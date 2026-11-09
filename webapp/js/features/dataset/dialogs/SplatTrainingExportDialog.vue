@@ -39,12 +39,9 @@
                 <small v-if="validation.errors.fileName" class="field-error">{{ validation.errors.fileName }}</small>
             </div>
 
-            <div v-if="running" class="progress-section">
-                <ProgressBar :value="percent" :show-value="true" />
-                <div class="progress-label">{{ phase || 'Working…' }}</div>
-            </div>
-
-            <PrimeMessage v-if="errorMessage" severity="error" :closable="false">{{ errorMessage }}</PrimeMessage>
+            <!-- The task: queued, exporting, failed with its reason (FR-XC-15) -->
+            <HeavyTaskStatus :task="exportTask" :error="errorMessage" label="Export" cancellable :cancelling="cancelling"
+                             @cancel="cancelHeavyTask($event, 'Splat training export')" />
 
             <PrimeMessage v-if="warnings.length" severity="warn" :closable="false">
                 <ul class="warnings" aria-label="Warnings of the export">
@@ -57,6 +54,7 @@
                 <a :href="resultUrl" :download="fileName || undefined">Download {{ fileName || 'the ZIP' }}</a>
             </PrimeMessage>
         </div>
+        <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
 
@@ -72,8 +70,11 @@ import Window from '@/components/HubWindow.vue';
 import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
-import ProgressBar from 'primevue/progressbar';
+import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
+import { useDialogs } from '@/composables/useDialogs';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
 import { notify } from '@/libs/notify';
 import { startFileDownload } from '@/features/viewers/splat/splatDownloads';
 import {
@@ -88,7 +89,9 @@ const props = defineProps({
 });
 const emit = defineEmits(['close']);
 
-const { runHeavyTask } = useHeavyTask();
+const { runHeavyTask, heavyTasks } = useHeavyTask();
+const dialogs = useDialogs();
+const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => props.dataset, dialogs);
 
 const path = trainingExportPath(props.file.entry);
 const folderLabel = path ?? 'the dataset';
@@ -103,8 +106,9 @@ const odmProject = ref(/** @type {boolean | null} */ (null));
 onMounted(async () => { odmProject.value = await looksLikeOdmProject(props.dataset, path); });
 
 const running = ref(false);
-const percent = ref(0);
-const phase = ref('');
+// The task of the latest submit (its state is read from heavyTasks) and the refusal of a submit with no task
+const exportTaskId = ref(/** @type {string | null} */ (null));
+const exportTask = computed(() => (exportTaskId.value ? heavyTasks.value[exportTaskId.value] ?? null : null));
 const warnings = ref(/** @type {string[]} */ ([]));
 const errorMessage = ref('');
 const taskId = ref(/** @type {string | null} */ (null));
@@ -117,26 +121,23 @@ async function start() {
     running.value = true;
     errorMessage.value = '';
     warnings.value = [];
-    percent.value = 0;
-    phase.value = 'Starting…';
+    exportTaskId.value = null;
     try {
         const result = await runHeavyTask(props.dataset, TRAINING_EXPORT_TOOL, {
             path: path ?? undefined,
             params,
             // No force: a second submit of the same export gets the running task (FR-PRC-02)
             notify: false,
-            onProgress: entry => {
-                percent.value = Math.max(0, Math.round(entry.percent ?? 0));
-                phase.value = entry.phase || '';
-                warnings.value = trainingWarnings(entry.logTail);
-            }
+            onSubmitted: entry => { exportTaskId.value = entry.taskId; },
+            onProgress: entry => { warnings.value = trainingWarnings(entry.logTail); }
         });
         warnings.value = trainingWarnings(result.logTail);
         taskId.value = result.taskId;
         notify.success('The training data is ready to download.', { summary: 'Export completed' });
     } catch (e) {
-        errorMessage.value = e instanceof Error ? e.message : String(e);
-        notify.error(e, { summary: 'Export failed', life: 'long' });
+        // The dialog is open: a failed task shows its reason in the status (not in a toast, FR-XC-11); a refusal of
+        // the submit has no task
+        if (!(/** @type {any} */ (e))?.task) errorMessage.value = e instanceof Error ? e.message : String(e);
     } finally {
         running.value = false;
     }
@@ -173,13 +174,6 @@ function download() {
 .field-error {
     color: var(--p-red-500);
     font-size: 0.8rem;
-}
-
-.progress-label {
-    margin-top: 0.4rem;
-    font-size: 0.85rem;
-    color: var(--p-text-muted-color);
-    text-align: center;
 }
 
 .warnings {

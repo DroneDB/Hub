@@ -35,6 +35,9 @@ export const DATASET_GONE_MESSAGE = 'The dataset was deleted.';
  * @property {boolean} [force] Bypass dedup
  * @property {number} [pollMs] Poll interval (ms)
  * @property {(entry: object) => void} [onProgress] Called with the live task entry on each poll
+ * @property {(entry: any) => void} [onSubmitted] Called once with the entry (state Enqueued, or Reused) as soon as the
+ *   Registry answers the submit, before the first poll: a dialog shows "Queued" from then on, reading
+ *   `heavyTasks.value[entry.taskId]` (HeavyTaskStatus, FR-XC-15)
  * @property {boolean} [notify] Show a toast on the terminal state (default true)
  */
 
@@ -141,6 +144,9 @@ export function useHeavyTask() {
                         // Why it failed: the server's message, or only the exception type of a task that
                         // failed before the server kept messages
                         error: summary.error || summary.errorType || null,
+                        // A processing node holds the task in its queue (D-024); who cancelled it (D-038)
+                        waitingForNode: summary.waitingForNode === true,
+                        cancelledBy: summary.cancelledBy ?? null,
                         artifact: null, // not in the summary; fetched on the terminal state
                         createdAt: summary.createdAt,
                         startedAt: summary.startedAt,
@@ -156,8 +162,12 @@ export function useHeavyTask() {
                         endTask(taskId);
                         try {
                             const full = await dataset.getTask(taskId);
-                            entry.error = full.error || null;
-                            entry.artifact = full.artifact || null;
+                            // Through the reactive entry: a write to the raw object would not re-render the status
+                            const live = heavyTasks.value[taskId] || entry;
+                            live.error = full.error || live.error || null;
+                            live.artifact = full.artifact || null;
+                            entry.error = live.error;
+                            entry.artifact = live.artifact;
                         } catch { /* best-effort */ }
                         if (disposed) return;
 
@@ -207,7 +217,7 @@ export function useHeavyTask() {
         if (submit && submit.error) throw new Error(submit.error);
 
         const taskId = submit.taskId;
-        setTask(taskId, {
+        const submitted = {
             taskId,
             toolId: submit.toolId || toolId,
             version: submit.version,
@@ -219,7 +229,11 @@ export function useHeavyTask() {
             error: null,
             artifact: null,
             deduplicated: !!submit.deduplicated
-        });
+        };
+        setTask(taskId, submitted);
+        if (typeof options.onSubmitted === 'function') {
+            try { options.onSubmitted(submitted); } catch { /* the caller's callback must not break the run */ }
+        }
         return poll(dataset, taskId, options);
     }
 

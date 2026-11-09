@@ -58,35 +58,22 @@
                     {{ validationResult.warnings.join('; ') }}
                 </div>
                 <div v-else class="result-msg ok">
-                    Compatible - Overlap: {{ fmt(validationResult.summary && validationResult.summary.overlapPercent, 1) }}%,
-                    GSD {{ fmt(validationResult.summary && validationResult.summary.sourceGsdM, 3) }} m
+                    Compatible - Overlap: {{ formatNumber(validationResult.summary && validationResult.summary.overlapPercent, 1) }}%,
+                    GSD {{ formatNumber(validationResult.summary && validationResult.summary.sourceGsdM, 3) }} m
                 </div>
             </div>
 
-            <!-- Align task progress -->
-            <div v-if="alignTaskId" class="task-row" :class="alignTaskState">
-                <i :class="taskIcon(alignTaskState)" />
-                <span class="task-label">Align</span>
-                <span class="task-phase">{{ alignPhase || alignTaskState }}</span>
-                <span v-if="alignPct !== null" class="task-pct">{{ alignPct }}%</span>
-            </div>
+            <!-- The two tasks: the align and the build of its output, each with its real state (FR-XC-15) -->
+            <HeavyTaskStatus :task="alignTask" label="Align" cancellable :cancelling="cancelling" @cancel="cancelHeavyTask($event, 'Align GeoTIFF')" />
+            <HeavyTaskStatus :task="buildTask" label="Build" cancellable :cancelling="cancelling" @cancel="cancelHeavyTask($event, 'Build')" />
 
-            <!-- Build task progress -->
-            <div v-if="buildTaskId" class="task-row" :class="buildTaskState">
-                <i :class="taskIcon(buildTaskState)" />
-                <span class="task-label">Build</span>
-                <span class="task-phase">{{ buildPhase || buildTaskState }}</span>
-                <span v-if="buildPct !== null" class="task-pct">{{ buildPct }}%</span>
-            </div>
-
-            <!-- Align result (parsed from log tail) -->
-            <div v-if="alignResult" class="result-msg ok">
-                Aligned - tx={{ fmt(alignResult.tx, 3) }} m,
-                ty={{ fmt(alignResult.ty, 3) }} m,
-                θ={{ fmt(alignResult.thetaDeg, 3) }}°,
-                s={{ fmt(alignResult.scale, 5) }},
-                conf={{ fmt(alignResult.confidence, 2) }}
+            <!-- Align result (parsed from the log tail): stays until the user closes the window (FR-PRC-11) -->
+            <div v-if="alignResult" ref="resultBox" class="result-msg ok" data-testid="align-result">
+                Aligned - {{ resultText }}
                 <span v-if="alignResult.warning"> - {{ alignResult.warning }}</span>
+            </div>
+            <div v-if="done" class="result-msg ok" data-testid="align-done">
+                Output saved as {{ writtenPath }}
             </div>
 
             <!-- Error -->
@@ -98,6 +85,8 @@
                         :disabled="!selectedReference || validating || running" @click="validate" />
                 <Button label="Align" icon="fa-solid fa-crosshairs" severity="primary"
                         :disabled="!canAlign" :loading="running" @click="startAlign" />
+                <Button v-if="done" label="Open on map" icon="fa-solid fa-map" severity="secondary"
+                        @click="$emit('close', 'map', { outputPath: writtenPath })" />
                 <Button label="Close" severity="secondary" :disabled="running" @click="$emit('close', 'close')" />
             </div>
         </div>
@@ -107,6 +96,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import ddb from 'ddb';
 import Window    from '@/components/HubWindow.vue';
@@ -116,33 +106,43 @@ import Select    from 'primevue/select';
 import PrimeMessage from 'primevue/message';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useDialogs } from '@/composables/useDialogs';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
 import {
     useConfirmReplace, replaceConflictPath, conflictIsFolder, existingItem, namesInFolder
 } from '@/composables/useConfirmReplace';
 import { freeName, namesClash, nameClashMessage } from '@/libs/nameRules';
 import { DOCS } from '@/libs/docsLinks';
+import { formatNumber } from '@/libs/format';
+import { formatAlignResult } from '@/libs/dataset/alignResult';
 
 /**
- * One click starts one task (FR-PRC-02): the form is busy from the click until the tasks end. The
+ * One click starts one task (FR-PRC-02): the form is busy from the click until the tasks end. The align and the
+ * build of its output show their state through HeavyTaskStatus, read from useHeavyTask (FR-XC-15). When both are
+ * done the window stays open with the result (tx, ty, rotation, scale, confidence): it emits `aligned` (the page
+ * refreshes its list and says the numbers in a toast) and closes only on Close or Open on map (FR-PRC-11). The
  * proposed output is a free name of the source's folder (FR-PRC-04); a name that exists is replaced
  * only after the user confirmed it (overwrite: true), also when the Registry finds it at the submit
  * (409 with conflictPath).
  */
 export default {
     name: 'AlignDialog',
-    components: { Window, Button, InputText, Select, PrimeMessage, LoadingSpinner, DialogHost },
+    components: { Window, Button, InputText, Select, PrimeMessage, LoadingSpinner, DialogHost, HeavyTaskStatus },
 
     props: {
         sourceEntry: { type: Object, required: true },
         dataset:     { type: Object, required: true },
         allEntries:  { type: Array,  required: true }
     },
-    emits: ['close'],
+    emits: ['close', 'aligned'],
 
-    setup() {
-        const { runHeavyTask } = useHeavyTask();
+    setup(props) {
+        const { runHeavyTask, heavyTasks } = useHeavyTask();
         const dialogs = useDialogs();
-        return { runHeavyTask, docsLink: DOCS.alignRaster, dialogs, confirmReplace: useConfirmReplace(dialogs) };
+        const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => props.dataset, dialogs);
+        return {
+            runHeavyTask, heavyTasks, formatNumber, docsLink: DOCS.alignRaster, dialogs, confirmReplace: useConfirmReplace(dialogs),
+            cancelHeavyTask, cancelling
+        };
     },
     data() {
         const stem = (this.sourceEntry?.entry?.path ?? 'output').replace(/\.tiff?$/i, '');
@@ -163,14 +163,12 @@ export default {
             validationResult: null,
 
             running:        false,
+            // The tasks of the latest run: their state is read from heavyTasks, never copied
             alignTaskId:    null,
-            alignTaskState: null,
-            alignPhase:     null,
-            alignPct:       null,
             buildTaskId:    null,
-            buildTaskState: null,
-            buildPhase:     null,
-            buildPct:       null,
+            // Both tasks ended: the result stays until the user closes the window
+            done:           false,
+            writtenPath:    null,
 
             alignResult: null,
             errorMsg:    null
@@ -178,6 +176,15 @@ export default {
     },
 
     computed: {
+        alignTask() {
+            return this.alignTaskId ? this.heavyTasks[this.alignTaskId] ?? null : null;
+        },
+        buildTask() {
+            return this.buildTaskId ? this.heavyTasks[this.buildTaskId] ?? null : null;
+        },
+        resultText() {
+            return formatAlignResult(this.alignResult);
+        },
         referenceOptions() {
             const srcPath = this.sourceEntry.entry.path;
             return this.allEntries
@@ -219,22 +226,19 @@ export default {
     },
 
     methods: {
-        fmt(v, digits) {
-            return typeof v === 'number' ? v.toFixed(digits) : '-';
-        },
-
-        taskIcon(state) {
-            if (!state || state === 'Enqueued' || state === 'Reused') return 'fa-solid fa-clock';
-            if (state === 'Processing') return 'fa-solid fa-spinner fa-spin';
-            if (state === 'Succeeded') return 'fa-solid fa-check';
-            if (state === 'Failed')    return 'fa-solid fa-xmark';
-            return 'fa-solid fa-clock';
+        /** Forgets the result and the tasks of the previous run */
+        clearRun() {
+            this.alignResult = null;
+            this.errorMsg    = null;
+            this.alignTaskId = null;
+            this.buildTaskId = null;
+            this.done        = false;
+            this.writtenPath = null;
         },
 
         onReferenceChange() {
             this.validationResult = null;
-            this.alignResult      = null;
-            this.errorMsg         = null;
+            this.clearRun();
         },
 
         validateOutputName() {
@@ -249,8 +253,7 @@ export default {
         async validate() {
             this.validating       = true;
             this.validationResult = null;
-            this.alignResult      = null;
-            this.errorMsg         = null;
+            this.clearRun();
             try {
                 const result = await this.dataset.validateAlignRaster(
                     this.sourceEntry.entry.path, this.selectedReference);
@@ -288,21 +291,15 @@ export default {
                     overwrite
                 },
                 notify: false,
-                onProgress: (entry) => {
-                    this.alignTaskId    = entry.taskId;
-                    this.alignTaskState = entry.state;
-                    this.alignPhase     = entry.phase;
-                    this.alignPct       = entry.percent ?? null;
-                }
+                onSubmitted: entry => { this.alignTaskId = entry.taskId; }
             });
         },
 
         async startAlign() {
             // Busy before the first await: a second click finds it set
             if (this.running || !this.canAlign) return;
-            this.running     = true;
-            this.errorMsg    = null;
-            this.alignResult = null;
+            this.running = true;
+            this.clearRun();
 
             const requested = this.outputPath;
             // The path written: a replaced file keeps its own (the Registry writes the existing entry, D-040)
@@ -334,49 +331,37 @@ export default {
                     alignEntry = await this.submitAlign(requested, true);
                     outputPath = conflict;
                 }
-                this.alignTaskId    = alignEntry.taskId;
-                this.alignTaskState = alignEntry.state;
-                this.alignPhase     = alignEntry.phase;
-                this.alignPct       = 100;
-                this.alignResult    = this._extractResultFromLog(alignEntry.logTail);
+                this.alignResult = this._extractResultFromLog(alignEntry.logTail);
+                // The result is there while the build still runs: bring it into view now, not when the build ends
+                if (this.alignResult) this.$nextTick(() => this.$refs.resultBox?.scrollIntoView?.({ block: 'nearest' }));
             } catch (e) {
-                this.alignTaskState = 'Failed';
-                this.errorMsg       = e?.message ?? String(e);
-                this.running        = false;
+                // A failed task shows its own reason in its row; a refusal of the submit has no task
+                if (!e?.task) this.errorMsg = e?.message ?? String(e);
+                this.running = false;
                 return;
             }
 
             // ── Step 2: build task (separate, consequence of the add) ──────────
             try {
-                const buildEntry = await this.runHeavyTask(this.dataset, 'build', {
+                await this.runHeavyTask(this.dataset, 'build', {
                     path:   outputPath,
                     params: { path: outputPath, force: false },
                     force:  false,
                     notify: false,
-                    onProgress: (entry) => {
-                        this.buildTaskId    = entry.taskId;
-                        this.buildTaskState = entry.state;
-                        this.buildPhase     = entry.phase;
-                        this.buildPct       = entry.percent ?? null;
-                    }
+                    onSubmitted: entry => { this.buildTaskId = entry.taskId; }
                 });
-                this.buildTaskId    = buildEntry.taskId;
-                this.buildTaskState = buildEntry.state;
-                this.buildPhase     = buildEntry.phase;
-                this.buildPct       = 100;
             } catch (e) {
-                this.buildTaskState = 'Failed';
-                // Build failure is non-blocking: aligned file is already indexed.
-                if (!this.errorMsg)
-                    this.errorMsg = `Alignment complete but build failed: ${e?.message ?? String(e)}`;
-            } finally {
-                this.running = false;
+                // Build failure is non-blocking: aligned file is already indexed. Its row shows the reason of a failed
+                // task; a build that could not be submitted has no row
+                if (!e?.task) this.errorMsg = `Alignment complete but the build could not start: ${e?.message ?? String(e)}`;
             }
 
-            // Notify parent to refresh file browser
-            if (this.alignTaskState === 'Succeeded') {
-                this.$emit('close', 'aligned', { outputPath });
-            }
+            // The output exists: the window stays open with the result until the user closes it (FR-PRC-11), and
+            // the page refreshes its list
+            this.writtenPath = outputPath;
+            this.done        = true;
+            this.running     = false;
+            this.$emit('aligned', { outputPath, result: this.alignResult });
         },
 
     }
@@ -442,24 +427,6 @@ export default {
 .result-msg.ok    { background: var(--p-green-50); color: var(--p-green-900); }
 .result-msg.warn  { background: var(--p-yellow-50); color: var(--p-yellow-900); }
 .result-msg.error { background: var(--p-red-50); color: var(--p-red-900); }
-
-.task-row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.4rem 0.6rem;
-    border-radius: 0.375rem;
-    margin: 0.3rem 0;
-    font-size: 0.88rem;
-    background: var(--p-surface-100);
-}
-.task-row.Succeeded { background: var(--p-green-50); }
-.task-row.Failed    { background: var(--p-red-50);   }
-.task-row.Processing{ background: var(--ddb-primary-50); }
-
-.task-label { font-weight: 600; min-width: 45px; }
-.task-phase { flex: 1; color: var(--p-text-muted-color); }
-.task-pct   { font-variant-numeric: tabular-nums; }
 
 .actions {
     display: flex;

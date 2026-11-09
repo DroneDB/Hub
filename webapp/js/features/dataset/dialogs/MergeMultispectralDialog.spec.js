@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import ddb from 'ddb';
@@ -14,11 +15,17 @@ import MergeMultispectralDialog from './MergeMultispectralDialog.vue';
 import { ApiError } from '@/libs/ddb/apiError';
 
 const runHeavyTask = vi.fn();
-vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask }) }));
+const heavyTasks = ref({});
+vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask, heavyTasks }) }));
 const confirmReplace = vi.fn();
 vi.mock('@/composables/useConfirmReplace', async importOriginal => ({
     ...(await importOriginal()), useConfirmReplace: () => confirmReplace
 }));
+
+// The cancel question and what it reaches: answered by the test, the poller not asked
+const confirmCancel = vi.fn();
+vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
 
 const BANDS = ['IMG_0001_1.tif', 'IMG_0001_2.tif', 'IMG_0001_3.tif'];
 
@@ -244,6 +251,7 @@ describe('MergeMultispectralDialog submit', () => {
     beforeEach(() => {
         runHeavyTask.mockReset();
         confirmReplace.mockReset();
+        heavyTasks.value = {};
     });
 
     it('starts one task on a double click, without force, and is busy while it runs', async () => {
@@ -337,7 +345,7 @@ describe('MergeMultispectralDialog submit', () => {
 
         expect(confirmReplace).not.toHaveBeenCalled();
         expect(runHeavyTask).toHaveBeenCalledOnce();
-        expect(w.find('.validation-errors').text()).toContain("A file or folder named 'IMG_0001_merged.tif' already exists in this folder");
+        expect(w.find('[data-testid="heavy-task-error"]').text()).toContain("A file or folder named 'IMG_0001_merged.tif' already exists in this folder");
     });
 
     it('asks once when the Registry finds the file at the submit (409 conflictPath), then resubmits with overwrite', async () => {
@@ -365,7 +373,7 @@ describe('MergeMultispectralDialog submit', () => {
         await flushPromises();
 
         expect(runHeavyTask).toHaveBeenCalledTimes(2);
-        expect(w.find('.validation-errors').text()).toContain("A file or folder named 'IMG_0001_merged.tif' already exists in this folder");
+        expect(w.find('[data-testid="heavy-task-error"]').text()).toContain("A file or folder named 'IMG_0001_merged.tif' already exists in this folder");
         expect(w.emitted('close')).toBeUndefined();
     });
 
@@ -389,13 +397,177 @@ describe('MergeMultispectralDialog submit', () => {
 
         await mergeButton(w).trigger('click');
         await flushPromises();
-        expect(w.find('.validation-errors').text()).toContain('Another task writes this output');
+        expect(w.find('[data-testid="heavy-task-error"]').text()).toContain('Another task writes this output');
 
         await w.vm.validate();
         await mergeButton(w).trigger('click');
         await flushPromises();
-        expect(w.find('.validation-errors').text()).toContain('The dataset is busy: try again');
+        expect(w.find('[data-testid="heavy-task-error"]').text()).toContain('The dataset is busy: try again');
         expect(confirmReplace).not.toHaveBeenCalled();
         expect(runHeavyTask).toHaveBeenCalledTimes(2);
     });
+});
+
+
+// ---- The task state and the busy lock (FR-PRC-13, FR-XC-15, FR-XC-11) -----------------------------------
+
+describe('MergeMultispectralDialog task status', () => {
+    beforeEach(() => {
+        runHeavyTask.mockReset();
+        confirmReplace.mockReset();
+        heavyTasks.value = {};
+    });
+
+    /** A submit that stays running: the entry is the one useHeavyTask keeps for the task */
+    function running(entry) {
+        runHeavyTask.mockImplementation((_dataset, _tool, options) => {
+            heavyTasks.value = { t1: { taskId: 't1', percent: 0, phase: null, error: null, ...entry } };
+            options.onSubmitted({ taskId: 't1' });
+            return new Promise(() => {});
+        });
+    }
+    const status = w => w.find('[data-testid="heavy-task-status"]');
+
+    it('shows nothing before the first submit', async () => {
+        expect(status(await openForSubmit()).exists()).toBe(false);
+    });
+
+    it('shows the task as queued, then merging with the percent, and disables the controls while it runs', async () => {
+        running({ state: 'Enqueued' });
+        const w = await openForSubmit();
+        await mergeButton(w).trigger('click');
+        await flushPromises();
+
+        expect(status(w).text()).toContain('Merge');
+        expect(status(w).text()).toContain('Queued…');
+        expect(w.findComponent(WindowStub).props('busy')).toBe(true);
+        expect(mergeButton(w).element.disabled).toBe(true);
+        expect(w.findAll('button').find(b => b.text() === 'Cancel').element.disabled).toBe(true);
+        expect(w.findAll('.band-move button').every(b => b.element.disabled)).toBe(true);
+        expect(w.findAll('.band-item').every(li => li.attributes('draggable') === 'false')).toBe(true);
+        expect(w.find('#deleteSrcCheckbox').element.disabled).toBe(true);
+        expect(output(w).element.disabled).toBe(true);
+
+        // The row follows the live entry, not a copy made at the submit
+        heavyTasks.value = { t1: { ...heavyTasks.value.t1, state: 'Processing', phase: 'Merging bands', percent: 42 } };
+        await flushPromises();
+        expect(status(w).text()).toContain('Merging bands');
+        expect(status(w).text()).toContain('42%');
+        expect(status(w).find('[role="progressbar"]').exists()).toBe(true);
+    });
+
+    it('shows a task that a processing node holds as queued', async () => {
+        running({ state: 'Processing', waitingForNode: true, percent: 0 });
+        const w = await openForSubmit();
+        await mergeButton(w).trigger('click');
+        await flushPromises();
+
+        expect(status(w).text()).toContain('Queued…');
+        expect(status(w).attributes('title')).toContain('Queued on node');
+    });
+
+    it('shows the reason of a failed task in the status, not in the validation area, and frees the controls', async () => {
+        runHeavyTask.mockImplementation((_dataset, _tool, options) => {
+            const entry = { taskId: 't1', state: 'Failed', percent: 100, error: 'The output is one of the source bands' };
+            heavyTasks.value = { t1: entry };
+            options.onSubmitted({ taskId: 't1' });
+            return Promise.reject(Object.assign(new Error(entry.error), { task: entry }));
+        });
+        const w = await openForSubmit();
+        await mergeButton(w).trigger('click');
+        await flushPromises();
+
+        expect(status(w).text()).toContain('Failed');
+        expect(status(w).text()).toContain('The output is one of the source bands');
+        // A failed task shows no full progress bar
+        expect(status(w).text()).not.toContain('100%');
+        expect(status(w).find('[role="progressbar"]').exists()).toBe(false);
+        expect(w.find('.validation-errors').exists()).toBe(false);
+        expect(w.findComponent(WindowStub).props('busy')).toBe(false);
+        expect(w.emitted('close')).toBeUndefined();
+        expect(mergeButton(w).element.disabled).toBe(false);
+        expect(w.findAll('.band-move button').some(b => b.element.disabled === false)).toBe(true);
+    });
+
+    it('clears the failure of the previous run when the user merges again', async () => {
+        runHeavyTask.mockRejectedValueOnce(new ApiError('The dataset is busy: try again', 503));
+        const w = await openForSubmit();
+        await mergeButton(w).trigger('click');
+        await flushPromises();
+        expect(status(w).text()).toContain('The dataset is busy: try again');
+
+        running({ state: 'Enqueued' });
+        await mergeButton(w).trigger('click');
+        await flushPromises();
+        expect(status(w).text()).not.toContain('The dataset is busy');
+        expect(status(w).text()).toContain('Queued…');
+    });
+});
+
+// ---- Cancel of a task that waits for a node or runs (FR-PRC-10, FR-XC-15) --------------------------------
+
+describe('MergeMultispectralDialog cancel', () => {
+    beforeEach(() => {
+        runHeavyTask.mockReset();
+        confirmCancel.mockReset();
+        heavyTasks.value = {};
+    });
+
+    /** A run that stays queued, and its end: what the poller does when the task is cancelled */
+    function queued() {
+        let end;
+        runHeavyTask.mockImplementation((_dataset, _tool, options) => new Promise((_resolve, reject) => {
+            heavyTasks.value = { t1: { taskId: 't1', toolId: 'merge-multispectral', state: 'Processing', waitingForNode: true, percent: 0 } };
+            options.onSubmitted({ taskId: 't1' });
+            end = () => {
+                const entry = { taskId: 't1', state: 'Deleted', cancelledBy: 'ann', percent: 0 };
+                heavyTasks.value = { t1: entry };
+                reject(Object.assign(new Error('Task Deleted'), { task: entry }));
+            };
+        }));
+        return () => end();
+    }
+    const cancelButton = w => w.find('[data-testid="heavy-task-cancel"]');
+
+    async function startMerge() {
+        const end = queued();
+        const w = await openForSubmit();
+        w.props('dataset').cancelTask = vi.fn().mockResolvedValue({ deleted: true });
+        await mergeButton(w).trigger('click');
+        await flushPromises();
+        return { w, end };
+    }
+
+    it('offers Cancel on a busy dialog whose task waits for a node, asks, cancels the task and unlocks when it ends', async () => {
+        confirmCancel.mockResolvedValue(true);
+        const { w, end } = await startMerge();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(true);
+        expect(w.find('[data-testid="heavy-task-status"]').text()).toContain('Queued…');
+
+        await cancelButton(w).trigger('click');
+        await flushPromises();
+
+        expect(confirmCancel).toHaveBeenCalledOnce();
+        expect(confirmCancel.mock.calls[0][0]).toMatchObject({ title: 'Cancel Task', danger: true });
+        expect(confirmCancel.mock.calls[0][0].message).toContain('Merge multispectral');
+        expect(w.props('dataset').cancelTask).toHaveBeenCalledWith('t1');
+
+        end();
+        await flushPromises();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(false);
+        expect(mergeButton(w).element.disabled).toBe(false);
+        expect(w.find('[data-testid="heavy-task-status"]').text()).toContain('Cancelled');
+        expect(cancelButton(w).exists()).toBe(false);
+    });
+
+    it('cancels nothing when the user does not confirm, and the dialog stays busy', async () => {
+        confirmCancel.mockResolvedValue(false);
+        const { w } = await startMerge();
+        await cancelButton(w).trigger('click');
+        await flushPromises();
+        expect(w.props('dataset').cancelTask).not.toHaveBeenCalled();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(true);
+        expect(cancelButton(w).exists()).toBe(true);
+    });
+
 });

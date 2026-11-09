@@ -21,6 +21,7 @@ import { itemFor } from '@/libs/dataset/explorerItems';
 import { CONFIRM_RESCAN, CONFIRM_REBUILD, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { transferModeFor } from '@/libs/dataset/transferMode';
+import { formatAlignResult } from '@/libs/dataset/alignResult';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import { useConfirmReplace } from '@/composables/useConfirmReplace';
@@ -366,10 +367,29 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         if (!entry) return;
         dialogs.open(AlignDialog, () => ({
             sourceEntry: entry, dataset, allEntries: listing.files.value,
-            onClose: async (action, result) => {
-                if (action !== 'aligned' || !result || !result.outputPath) return;
-                notify.success(`Output saved as ${result.outputPath}`, { summary: 'Alignment complete', life: 'long' });
+            // The window stays open with the result until the user closes it (FR-PRC-11): the page refreshes its
+            // list and says the numbers when the align is done, and opens the output on the map when asked
+            onAligned: async result => {
+                if (!result || !result.outputPath) return;
+                const numbers = formatAlignResult(result.result);
+                notify.success(`Output saved as ${result.outputPath}${numbers ? ` (${numbers})` : ''}`, { summary: 'Alignment complete', life: 'long' });
                 await listing.addEntry(result.outputPath).catch(e => console.warn('Could not refresh file browser after align:', e));
+            },
+            onClose: async (action, result) => {
+                if (action !== 'map' || !result || !result.outputPath) return;
+                // The output is in the list in view, else the Registry is asked; no answer (a failed read, or no such
+                // entry) is said in words, not as the TypeError of a missing entry
+                const entry = listing.files.value.find(f => f.entry.path === result.outputPath)?.entry
+                    ?? await dataset.listOne(result.outputPath).catch(() => null);
+                if (!entry) {
+                    showError(`The aligned file ${result.outputPath} could not be found in the dataset. Refresh the file list and open it from there.`, 'Open on map');
+                    return;
+                }
+                try {
+                    openItem({ label: pathutils.basename(entry.path), entry, path: dataset.remoteUri(entry.path) });
+                } catch (e) {
+                    showError(e, 'Open on map');
+                }
             }
         }));
     }

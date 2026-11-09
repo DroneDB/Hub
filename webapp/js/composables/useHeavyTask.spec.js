@@ -6,7 +6,7 @@
  * - a task whose dataset is deleted (404) settles once, with "The dataset was deleted."
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { effectScope } from 'vue';
+import { effectScope, watch } from 'vue';
 import { useHeavyTask } from './useHeavyTask';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { ApiError } from '@/libs/ddb/apiError';
@@ -113,6 +113,29 @@ describe('terminal state', () => {
 
         await expect(result).rejects.toThrow(message);
         expect(seen[0]).toBe(message);
+        host.$unmount();
+    });
+
+    it('puts the full error text of the task read on the reactive entry, so a status that shows it updates', async () => {
+        const full = 'The raster could not be opened: the file is truncated after 1048576 bytes';
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'build', state: 'Failed', errorType: 'DdbException', error: null }]),
+            getTask: vi.fn(async () => ({ error: full, artifact: null })),
+        });
+        const host = makeHost();
+        // What a dialog reads: a watcher runs again only when the write goes through the reactive entry
+        const shown = [];
+        const scope = effectScope();
+        scope.run(() => watch(() => host.heavyTasks.value.t1?.error, error => shown.push(error), { flush: 'sync' }));
+
+        const result = host.trackHeavyTask(dataset, 't1', { notify: false });
+        result.catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).rejects.toMatchObject({ message: full });
+        expect(host.heavyTasks.value.t1.error).toBe(full);
+        expect(shown).toEqual([null, 'DdbException', full]);
+        scope.stop();
         host.$unmount();
     });
 
@@ -237,5 +260,61 @@ describe('a dataset deleted while its task runs (FR-UPL-05, D-004)', () => {
         expect(settled).not.toHaveBeenCalled();
         host.$unmount();
         log.mockRestore();
+    });
+});
+
+describe('what a dialog reads of a task (FR-XC-15)', () => {
+    it('tells the caller the task as soon as the submit is answered, before the first poll', async () => {
+        const dataset = makeDataset({
+            submitTask: vi.fn(async () => ({ taskId: 't1', toolId: 'merge-multispectral' })),
+            // Never listed yet: the poll waits
+            getTasks: vi.fn(async () => []),
+        });
+        const host = makeHost();
+        const submitted = vi.fn();
+
+        host.runHeavyTask(dataset, 'merge-multispectral', { notify: false, onSubmitted: submitted }).catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(submitted).toHaveBeenCalledOnce();
+        expect(submitted.mock.calls[0][0]).toMatchObject({ taskId: 't1', toolId: 'merge-multispectral', state: 'Enqueued', percent: 0 });
+        expect(host.heavyTasks.value.t1).toMatchObject({ state: 'Enqueued' });
+        host.$unmount();
+    });
+
+    it('does not let a failing onSubmitted break the run', async () => {
+        const dataset = makeDataset({
+            submitTask: vi.fn(async () => ({ taskId: 't1' })),
+            getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'x', state: 'Succeeded' }]),
+        });
+        const host = makeHost();
+
+        const result = host.runHeavyTask(dataset, 'x', { notify: false, onSubmitted: () => { throw new Error('boom'); } });
+        await vi.advanceTimersByTimeAsync(0);
+        await expect(result).resolves.toMatchObject({ taskId: 't1', state: 'Succeeded' });
+    });
+
+    it('carries the node wait and the canceller of the task into the live entry', async () => {
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'x', state: 'Processing', waitingForNode: true, cancelledBy: 'ann' }]),
+        });
+        const host = makeHost();
+
+        host.trackHeavyTask(dataset, 't1', { notify: false }).catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(host.heavyTasks.value.t1).toMatchObject({ waitingForNode: true, cancelledBy: 'ann', state: 'Processing' });
+        host.$unmount();
+    });
+
+    it('reads a summary without the flags as not waiting', async () => {
+        const dataset = makeDataset({ getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'x', state: 'Processing' }]) });
+        const host = makeHost();
+
+        host.trackHeavyTask(dataset, 't1', { notify: false }).catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(host.heavyTasks.value.t1).toMatchObject({ waitingForNode: false, cancelledBy: null });
+        host.$unmount();
     });
 });

@@ -10,7 +10,7 @@
                         <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- dragging is the mouse way; the arrow buttons are the keyboard way -->
                         <li v-for="(item, index) in orderedFiles" :key="item.entry.path"
                             class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
-                            draggable="true"
+                            :draggable="!submitting"
                             @dragstart="onDragStart(index, $event)"
                             @dragover.prevent="onDragOver(index)"
                             @dragleave="onDragLeave"
@@ -25,10 +25,10 @@
                             </span>
                             <span class="band-move">
                                 <Button icon="fa-solid fa-arrow-up" text rounded size="small" severity="secondary"
-                                        :aria-label="`Move ${item.label} up`" :disabled="index === 0"
+                                        :aria-label="`Move ${item.label} up`" :disabled="submitting || index === 0"
                                         @click="moveBand(index, index - 1)" />
                                 <Button icon="fa-solid fa-arrow-down" text rounded size="small" severity="secondary"
-                                        :aria-label="`Move ${item.label} down`" :disabled="index === orderedFiles.length - 1"
+                                        :aria-label="`Move ${item.label} down`" :disabled="submitting || index === orderedFiles.length - 1"
                                         @click="moveBand(index, index + 1)" />
                             </span>
                         </li>
@@ -115,6 +115,10 @@
                     <Button :disabled="!canMerge" :loading="submitting" severity="primary" label="Merge" @click="merge" />
                 </div>
             </div>
+
+            <!-- The task: queued, merging, failed with its reason (FR-PRC-13) -->
+            <HeavyTaskStatus class="merge-task" :task="mergeTask" :error="mergeError" label="Merge" cancellable :cancelling="cancelling"
+                             @cancel="cancelHeavyTask($event, 'Merge multispectral')" />
         </div>
         <Window v-if="previewOpen && previewUrl" title="Merge preview" modal width="1100px" height="auto" close-button cancel-label="Close"
                 @close="previewOpen = false">
@@ -131,8 +135,10 @@ import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
+import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useDialogs } from '@/composables/useDialogs';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
 import {
     useConfirmReplace, replaceConflictPath, conflictIsFolder, existingItem, namesInFolder
 } from '@/composables/useConfirmReplace';
@@ -160,7 +166,7 @@ const PREVIEW_MAX_PX = 1024;
  * itself (deleteSources), once the output is written and opens.
  */
 export default {
-    components: { Window, Button, InputText, Checkbox, LoadingSpinner, DialogHost },
+    components: { Window, Button, InputText, Checkbox, LoadingSpinner, DialogHost, HeavyTaskStatus },
     props: {
         files: { type: Array, required: true },
         dataset: { type: Object, required: true },
@@ -169,10 +175,11 @@ export default {
     },
     emits: ['close'],
 
-    setup() {
-        const { runHeavyTask } = useHeavyTask();
+    setup(props) {
+        const { runHeavyTask, heavyTasks } = useHeavyTask();
         const dialogs = useDialogs();
-        return { runHeavyTask, dialogs, confirmReplace: useConfirmReplace(dialogs) };
+        const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => props.dataset, dialogs);
+        return { runHeavyTask, heavyTasks, dialogs, confirmReplace: useConfirmReplace(dialogs), cancelHeavyTask, cancelling };
     },
     data() {
         return {
@@ -189,12 +196,19 @@ export default {
             deleteSource: false,
             bandInfo: {},
             submitting: false,
+            // The task of the latest submit (its state is read from heavyTasks, not copied) and the refusal of
+            // a submit that started none
+            mergeTaskId: null,
+            mergeError: '',
             // The number of the latest check (validate): the answers of the older ones are ignored
             validationRequest: 0
         };
     },
 
     computed: {
+        mergeTask() {
+            return this.mergeTaskId ? this.heavyTasks[this.mergeTaskId] ?? null : null;
+        },
         outputPath() {
             return this.outputName.trim();
         },
@@ -417,6 +431,8 @@ export default {
             // Busy before the first await: a second click finds it set
             if (this.submitting || !this.canMerge) return;
             this.submitting = true;
+            this.mergeTaskId = null;
+            this.mergeError = '';
 
             try {
                 const paths = this.orderedFiles.map(f => f.entry.path);
@@ -435,7 +451,8 @@ export default {
                 // Offloaded to the merge-multispectral heavy task (progress visible in
                 // the Tasks tab). Awaits completion so the file listing can refresh.
                 const submit = replace => this.runHeavyTask(this.dataset, 'merge-multispectral', {
-                    params: { paths, outputPath, overwrite: replace, deleteSources }, notify: false
+                    params: { paths, outputPath, overwrite: replace, deleteSources }, notify: false,
+                    onSubmitted: entry => { this.mergeTaskId = entry.taskId; }
                 });
                 try {
                     await submit(overwrite);
@@ -452,7 +469,8 @@ export default {
                 const sourceNames = paths.map(p => pathutils.basename(p));
                 this.$emit('close', 'merged', { outputPath: written, deleteSource: deleteSources, sourceNames, sourcePaths: paths });
             } catch (e) {
-                this.validationResult = { ok: false, errors: [e.message || 'Merge failed'], warnings: [] };
+                // A failed task shows its own reason in the status; a refusal of the submit has no task
+                if (!e?.task) this.mergeError = e?.message || 'Merge failed';
             } finally {
                 this.submitting = false;
             }

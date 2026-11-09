@@ -3,11 +3,6 @@
         <div class="extract-dialog">
             <form @submit.prevent>
 
-                <!-- Error Message -->
-                <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
-                    {{ errorMessage }}
-                </PrimeMessage>
-
                 <!-- Archive Info -->
                 <PrimeMessage severity="info" :closable="false">
                     <strong>Archive:</strong> {{ archiveName }}
@@ -46,11 +41,9 @@
                     </div>
                 </div>
 
-                <!-- Progress Bar -->
-                <div v-if="isExtracting" class="progress-section">
-                    <ProgressBar :value="progress" :show-value="true" />
-                    <div class="progress-label">{{ statusMessage }}</div>
-                </div>
+                <!-- The task: queued, extracting, failed with its reason (FR-XC-15) -->
+                <HeavyTaskStatus :task="extractTask" :error="errorMessage" label="Extract" :phases="PHASES" cancellable :cancelling="cancelling"
+                                 @cancel="cancelHeavyTask($event, 'Extract archive')" />
 
             </form>
 
@@ -60,6 +53,7 @@
         <!-- Guided folder browser -->
         <FolderPicker v-if="folderPickerOpen" :dataset="dataset" mode="folder" title="Select Destination Folder" :initial-path="destPath"
                       @close="handleFolderPickerClose" />
+        <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
 
@@ -70,15 +64,25 @@ import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
-import ProgressBar from 'primevue/progressbar';
+import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
 import FolderPicker from '@/components/FolderPicker.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
+import { useDialogs } from '@/composables/useDialogs';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
 import ddb from 'ddb';
 
 const { pathutils } = ddb;
 
+// The phases the archive-extract tool reports, in words
+const PHASES = Object.freeze({
+    extracting: 'Extracting files…',
+    building: 'Building derivatives…',
+    done: 'Finishing…'
+});
+
 export default {
-    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPicker, LoadingSpinner },
+    components: { Window, Button, PrimeMessage, InputText, Checkbox, HeavyTaskStatus, FolderPicker, LoadingSpinner, DialogHost },
 
     props: {
         file: { type: Object, required: true },
@@ -86,9 +90,11 @@ export default {
     },
     emits: ['close'],
 
-    setup() {
-        const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask };
+    setup(props) {
+        const { runHeavyTask, heavyTasks } = useHeavyTask();
+        const dialogs = useDialogs();
+        const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => props.dataset, dialogs);
+        return { runHeavyTask, heavyTasks, PHASES, dialogs, cancelHeavyTask, cancelling };
     },
     data() {
         return {
@@ -96,9 +102,9 @@ export default {
             overwrite: false,
             deleteArchive: false,
             isExtracting: false,
-            progress: 0,
-            statusMessage: '',
-            errorMessage: null,
+            // The task of the latest submit (its state is read from heavyTasks) and the refusal of a submit with no task
+            extractTaskId: null,
+            errorMessage: '',
             destPathError: null,
             destPathExists: null,    // null = unknown/root, true = exists, false = will be created
             destPathChecking: false,
@@ -107,6 +113,9 @@ export default {
     },
 
     computed: {
+        extractTask() {
+            return this.extractTaskId ? this.heavyTasks[this.extractTaskId] ?? null : null;
+        },
         archiveName() {
             const p = this.file && this.file.entry ? this.file.entry.path : '';
             return p ? pathutils.basename(p) : '';
@@ -220,9 +229,8 @@ export default {
             if (!sourcePath) return;
 
             this.isExtracting = true;
-            this.errorMessage = null;
-            this.progress = 0;
-            this.statusMessage = 'Starting…';
+            this.errorMessage = '';
+            this.extractTaskId = null;
 
             try {
                 // Offloaded to the archive-extract heavy task. Awaits completion so the
@@ -238,10 +246,7 @@ export default {
                     },
                     // No force: a second submit of the same extraction gets the running task (FR-PRC-02)
                     notify: false,
-                    onProgress: (t) => {
-                        this.progress = t.percent || 0;
-                        this.statusMessage = this.phaseLabel(t.phase);
-                    }
+                    onSubmitted: entry => { this.extractTaskId = entry.taskId; }
                 });
 
                 this.$emit('close', 'extracted', {
@@ -250,18 +255,10 @@ export default {
                     archivePath: sourcePath
                 });
             } catch (e) {
-                this.errorMessage = (e && e.message) ? e.message : String(e);
+                // A failed task shows its own reason in the status; a refusal of the submit has no task
+                if (!e?.task) this.errorMessage = (e && e.message) ? e.message : String(e);
             } finally {
                 this.isExtracting = false;
-            }
-        },
-
-        phaseLabel(phase) {
-            switch (phase) {
-                case 'extracting': return 'Extracting files…';
-                case 'building': return 'Building derivatives…';
-                case 'done': return 'Finishing…';
-                default: return 'Working…';
             }
         },
 
@@ -306,16 +303,5 @@ export default {
 .dest-create {
     color: var(--p-primary-color);
     font-size: 0.8rem;
-}
-
-.progress-section {
-    margin-top: 1rem;
-}
-
-.progress-label {
-    margin-top: 0.4rem;
-    font-size: 0.85rem;
-    color: var(--p-text-muted-color);
-    text-align: center;
 }
 </style>

@@ -3,6 +3,7 @@
  * output checks apply; the dialog is busy while it runs, and a refusal (409) shows the server's message.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ref } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import ddb from 'ddb';
@@ -10,7 +11,13 @@ import ExtractDialog from './ExtractDialog.vue';
 import { ApiError } from '@/libs/ddb/apiError';
 
 const runHeavyTask = vi.fn();
-vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask }) }));
+const heavyTasks = ref({});
+vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask, heavyTasks }) }));
+
+// The cancel question and what it reaches: answered by the test, the poller not asked
+const confirmCancel = vi.fn();
+vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
 
 const WindowStub = {
     props: ['confirmLabel', 'confirmDisabled', 'busy'],
@@ -28,7 +35,7 @@ function open() {
 }
 
 describe('ExtractDialog submit', () => {
-    beforeEach(() => { runHeavyTask.mockReset(); });
+    beforeEach(() => { runHeavyTask.mockReset(); heavyTasks.value = {}; });
 
     it('starts one task on a double click, without force, and is busy while it runs', async () => {
         runHeavyTask.mockImplementation(() => new Promise(() => {}));
@@ -62,5 +69,113 @@ describe('ExtractDialog submit', () => {
         expect(runHeavyTask).toHaveBeenCalledOnce();
         expect(w.text()).toContain("A file or folder named 'a.txt' already exists in this folder");
         expect(w.findComponent(WindowStub).props('busy')).toBe(false);
+    });
+});
+
+describe('ExtractDialog task status', () => {
+    beforeEach(() => { runHeavyTask.mockReset(); heavyTasks.value = {}; });
+    const status = w => w.find('[data-testid="heavy-task-status"]');
+
+    it('shows the task queued, then the phase in words with the percent', async () => {
+        runHeavyTask.mockImplementation((_dataset, _tool, options) => {
+            heavyTasks.value = { t1: { taskId: 't1', state: 'Enqueued', percent: 0 } };
+            options.onSubmitted({ taskId: 't1' });
+            return new Promise(() => {});
+        });
+        const { w } = open();
+        await flushPromises();
+        expect(status(w).exists()).toBe(false);
+
+        w.findComponent(WindowStub).vm.$emit('confirm');
+        await flushPromises();
+        expect(status(w).text()).toContain('Queued…');
+
+        heavyTasks.value = { t1: { taskId: 't1', state: 'Processing', phase: 'extracting', percent: 30 } };
+        await flushPromises();
+        expect(status(w).text()).toContain('Extracting files…');
+        expect(status(w).text()).toContain('30%');
+    });
+
+    it('shows the reason of a failed task, and the dialog stays open and free', async () => {
+        runHeavyTask.mockImplementation((_dataset, _tool, options) => {
+            const entry = { taskId: 't1', state: 'Failed', percent: 100, error: 'The archive is damaged' };
+            heavyTasks.value = { t1: entry };
+            options.onSubmitted({ taskId: 't1' });
+            return Promise.reject(Object.assign(new Error(entry.error), { task: entry }));
+        });
+        const { w } = open();
+        await flushPromises();
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+
+        expect(status(w).text()).toContain('The archive is damaged');
+        expect(w.emitted('close')).toBeUndefined();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(false);
+    });
+});
+
+// ---- Cancel of a task that waits for a node or runs (FR-PRC-10, FR-XC-15) --------------------------------
+
+describe('ExtractDialog cancel', () => {
+    beforeEach(() => {
+        runHeavyTask.mockReset();
+        confirmCancel.mockReset();
+        heavyTasks.value = {};
+    });
+
+    /** A run that stays queued on a node, and its end: what the poller does when the task is cancelled */
+    function queued() {
+        let end;
+        runHeavyTask.mockImplementation((_dataset, _tool, options) => new Promise((_resolve, reject) => {
+            heavyTasks.value = { t1: { taskId: 't1', toolId: 'archive-extract', state: 'Processing', waitingForNode: true, percent: 0 } };
+            options.onSubmitted({ taskId: 't1' });
+            end = () => {
+                const entry = { taskId: 't1', state: 'Deleted', cancelledBy: 'ann', percent: 0 };
+                heavyTasks.value = { t1: entry };
+                reject(Object.assign(new Error('Task Deleted'), { task: entry }));
+            };
+        }));
+        return () => end();
+    }
+    const cancelButton = w => w.find('[data-testid="heavy-task-cancel"]');
+
+    async function start() {
+        const end = queued();
+        const { w, dataset } = open();
+        dataset.cancelTask = vi.fn().mockResolvedValue({ deleted: true });
+        await flushPromises();
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        return { w, dataset, end };
+    }
+
+    it('offers Cancel on a busy dialog whose task waits for a node, asks, cancels the task and unlocks when it ends', async () => {
+        confirmCancel.mockResolvedValue(true);
+        const { w, dataset, end } = await start();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(true);
+        expect(w.find('[data-testid="heavy-task-status"]').text()).toContain('Queued…');
+
+        await cancelButton(w).trigger('click');
+        await flushPromises();
+
+        expect(confirmCancel).toHaveBeenCalledOnce();
+        expect(confirmCancel.mock.calls[0][0]).toMatchObject({ title: 'Cancel Task', danger: true, warningMessage: 'The files extracted so far are deleted.' });
+        expect(confirmCancel.mock.calls[0][0].message).toContain('Extract archive');
+        expect(dataset.cancelTask).toHaveBeenCalledWith('t1');
+
+        end();
+        await flushPromises();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(false);
+        expect(cancelButton(w).exists()).toBe(false);
+        expect(w.find('[data-testid="heavy-task-status"]').text()).toContain('Cancelled');
+    });
+
+    it('cancels nothing when the user does not confirm, and the dialog stays busy', async () => {
+        confirmCancel.mockResolvedValue(false);
+        const { w, dataset } = await start();
+        await cancelButton(w).trigger('click');
+        await flushPromises();
+        expect(dataset.cancelTask).not.toHaveBeenCalled();
+        expect(w.findComponent(WindowStub).props('busy')).toBe(true);
     });
 });
