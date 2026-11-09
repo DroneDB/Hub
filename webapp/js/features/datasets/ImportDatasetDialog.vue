@@ -117,7 +117,7 @@
                         <label for="import-dataset-dialog-slug" class="d-block mb-1 fw-semibold">Slug</label>
                         <InputText id="import-dataset-dialog-slug" v-model="slug" placeholder="dataset-slug" class="w-100" @input="slugEdited = true" />
                         <small v-if="slug && slugFormatInvalid" class="text-danger">
-                            A slug may only contain lowercase letters, numbers, dashes and underscores.
+                            {{ slugFormatProblem }}
                         </small>
                         <small v-else-if="slugTaken" class="text-danger">
                             A dataset with this slug already exists in this organization.
@@ -164,8 +164,7 @@ import { Visibility } from 'ddb';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { IMPORT_SOURCES, getImportSource, splitRegistryLink } from './importSources';
 import { formatDurationSeconds } from '@/libs/format';
-
-const slugRe = /^[a-z0-9\-_]+$/;
+import { slugProblem } from '@/libs/slug';
 
 /**
  * ImportDatasetDialog - Import a remote dataset (another Registry instance or a downloadable
@@ -248,8 +247,12 @@ export default {
                 .filter(f => f.required)
                 .every(f => (this.params[f.name] || '').trim().length > 0);
         },
+        // The Registry's slug rule and its text (FR-XC-12)
+        slugFormatProblem() {
+            return slugProblem(this.slug, 'Dataset');
+        },
         slugFormatInvalid() {
-            return !this.slug || !slugRe.test(this.slug);
+            return !!this.slugFormatProblem;
         },
         slugTaken() {
             return !!this.slug && this.forbiddenSlugs.includes(this.slug);

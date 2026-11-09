@@ -662,7 +662,8 @@ export default {
                     this.optionsError = 'A new dataset name is required.';
                     return null;
                 }
-                // Basic kebab-case validation
+                // Basic kebab-case validation: the same check as PhotogrammetryTool on the server, until FR-PRC-03
+                // moves both to the published slug rule (SlugRules, libs/slug.js)
                 if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(this.photogrammetryForm.newDatasetName)) {
                     this.optionsError = 'Dataset name must be kebab-case (lowercase letters, digits, hyphens).';
                     return null;

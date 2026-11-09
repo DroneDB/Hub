@@ -94,6 +94,23 @@ export default class AdminApi {
         });
     }
 
+    /**
+     * Disables a user: they can no longer sign in (the server adds the system role 'deactivated').
+     * 204; 404 for an unknown user, 400 for your own account or the last active admin.
+     * @param {string} userName
+     */
+    async disableUser(userName) {
+        return await this.registry.postRequest(`/users/${encodeURIComponent(userName)}/disable`, {});
+    }
+
+    /**
+     * Enables a disabled user (the server removes the system role 'deactivated'). 204; 404 for an unknown user.
+     * @param {string} userName
+     */
+    async enableUser(userName) {
+        return await this.registry.postRequest(`/users/${encodeURIComponent(userName)}/enable`, {});
+    }
+
     // Role management
     async createRole(roleName) {
         return await this.registry.postRequest('/users/roles', {roleName: roleName});

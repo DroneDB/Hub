@@ -15,8 +15,8 @@
                     <label for="edit-user-dialog-email" class="d-block mb-1 fw-semibold">Email</label>
                     <InputText id="edit-user-dialog-email" v-model="editUser.email" placeholder="user@example.com"
                                class="w-100" @keydown="clearError()" />
-                    <div v-if="editUser.email && !isEmailValid()" class="text-danger small">
-                        Please enter a valid email address
+                    <div v-if="emailError" class="text-danger small">
+                        {{ emailError }}
                     </div>
                 </div>
                 <div class="mb-3">
@@ -35,6 +35,8 @@ import Message from '@/components/HubMessage.vue';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
 import reg from '@/libs/api/sharedRegistry';
+import { emailProblem } from '@/libs/nameRules';
+import { isDeactivatedRole, pickableRoles, publishesSystemRoles } from '@/libs/roles';
 
 export default {
     components: {
@@ -61,13 +63,18 @@ export default {
             editUser: {
                 userName: this.user.userName,
                 email: this.user.email || '',
-                roles: [...(this.user.roles || [])]
+                // 'deactivated' is not offered: Disable and Enable in the Users list change it
+                roles: pickableRoles(this.user.roles || [])
             }
         };
     },
     computed: {
         roleOptions() {
-            return this.availableRoles.map(r => ({ label: r, value: r }));
+            return pickableRoles(this.availableRoles).map(r => ({ label: r, value: r }));
+        },
+        // The server's rule text, at the field, before submit
+        emailError() {
+            return emailProblem(this.editUser.email);
         }
     },
     mounted: function () {
@@ -77,28 +84,29 @@ export default {
         clearError: function () {
             this.error = "";
         },
-        isEmailValid: function () {
-            if (!this.editUser.email || this.editUser.email.trim() === "") return true; // Email is optional
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(this.editUser.email.trim());
-        },
         isValid: function () {
-            return this.isEmailValid();
+            return !this.emailError;
+        },
+        // The roles to send. A Registry that lists its system roles keeps 'deactivated' itself (and refuses it in
+        // the list); an older one replaces every role, so a disabled user gets it back, or the edit would enable them.
+        rolesToSend: function () {
+            const roles = [...this.editUser.roles];
+            if (!publishesSystemRoles()) {
+                const deactivated = (this.user.roles || []).find(isDeactivatedRole);
+                if (deactivated) roles.push(deactivated);
+            }
+            return roles;
         },
         confirmUpdate: async function () {
             if (!this.isValid()) {
-                if (!this.isEmailValid()) {
-                    this.error = "Please enter a valid email address";
-                    return;
-                }
+                this.error = this.emailError;
                 return;
             }
 
             this.updating = true;
             try {
                 // Update user with both email and roles
-                await reg.admin.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
+                await reg.admin.updateUser(this.editUser.userName, this.editUser.email, this.rolesToSend());
 
                 this.$notify.success(`User "${this.editUser.userName}" updated successfully`, { summary: 'User Updated' });
                 this.updating = false;

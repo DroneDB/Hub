@@ -179,7 +179,7 @@
         <DialogHost :dialogs="dialogs" />
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
-                       @close="handleDatasetClose" />
+                       :org-slug="$route.params.org" @close="handleDatasetClose" />
 
         <ImportDatasetDialog v-if="importDialogOpen" :org-slug="$route.params.org" :forbidden-slugs="forbiddenSlugs"
                              @close="handleImportClose" />
@@ -209,7 +209,7 @@ import ListToolbar from '@/components/ListToolbar.vue';
 import { DatasetLocationsMap } from './locationsMap';
 import UnlocatedDatasetsButton from './UnlocatedDatasetsButton.vue';
 import { setTitle, bytesToSize, formatTimeAgo, parseTimestamp } from '@/libs/utils';
-import { renameDataset, datasetName } from '@/libs/api/registryUtils';
+import { datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences } from '@/libs/storageUtils';
 import { shallowRef } from 'vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -696,38 +696,51 @@ export default {
                 let renamed = false;
 
                 try {
-                    // Use renameDataset function to update name and slug
-                    let ret = await renameDataset(this.$route.params.org, ds.slug, newds.name);
+                    let dsobj = this.org.Dataset(ds.slug);
 
-                    if (ret) {
+                    // Only a new slug the user asked for (Change URL) renames the dataset: its links change.
+                    // It goes first, so a refused slug sends nothing else and the dataset stays as it was.
+                    if (newds.changeSlug && newds.slug && newds.slug !== ds.slug) {
+                        let ret;
+                        try {
+                            ret = await dsobj.rename(newds.slug);
+                        } catch (e) {
+                            console.error(e);
+                            this.$notify.error(`The URL was not changed: ${e.message}`, { summary: 'Dataset Not Updated' });
+                            dsitem['editing'] = false;
+                            return;
+                        }
+                        dsitem['slug'] = ret?.slug || newds.slug;
                         renamed = true;
-                        // Also update visibility if needed
-                        let dsobj = this.org.Dataset(ret.slug);
-                        let update = await dsobj.update(newds.name, newds.visibility);
+                        dsobj = this.org.Dataset(dsitem['slug']);
+                    }
 
-                        // Handle tagline update
-                        if (newds.tagline) {
-                            await dsobj.metaSet('tagline', newds.tagline);
-                        } else {
-                            await dsobj.metaUnset('tagline');
-                        }
+                    // The name is the display name: saving it keeps the URL (FR-ORG-08)
+                    await dsobj.metaSet('name', newds.name);
+                    renamed = true;
 
-                        if (update) {
-                            // Update the object in the local dataset
-                            dsitem['slug'] = ret.slug;
-                            dsitem['name'] = newds.name;
-                            dsitem['visibility'] = newds.visibility;
-                            dsitem['tagline'] = newds.tagline || '';
-                            this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
-                        }
+                    // Visibility only: the name is saved above
+                    let update = await dsobj.update(undefined, newds.visibility);
+
+                    // Handle tagline update
+                    if (newds.tagline) {
+                        await dsobj.metaSet('tagline', newds.tagline);
                     } else {
-                        this.$notify.error(`Failed to update dataset "${ds.slug}"`);
+                        await dsobj.metaUnset('tagline');
+                    }
+
+                    if (update) {
+                        // Update the object in the local dataset
+                        dsitem['name'] = newds.name;
+                        dsitem['visibility'] = newds.visibility;
+                        dsitem['tagline'] = newds.tagline || '';
+                        this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
                     }
                 } catch (e) {
                     console.error(e);
                     this.$notify.error('Failed to update dataset: ' + e.message);
                 }
-                // The pins know the dataset by its slug and name, which the rename changed
+                // The pins know the dataset by its slug and name, which the edit changed
                 if (renamed) this.invalidateLocations();
 
                 dsitem['editing'] = false;

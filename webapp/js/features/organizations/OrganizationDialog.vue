@@ -6,7 +6,10 @@
                     <label for="organization-dialog-name" class="d-block mb-1 fw-semibold">Name</label>
                     <InputText id="organization-dialog-name" ref="name"
                                v-model="org.name" placeholder="Name"
-                               class="w-100" />
+                               class="w-100" :invalid="!!nameError"
+                               :aria-describedby="nameError ? 'organization-dialog-name-error' : undefined" />
+                    <!-- The Registry's rule text, before submit (D-035, slug rule) -->
+                    <small v-if="nameError" id="organization-dialog-name-error" class="d-block text-danger">{{ nameError }}</small>
                 </div>
                 <div class="mb-3">
                     <label for="organization-dialog-description" class="d-block mb-1 fw-semibold">Description</label>
@@ -27,8 +30,8 @@ import Checkbox from 'primevue/checkbox';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import { slugFromName } from '@/libs/api/registryUtils';
-
-var re = /^[a-z0-9\-_]+$/;
+import { slugProblem } from '@/libs/slug';
+import { latinNameProblem } from '@/libs/nameRules';
 
 export default {
     components: {
@@ -50,6 +53,16 @@ export default {
             },
             title: null
         };
+    },
+    computed: {
+        // What the Registry would refuse in the name: no Latin letter or digit (D-035; the dialog has no slug
+        // field), or, for a new organization, a slug made from it that the slug rule refuses
+        nameError() {
+            if (!this.org.name || !this.org.name.trim()) return null;
+            const latin = latinNameProblem(this.org.name, { withSlugField: false });
+            if (latin || this.mode === 'edit') return latin;
+            return slugProblem(slugFromName(this.org.name), 'Organization');
+        }
     },
     mounted: function () {
         if (this.mode == 'edit') {
@@ -83,9 +96,8 @@ export default {
             });
         },
         isValid: function () {
-            // organization slug can contain only letters, numbers, dashes and underscores
-            const slug = slugFromName(this.org.name);
-            return slug && re.test(slug) && this.org.name;
+            // An edit keeps the organization's slug: only a new one is made from the name
+            return !!this.org.name && !!this.org.name.trim() && !this.nameError;
         }
     }
 }

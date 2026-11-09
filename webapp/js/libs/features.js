@@ -20,5 +20,9 @@ export const Features = {
     ENTRY_TYPES: 'entryTypes',
     ARCHIVE_EXTENSIONS: 'archiveExtensions',
     // The heavy tools the server runs (id, title, hidden, disabled): a feature that needs one is offered only when it is listed
-    TASK_TOOLS: 'taskTools'
+    TASK_TOOLS: 'taskTools',
+    // The input rules the Hub checks before submit (slug, e-mail, entry names, ...): libs/nameRules.js and libs/slug.js read them
+    INPUT_RULES: 'inputRules',
+    // The role names the server depends on (admin, deactivated): libs/roles.js reads them
+    SYSTEM_ROLES: 'systemRoles'
 };

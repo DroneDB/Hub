@@ -234,7 +234,7 @@ describe('DatasetsPage map view', () => {
 
         datasetApi.rename.mockClear();
         wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
-        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '' });
+        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof-2026', changeSlug: true });
         await flushPromises();
         expect(datasetApi.rename).toHaveBeenCalledWith('roof-2026');
         expect(wrapper.vm.datasets[0].slug).toBe('roof-2026');
@@ -247,6 +247,52 @@ describe('DatasetsPage map view', () => {
         calls[1].resolve([{ slug: 'roof-2026', name: 'Roof 2026', bbox: [1, 1, 2, 2] }]);
         await flushPromises();
         expect(mapProps().groups[0].datasets.map(d => d.slug)).toEqual(['roof-2026']);
+    });
+
+    it('saves a new name as the display name only: the slug, and so the URL, stays', async () => {
+        pendingLocations();
+        await render();
+        for (const fn of Object.values(datasetApi)) fn.mockClear();
+        wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
+        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'ds', changeSlug: false });
+        await flushPromises();
+        expect(datasetApi.metaSet).toHaveBeenCalledWith('name', 'Roof 2026');
+        expect(datasetApi.rename).not.toHaveBeenCalled();
+        // The visibility only: the name is not sent a second time
+        expect(datasetApi.update).toHaveBeenCalledWith(undefined, 0);
+        expect(wrapper.vm.datasets[0]).toMatchObject({ slug: 'ds', name: 'Roof 2026' });
+    });
+
+    it('renames the dataset only when the user asked to change the URL', async () => {
+        pendingLocations();
+        await render();
+        for (const fn of Object.values(datasetApi)) fn.mockClear();
+        wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
+        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof', changeSlug: true });
+        await flushPromises();
+        expect(datasetApi.rename).toHaveBeenCalledWith('roof');
+        expect(datasetApi.metaSet).toHaveBeenCalledWith('name', 'Roof 2026');
+        // The rename goes first: the name and the rest go to the dataset at its new slug
+        expect(datasetApi.rename.mock.invocationCallOrder[0]).toBeLessThan(datasetApi.metaSet.mock.invocationCallOrder[0]);
+        expect(wrapper.vm.datasets[0].slug).toBe('roof');
+    });
+
+    it('sends nothing else when the rename is refused, and says the URL did not change', async () => {
+        pendingLocations();
+        await render();
+        for (const fn of Object.values(datasetApi)) fn.mockClear();
+        datasetApi.rename.mockImplementationOnce(() => Promise.reject(new Error('Dataset slug is invalid')));
+        const notify = wrapper.vm.$notify;
+        notify.error.mockClear();
+        wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
+        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof', changeSlug: true });
+        await flushPromises();
+        expect(datasetApi.rename).toHaveBeenCalledWith('roof');
+        expect(datasetApi.metaSet).not.toHaveBeenCalled();
+        expect(datasetApi.update).not.toHaveBeenCalled();
+        expect(datasetApi.metaUnset).not.toHaveBeenCalled();
+        expect(notify.error).toHaveBeenCalledWith('The URL was not changed: Dataset slug is invalid', expect.anything());
+        expect(wrapper.vm.datasets[0]).toMatchObject({ slug: 'ds', editing: false });
     });
 
     it('stores the view with the other table settings, which reach the account whole', async () => {
@@ -265,5 +311,73 @@ describe('DatasetsPage map view', () => {
         await flushPromises();
         expect(wrapper.vm.view).toBe('map');
         expect(locations).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('DatasetsPage edit dialog (DatasetDialog)', () => {
+    let dialog;
+    afterEach(() => {
+        dialog?.unmount();
+        dialog = null;
+        document.body.innerHTML = '';
+    });
+
+    async function open(props) {
+        const { default: DatasetDialog } = await import('./DatasetDialog.vue');
+        dialog = mount(DatasetDialog, {
+            props: { orgSlug: 'org', forbiddenSlugs: ['taken'], ...props },
+            global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /></div>' } } }
+        });
+        await flushPromises();
+    }
+    const edit = () => open({ mode: 'edit', model: { slug: 'survey-2026', name: 'Survey 2026', visibility: 0, tagline: '' } });
+    const closed = () => dialog.emitted('close').at(-1);
+
+    it('keeps the slug on a name edit: no slug field until Change URL is ticked', async () => {
+        await edit();
+        expect(dialog.find('#dataset-dialog-slug').exists()).toBe(false);
+        await dialog.find('#dataset-dialog-dataset-name').setValue('Roof 2026');
+        dialog.vm.close('save');
+        expect(closed()).toEqual(['save', expect.objectContaining({ name: 'Roof 2026', slug: 'survey-2026', changeSlug: false })]);
+    });
+
+    it('warns that the old links stop working, and checks the new slug with the Registry rule', async () => {
+        await edit();
+        await dialog.find('#dataset-dialog-change-slug').setValue(true);
+        expect(dialog.text()).toContain('Links to /r/org/survey-2026 will stop working');
+        await dialog.find('#dataset-dialog-slug').setValue('Roof 2026');
+        expect(dialog.text()).toContain("Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'");
+        expect(dialog.vm.isValid()).toBe(false);
+        await dialog.find('#dataset-dialog-slug').setValue('taken');
+        expect(dialog.vm.isValid()).toBe(false);
+        await dialog.find('#dataset-dialog-slug').setValue('roof-2026');
+        expect(dialog.vm.isValid()).toBe(true);
+        dialog.vm.close('save');
+        expect(closed()).toEqual(['save', expect.objectContaining({ slug: 'roof-2026', changeSlug: true })]);
+    });
+
+    it('shows the Latin letter rule at the name field: a new dataset has no slug field, an edit has one', async () => {
+        await open({ mode: 'new' });
+        await dialog.find('#dataset-dialog-dataset-name').setValue('Москва');
+        expect(dialog.find('#dataset-dialog-name-error').text()).toBe('Use at least one Latin letter (a–z) or digit');
+        expect(dialog.vm.isValid()).toBe(false);
+        dialog.unmount();
+
+        await edit();
+        await dialog.find('#dataset-dialog-dataset-name').setValue('Москва');
+        expect(dialog.find('#dataset-dialog-name-error').text()).toBe('Use at least one Latin letter (a–z) or digit in the name, or enter a slug');
+        await dialog.find('#dataset-dialog-change-slug').setValue(true);
+        await dialog.find('#dataset-dialog-slug').setValue('moskva');
+        expect(dialog.find('#dataset-dialog-name-error').exists()).toBe(false);
+        expect(dialog.vm.isValid()).toBe(true);
+    });
+
+    it('checks the slug a new dataset gets from its name', async () => {
+        await open({ mode: 'new' });
+        await dialog.find('#dataset-dialog-dataset-name').setValue('a');
+        expect(dialog.text()).toContain('Dataset slug is invalid');
+        expect(dialog.vm.isValid()).toBe(false);
+        await dialog.find('#dataset-dialog-dataset-name').setValue('Survey Team');
+        expect(dialog.vm.isValid()).toBe(true);
     });
 });

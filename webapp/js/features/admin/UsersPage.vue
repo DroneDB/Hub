@@ -43,7 +43,11 @@
                         <i class="fa-solid fa-user" /> Username
                     </template>
                     <template #body="slotProps">
-                        <strong>{{ slotProps.data.userName }}</strong>
+                        <!-- The status is in this column, which every width shows -->
+                        <span class="user-name">
+                            <strong>{{ slotProps.data.userName }}</strong>
+                            <Tag v-if="isDisabledUser(slotProps.data)" severity="danger" value="Disabled" class="disabled-tag" />
+                        </span>
                     </template>
                 </Column>
                 <Column field="email" header="Email" :sortable="true" v-bind="columnFrom('lg')">
@@ -53,8 +57,9 @@
                 </Column>
                 <Column header="Roles" v-bind="columnFrom('lg')">
                     <template #body="slotProps">
-                        <div v-if="slotProps.data.roles && slotProps.data.roles.length > 0">
-                            <Chip v-for="role in slotProps.data.roles" :key="role" :label="role" />
+                        <!-- 'deactivated' is the Disabled tag, not a role to list -->
+                        <div v-if="pickableRoles(slotProps.data.roles).length > 0">
+                            <Chip v-for="role in pickableRoles(slotProps.data.roles)" :key="role" :label="role" />
                         </div>
                         <span v-else class="text-muted">No roles</span>
                     </template>
@@ -91,6 +96,16 @@
                             <Button severity="secondary" size="small" :disabled="slotProps.data.editing || slotProps.data.deleting"
                                     title="Change Password" aria-label="Change Password" icon="fa-solid fa-key"
                                     @click.stop="changePassword(slotProps.data)" />
+                            <template v-if="canDisableUsers">
+                                <Button v-if="isDisabledUser(slotProps.data)" severity="secondary" size="small"
+                                        :loading="slotProps.data.switching" :disabled="slotProps.data.switching || slotProps.data.editing || slotProps.data.deleting"
+                                        title="Enable User" aria-label="Enable User" icon="fa-solid fa-user-check"
+                                        @click.stop="enableUser(slotProps.data)" />
+                                <Button v-else severity="warn" size="small"
+                                        :loading="slotProps.data.switching" :disabled="slotProps.data.switching || slotProps.data.editing || slotProps.data.deleting"
+                                        title="Disable User" aria-label="Disable User" icon="fa-solid fa-user-slash"
+                                        @click.stop="disableUser(slotProps.data)" />
+                            </template>
                             <Button severity="danger" size="small" :loading="slotProps.data.deleting"
                                     :disabled="slotProps.data.deleting || slotProps.data.editing || slotProps.data.userName === 'admin'"
                                     title="Delete User" aria-label="Delete User"
@@ -117,6 +132,8 @@
         <RoleManagementDialog v-if="showRoleManagement" :roles="availableRoles"
                               @close="handleCloseRoleManagement" @roles-changed="refreshRoles" />
         <OrganizationManagementDialog v-if="showOrganizationManagement" @close="handleCloseOrganizationManagement" />
+        <!-- The Disable question -->
+        <DialogHost :dialogs="dialogs" />
 
         <!-- Delete User Confirmation Dialog -->
         <!-- Deleting all the data asks for the user name to be typed; a transfer does not -->
@@ -206,6 +223,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/HubMessage.vue';
 import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import AddUserDialog from './AddUserDialog.vue';
 import EditUserDialog from './EditUserDialog.vue';
 import ChangePasswordDialog from './ChangePasswordDialog.vue';
@@ -215,6 +233,7 @@ import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Chip from 'primevue/chip';
+import Tag from 'primevue/tag';
 import Select from 'primevue/select';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -228,6 +247,10 @@ import { formatDateTime } from '@/libs/format';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
+import { isDisabledUser, pickableRoles, publishesSystemRoles } from '@/libs/roles';
+import { escapeHtml } from '@/libs/sanitize';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
 
 /**
  * Users - Admin panel for managing platform users.
@@ -243,6 +266,7 @@ export default {
         Message,
         Window,
         ConfirmDialog,
+        DialogHost,
         AddUserDialog,
         EditUserDialog,
         ChangePasswordDialog,
@@ -252,6 +276,7 @@ export default {
         Button,
         PrimeMessage,
         Chip,
+        Tag,
         Select,
         DataTable,
         Column,
@@ -261,7 +286,8 @@ export default {
         IconField
     },
     setup() {
-        return { columnFrom };
+        const dialogs = useDialogs();
+        return { columnFrom, dialogs, confirm: useConfirm(dialogs) };
     },
     data: function () {
         return {
@@ -290,6 +316,10 @@ export default {
         }
     },
     computed: {
+        // A Registry that lists its system roles has the disable and enable endpoints; an older one does not
+        canDisableUsers() {
+            return publishesSystemRoles();
+        },
         // Filtering
         filteredUsers: function () {
             if (!this.searchQuery) return this.users;
@@ -328,6 +358,8 @@ export default {
 
     methods: {
         bytesToSize,
+        isDisabledUser,
+        pickableRoles,
 
         async loadData() {
             try {
@@ -340,7 +372,8 @@ export default {
                 this.users = usersData.map(user => ({
                     ...user,
                     editing: false,
-                    deleting: false
+                    deleting: false,
+                    switching: false
                 }));
                 this.availableRoles = rolesData;
             } catch (e) {
@@ -377,6 +410,41 @@ export default {
         showUserOrganizations(user) {
             this.currentUser = user;
             this.showOrganizationsDialog = true;
+        },
+
+        // Disable blocks sign-in at once: it asks first, as a destructive action
+        async disableUser(user) {
+            const confirmed = await this.confirm({
+                title: `Disable user “${user.userName}”`,
+                message: `<strong>${escapeHtml(user.userName)}</strong> will no longer be able to sign in, and their open sessions lose access at once. Their data is kept, and Enable gives the access back.`,
+                confirmText: 'Disable',
+                danger: true
+            });
+            if (!confirmed) return;
+            await this.switchUser(user, 'disable');
+        },
+
+        async enableUser(user) {
+            await this.switchUser(user, 'enable');
+        },
+
+        // The server refuses to disable your own account or the last active admin (400): its message says so
+        async switchUser(user, action) {
+            user.switching = true;
+            try {
+                if (action === 'disable') await reg.admin.disableUser(user.userName);
+                else await reg.admin.enableUser(user.userName);
+                this.$notify.success(action === 'disable'
+                    ? `User "${user.userName}" can no longer sign in`
+                    : `User "${user.userName}" can sign in again`, { summary: action === 'disable' ? 'User Disabled' : 'User Enabled' });
+                await this.loadData();
+            } catch (e) {
+                if (isUnauthorized(e)) return;
+                this.error = e.message;
+                this.$notify.error(`Failed to ${action} user: ${e.message}`);
+            } finally {
+                user.switching = false;
+            }
         },
 
         async handleDelete(user) {
@@ -496,6 +564,13 @@ export default {
 
 .search-col {
     min-width: 12rem;
+}
+
+.user-name {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ddb-spacing-xs);
 }
 
 /* A phone shows 3 page links and no first/last jump, so the paginator stays on one row */

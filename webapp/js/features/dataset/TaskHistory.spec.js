@@ -283,3 +283,25 @@ describe('showClearDialog', () => {
         expect(vm.dataset.clearTasks).not.toHaveBeenCalled();
     });
 });
+
+describe('photogrammetry new dataset name', () => {
+    // The server's PhotogrammetryTool check (kebab-case) until FR-PRC-03 moves both to the published slug rule
+    const build = newDatasetName => {
+        const vm = {
+            optionsError: '',
+            photogrammetryForm: { preset: 'custom', optionsText: '', createNewDataset: true, newDatasetName, newDatasetVisibility: 0 }
+        };
+        return { params: TaskHistory.methods._buildSubmitParams.call(vm), error: vm.optionsError };
+    };
+
+    it('refuses what the server refuses, with its kebab-case rule', () => {
+        for (const name of ['survey_2026', 'survey-']) {
+            expect(build(name)).toEqual({ params: null, error: 'Dataset name must be kebab-case (lowercase letters, digits, hyphens).' });
+        }
+    });
+
+    it('accepts what the server accepts, one character too', () => {
+        expect(build('a').params).toMatchObject({ createNewDataset: true, newDatasetName: 'a' });
+        expect(build('survey-2026').error).toBe('');
+    });
+});

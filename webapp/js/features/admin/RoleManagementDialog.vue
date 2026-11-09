@@ -26,7 +26,7 @@
                                     <div>
                                         <div class="role-name">{{ role }}</div>
                                         <div class="role-description">
-                                            {{ isAdminRole(role) ? 'Administrator role with full system access' : 'Custom user role' }}
+                                            {{ roleDescription(role) }}
                                         </div>
                                     </div>
                                 </div>
@@ -85,7 +85,7 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
-import { isAdminRole, isSystemRole } from '@/libs/roles';
+import { isSystemRole, roleDescription } from '@/libs/roles';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
 export default {
@@ -139,8 +139,8 @@ export default {
         });
     },
     methods: {
-        isAdminRole,
         isSystemRole,
+        roleDescription,
         focusRoleInput() {
             if (this.$refs.txtRoleName) {
                 const el = this.$refs.txtRoleName.$el || this.$refs.txtRoleName;

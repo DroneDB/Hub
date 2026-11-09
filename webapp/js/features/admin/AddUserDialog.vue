@@ -16,8 +16,8 @@
                     <label for="add-user-dialog-email" class="d-block mb-1 fw-semibold">Email</label>
                     <InputText id="add-user-dialog-email" v-model="email" placeholder="user@example.com"
                                class="w-100" @keydown="clearError()" />
-                    <div v-if="email && !isEmailValid()" class="text-danger small">
-                        Please enter a valid email address
+                    <div v-if="emailError" class="text-danger small">
+                        {{ emailError }}
                     </div>
                 </div>
                 <div class="mb-3">
@@ -50,6 +50,8 @@ import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import { emailProblem } from '@/libs/nameRules';
+import { pickableRoles } from '@/libs/roles';
 import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
 
 export default {
@@ -80,8 +82,13 @@ export default {
         };
     },
     computed: {
+        // 'deactivated' is not a role to give: Disable in the Users list blocks sign-in
         roleOptions() {
-            return this.availableRoles.map(r => ({ label: r, value: r }));
+            return pickableRoles(this.availableRoles).map(r => ({ label: r, value: r }));
+        },
+        // The server's rule text, at the field, before submit
+        emailError() {
+            return emailProblem(this.email);
         }
     },
     mounted: function () {
@@ -119,15 +126,12 @@ export default {
             return false;
         },
         isEmailValid: function () {
-            if (!this.email || this.email.trim() === "") return true; // Email is optional
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(this.email.trim());
+            return !this.emailError; // Email is optional
         },
         confirmAddUser: async function () {
             if (!this.isFilled()) {
                 if (!this.isEmailValid()) {
-                    this.error = "Please enter a valid email address";
+                    this.error = this.emailError;
                     return;
                 }
                 return;

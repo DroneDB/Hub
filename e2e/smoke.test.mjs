@@ -461,6 +461,36 @@ test('admin pages render for an admin', async () => {
     await page.waitForSelector(`text=${USER}`, { timeout: 15000 });
 });
 
+test('admin users: Disable asks, tags the user and refuses their sign-in; Enable gives it back', async () => {
+    // User names are lowercase letters and digits
+    const victim = `smoke${Date.now().toString(36)}`;
+    const password = 'a-long-passw0rd';
+    const signIn = () => fetch(`${URL_}/users/authenticate`, { method: 'POST', body: form({ username: victim, password }) });
+    const res = await fetch(`${URL_}/users`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: victim, password, email: '', roles: [] })
+    });
+    assert.ok(res.ok, `POST /users -> ${res.status}`);
+    try {
+        await page.goto(`${URL_}/admin/users`);
+        await page.fill('input[aria-label="Search users"]', victim, { timeout: 15000 });
+        const row = page.locator('tr', { hasText: victim });
+        const tag = row.locator('.user-name', { hasText: 'Disabled' });
+        await row.locator('button[aria-label="Disable User"]').click({ timeout: 15000 });
+        await page.waitForSelector(`.p-dialog >> text=Disable user “${victim}”`, { timeout: 10000 });
+        await page.click('.p-dialog button[data-confirm]:has-text("Disable")');
+        await tag.waitFor({ timeout: 15000 });
+        assert.equal((await signIn()).ok, false);
+
+        await row.locator('button[aria-label="Enable User"]').click();
+        await tag.waitFor({ state: 'detached', timeout: 15000 });
+        assert.equal((await signIn()).ok, true);
+    } finally {
+        try { await api('DELETE', `/users/${victim}`); } catch { /* best effort */ }
+    }
+});
+
 test('a session the server rejects goes to Login', async () => {
     await page.goto(`${URL_}/r/${USER}`);
     await page.waitForSelector(`text=${DS}`, { timeout: 15000 });
