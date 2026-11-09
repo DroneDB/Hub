@@ -2,7 +2,7 @@
  * Unit tests for libs/utils.js
  * Run with: npx vitest run --reporter=verbose
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     setTitle,
     getCookie,
@@ -10,7 +10,10 @@ import {
     inIframe,
     clone,
     bytesToSize,
-    parseTimestamp
+    parseTimestamp,
+    supportsFullScreen,
+    requestFullScreen,
+    exitFullScreen
 } from './utils';
 
 describe('setTitle', () => {
@@ -150,5 +153,61 @@ describe('parseTimestamp', () => {
 
     it('is null for a missing or invalid date, never 1970 or NaN', () => {
         for (const value of [null, undefined, '', 'yesterday', 0, 12345, {}]) expect(parseTimestamp(value)).toBeNull();
+    });
+});
+
+describe('full screen', () => {
+    afterEach(() => {
+        delete HTMLElement.prototype.requestFullscreen;
+        delete HTMLElement.prototype.webkitRequestFullScreen;
+        delete document.exitFullscreen;
+        vi.restoreAllMocks();
+    });
+
+    it('is supported by a browser with only the standard API, and asks the element for it', () => {
+        expect(supportsFullScreen()).toBe(false);
+        const request = vi.fn(() => Promise.resolve());
+        HTMLElement.prototype.requestFullscreen = request;
+        expect(supportsFullScreen()).toBe(true);
+        const el = document.createElement('div');
+        requestFullScreen(el);
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.mock.contexts[0]).toBe(el);
+        requestFullScreen();
+        expect(request.mock.contexts[1]).toBe(document.body);
+    });
+
+    it('prefers the standard method to a prefixed one', () => {
+        const standard = vi.fn(() => Promise.resolve());
+        const prefixed = vi.fn();
+        HTMLElement.prototype.requestFullscreen = standard;
+        HTMLElement.prototype.webkitRequestFullScreen = prefixed;
+        requestFullScreen(document.createElement('div'));
+        expect(standard).toHaveBeenCalledTimes(1);
+        expect(prefixed).not.toHaveBeenCalled();
+    });
+
+    it('still uses a prefixed method when the standard one is missing', () => {
+        const prefixed = vi.fn();
+        HTMLElement.prototype.webkitRequestFullScreen = prefixed;
+        expect(supportsFullScreen()).toBe(true);
+        requestFullScreen(document.createElement('div'));
+        expect(prefixed).toHaveBeenCalledTimes(1);
+    });
+
+    it('says when the browser refuses it', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        HTMLElement.prototype.requestFullscreen = vi.fn(() => Promise.reject(new TypeError('Permissions check failed')));
+        requestFullScreen(document.createElement('div'));
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(warn).toHaveBeenCalledWith('Full screen was refused:', expect.any(TypeError));
+    });
+
+    it('leaves it with the standard exit', () => {
+        const exit = vi.fn();
+        document.exitFullscreen = exit;
+        exitFullScreen();
+        expect(exit).toHaveBeenCalledTimes(1);
     });
 });

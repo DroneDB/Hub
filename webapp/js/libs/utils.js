@@ -78,8 +78,17 @@ export function isFullScreenCurrently() {
     return fse !== null;
 }
 
+// The standard method first, then the prefixed ones of older browsers
+const REQUEST_FULLSCREEN = ['requestFullscreen', 'requestFullScreen', 'webkitRequestFullscreen', 'webkitRequestFullScreen', 'mozRequestFullScreen', 'msRequestFullscreen', 'msRequestFullScreen'];
+
+/** The element's method that makes it full screen, or null. @param {Element} element */
+function requestFullScreenMethod(element) {
+    const name = REQUEST_FULLSCREEN.find(n => typeof element[n] === 'function');
+    return name ? element[name] : null;
+}
+
 export function supportsFullScreen() {
-    return !!(document.body.requestFullScreen || document.body.webkitRequestFullScreen || document.body.mozRequestFullScreen || document.body.msRequestFullScreen);
+    return !!requestFullScreenMethod(document.body);
 }
 
 // https://stackoverflow.com/a/7525760
@@ -89,11 +98,14 @@ export function requestFullScreen(element) {
         element = document.body; // Make the body go full screen.
     }
 
-    // Supports most browsers and their versions.
-    const requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
+    const requestMethod = requestFullScreenMethod(element);
 
     if (requestMethod) { // Native full screen.
-        requestMethod.call(element);
+        const result = requestMethod.call(element);
+        // The standard method returns a promise, rejected when the browser refuses (no user gesture, a policy)
+        if (result && typeof result.catch === 'function') {
+            result.catch(e => console.warn('Full screen was refused:', e));
+        }
     } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
         var wscript = new window.ActiveXObject("WScript.Shell");
         if (wscript !== null) {

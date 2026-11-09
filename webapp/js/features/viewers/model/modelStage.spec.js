@@ -27,6 +27,8 @@ class FakeControls {
         this.update = vi.fn();
         this.dispose = vi.fn();
         this.setGizmosVisible = vi.fn();
+        this.saveState = vi.fn();
+        this.reset = vi.fn();
     }
 }
 
@@ -152,6 +154,53 @@ describe('frameModel', () => {
         stage.frameModel(object, { center: { x: 10, y: -4, z: 2 }, radius: 4 });
         expect(object.scale.toArray()).toEqual([0.25, 0.25, 0.25]);
         expect(object.position.toArray()).toEqual([-2.5, 1, -0.5]);
+    });
+});
+
+describe('resetView (Home)', () => {
+    it('puts the camera back where the model is framed, after a rotation, a pan, a zoom and a change of the field of view', () => {
+        makeStage();
+        stage.start();
+        const framed = stage.camera.position.clone();
+        expect(framed.x).toBeCloseTo(0, 6);
+        expect(framed.y).toBeCloseTo(0, 6);
+
+        stage.camera.position.set(2, -1, 0.5);
+        stage.camera.quaternion.set(0.3, 0.2, 0.1, 0.9).normalize();
+        stage.camera.up.set(1, 0, 0);
+        stage.camera.zoom = 3;
+        stage.camera.fov = 60;
+        stage.controls.target.set(0.4, 0.2, 0);
+        stage.controls._gizmos.position.set(0.5, 0.1, 0);
+        stage.resetView();
+
+        expect(stage.camera.position.x).toBeCloseTo(0, 6);
+        expect(stage.camera.position.y).toBeCloseTo(0, 6);
+        expect(stage.camera.position.z).toBeCloseTo(fitDistance(1, 35, 2, 1.25), 6);
+        expect(stage.camera.quaternion.toArray()).toEqual([0, 0, 0, 1]);
+        expect(stage.camera.up.toArray()).toEqual([0, 1, 0]);
+        expect(stage.camera.zoom).toBe(1);
+        expect(stage.camera.fov).toBe(35);
+        expect(stage.controls.target.toArray()).toEqual([0, 0, 0]);
+        expect(stage.controls._gizmos.position.toArray()).toEqual([0, 0, 0]);
+        // The controls drop their own state through the framing they were just given
+        expect(stage.controls.saveState).toHaveBeenCalledTimes(1);
+        expect(stage.controls.reset).toHaveBeenCalledTimes(1);
+        expect(stage.controls.saveState.mock.invocationCallOrder[0]).toBeLessThan(stage.controls.reset.mock.invocationCallOrder[0]);
+    });
+
+    it('stops the inertia the controls still run, and keeps the fit to the canvas that follows', () => {
+        makeStage();
+        stage.start();
+        stage.controls._animationId = 7;
+        stage.resetView();
+        expect(cancelAnimationFrame).toHaveBeenCalledWith(7);
+        expect(stage.controls._animationId).toBe(-1);
+
+        // A resize after Home scales the framed distance, not a stale one
+        sizeCanvas(400, 800);
+        runFrame();
+        expect(stage.camera.position.z).toBeCloseTo(fitDistance(1, 35, 0.5, 1.25), 6);
     });
 });
 

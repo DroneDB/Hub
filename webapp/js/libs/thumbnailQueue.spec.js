@@ -86,4 +86,19 @@ describe('thumbnailRequestSize', () => {
         expect(thumbnailRequestSize(128, 3)).toBe(512);
         expect(thumbnailRequestSize(48, 1)).toBe(128);
     });
+
+    it('steps up to 1024, 2048 and 4096', () => {
+        expect(thumbnailRequestSize(86, 2)).toBe(256);
+        expect(thumbnailRequestSize(400, 2)).toBe(1024);
+        expect(thumbnailRequestSize(1920, 1)).toBe(2048);
+        expect(thumbnailRequestSize(3840, 1)).toBe(4096);
+        expect(thumbnailRequestSize(1920, 2)).toBe(4096);
+        expect(thumbnailRequestSize(8000, 2)).toBe(4096);
+    });
+
+    it('never asks for more than the photo long side', () => {
+        expect(thumbnailRequestSize(3840, 1, 3000)).toBe(3000);
+        expect(thumbnailRequestSize(1920, 1, 4000)).toBe(2048);
+        expect(thumbnailRequestSize(1920, 2, 0)).toBe(4096);
+    });
 });

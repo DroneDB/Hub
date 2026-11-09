@@ -98,6 +98,7 @@ const overlay = useOverlay({
     container: dialogElement,
     focusRoot: () => contentRoot.value,
     danger: () => props.danger || props.confirmSeverity === 'danger',
+    modal: () => props.modal,
     onEscape: e => {
         if (!props.closable) return;
         e.preventDefault();

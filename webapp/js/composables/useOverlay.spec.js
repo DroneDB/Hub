@@ -6,13 +6,14 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { defineComponent, h, ref, nextTick } from 'vue';
 import { mount } from '@vue/test-utils';
-import { useOverlay, focusTargetIn, hasOpenOverlay } from './useOverlay';
+import { useOverlay, focusTargetIn, hasOpenOverlay, hasOpenModalOverlay } from './useOverlay';
 
 const Overlay = defineComponent({
     props: {
         active: { type: Boolean, default: true },
         danger: { type: Boolean, default: false },
         autoFocus: { type: Boolean, default: false },
+        modal: { type: Boolean, default: false },
         html: { type: String, default: '' }
     },
     emits: ['escape'],
@@ -20,7 +21,7 @@ const Overlay = defineComponent({
         const el = ref(null);
         const api = useOverlay({
             active: () => props.active, container: () => el.value, danger: () => props.danger,
-            onEscape: e => emit('escape', e), autoFocus: props.autoFocus
+            onEscape: e => emit('escape', e), autoFocus: props.autoFocus, modal: () => props.modal
         });
         expose(api);
         return () => (props.active ? h('div', { ref: el, class: 'overlay', innerHTML: props.html }) : null);
@@ -233,5 +234,40 @@ describe('useOverlay Escape', () => {
         w.unmount();
         mounted.splice(mounted.indexOf(w), 1);
         expect(hasOpenOverlay()).toBe(false);
+    });
+});
+
+describe('useOverlay modal', () => {
+    it('is not modal by default: an open overlay is not a modal one', async () => {
+        await open({});
+        expect(hasOpenOverlay()).toBe(true);
+        expect(hasOpenModalOverlay()).toBe(false);
+    });
+
+    it('a modal overlay is one while it is shown, whatever is above or below it', async () => {
+        const modal = await open({ modal: true });
+        const popup = await open({});
+        expect(hasOpenModalOverlay()).toBe(true);
+        popup.unmount();
+        mounted.splice(mounted.indexOf(popup), 1);
+        expect(hasOpenModalOverlay()).toBe(true);
+        await modal.setProps({ active: false });
+        await nextTick();
+        expect(hasOpenModalOverlay()).toBe(false);
+    });
+
+    it('follows a reactive modal flag', async () => {
+        const w = await open({});
+        expect(hasOpenModalOverlay()).toBe(false);
+        await w.setProps({ modal: true });
+        expect(hasOpenModalOverlay()).toBe(true);
+    });
+
+    it('does not change the Escape order: the topmost overlay closes first, modal or not', async () => {
+        const modal = await open({ modal: true });
+        const popup = await open({});
+        escape();
+        expect(popup.emitted('escape')).toHaveLength(1);
+        expect(modal.emitted('escape')).toBeUndefined();
     });
 });

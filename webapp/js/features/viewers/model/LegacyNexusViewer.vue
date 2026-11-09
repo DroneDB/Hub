@@ -1,6 +1,6 @@
 <template>
     <ModelViewerShell v-model:error="error" v-model:settings-open="showSettings" :settings="settings" :loading="loading"
-                      :loaded="loaded" :has-texture="modelInfo.hasTexture" @reset="resetSettings">
+                      :loaded="loaded" :has-texture="modelInfo.hasTexture" @reset="resetSettings" @home="goHome">
         <canvas ref="canvas" />
     </ModelViewerShell>
 </template>
@@ -60,6 +60,11 @@ function loadNexus() {
     }, () => {}, stage.renderer, false);
     stage.scene.add(nexusObj);
     stage.start();
+}
+
+// Home (the button, and the keys Home, H and 0): the camera back to the framing of the model
+function goHome() {
+    stage?.resetView();
 }
 
 onMounted(async () => {

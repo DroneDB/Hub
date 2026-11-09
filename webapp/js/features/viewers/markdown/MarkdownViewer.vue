@@ -12,7 +12,7 @@
                 <textarea ref="editor" v-model="rawContent" aria-label="Markdown source" :readonly="saving" />
             </div>
             <template v-else>
-                <Button v-if="canWrite" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" aria-label="Edit"
+                <Button v-if="canWrite" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" label="Edit"
                         @click="edit" />
                 <!-- eslint-disable-next-line vue/no-v-html -- sanitised by renderMarkdown -->
                 <div class="content" v-html="content" />
@@ -182,9 +182,111 @@ textarea {
 
 .content {
     padding: var(--ddb-spacing-md);
+    color: var(--ddb-text);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
 }
 
 .content :deep(img) {
     max-width: 100%;
+}
+
+/* GitHub-like rendering of what renderMarkdown produces */
+.content :deep(h1),
+.content :deep(h2),
+.content :deep(h3),
+.content :deep(h4),
+.content :deep(h5),
+.content :deep(h6) {
+    margin: var(--ddb-spacing-lg) 0 var(--ddb-spacing-md);
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.content :deep(h1),
+.content :deep(h2) {
+    padding-bottom: var(--ddb-spacing-xs);
+    border-bottom: 1px solid var(--ddb-border-light);
+}
+
+.content :deep(h1) { font-size: var(--ddb-font-size-title); }
+.content :deep(h2) { font-size: var(--ddb-font-size-xl); }
+.content :deep(h3) { font-size: var(--ddb-font-size-lg); }
+.content :deep(h4),
+.content :deep(h5),
+.content :deep(h6) { font-size: var(--ddb-font-size-base); }
+
+.content :deep(p),
+.content :deep(ul),
+.content :deep(ol) {
+    margin: 0 0 var(--ddb-spacing-md);
+}
+
+.content :deep(ul),
+.content :deep(ol) {
+    padding-left: var(--ddb-spacing-xl);
+}
+
+.content :deep(table) {
+    display: block;
+    max-width: 100%;
+    overflow: auto;
+    margin: 0 0 var(--ddb-spacing-md);
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.content :deep(th),
+.content :deep(td) {
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+    border: 1px solid var(--ddb-border);
+}
+
+.content :deep(th) {
+    font-weight: 600;
+    background: var(--ddb-bg-light);
+}
+
+.content :deep(tbody tr:nth-child(even)) {
+    background: var(--ddb-bg-subtle);
+}
+
+.content :deep(code) {
+    padding: 0.15em 0.4em;
+    font-family: monospace;
+    font-size: 85%;
+    background: var(--ddb-bg-subtle);
+    border-radius: var(--ddb-radius-sm);
+}
+
+.content :deep(pre) {
+    margin: 0 0 var(--ddb-spacing-md);
+    padding: var(--ddb-spacing-md);
+    overflow: auto;
+    line-height: 1.45;
+    background: var(--ddb-bg-subtle);
+    border: 1px solid var(--ddb-border-light);
+    border-radius: var(--ddb-radius-md);
+}
+
+.content :deep(pre code) {
+    padding: 0;
+    font-size: 100%;
+    background: transparent;
+    border-radius: 0;
+}
+
+.content :deep(blockquote) {
+    margin: 0 0 var(--ddb-spacing-md);
+    padding: 0 var(--ddb-spacing-md);
+    color: var(--ddb-text-secondary);
+    border-left: 0.25em solid var(--ddb-border-medium);
+}
+
+.content :deep(hr) {
+    height: 0;
+    margin: var(--ddb-spacing-lg) 0;
+    border: 0;
+    border-top: 1px solid var(--ddb-border-medium);
 }
 </style>

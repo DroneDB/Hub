@@ -76,8 +76,14 @@ describe('estimated up', () => {
         expect(formatEstimatedUp(null)).toBe('Not estimated');
         expect(formatEstimatedUp({})).toBe('Not estimated');
         expect(formatEstimatedUp({ up: [0, 0, 0], upConfidence: 1 })).toBe('Not estimated');
-        expect(formatEstimatedUp({ up: [0, 1, 0] })).toBe('+Y, confidence unknown');
         expect(formatEstimatedUp({ up: [0, 1, 0], upConfidence: 3, upSource: 'magic' })).toBe('+Y, 100% sure');
+    });
+
+    it('says there is no reliable estimate when estimatedUp finds none, keeping the source label', () => {
+        expect(formatEstimatedUp({ up: [0, -1, 0], upConfidence: 0 })).toBe('No reliable estimate');
+        expect(formatEstimatedUp({ up: [0, -1, 0], upConfidence: 0, upSource: 'ground-plane' })).toBe('No reliable estimate (ground plane)');
+        expect(formatEstimatedUp({ up: [0, 1, 0], upConfidence: 0.59, upSource: 'pca' })).toBe('No reliable estimate (principal axes)');
+        expect(formatEstimatedUp({ up: [0, 1, 0] })).toBe('No reliable estimate');
     });
 });
 

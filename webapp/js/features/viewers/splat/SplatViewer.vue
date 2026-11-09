@@ -101,6 +101,7 @@ import { useNotify } from '@/composables/useNotify';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
 import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import AnnotationManager from './AnnotationManager.vue';
 import CameraManager from './CameraManager.vue';
 import PinCard from './PinCard.vue';
@@ -199,7 +200,11 @@ const { annotations, activePin } = views;
 const { removePin, movePin, renamePin, editPin, updatePinView } = views;
 const shownPin = computed(() => (activePin.value === null ? null : annotations.value[activePin.value] ?? null));
 const shownPinCoordinates = computed(() => (shownPin.value && coordWriter.value ? coordWriter.value(shownPin.value.position) : ''));
-const shownPinImage = computed(() => (shownPin.value?.image ? dataset.value.thumbUrl(shownPin.value.image, 800) : ''));
+// The card is 22 rem wide at most (352 css px): the bitmap follows the pixel ratio (FR-XC-32)
+const PIN_IMAGE_CSS_PX = 352;
+const shownPinImage = computed(() => (shownPin.value?.image
+    ? dataset.value.thumbUrl(shownPin.value.image, thumbnailRequestSize(PIN_IMAGE_CSS_PX))
+    : ''));
 const infoSource = computed(() => ({
     entry: entry.value, bounds: boundsInfo.value, scale: measureScale.value, streaming: streaming.value,
     quality: describeQuality(qualitySetting.value, qualityLevel.value)
@@ -404,9 +409,8 @@ async function loadSplat() {
     frameRetry.start();
     loaded.value = true;
     applyNavMode();
-    // A tour through the saved cameras, else a slow orbit; any navigation stops it, P resumes
-    startPresentation();
-
+    // The tour waits for the user (FR-VWR-31): the scene opens without moving, and the rail
+    // highlights 'Start cycling' with a hint to press P
     stage.start();
 }
 

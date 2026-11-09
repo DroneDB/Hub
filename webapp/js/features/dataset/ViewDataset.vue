@@ -90,6 +90,7 @@ import { useOpenItem } from '@/composables/useOpenItem';
 import { useDatasetShortcuts } from '@/composables/useDatasetShortcuts';
 import { useViewActions } from '@/composables/useViewActions';
 import { useEventListener } from '@/composables/useEventListener';
+import { hasOpenModalOverlay } from '@/composables/useOverlay';
 import { listViews } from '@/libs/views/viewStore';
 import Message from '@/components/HubMessage.vue';
 import ResourceState from '@/components/ResourceState.vue';
@@ -204,8 +205,10 @@ const { openItem } = useOpenItem({
     }
 });
 
+// A dialog, or a modal overlay over the page (the photo or video lightbox, a modal window), takes
+// the keys; a non-modal one (the draggable map popup) leaves them to the page
 useDatasetShortcuts({
-    blocked: () => dialogs.stack.value.length > 0,
+    blocked: () => dialogs.stack.value.length > 0 || hasOpenModalOverlay(),
     canWrite,
     selected: () => listing.selected.value,
     treeFor: target => (target.closest && target.closest('.tree-view')

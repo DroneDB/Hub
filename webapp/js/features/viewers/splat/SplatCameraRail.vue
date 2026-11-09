@@ -1,39 +1,45 @@
 <template>
-    <div class="camera-rail">
-        <div v-if="cameras.length" class="rail-cameras">
-            <button v-for="(cam, i) in cameras" :key="cam.id" class="rail-btn cam" :class="{ active: i === activeIndex }"
-                    :title="cam.name || `Camera ${i + 1}`" :aria-label="cam.name || `Camera ${i + 1}`" @click="emit('goto', i)">
-                {{ i + 1 }}
+    <div class="camera-rail-anchor">
+        <div class="camera-rail">
+            <div v-if="cameras.length" class="rail-cameras">
+                <button v-for="(cam, i) in cameras" :key="cam.id" class="rail-btn cam" :class="{ active: i === activeIndex }"
+                        :title="cam.name || `Camera ${i + 1}`" :aria-label="cam.name || `Camera ${i + 1}`" @click="emit('goto', i)">
+                    {{ i + 1 }}
+                </button>
+            </div>
+            <div v-if="cameras.length" class="rail-sep" />
+            <button class="rail-btn" :class="{ active: mode === 'orbit' }" :title="mode === 'orbit' ? 'Stop orbit' : 'Start orbit'"
+                    :aria-label="mode === 'orbit' ? 'Stop orbit' : 'Start orbit'" @click="emit('toggle-orbit')">
+                <i :class="mode === 'orbit' ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
             </button>
+            <button v-if="hasTour" class="rail-btn" :class="{ active: mode === 'tour', waiting: tourPaused }"
+                    :title="mode === 'tour' ? 'Stop cycling' : tourPaused ? `Start cycling. ${TOUR_HINT}` : 'Start cycling'"
+                    :aria-label="mode === 'tour' ? 'Stop cycling' : 'Start cycling'" :aria-describedby="tourPaused ? 'splat-tour-hint' : undefined"
+                    @click="emit('toggle-tour')">
+                <i class="fa-solid fa-camera-rotate" />
+            </button>
+            <template v-if="canWrite">
+                <button class="rail-btn" title="Save current view as a camera" aria-label="Save current view as a camera" @click="emit('add')">
+                    <i class="fa-solid fa-camera" />
+                </button>
+                <button class="rail-btn" :class="{ dirty }" :disabled="!dirty" title="Save the views to the dataset"
+                        aria-label="Save the views to the dataset" @click="emit('save')">
+                    <i class="fa-solid fa-floppy-disk" />
+                </button>
+            </template>
         </div>
-        <div v-if="cameras.length" class="rail-sep" />
-        <button class="rail-btn" :class="{ active: mode === 'orbit' }" :title="mode === 'orbit' ? 'Stop orbit' : 'Start orbit'"
-                :aria-label="mode === 'orbit' ? 'Stop orbit' : 'Start orbit'" @click="emit('toggle-orbit')">
-            <i :class="mode === 'orbit' ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
-        </button>
-        <button v-if="hasTour" class="rail-btn" :class="{ active: mode === 'tour' }"
-                :title="mode === 'tour' ? 'Stop cycling' : 'Start cycling'" :aria-label="mode === 'tour' ? 'Stop cycling' : 'Start cycling'"
-                @click="emit('toggle-tour')">
-            <i class="fa-solid fa-camera-rotate" />
-        </button>
-        <template v-if="canWrite">
-            <button class="rail-btn" title="Save current view as a camera" aria-label="Save current view as a camera" @click="emit('add')">
-                <i class="fa-solid fa-camera" />
-            </button>
-            <button class="rail-btn" :class="{ dirty }" :disabled="!dirty" title="Save the views to the dataset"
-                    aria-label="Save the views to the dataset" @click="emit('save')">
-                <i class="fa-solid fa-floppy-disk" />
-            </button>
-        </template>
+        <p v-if="tourPaused" id="splat-tour-hint" class="rail-hint">{{ TOUR_HINT }}</p>
     </div>
 </template>
 
 <script setup>
+import { computed } from 'vue';
+
 /**
  * The splat viewer's left-edge camera rail: jump to a saved
  * camera, toggle the orbit or the tour, save the current view and the cameras.
  */
-defineProps({
+const props = defineProps({
     cameras: { type: Array, required: true },
     activeIndex: { type: Number, default: null },
     /** Presentation mode: 'orbit', 'tour', 'transition' or null */
@@ -44,6 +50,10 @@ defineProps({
     hasTour: { type: Boolean, default: false }
 });
 const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save']);
+
+/** The tour waits for the user (it does not start by itself): the button is highlighted and says how to play it. */
+const TOUR_HINT = 'Press P to play the tour';
+const tourPaused = computed(() => props.hasTour && props.mode === null);
 </script>
 
 <style scoped lang="scss">
@@ -51,16 +61,37 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
 
 /* Left-edge camera rail (vertically centered): jump between saved cameras,
    toggle the auto-orbit, save the current view, and persist to the dataset. */
-.camera-rail {
+.camera-rail-anchor {
     position: absolute;
     left: 0;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     flex-direction: column;
+    max-height: 82%;
+}
+
+.rail-hint {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0 0 0 0.5rem;
+    padding: 0.25rem 0.6rem;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: rgb(var(--ddb-glass-rgb));
+    background: rgba(var(--ddb-shade-rgb), 0.7);
+    border-radius: var(--ddb-radius-sm);
+    pointer-events: none;
+}
+
+.camera-rail {
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.3rem;
-    max-height: 82%;
+    min-height: 0;
     overflow-y: auto;
     padding: 0.35rem var(--splat-rail-padding);
     background: rgba(var(--ddb-shade-rgb), 0.35);
@@ -88,6 +119,11 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
 }
 .rail-btn.dirty {
     border-color: rgba(var(--ddb-viewer-accent-rgb), 0.9);
+}
+/* The tour is waiting for the user: stands out like an active button, without being on */
+.rail-btn.waiting {
+    border-color: var(--ddb-primary-300);
+    box-shadow: 0 0 0 2px rgba(var(--ddb-primary-rgb), 0.55);
 }
 
 

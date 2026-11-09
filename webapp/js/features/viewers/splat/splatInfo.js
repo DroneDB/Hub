@@ -8,7 +8,7 @@
  * a field that is missing or not of its type is "unknown" and never an error.
  */
 import { measureFormatters } from '@/features/viewers/unified/sceneUtils';
-import { UP_AXES, ESTIMATE_LABELS } from './upAxis';
+import { UP_AXES, ESTIMATE_LABELS, estimatedUp } from './upAxis';
 import { isVec3 } from './measureMath';
 import { formatNumber, UNKNOWN } from '@/libs/format';
 
@@ -58,8 +58,10 @@ export function formatGeoreference(properties) {
 }
 
 /**
- * The up the build estimated, as "+Z, 85% sure (ground plane)", or "Not estimated". A direction
- * close to a world axis is named by it, any other is given as a vector of the file.
+ * The up the build estimated, as "+Z, 85% sure (ground plane)", "Not estimated" without one, or
+ * "No reliable estimate (ground plane)" when `estimatedUp` finds the confidence too low to use it
+ * (FR-VWR-31). A direction close to a world axis is named by it, any other is given as a vector
+ * of the file.
  * @param {any} bounds
  */
 export function formatEstimatedUp(bounds) {
@@ -67,12 +69,14 @@ export function formatEstimatedUp(bounds) {
     if (!isVec3(up)) return 'Not estimated';
     const length = Math.hypot(up[0], up[1], up[2]);
     if (!(length > 1e-9)) return 'Not estimated';
-    const unit = up.map(v => v / length);
+    const source = Object.hasOwn(ESTIMATE_LABELS, bounds.upSource) ? ` (${ESTIMATE_LABELS[bounds.upSource]})` : '';
+    const estimate = estimatedUp(bounds);
+    if (!estimate) return `No reliable estimate${source}`;
+    const unit = estimate.up;
     const axis = UP_AXES.find(a => a.up[0] * unit[0] + a.up[1] * unit[1] + a.up[2] * unit[2] >= AXIS_COS);
     const direction = axis ? axis.id.toUpperCase() : `(${unit.map(v => v.toFixed(2)).join(', ')})`;
     const confidence = typeof bounds.upConfidence === 'number' && Number.isFinite(bounds.upConfidence)
         ? `${Math.round(Math.min(1, Math.max(0, bounds.upConfidence)) * 100)}% sure` : 'confidence unknown';
-    const source = Object.hasOwn(ESTIMATE_LABELS, bounds.upSource) ? ` (${ESTIMATE_LABELS[bounds.upSource]})` : '';
     return `${direction}, ${confidence}${source}`;
 }
 

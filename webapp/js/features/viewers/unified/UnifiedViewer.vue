@@ -1,6 +1,7 @@
 <template>
     <ViewerShell id="unified-viewer" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading" :load-error="loadError"
-                 :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings">
+                 :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings"
+                 nav-toolbar :gestures="GESTURES" @home="goHome">
         <template #loading>
             <LoadingSpinner :label="loadingText" />
             <LoadProgress :progress="progress" />
@@ -39,14 +40,6 @@
             </label>
         </div>
 
-        <!-- Navigation toolbar (bottom-left): one navigation mode in every scene, so Home
-                 is the only control it needs. -->
-        <div v-if="ready" class="nav-toolbar">
-            <button title="Home - return to the framed view (Home key)" aria-label="Home" @click="goHome">
-                <i class="fa-solid fa-house" />
-            </button>
-        </div>
-
         <template #settings>
             <RangeSetting v-model="settings.ambientIntensity" label="Ambient" :max="5" />
             <RangeSetting v-model="settings.directionalIntensity" label="Directional" :max="5" />
@@ -76,7 +69,6 @@ import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
-import keyboard from '@/libs/keyboard';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { loadGiro3dLibs } from './giro3dLibs';
 import { UnifiedScene } from './unifiedScene';
@@ -115,6 +107,15 @@ watch(settings, () => { if (scene) scene.updateLighting(); }, { deep: true });
 const measureUnit = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 watch(measureUnit, () => { if (measureTool) measureTool.relabel(); });
 
+// What the navigation does (the help of the toolbar of ViewerShell, which also takes Home, H and 0)
+const GESTURES = [
+    { input: 'Left drag', action: 'Rotate' },
+    { input: 'Right drag or Ctrl + left drag', action: 'Pan' },
+    { input: 'Wheel or pinch', action: 'Zoom' },
+    { input: 'Shift + wheel', action: 'Field of view' },
+    { input: 'Double click', action: 'Focus on the point' }
+];
+
 const measure = kind => measureTool && measureTool.measure(kind);
 const clearMeasurements = () => measureTool && measureTool.clear();
 const goHome = () => scene && scene.goHome();
@@ -151,23 +152,11 @@ async function load() {
     }
 }
 
-// Home / 0 re-frames, whatever has the focus (but not while typing)
-function onHomeKey(e) {
-    const t = e.target;
-    if (!ready.value || (t instanceof Element && (t.closest('input, textarea') || t.isContentEditable))) return;
-    if (e.key === 'Home' || e.key === '0') {
-        e.preventDefault();
-        goHome();
-    }
-}
-
 onMounted(async () => {
-    keyboard.onKeyDown(onHomeKey);
     if (await entryLoaded) await load();
 });
 
 onBeforeUnmount(() => {
-    keyboard.offKeyDown(onHomeKey);
     dispose();
 });
 </script>

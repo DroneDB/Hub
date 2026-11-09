@@ -42,6 +42,34 @@ describe('measure snapshots', () => {
         expect(matchesSnapshot(restored, data)).toBe(true);
         expect(matchesSnapshot(measure([[1, 2, 3], [4, 5, 7]]), data)).toBe(false);
     });
+
+    it('keep the description, the look of the properties dialog, the kind and the units', () => {
+        const meter = { code: 'm', unitspermeter: 1 };
+        const original = measure([[1, 2, 3]], { name: 'Pole', maxMarkers: 1, showCoordinates: true, showAzimuth: true, lengthUnit: meter });
+        assignMeasureProperties(original, {
+            description: 'Top of the pole', stroke: '#00ff00', 'stroke-width': 4, 'stroke-opacity': 0.5, fill: '#0000ff', 'fill-opacity': 0.6
+        });
+        const restored = restoreMeasure(snapshotMeasure(original));
+        expect(restored).not.toBe(original);
+        expect(restored.description).toBe('Top of the pole');
+        expect(restored.color.getHexString()).toBe('00ff00');
+        expect(restored.strokeWidth).toBe(4);
+        expect(restored.strokeOpacity).toBe(0.5);
+        expect(restored.fillColor.getHexString()).toBe('0000ff');
+        expect(restored.fillOpacity).toBe(0.6);
+        expect(restored.maxMarkers).toBe(1);
+        expect(restored.showCoordinates).toBe(true);
+        expect(restored.showAzimuth).toBe(true);
+        expect(restored.lengthUnit).toBe(meter);
+    });
+
+    it('leave what the measure did not have to Potree\'s defaults', () => {
+        const restored = restoreMeasure(snapshotMeasure(measure([[0, 0, 0], [1, 0, 0]], { name: 'Plain' })));
+        expect(restored.description).toBeUndefined();
+        expect(restored.fillColor).toBeUndefined();
+        expect(restored.maxMarkers).toBeUndefined();
+        expect(restored.showAzimuth).toBe(false);
+    });
 });
 
 describe('measure style', () => {

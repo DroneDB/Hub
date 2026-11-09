@@ -26,10 +26,11 @@
  */
 import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 import { tokenHex } from '@/libs/colorScheme';
+import { appliedPixelRatio, MAX_PIXEL_RATIO } from '@/libs/pixelRatio';
 
 // Splat rendering is limited by fill rate: a phone at a ratio of 3 or more draws 2.25 times the
-// pixels of a ratio of 2 for a sharpness no one sees on soft splats
-export const MAX_PIXEL_RATIO = 2;
+// pixels of a ratio of 2 for a sharpness no one sees on soft splats (the cap lives in libs/pixelRatio.js)
+export { MAX_PIXEL_RATIO };
 // The viewers are dark in both themes: --ddb-viewer-bg has one value
 const BACKGROUND = () => tokenHex('--ddb-viewer-bg');
 
@@ -94,8 +95,7 @@ export function createSplatStage({
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     // The cap on the pixel ratio: the quality preset moves it (up to MAX_PIXEL_RATIO)
     let pixelCap = MAX_PIXEL_RATIO;
-    const drawRatio = () => Math.min(window.devicePixelRatio || 1, pixelCap);
-    renderer.setPixelRatio(drawRatio());
+    renderer.setPixelRatio(appliedPixelRatio(pixelCap));
     renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
 
     const scene = new THREE.Scene();
@@ -178,7 +178,8 @@ export function createSplatStage({
         spark.lodSplatScale = preset.lodSplatScale;
         pixelCap = Math.min(preset.pixelRatio, MAX_PIXEL_RATIO);
         // The canvas follows the new ratio on the next frame (fitCanvas compares its buffer with it)
-        if (renderer.getPixelRatio() !== drawRatio()) renderer.setPixelRatio(drawRatio());
+        const ratio = appliedPixelRatio(pixelCap);
+        if (renderer.getPixelRatio() !== ratio) renderer.setPixelRatio(ratio);
         if (mesh) qualifyMesh(mesh);
     }
 

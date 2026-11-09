@@ -39,19 +39,24 @@ onMounted(async () => {
         await loadResources('/photosphereviewer/photo-sphere-viewer.min.css');
         await loadResources('/photosphereviewer/photo-sphere-viewer.min.js');
         if (left) return;
-        const p = entry.value.properties;
+        const p = entry.value.properties || {};
+        // The size of the whole sphere of a cropped panorama (GPano FullPanoWidthPixels/HeightPixels). The size of
+        // the image is the cropped part, not the sphere: it is never given as the full size (FR-VWR-19). Without
+        // it in the entry the viewer reads the GPano XMP of the file (it is the original), and failing that it has
+        // the image size, which is right for a complete panorama.
+        const hasFullSize = [p.fullWidth, p.fullHeight].every(v => typeof v === 'number' && v > 0);
         viewer = new PhotoSphereViewer.Viewer({
             container: container.value,
             panorama: dataset.value.downloadUrl(entry.value.path, { inline: true }),
             loadingTxt: 'Loading ...',
-            useXmpData: false,
+            useXmpData: !hasFullSize,
             // The viewers are dark in both themes: the token has one value
             canvasBackground: colorToken('--ddb-viewer-canvas-bg'),
             minFov: 1,
             defaultZoomLvl: 60,
             panoData: {
-                fullWidth: p.width,
-                fullHeight: p.height,
+                fullWidth: hasFullSize ? p.fullWidth : undefined,
+                fullHeight: hasFullSize ? p.fullHeight : undefined,
                 croppedWidth: p.croppedWidth,
                 croppedHeight: p.croppedHeight,
                 croppedX: p.croppedX,

@@ -21,6 +21,7 @@ vi.mock('./modelStage', () => ({
             setMaterialColor: vi.fn(),
             scene: { add: vi.fn() },
             frameModel: vi.fn(),
+            resetView: vi.fn(),
             start: vi.fn(),
             dispose: vi.fn()
         };
@@ -34,7 +35,7 @@ const { default: Bm3dViewer } = await import('./Bm3dViewer.vue');
 const ARTIFACT = { role: 'model.bm3d', url: 'http://registry.invalid/orgs/o/ds/d/build/h/bm3d/model.bm3d' };
 const entry = { path: 'house.obj', hash: 'h', artifacts: [ARTIFACT] };
 const dataset = { Entry: vi.fn(e => ({ getModelArtifact: () => `/orgs/o/ds/d/build/${e.hash}/bm3d/model.bm3d` })) };
-const ViewerShell = { template: '<div><slot /></div>' };
+const ViewerShell = { props: { navToolbar: Boolean, gestures: Array }, emits: ['home'], template: '<div><slot /></div>' };
 
 let wrapper;
 async function open(props = { entry, dataset }) {
@@ -63,6 +64,25 @@ describe('Bm3dViewer', () => {
         model.material = { map: null, vertexColors: false, isMeshLambertMaterial: true };
         model.onLoad(model);
         expect(h.stage.frameModel).toHaveBeenCalledWith(model, model.geometry.boundingSphere);
+    });
+
+    it('asks for the navigation toolbar with the gestures of the arcball, and Home puts the camera back to the framing of the stage', async () => {
+        await open();
+        const shell = wrapper.findComponent(ViewerShell);
+        expect(shell.props('navToolbar')).toBe(true);
+        expect(shell.props('gestures').map(g => g.action)).toEqual(expect.arrayContaining(['Rotate', 'Pan', 'Zoom']));
+        expect(h.stage.resetView).not.toHaveBeenCalled();
+        // The button and the keys Home, H and 0 are ViewerShell's: they all arrive as its home event
+        shell.vm.$emit('home');
+        shell.vm.$emit('home');
+        expect(h.stage.resetView).toHaveBeenCalledTimes(2);
+    });
+
+    it('Home before the stage exists does nothing', async () => {
+        wrapper = mount(Bm3dViewer, { props: { entry, dataset: { Entry: () => ({ getModelArtifact: () => { throw new Error('x'); } }) } }, global: { stubs: { ViewerShell } } });
+        wrapper.findComponent(ViewerShell).vm.$emit('home');
+        await flushPromises();
+        expect(h.stage).toBeNull();
     });
 
     it('shades a model with normals and no texture with the material of the stage, with its vertex colours', async () => {

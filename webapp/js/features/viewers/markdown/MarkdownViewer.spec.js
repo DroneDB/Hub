@@ -105,6 +105,16 @@ describe('MarkdownViewer', () => {
         expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
     });
 
+    it('labels Edit and Save with visible text, not only an icon', async () => {
+        source.canWrite = true;
+        await render('# Old');
+        const edit = wrapper.find('button[aria-label="Edit"]');
+        expect(edit.text()).toBe('Edit');
+        await edit.trigger('click');
+        await flushPromises();
+        expect(wrapper.find('button[aria-label="Save"]').text()).toBe('Save');
+    });
+
     it('lets a writer edit the source, saves it and renders the new text', async () => {
         source.canWrite = true;
         await render('# Old');

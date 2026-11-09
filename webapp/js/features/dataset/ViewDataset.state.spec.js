@@ -5,7 +5,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils';
-import { ref, h, defineComponent, onMounted } from 'vue';
+import { ref, h, defineComponent, onMounted, effectScope } from 'vue';
+import PrimeVue from 'primevue/config';
 import { createPinia, setActivePinia } from 'pinia';
 
 const h_ = vi.hoisted(() => ({ dataset: null, showError: null, loggedIn: true }));
@@ -43,6 +44,10 @@ vi.mock('./TaskHistory.vue', () => ({ default: { render: () => null } }));
 const { default: ViewDataset } = await import('./ViewDataset.vue');
 const { ApiError } = await import('@/libs/ddb/apiError');
 const { useDatasetSessionStore } = await import('@/stores/datasetSession');
+const { useDatasetShortcuts } = await import('@/composables/useDatasetShortcuts');
+const { default: PhotoLightbox } = await import('./PhotoLightbox.vue');
+const { default: MapFilePopup } = await import('@/features/viewers/map/MapFilePopup.vue');
+const { hasOpenOverlay } = await import('@/composables/useOverlay');
 
 // The tree asks for the root of the dataset when it mounts, as the real one does
 const FileBrowserStub = defineComponent({
@@ -124,5 +129,78 @@ describe('ViewDataset page states', () => {
         await open(Promise.resolve([{ path: '', type: 1, properties: { permissions: { canRead: true } } }]));
         expect(wrapper.find('.panel').exists()).toBe(true);
         expect(useDatasetSessionStore().unavailable).toBe(false);
+    });
+});
+
+describe('ViewDataset keyboard shortcuts', () => {
+    it('leave the keys to an overlay over the page: Delete, Ctrl+C and Ctrl+X do nothing under the photo lightbox', async () => {
+        await open(Promise.resolve([{ path: '', type: 1, properties: { permissions: { canRead: true } } }]));
+        // The page's rule, run by the real shortcuts
+        const { blocked } = useDatasetShortcuts.mock.calls.at(-1)[0];
+        const { useDatasetShortcuts: realShortcuts } = await vi.importActual('@/composables/useDatasetShortcuts');
+        const actions = { remove: vi.fn(), upload: vi.fn(), importFromUrl: vi.fn() };
+        const clipboard = { copy: vi.fn(), cut: vi.fn(), paste: vi.fn() };
+        const scope = effectScope();
+        scope.run(() => realShortcuts({
+            blocked, canWrite: ref(true), selected: () => [{ path: 'a.jpg', entry: { path: 'a.jpg', type: 6 } }], treeFor: () => null, actions, clipboard
+        }));
+        expect(blocked()).toBe(false);
+
+        const lightbox = mount(PhotoLightbox, {
+            props: { dataset: { thumbUrl: p => `/thumb/${p}`, downloadUrl: p => `/download/${p}` }, photos: [{ path: 'a.jpg', entry: { path: 'a.jpg', type: 6 } }] },
+            attachTo: document.body, global: { plugins: [PrimeVue, pinia] }
+        });
+        await flushPromises();
+        expect(blocked()).toBe(true);
+        const press = (key, mods = {}) => (document.activeElement || document.body)
+            .dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mods }));
+        press('Delete');
+        press('c', { ctrlKey: true });
+        press('x', { ctrlKey: true });
+        expect(actions.remove).not.toHaveBeenCalled();
+        expect(clipboard.copy).not.toHaveBeenCalled();
+        expect(clipboard.cut).not.toHaveBeenCalled();
+
+        // Closed, the page has its keys again
+        lightbox.unmount();
+        expect(blocked()).toBe(false);
+        press('Delete');
+        expect(actions.remove).toHaveBeenCalledTimes(1);
+        scope.stop();
+    });
+
+    it('keep the keys of the page under a map popup (not modal): Delete, Ctrl+C and Ctrl+X work', async () => {
+        await open(Promise.resolve([{ path: '', type: 1, properties: { permissions: { canRead: true } } }]));
+        const { blocked } = useDatasetShortcuts.mock.calls.at(-1)[0];
+        const { useDatasetShortcuts: realShortcuts } = await vi.importActual('@/composables/useDatasetShortcuts');
+        const actions = { remove: vi.fn(), upload: vi.fn(), importFromUrl: vi.fn() };
+        const clipboard = { copy: vi.fn(), cut: vi.fn(), paste: vi.fn() };
+        const scope = effectScope();
+        scope.run(() => realShortcuts({
+            blocked, canWrite: ref(true), selected: () => [{ path: 'a.txt', entry: { path: 'a.txt', type: 2 } }], treeFor: () => null, actions, clipboard
+        }));
+
+        // The draggable popup of a file on the map, shown: an overlay, but not a modal one
+        const target = document.createElement('div');
+        document.body.appendChild(target);
+        const map = { addOverlay: o => target.appendChild(o.getElement().parentElement), removeOverlay: vi.fn(), getTargetElement: () => target };
+        const popup = mount(MapFilePopup, { props: { map }, attachTo: document.body });
+        popup.vm.show({ path: 'ddb://localhost/org/ds/a.txt', entry: { path: 'a.txt', type: 2, properties: {}, point_geom: { type: 'Point', coordinates: [9, 45] } } }, [0, 0]);
+        await flushPromises();
+        expect(hasOpenOverlay()).toBe(true);
+        expect(blocked()).toBe(false);
+
+        const press = (key, mods = {}) => document.body
+            .dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mods }));
+        press('Delete');
+        press('c', { ctrlKey: true });
+        press('x', { ctrlKey: true });
+        expect(actions.remove).toHaveBeenCalledTimes(1);
+        expect(clipboard.copy).toHaveBeenCalledTimes(1);
+        expect(clipboard.cut).toHaveBeenCalledTimes(1);
+
+        popup.unmount();
+        target.remove();
+        scope.stop();
     });
 });

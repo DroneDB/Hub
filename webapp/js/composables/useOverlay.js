@@ -26,6 +26,9 @@
  *   overlay (or nowhere): a click elsewhere keeps its focus.
  * - The focus trap: `vFocusTrap`, PrimeVue's focustrap directive (HubWindow gets it from its
  *   modal Dialog).
+ * - `modal`: the overlay takes the whole page (a lightbox, a modal window), so the page's own
+ *   shortcuts stop while it is shown (`hasOpenModalOverlay`). A non-modal overlay (a draggable
+ *   map popup, a viewer's settings panel) only takes Escape. It changes nothing in the Escape order.
  *
  *   const { isTopmost, focusInitial } = useOverlay({
  *       active: () => props.visible, container: () => el.value,
@@ -47,6 +50,7 @@ export const vFocusTrap = FocusTrap;
  * @property {import('vue').MaybeRefOrGetter<boolean>} [danger]  a destructive confirmation: the focus starts on [data-cancel]
  * @property {() => (HTMLElement | null | undefined)} [returnTo]  where the focus goes on close, instead of the opener
  * @property {boolean} [autoFocus]  focus the target on the tick after it is pushed (else call focusInitial)
+ * @property {import('vue').MaybeRefOrGetter<boolean>} [modal]  it covers the page: the page's shortcuts stop (default false)
  */
 
 /**
@@ -55,6 +59,7 @@ export const vFocusTrap = FocusTrap;
  * @property {() => (HTMLElement | null)} focusRoot
  * @property {((e: KeyboardEvent) => void) | undefined} onEscape
  * @property {() => boolean} danger
+ * @property {() => boolean} modal
  * @property {(() => (HTMLElement | null | undefined)) | undefined} returnTo
  * @property {HTMLElement | null} opener
  * @property {number[]} frames
@@ -221,6 +226,11 @@ export function hasOpenOverlay() {
     return stack.length > 0;
 }
 
+/** Whether a modal overlay is shown (a lightbox, a modal window): the page's shortcuts wait. */
+export function hasOpenModalOverlay() {
+    return stack.some(overlay => overlay.modal());
+}
+
 /**
  * Puts the overlay on the stack while `active` is true.
  * @param {OverlayOptions} options
@@ -233,6 +243,7 @@ export function useOverlay(options) {
         focusRoot: () => (options.focusRoot ? options.focusRoot() : options.container()) || null,
         onEscape: options.onEscape,
         danger: () => !!toValue(options.danger),
+        modal: () => !!toValue(options.modal),
         returnTo: options.returnTo,
         opener: null,
         frames: []

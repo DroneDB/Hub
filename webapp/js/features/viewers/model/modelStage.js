@@ -12,11 +12,14 @@
  *   const model = new Bm3dObject(url, () => stage.frameModel(model, sphere), () => {}, stage.renderer);
  *   stage.scene.add(model);
  *   stage.start();                 // ...and stage.dispose() when the viewer goes away
+ *   stage.resetView();             // Home: the camera back to the framing of the model
  */
 import { watch } from 'vue';
 import { fitDistance, canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 import { tokenHex } from '@/libs/colorScheme';
 
+// The vertical field of view of the camera, in degrees
+const FOV = 35;
 // Room around the unit sphere the model is scaled to (the mesh is not strictly inside it)
 const FIT_MARGIN = 1.25;
 // The viewers are dark in both themes: --ddb-viewer-bg has one value
@@ -63,7 +66,7 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     // (the colour space is not a parameter there)
     const colour = hex => new THREE.Color().setHex(hex, THREE.LinearSRGBColorSpace);
 
-    const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(FOV, 2, 0.1, 100);
     camera.position.z = 4.0;
     // The model is scaled to a sphere of radius 1; the camera stands where that sphere (and some
     // room, as the mesh reaches out of it) fits the canvas, whatever its shape
@@ -127,6 +130,38 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         object.scale.set(s, s, s);
     }
 
+    /**
+     * Home: puts the camera back where the model is framed (the fitted distance on the +z axis, the
+     * field of view and the up the stage started with, the unit sphere in the middle) and drops the
+     * rotation, pan and zoom of the arcball controls. The controls restore a saved state, so the
+     * framing is saved first.
+     */
+    function resetView() {
+        // An inertia or a focus the controls still run on animation frames would move the camera again
+        if (controls._animationId !== undefined && controls._animationId !== -1) {
+            cancelAnimationFrame(controls._animationId);
+            controls._animationId = -1;
+            controls._timeStart = -1;
+        }
+        camera.fov = FOV;
+        fittedDistance = fitDistance(1, camera.fov, camera.aspect, FIT_MARGIN);
+        camera.position.set(0, 0, fittedDistance);
+        camera.up.set(0, 1, 0);
+        camera.quaternion.set(0, 0, 0, 1);
+        camera.zoom = 1;
+        camera.updateMatrix();
+        camera.updateProjectionMatrix();
+        controls.target?.set(0, 0, 0);
+        const gizmos = controls._gizmos;
+        if (gizmos) {
+            gizmos.position.set(0, 0, 0);
+            gizmos.quaternion.set(0, 0, 0, 1);
+            gizmos.updateMatrix();
+        }
+        controls.saveState?.();
+        controls.reset?.();
+    }
+
     function fitCanvas() {
         const el = renderer.domElement;
         if (!canvasNeedsResize(el, renderer.getPixelRatio())) return;
@@ -168,5 +203,5 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         renderer.dispose();
     }
 
-    return { scene, camera, renderer, material, controls, setMaterialColor, frameModel, start, dispose };
+    return { scene, camera, renderer, material, controls, setMaterialColor, frameModel, resetView, start, dispose };
 }

@@ -1,6 +1,6 @@
 /**
  * usePotreeMeasurements - the measurements of the point-cloud viewer: count, saved file (load / save / delete), editing through the properties
- * dialogs on double click, the delete tool, and undo / redo of deletions (Ctrl+Z / Ctrl+Y).
+ * dialogs on double click, the delete tool, and undo / redo of additions and deletions (Ctrl+Z / Ctrl+Y).
  *
  * Like the 2D map, the viewer is a working copy of its measurements in the file: Save makes the file match the
  * viewer (also with nothing left to save), and Delete saved removes them from the file and the viewer. The map's
@@ -42,6 +42,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     const canUndo = ref(false);
     const canRedo = ref(false);
     const later = useTimerGroup();
+    /**
+     * Typed history (FR-VWR-13). `ref` follows the measure through undo and redo (a restored measure is a new
+     * object): an add undoes by removing `ref.measure` (its points are read at that moment, Potree adds the
+     * measure before the user has clicked its points), a removal undoes by adding a copy of `snapshot`.
+     * @type {import('@/libs/undoStack').UndoStack<{ op: 'add' | 'remove', ref: { measure: any }, snapshot: any }>}
+     */
     const history = createUndoStack({ limit: 50, onChange: h => { canUndo.value = h.canUndo(); canRedo.value = h.canRedo(); } });
 
     // Set by attach (non-reactive: Potree objects)
@@ -51,6 +57,14 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     let deleteTool = null;
     let storage = null;
     let dialog = null;
+    // The measure of a history entry, whichever object stands for it now
+    const refs = new WeakMap();
+    // Undo, redo, load and clear change the scene themselves: their events are not history
+    let replaying = 0;
+    const replay = fn => {
+        replaying++;
+        try { return fn(); } finally { replaying--; }
+    };
 
     const labelCtx = () => ({ viewer, session });
     // The file's migration needs the point cloud's SRS when the file states none
@@ -68,8 +82,10 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     // Takes what Save writes out of the viewer
     function clearMeasurements() {
         const scene = viewer.scene;
-        [...(scene.measurements || [])].forEach(measure => scene.removeMeasurement(measure));
+        replay(() => [...(scene.measurements || [])].forEach(measure => scene.removeMeasurement(measure)));
         scene.annotations.removeAllChildren();
+        // What the history refers to is gone
+        history.clear();
         countMeasurements();
     }
 
@@ -120,27 +136,95 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         session.track(title, 'dblclick', annotation._editHandler);
     }
 
-    // A deletion goes through the history, so Ctrl+Z brings the measure back
+    // The scene tells every addition and removal, the delete tool's, Potree's own remove button's and a drawing's
+    function recordAdded(measure) {
+        if (replaying || !measure) return;
+        const ref = { measure };
+        refs.set(measure, ref);
+        history.push({ op: 'add', ref, snapshot: null });
+    }
+
+    function recordRemoved(measure) {
+        // A drawing Potree takes back (one marker, never finished) is nothing to restore
+        if (replaying || !measure || ((measure.points || []).length < 2 && measure.maxMarkers > 1)) return;
+        const ref = refs.get(measure) || { measure };
+        refs.set(measure, ref);
+        history.push({ op: 'remove', ref, snapshot: snapshotMeasure(measure) });
+    }
+
+    // Potree adds a measure to the scene when its drawing starts, and the last marker follows the pointer
+    // (the input handler drags its sphere) until the measure has all its markers: such a measure is not
+    // there to be undone yet. Potree's measuring tool keeps no active measurement to ask instead.
+    function isDrawing(measure) {
+        const dragged = viewer.inputHandler && viewer.inputHandler.drag && viewer.inputHandler.drag.object;
+        return !!dragged && (measure.spheres || []).includes(dragged) && (measure.points || []).length < measure.maxMarkers;
+    }
+    const drawingAny = () => (viewer.scene.measurements || []).some(isDrawing);
+
+    const sceneHas = measure => !!measure && (viewer.scene.measurements || []).includes(measure);
+
+    // A deletion goes through the scene's event, so Ctrl+Z brings the measure back
     function deleteMeasure(measure) {
-        history.push(snapshotMeasure(measure));
         viewer.scene.removeMeasurement(measure);
         flash('Measurement deleted (Ctrl+Z to undo)', 'warning');
     }
 
+    // A measure built outside Potree's measuring tool (from the file or a snapshot): its units, labels and look
+    function finishRestored(measure) {
+        measure.lengthUnit = viewer.lengthUnit;
+        measure.lengthUnitDisplay = viewer.lengthUnitDisplay;
+        measure.update();
+        applyMeasureStyle(measure);
+        updateNameLabel(measure, labelCtx());
+    }
+
+    function addCopy(entry) {
+        const measure = restoreMeasure(entry.snapshot);
+        replay(() => viewer.scene.addMeasurement(measure));
+        finishRestored(measure);
+        entry.ref.measure = measure;
+        refs.set(measure, entry.ref);
+    }
+
+    function removeOf(entry) {
+        const measure = sceneHas(entry.ref.measure)
+            ? entry.ref.measure
+            : (viewer.scene.measurements || []).find(m => matchesSnapshot(m, entry.snapshot));
+        if (!measure) return false;
+        replay(() => viewer.scene.removeMeasurement(measure));
+        return true;
+    }
+
+    // An entry whose measure is gone (Delete saved, a cancelled drawing) is skipped: the next one is the action
     function undo() {
-        const data = history.undo();
-        if (!data) return;
-        viewer.scene.addMeasurement(restoreMeasure(data));
-        flash('Measurement restored');
+        if (drawingAny()) return;
+        for (let entry = history.undo(); entry; entry = history.undo()) {
+            if (entry.op === 'add') {
+                if (!sceneHas(entry.ref.measure)) continue;
+                entry.snapshot = snapshotMeasure(entry.ref.measure);
+                removeOf(entry);
+                flash('Measurement removed');
+            } else {
+                addCopy(entry);
+                flash('Measurement restored');
+            }
+            return;
+        }
     }
 
     function redo() {
-        const data = history.redo();
-        if (!data) return;
-        const measure = (viewer.scene.measurements || []).find(m => matchesSnapshot(m, data));
-        if (!measure) return;
-        viewer.scene.removeMeasurement(measure);
-        flash('Measurement deleted');
+        if (drawingAny()) return;
+        for (let entry = history.redo(); entry; entry = history.redo()) {
+            if (entry.op === 'add') {
+                if (!entry.snapshot) continue;
+                addCopy(entry);
+                flash('Measurement restored');
+            } else {
+                if (!removeOf(entry)) continue;
+                flash('Measurement deleted');
+            }
+            return;
+        }
     }
 
     /**
@@ -156,8 +240,14 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         storage = null;
         const scene = viewer.scene;
 
-        ['measurement_added', 'measurement_removed']
-            .forEach(type => session.track(scene, type, countMeasurements));
+        session.track(scene, 'measurement_added', e => {
+            countMeasurements();
+            recordAdded(e && e.measurement);
+        });
+        session.track(scene, 'measurement_removed', e => {
+            countMeasurements();
+            recordRemoved(e && e.measurement);
+        });
         session.track(scene.annotations, 'annotation_added', e => {
             countMeasurements();
             listenToAnnotation(e.annotation);
@@ -167,7 +257,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
         // Double click on a finished measure edits it (while drawing, it ends the measure)
         session.track(viewer.renderer.domElement, 'dblclick', event => {
-            if (viewer.measuringTool && viewer.measuringTool.activeMeasurement) return;
+            if (drawingAny()) return;
             const measure = measureAt(viewer, event);
             if (measure) editMeasure(measure);
         });
@@ -196,15 +286,11 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             const geojson = await storageFor().load();
             if (!geojson) return;
             const count = geojson.features.length;
-            const imported = importMeasurements(geojson, viewer, coordinateSystem) || [];
+            const imported = replay(() => importMeasurements(geojson, viewer, coordinateSystem)) || [];
             // Potree builds the measure geometry asynchronously
             later(() => imported.forEach(item => {
                 if (item.edges) {
-                    item.lengthUnit = viewer.lengthUnit;
-                    item.lengthUnitDisplay = viewer.lengthUnitDisplay;
-                    item.update();
-                    applyMeasureStyle(item);
-                    updateNameLabel(item, labelCtx());
+                    finishRestored(item);
                 } else if (item.description) {
                     updateAnnotationTooltip(item, labelCtx());
                 }
