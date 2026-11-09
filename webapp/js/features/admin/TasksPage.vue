@@ -40,11 +40,7 @@
 
         <!-- Delete task confirmation -->
         <ConfirmDialog v-if="deleteDialogOpen"
-                       title="Delete Task"
-                       :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, taskTools)}</strong> will be removed together with any downloadable results it produced.`"
-                       confirm-text="Delete" cancel-text="Cancel" confirm-button-class="danger"
-                       warning-title="Warning"
-                       warning-message="This action cannot be undone. Any task results still available for download will be deleted."
+                       v-bind="deleteDialog"
                        @close="handleDeleteDialogClose" />
     </div>
 </template>
@@ -59,6 +55,7 @@ import Select from 'primevue/select';
 import reg from '@/libs/api/sharedRegistry';
 import { isForbidden } from '@/libs/ddb/apiError';
 import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
+import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -101,6 +98,16 @@ export default {
     },
 
     computed: {
+        // The concluded task leaves the history with its results
+        deleteDialog() {
+            const task = this.deletingTask;
+            if (!task) return { message: '' };
+            return confirmDialogProps({
+                kind: 'task',
+                items: [{ name: this.toolTitle(task.toolId, this.taskTools), note: task.path ? `on ${task.path}` : '' }],
+                lost: ['the results it produced that are still available for download']
+            });
+        },
         userOptions() {
             const opts = [{ label: 'All users', value: '' }];
             this.users.forEach(u => {

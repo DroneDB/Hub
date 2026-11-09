@@ -28,3 +28,11 @@ describe('RoleManagementDialog', () => {
         expect(editor.find('button').text()).toContain('Delete');
     });
 });
+
+describe('RoleManagementDialog delete question', () => {
+    it('uses the shared delete wording, with Delete / Cancel', () => {
+        const props = RoleManagementDialog.computed.deleteDialog.call({ roleToDelete: 'editor' });
+        expect(props).toMatchObject({ title: 'Delete role “editor”', confirmText: 'Delete', cancelText: 'Cancel', confirmButtonClass: 'danger' });
+        expect(props.message).toContain('<strong>editor</strong>');
+    });
+});

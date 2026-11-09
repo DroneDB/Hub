@@ -101,20 +101,12 @@
 
         <!-- Confirm delete measurement -->
         <ConfirmDialog v-if="deleteConfirmOpen"
-                       title="Delete Measurement"
-                       :message="deleteConfirmMessage"
-                       confirm-text="Delete"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
+                       v-bind="deleteConfirmDialog"
                        @close="handleDeleteConfirm" />
 
         <!-- Confirm delete group -->
         <ConfirmDialog v-if="deleteGroupConfirmOpen"
-                       title="Delete Group"
-                       :message="deleteGroupConfirmMessage"
-                       confirm-text="Delete"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
+                       v-bind="deleteGroupConfirmDialog"
                        @close="handleDeleteGroupConfirm" />
     </Window>
 </template>
@@ -123,6 +115,8 @@
 import Window from '@/components/HubWindow';
 import Button from 'primevue/button';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { confirmDialogProps } from '@/libs/deleteConfirmation';
+import { countOf } from '@/libs/format';
 
 export default {
     components: { Window, Button, ConfirmDialog },
@@ -156,15 +150,21 @@ export default {
         };
     },
     computed: {
-        deleteConfirmMessage() {
-            if (!this.pendingDeleteItem) return '';
-            const name = this.pendingDeleteItem.name || this.typeLabel(this.pendingDeleteItem.type);
-            const value = this.pendingDeleteItem.value ? ` (${this.pendingDeleteItem.value})` : '';
-            return `Are you sure you want to delete "${name}${value}"?`;
+        deleteConfirmDialog() {
+            const m = this.pendingDeleteItem;
+            if (!m) return { message: '' };
+            const name = m.name || this.typeLabel(m.type);
+            return confirmDialogProps({ kind: 'measurement', items: [{ name, note: m.value ? `(${m.value})` : '' }] });
         },
-        deleteGroupConfirmMessage() {
-            if (!this.pendingDeleteGroup) return '';
-            return `Delete group "${this.pendingDeleteGroup.name}" and all its measurements?`;
+        deleteGroupConfirmDialog() {
+            const group = this.pendingDeleteGroup;
+            if (!group) return { message: '' };
+            const count = Array.isArray(group.items) ? group.items.length : null;
+            return confirmDialogProps({
+                kind: 'measurement group',
+                items: [group.name],
+                lost: [count === null ? 'all its measurements' : `its ${countOf(count, 'measurement')}`]
+            });
         },
         groupedStructure() {
             const groupMap = {};

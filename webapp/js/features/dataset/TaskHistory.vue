@@ -191,6 +191,8 @@ import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
 import { escapeHtml } from '@/libs/sanitize';
+import { deleteConfirmation } from '@/libs/deleteConfirmation';
+import { countOf } from '@/libs/format';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Window from '@/components/HubWindow.vue';
@@ -824,12 +826,12 @@ export default {
         },
 
         async showClearDialog() {
-            if (!await this.confirm({
-                title: 'Clear Concluded Tasks', danger: true, confirmText: 'Clear',
-                message: `Delete all concluded tasks?<br/><strong>${this.concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`,
-                warningTitle: 'Warning',
-                warningMessage: 'This action cannot be undone. Any task results still available for download will be deleted.'
-            })) return;
+            // The server removes their history rows (with the logs) and the results they produced
+            if (!await this.confirm(deleteConfirmation({
+                kind: 'concluded tasks',
+                description: countOf(this.concludedCount, 'concluded task'),
+                lost: ['their logs', 'the results they produced that are still available for download']
+            }))) return;
             try {
                 this.loading = true;
                 await this.dataset.clearTasks(this.selectedTool || undefined);
@@ -844,12 +846,12 @@ export default {
         },
 
         async deleteTask(task) {
-            if (!await this.confirm({
-                title: 'Delete Task', danger: true, confirmText: 'Delete',
-                message: `Permanently delete this concluded task from the history?<br/><strong>${escapeHtml(this.toolTitle(task.toolId, this.tools))}</strong> will be removed together with any downloadable results it produced.`,
-                warningTitle: 'Warning',
-                warningMessage: 'This action cannot be undone. Any task results still available for download will be deleted.'
-            })) return;
+            // The concluded task leaves the history with its results
+            if (!await this.confirm(deleteConfirmation({
+                kind: 'task',
+                items: [{ name: this.toolTitle(task.toolId, this.tools), note: task.path ? `on ${task.path}` : '' }],
+                lost: ['the results it produced that are still available for download']
+            }))) return;
             try {
                 await this.dataset.deleteTask(task.taskId);
                 await taskMonitor.forceRefresh(this.dataset);

@@ -104,18 +104,44 @@ test('dataset list shows the smoke dataset', async () => {
     await page.waitForSelector(`text=${DS}`, { timeout: 15000 });
 });
 
-test('dataset list: delete asks first, then removes the dataset', async () => {
+test('dataset list: delete asks first, Enter does not confirm, then removes the dataset', async () => {
     const victim = `${DS}-del`;
     await api('POST', `/orgs/${USER}/ds`, form({ slug: victim, name: victim }));
     await page.goto(`${URL_}/r/${USER}`);
     const row = page.locator('tr', { hasText: victim });
     await row.locator('button[aria-label="Delete dataset"]').click({ timeout: 15000 });
-    await page.waitForSelector(`.p-dialog >> text=${victim}`, { timeout: 10000 });
+    await page.waitForSelector(`.p-dialog >> text=Delete dataset “${victim}”`, { timeout: 10000 });
     await page.keyboard.press('Escape');
     await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    // The focus starts on Cancel: Enter keeps the dataset
     await row.locator('button[aria-label="Delete dataset"]').click();
-    await page.click('.p-dialog button:has-text("Remove")');
+    await page.waitForSelector('.p-dialog [data-cancel]:focus', { timeout: 10000 });
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    assert.equal(await row.count(), 1);
+    await row.locator('button[aria-label="Delete dataset"]').click();
+    await page.click('.p-dialog button[data-confirm]:has-text("Delete")');
     await page.waitForSelector(`tr:has-text("${victim}")`, { state: 'detached', timeout: 15000 });
+});
+
+test('organization list: Enter on the delete question keeps it; the typed slug and Delete remove it', async () => {
+    const victim = `${DS}-org`;
+    await api('POST', '/orgs', form({ slug: victim, name: victim }));
+    await page.goto(`${URL_}/r`);
+    const card = page.locator('.org-card', { hasText: victim });
+    await card.locator('button[aria-label="Delete organization"]').click({ timeout: 15000 });
+    await page.waitForSelector(`.p-dialog >> text=Delete organization “${victim}”`, { timeout: 10000 });
+    // The slug input has the focus: Enter before typing it deletes nothing (AC-004)
+    await page.waitForSelector('.p-dialog input:focus', { timeout: 10000 });
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('.p-dialog button[data-confirm]').isDisabled(), true);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    assert.equal(await card.count(), 1);
+    await card.locator('button[aria-label="Delete organization"]').click();
+    await page.fill('.p-dialog input', victim);
+    await page.click('.p-dialog button[data-confirm]:has-text("Delete")');
+    await page.waitForSelector(`.org-card:has-text("${victim}")`, { state: 'detached', timeout: 15000 });
 });
 
 test('dataset page lists the uploaded files', async () => {
@@ -190,8 +216,9 @@ test('dataset page: rename and delete through the toolbar and the Delete key', a
     await page.waitForSelector('#explorer >> text=smoke-renamed', { timeout: 15000 });
     await page.click('#explorer >> text=smoke-renamed');
     await page.keyboard.press('Delete');
-    await page.waitForSelector('.p-dialog >> text=Are you sure', { timeout: 10000 });
-    await page.keyboard.press('Enter');
+    await page.waitForSelector('.p-dialog >> text=Delete file “smoke-renamed”', { timeout: 10000 });
+    // The focus is on Cancel, so the delete is a click on Delete
+    await page.click('.p-dialog button[data-confirm]:has-text("Delete")');
     await page.waitForSelector('#explorer >> text=smoke-renamed', { state: 'detached', timeout: 15000 });
 });
 

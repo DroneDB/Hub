@@ -189,6 +189,7 @@
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="$route.params.org"
                                    :can-manage-members="orgInfo?.permissions?.canManageMembers || false"
+                                   @permissions-changed="reloadOrgInfo"
                                    @close="closeMembersDialog" />
 
         <!-- Full-screen feedback while a new dataset is being created -->
@@ -520,6 +521,7 @@ export default {
         handleDelete(ds) {
             this.deleteEntity(ds, {
                 kind: 'dataset',
+                name: ds.name,
                 warning: 'All the files will be deleted too.',
                 remove: () => this.org.Dataset(ds.slug).delete(),
                 // The next dataset moves into the page
@@ -921,6 +923,16 @@ export default {
 
         closeMembersDialog() {
             this.membersDialogOpen = false;
+        },
+
+        // The user changed their own permissions in the members dialog: what the page and the
+        // dialog offer follows the organization's answer
+        async reloadOrgInfo() {
+            try {
+                this.orgInfo = await this.org.info();
+            } catch (e) {
+                if (!isUnauthorized(e)) this.$notify.error(e.message);
+            }
         }
     }
 }

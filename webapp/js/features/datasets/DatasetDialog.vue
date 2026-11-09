@@ -1,5 +1,5 @@
 <template>
-    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
+    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
         <div class="ds-dialog">
             <form class="me-2" :class="{ error: !isValid() }" @submit.prevent>
                 <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
@@ -104,14 +104,14 @@ export default {
         };
     }, mounted: function () {
         if (this.mode == 'edit') {
-            this.title = "Edit dataset " + this.model.slug;
+            this.title = `Edit ${this.model.name || this.model.slug}`;
 
             this.ds.slug = this.model.slug;
             this.ds.name = this.model.name;
             this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : Visibility.PRIVATE;
             this.ds.tagline = this.model.tagline || '';
         } else {
-            this.title = "Create new dataset";
+            this.title = 'Create dataset';
 
             this.ds.slug = null;
             this.ds.name = null;

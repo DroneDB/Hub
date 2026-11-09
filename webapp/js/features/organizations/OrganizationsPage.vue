@@ -136,6 +136,7 @@
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="selectedOrgForMembers.slug"
                                    :can-manage-members="selectedOrgForMembers.permissions?.canManageMembers || false"
+                                   @permissions-changed="onMembersPermissionsChanged"
                                    @close="closeMembersDialog" />
 
     </div>
@@ -158,7 +159,7 @@ import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
-import { formatDateTime, formatTimeAgo } from '@/libs/format';
+import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
 import { ORG_SORT_OPTIONS, organizationRow, sortOrganizations } from '@/libs/organizationList';
 import { getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition } from '@/libs/storageUtils';
 import reg from '@/libs/api/sharedRegistry';
@@ -357,25 +358,31 @@ export default {
     methods: {
 
         // A list asked while another is in flight replaces it: the older answer (or error) is
-        // dropped whenever it arrives, so the list always matches the filter last chosen
+        // dropped whenever it arrives, so the list always matches the filter last chosen.
+        // True when this answer became the list (not an error, not superseded).
         async fetchOrganizations() {
             // The number of the last list asked: only its answer is shown
             const request = this._organizationsRequest = (this._organizationsRequest ?? 0) + 1;
             const isLatest = () => request === this._organizationsRequest;
             this.loading = true;
+            let listed = false;
             try {
                 this.isAdmin = reg.isAdmin();
 
                 const tmp = await reg.orgs.getOrganizations(!this.showAll);
 
-                if (isLatest()) this.organizations = tmp.map(item => organizationRow(item.org));
+                if (isLatest()) {
+                    this.organizations = tmp.map(item => organizationRow(item.org));
+                    listed = true;
+                }
             } catch (e) {
                 // A 401 is handled by reg.onUnauthorized (end the session, sign in)
                 if (isLatest() && !isUnauthorized(e)) this.$notify.error(e.message);
             }
-            if (!isLatest()) return;
+            if (!isLatest()) return false;
             this.loading = false;
             this.loaded = true;
+            return listed;
         },
 
         // Only a change of the user stores the list settings, which follow the account; leaving
@@ -441,6 +448,10 @@ export default {
         handleDelete(org) {
             this.deleteEntity(org, {
                 kind: 'organization',
+                name: org.name,
+                lost: org.datasetCount != null ? [`${countOf(org.datasetCount, 'dataset')} and their files`] : [],
+                // One Enter must not delete an organization and all its datasets: its slug is typed
+                typed: true,
                 warning: 'All the datasets owned by this organization will be deleted too.',
                 remove: () => reg.orgs.deleteOrganization(org.slug),
                 done: () => { this.organizations = this.organizations.filter(o => o.slug !== org.slug); }
@@ -557,6 +568,21 @@ export default {
         closeMembersDialog() {
             this.membersDialogOpen = false;
             this.selectedOrgForMembers = null;
+        },
+
+        // The user changed their own permissions: the list says what they may do now, and the
+        // open dialog follows it (read-only once they are no longer an admin)
+        async onMembersPermissionsChanged() {
+            const slug = this.selectedOrgForMembers?.slug;
+            const listed = await this.fetchOrganizations();
+            if (!this.membersDialogOpen || !this.selectedOrgForMembers) return;
+            const row = listed ? this.organizations.find(o => o.slug === slug) : null;
+            // No fresh answer (an error, a superseded request, or the organization left the
+            // list): the rows may still hold the old permissions, so read-only, to be safe
+            this.selectedOrgForMembers = row || {
+                ...this.selectedOrgForMembers,
+                permissions: { ...this.selectedOrgForMembers.permissions, canManageMembers: false }
+            };
         },
 
         upload: function () {

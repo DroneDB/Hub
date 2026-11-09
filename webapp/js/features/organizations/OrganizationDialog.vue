@@ -1,5 +1,5 @@
 <template>
-    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
+    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
         <div class="org-dialog">
             <form @submit.prevent>
                 <div class="mb-3">
@@ -54,14 +54,14 @@ export default {
     mounted: function () {
         if (this.mode == 'edit') {
 
-            this.title = "Edit " + this.model.slug;
+            this.title = `Edit ${this.model.name || this.model.slug}`;
 
             this.org.name = this.model.name;
             this.org.description = this.model.description;
             this.org.isPublic = this.model.isPublic;
         } else {
 
-            this.title = "Add New Organization";
+            this.title = 'Create organization';
 
             this.org.name = null;
             this.org.description = null;

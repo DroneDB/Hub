@@ -119,12 +119,10 @@
         <OrganizationManagementDialog v-if="showOrganizationManagement" @close="handleCloseOrganizationManagement" />
 
         <!-- Delete User Confirmation Dialog -->
+        <!-- Deleting all the data asks for the user name to be typed; a transfer does not -->
         <ConfirmDialog v-if="showDeleteDialog"
-                       title="Delete User"
-                       :message="deleteDialogMessage"
-                       confirm-text="Delete"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
+                       v-bind="deleteDialog"
+                       :require-text="deleteSuccessor ? '' : (userToDelete?.userName || '')"
                        @close="handleDeleteDialogClose">
             <template #extra>
                 <div class="delete-options">
@@ -227,6 +225,7 @@ import IconField from 'primevue/iconfield';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
 import { formatDateTime } from '@/libs/format';
+import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
 
@@ -308,9 +307,19 @@ export default {
                 .filter(u => u.userName !== this.userToDelete.userName)
                 .map(u => ({ label: u.userName, value: u.userName }));
         },
-        deleteDialogMessage() {
-            if (!this.userToDelete) return '';
-            return `Are you sure you want to delete user <strong>${this.userToDelete.userName}</strong>?`;
+        // Title, body and buttons from the delete-text builder; the body says what goes with
+        // the user when no successor takes their data
+        deleteDialog() {
+            const user = this.userToDelete;
+            if (!user) return { message: '' };
+            // The row counts every organization the user is a member of, while a delete removes
+            // only the ones they own: no counts. storageUsed is the size of what they own.
+            const lost = this.deleteSuccessor ? [] : [
+                'the organizations they own and all their datasets',
+                Number.isFinite(user.storageUsed) && `${bytesToSize(user.storageUsed)} of files`
+            ].filter(Boolean);
+            const { title, message, confirmText, cancelText } = deleteConfirmation({ kind: 'user', items: [user.userName], lost });
+            return { title, message, confirmText, cancelText, confirmButtonClass: 'danger' };
         }
     },
     mounted: async function () {
@@ -407,9 +416,8 @@ export default {
 
                 // Close delete dialog and show result dialog
                 this.showDeleteDialog = false;
+                // The result dialog reports the delete: no toast as well
                 this.showDeleteResultDialog = true;
-
-                this.$notify.success(`User "${result.userName}" deleted successfully`, { summary: 'User Deleted' });
 
             } catch (e) {
                 this.$notify.error('Failed to delete user: ' + e.message);

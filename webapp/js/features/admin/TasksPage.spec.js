@@ -92,3 +92,12 @@ describe('TasksPage handleCancelDialogClose', () => {
         expect(vm.cancellingTask).toBeNull();
     });
 });
+
+describe('TasksPage delete question', () => {
+    it('uses the shared delete wording: the task by its tool and path, Delete / Cancel', () => {
+        const vm = { deletingTask: { ...TASK, path: 'a.tif' }, taskTools: [], toolTitle: () => 'Build' };
+        const props = TasksPage.computed.deleteDialog.call(vm);
+        expect(props).toMatchObject({ title: 'Delete task “Build”', confirmText: 'Delete', cancelText: 'Cancel', confirmButtonClass: 'danger' });
+        expect(props.message).toContain('<strong>Build</strong> on a.tif');
+    });
+});

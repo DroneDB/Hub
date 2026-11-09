@@ -4,6 +4,11 @@
  *
  *   const confirm = useConfirm(dialogs);
  *   if (await confirm({ title: 'Replace cover', message: '...', confirmText: 'Replace', danger: true })) ...
+ *
+ * `danger` makes it a destructive confirmation: the focus starts on Cancel and Enter does not
+ * confirm. `requireText` adds a typed confirmation: Confirm stays disabled until the input
+ * holds that text (the input has the focus, and Enter there confirms once it matches).
+ * A delete takes its options from libs/deleteConfirmation.js.
  */
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
@@ -12,7 +17,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
  */
 export function useConfirm(dialogs) {
     /**
-     * @param {{ title?: string, message: string, confirmText?: string, cancelText?: string, danger?: boolean, warningTitle?: string, warningMessage?: string }} options
+     * @param {{ title?: string, message: string, confirmText?: string, cancelText?: string, danger?: boolean, requireText?: string, warningTitle?: string, warningMessage?: string }} options
      * @returns {Promise<boolean>}
      */
     return function confirm({ danger = false, ...props }) {

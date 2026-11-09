@@ -1,6 +1,9 @@
 /**
  * Adding a member: the owner types the exact user name (no user list, which only admins may
  * read), the server checks it, and its error text is shown when it refuses.
+ *
+ * Changing permissions: dropping your own row below Admin asks first (Cancel puts the level
+ * back), a change to yourself tells the parent, and a refused change leaves its error visible.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
@@ -10,11 +13,13 @@ import { ApiError } from '@/libs/ddb/apiError';
 const reg = vi.hoisted(() => ({
     features: { get: () => true },
     admin: { users: null },
-    orgs: { getOrganizationMembers: null, addOrganizationMember: null }
+    getUsername: () => 'me',
+    orgs: { getOrganizationMembers: null, addOrganizationMember: null, updateMemberPermissions: null }
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: OrganizationMembersDialog } = await import('./OrganizationMembersDialog.vue');
+const { default: Select } = await import('primevue/select');
 
 let wrapper;
 async function render() {
@@ -25,6 +30,16 @@ async function render() {
     });
     await flushPromises();
 }
+const ADMIN = 3;
+const READ_ONLY = 0;
+const rows = () => [{ userName: 'me', permissions: ADMIN }, { userName: 'bob', permissions: 1 }];
+const member = name => wrapper.vm.members.find(m => m.userName === name);
+const selectOf = name => wrapper.findAllComponents(Select).find(s => s.props('ariaLabel') === `Permissions of ${name}`);
+async function choose(name, value) {
+    selectOf(name).vm.$emit('update:modelValue', value);
+    await flushPromises();
+}
+const confirmDialog = () => document.getElementById('confirmDialog');
 const nameInput = () => document.getElementById('organization-members-dialog-user');
 const addButton = () => [...document.body.querySelectorAll('button')].find(b => b.textContent.trim() === 'Add');
 async function typeName(value) {
@@ -38,6 +53,7 @@ beforeEach(() => {
     reg.admin.users = vi.fn(() => Promise.reject(new ApiError('Forbidden', 403)));
     reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve([]));
     reg.orgs.addOrganizationMember = vi.fn(() => Promise.resolve());
+    reg.orgs.updateMemberPermissions = vi.fn(() => Promise.resolve());
 });
 afterEach(() => {
     wrapper?.unmount();
@@ -72,5 +88,58 @@ describe('OrganizationMembersDialog', () => {
         await flushPromises();
         expect(document.body.textContent).toContain('User not found');
         expect(nameInput().value).toBe('nobody');
+    });
+
+    it('asks before you drop your own row below Admin; Cancel puts Admin back and saves nothing', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+        await render();
+        await choose('me', READ_ONLY);
+        expect(confirmDialog().textContent).toContain('Remove your admin rights?');
+        expect(confirmDialog().textContent).toContain('Read Only');
+        expect(reg.orgs.updateMemberPermissions).not.toHaveBeenCalled();
+
+        confirmDialog().querySelector('[data-cancel]').click();
+        await flushPromises();
+        expect(confirmDialog()).toBeNull();
+        expect(member('me').permissions).toBe(ADMIN);
+        expect(reg.orgs.updateMemberPermissions).not.toHaveBeenCalled();
+        expect(wrapper.emitted('permissions-changed')).toBeUndefined();
+    });
+
+    it('saves your own demotion once confirmed, and tells the parent', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+        await render();
+        await choose('me', READ_ONLY);
+        confirmDialog().querySelector('[data-confirm]').click();
+        await flushPromises();
+        expect(reg.orgs.updateMemberPermissions).toHaveBeenCalledWith('acme', 'me', READ_ONLY);
+        expect(wrapper.emitted('permissions-changed')).toHaveLength(1);
+    });
+
+    it("changes another member's permissions without asking, and does not tell the parent", async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+        await render();
+        await choose('bob', READ_ONLY);
+        expect(confirmDialog()).toBeNull();
+        expect(reg.orgs.updateMemberPermissions).toHaveBeenCalledWith('acme', 'bob', READ_ONLY);
+        expect(wrapper.emitted('permissions-changed')).toBeUndefined();
+    });
+
+    it('leaves the error of a refused change visible, over the reloaded list', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+        reg.orgs.updateMemberPermissions = vi.fn(() => Promise.reject(new ApiError('You are not an admin', 403)));
+        await render();
+        await choose('bob', READ_ONLY);
+        expect(reg.orgs.getOrganizationMembers).toHaveBeenCalledTimes(2);
+        expect(member('bob').permissions).toBe(1);
+        expect(document.body.textContent).toContain('You are not an admin');
+    });
+
+    it('is read-only once the parent says you may no longer manage the members', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+        await render();
+        await wrapper.setProps({ canManageMembers: false });
+        expect(nameInput()).toBeNull();
+        expect(wrapper.findAllComponents(Select)).toHaveLength(0);
     });
 });

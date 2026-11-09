@@ -65,11 +65,7 @@
 
         <!-- Delete Role Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
-                       title="Delete Role"
-                       :message="`Are you sure you want to delete the role <strong>${roleToDelete}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. Users with this role will lose associated permissions.`"
-                       confirm-text="Delete Role"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
+                       v-bind="deleteDialog"
                        @close="handleDeleteDialogClose" />
     </Window>
 </template>
@@ -90,6 +86,7 @@ import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
 import { isAdminRole, isSystemRole } from '@/libs/roles';
+import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
 export default {
     components: {
@@ -117,6 +114,15 @@ export default {
             showDeleteDialog: false,
             roleToDelete: null
         };
+    },
+    computed: {
+        deleteDialog() {
+            return confirmDialogProps({
+                kind: 'role',
+                items: [this.roleToDelete || ''],
+                lost: ['the permissions it gives to the users who have it']
+            });
+        }
     },
     watch: {
         activeTab: function(newTab) {

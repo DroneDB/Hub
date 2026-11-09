@@ -39,6 +39,40 @@ describe('Organizations.fetchOrganizations', () => {
     });
 });
 
+describe('Organizations.onMembersPermissionsChanged', () => {
+    const { onMembersPermissionsChanged, fetchOrganizations } = Organizations.methods;
+    const OLD = { slug: 'acme', permissions: { canManageMembers: true } };
+    function membersView() {
+        const vm = { ...fakeView(), membersDialogOpen: true, selectedOrgForMembers: OLD, organizations: [OLD] };
+        vm.fetchOrganizations = () => fetchOrganizations.call(vm);
+        return vm;
+    }
+
+    it('follows the fresh row of the organization', async () => {
+        reg.orgs.getOrganizations = vi.fn(() => Promise.resolve([{ org: { slug: 'acme', permissions: { canManageMembers: false } } }]));
+        const vm = membersView();
+        await onMembersPermissionsChanged.call(vm);
+        expect(vm.selectedOrgForMembers.permissions.canManageMembers).toBe(false);
+    });
+
+    it('turns read-only when the list cannot be read again (the old row is not trusted)', async () => {
+        reg.orgs.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Boom', 500)));
+        const vm = membersView();
+        await onMembersPermissionsChanged.call(vm);
+        expect(vm.selectedOrgForMembers.slug).toBe('acme');
+        expect(vm.selectedOrgForMembers.permissions.canManageMembers).toBe(false);
+    });
+
+    it('turns read-only when a later request superseded the answer', async () => {
+        reg.orgs.getOrganizations = vi.fn(() => Promise.resolve([{ org: OLD }]));
+        const vm = membersView();
+        const pending = onMembersPermissionsChanged.call(vm);
+        vm._organizationsRequest += 1;
+        await pending;
+        expect(vm.selectedOrgForMembers.permissions.canManageMembers).toBe(false);
+    });
+});
+
 describe('handleUnauthorized', () => {
     const router = path => {
         window.history.replaceState({}, '', path);

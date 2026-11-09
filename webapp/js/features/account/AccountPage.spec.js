@@ -101,4 +101,26 @@ describe('AccountPage', () => {
 
         expect(wrapper.find('.storage-details').text()).toContain('Unlimited');
     });
+
+    it('signs out only from the Logout button, not from a click on the Session card', async () => {
+        h.reg.logout = vi.fn();
+        await render();
+        const card = wrapper.findAll('.account-card').find(c => c.text().includes('Session'));
+        await card.find('.action-row .main').trigger('click');
+        await card.trigger('click');
+        expect(h.reg.logout).not.toHaveBeenCalled();
+
+        await card.findAll('button').find(b => b.text().includes('Logout')).trigger('click');
+        await flushPromises();
+        expect(h.reg.logout).toHaveBeenCalledTimes(1);
+    });
+
+    it('opens Change Password only from its button, not from a click on the Security card', async () => {
+        await render();
+        const card = wrapper.findAll('.account-card').find(c => c.text().includes('Security'));
+        await card.trigger('click');
+        expect(wrapper.vm.showChangePwd).toBe(false);
+        await card.findAll('button').find(b => b.text().includes('Change Password')).trigger('click');
+        expect(wrapper.vm.showChangePwd).toBe(true);
+    });
 });

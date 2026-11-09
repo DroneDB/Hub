@@ -7,7 +7,7 @@
             <slot />
             <div v-if="$slots.footer || confirmLabel || closeButton" class="window-footer d-flex justify-content-end gap-2 mt-3 w-100">
                 <slot name="footer">
-                    <Button :label="cancelLabel" severity="secondary" :disabled="busy" @click="close()" />
+                    <Button :label="cancelLabel" severity="secondary" :disabled="busy" data-cancel @click="close()" />
                     <Button v-if="confirmLabel" :label="confirmLabel" :severity="confirmSeverity" :icon="confirmIcon" data-confirm
                             :disabled="busy || confirmDisabled" :loading="busy" @click="emit('confirm')" />
                 </slot>
@@ -24,12 +24,16 @@
  * - `close` (with an optional result) on the X, a mask click (closeModalOnClick) or Escape;
  *   `update:visible` too, so `v-model:visible` works. Rendered with v-if, visible stays true.
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
- *   something else). Only the topmost open Window reacts to the keyboard.
+ *   something else; never with `enterConfirms` false or `confirmDisabled`). Only the topmost
+ *   open Window reacts to the keyboard.
  * - `busy` disables closing and the footer buttons.
  * - A footer: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
- *   just the Cancel (`cancelLabel`) button with `closeButton`.
- * - Focuses the [data-autofocus] element, the first field, or the confirm button when shown,
- *   so the keyboard never stays on the page behind the dialog.
+ *   just the Cancel (`cancelLabel`) button with `closeButton`. A footer of its own marks its
+ *   buttons [data-cancel] and [data-confirm].
+ * - Focuses, when shown, the [data-autofocus] element; for a destructive confirmation
+ *   (`danger`, or confirmSeverity 'danger') the [data-cancel] button; else the first field,
+ *   then the confirm button; so the keyboard never stays on the page behind the dialog, and
+ *   Enter never confirms a destructive action by default.
  *
  *   <Window id="rename" title="Rename" modal confirm-label="Rename" :busy="saving" @confirm="rename" @close="cancel">
  */
@@ -64,6 +68,10 @@ const props = defineProps({
     confirmSeverity: { type: String, default: 'primary' },
     confirmIcon: { type: String, default: undefined },
     confirmDisabled: { type: Boolean, default: false },
+    /** Enter from a field confirms (a form); false for a question Enter must not answer */
+    enterConfirms: { type: Boolean, default: true },
+    /** A destructive confirmation: the focus starts on the [data-cancel] button */
+    danger: { type: Boolean, default: false },
     /** A footer with only the Cancel button (labelled cancelLabel) */
     closeButton: { type: Boolean, default: false }
 });
@@ -97,7 +105,7 @@ useEventListener(document, 'keydown', e => {
     if (e.key === 'Escape' && props.closable) {
         e.preventDefault();
         close();
-    } else if (e.key === 'Enter' && !props.busy && !props.confirmDisabled && !(e.target instanceof Element && e.target.closest(NOT_FOR_ENTER))) {
+    } else if (e.key === 'Enter' && props.enterConfirms && !props.busy && !props.confirmDisabled && !(e.target instanceof Element && e.target.closest(NOT_FOR_ENTER))) {
         emit('confirm');
     }
 });
@@ -127,13 +135,17 @@ const FIELD = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):n
 
 const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
+const isDanger = computed(() => props.danger || props.confirmSeverity === 'danger');
+
 // PrimeVue focuses the [autofocus] element after its enter transition: tag the target
-// ([data-autofocus], else the first field, the confirm button, anything focusable) and
-// focus it now too, without scrolling mid-animation
+// ([data-autofocus] (a typed confirmation's input), else the Cancel button of a destructive
+// confirmation, the first field, the confirm button, anything focusable) and focus it now
+// too, without scrolling mid-animation
 function focusTarget(root) {
     const explicit = root.querySelector('[data-autofocus]');
     if (explicit) return explicit.matches(FIELD) ? explicit : explicit.querySelector(FIELD) || explicit;
-    return root.querySelector(FIELD) || root.querySelector('[data-confirm]:not([disabled])') || root.querySelector(FOCUSABLE);
+    const cancel = isDanger.value && root.querySelector('[data-cancel]:not([disabled])');
+    return cancel || root.querySelector(FIELD) || root.querySelector('[data-confirm]:not([disabled])') || root.querySelector(FOCUSABLE);
 }
 
 function onShow() {

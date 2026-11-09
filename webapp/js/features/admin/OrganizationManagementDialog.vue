@@ -92,13 +92,9 @@
 
         </div>
 
-        <!-- Delete Organization Confirmation Dialog -->
+        <!-- Delete Organization Confirmation Dialog: the slug is typed to confirm -->
         <ConfirmDialog v-if="showDeleteDialog"
-                       title="Delete Organization"
-                       :message="`Are you sure you want to delete the organization <strong>${orgToDelete && (orgToDelete.name || orgToDelete.slug)}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. All data associated with this organization will be permanently removed.`"
-                       confirm-text="Delete Organization"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
+                       v-bind="deleteDialog"
                        @close="handleDeleteDialogClose" />
     </Window>
 </template>
@@ -121,6 +117,8 @@ import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
 import { showFrom } from '@/libs/responsiveColumns';
+import { countOf } from '@/libs/format';
+import { confirmDialogProps, namedItem } from '@/libs/deleteConfirmation';
 
 export default {
     components: {
@@ -167,6 +165,19 @@ export default {
             }
 
             return filtered;
+        },
+
+        // The shared delete wording: name and slug, its datasets when known, the slug typed
+        deleteDialog() {
+            const org = this.orgToDelete;
+            if (!org) return { message: '' };
+            return confirmDialogProps({
+                kind: 'organization',
+                items: [namedItem(org.name, org.slug)],
+                lost: Number.isFinite(org.datasetCount) ? [`${countOf(org.datasetCount, 'dataset')} and their files`] : [],
+                typed: org.slug,
+                warning: 'All the datasets owned by this organization will be deleted too.'
+            });
         },
 
         suggestedSlug: function() {

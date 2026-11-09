@@ -56,13 +56,13 @@
                                 <td :class="showFrom('sm')">{{ member.email }}</td>
                                 <td>
                                     <Select v-if="canManageMembers"
-                                            v-model="member.permissions"
+                                            :model-value="member.permissions"
                                             :aria-label="`Permissions of ${member.userName}`"
                                             :options="permissionsOptions"
                                             option-label="label"
                                             option-value="value"
                                             class="w-100"
-                                            @change="updatePermission(member)" />
+                                            @update:model-value="value => changePermission(member, value)" />
                                     <span v-else>{{ member.permissionName }}</span>
                                 </td>
                                 <td :class="showFrom('sm')">
@@ -99,6 +99,14 @@
                            cancel-text="Cancel"
                            confirm-button-class="danger"
                            @close="handleRemoveMemberDialogClose" />
+
+            <ConfirmDialog v-if="selfDemotion"
+                           title="Remove your admin rights?"
+                           :message="selfDemotionMessage"
+                           confirm-text="Remove my admin rights"
+                           cancel-text="Cancel"
+                           confirm-button-class="danger"
+                           @close="handleSelfDemotionClose" />
         </Window>
     </div>
 </template>
@@ -115,6 +123,8 @@ import { Features } from '@/libs/features';
 import { formatDate } from '@/libs/format';
 import { showFrom } from '@/libs/responsiveColumns';
 
+const ADMIN = 3;
+
 export default {
     components: { Window, ConfirmDialog, Select, InputText, Button, PrimeMessage },
 
@@ -122,7 +132,9 @@ export default {
         orgSlug: { type: String, required: true },
         canManageMembers: { type: Boolean, default: false }
     },
-    emits: ['close'],
+    // permissions-changed: the user changed their own permissions (the parent reads them again
+    // and passes canManageMembers: false once they may no longer manage the members)
+    emits: ['close', 'permissions-changed'],
     setup() {
         return { showFrom };
     },
@@ -141,6 +153,8 @@ export default {
             },
             removeMemberDialogOpen: false,
             memberToRemove: null,
+            // Your own row dropping below Admin, waiting for the answer: { member, previous }
+            selfDemotion: null,
             permissionsOptions: [
                 { value: 0, label: 'Read Only' },
                 { value: 1, label: 'Read/Write' },
@@ -153,6 +167,11 @@ export default {
     computed: {
         canAdd() {
             return !!this.newMember.userName.trim() && !this.addingMember;
+        },
+        selfDemotionMessage() {
+            const level = this.permissionsOptions.find(o => o.value === this.selfDemotion?.member.permissions)?.label ?? '';
+            return `<p>You are changing your own permissions in this organization to <strong>${level}</strong>.</p>`
+                + '<p>You will no longer be able to manage its members; only another admin can give you the rights back.</p>';
         }
     },
 
@@ -214,6 +233,30 @@ export default {
             }
         },
 
+        isSelf(member) {
+            return member.userName === reg.getUsername();
+        },
+
+        // The row shows the new level at once; dropping your own row below Admin asks first and
+        // puts the previous level back on Cancel
+        changePermission(member, value) {
+            const previous = member.permissions;
+            if (value === previous) return;
+            member.permissions = value;
+            if (this.isSelf(member) && previous === ADMIN && value < ADMIN) {
+                this.selfDemotion = { member, previous };
+                return;
+            }
+            this.updatePermission(member);
+        },
+
+        handleSelfDemotionClose(action) {
+            const { member, previous } = this.selfDemotion;
+            this.selfDemotion = null;
+            if (action === 'confirm') this.updatePermission(member);
+            else member.permissions = previous;
+        },
+
         async updatePermission(member) {
             try {
                 await reg.orgs.updateMemberPermissions(
@@ -222,10 +265,11 @@ export default {
                     member.permissions
                 );
                 this.$notify.success('Permissions saved successfully', { summary: 'Permissions Updated' });
+                if (this.isSelf(member)) this.$emit('permissions-changed');
             } catch (e) {
-                this.error = e.message || 'Failed to update permissions';
-                // Reload to get correct state
+                // The server's state first (loadData clears the error), then why it failed
                 await this.loadData();
+                this.error = e.message || 'Failed to update permissions';
             }
         },
 

@@ -56,29 +56,29 @@
                 <!-- Upload self-test -->
                 <UploadDiagnostics />
 
-                <!-- Security Section (only if account management is enabled) -->
-                <Card v-if="accountManagement" class="account-card action-card" @click="handleChangePwd">
+                <!-- Security Section (only if account management is enabled); only the buttons act -->
+                <Card v-if="accountManagement" class="account-card">
                     <template #content>
                         <div class="action-row">
                             <div class="main">
                                 <i class="fa-solid fa-lock" /> Security
                             </div>
                             <div>
-                                <Button size="small" icon="fa-solid fa-pencil" label="Change Password" @click.stop="handleChangePwd" />
+                                <Button size="small" icon="fa-solid fa-pencil" label="Change Password" @click="handleChangePwd" />
                             </div>
                         </div>
                     </template>
                 </Card>
 
                 <!-- Session Section -->
-                <Card class="account-card action-card logout" @click="handleLogout">
+                <Card class="account-card">
                     <template #content>
                         <div class="action-row">
                             <div class="main">
                                 <i class="fa-solid fa-right-from-bracket" /> Session
                             </div>
                             <div>
-                                <Button severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" @click.stop="handleLogout" />
+                                <Button severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" @click="handleLogout" />
                             </div>
                         </div>
                     </template>
@@ -260,19 +260,6 @@ export default {
 
 .storage-bar-container .storage-details .available {
     color: var(--ddb-text-secondary);
-}
-
-.action-card {
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.action-card:hover {
-    background-color: var(--ddb-bg-subtle);
-}
-
-.action-card.logout:hover {
-    background-color: var(--ddb-danger-bg);
 }
 
 .action-row {

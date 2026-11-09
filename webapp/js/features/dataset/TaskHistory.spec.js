@@ -250,3 +250,36 @@ describe('processing nodes', () => {
         expect(processingNodes).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('deleteTask', () => {
+    const { deleteTask } = TaskHistory.methods;
+
+    it('asks with the shared delete wording: the task by its tool and path, Delete / Cancel', async () => {
+        const vm = {
+            tools: [],
+            toolTitle: () => 'Build <3D>',
+            confirm: vi.fn(() => Promise.resolve(false)),
+            dataset: { deleteTask: vi.fn() }
+        };
+        await deleteTask.call(vm, fixedTask(1, { state: 'Succeeded', path: 'a.tif' }));
+        const question = vm.confirm.mock.calls[0][0];
+        expect(question).toMatchObject({ title: 'Delete task “Build <3D>”', confirmText: 'Delete', cancelText: 'Cancel', danger: true });
+        expect(question.message).toContain('<strong>Build &lt;3D&gt;</strong> on a.tif');
+        expect(question.message).toContain('results it produced');
+        expect(vm.dataset.deleteTask).not.toHaveBeenCalled();
+    });
+});
+
+describe('showClearDialog', () => {
+    const { showClearDialog } = TaskHistory.methods;
+
+    it('asks with the shared delete wording, Delete / Cancel, and clears nothing on Cancel', async () => {
+        const vm = { concludedCount: 3, confirm: vi.fn(() => Promise.resolve(false)), dataset: { clearTasks: vi.fn() } };
+        await showClearDialog.call(vm);
+        const question = vm.confirm.mock.calls[0][0];
+        expect(question).toMatchObject({ title: 'Delete concluded tasks', confirmText: 'Delete', cancelText: 'Cancel', danger: true });
+        expect(question.message).toContain('This deletes 3 concluded tasks.');
+        expect(question.message).toContain('their logs');
+        expect(vm.dataset.clearTasks).not.toHaveBeenCalled();
+    });
+});

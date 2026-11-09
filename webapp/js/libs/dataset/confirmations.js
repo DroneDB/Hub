@@ -1,18 +1,8 @@
 // @ts-check
 /**
- * The dataset page's yes/no questions, as useConfirm() options.
+ * The dataset page's yes/no questions, as useConfirm() options. A delete asks with
+ * libs/deleteConfirmation.js.
  */
-import { escapeHtml } from '@/libs/sanitize';
-
-/** @param {Array<{ label: string }>} files */
-export const confirmDelete = files => ({
-    title: 'Confirm delete',
-    message: `Are you sure you want to delete ${files.length === 1 ? `"${escapeHtml(files[0].label)}"` : `${files.length} entries`}?`,
-    confirmText: 'Remove',
-    cancelText: 'Close',
-    danger: true
-});
-
 export const CONFIRM_RESCAN = Object.freeze({
     title: 'Rescan Dataset',
     message: '<p><strong>Are you sure you want to rescan this dataset?</strong></p>'

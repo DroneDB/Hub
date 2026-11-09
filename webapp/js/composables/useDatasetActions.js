@@ -17,7 +17,8 @@ import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import emitter from '@/libs/eventBus';
 import { itemFor } from '@/libs/dataset/explorerItems';
-import { confirmDelete, CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
+import { CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
+import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
@@ -112,7 +113,14 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     // ---- Delete --------------------------------------------------------------------------
 
     async function remove(files) {
-        if (files.length && await confirm(confirmDelete(files))) deleteFiles(files);
+        if (!files.length) return;
+        // A folder goes with everything inside it
+        const folder = f => ddb.entry.isDirectory(f.entry);
+        const question = deleteConfirmation({
+            kind: folder(files[0]) ? 'folder' : 'file',
+            items: files.map(f => ({ name: f.label, note: folder(f) ? 'and everything inside it' : '' }))
+        });
+        if (await confirm(question)) deleteFiles(files);
     }
 
     async function deleteFiles(files) {

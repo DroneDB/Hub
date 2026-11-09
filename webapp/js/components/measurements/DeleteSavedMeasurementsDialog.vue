@@ -1,11 +1,5 @@
 <template>
-    <ConfirmDialog title="Delete Saved Measurements"
-                   message="Delete the saved measurements of this view? They are removed from the file and from the view."
-                   confirm-text="Delete"
-                   cancel-text="Cancel"
-                   confirm-button-class="danger"
-                   warning-message="This action cannot be undone."
-                   @close="$emit('close', $event)" />
+    <ConfirmDialog v-bind="question" @close="$emit('close', $event)" />
 </template>
 
 <script>
@@ -14,9 +8,18 @@
  * measurements leave the file and the view (the other view's measurements in the file stay).
  */
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
 export default {
     components: { ConfirmDialog },
-    emits: ['close']
+    emits: ['close'],
+    setup() {
+        return {
+            question: confirmDialogProps({
+                kind: 'saved measurements',
+                description: 'the saved measurements of this view: they leave the file and the view'
+            })
+        };
+    }
 };
 </script>
