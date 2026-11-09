@@ -6,7 +6,8 @@
  *
  * Env: HUB_URL (default http://localhost:5100), HUB_USER/HUB_PASS (admin/password123),
  * HUB_TEST_DATA (/mnt/data/repos/test_data), HUB_HEADED=1 to watch, HUB_CHROME to use a given
- * Chromium binary (otherwise Playwright's own, else the newest one in ~/.cache/ms-playwright).
+ * Chromium binary (otherwise Playwright's own, else the newest one in ~/.cache/ms-playwright, or
+ * %LOCALAPPDATA%\ms-playwright on Windows).
  * It creates a throw-away dataset in the user's organisation and deletes it at the end.
  * To test a local build: `npm run build`, copy build/* into <storage>/ClientApp, write the
  * package version into <storage>/ClientApp/version.txt and restart the Registry. Without
@@ -39,10 +40,17 @@ const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 function chromeExecutable() {
     if (process.env.HUB_CHROME) return process.env.HUB_CHROME;
     try { if (fs.existsSync(chromium.executablePath())) return undefined; } catch { /* not resolvable */ }
-    const cache = path.join(process.env.HOME || '', '.cache', 'ms-playwright');
-    const candidates = fs.existsSync(cache) ? fs.readdirSync(cache).filter(d => /^chromium-\d+$/.test(d)).sort().reverse() : [];
+    const windows = process.platform === 'win32';
+    const cache = windows
+        ? path.join(process.env.LOCALAPPDATA || '', 'ms-playwright')
+        : path.join(process.env.HOME || '', '.cache', 'ms-playwright');
+    const build = d => Number(d.slice('chromium-'.length));
+    // Newest build first (chromium-1200 after chromium-999)
+    const candidates = fs.existsSync(cache)
+        ? fs.readdirSync(cache).filter(d => /^chromium-\d+$/.test(d)).sort((a, b) => build(b) - build(a))
+        : [];
     for (const d of candidates) {
-        const exe = path.join(cache, d, 'chrome-linux64', 'chrome');
+        const exe = windows ? path.join(cache, d, 'chrome-win64', 'chrome.exe') : path.join(cache, d, 'chrome-linux64', 'chrome');
         if (fs.existsSync(exe)) return exe;
     }
     return undefined;
@@ -344,41 +352,70 @@ test('dataset Map tab: split compare and the display toggles', async () => {
     await page.click(flight);
 });
 
-test('compare view: georasters side by side, saved and listed under the tree', async () => {
-    const paths = [path.basename(FILES.raster), path.basename(FILES.dem)];
-    const query = paths.map(p => `p=${Buffer.from(p, 'utf8').toString('base64url')}`).join('&');
-    await page.goto(`${URL_}/r/${USER}/${DS}/compare?${query}`);
-    await page.waitForSelector('.split-overlay', { timeout: 30000 });
-    assert.deepEqual(await page.locator('.split-label-text').allInnerTexts(), paths);
-    await page.click('.compare-toolbar button:has-text("Save")');
-    await page.fill('.p-dialog input', 'Smoke comparison');
-    await Promise.all([page.waitForURL(/\?c=c_/, { timeout: 15000 }), page.click('.p-dialog button[data-confirm]')]);
-    await page.goto(`${URL_}/r/${USER}/${DS}`);
-    await page.waitForSelector('.saved-comparisons >> text=Smoke comparison', { timeout: 20000 });
-});
-
-test('dataset Map tab: with one georaster, Compare opens the compare view with the picker', async () => {
-    const dem = path.basename(FILES.dem);
-    await api('POST', `/orgs/${USER}/ds/${DS}/obj`, form({ path: `single/${dem}`, file: new Blob([fs.readFileSync(FILES.dem)]) }));
-    await page.goto(`${URL_}/r/${USER}/${DS}`);
-    await page.click('text=Files');
-    await page.dblclick('#explorer >> text=single');
-    await page.waitForSelector(`#explorer >> text=${dem}`, { timeout: 20000 });
-    await page.click('text=Map');
-    const compare = page.locator('button[aria-label="Compare to another georaster"]');
-    await compare.waitFor({ timeout: 60000 });
-    const [tab] = await Promise.all([page.context().waitForEvent('page'), compare.click()]);
-    await tab.waitForLoadState();
-    assert.match(tab.url(), /\/compare\?p=[^&]+&pick=1$/);
-    await tab.waitForSelector('.p-dialog >> text=Add raster to compare', { timeout: 30000 });
-    // In the compare view, with its one raster, the same button asks for another
-    await tab.keyboard.press('Escape');
-    await tab.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
-    await tab.click('button[aria-label="Compare to another georaster"]');
-    await tab.waitForSelector('.p-dialog >> text=Add raster to compare', { timeout: 10000 });
-    await tab.close();
+// The dataset page at its root: where the tests after the map viewer ones start
+async function backToDataset() {
     await page.goto(`${URL_}/r/${USER}/${DS}`);
     await appReady();
+}
+
+test('map viewer: a file with another georaster added opens split, saved as a view listed under the tree', async () => {
+    const [raster, dem] = [path.basename(FILES.raster), path.basename(FILES.dem)];
+    try {
+        // The map of the orthophoto with the DEM added (MapCore's Compare in Map, fileViewUrl's `add`)
+        await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(raster)}/map?add=${Buffer.from(dem, 'utf8').toString('base64url')}`);
+        await page.waitForSelector('.split-overlay', { timeout: 30000 });
+        assert.deepEqual((await page.locator('.split-label-text').allInnerTexts()).sort(), [raster, dem].sort());
+        // Both are layers of the view; the split toggle is on
+        // (the panel's "Layers (n)" header shows on phones only)
+        const rows = page.locator('.raster-opacity-panel .raster-opacity-row');
+        await rows.nth(1).waitFor({ timeout: 10000 });
+        assert.equal(await rows.count(), 2);
+        assert.equal(await page.locator('button[aria-label="Compare georasters side by side"]').getAttribute('aria-pressed'), 'true');
+        // `add` is read once: the address names the file, not the view
+        assert.equal(new URL(page.url()).searchParams.has('add'), false);
+        await page.click('.view-bar button:has-text("Save")');
+        await page.fill('.p-dialog input', 'Smoke view');
+        await Promise.all([page.waitForURL(/\/views\/[^/?#]+/, { timeout: 15000 }), page.click('.p-dialog button[data-confirm]')]);
+        await page.goto(`${URL_}/r/${USER}/${DS}`);
+        await page.waitForSelector('.saved-views >> text=Smoke view', { timeout: 20000 });
+    } finally {
+        await backToDataset();
+    }
+});
+
+test('dataset Map tab: with one georaster, Compare opens its map with the picker', async () => {
+    const dem = path.basename(FILES.dem);
+    await api('POST', `/orgs/${USER}/ds/${DS}/obj`, form({ path: `single/${dem}`, file: new Blob([fs.readFileSync(FILES.dem)]) }));
+    let tab;
+    try {
+        await page.goto(`${URL_}/r/${USER}/${DS}`);
+        await page.click('text=Files');
+        await page.dblclick('#explorer >> text=single');
+        await page.waitForSelector(`#explorer >> text=${dem}`, { timeout: 20000 });
+        await page.click('text=Map');
+        const compare = page.locator('button[aria-label="Compare to another georaster"]');
+        await compare.waitFor({ timeout: 60000 });
+        // The viewer takes `pick` off the address once read: the link is checked as it is opened
+        await page.evaluate(() => {
+            const open = window.open;
+            window.__opened = [];
+            window.open = (url, ...rest) => { window.__opened.push(String(url)); return open.call(window, url, ...rest); };
+        });
+        [tab] = await Promise.all([page.context().waitForEvent('page'), compare.click()]);
+        assert.deepEqual(await page.evaluate(() => window.__opened), [`/r/${USER}/${DS}/view/${b64(`single/${dem}`)}/map?pick=1`]);
+        await tab.waitForLoadState();
+        await tab.waitForSelector('.p-dialog >> text=Add layer', { timeout: 30000 });
+        assert.match(new URL(tab.url()).pathname, /\/view\/[^/]+\/map$/);
+        assert.equal(new URL(tab.url()).searchParams.has('pick'), false);
+        // In the map viewer, with its one raster, Add layer of the layer panel asks for another
+        await tab.keyboard.press('Escape');
+        await tab.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+        await tab.click('button.add-btn');
+        await tab.waitForSelector('.p-dialog >> text=Add layer', { timeout: 10000 });
+    } finally {
+        await tab?.close();
+        await backToDataset();
+    }
 });
 
 test('dataset Map tab: clicking a photo opens its popup', async () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
-const source = vi.hoisted(() => ({ text: '', path: 'readme.md', canWrite: false, writeObj: null }));
+const source = vi.hoisted(() => ({ text: '', path: 'readme.md', canWrite: false, writeObj: null, refused: '' }));
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const guards = vi.hoisted(() => ({ leave: null, update: null }));
 vi.mock('vue-router', async importOriginal => ({
@@ -14,8 +14,22 @@ vi.mock('vue-router', async importOriginal => ({
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => notify }));
 vi.mock('@/composables/useViewerEntry', async () => {
     const { ref, shallowRef } = await import('vue');
+    // A refused file (of another type), as useViewerEntry leaves it: no entry or dataset,
+    // the message in `error`, `loading` false once `entryLoaded` settles to false
+    const refusedEntry = message => {
+        const loading = ref(true);
+        const error = ref('');
+        const entryLoaded = Promise.resolve().then(() => {
+            error.value = message;
+            loading.value = false;
+            return false;
+        });
+        return {
+            entry: shallowRef(null), dataset: shallowRef(null), canWrite: ref(false), loading, error, entryLoaded
+        };
+    };
     return {
-        useViewerEntry: () => ({
+        useViewerEntry: () => source.refused ? refusedEntry(source.refused) : ({
             entry: shallowRef({ path: source.path }),
             dataset: shallowRef({
                 getFileContents: () => Promise.resolve(source.text), writeObj: source.writeObj,
@@ -36,6 +50,7 @@ beforeEach(() => {
     source.path = 'readme.md';
     source.canWrite = false;
     source.writeObj = vi.fn(() => Promise.resolve());
+    source.refused = '';
 });
 
 let wrapper;
@@ -125,6 +140,24 @@ describe('MarkdownViewer', () => {
         expect(content.find('img').exists()).toBe(false);
         expect(content.text()).toContain('secret');
         expect(content.find('a').attributes('href')).toBeUndefined();
+    });
+
+    it('shows the error of a file of another type, without reading its path', async () => {
+        source.refused = 'cog.tif cannot be opened as markdown';
+        const errorHandler = vi.fn();
+        wrapper = mount(MarkdownViewer, {
+            attachTo: document.body,
+            global: {
+                plugins: [PrimeVue],
+                config: { errorHandler },
+                stubs: { ViewerShell: { props: ['error', 'loading'], template: '<div><p class="error">{{ error }}</p><slot /></div>' } }
+            }
+        });
+        await flushPromises();
+        expect(errorHandler).not.toHaveBeenCalled();
+        expect(wrapper.find('.error').text()).toBe('cog.tif cannot be opened as markdown');
+        expect(wrapper.find('.md-container').exists()).toBe(false);
+        expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
     });
 
     describe('editing', () => {

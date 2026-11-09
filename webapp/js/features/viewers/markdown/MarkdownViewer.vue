@@ -1,6 +1,7 @@
 <template>
     <ViewerShell v-model:error="error" class="markdown" :loading="loading">
-        <div v-if="!loading" class="md-container">
+        <!-- No entry when it did not load (a file of another type): ViewerShell shows the error -->
+        <div v-if="!loading && entry" class="md-container">
             <div v-if="editing" class="edit-container">
                 <div class="edit-toolbar" role="toolbar" aria-label="Markdown editor">
                     <span v-if="dirty" class="unsaved me-auto" role="status">Unsaved changes</span>
@@ -58,8 +59,11 @@ const original = ref('');
 const editing = ref(false);
 const saving = ref(false);
 const editor = ref(null);
-// Images and links of the file name files of the dataset from the file's folder
-const content = computed(() => renderMarkdown(rawContent.value, { resolveUrl: datasetFileUrls(dataset.value, entry.value.path) }));
+// Images and links of the file name files of the dataset from the file's folder (nothing to
+// render when the entry did not load)
+const content = computed(() => entry.value
+    ? renderMarkdown(rawContent.value, { resolveUrl: datasetFileUrls(dataset.value, entry.value.path) })
+    : '');
 const dirty = computed(() => editing.value && rawContent.value !== original.value);
 
 useLeaveGuard({ isDirty: dirty, save, dialogs });
