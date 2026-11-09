@@ -7,7 +7,9 @@
  *    field it lacks keeps its local value and is sent (an empty account is seeded this way);
  *  - a local change marks its section dirty and a debounced PATCH sends the dirty sections,
  *    one request at a time. A section is sent whole; a key without a value is sent as null and
- *    a section without any value as null (the account forgets it).
+ *    a section without any value as null (the account forgets it). The exception is a section the
+ *    server merges field by field (MERGED_SECTIONS): only the fields that changed are sent, so a
+ *    device with a stale copy of the other fields cannot overwrite what another device saved.
  *
  * The store is the only subscriber to the login state of the sync; it does not subscribe to
  * the client's events (the auth store does).
@@ -29,6 +31,43 @@ for (const [key, [section, field]] of Object.entries(ACCOUNT_SECTIONS)) {
     SECTIONS.get(section)?.push({ key, field });
 }
 
+/**
+ * Sections the server merges field by field (a missing or null field keeps the stored value). Only the
+ * changed fields of these are sent; every other section is replaced whole by the server, so it is sent whole.
+ */
+const MERGED_SECTIONS = new Set(['notifications']);
+
+/**
+ * Pending work per section: the fields to send, or null for the whole section.
+ * @typedef {Map<string, Set<string>|null>} PendingSections
+ */
+
+/**
+ * Records that `field` of section `name` (the whole section when the field is not given or the server replaces
+ * the section whole) is to be sent.
+ * @param {PendingSections} pending @param {string} name @param {string} [field]
+ */
+function addPending(pending, name, field) {
+    if (!MERGED_SECTIONS.has(name) || field === undefined) {
+        pending.set(name, null);
+        return;
+    }
+    const fields = pending.get(name);
+    if (fields === null) return;
+    if (fields) fields.add(field);
+    else pending.set(name, new Set([field]));
+}
+
+/**
+ * Whether `field` of section `name` is in `pending` (the whole section counts).
+ * @param {PendingSections} pending @param {string} name @param {string} field
+ */
+function isPending(pending, name, field) {
+    if (!pending.has(name)) return false;
+    const fields = pending.get(name);
+    return fields === null || !!fields?.has(field);
+}
+
 /** @param {unknown} value @returns {value is Record<string, any>} */
 const isObject = value => !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -47,14 +86,15 @@ const TO_ACCOUNT = {
 const hasLocalValue = key => getPref(key, null) !== null;
 
 /**
- * The account form of a section from the local values: every field, null for a key without a
- * value; null when no key has one.
- * @param {string} name
+ * The account form of a section from the local values: every field (or only those in `only`), null for a
+ * key without a value; null when no key has one (and `only` is not given: a partial section is never null).
+ * @param {string} name @param {Set<string>|null} [only]
  */
-function buildSection(name) {
+function buildSection(name, only = null) {
     const fields = /** @type {Record<string, unknown>} */ ({});
-    let any = false;
+    let any = !!only;
     for (const { key, field } of SECTIONS.get(name) ?? []) {
+        if (only && !only.has(field)) continue;
         const value = getPref(key, null);
         any ||= value !== null;
         fields[field] = isObject(value) && TO_ACCOUNT[key] ? TO_ACCOUNT[key](value) : value;
@@ -62,8 +102,8 @@ function buildSection(name) {
     return any ? fields : null;
 }
 
-/** @param {Iterable<string>} names */
-const buildBody = names => Object.fromEntries([...names].map(name => [name, buildSection(name)]));
+/** @param {PendingSections} pending */
+const buildBody = pending => Object.fromEntries([...pending].map(([name, only]) => [name, buildSection(name, only)]));
 
 /** @param {unknown} e */
 const isConflict = e => !!e && typeof e === 'object' && /** @type {any} */ (e).status === 409;
@@ -74,10 +114,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
     /** @type {import('vue').Ref<'idle'|'loading'|'saving'|'error'>} */
     const status = ref('idle');
-    /** Names of the sections to send. @type {Set<string>} */
-    const dirty = new Set();
-    /** Names of the sections of the request in flight. @type {Set<string>} */
-    const inFlight = new Set();
+    /** The sections (and fields) to send. @type {PendingSections} */
+    const dirty = new Map();
+    /** The sections (and fields) of the request in flight. @type {PendingSections} */
+    const inFlight = new Map();
     /** @type {ReturnType<typeof setTimeout>|null} */
     let timer = null;
     /** Bumped when the session ends or changes: the answers of an older one are dropped. */
@@ -95,10 +135,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
         timer = null;
     }
 
-    /** @param {string} name */
-    function markSection(name) {
+    /** @param {string} name @param {string} [field] the changed field; the whole section when not given */
+    function markSection(name, field) {
         if (!auth.isLoggedIn || !SECTIONS.has(name)) return;
-        dirty.add(name);
+        addPending(dirty, name, field);
         if (!loading) status.value = 'saving';
         clearTimer();
         timer = setTimeout(() => { timer = null; void send(); }, SAVE_DELAY_MS);
@@ -106,7 +146,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
     /** @type {import('@/libs/preferences').PrefListener} */
     function onLocalChange(key, _value, origin) {
-        if (origin === 'local' && Object.hasOwn(ACCOUNT_SECTIONS, key)) markSection(ACCOUNT_SECTIONS[key][0]);
+        if (origin === 'local' && Object.hasOwn(ACCOUNT_SECTIONS, key)) markSection(ACCOUNT_SECTIONS[key][0], ACCOUNT_SECTIONS[key][1]);
     }
 
     /** The send failed or the load did: keep what is pending, say so once per session. @param {unknown} error */
@@ -121,8 +161,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
 
     /**
-     * Reads the account and applies it to the sections that are not dirty or being sent (those
-     * hold a newer local change): the account wins for the fields it has; a field it lacks that has a
+     * Reads the account and applies it to the fields that are not dirty or being sent (those
+     * hold a newer local change; a whole section for the sections the server replaces whole, a field for the
+     * ones it merges): the account wins for the fields it has; a field it lacks that has a
      * local value is marked dirty, except for an ACCOUNT_OWNED key, whose local value is removed. A
      * field the account holds under its old name (RENAMED_PREFS) counts as the new field, and its
      * section is marked dirty so the next save leaves the old name out.
@@ -146,17 +187,19 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
         const sections = isObject(account) ? account : {};
         for (const [name, fields] of SECTIONS) {
-            if (dirty.has(name) || inFlight.has(name)) continue;
             const stored = Object.hasOwn(sections, name) ? sections[name] : null;
             /** @param {string | undefined} field */
             const holds = field => !!field && isObject(stored) && Object.hasOwn(stored, field);
+            // Decided before the loop: what this loop marks dirty must not hide the other fields of the section
+            const held = new Set(fields.map(f => f.field).filter(f => isPending(dirty, name, f) || isPending(inFlight, name, f)));
             for (const { key, field } of fields) {
+                if (held.has(field)) continue;
                 const oldField = RENAMED_PREFS[key]?.field;
                 if (holds(field)) applyAccountValue(key, stored[field]);
                 else if (holds(oldField)) applyAccountValue(key, stored[/** @type {string} */ (oldField)]);
                 else if (ACCOUNT_OWNED.includes(key)) applyAccountValue(key, null);
-                else if (hasLocalValue(key)) dirty.add(name);
-                if (holds(oldField)) dirty.add(name);
+                else if (hasLocalValue(key)) addPending(dirty, name, field);
+                if (holds(oldField)) addPending(dirty, name);
             }
         }
         status.value = dirty.size ? 'saving' : 'idle';
@@ -171,16 +214,19 @@ export const usePreferencesStore = defineStore('preferences', () => {
         let reloaded = false;
         try {
             while (dirty.size && timer === null && !loading) {
-                const names = [...dirty];
+                const batch = new Map(dirty);
                 dirty.clear();
-                names.forEach(name => inFlight.add(name));
+                batch.forEach((fields, name) => inFlight.set(name, fields));
                 status.value = 'saving';
                 try {
-                    await reg.patchRequest(ENDPOINT, buildBody(names), { invalidate: ENDPOINT });
+                    await reg.patchRequest(ENDPOINT, buildBody(batch), { invalidate: ENDPOINT });
                 } catch (e) {
                     if (sessionId !== session) return;
                     inFlight.clear();
-                    names.forEach(name => dirty.add(name));
+                    for (const [name, fields] of batch) {
+                        if (fields === null) addPending(dirty, name);
+                        else fields.forEach(field => addPending(dirty, name, field));
+                    }
                     // The account changed during the save: read it, then send what is still pending
                     if (isConflict(e) && !reloaded) {
                         reloaded = true;

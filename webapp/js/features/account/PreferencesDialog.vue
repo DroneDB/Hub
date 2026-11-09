@@ -219,12 +219,19 @@ const currency = computed({
     set: value => { storedCurrency.value = normalizeCurrency(value); }
 });
 
-// ---- Notifications: e-mail about the user's builds ----
+// ---- Notifications: e-mail about the user's builds and tasks ----
 
 const BUILD_NOTIFICATION_OPTIONS = [
     { value: 'none', label: 'None' },
     { value: 'all', label: 'All' },
     { value: 'failed', label: 'Failed or waiting for files' }
+];
+// The tasks the server e-mails about (FR-PRC-40): photogrammetry, imports, extracts, exports. "Failed only" means the
+// tasks that failed; a build is the setting above
+const TASK_NOTIFICATION_OPTIONS = [
+    { value: 'none', label: 'None' },
+    { value: 'all', label: 'All' },
+    { value: 'failed', label: 'Failed only' }
 ];
 /** Why the server cannot e-mail this account, by the status `reason` (emailDisabled hides the tab instead). */
 const CANNOT_RECEIVE = {
@@ -243,6 +250,12 @@ const notificationsHint = computed(() => (cannotReceive.value
     ? CANNOT_RECEIVE[notificationStatus.value?.reason ?? ''] ?? 'Your account cannot receive e-mail from this server.'
     : 'An e-mail tells you when the builds of your files end, and once when a build waits for files to be uploaded; '
         + 'builds that end close together share one e-mail.'));
+
+// The hint of the task setting: the same reason when the account cannot be e-mailed
+const tasksHint = computed(() => (cannotReceive.value
+    ? notificationsHint.value
+    : 'An e-mail tells you when a task of yours ends, such as a photogrammetry run, an import or an export, '
+        + 'with the reason when it failed and a link to the dataset Tasks tab. One e-mail per task.'));
 
 let statusAsked = false;
 async function loadNotificationStatus() {
@@ -367,7 +380,10 @@ const TABS = [
             controls: [
                 select('build-notifications', 'Send build notifications',
                     usePreference(PREF.BUILD_NOTIFICATIONS, PREF_DEFAULTS[PREF.BUILD_NOTIFICATIONS]), BUILD_NOTIFICATION_OPTIONS,
-                    { disabled: notificationsDisabled, hint: notificationsHint })
+                    { disabled: notificationsDisabled, hint: notificationsHint }),
+                select('task-notifications', 'Send task notifications',
+                    usePreference(PREF.TASK_NOTIFICATIONS, PREF_DEFAULTS[PREF.TASK_NOTIFICATIONS]), TASK_NOTIFICATION_OPTIONS,
+                    { disabled: notificationsDisabled, hint: tasksHint })
             ]
         }]
     }

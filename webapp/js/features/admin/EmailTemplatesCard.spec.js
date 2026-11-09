@@ -226,6 +226,8 @@ describe('EmailTemplatesCard', () => {
             expect(frame.attributes('title')).toBeTruthy();
             expect(wrapper.find('pre.preview-text').text()).toBe(PREVIEW.text);
             expect(wrapper.text()).toContain(PREVIEW.subject);
+            // Two kinds of e-mail now (builds and tasks): the sample is not always builds
+            expect(wrapper.find('#email-template-preview-title').text()).toBe('Preview with sample data');
             // The server's HTML is never part of this page
             expect(document.body.querySelector('.email-templates-card script')).toBeNull();
             await button('Close preview').trigger('click');
@@ -248,7 +250,7 @@ describe('EmailTemplatesCard', () => {
         await button('Send me a test').trigger('click');
         await flushPromises();
         expect(h.sys.testEmailTemplate).toHaveBeenCalledWith(NAME, { subject: TEMPLATE.subject, body: 'Test body {{builds}}' });
-        expect(h.notify.success).toHaveBeenCalledWith(expect.stringContaining('sent to your address'), { summary: 'Test e-mail sent' });
+        expect(h.notify.success).toHaveBeenCalledWith('A test e-mail with sample data was sent to your address.', { summary: 'Test e-mail sent' });
     });
 
     describe('Reset to default', () => {

@@ -65,7 +65,7 @@
 
             <section v-if="preview" class="template-preview" aria-labelledby="email-template-preview-title">
                 <div class="preview-header">
-                    <h3 id="email-template-preview-title">Preview with sample builds</h3>
+                    <h3 id="email-template-preview-title">Preview with sample data</h3>
                     <Button label="Close preview" icon="fa-solid fa-xmark" severity="secondary" size="small" text
                             @click="preview = null" />
                 </div>
@@ -86,7 +86,7 @@
 <script setup>
 /**
  * EmailTemplatesCard - the admin edits the subject and body of the e-mails the server lets
- * them change (today the build notifications), with {{placeholders}} for the values. The
+ * them change (the build and the task notifications), with {{placeholders}} for the values. The
  * server checks the text (an unknown or misplaced placeholder is a 400 that names it), renders
  * the preview with sample data through the real e-mail layout, sends a test to the admin and
  * keeps the built-in text as the default. Shown only on a server that sends e-mail.
@@ -232,7 +232,7 @@ function showPreview() {
 
 async function sendTest() {
     if (await run('test', () => reg.sys.testEmailTemplate(selectedName.value, text()))) {
-        notify.success('A test e-mail with sample builds was sent to your address.', { summary: 'Test e-mail sent' });
+        notify.success('A test e-mail with sample data was sent to your address.', { summary: 'Test e-mail sent' });
     }
 }
 

@@ -36,6 +36,7 @@ beforeEach(() => {
     setPref(PREF.MEASURE_UNIT, null);
     setPref(PREF.CUSTOM_BASEMAP, null);
     setPref(PREF.BUILD_NOTIFICATIONS, null);
+    setPref(PREF.TASK_NOTIFICATIONS, null);
     setPref(PREF.APPEARANCE, null);
     h.auth.flags.emailEnabled = true;
     h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: true, reason: null }));
@@ -424,6 +425,7 @@ describe('PreferencesDialog', () => {
         const selectRoot = () => select()?.closest('.p-select');
         const hint = () => document.getElementById('pref-build-notifications-hint');
         const activeTab = () => dom().find('[role="tab"][aria-selected="true"]').text();
+        const selectOf = inputId => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === inputId);
 
         it('has no tab on a server that sends no e-mail, and asks nothing', async () => {
             h.auth.flags.emailEnabled = false;
@@ -460,7 +462,7 @@ describe('PreferencesDialog', () => {
             expect(document.body.textContent).toContain('Send build notifications');
             expect(selectRoot().classList.contains('p-disabled')).toBe(false);
             expect(selectRoot().textContent).toContain('None');
-            const options = wrapper.findAllComponents({ name: 'Select' }).at(-1).props('options');
+            const options = selectOf('pref-build-notifications').props('options');
             expect(options).toEqual([
                 { value: 'none', label: 'None' }, { value: 'all', label: 'All' }, { value: 'failed', label: 'Failed or waiting for files' }
             ]);
@@ -469,9 +471,38 @@ describe('PreferencesDialog', () => {
 
         it('stores the choice as the build notifications preference', async () => {
             await render({ initialTab: 'notifications' });
-            await wrapper.findAllComponents({ name: 'Select' }).at(-1).vm.$emit('update:modelValue', 'failed');
+            await selectOf('pref-build-notifications').vm.$emit('update:modelValue', 'failed');
             await flushPromises();
             expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('failed');
+            expect(getPref(PREF.TASK_NOTIFICATIONS, '')).toBe(''); // never chosen: nothing stored
+        });
+
+        // FR-PRC-40, D-012: a second setting for the tasks that end (photogrammetry, imports, exports)
+        it('has a task notifications setting beside the build one, None first and None by default', async () => {
+            await render({ initialTab: 'notifications' });
+            expect(document.body.textContent).toContain('Send task notifications');
+            expect(selectOf('pref-task-notifications').props('options')).toEqual([
+                { value: 'none', label: 'None' }, { value: 'all', label: 'All' }, { value: 'failed', label: 'Failed only' }
+            ]);
+            expect(selectOf('pref-task-notifications').props('modelValue')).toBe('none');
+            expect(document.getElementById('pref-task-notifications-hint').textContent)
+                .toContain('when a task of yours ends');
+        });
+
+        it('stores the task choice as the task notifications preference, apart from the build one', async () => {
+            await render({ initialTab: 'notifications' });
+            await selectOf('pref-task-notifications').vm.$emit('update:modelValue', 'failed');
+            await flushPromises();
+            expect(getPref(PREF.TASK_NOTIFICATIONS, '')).toBe('failed');
+            expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('');
+        });
+
+        it('disables the task setting too, with the same reason, for an account without an e-mail address', async () => {
+            h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: false, reason: 'noAddress' }));
+            await render({ initialTab: 'notifications' });
+            expect(document.getElementById('pref-task-notifications').closest('.p-select').classList.contains('p-disabled')).toBe(true);
+            expect(document.getElementById('pref-task-notifications-hint').textContent)
+                .toBe('Your account has no e-mail address. Ask an administrator to add one.');
         });
 
         it('is disabled, with the reason, for an account without an e-mail address', async () => {

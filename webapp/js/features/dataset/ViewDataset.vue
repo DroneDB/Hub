@@ -12,7 +12,7 @@
                 </div>
             </template>
             <template #second>
-                <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="mainTabs[0].key" position="top"
+                <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="initialTab ?? mainTabs[0].key" position="top"
                              :hide-single="false" bottom-nav-phone @tab-change="onTabChange">
                     <template v-if="phoneLayout" #filebrowser>
                         <FileBrowser ref="mobileFileBrowser" v-bind="treeProps" v-on="treeEvents" />
@@ -63,7 +63,7 @@
  * (libs/dataset/explorerActions) that the menus and the shortcuts read too; the lightbox is a component.
  */
 import { ref, shallowRef, reactive, computed, watch, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import icons from '@/libs/icons';
@@ -124,6 +124,7 @@ const TaskHistory = lazyComponent(() => import(/* webpackChunkName: "dataset-tas
 defineOptions({ name: 'ViewDataset' });
 
 const route = useRoute();
+const router = useRouter();
 const params = { org: String(route.params.org), ds: String(route.params.ds) };
 const dataset = reg.Organization(params.org).Dataset(params.ds);
 const session = useDatasetSessionStore();
@@ -153,6 +154,11 @@ const mainTabs = computed(() => [
     { label: 'Map', icon: 'fa-solid fa-map', key: 'map' },
     { label: 'Tasks', icon: 'fa-solid fa-list-check', key: 'tasks' }
 ]);
+// The link of the task e-mail (FR-PRC-40) opens the Tasks tab: `?tab=tasks`; any other query leaves the first tab.
+// It is read for the first tab; the route is followed afterwards (watch below), and the query goes once the user
+// switches to another tab (onTabChange), so a reload or a shared address does not bring the old tab back.
+const TASKS_TAB_QUERY = 'tasks';
+const initialTab = route.query?.tab === TASKS_TAB_QUERY ? TASKS_TAB_QUERY : null;
 // The tab on show
 const activeTab = ref(null);
 // Tabs whose code loads on first use stay mounted once opened
@@ -229,8 +235,22 @@ function onMapFileWritten(path) {
     listing.addEntry(path).catch(e => console.warn(`Could not show ${path} in the file list:`, e));
 }
 
+// The user left the tab that `?tab=` names: the address stops saying so (replace: no history entry for a tab switch)
+function dropTabQuery(key) {
+    if (route.query?.tab !== TASKS_TAB_QUERY || key === TASKS_TAB_QUERY) return;
+    const query = { ...route.query };
+    delete query.tab;
+    void router.replace({ query, hash: route.hash });
+}
+
+// `?tab=tasks` arriving while the page is open (back/forward, a link to the same dataset) shows the Tasks tab
+watch(() => route.query?.tab, tab => {
+    if (tab === TASKS_TAB_QUERY) tabs.value?.activateTab(TASKS_TAB_QUERY);
+});
+
 function onTabChange(key) {
     activeTab.value = key;
+    dropTabQuery(key);
     if (key in openedTabs) openedTabs[key] = true;
     // The header gates Download / Share on the Files tab
     session.setActiveTab(key);

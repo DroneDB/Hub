@@ -11,7 +11,7 @@ import { createPinia, setActivePinia } from 'pinia';
 
 const h_ = vi.hoisted(() => ({ dataset: null, showError: null, importFromUrl: null, loggedIn: true, gone: null, uploads: null, uploaded: null }));
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'r3sharing', ds: 'brighton-beach' } }) }));
+vi.mock('vue-router', () => ({ useRouter: () => ({ replace: vi.fn() }), useRoute: () => ({ params: { org: 'r3sharing', ds: 'brighton-beach' } }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
         Organization: () => ({ Dataset: () => h_.dataset }),

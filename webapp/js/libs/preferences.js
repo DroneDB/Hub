@@ -38,6 +38,7 @@ export const PREF = Object.freeze({
     UNIFIED_NAV_HINT: 'ddb.unified.navHint', // true once the 3D viewer told the user how to move (keys, Controls help); device only
     MODEL_LIGHTING: 'model-lighting-settings',
     BUILD_NOTIFICATIONS: 'buildNotifications', // 'none' | 'all' | 'failed': which ended builds the server e-mails
+    TASK_NOTIFICATIONS: 'taskNotifications', // 'none' | 'all' | 'failed': which ended tasks (photogrammetry, imports, exports) the server e-mails
     STOCKPILE_MATERIALS: 'stockpileMaterials', // { overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     // 'system' | 'light' | 'dark': the colour scheme (libs/colorScheme.js); device only (D-044). The
@@ -174,6 +175,7 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.MODEL_LIGHTING]: ['viewers', 'modelLighting'],
     [PREF.UNIFIED_VIEWER]: ['viewers', 'unifiedLighting'],
     [PREF.BUILD_NOTIFICATIONS]: ['notifications', 'builds'],
+    [PREF.TASK_NOTIFICATIONS]: ['notifications', 'tasks'],
     [PREF.STOCKPILE_MATERIALS]: ['stockpiles', 'materials']
 });
 
@@ -184,7 +186,7 @@ export const ACCOUNT_SECTIONS = Object.freeze({
  * another device has since reset, would turn e-mails on for an account that never asked.
  * A change made here is still sent as usual.
  */
-export const ACCOUNT_OWNED = /** @type {readonly string[]} */ (Object.freeze([PREF.BUILD_NOTIFICATIONS]));
+export const ACCOUNT_OWNED = /** @type {readonly string[]} */ (Object.freeze([PREF.BUILD_NOTIFICATIONS, PREF.TASK_NOTIFICATIONS]));
 
 /** Object.freeze that keeps the property types wide (number, not 10). @template T @param {T} value @returns {Readonly<T>} */
 const frozen = value => Object.freeze(value);
@@ -217,6 +219,7 @@ export const PREF_DEFAULTS = frozen({
     [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 }),
     // Opt-in: the server sends nothing for a missing or unknown value either
     [PREF.BUILD_NOTIFICATIONS]: 'none',
+    [PREF.TASK_NOTIFICATIONS]: 'none',
     // The built-in materials as they are
     [PREF.STOCKPILE_MATERIALS]: frozen({ overrides: frozen({}), custom: frozen([]) })
 });

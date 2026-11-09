@@ -175,7 +175,14 @@ describe('catalog', () => {
         // The server reads this section and field, and treats a missing value as 'none'
         expect(ACCOUNT_SECTIONS[PREF.BUILD_NOTIFICATIONS]).toEqual(['notifications', 'builds']);
         expect(PREF_DEFAULTS[PREF.BUILD_NOTIFICATIONS]).toBe('none');
-        expect(ACCOUNT_OWNED).toEqual([PREF.BUILD_NOTIFICATIONS]);
+        expect(ACCOUNT_OWNED).toContain(PREF.BUILD_NOTIFICATIONS);
+    });
+
+    it('task notifications are notifications.tasks next to the builds field, off by default, and owned by the account (FR-PRC-40)', () => {
+        // The server reads this field of the same section, and treats a missing value as 'none'
+        expect(ACCOUNT_SECTIONS[PREF.TASK_NOTIFICATIONS]).toEqual(['notifications', 'tasks']);
+        expect(PREF_DEFAULTS[PREF.TASK_NOTIFICATIONS]).toBe('none');
+        expect(ACCOUNT_OWNED).toEqual([PREF.BUILD_NOTIFICATIONS, PREF.TASK_NOTIFICATIONS]);
     });
 
     it('the splat quality is an account preference in the viewers section, automatic by default', () => {

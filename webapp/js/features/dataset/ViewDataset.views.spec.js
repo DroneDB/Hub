@@ -11,7 +11,7 @@ import { createPinia } from 'pinia';
 
 const h_ = vi.hoisted(() => ({ dataset: null, actions: null }));
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'org', ds: 'ds' } }) }));
+vi.mock('vue-router', () => ({ useRouter: () => ({ replace: vi.fn() }), useRoute: () => ({ params: { org: 'org', ds: 'ds' } }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
         Organization: () => ({ Dataset: () => h_.dataset }),

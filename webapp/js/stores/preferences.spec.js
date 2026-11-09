@@ -168,6 +168,21 @@ describe('preferences store: load', () => {
             expect(h.reg.patchRequest).not.toHaveBeenCalled();
         });
 
+        it('task notifications are synced as notifications.tasks alone, the builds field is not sent', async () => {
+            await start({ ...SYNCED_ACCOUNT, notifications: { builds: 'failed' } });
+            setPref(PREF.TASK_NOTIFICATIONS, 'all');
+            await tick(600);
+            expect(bodies()).toEqual([{ notifications: { tasks: 'all' } }]);
+        });
+
+        it('a task value left on the device is dropped, never sent, for an account without one', async () => {
+            setPref(PREF.TASK_NOTIFICATIONS, 'all');
+            await start(SYNCED_ACCOUNT);
+            await tick(5000);
+            expect(localStorage.getItem(PREF.TASK_NOTIFICATIONS)).toBeNull();
+            expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        });
+
         it('a change made during the load is still sent', async () => {
             const read = deferred();
             h.reg.getRequest.mockReturnValue(read.promise);
@@ -178,6 +193,43 @@ describe('preferences store: load', () => {
             await tick(600);
             expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('all');
             expect(bodies()).toEqual([{ notifications: { builds: 'all' } }]);
+        });
+
+        it('a build change during the load leaves the task choice of the account intact and out of the PATCH', async () => {
+            const read = deferred();
+            h.reg.getRequest.mockReturnValue(read.promise);
+            setActivePinia(createPinia());
+            store = usePreferencesStore();
+            setPref(PREF.BUILD_NOTIFICATIONS, 'all');
+            read.resolve({ ...SYNCED_ACCOUNT, notifications: { builds: 'none', tasks: 'all' } });
+            await tick(600);
+            expect(bodies()).toEqual([{ notifications: { builds: 'all' } }]);
+            expect(bodies()[0].notifications).not.toHaveProperty('tasks');
+            // The field that was not changed follows the account
+            expect(getPref(PREF.TASK_NOTIFICATIONS, '')).toBe('all');
+            expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('all');
+        });
+
+        it('changing both fields sends both, and a reset of the section still sends it as null', async () => {
+            await start({ ...SYNCED_ACCOUNT, notifications: { builds: 'none', tasks: 'none' } });
+            setPref(PREF.BUILD_NOTIFICATIONS, 'all');
+            setPref(PREF.TASK_NOTIFICATIONS, 'failed');
+            await tick(600);
+            expect(bodies()).toEqual([{ notifications: { builds: 'all', tasks: 'failed' } }]);
+            store.resetSection('notifications');
+            await tick(600);
+            expect(bodies()[1]).toEqual({ notifications: null });
+        });
+
+        it('a failed send keeps only the changed field pending', async () => {
+            await start({ ...SYNCED_ACCOUNT, notifications: { builds: 'none', tasks: 'all' } });
+            h.reg.patchRequest.mockRejectedValueOnce(failure());
+            setPref(PREF.BUILD_NOTIFICATIONS, 'failed');
+            await tick(600);
+            expect(bodies()).toEqual([{ notifications: { builds: 'failed' } }]);
+            setPref(PREF.BUILD_NOTIFICATIONS, 'all');
+            await tick(600);
+            expect(bodies()[1]).toEqual({ notifications: { builds: 'all' } });
         });
     });
 
