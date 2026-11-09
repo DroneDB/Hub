@@ -12,17 +12,19 @@ const TEXT_EXTENSIONS = [
     'wkt', 'prj'
 ];
 
-// Binary extensions that should never be opened as text
-const BINARY_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff', 'jp2', 'j2k',
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
-    'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz',
-    'exe', 'dll', 'so', 'dylib', 'bin',
-    'mp3', 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'wav', 'ogg', 'flac',
-    'las', 'laz', 'ply', 'obj', 'fbx', 'glb', 'gltf', 'dae', 'stl', '3ds',
-    'shp', 'dbf', 'shx', 'gpkg', 'mbtiles', 'sqlite', 'db',
-    'ddb', 'nxs', 'nxz', 'bm3d'
+// Text formats that open in their viewer by default but can also be edited as text:
+// vector and model formats stored as text, and the text sidecars of drone and GIS files
+// (subtitles of a drone video, world files, VRT, XMP, QGIS/SLD styles...), ASCII point
+// clouds and grids (XYZ, PTS, Esri ASCII grid), CZML and TOML
+const EDITABLE_TEXT_EXTENSIONS = [
+    'geojson', 'topojson', 'kml', 'gpx', 'gml', 'svg', 'dxf', 'obj', 'mtl',
+    'srt', 'tfw', 'jgw', 'pgw', 'wld', 'vrt', 'xmp', 'cpg', 'qml', 'sld', 'tsv',
+    'xyz', 'asc', 'pts', 'czml', 'toml'
 ];
+
+// Every extension the text editor may open: an allow-list, by extension only (an entry type
+// such as VECTOR covers binary formats too: KMZ, FlatGeobuf, GeoPackage, Shapefile, DWG)
+const OPENABLE_TEXT_EXTENSIONS = new Set([...TEXT_EXTENSIONS, ...EDITABLE_TEXT_EXTENSIONS]);
 
 // Maximum file size for text editing (5MB)
 const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
@@ -43,14 +45,6 @@ function isDefaultTextFile(path) {
 }
 
 /**
- * Check if file is definitely binary (should never be opened as text)
- */
-function isBinaryFile(path) {
-    const ext = getExtension(path);
-    return BINARY_EXTENSIONS.includes(ext);
-}
-
-/**
  * Check if file is a PDF
  */
 function isPdfFile(entry) {
@@ -60,13 +54,13 @@ function isPdfFile(entry) {
 
 /**
  * Check if file can potentially be opened as text
- * (not binary AND within size limit)
+ * (a known text extension AND within size limit; files without an extension cannot)
  */
 function canOpenAsText(entry) {
     if (!entry || !entry.path) return false;
 
-    // Check if binary
-    if (isBinaryFile(entry.path)) return false;
+    // Only known text formats
+    if (!OPENABLE_TEXT_EXTENSIONS.has(getExtension(entry.path))) return false;
 
     // Check size limit
     if (entry.size && entry.size > MAX_TEXT_FILE_SIZE) return false;
@@ -80,6 +74,19 @@ function canOpenAsText(entry) {
 function shouldOpenAsText(entry) {
     if (!canOpenAsText(entry)) return false;
     return isDefaultTextFile(entry.path);
+}
+
+// How much of the loaded content is looked at for a NUL character
+const BINARY_SNIFF_LENGTH = 8192;
+
+/**
+ * Check if loaded file content is not text: a NUL character near the start, or the
+ * header of a ZIP archive (KMZ, 3TZ and the like are ZIPs)
+ * @param {unknown} content
+ */
+function looksBinary(content) {
+    if (typeof content !== 'string') return false;
+    return content.startsWith('PK\u0003\u0004') || content.slice(0, BINARY_SNIFF_LENGTH).includes('\u0000');
 }
 
 /**
@@ -152,6 +159,7 @@ export {
     isPdfFile,
     canOpenAsText,
     shouldOpenAsText,
+    looksBinary,
     getLanguageMode,
     canFormat,
     formatContent

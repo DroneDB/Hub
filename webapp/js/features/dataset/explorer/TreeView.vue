@@ -103,9 +103,12 @@ export default {
         emitter.off('folderOpened', this._onFolderOpened);
     },
     methods: {
-        // Drop of a node onto `destItem`: the other selected nodes move too
+        // Drop of a node onto `destItem`: when the dragged node is one of the selected,
+        // the other selected nodes move too (a node dragged outside the selection moves alone)
         moveSelected: function (destItem, primaryPath) {
-            for (const node of this._nodes) {
+            const nodes = [...this._nodes];
+            if (!nodes.some(n => n.selected && n.node.entry.path === primaryPath)) return;
+            for (const node of nodes) {
                 if (!node.selected) continue;
                 node.selected = false;
                 // The dragged node itself was already moved by its drop handler

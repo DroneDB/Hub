@@ -16,20 +16,24 @@
                 </PrimeMessage>
 
                 <template v-else>
+                    <PrimeMessage v-if="binaryDetected" severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
+                        This file is not text: it opens read-only.
+                    </PrimeMessage>
+
                     <div ref="editorContainer" class="editor-container" />
 
-                    <PrimeMessage v-if="!readonly && isModified" severity="info" :closable="false" icon="fa-solid fa-circle-info">
+                    <PrimeMessage v-if="!isReadonly && isModified" severity="info" :closable="false" icon="fa-solid fa-circle-info">
                         You have unsaved changes
                     </PrimeMessage>
 
                     <div class="footer-actions">
                         <div class="footer-left">
-                            <Button v-if="!readonly && canFormatFile" :disabled="saving" severity="secondary"
+                            <Button v-if="!isReadonly && canFormatFile" :disabled="saving" severity="secondary"
                                     title="Format document (Shift+Alt+F)" icon="fa-solid fa-code"
                                     label="Format" @click="formatDocument" />
                         </div>
                         <div class="footer-right">
-                            <Button v-if="!readonly && isModified" :disabled="saving"
+                            <Button v-if="!isReadonly && isModified" :disabled="saving"
                                     icon="fa-solid fa-floppy-disk"
                                     :label="saving ? 'Saving...' : 'Save'" @click="save" />
                             <Button severity="secondary" label="Close" @click="close" />
@@ -60,7 +64,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import { useListenerBag } from '@/composables/useEventListener';
-import { getLanguageMode, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '@/libs/textFileUtils';
+import { getLanguageMode, MAX_TEXT_FILE_SIZE, canFormat, formatContent, looksBinary } from '@/libs/textFileUtils';
 import { bytesToSize } from '@/libs/utils';
 
 // CodeMirror imports
@@ -110,13 +114,19 @@ export default {
             currentContent: '',
             editor: null,
             fileTooLarge: false,
+            // The loaded content is not text (a NUL byte, a ZIP header): it opens read-only
+            binaryDetected: false,
             showConfirmClose: false
         };
     },
 
     computed: {
+        isReadonly() {
+            return this.readonly || this.binaryDetected;
+        },
+
         windowTitle() {
-            const mode = this.readonly ? 'View' : 'Edit';
+            const mode = this.isReadonly ? 'View' : 'Edit';
             return `${mode}: ${this.fileName}`;
         },
 
@@ -171,6 +181,7 @@ export default {
 
                 // Fetch file contents
                 const content = await this.dataset.getFileContents(this.entry.path);
+                this.binaryDetected = looksBinary(content);
                 this.originalContent = content;
                 this.currentContent = content;
 
@@ -243,7 +254,7 @@ export default {
             }
 
             // Make readonly if needed
-            if (this.readonly) {
+            if (this.isReadonly) {
                 extensions.push(EditorState.readOnly.of(true));
             }
 
@@ -257,7 +268,7 @@ export default {
         },
 
         async save() {
-            if (this.readonly || !this.isModified || this.saving) return;
+            if (this.isReadonly || !this.isModified || this.saving) return;
 
             this.saving = true;
             this.error = '';
@@ -315,7 +326,7 @@ export default {
         },
 
         formatDocument() {
-            if (this.readonly || !this.canFormatFile || !this.editor) return;
+            if (this.isReadonly || !this.canFormatFile || !this.editor) return;
 
             const mode = getLanguageMode(this.entry.path);
             const result = formatContent(this.currentContent, mode);

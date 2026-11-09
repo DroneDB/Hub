@@ -1,5 +1,5 @@
 <template>
-    <Window id="rename" title="Rename" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Rename" :confirm-disabled="!renameText || renameText === file.label" :busy="busy" @confirm="rename" @close="onWindowClose" @show="focusInput">
+    <Window id="rename" :title="title" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Rename" :confirm-disabled="!renameText || renameText === file.label" :busy="busy" @confirm="rename" @close="onWindowClose" @show="focusInput">
 
         <InputText ref="renameInput" v-model="renameText" class="renameInput" aria-label="New name" :invalid="renameText == null || renameText.length == 0"
                    :disabled="busy" fluid />
@@ -49,6 +49,13 @@ export default {
             sidecars: [],
             renameSidecars: true  // Checked by default
         };
+    },
+    computed: {
+        // Names the item renamed (the toolbar acts on the selection of the moment)
+        title: function () {
+            const name = this.file.label || ddb.pathutils.basename(this.file.entry?.path || '');
+            return name ? `Rename "${name}"` : 'Rename';
+        }
     },
     mounted: function () {
         this.renameText = this.file.label;

@@ -141,8 +141,9 @@ export function syntheticFolderItem(currentPath) {
 /**
  * Ask the dataset page to move items for an internal drag-drop (through the `datasetDrop` the page provides, not the global event bus).
  *
- * Multi-selection is supported: every currently-selected file in `extraSourceItems`
- * is also moved (deduplicated against the primary source).
+ * Multi-selection is supported: when the dragged item is one of the selected files in
+ * `extraSourceItems`, the other selected files move with it (deduplicated against the
+ * primary source); an item dragged outside the selection moves alone.
  *
  * @param {{ move: (source: object, dest: object) => void }|null} datasetDrop - injected from the dataset page
  * @param {object} sourceItem - dragged item (file/node from the file browser)
@@ -154,8 +155,10 @@ export function syntheticFolderItem(currentPath) {
 export function requestMove(datasetDrop, sourceItem, destItem, extraSourceItems = []) {
     if (!datasetDrop) return;
     datasetDrop.move(sourceItem, destItem);
+    const sourcePath = sourceItem.entry.path;
+    if (!extraSourceItems.some(sel => sel.entry.path === sourcePath)) return;
     for (const sel of extraSourceItems) {
-        if (sel.entry.path === sourceItem.entry.path) continue;
+        if (sel.entry.path === sourcePath) continue;
         datasetDrop.move(sel, destItem);
     }
 }

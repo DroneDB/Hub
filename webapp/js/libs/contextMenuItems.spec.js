@@ -126,3 +126,21 @@ describe('the map entries of the context menu', () => {
         expect(visible(items.find(i => i.label === 'Compare in Map'))).toBe(false);
     });
 });
+
+describe('the Edit entry of the context menu', () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    function editOf(path) {
+        const selected = [{ path: `ddb://h/org/ds/${path}`, entry: { path, type: ddb.entry.type.VECTOR, size: 1024 } }];
+        const items = buildStandardContextMenu({ getSelectedEntries: () => selected, canWrite: true, dataset: null, emit: vi.fn() });
+        return items.flatMap(i => (i.items ? [i, ...i.items] : [i])).find(i => i.label === 'Edit');
+    }
+
+    it('is not offered for a binary vector file (KMZ)', () => {
+        expect(visible(editOf('places.kmz'))).toBe(false);
+    });
+
+    it('is offered for a text vector file (KML)', () => {
+        expect(visible(editOf('places.kml'))).toBe(true);
+    });
+});

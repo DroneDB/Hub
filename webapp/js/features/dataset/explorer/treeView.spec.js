@@ -326,6 +326,72 @@ describe('selection cleanup on deleteEntries', () => {
         TreeView.beforeUnmount.call(vm);
     });
 
+    it('TreeView moves no other node when the dragged node is not one of the selected', async () => {
+        const TreeView = (await import('./TreeView.vue')).default;
+        const vm = { datasetDrop: { move: vi.fn() } };
+        TreeView.created.call(vm);
+        TreeView.mounted.call(vm);
+        const node = (path, selected) => ({ selected, node: { entry: { path } }, removeChildren: vi.fn(), addItems: vi.fn(), openFromTree: vi.fn() });
+        const a = node('a.jpg', false), b = node('b.jpg', true), c = node('c.jpg', true);
+        [a, b, c].forEach(n => vm._nodes.add(n));
+
+        // a.jpg was moved by its own drop handler: b.jpg and c.jpg stay, and stay selected
+        TreeView.methods.moveSelected.call(vm, { entry: { path: 'dest' } }, 'a.jpg');
+        expect(vm.datasetDrop.move).not.toHaveBeenCalled();
+        expect(b.selected && c.selected).toBe(true);
+        TreeView.beforeUnmount.call(vm);
+    });
+
+    describe('a drag from one tree node dropped on another', () => {
+        // Real TreeNodes registered with the real TreeView.moveSelected; dataTransfer is shared
+        // by the dragstart and the drop, as in a browser
+        async function mountTree() {
+            const { mount } = await import('@vue/test-utils');
+            const TreeView = (await import('./TreeView.vue')).default;
+            const TreeNode = (await import('./TreeNode.vue')).default;
+            const datasetDrop = { move: vi.fn(), upload: vi.fn() };
+            const tree = { datasetDrop, _nodes: new Set() };
+            const treeRegistry = {
+                add: n => tree._nodes.add(n), remove: n => tree._nodes.delete(n),
+                moveSelected: (dest, primary) => TreeView.methods.moveSelected.call(tree, dest, primary)
+            };
+            const mountNode = (path, type = FILE) => mount(TreeNode, {
+                props: { node: nodeData(path, type), getChildren: async () => [], canWrite: true },
+                global: { provide: { treeRegistry, datasetDrop } }
+            });
+            const nodes = { a: mountNode('a.jpg'), b: mountNode('b.jpg'), dest: mountNode('dest', DIR) };
+            const store = {};
+            const evt = {
+                preventDefault: vi.fn(), stopPropagation: vi.fn(),
+                dataTransfer: { setData: (k, v) => { store[k] = v; }, getData: k => store[k] || '', types: ['item'] }
+            };
+            const drag = (from, to) => {
+                from.vm.onDragStart(evt, from.props('node'));
+                to.vm.onItemDrop(evt, to.props('node'));
+            };
+            return { nodes, datasetDrop, drag };
+        }
+
+        it('moves only the dragged node when it is not selected, and keeps the selection', async () => {
+            const { nodes, datasetDrop, drag } = await mountTree();
+            nodes.b.vm.selected = true;
+            drag(nodes.a, nodes.dest);
+            expect(datasetDrop.move).toHaveBeenCalledTimes(1);
+            expect(datasetDrop.move.mock.calls[0][0].entry.path).toBe('a.jpg');
+            expect(datasetDrop.move.mock.calls[0][1].entry.path).toBe('dest');
+            expect(nodes.a.vm.selected).toBe(false);
+            expect(nodes.b.vm.selected).toBe(true);
+        });
+
+        it('moves the whole selection when the dragged node is one of the selected', async () => {
+            const { nodes, datasetDrop, drag } = await mountTree();
+            nodes.a.vm.selected = nodes.b.vm.selected = true;
+            drag(nodes.a, nodes.dest);
+            expect(datasetDrop.move.mock.calls.map(c => c[0].entry.path)).toEqual(['a.jpg', 'b.jpg']);
+            expect(nodes.a.vm.selected || nodes.b.vm.selected).toBe(false);
+        });
+    });
+
     it('FileBrowser forgets a deleted lastSelectedNode', async () => {
         const emitter = (await import('@/libs/eventBus')).default;
         const vm = { lastSelectedNode: treeNode('gone.jpg'), refreshNodes: vi.fn() };

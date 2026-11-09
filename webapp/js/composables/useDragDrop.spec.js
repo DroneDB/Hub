@@ -21,11 +21,21 @@ describe('useDragDrop', () => {
         const datasetDrop = { move: vi.fn(), upload: vi.fn() };
         const props = reactive({ canWrite: true, currentPath: 'photos' });
         const other = { entry: { path: 'b.jpg' } };
-        const api = harness(props, datasetDrop, [other]);
+        const api = harness(props, datasetDrop, [{ entry: { path: 'a.jpg' } }, other]);
         await api.explorerDropHandler(internalDrop({ entry: { path: 'a.jpg' } }));
         expect(datasetDrop.move).toHaveBeenCalledTimes(2);
+        expect(datasetDrop.move.mock.calls.map(c => c[0].entry.path)).toEqual(['a.jpg', 'b.jpg']);
         expect(datasetDrop.move.mock.calls[0][1].entry.path).toBe('photos');
         expect(api.dropping.value).toBe(false);
+    });
+
+    it('moves only the dragged item when it is not one of the selected', async () => {
+        const datasetDrop = { move: vi.fn(), upload: vi.fn() };
+        const props = reactive({ canWrite: true, currentPath: 'photos' });
+        const api = harness(props, datasetDrop, [{ entry: { path: 'b.jpg' } }, { entry: { path: 'c.jpg' } }]);
+        await api.explorerDropHandler(internalDrop({ entry: { path: 'a.jpg' } }));
+        expect(datasetDrop.move).toHaveBeenCalledTimes(1);
+        expect(datasetDrop.move.mock.calls[0][0].entry.path).toBe('a.jpg');
     });
 
     it('does nothing without write access and skips drops an item already handled', async () => {

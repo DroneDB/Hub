@@ -143,14 +143,13 @@ export default {
 
         /**
          * Drag start on a TreeNode entry. Stop propagation so a parent
-         * TreeNode does not also try to start a drag, mark this node as
-         * (multi-)selected, then delegate dataTransfer setup to the shared
-         * helper.
+         * TreeNode does not also try to start a drag, then delegate
+         * dataTransfer setup to the shared helper. The selection is left as it
+         * is: a node dragged outside it moves alone (TreeView.moveSelected).
          */
         onDragStart(evt, item) {
             evt.stopPropagation();
             startInternalDrag(evt, item);
-            this.selected = true;
         },
 
         /**
