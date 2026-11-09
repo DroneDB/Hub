@@ -165,6 +165,22 @@ describe('useSavedView file route', () => {
         expect(view.baseEntry.value.type).toBe(T.VECTOR);
     });
 
+    it('refuses a file that cannot be opened as a map (README.md), with no view', async () => {
+        const dataset = fakeDataset();
+        dataset.listOne.mockImplementation(async path => ({ path, type: T.MARKDOWN, hash: 'h' }));
+        const { view } = await open(fileUrl('README.md'), { dataset });
+        expect(view.error.value).toBe('README.md cannot be opened as a map');
+        expect(view.state.value).toBeNull();
+    });
+
+    it('refuses a drawing without geolocation, which has nothing to place on a map', async () => {
+        const dataset = fakeDataset();
+        dataset.listOne.mockImplementation(async path => ({ path, type: T.VECTOR, hash: 'h', properties: { georeferenced: false } }));
+        const { view } = await open(fileUrl('site.dxf'), { dataset });
+        expect(view.error.value).toBe('site.dxf cannot be opened as a map');
+        expect(view.state.value).toBeNull();
+    });
+
     it('shows the error of a file that is not there, with no view', async () => {
         const { view } = await open(fileUrl('f/a.tif'), { dataset: fakeDataset({ missing: ['f/a.tif'] }) });
         expect(view.error.value).toBe('Cannot find: f/a.tif.');

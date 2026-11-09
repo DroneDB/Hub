@@ -144,3 +144,93 @@ describe('the Edit entry of the context menu', () => {
         expect(visible(editOf('places.kml'))).toBe(true);
     });
 });
+
+describe('the Open items of the context menu (the viewer table)', () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    const opens = (type, path) => {
+        const selected = [{ path: `ddb://h/org/ds/${path}`, entry: { path, type } }];
+        return buildStandardContextMenu({ getSelectedEntries: () => selected, canWrite: true, dataset: null, emit: vi.fn() })
+            .filter(i => visible(i) && /^Open\b/.test(i.label || ''));
+    };
+
+    it('a PDF has exactly one Open item, with a Font Awesome PDF icon', () => {
+        const items = opens(ddb.entry.type.GENERIC, 'docs/report.pdf');
+        expect(items.map(i => i.label)).toEqual(['Open']);
+        expect(items[0].icon).toBe('fa-regular fa-file-pdf');
+    });
+
+    it('3D Tiles have an Open 3D Tiles item at the top level, which opens the 3D viewer', () => {
+        const items = opens(ddb.entry.type.TILES3D, 'the-limes-test.3tz');
+        expect(items.map(i => i.label)).toEqual(['Open 3D Tiles']);
+    });
+
+    it('offers Open Map for every map-viewable type, not for a drawing without geolocation', () => {
+        for (const type of [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR, ddb.entry.type.GEOVIDEO]) {
+            expect(opens(type, 'f.x').map(i => i.label)).toContain('Open Map');
+        }
+        const local = [{ path: 'ddb://h/org/ds/site.dxf', entry: { path: 'site.dxf', type: ddb.entry.type.VECTOR, properties: { georeferenced: false } } }];
+        const items = buildStandardContextMenu({ getSelectedEntries: () => local, canWrite: true, dataset: null, emit: vi.fn() });
+        expect(items.filter(visible).map(i => i.label)).not.toContain('Open Map');
+        expect(items.filter(visible).map(i => i.label)).toContain('Open');
+    });
+
+    it('a photo keeps its Open (the lightbox) next to Open Map', () => {
+        expect(opens(ddb.entry.type.GEOIMAGE, 'a.jpg').map(i => i.label)).toEqual(['Open', 'Open Map']);
+    });
+});
+
+describe('the background menu (nothing selected)', () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    it('has the folder actions only: New folder, Upload, Select all, Refresh, and Paste with something to paste', () => {
+        const emit = vi.fn();
+        const items = buildStandardContextMenu({ getSelectedEntries: () => [], canWrite: true, dataset: null, emit, clipboardEmpty: () => false })
+            .filter(i => (i.items ? i.items.some(visible) : visible(i)));
+        expect(items.map(i => i.label)).toEqual(['Paste', 'New folder', 'Upload', 'Select all', 'Refresh']);
+        items.find(i => i.label === 'Select all').click();
+        expect(emit).toHaveBeenCalledWith('selectAll');
+    });
+
+    it('offers a reader Select all and Refresh', () => {
+        const items = buildStandardContextMenu({ getSelectedEntries: () => [], canWrite: false, dataset: null, emit: vi.fn() })
+            .filter(i => (i.items ? i.items.some(visible) : visible(i)));
+        expect(items.map(i => i.label)).toEqual(['Select all', 'Refresh']);
+    });
+});
+
+describe('the folder actions in the menu of a selection', () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    it('offers New folder and Select all, which a full list leaves no empty area to reach', () => {
+        const emit = vi.fn();
+        const files = [...selection, { path: 'b.jpg', entry: { path: 'b.jpg', type: ddb.entry.type.IMAGE } }];
+        const items = buildStandardContextMenu({ getSelectedEntries: () => selection, getFiles: () => files, canWrite: true, dataset: null, emit });
+        const labels = items.filter(visible).map(i => i.label);
+        expect(labels).toContain('New folder');
+        expect(labels).toContain('Select all');
+        expect(labels).not.toContain('Upload');
+        expect(labels).not.toContain('Refresh');
+        items.find(i => i.label === 'New folder').click();
+        expect(emit).toHaveBeenCalledWith('createFolder');
+    });
+
+    it('leaves New folder out for a reader', () => {
+        const items = buildStandardContextMenu({ getSelectedEntries: () => selection, canWrite: false, dataset: null, emit: vi.fn() });
+        expect(items.filter(visible).map(i => i.label)).not.toContain('New folder');
+    });
+});
+
+describe('the order of the context menu', () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    it('goes Open, Edit, Share & download, Organize, the folder, Tools, and ends with Delete, marked as dangerous', () => {
+        const { all } = menu(true);
+        const top = buildStandardContextMenu({ getSelectedEntries: () => selection, canWrite: true, dataset: null, emit: vi.fn() })
+            .filter(i => (i.items ? i.items.some(visible) : visible(i)));
+        const groups = top.map(i => i.group).filter((g, i, a) => a[i - 1] !== g);
+        expect(groups).toEqual(['open', 'edit', 'share', 'organize', 'folder', 'tools', 'danger']);
+        expect(top[top.length - 1]).toMatchObject({ label: 'Delete', danger: true });
+        expect(all.filter(i => i.danger).map(i => i.label)).toEqual(['Delete']);
+    });
+});

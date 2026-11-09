@@ -1,21 +1,32 @@
 import ddb from 'ddb';
-import { OpenItemDefaults } from '@/libs/openItemDefaults';
 import { isArchivePath } from '@/libs/entryTypeCapabilities';
-
-// Types that have a dedicated viewer (derived from OpenItemDefaults)
-const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
 
 // Type groupings used across the application
 const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR, ddb.entry.type.GEOVIDEO];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
 
 // Helper functions
-function hasDedicatedViewer(type) {
-    return TYPES_WITH_DEDICATED_VIEWER.includes(type);
-}
-
 function isMapViewable(type) {
     return MAP_VIEWABLE_TYPES.includes(type);
+}
+
+/**
+ * True for a vector without geolocation: a CAD drawing (DXF/DWG) with no coordinate
+ * system, flagged by DroneDB at index time (properties.georeferenced === false). It has
+ * no map footprint and no MVT tiles; it is shown without a globe in the unified viewer.
+ */
+function isLocalVector(entry) {
+    return !!entry && entry.type === ddb.entry.type.VECTOR &&
+        !!entry.properties && entry.properties.georeferenced === false;
+}
+
+/**
+ * The one rule of "this entry opens in the map": the explorer's Open Map (toolbar and menu) and the
+ * map viewer page (which refuses any other file) both ask it. A drawing without geolocation has
+ * nothing to place on a map.
+ */
+function canOpenInMap(entry) {
+    return !!entry && isMapViewable(entry.type) && !isLocalVector(entry);
 }
 
 function isPanoramaType(type) {
@@ -107,8 +118,9 @@ function sortEntriesDirectoriesFirst(entries, getPath, descending = false) {
 }
 
 export {
-    hasDedicatedViewer,
     isMapViewable,
+    isLocalVector,
+    canOpenInMap,
     isPanoramaType,
     isDroneDB,
     isGeoraster,

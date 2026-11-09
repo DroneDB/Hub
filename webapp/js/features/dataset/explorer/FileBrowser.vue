@@ -42,7 +42,8 @@ import Button from 'primevue/button';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
-import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator } from '@/libs/contextMenuItems';
+import { buildStandardContextMenu } from '@/libs/contextMenuItems';
+import { runShortcut } from '@/libs/dataset/explorerActions';
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
@@ -81,7 +82,7 @@ export default {
             default: () => []
         }
     },
-    emits: ['renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'refresh', 'renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
         return { requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },
@@ -97,30 +98,9 @@ export default {
             component: self
         };
 
-        let contextMenu = [];
-
-        contextMenu = contextMenu.concat([
-        {
-            label: 'Select All',
-            icon: 'fa-regular fa-square-check',
-            isVisible: () => { return this.lastSelectedNode === null; },
-            click: () => {
-                this.$emit('selectAll');
-            }
-        },
-        {
-            label: 'Create folder',
-            icon: 'fa-solid fa-folder',
-            isVisible: () => { return this.canWrite && this.lastSelectedNode === null; },
-            click: () => {
-                this.$emit('createFolder');
-            }
-        },
-        ...buildViewerMenuItems(ctx),
-        ...buildActionMenuItems(ctx),
-        deleteSeparator(ctx),
-        deleteItem(ctx),
-        ]);
+        // The same menu as the file list; with nothing selected in the tree, the folder's
+        // (Select all selects the files of the list)
+        const contextMenu = buildStandardContextMenu(ctx);
 
         return {
             nodes: [],
@@ -189,30 +169,15 @@ export default {
             this.$emit(event, ...args);
         },
 
-        // Ctrl/Cmd + C / X and Delete typed in the tree (routed by ViewDataset).
-        // Ctrl+V is handled by the document paste listener and pastes into the
-        // current folder.
+        // The accelerators of the action registry typed in the tree (routed by ViewDataset), on the
+        // tree selection: Ctrl/Cmd + C / X and Delete. Ctrl+V is the document paste listener's and
+        // pastes into the current folder.
         handleTreeKeyDown: function (e) {
-            const entries = this.getTreeSelectionEntries();
-            if (entries.length === 0) return;
-
-            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-                const k = (e.key || '').toLowerCase();
-                if (k === 'c') {
-                    e.preventDefault();
-                    this.emitTreeAction('copySelectedItems');
-                } else if (k === 'x' && this.canWrite) {
-                    e.preventDefault();
-                    this.emitTreeAction('cutSelectedItems');
-                }
-                return;
-            }
-
-            if (e.key === 'Delete' && this.canWrite
-                && !entries.some(f => f.entry.type === ddb.entry.type.DRONEDB)) {
-                e.preventDefault();
-                this.emitTreeAction('deleteSelecteditems');
-            }
+            runShortcut(e, {
+                getSelectedEntries: () => this.getTreeSelectionEntries(),
+                canWrite: this.canWrite,
+                emit: (event, ...args) => this.emitTreeAction(event, ...args)
+            });
         },
 
         reportLoadError: function (e) {

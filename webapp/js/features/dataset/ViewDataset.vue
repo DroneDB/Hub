@@ -52,7 +52,8 @@
  * detail panel, the Map and Tasks tabs. The page composes; what it does lives in
  * useDatasetListing (the folder on show), useDatasetActions (every file operation through
  * its dialog, on the dialog registry), useDatasetClipboard, useOpenItem and
- * useDatasetShortcuts; the toolbar is libs/dataset/explorerTools; the lightbox is a component.
+ * useDatasetShortcuts; the toolbar is libs/dataset/explorerTools, from the action registry
+ * (libs/dataset/explorerActions) that the menus and the shortcuts read too; the lightbox is a component.
  */
 import { ref, reactive, computed, watch, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
@@ -332,6 +333,8 @@ const viewActions = useViewActions({ dataset, dialogs, onChanged: () => loadView
 const commonEvents = items => ({
     openItem: onOpenItem,
     createFolder: actions.newFolder,
+    upload: () => actions.upload(),
+    refresh,
     deleteSelecteditems: () => actions.remove(items()),
     moveSelectedItems: () => items().length === 1 && actions.rename(items()[0]),
     transferSelectedItems: () => actions.transfer(items()),
@@ -368,25 +371,27 @@ const fileEvents = { ...commonEvents(() => listing.selected.value), selectionCha
 const detailEvents = { close: closeDetail, open: file => onOpenItem(file), share: actions.share, buildStarted: handleBuildStarted, buildError: handleBuildError };
 
 const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, views: views.value }));
-const tools = computed(() => explorerTools({
-    canWrite: canWrite.value, files: listing.files.value, selected: listing.selected.value,
-    viewMode: viewMode.value, expandedGrid: expandedGrid.value
-}, {
-    upload: () => actions.upload(),
-    newFolder: actions.newFolder,
-    selectAll,
-    rename: actions.rename,
-    remove: () => actions.remove(listing.selected.value),
-    share: actions.share,
-    open: onOpenItem,
-    refresh,
+// The toolbar runs the actions of the registry with the handlers of the file list
+const toolbarEvents = {
+    ...fileEvents,
     toggleExpandedGrid: () => { expandedGrid.value = !expandedGrid.value; },
-    toggleViewMode: () => {
+    setViewMode: mode => {
         // Close any open context menu first
         window.dispatchEvent(new MouseEvent('click'));
-        viewMode.value = viewMode.value === 'grid' ? 'table' : 'grid';
+        viewMode.value = mode;
     }
-}));
+};
+const toolbarContext = {
+    getSelectedEntries: () => listing.selected.value,
+    getFiles: () => listing.files.value,
+    get canWrite() { return canWrite.value; },
+    dataset,
+    get viewMode() { return viewMode.value; },
+    get expandedGrid() { return expandedGrid.value; },
+    selectAll,
+    emit: (event, ...args) => toolbarEvents[event]?.(...args)
+};
+const tools = computed(() => explorerTools(toolbarContext));
 const explorerProps = computed(() => ({
     files: listing.files.value, tools: tools.value, currentPath: listing.currentPath.value, dataset,
     canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value

@@ -189,11 +189,11 @@ test('the header Settings button opens the dataset settings', async () => {
 test('dialogs: Escape closes, Enter confirms', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}`);
     await page.waitForSelector(`#explorer >> text=${path.basename(FILES.raster)}`, { timeout: 20000 });
-    await page.click('[title="Create folder"]');
+    await page.click('[title="New folder"]');
     await page.waitForSelector('.p-dialog input', { timeout: 10000 });
     await page.keyboard.press('Escape');
     await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
-    await page.click('[title="Create folder"]');
+    await page.click('[title="New folder"]');
     await page.fill('.p-dialog input', 'smoke-folder');
     await page.keyboard.press('Enter');
     await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });

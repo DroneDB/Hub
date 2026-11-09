@@ -34,13 +34,14 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
 /**
  * @param {object} options
  * @param {string[]} [options.types]   accepted entry types (any when omitted)
+ * @param {(entry: any) => boolean} [options.accepts]  a further test of the entry (the map: canOpenInMap)
  * @param {string} [options.typeLabel] "a 3D model": the error says the file "cannot be opened as <typeLabel>"
  * @param {string|null} options.title  page title suffix ("<file> - <title>"); null leaves the title alone
  * @param {string|import('vue').Ref<string|null>|Promise<string|null>|(() => string|null|Promise<string|null>)} [options.path]
  *   the dataset path of the file, when the route does not name it (its `encodedPath` is used by default)
  * @param {boolean} [options.allowMissing]  a file that is not in the dataset loads as `entry = null`, not as an error
  */
-export function useViewerEntry({ types, typeLabel = 'this view', title, path: pathOption, allowMissing = false }) {
+export function useViewerEntry({ types, accepts, typeLabel = 'this view', title, path: pathOption, allowMissing = false }) {
     const route = useRoute();
     const entry = shallowRef(null);
     const dataset = shallowRef(null);
@@ -77,7 +78,7 @@ export function useViewerEntry({ types, typeLabel = 'this view', title, path: pa
         } catch (listError) {
             if (!allowMissing || !isMissing(listError)) throw listError;
         }
-        if (e && types && !types.includes(e.type)) throw new Error(`${e.path} cannot be opened as ${typeLabel}`);
+        if (e && ((types && !types.includes(e.type)) || (accepts && !accepts(e)))) throw new Error(`${e.path} cannot be opened as ${typeLabel}`);
 
         let permissions = { ...NO_PERMISSIONS };
         try {
