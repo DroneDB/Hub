@@ -19,7 +19,7 @@
                 <div class="d-flex gap-3 flex-wrap align-items-end">
                     <div class="flex-grow-1" style="min-width: min(12rem, 100%);">
                         <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
-                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter placeholder="Search organization..." class="w-100" />
+                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter filter-placeholder="Search organizations" :pt="{ pcFilter: { root: { 'aria-label': 'Search organizations' } } }" placeholder="Select an organization" class="w-100" />
                     </div>
                     <div style="min-width: min(10rem, 100%);">
                         <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
@@ -35,12 +35,12 @@
 
             <!-- User organizations table -->
             <h4 v-if="!loading">User Organizations</h4>
-            <table v-if="!loading && userOrganizations.length > 0" class="ui celled table">
+            <table v-if="!loading && userOrganizations.length > 0" class="ui celled table stacked-table">
                 <thead>
                     <tr>
                         <th>Organization</th>
                         <th>Permissions</th>
-                        <th :class="showFrom('sm')">Granted</th>
+                        <th :class="stackedFrom('sm')">Granted</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -50,7 +50,7 @@
                             {{ org.name || org.slug }}
                             <Tag v-if="org.isOwner" severity="secondary" value="Owner" class="ms-1" />
                         </td>
-                        <td>
+                        <td v-bind="stackedCell('Permissions')">
                             <Select v-if="!org.isOwner"
                                     v-model="org.permissions"
                                     :aria-label="`Permissions in ${org.name || org.slug}`"
@@ -61,7 +61,7 @@
                                     @change="updatePermission(org)" />
                             <Tag v-else severity="info" value="Full Access" />
                         </td>
-                        <td :class="showFrom('sm')">
+                        <td v-bind="stackedCell('Granted', 'sm')">
                             <span v-if="org.grantedAt">
                                 {{ formatDate(org.grantedAt) }}
                                 <span v-if="org.grantedBy"> by {{ org.grantedBy }}</span>
@@ -113,7 +113,7 @@ import Divider from 'primevue/divider';
 import Tag from 'primevue/tag';
 import reg from '@/libs/api/sharedRegistry';
 import { formatDate } from '@/libs/format';
-import { showFrom } from '@/libs/responsiveColumns';
+import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
 
 export default {
     components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider, Tag },
@@ -126,7 +126,7 @@ export default {
     },
     emits: ['close'],
     setup() {
-        return { showFrom };
+        return { stackedFrom, stackedCell };
     },
 
     data() {

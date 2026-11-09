@@ -36,7 +36,9 @@
                         <div class="d-flex gap-2">
                             <Select v-if="remoteOrgs !== null" v-model="params.organization" input-id="import-dataset-dialog-organization" aria-labelledby="import-dataset-dialog-organization-label"
                                     :options="remoteOrgs" option-label="label" option-value="value"
-                                    placeholder="Select an organization" class="flex-grow-1"
+                                    filter :filter-fields="['label', 'value']" filter-placeholder="Search organizations"
+                                    :pt="{ pcFilter: { root: { 'aria-label': 'Search organizations' } } }"
+                                    placeholder="Select an organization" class="flex-grow-1" style="min-width: 0"
                                     :disabled="verifying || browsingOrgs" @change="onRemoteOrgChange" />
                             <InputText v-else v-model="params.organization" placeholder="organization slug" aria-label="Organization slug"
                                        class="flex-grow-1" :disabled="verifying || browsingOrgs"
@@ -52,7 +54,9 @@
                         <div class="d-flex gap-2">
                             <Select v-if="remoteDatasets !== null" v-model="params.dataset" input-id="import-dataset-dialog-dataset" aria-labelledby="import-dataset-dialog-dataset-label"
                                     :options="remoteDatasets" option-label="label" option-value="value"
-                                    placeholder="Select a dataset" class="flex-grow-1"
+                                    filter :filter-fields="['label', 'value']" filter-placeholder="Search datasets"
+                                    :pt="{ pcFilter: { root: { 'aria-label': 'Search datasets' } } }"
+                                    placeholder="Select a dataset" class="flex-grow-1" style="min-width: 0"
                                     :disabled="verifying || browsingDatasets" />
                             <InputText v-else v-model="params.dataset" placeholder="dataset slug" aria-label="Dataset slug"
                                        class="flex-grow-1" :disabled="verifying || browsingDatasets"

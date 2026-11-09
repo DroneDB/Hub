@@ -26,4 +26,13 @@ describe('ListToolbar', () => {
         expect(wrapper.find('.list-toolbar-start .filter').exists()).toBe(true);
         expect(wrapper.find('.list-toolbar-end .view').exists()).toBe(true);
     });
+
+    it('uses the shared SearchField: a Clear search button while it has text, and Escape empties it (FR-ORG-18)', async () => {
+        const wrapper = render({ search: 'quarry', searchLabel: 'Search datasets', 'onUpdate:search': v => wrapper.setProps({ search: v }) });
+        expect(wrapper.findComponent({ name: 'SearchField' }).exists()).toBe(true);
+        expect(wrapper.find('button[aria-label="Clear search"]').exists()).toBe(true);
+        await wrapper.find('input').trigger('keydown', { key: 'Escape' });
+        expect(wrapper.props('search')).toBe('');
+        expect(wrapper.find('button[aria-label="Clear search"]').exists()).toBe(false);
+    });
 });

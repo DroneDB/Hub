@@ -11,21 +11,25 @@
             </div>
         </div>
 
+        <!-- The three filters clear the same way (their x, or Clear filters), and stay in the address -->
         <div class="filters d-flex gap-2 flex-wrap mb-3">
             <Select v-model="selectedUser" aria-label="Filter by user" :options="userOptions" option-label="label" option-value="value"
                     placeholder="All users" filter show-clear class="filter-select" @change="onFilterChange" />
             <Select v-model="selectedTool" aria-label="Filter by tool" :options="toolOptions" option-label="label" option-value="value"
                     placeholder="All tools" show-clear class="filter-select" @change="onFilterChange" />
             <Select v-model="selectedState" aria-label="Filter by state" :options="stateOptions" option-label="label" option-value="value"
-                    placeholder="All States" class="filter-select" @change="onFilterChange" />
+                    placeholder="All States" show-clear class="filter-select" @change="onFilterChange" />
+            <Button v-if="filtered" severity="secondary" text icon="fa-solid fa-filter-circle-xmark" label="Clear filters"
+                    class="clear-filters" @click="clearFilters" />
         </div>
 
         <TasksTable :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
-                    :total-records="total" :rows="pageSize"
+                    :total-records="total" :first="skip" :rows="pageSize" :filtered="filtered"
+                    :sort-field="sortField" :sort-order="sortOrder"
                     :downloading-task-id="downloadingTaskId"
                     style="flex: 1; min-height: 18rem;"
                     empty-message="No tasks match the current filters."
-                    @page="onPage" @view-log="openLog" @download-result="downloadResult"
+                    @page="onPage" @sort="onSort" @clear-filters="clearFilters" @view-log="openLog" @download-result="downloadResult"
                     @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
 
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
@@ -56,6 +60,8 @@ import { deniedLocation } from '@/libs/authRoutes';
 import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
 import { cancelDialogProps } from '@/libs/tasks/cancelConfirmation';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
+import { readTaskFilters, taskFilterKeys, hasTaskFilters, lastPageSkip } from '@/libs/tasks/taskFilters';
+import { currentLocation, replaceQueryKeys } from '@/libs/routeQuery';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -71,17 +77,21 @@ export default {
         return { ...useTaskFormatting() };
     },
     data() {
+        // The list as the address has it: a reload or a link opens the same filters, page and order
+        const read = readTaskFilters(currentLocation().query);
         return {
             items: [],
             total: 0,
             loading: false,
-            pageSize: 10,
-            skip: 0,
+            pageSize: read.take,
+            skip: read.skip,
+            sortField: read.sortField,
+            sortOrder: read.sortOrder,
 
             users: [],
-            selectedUser: '',
-            selectedTool: '',
-            selectedState: '',
+            selectedUser: read.userId,
+            selectedTool: read.toolId,
+            selectedState: read.state,
 
             logDialogOpen: false,
             logTask: null,
@@ -126,6 +136,10 @@ export default {
             return [{ label: 'All tools', value: '' }]
                 .concat(this.taskTools.map(t => ({ label: t.title || t.id, value: t.id })));
         },
+        /** A filter hides tasks: the empty state offers Clear filters, and so does the toolbar */
+        filtered() {
+            return hasTaskFilters({ toolId: this.selectedTool || '', state: this.selectedState || '', userId: this.selectedUser || '' });
+        },
         hasActiveTasks() {
             return this.items.some(t => this.isActive(t.state));
         },
@@ -163,10 +177,19 @@ export default {
                     state: this.selectedState || undefined,
                     userId: this.selectedUser || undefined,
                     skip: this.skip,
-                    take: this.pageSize
+                    take: this.pageSize,
+                    sortField: this.sortField,
+                    sortOrder: this.sortOrder === 1 ? 'asc' : 'desc'
                 });
                 this.items = (res && res.items) || [];
                 this.total = (res && res.total) || 0;
+                // Past the end (a link to a page the list no longer has): the last page, in the address too
+                if (this.total > 0 && this.skip >= this.total) {
+                    this.skip = lastPageSkip(this.total, this.pageSize);
+                    this.keepInAddress();
+                    await this.loadTasks();
+                    return;
+                }
             } catch (e) {
                 console.error('Failed to load tasks:', e);
                 // The server refuses the admin rights the client believed in: home, saying why
@@ -196,14 +219,41 @@ export default {
             }, delay);
         },
 
+        /** Writes the filters, the page and the order in the address (no new history entry) */
+        keepInAddress() {
+            replaceQueryKeys(taskFilterKeys({
+                toolId: this.selectedTool || '', state: this.selectedState || '', userId: this.selectedUser || '',
+                skip: this.skip, take: this.pageSize, sortField: this.sortField, sortOrder: this.sortOrder === 1 ? 1 : -1
+            }));
+        },
+
         onFilterChange() {
             this.skip = 0;
+            this.keepInAddress();
             this.loadTasks();
+        },
+
+        /** Every filter back to all, the same for the three (FR-PRC-28) */
+        clearFilters() {
+            this.selectedUser = '';
+            this.selectedTool = '';
+            this.selectedState = '';
+            this.onFilterChange();
         },
 
         onPage({ skip, take }) {
             this.skip = skip;
             this.pageSize = take;
+            this.keepInAddress();
+            this.loadTasks();
+        },
+
+        /** A column to order by (createdAt, state, toolId): back to the first page */
+        onSort({ field, order }) {
+            this.sortField = field;
+            this.sortOrder = order === 1 ? 1 : -1;
+            this.skip = 0;
+            this.keepInAddress();
             this.loadTasks();
         },
 

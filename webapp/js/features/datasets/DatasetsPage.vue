@@ -77,7 +77,7 @@
             </div>
 
             <!-- How the datasets are shown: the search, the datasets without a location, list or map -->
-            <ListToolbar v-model:search="searchQuery" :search-label="view === 'list' ? 'Search datasets' : ''">
+            <ListToolbar ref="searchField" v-model:search="searchQuery" :search-label="view === 'list' ? 'Search datasets' : ''">
                 <template #end>
                     <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" />
                     <ViewSelect v-model="view" label="Show the datasets as" />
@@ -86,6 +86,16 @@
 
             <!-- Where the datasets are -->
             <DatasetLocationsMap v-if="view === 'map'" :groups="locationGroups" :loading="locationsLoading" />
+            <!-- Nothing to list: the empty state, not an empty table with its header (FR-ORG-13) -->
+            <EmptyState v-else-if="datasets.length === 0" title="No datasets found" items="datasets" :query="searchQuery"
+                        class="ds-empty" @clear="searchQuery = ''; $refs.searchField?.focus()">
+                <p v-if="canCreateDataset">This organization has no datasets yet. Create one, import one from another Registry, or upload files.</p>
+                <template v-if="canCreateDataset" #actions>
+                    <Button severity="primary" size="small" icon="fa-solid fa-plus" label="Create dataset" @click="handleNew()" />
+                    <Button severity="secondary" size="small" icon="fa-solid fa-download" label="Import" @click="openImportDialog()" />
+                    <Button severity="secondary" size="small" icon="fa-solid fa-upload" label="Upload" @click="upload()" />
+                </template>
+            </EmptyState>
             <!-- Datasets Table -->
             <DataTable v-else :value="datasets" :paginator="false" striped-rows
                        row-hover class="ds-table" scrollable scroll-height="flex"
@@ -164,11 +174,6 @@
                                 @click.stop="openRowMenu($event, slotProps.data)" />
                     </template>
                 </Column>
-                <template #empty>
-                    <EmptyState title="No datasets found">
-                        <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
-                    </EmptyState>
-                </template>
             </DataTable>
 
             <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" @show="rowMenuOpen = true" @hide="onRowMenuHide" />

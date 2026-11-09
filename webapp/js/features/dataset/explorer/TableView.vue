@@ -70,8 +70,7 @@
                 <template #empty>
                     <LoadingSpinner v-if="isLoadingFiles" />
                     <div v-else class="text-center p-4">
-                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
-                        <p class="mt-2">This folder is empty</p>
+                        <FolderEmptyState :can-write="canWrite" @upload="$emit('upload')" @import-from-url="$emit('importFromUrl')" />
                     </div>
                 </template>
             </DataTable>
@@ -81,6 +80,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import FolderEmptyState from './FolderEmptyState.vue';
 import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import { getFileSizeDisplay, formatModifiedDate, formatModifiedTimeAgo } from '@/libs/propertiesUtils';
@@ -113,7 +113,7 @@ import { columnFrom } from '@/libs/responsiveColumns';
  */
 export default {
     components: {
-        LoadingSpinner,
+        LoadingSpinner, FolderEmptyState,
         Toolbar, ContextMenu, PathBreadcrumb, SortHeader, DataTable, Column
     },
     inject: { showBuildConfirm: { default: null } },
@@ -126,7 +126,7 @@ export default {
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
-    emits: ['upload', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         // One tab stop: the table holds the focus and names its active row (aria-activedescendant), FR-EXP-09

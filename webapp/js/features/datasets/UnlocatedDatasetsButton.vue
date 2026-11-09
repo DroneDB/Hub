@@ -15,10 +15,7 @@
                 position, orthophotos, point clouds, models or vector layers.
             </p>
 
-            <IconField v-if="searchable" class="mb-2">
-                <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="query" placeholder="Search" aria-label="Search the datasets without a location" fluid />
-            </IconField>
+            <SearchField v-if="searchable" ref="searchField" v-model="query" label="Search the datasets without a location" placeholder="Search" class="mb-2" />
 
             <VirtualScroller v-if="shown.length" v-slot="{ item }" class="udb-list" :items="shown" :item-size="ROW_HEIGHT" :min-height="0"
                              :style="{ '--udb-row-height': `${ROW_HEIGHT}px` }"
@@ -34,7 +31,7 @@
                     </router-link>
                 </div>
             </VirtualScroller>
-            <EmptyState v-else title="No datasets match" filtered />
+            <EmptyState v-else title="No datasets" items="datasets" :query="query" @clear="clearQuery" />
         </Window>
     </div>
 </template>
@@ -47,12 +44,10 @@
  *
  *   <UnlocatedDatasetsButton :groups="locationGroups" show-organization />
  */
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import Badge from 'primevue/badge';
 import Button from 'primevue/button';
-import IconField from 'primevue/iconfield';
-import InputIcon from 'primevue/inputicon';
-import InputText from 'primevue/inputtext';
+import SearchField from '@/components/SearchField.vue';
 import Window from '@/components/HubWindow.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -75,6 +70,13 @@ const SEARCH_FROM = 8;
 
 const open = ref(false);
 const query = ref('');
+const searchField = useTemplateRef('searchField');
+
+/** The empty state's Clear search: the whole list again, and the focus back in the field (its button goes) */
+function clearQuery() {
+    query.value = '';
+    searchField.value?.focus();
+}
 
 const datasets = computed(() => unlocatedDatasets(props.groups));
 const summary = computed(() => {

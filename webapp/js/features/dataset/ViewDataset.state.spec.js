@@ -9,7 +9,7 @@ import { ref, h, defineComponent, onMounted, effectScope } from 'vue';
 import PrimeVue from 'primevue/config';
 import { createPinia, setActivePinia } from 'pinia';
 
-const h_ = vi.hoisted(() => ({ dataset: null, showError: null, loggedIn: true, gone: null }));
+const h_ = vi.hoisted(() => ({ dataset: null, showError: null, importFromUrl: null, loggedIn: true, gone: null }));
 
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'r3sharing', ds: 'brighton-beach' } }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
@@ -37,7 +37,7 @@ vi.mock('@/composables/useDatasetListing', () => ({
     })
 }));
 vi.mock('@/composables/useDatasetActions', () => ({
-    useDatasetActions: () => ({ showError: h_.showError, confirmBuild: vi.fn(), move: vi.fn(), upload: vi.fn() })
+    useDatasetActions: () => ({ showError: h_.showError, confirmBuild: vi.fn(), move: vi.fn(), upload: vi.fn(), importFromUrl: (...args) => h_.importFromUrl(...args) })
 }));
 vi.mock('@/composables/useDatasetClipboard', () => ({ useDatasetClipboard: () => ({}) }));
 vi.mock('@/composables/useOpenItem', () => ({ useOpenItem: () => ({ openItem: vi.fn() }) }));
@@ -74,10 +74,10 @@ const stubs = {
 
 let wrapper;
 let pinia;
-async function open(infoResult) {
+async function open(infoResult, extraStubs = {}) {
     h_.dataset = { baseApi: 'r3sharing/brighton-beach', info: vi.fn(() => infoResult), metaGet: vi.fn(() => Promise.resolve([])) };
     document.body.insertAdjacentHTML('beforeend', '<div id="app"></div>');
-    wrapper = mount(ViewDataset, { global: { stubs, plugins: [pinia] } });
+    wrapper = mount(ViewDataset, { global: { stubs: { ...stubs, ...extraStubs }, plugins: [pinia] } });
     await flushPromises();
 }
 
@@ -87,6 +87,7 @@ beforeEach(() => {
     setActivePinia(pinia);
     h_.loggedIn = true;
     h_.showError = vi.fn();
+    h_.importFromUrl = vi.fn();
     vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
@@ -243,5 +244,15 @@ describe('ViewDataset when the dataset is deleted while it is open (FR-UPL-05, D
         wrapper.unmount();
         wrapper = null;
         expect(h_.gone).toBeNull();
+    });
+});
+
+describe('ViewDataset empty folder (FR-EXP-37)', () => {
+    it('runs the Import from URL action of the dataset, with no address, when the file list asks for it', async () => {
+        // The grid, whose events are the page's (the empty folder's buttons emit them)
+        const Grid = defineComponent({ name: 'FileGridStub', inheritAttrs: false, emits: ['importFromUrl', 'upload'], render: () => h('div', { class: 'file-list' }) });
+        await open(Promise.resolve([{ path: '', type: 1, properties: { permissions: { canRead: true, canWrite: true } } }]), { Explorer: Grid, TabSwitcher: { render() { return h('div', this.$slots.explorer?.()); } } });
+        wrapper.findComponent(Grid).vm.$emit('importFromUrl');
+        expect(h_.importFromUrl).toHaveBeenCalledWith('');
     });
 });

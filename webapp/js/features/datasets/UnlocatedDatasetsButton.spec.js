@@ -92,6 +92,10 @@ describe('UnlocatedDatasetsButton', () => {
         expect(names()).toEqual(['Roof']);
         await search.setValue('nothing like it');
         expect(names()).toEqual([]);
-        expect(wrapper.text()).toContain('No datasets match');
+        expect(wrapper.text()).toContain('No datasets match "nothing like it"');
+        // The shared empty state: Clear search brings the list back (FR-ORG-13)
+        await wrapper.find('.empty-state button').trigger('click');
+        expect(search.element.value).toBe('');
+        expect(names()).toHaveLength(8);
     });
 });

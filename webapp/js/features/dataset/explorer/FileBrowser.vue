@@ -2,13 +2,8 @@
     <div class="file-browser">
         <ContextMenu :items="contextMenu" />
         <div id="search-box">
-            <IconField style="flex: 1; min-width: 0;">
-                <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" placeholder="Search files" aria-label="Search files" style="width: 100%;" @keyup.enter="search(filterRaw)" />
-            </IconField>
-            <Button v-if="filterRaw != null && filterRaw.length > 0" icon="fa-solid fa-xmark"
-                    title="Clear search" aria-label="Clear search" severity="secondary" text size="small"
-                    @click="clearSearch()" />
+            <!-- The shared search: its x and Escape empty it (clearSearch goes back to the tree) -->
+            <SearchField ref="searchField" v-model="filterRaw" label="Search files" style="flex: 1; min-width: 0;" @enter="search(filterRaw)" @clear="clearSearch()" />
             <Button
                 :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
                 :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
@@ -18,15 +13,17 @@
                 @click="toggleSortDirection"
             />
         </div>
+        <!-- What the search found: the number of results, and what they are for -->
+        <div v-if="!loading && searchStaticPaths != null && !noResults" class="search-summary" role="status">
+            {{ countOf(searchResultCount, 'result') }} for &ldquo;{{ filter }}&rdquo;
+        </div>
         <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
                   :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
         <SavedViews v-if="views.length && dataset && !loading && searchStaticPaths == null" :views="views"
                     :dataset="dataset" :can-write="canWrite" @rename="v => $emit('renameView', v)"
                     @delete="v => $emit('deleteView', v)" />
         <LoadingSpinner v-if="loading" />
-        <div v-if="!loading && noResults" class="no-results">
-            No files found
-        </div>
+        <EmptyState v-if="!loading && noResults" title="No files found" items="files" :query="filter || ''" @clear="clearSearch(); $refs.searchField?.focus()" />
     </div>
 </template>
 
@@ -35,9 +32,8 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
 import SavedViews from './SavedViews.vue';
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
-import InputText from 'primevue/inputtext';
-import InputIcon from 'primevue/inputicon';
-import IconField from 'primevue/iconfield';
+import SearchField from '@/components/SearchField.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import Button from 'primevue/button';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
@@ -51,6 +47,7 @@ import { useRequestScope, isAbort } from '@/composables/useRequestScope';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 import { isUnauthorized } from '@/libs/ddb/apiError';
+import { countOf } from '@/libs/format';
 
 const { pathutils } = ddb;
 
@@ -59,7 +56,7 @@ const isBlank = (text) => text == null || text.length === 0;
 export default {
     components: {
         LoadingSpinner,
-        TreeView, SavedViews, ContextMenu, InputText, InputIcon, IconField, Button
+        TreeView, SavedViews, ContextMenu, SearchField, EmptyState, Button
     },
     // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
@@ -84,7 +81,7 @@ export default {
     },
     emits: ['upload', 'refresh', 'renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
-        return { requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
+        return { countOf, requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
@@ -113,6 +110,13 @@ export default {
             searchStaticPaths: null,
             noResults: false,
         };
+    },
+    computed: {
+        // The entries the search found (searchEntries of the dataset root, folders and files)
+        searchResultCount() {
+            const found = this.searchStaticPaths ? Object.values(this.searchStaticPaths)[0] : null;
+            return found ? found.length : 0;
+        }
     },
     watch: {
         // Search as the user types; Enter may have searched this text already
@@ -440,11 +444,11 @@ export default {
     }
 
 
-    .no-results {
-        text-align: center;
-        padding: 1rem;
-        color: var(--ddb-text-muted);
-        font-style: italic;
-    }
+}
+
+.search-summary {
+    padding: 0.25rem 0.5rem;
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
 }
 </style>

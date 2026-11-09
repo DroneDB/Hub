@@ -40,21 +40,21 @@
 
                     <!-- Current members table -->
                     <h3>Current Members</h3>
-                    <table v-if="members.length > 0" class="ui celled table">
+                    <table v-if="members.length > 0" class="ui celled table stacked-table">
                         <thead>
                             <tr>
                                 <th>Username</th>
-                                <th :class="showFrom('sm')">Email</th>
+                                <th :class="stackedFrom('sm')">Email</th>
                                 <th>Permissions</th>
-                                <th :class="showFrom('sm')">Granted</th>
+                                <th :class="stackedFrom('sm')">Granted</th>
                                 <th v-if="canManageMembers">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="member in members" :key="member.userName">
-                                <td>{{ member.userName }}</td>
-                                <td :class="showFrom('sm')">{{ member.email }}</td>
-                                <td>
+                                <td><strong>{{ member.userName }}</strong></td>
+                                <td v-bind="stackedCell('Email', 'sm')">{{ member.email }}</td>
+                                <td v-bind="stackedCell('Permissions')">
                                     <Select v-if="canManageMembers"
                                             :model-value="member.permissions"
                                             :aria-label="`Permissions of ${member.userName}`"
@@ -65,7 +65,7 @@
                                             @update:model-value="value => changePermission(member, value)" />
                                     <span v-else>{{ member.permissionName }}</span>
                                 </td>
-                                <td :class="showFrom('sm')">
+                                <td v-bind="stackedCell('Granted', 'sm')">
                                     <span v-if="member.grantedAt">
                                         {{ formatDate(member.grantedAt) }}
                                         <span v-if="member.grantedBy"> by {{ member.grantedBy }}</span>
@@ -73,7 +73,9 @@
                                     <span v-else>-</span>
                                 </td>
                                 <td v-if="canManageMembers">
-                                    <Button severity="danger" size="small" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" @click="removeMember(member)" />
+                                    <!-- On a phone only the icon, named for the member -->
+                                    <Button severity="danger" size="small" class="member-remove" :disabled="removingMember === member.userName"
+                                            icon="fa-solid fa-trash" label="Remove" :aria-label="`Remove ${member.userName}`" @click="removeMember(member)" />
                                 </td>
                             </tr>
                         </tbody>
@@ -121,7 +123,7 @@ import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { formatDate } from '@/libs/format';
-import { showFrom } from '@/libs/responsiveColumns';
+import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
 
 const ADMIN = 3;
 
@@ -136,7 +138,7 @@ export default {
     // and passes canManageMembers: false once they may no longer manage the members)
     emits: ['close', 'permissions-changed'],
     setup() {
-        return { showFrom };
+        return { stackedFrom, stackedCell };
     },
 
     data() {
@@ -309,5 +311,12 @@ export default {
 
 table.ui.celled.table {
     margin-top: 0.5rem;
+}
+
+/* A phone card: Remove is its icon (named for the member by its aria-label) */
+@media only screen and (max-width: 575.98px) {
+    .member-remove :deep(.p-button-label) {
+        display: none;
+    }
 }
 </style>

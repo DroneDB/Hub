@@ -5,10 +5,14 @@
         <div v-if="currentPath">
             <PathBreadcrumb :path="currentPath" root-path="/" class="mt-3 ms-3" @navigate="goToPath" />
         </div>
+        <!-- A list of files is a listbox; an empty folder is not (its empty state has buttons of its own), the
+             drop area stays -->
+        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- a listbox (bound role) while it has files; empty, its keys and clicks only clear a selection and it is the drop area -->
         <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }"
              :style="{ '--grid-cell-width': gridCellWidth + 'px' }"
-             role="listbox" aria-label="Files" aria-multiselectable="true" tabindex="0" data-file-list
-             :aria-activedescendant="nav.activeId.value"
+             :role="hasFiles ? 'listbox' : undefined" :aria-label="hasFiles ? 'Files' : undefined"
+             :aria-multiselectable="hasFiles ? 'true' : undefined" :tabindex="hasFiles ? 0 : undefined" data-file-list
+             :aria-activedescendant="hasFiles ? nav.activeId.value : undefined"
              @click="onClick" @contextmenu="onBackgroundContextMenu" @focus="onFocus" @keydown="onKeydown" @keydown.esc="clearSelection"
              @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)" @dragover.prevent>
@@ -16,8 +20,7 @@
                 <LoadingSpinner />
             </div>
             <div v-else-if="files.length === 0" class="explorer-notice text-center m-3">
-                <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
-                <p class="mt-2">This folder is empty</p>
+                <FolderEmptyState :can-write="canWrite" @upload="$emit('upload')" @import-from-url="$emit('importFromUrl')" />
             </div>
             <!-- Large folders: only the rows on screen are rendered -->
             <VirtualScroller v-else-if="virtualGrid" ref="grid" v-slot="{ item: row }" class="thumbnail-grid"
@@ -48,6 +51,7 @@
 <script>
 import Thumbnail from './EntryThumbnail.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import FolderEmptyState from './FolderEmptyState.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import { createThumbnailQueue, createVisibilityTracker } from '@/libs/thumbnailQueue';
 import { GRID_CELL_WIDTH, tileHeight } from './tileGeometry';
@@ -81,7 +85,7 @@ import { useListNavigation } from '@/composables/useListNavigation';
 export default {
     name: 'DatasetExplorer',
     components: {
-        Thumbnail, LoadingSpinner, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
+        Thumbnail, LoadingSpinner, FolderEmptyState, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
     },
     // Thumbnails load as they come into view, a few at a time
     provide: function () {
@@ -101,7 +105,7 @@ export default {
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
-    emits: ['upload', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         // One tab stop: the list holds the focus and names its active tile (aria-activedescendant), FR-EXP-09
@@ -146,6 +150,10 @@ export default {
         };
     },
     computed: {
+        // A list of files is the one tab stop of the files (FR-EXP-09); an empty folder is no listbox
+        hasFiles: function () {
+            return this.files.length > 0;
+        },
         selectedFiles: function () {
             return this.files.filter(f => f.selected);
         },

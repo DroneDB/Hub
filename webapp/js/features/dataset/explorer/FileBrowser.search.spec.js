@@ -104,6 +104,85 @@ describe('FileBrowser search box', () => {
     });
 });
 
+describe('FileBrowser search field (FR-EXP-31, FR-ORG-18)', () => {
+    let searchEntries;
+    const found = n => Array.from({ length: n }, (_, i) => ({ path: `flight/DJI_${i}.JPG`, type: ddb.entry.type.IMAGE }));
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        searchEntries = vi.spyOn(ddb, 'searchEntries').mockResolvedValue(found(18));
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+    });
+
+    async function searchFor(w, text) {
+        await searchBox(w).setValue(text);
+        await searchBox(w).trigger('keyup', { key: 'Enter' });
+        await flushPromises();
+    }
+
+    it('is the shared SearchField, with the one Clear search button', async () => {
+        const w = mountBrowser();
+        await flushPromises();
+        expect(w.findComponent({ name: 'SearchField' }).exists()).toBe(true);
+        expect(w.findAll('button[aria-label="Clear search"]')).toHaveLength(0);
+        await searchFor(w, 'DJI');
+        expect(w.findAll('button[aria-label="Clear search"]')).toHaveLength(1);
+        w.unmount();
+    });
+
+    it('is emptied by Escape, which goes back to the tree', async () => {
+        const w = mountBrowser();
+        await flushPromises();
+        await searchFor(w, 'DJI');
+        expect(w.vm.searchStaticPaths).not.toBeNull();
+
+        await searchBox(w).trigger('keydown', { key: 'Escape' });
+        await vi.advanceTimersByTimeAsync(600);
+        await flushPromises();
+
+        expect(searchBox(w).element.value).toBe('');
+        expect(w.vm.searchStaticPaths).toBeNull();
+        expect(w.vm.filter).toBeNull();
+        expect(searchEntries).toHaveBeenCalledTimes(1);
+        w.unmount();
+    });
+
+    it('says how many results the search has, and for what', async () => {
+        const w = mountBrowser();
+        await flushPromises();
+        expect(w.find('.search-summary').exists()).toBe(false);
+        await searchFor(w, 'DJI');
+        expect(w.find('.search-summary').text()).toBe('18 results for \u201CDJI\u201D');
+        expect(w.find('.search-summary').attributes('role')).toBe('status');
+
+        searchEntries.mockResolvedValue(found(1));
+        await searchFor(w, 'DJI_0');
+        expect(w.find('.search-summary').text()).toBe('1 result for \u201CDJI_0\u201D');
+        w.unmount();
+    });
+
+    it('names the query when nothing was found, and clears it from the empty state', async () => {
+        searchEntries.mockResolvedValue([]);
+        const w = mountBrowser();
+        await flushPromises();
+        await searchFor(w, 'nomatchxyz');
+        expect(w.find('.search-summary').exists()).toBe(false);
+        expect(w.find('.empty-state h3').text()).toBe('No files match "nomatchxyz"');
+
+        await w.find('.empty-state button').trigger('click');
+        await vi.advanceTimersByTimeAsync(600);
+        await flushPromises();
+        expect(searchBox(w).element.value).toBe('');
+        expect(w.find('.empty-state').exists()).toBe(false);
+        expect(w.vm.searchStaticPaths).toBeNull();
+        w.unmount();
+    });
+});
+
 describe('FileBrowser saved views', () => {
     const dataset = { org: 'org', ds: 'ds' };
     const views = [{ uid: 'v_aaaaaaaa', name: 'Alpha' }];

@@ -385,6 +385,7 @@ const commonEvents = items => ({
     openItem: onOpenItem,
     createFolder: actions.newFolder,
     upload: () => actions.upload(),
+    importFromUrl: () => actions.importFromUrl(''),
     refresh,
     deleteSelecteditems: () => actions.remove(items()),
     moveSelectedItems: () => items().length === 1 && actions.rename(items()[0]),

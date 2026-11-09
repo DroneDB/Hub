@@ -17,10 +17,7 @@
             <div class="">
                 <div class="controls-row">
                     <div class="search-col flex-grow-1">
-                        <IconField>
-                            <InputIcon class="fa-solid fa-magnifying-glass" />
-                            <InputText v-model="searchQuery" placeholder="Search users" aria-label="Search users" style="width: 100%;" />
-                        </IconField>
+                        <SearchField ref="searchField" v-model="searchQuery" label="Search users" />
                     </div>
                     <!-- align right -->
                     <div class="actions-col d-flex flex-wrap gap-2">
@@ -32,13 +29,13 @@
             </div>
 
             <!-- Users Table -->
-            <DataTable :value="filteredUsers" data-key="userName"
+            <DataTable :value="filteredUsers" data-key="userName" :class="STACKED_TABLE_CLASS"
                        paginator :rows="10" :rows-per-page-options="[5, 10, 25, 50, 100]" :page-link-size="3"
                        :always-show-paginator="false"
                        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                        sort-field="userName" :sort-order="1"
                        striped-rows row-hover>
-                <Column field="userName" :sortable="true">
+                <Column field="userName" :sortable="true" v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
                     <template #header>
                         <i class="fa-solid fa-user" /> Username
                     </template>
@@ -50,12 +47,12 @@
                         </span>
                     </template>
                 </Column>
-                <Column field="email" header="Email" :sortable="true" v-bind="columnFrom('lg')">
+                <Column field="email" header="Email" :sortable="true" v-bind="stackedColumn('Email', undefined, {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         {{ slotProps.data.email || '-' }}
                     </template>
                 </Column>
-                <Column header="Roles" v-bind="columnFrom('lg')">
+                <Column header="Roles" v-bind="stackedColumn('Roles')">
                     <template #body="slotProps">
                         <!-- 'deactivated' is the Disabled tag, not a role to list -->
                         <div v-if="pickableRoles(slotProps.data.roles).length > 0">
@@ -64,14 +61,14 @@
                         <span v-else class="text-muted">No roles</span>
                     </template>
                 </Column>
-                <Column field="organizationCount" header="Organizations" :sortable="true" v-bind="columnFrom('md')">
+                <Column field="organizationCount" header="Organizations" :sortable="true" v-bind="stackedColumn('Organizations', 'md', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         <Button size="small" title="Manage Organizations" severity="secondary" icon="fa-solid fa-sitemap"
                                 :label="String(slotProps.data.organizationCount)" @click="showUserOrganizations(slotProps.data)" />
                     </template>
                 </Column>
-                <Column field="datasetCount" header="Datasets" :sortable="true" v-bind="columnFrom('lg')" />
-                <Column field="storageUsed" header="Storage" :sortable="true" v-bind="columnFrom('md')">
+                <Column field="datasetCount" header="Datasets" :sortable="true" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
+                <Column field="storageUsed" header="Storage" :sortable="true" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         <div v-if="slotProps.data.storageQuota">
                             {{ bytesToSize(slotProps.data.storageUsed) }} / {{ bytesToSize(slotProps.data.storageQuota) }}
@@ -82,12 +79,12 @@
                         </div>
                     </template>
                 </Column>
-                <Column field="createdDate" header="Created" :sortable="true" v-bind="columnFrom('xl')">
+                <Column field="createdDate" header="Created" :sortable="true" v-bind="stackedColumn('Created', 'xl', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         {{ formatCreated(slotProps.data.createdDate) }}
                     </template>
                 </Column>
-                <Column header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }">
+                <Column header="Actions" v-bind="stackedColumn(undefined, undefined, { style: 'text-align: center' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
                     <template #body="slotProps">
                         <div class="d-flex gap-1 justify-content-center">
                             <Button size="small" :loading="slotProps.data.editing"
@@ -114,7 +111,7 @@
                     </template>
                 </Column>
                 <template #empty>
-                    <EmptyState title="No users found" :filtered="!!searchQuery">
+                    <EmptyState title="No users found" items="users" :query="searchQuery" @clear="searchQuery = ''; $refs.searchField?.focus()">
                         <p>No users available.</p>
                     </EmptyState>
                 </template>
@@ -238,15 +235,14 @@ import Select from 'primevue/select';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import ProgressBar from 'primevue/progressbar';
-import InputText from 'primevue/inputtext';
-import InputIcon from 'primevue/inputicon';
-import IconField from 'primevue/iconfield';
+import SearchField from '@/components/SearchField.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
 import { formatDateTime, UNKNOWN } from '@/libs/format';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { isUnauthorized } from '@/libs/ddb/apiError';
-import { columnFrom } from '@/libs/responsiveColumns';
+import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
+import { useStackedLayout } from '@/composables/useStackedLayout';
 import { isDisabledUser, pickableRoles, publishesSystemRoles } from '@/libs/roles';
 import { escapeHtml } from '@/libs/sanitize';
 import { useDialogs } from '@/composables/useDialogs';
@@ -281,13 +277,12 @@ export default {
         DataTable,
         Column,
         ProgressBar,
-        InputText,
-        InputIcon,
-        IconField
+        SearchField
     },
     setup() {
         const dialogs = useDialogs();
-        return { columnFrom, dialogs, confirm: useConfirm(dialogs) };
+        // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order (D-026)
+        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs) };
     },
     data: function () {
         return {

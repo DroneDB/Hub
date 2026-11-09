@@ -64,15 +64,19 @@ export default class AdminApi {
      * @param {string} [filter.userId]
      * @param {number} [filter.skip]
      * @param {number} [filter.take]
+     * @param {string} [filter.sortField] the column to order by: createdAt (the default), state or toolId
+     * @param {'asc'|'desc'} [filter.sortOrder] the direction (descending by default)
      * @returns {Promise<Object>} { items, total, skip, take }
      */
-    async adminTasks({ toolId, state, userId, skip = 0, take = 50 } = {}) {
+    async adminTasks({ toolId, state, userId, skip = 0, take = 50, sortField, sortOrder } = {}) {
         const q = new URLSearchParams();
         if (toolId) q.append('toolId', toolId);
         if (state) q.append('state', state);
         if (userId) q.append('userId', userId);
         q.append('skip', String(skip));
         q.append('take', String(take));
+        if (sortField) q.append('sortField', sortField);
+        if (sortOrder) q.append('sortOrder', sortOrder);
         return this.registry.getRequest(`/sys/tasks?${q}`);
     }
 

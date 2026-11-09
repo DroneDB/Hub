@@ -219,6 +219,130 @@ h4, h5, h6 { font-size: var(--ddb-font-size-base); }
     }
 }
 
+// A cell that is the row's actions: its buttons keep their labels on one line and it takes no more
+// than its content (a label that broke into 'De/let/e' in a narrow cell)
+.ui.table td.cell-actions {
+    width: 1%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
+
+// A cell of a slug or another identifier: it wraps between words (after a hyphen, a <wbr>), never
+// inside one
+.ui.table td.cell-slug {
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+// --- Stacked cards (D-026, FR-XC-20) ---
+//
+// The one renderer of a table on a phone. Below `sm` (576 px, BREAKPOINT_PX.sm of
+// libs/responsiveColumns.js) every row of a table that has `stacked-table` (the class of a plain
+// <table class="ui table stacked-table">, or of a DataTable root) is a card: the header is hidden, the
+// cells are lines of the card, each with its `data-label` before the value, and every column is shown,
+// the ones that join the table later too (`.stack-col`, responsiveColumns.js stackedCell and
+// stackedColumn). From `sm` up the table is a table, and a `.stack-col-<breakpoint>` column is
+// hidden until that width.
+@each $name, $px in (md: 768px, lg: 992px, xl: 1200px, xxl: 1400px) {
+    @media only screen and (min-width: 576px) and (max-width: #{$px - 0.02px}) {
+        .stack-col-#{$name} { display: none; }
+    }
+}
+
+$stacked-table: '.ui.table.stacked-table, .stacked-table.p-datatable .p-datatable-table';
+
+@media only screen and (max-width: 575.98px) {
+    #{$stacked-table} {
+        display: block;
+        width: 100%;
+        margin: 0;
+        border: 0;
+        background: transparent;
+
+        // Hidden, not removed: a screen reader still has the column names
+        thead {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+        }
+
+        tbody {
+            display: block;
+        }
+
+        tbody > tr {
+            display: flex;
+            flex-direction: column;
+            gap: var(--ddb-spacing-xs);
+            margin-bottom: var(--ddb-spacing-sm);
+            padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+            border: var(--ddb-border-width) solid var(--ddb-border-light);
+            border-radius: var(--ddb-radius-md);
+            background: var(--ddb-bg-surface);
+        }
+
+        tbody > tr > td {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+            // A column's own width (a Column's style) belongs to the table
+            width: auto !important;
+            min-width: 0;
+            padding: 0;
+            border: 0;
+            text-align: left;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        tbody > tr > td > *:not(.p-button) {
+            min-width: 0;
+        }
+
+        // A labelled cell: label and value on a line; a long value wraps under its label
+        tbody > tr > td[data-label] {
+            flex-wrap: nowrap;
+            align-items: flex-start;
+
+            &::before {
+                content: attr(data-label);
+                flex: 0 0 6.5rem;
+                font-weight: 600;
+                color: var(--ddb-text-muted);
+            }
+
+            > *:not(.p-button):not(.p-chip) {
+                flex: 1 1 0;
+            }
+        }
+
+        // A select or a field in a card takes the width of the card
+        tbody > tr > td .p-select {
+            width: 100%;
+        }
+    }
+}
+
+// --- Select overlays (FR-XC-20) ---
+//
+// The one width rule of every Select's list. PrimeVue gives the list the width of its Select as a
+// minimum and lets it grow to the longest option, so a long organization name ran the list off the
+// screen. Here the list never exceeds the viewport, and an option wraps (a word that does not fit
+// breaks) instead of widening it. No Select sets its own overlay width.
+.p-select-overlay {
+    max-width: calc(100vw - 1rem);
+    box-sizing: border-box;
+
+    .p-select-option {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+}
+
 // --- Top banner (heading row) ---
 .top-banner {
     margin-top: var(--ddb-spacing-md);

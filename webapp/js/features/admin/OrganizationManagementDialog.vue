@@ -14,46 +14,43 @@
                     <TabPanel value="list">
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div style="flex: 1 1 12rem; max-width: 18.75rem;">
-                                <IconField>
-                                    <InputIcon class="fa-solid fa-magnifying-glass" />
-                                    <InputText v-model="searchQuery" placeholder="Search organizations" aria-label="Search organizations" class="w-100" />
-                                </IconField>
+                                <SearchField ref="searchField" v-model="searchQuery" label="Search organizations" />
                             </div>
                             <Button severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" @click="loadOrganizations" />
                         </div>
 
-                        <table v-if="filteredOrganizations.length > 0" class="ui celled table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Slug</th>
-                                    <th :class="showFrom('sm')">Description</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="org in filteredOrganizations" :key="org.slug">
-                                    <td><strong>{{ org.name || org.slug }}</strong></td>
-                                    <td><code>{{ org.slug }}</code></td>
-                                    <td :class="showFrom('sm')">{{ org.description || '-' }}</td>
-                                    <td>
-                                        <Button severity="danger"
-                                                size="small" :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
-                                                :loading="deleting === org.slug"
-                                                icon="fa-solid fa-trash"
-                                                label="Delete" title="Delete Organization"
-                                                @click="confirmDeleteOrganization(org)" />
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        <div v-else>
-                            <PrimeMessage severity="info" :closable="false">
-                                <strong>No Organizations Found</strong>
-                                <p>{{ searchQuery ? 'Try adjusting your search criteria.' : 'No organizations available.' }}</p>
-                            </PrimeMessage>
+                        <!-- The list scrolls inside the dialog under its header: fifty organizations do not push the dialog off the screen -->
+                        <div v-if="filteredOrganizations.length > 0" class="org-table-scroll">
+                            <table class="ui celled table stacked-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Slug</th>
+                                        <th :class="stackedFrom('sm')">Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="org in filteredOrganizations" :key="org.slug">
+                                        <td><strong>{{ org.name || org.slug }}</strong></td>
+                                        <td v-bind="stackedCell('Slug')" class="cell-slug">
+                                            <code><template v-for="(part, i) in breakAfterHyphens(org.slug)" :key="i"><wbr v-if="i > 0">{{ part }}</template></code>
+                                        </td>
+                                        <td v-bind="stackedCell('Description', 'sm')">{{ org.description || '-' }}</td>
+                                        <td class="cell-actions">
+                                            <Button severity="danger"
+                                                    size="small" :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
+                                                    :loading="deleting === org.slug"
+                                                    icon="fa-solid fa-trash"
+                                                    label="Delete" title="Delete Organization"
+                                                    @click="confirmDeleteOrganization(org)" />
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
+
+                        <EmptyState v-else title="No organizations available" items="organizations" :query="searchQuery" @clear="searchQuery = ''; $refs.searchField?.focus()" />
                     </TabPanel>
                     <TabPanel value="create">
                         <form :class="{ error: !!createError }" @submit.prevent>
@@ -107,8 +104,6 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
-import InputIcon from 'primevue/inputicon';
-import IconField from 'primevue/iconfield';
 import Textarea from 'primevue/textarea';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
@@ -116,7 +111,9 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
-import { showFrom } from '@/libs/responsiveColumns';
+import { stackedFrom, stackedCell, breakAfterHyphens } from '@/libs/responsiveColumns';
+import SearchField from '@/components/SearchField.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import { countOf } from '@/libs/format';
 import { confirmDialogProps, namedItem } from '@/libs/deleteConfirmation';
 
@@ -124,11 +121,11 @@ export default {
     components: {
         LoadingSpinner,
         Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
-        InputIcon, IconField, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
+        SearchField, EmptyState, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
     },
     emits: ['close'],
     setup() {
-        return { showFrom };
+        return { stackedFrom, stackedCell, breakAfterHyphens };
     },
 
     data: function () {
@@ -309,6 +306,29 @@ export default {
 .dialog {
     min-width: min(25rem, var(--window-content-width, 100%));
     padding: 0.25rem;
+}
+
+/* A fixed area under a sticky header: the list scrolls here, not the dialog */
+.org-table-scroll {
+    max-height: min(24rem, 50vh);
+    overflow: auto;
+}
+
+.org-table-scroll .ui.table {
+    margin: 0;
+}
+
+.org-table-scroll :deep(th) {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+@media only screen and (max-width: 575.98px) {
+    /* The cards have no header to stay under */
+    .org-table-scroll :deep(th) {
+        position: static;
+    }
 }
 
 code {

@@ -420,6 +420,7 @@ describe('DatasetsPage create actions', () => {
         });
         await flushPromises();
     }
+    const emptyActions = () => wrapper.findAll('.empty-state-actions button').map(b => b.text());
     const createActions = () => wrapper.findAll('button').map(b => b.attributes('title') || b.text())
         .filter(t => t === 'Import Dataset' || t === 'Create Dataset');
 
@@ -427,13 +428,37 @@ describe('DatasetsPage create actions', () => {
         await renderEmpty({ canRead: true, canWrite: false, canDelete: false, canManageMembers: false });
         expect(wrapper.vm.canCreateDataset).toBe(false);
         expect(createActions()).toEqual([]);
-        expect(wrapper.text()).not.toContain('create a new dataset');
+        expect(emptyActions()).toEqual([]);
+        expect(wrapper.find('.empty-state h3').text()).toBe('No datasets found');
     });
 
     it('shows them in an empty organization the user may write', async () => {
         await renderEmpty({ canRead: true, canWrite: true, canDelete: false, canManageMembers: false });
         expect(createActions()).toEqual(['Import Dataset', 'Create Dataset']);
-        expect(wrapper.text()).toContain('create a new dataset');
+        // FR-ORG-13: the empty state has the buttons that fill the organization, and the table is not drawn
+        expect(emptyActions()).toEqual(['Create dataset', 'Import', 'Upload']);
+        expect(wrapper.find('.p-datatable').exists()).toBe(false);
+        expect(wrapper.find('.empty-state h3').text()).toBe('No datasets found');
+
+        // The buttons do what the header's do, and Upload opens the upload page
+        await wrapper.findAll('.empty-state-actions button')[1].trigger('click');
+        expect(wrapper.vm.importDialogOpen).toBe(true);
+        await wrapper.findAll('.empty-state-actions button')[2].trigger('click');
+        expect(wrapper.vm.$router.push).toHaveBeenCalledWith({ name: 'Upload' });
+    });
+
+    it('names the query of a search without a match, with a Clear search button that empties the search (FR-ORG-13)', async () => {
+        await renderEmpty({ canRead: true, canWrite: true, canDelete: false, canManageMembers: false });
+        await wrapper.find('input[aria-label="Search datasets"]').setValue('nomatchxyz');
+        expect(wrapper.find('.empty-state h3').text()).toBe('No datasets match "nomatchxyz"');
+        // A search that found nothing is not an empty organization: no Create, Import or Upload beside it
+        expect(emptyActions()).toEqual([]);
+        expect(wrapper.find('.p-datatable').exists()).toBe(false);
+
+        await wrapper.find('.empty-state button').trigger('click');
+        expect(wrapper.vm.searchQuery).toBe('');
+        expect(wrapper.find('.empty-state h3').text()).toBe('No datasets found');
+        expect(emptyActions()).toEqual(['Create dataset', 'Import', 'Upload']);
     });
 
     it('shows none to an anonymous visitor of an empty Public organization (the Registry sends them no permissions)', async () => {
@@ -441,7 +466,8 @@ describe('DatasetsPage create actions', () => {
         await renderEmpty(null);
         expect(wrapper.vm.canCreateDataset).toBe(false);
         expect(createActions()).toEqual([]);
-        expect(wrapper.text()).not.toContain('create a new dataset');
+        expect(emptyActions()).toEqual([]);
+        expect(wrapper.find('.empty-state h3').text()).toBe('No datasets found');
     });
 
     it('offers none in an empty organization of an older Registry that sends no permissions (FR-ACC-02)', async () => {

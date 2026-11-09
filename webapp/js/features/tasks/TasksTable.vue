@@ -1,34 +1,34 @@
 <template>
     <div class="tasks-table">
         <!-- Skeleton while first load is in flight -->
-        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows>
-            <Column header="State" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
-            <Column header="Tool"><template #body><Skeleton width="80%" /></template></Column>
-            <Column v-if="showDataset" header="Dataset" v-bind="columnFrom('md')"><template #body><Skeleton width="70%" /></template></Column>
-            <Column v-if="showOwner" header="Owner" v-bind="columnFrom('xl')"><template #body><Skeleton width="60%" /></template></Column>
-            <Column header="Progress" v-bind="columnFrom('md')"><template #body><Skeleton width="90%" /></template></Column>
-            <Column header="Created" v-bind="columnFrom('lg')"><template #body><Skeleton width="70%" /></template></Column>
-            <Column header="Duration" style="width: 9rem;" v-bind="columnFrom('lg')"><template #body><Skeleton width="60%" /></template></Column>
-            <Column header="Actions" style="width: 10rem;"><template #body><Skeleton width="90%" /></template></Column>
+        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows :class="STACKED_TABLE_CLASS">
+            <Column header="State" v-bind="stackedColumn('State')" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
+            <Column header="Tool" v-bind="stackedColumn()"><template #body><Skeleton width="80%" /></template></Column>
+            <Column v-if="showDataset" header="Dataset" v-bind="stackedColumn('Dataset', 'md')"><template #body><Skeleton width="70%" /></template></Column>
+            <Column v-if="showOwner" header="Owner" v-bind="stackedColumn('Owner', 'xl')"><template #body><Skeleton width="60%" /></template></Column>
+            <Column header="Progress" v-bind="stackedColumn('Progress', 'md')"><template #body><Skeleton width="90%" /></template></Column>
+            <Column header="Created" v-bind="stackedColumn('Created', 'lg')"><template #body><Skeleton width="70%" /></template></Column>
+            <Column header="Duration" style="width: 9rem;" v-bind="stackedColumn('Duration', 'lg')"><template #body><Skeleton width="60%" /></template></Column>
+            <Column header="Actions" style="width: 10rem;" v-bind="stackedColumn()"><template #body><Skeleton width="90%" /></template></Column>
         </DataTable>
 
         <!-- Empty state -->
-        <PrimeMessage v-else-if="tasks.length === 0" severity="info" :closable="false">
-            <strong>No tasks found</strong>
+        <EmptyState v-else-if="tasks.length === 0" title="No tasks found" :filtered="filtered" :clear-label="filtered ? 'Clear filters' : ''"
+                    @clear="$emit('clear-filters')">
             <p>{{ emptyMessage }}</p>
-        </PrimeMessage>
+        </EmptyState>
 
         <!-- Task table -->
-        <DataTable v-else :value="slicedTasks" striped-rows row-hover
-                   :lazy="lazy" :total-records="lazy ? totalRecords : undefined"
-                   :sort-field="lazy ? undefined : 'createdAt'" :sort-order="-1"
+        <DataTable v-else :value="slicedTasks" striped-rows row-hover :class="STACKED_TABLE_CLASS"
+                   :lazy="lazy" :total-records="lazy ? totalRecords : undefined" :first="lazy ? first : undefined"
+                   :sort-field="lazy ? sortField : 'createdAt'" :sort-order="lazy ? sortOrder : -1"
                    scrollable scroll-height="flex"
                    :paginator="lazy"
                    paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                    :rows="lazy ? rows : undefined"
                    :rows-per-page-options="lazy ? rowsPerPageOptions : undefined"
-                   :page-link-size="3" @page="onPage">
-            <Column field="state" header="State" :sortable="!lazy" style="width: 5rem;">
+                   :page-link-size="3" @page="onPage" @sort="onSort">
+            <Column field="state" header="State" sortable v-bind="stackedColumn('State', undefined, {}, sortableHeaderPt(stacked))" style="width: 5rem;">
                 <template #body="slotProps">
                     <Tag :severity="stateTag(slotProps.data).severity"
                          :pt="{ root: { title: stateTag(slotProps.data).title, 'aria-label': stateTag(slotProps.data).label } }">
@@ -36,26 +36,28 @@
                     </Tag>
                 </template>
             </Column>
-            <Column field="toolId" header="Tool" :sortable="!lazy">
+            <Column field="toolId" header="Tool" sortable v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
                     <div :title="slotProps.data.path || ''">
                         <strong>{{ toolTitle(slotProps.data.toolId, tools) }}</strong>
                         <span class="muted"> v{{ slotProps.data.version }}</span>
                         <small class="path-details">{{ formatPath(slotProps.data.path) }}</small>
+                        <!-- On a phone the card has the room for the whole path -->
+                        <small class="path-full">{{ fullPath(slotProps.data.path) }}</small>
                     </div>
                 </template>
             </Column>
-            <Column v-if="showDataset" header="Dataset" v-bind="columnFrom('md')">
+            <Column v-if="showDataset" header="Dataset" v-bind="stackedColumn('Dataset', 'md')">
                 <template #body="slotProps">
                     <span class="dataset-cell" :title="`${slotProps.data.orgSlug}/${slotProps.data.dsSlug}`">{{ slotProps.data.orgSlug }}/{{ slotProps.data.dsSlug }}</span>
                 </template>
             </Column>
-            <Column v-if="showOwner" header="Owner" v-bind="columnFrom('xl')">
+            <Column v-if="showOwner" header="Owner" v-bind="stackedColumn('Owner', 'xl')">
                 <template #body="slotProps">
                     <span class="owner-cell" :title="slotProps.data.owner || slotProps.data.userId || 'System'">{{ slotProps.data.owner || slotProps.data.userId || 'System' }}</span>
                 </template>
             </Column>
-            <Column header="Progress" v-bind="columnFrom('md')">
+            <Column header="Progress" v-bind="stackedColumn('Progress', 'md')">
                 <template #body="slotProps">
                     <div v-if="progressKind(slotProps.data) === 'waiting'" class="waiting-for-files"
                          :title="stateTag(slotProps.data).title">
@@ -66,15 +68,15 @@
                         <Tag severity="danger" icon="fa-solid fa-triangle-exclamation" value="Failed" />
                         <small class="error-text" :title="slotProps.data.errorType || undefined">{{ failureText(slotProps.data) }}</small>
                     </div>
-                    <template v-else-if="progressKind(slotProps.data) === 'bar'">
+                    <div v-else-if="progressKind(slotProps.data) === 'bar'" class="task-progress">
                         <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
                                      :show-value="true" style="height: 1rem;" />
                         <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
-                    </template>
+                    </div>
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column field="createdAt" header="Created" :sortable="!lazy" v-bind="columnFrom('lg')">
+            <Column field="createdAt" header="Created" sortable v-bind="stackedColumn('Created', 'lg', {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
                     <div class="date-time">
                         <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
@@ -82,7 +84,7 @@
                     </div>
                 </template>
             </Column>
-            <Column header="Duration" style="width: 9rem;" v-bind="columnFrom('lg')">
+            <Column header="Duration" style="width: 9rem;" v-bind="stackedColumn('Duration', 'lg')">
                 <template #body="slotProps">
                     <div v-if="isActive(slotProps.data.state)" class="duration running" title="Running time">
                         <i class="fa-solid fa-stopwatch" /> {{ runningTime(slotProps.data) }}
@@ -93,7 +95,7 @@
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column header="Actions" style="width: 10rem;">
+            <Column header="Actions" style="width: 10rem;" v-bind="stackedColumn()">
                 <template #body="slotProps">
                     <div class="d-flex gap-1 flex-wrap">
                         <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log" aria-label="View log"
@@ -119,13 +121,14 @@
 <script>
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import Button from 'primevue/button';
-import PrimeMessage from 'primevue/message';
 import Tag from 'primevue/tag';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Skeleton from 'primevue/skeleton';
 import ProgressBar from 'primevue/progressbar';
-import { columnFrom } from '@/libs/responsiveColumns';
+import EmptyState from '@/components/EmptyState.vue';
+import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
+import { useStackedLayout } from '@/composables/useStackedLayout';
 import { isWaitingForFiles } from '@/libs/tasks/taskFormat';
 
 /**
@@ -136,7 +139,7 @@ import { isWaitingForFiles } from '@/libs/tasks/taskFormat';
 export default {
     name: 'TasksTable',
 
-    components: { Button, PrimeMessage, Tag, DataTable, Column, Skeleton, ProgressBar },
+    components: { Button, EmptyState, Tag, DataTable, Column, Skeleton, ProgressBar },
 
 
     props: {
@@ -147,8 +150,15 @@ export default {
         showDataset: { type: Boolean, default: false },
         lazy: { type: Boolean, default: false },
         totalRecords: { type: Number, default: 0 },
+        // The offset of the page the lazy table shows (the parent's skip): the paginator marks that page
+        first: { type: Number, default: 0 },
         rows: { type: Number, default: 10 },
         emptyMessage: { type: String, default: 'No processing tasks have been run yet.' },
+        // The list is empty because filters hide tasks: the empty state offers 'Clear filters' (FR-PRC-28)
+        filtered: { type: Boolean, default: false },
+        // The server-side order of a lazy table: a field of the whitelist (createdAt, state, toolId) and 1 / -1
+        sortField: { type: String, default: 'createdAt' },
+        sortOrder: { type: Number, default: -1 },
         rowsPerPageOptions: { type: Array, default: () => [10, 25, 50, 100] },
         // Task id whose result download is currently in flight: its Result button is
         // disabled + spinning to prevent repeated clicks overloading the server.
@@ -157,11 +167,12 @@ export default {
         currentPageFirst: { type: Number, default: 0 }
     },
 
-    emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset'],
+    emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset', 'sort', 'clear-filters'],
 
     setup() {
-        // Secondary columns leave a narrow screen, so a phone keeps the state, the tool and the actions
-        return { ...useTaskFormatting(), columnFrom };
+        // Secondary columns leave a narrow table; below `sm` every row is a stacked card with all of them (D-026),
+        // and the hidden header's sortable cells leave the tab order
+        return { ...useTaskFormatting(), stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout() };
     },
     data() {
         return {
@@ -247,6 +258,18 @@ export default {
             return '.../' + kept.join('/\u200B');
         },
 
+        /** The whole path of a task, which may break after a slash (the card of a phone shows it) */
+        fullPath(path) {
+            return path ? path.split('/').join('/\u200B') : 'Whole dataset';
+        },
+
+        /** A click on a sortable header of a lazy table: the parent asks the server in that order */
+        onSort(event) {
+            if (this.lazy) {
+                this.$emit('sort', { field: event.sortField, order: event.sortOrder });
+            }
+        },
+
         onPage(event) {
             // Only the admin (lazy) dashboard needs server-side paging.
             if (this.lazy) {
@@ -307,6 +330,10 @@ export default {
     overflow-wrap: anywhere;
 }
 
+.task-progress {
+    min-width: 0;
+}
+
 .waiting-for-files {
     display: flex;
     flex-direction: column;
@@ -321,6 +348,12 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.path-full {
+    display: none;
+    color: var(--ddb-text-muted);
+    overflow-wrap: anywhere;
 }
 
 .path-details {
@@ -347,6 +380,21 @@ export default {
     background: var(--p-content-background);
     border-top: 1px solid var(--p-content-border-color);
     padding: var(--ddb-spacing-xs) 0;
+}
+
+/* A phone card: the whole path, wrapped, in place of the cut one; its buttons take their own width */
+@media only screen and (max-width: 575.98px) {
+    .path-details {
+        display: none;
+    }
+
+    .path-full {
+        display: block;
+    }
+
+    .tasks-table :deep(.p-datatable-table .p-button) {
+        flex: 0 0 auto;
+    }
 }
 
 .duration {

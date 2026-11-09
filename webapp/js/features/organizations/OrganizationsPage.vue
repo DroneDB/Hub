@@ -29,7 +29,7 @@
         </div>
 
         <!-- Which organizations, and how they are shown: the search and Show all filter the list and the map -->
-        <ListToolbar v-if="!loadKind" v-model:search="searchQuery" search-label="Search organizations">
+        <ListToolbar v-if="!loadKind" ref="searchField" v-model:search="searchQuery" search-label="Search organizations">
             <template #start>
                 <div class="d-flex align-items-center gap-2">
                     <ToggleSwitch v-model="showAll" input-id="organizations-show-all" />
@@ -77,7 +77,8 @@
 
         <!-- Data loaded -->
         <div v-else ref="cardsArea" class="org-cards-area">
-            <EmptyState v-if="paginatedOrganizations.length === 0" title="No organizations found" :filtered="!!searchQuery">
+            <EmptyState v-if="paginatedOrganizations.length === 0" title="No organizations found" items="organizations" :query="searchQuery"
+                        @clear="searchQuery = ''; $refs.searchField?.focus()">
                 <!-- The default list holds the organizations the user owns, belongs to, or that are Public (D-003) -->
                 <p v-if="!showAll" data-org-empty-hint>No organizations yet: you don't own or belong to any, and none is public.</p>
                 <p v-else data-org-empty-hint>No organizations yet.</p>
@@ -129,7 +130,7 @@
         </div>
 
         <!-- Sticky paginator -->
-        <div v-if="!loadKind && !showSkeleton && view === 'list'" class="org-pagination">
+        <div v-if="!loadKind && !showSkeleton && view === 'list' && filteredOrganizations.length > 0" class="org-pagination">
             <Paginator :rows="Number(itemsPerPage)" :total-records="filteredOrganizations.length"
                        :first="(currentPage - 1) * itemsPerPage"
                        :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
