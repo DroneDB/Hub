@@ -415,8 +415,9 @@ const explorerProps = computed(() => ({
 
 // ---- Session and lifecycle -------------------------------------------------------------
 
-// The header reads the selection and asks for the settings
+// The header reads the selection and the permissions, and asks for the settings
 watch(listing.files, () => session.setSelectedFiles(listing.selected.value), { deep: true });
+watch(canWrite, value => session.setCanWrite(value), { immediate: true });
 watch(() => session.settingsRequests, () => actions.settings());
 
 onMounted(() => {

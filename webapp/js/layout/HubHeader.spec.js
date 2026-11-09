@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 import { reactive } from 'vue';
+import ddb from 'ddb';
 
 const h = vi.hoisted(() => ({
     reg: null,
@@ -46,6 +47,9 @@ vi.mock('@/libs/api/xauth', async importOriginal => ({ ...(await importOriginal(
 const { default: HubHeader } = await import('./HubHeader.vue');
 const { resetUpdateCheck } = await import('@/composables/useUpdateCheck');
 const { replaceQueryKeys, replaceHash } = await import('@/libs/routeQuery');
+const { useDatasetSessionStore } = await import('@/stores/datasetSession');
+const { explorerTools } = await import('@/libs/dataset/explorerTools');
+const { actionMenuItem } = await import('@/libs/dataset/explorerActions');
 
 const AVAILABLE = { currentVersion: '2.0.0', latestVersion: '2.1.0', isUpdateAvailable: true, isSecurityUpdate: false, releaseNotes: 'Notes' };
 
@@ -363,7 +367,7 @@ describe('HubHeader accessible names', () => {
         await flushPromises();
         expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(false);
         expect(wrapper.find('[aria-label="Download"]').exists()).toBe(false);
-        expect(wrapper.find('[aria-label="Share"]').exists()).toBe(false);
+        expect(wrapper.find('[aria-label="Share/Embed"]').exists()).toBe(false);
         session.setUnavailable(false);
         await flushPromises();
         expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(true);
@@ -390,6 +394,82 @@ describe('HubHeader accessible names', () => {
 
         // The other rows keep their label as their name
         expect(wrapper.vm.userMenuPt.item({ context: { item: { label: 'Logout' } } })).toEqual({});
+    });
+});
+
+// FR-XC-14: Download, Share/Embed and Settings are actions of the explorer's registry
+describe('HubHeader dataset actions', () => {
+    const tif = { path: 'ddb://acme/site/a.tif', entry: { path: 'a.tif', type: ddb.entry.type.GEORASTER } };
+    const jpg = { path: 'ddb://acme/site/b.jpg', entry: { path: 'b.jpg', type: ddb.entry.type.IMAGE } };
+    const button = label => wrapper.find(`button[aria-label="${label}"]`);
+
+    async function onDataset({ canWrite = true, selected = [tif] } = {}) {
+        await render();
+        const session = useDatasetSessionStore(wrapper.vm.$pinia);
+        session.activeTab = 'explorer';
+        session.setCanWrite(canWrite);
+        session.setSelectedFiles(selected);
+        await flushPromises();
+        return session;
+    }
+
+    describe.each([['writer', true], ['reader', false]])('for a %s', (_, canWrite) => {
+        it('has the labels, icons, permissions and enabled state of the toolbar and the menu', async () => {
+            await onDataset({ canWrite });
+            const ctx = { getSelectedEntries: () => [tif], canWrite, emit: vi.fn() };
+            const share = explorerTools(ctx).find(t => t.id === 'share-embed');
+            expect(share).toBeDefined();
+            expect(button(share.title).exists()).toBe(true);
+            expect(button(share.title).find('i').classes()).toEqual(expect.arrayContaining(share.icon.split(' ')));
+            const download = actionMenuItem('download', ctx);
+            expect(download.isVisible()).toBe(true);
+            expect(button(download.label).exists()).toBe(true);
+            expect(button(download.label).find('i').classes()).toEqual(expect.arrayContaining(download.icon.split(' ')));
+            expect(button(download.label).attributes('aria-disabled')).toBe(download.isEnabled() ? undefined : 'true');
+            // The settings window is read-only for a reader
+            expect(button('Settings').exists()).toBe(true);
+        });
+    });
+
+    it('shows Share/Embed only for one item, like the menu, and counts the files Download takes', async () => {
+        const session = await onDataset({ selected: [tif, jpg] });
+        const ctx = { getSelectedEntries: () => [tif, jpg], canWrite: true, emit: vi.fn() };
+        expect(actionMenuItem('share-embed', ctx).isVisible()).toBe(false);
+        expect(button('Share/Embed').exists()).toBe(false);
+        expect(button('Download').text()).toBe('2');
+        session.setSelectedFiles([]);
+        await flushPromises();
+        expect(button('Share/Embed').exists()).toBe(false);
+        expect(button('Download').attributes('title')).toBe('Download');
+    });
+
+    it('keeps Download in place, disabled with its reason, while an archive is prepared', async () => {
+        const session = await onDataset();
+        session.setActiveBulkDownload(true);
+        await flushPromises();
+        const download = button('Download');
+        expect(download.attributes('aria-disabled')).toBe('true');
+        expect(download.attributes('title')).toBe('Download: A download archive is being prepared. Please wait for it to complete.');
+        expect(wrapper.find(`#${download.attributes('aria-describedby')}`).text()).toContain('A download archive is being prepared');
+        await download.trigger('click');
+        expect(wrapper.vm.downloadConfirmOpen).toBe(false);
+    });
+
+    it('runs the action of the registry: Download asks first, Share/Embed opens the window, Settings asks the page', async () => {
+        const session = await onDataset();
+        await button('Download').trigger('click');
+        expect(wrapper.vm.downloadConfirmOpen).toBe(true);
+        await button('Share/Embed').trigger('click');
+        expect(wrapper.vm.shareFile).toStrictEqual(tif);
+        await button('Settings').trigger('click');
+        expect(session.settingsRequests).toBe(1);
+    });
+
+    it('offers no Settings to a visitor who is not signed in', async () => {
+        h.auth.isLoggedIn = false;
+        await onDataset();
+        expect(button('Settings').exists()).toBe(false);
+        expect(button('Download').exists()).toBe(true);
     });
 });
 

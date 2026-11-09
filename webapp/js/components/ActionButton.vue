@@ -2,7 +2,11 @@
     <Button v-bind="$attrs" :icon="icon" :label="showLabel ? label : undefined" :aria-label="label" :title="tooltip"
             :aria-disabled="disabled ? 'true' : undefined" :aria-describedby="describedBy"
             :aria-pressed="pressed === undefined ? undefined : String(!!pressed)"
-            :class="{ 'action-disabled': disabled }" @click="onClick" />
+            :class="{ 'action-disabled': disabled }" @click="onClick">
+        <template v-if="$slots.default" #default>
+            <slot />
+        </template>
+    </Button>
     <span v-if="describedBy" :id="reasonId" class="visually-hidden">{{ disabledReason }}</span>
 </template>
 
@@ -23,6 +27,7 @@ import Button from 'primevue/button';
  *   disabledReason - why (read by screen readers and shown as the tooltip)
  *   pressed        - a toggle's state; leave undefined for a plain button
  *   showLabel      - show the label next to the icon
+ * A default slot replaces the button's content (the icon and the label); the label stays its name.
  * Other attributes (severity, size, text...) go to the PrimeVue Button.
  */
 export default {

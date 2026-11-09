@@ -3,12 +3,14 @@
  * The action registry of the file explorer: each action that more than one surface offers is
  * defined once here (D-017, FR-XC-14). The toolbar (libs/dataset/explorerTools.js), the context
  * menus of the grid, the table and the tree (libs/contextMenuItems.js, also on the background),
- * the keyboard shortcuts (useDatasetShortcuts and the tree) and the detail panel render from these
+ * the keyboard shortcuts (useDatasetShortcuts and the tree), the detail panel and the header's
+ * dataset actions (layout/HubHeader.vue: Download, Share/Embed, Settings) render from these
  * definitions, so an action has the same label, icon, accelerator and enabled state on each.
  *
  * A definition says:
  *   - `surfaces`: where it is offered ('toolbar', 'menu' for a selection, 'background' for the menu
- *     of an empty selection, 'shortcut');
+ *     of an empty selection, 'shortcut', 'header' for the dataset actions of the page header, which
+ *     like a menu shows only what applies);
  *   - `permitted(ctx)`: false hides it on every surface (a reader has no Delete);
  *   - `applies(ctx)`: whether it applies to the selection. The menus show only the actions that
  *     apply; the toolbar keeps a fixed list and disables the others, with `reason(ctx)`;
@@ -19,12 +21,16 @@
  * the menu offers one "Open ..." item per row, the toolbar has one Open slot labelled by the
  * file's default row.
  */
+import ddb from 'ddb';
+import reg from '@/libs/api/sharedRegistry';
+import { Features } from '@/libs/features';
 import { isDroneDB } from '@/libs/entryTypes';
 import { VIEWERS, defaultViewerFor } from '@/libs/openItemDefaults';
 import { useClipboardStore } from '@/stores/clipboard';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 /**
- * @typedef {'toolbar'|'menu'|'background'|'shortcut'} Surface
+ * @typedef {'toolbar'|'menu'|'background'|'shortcut'|'header'} Surface
  *
  * @typedef {object} ActionContext
  * @property {() => any[]} getSelectedEntries   the explorer items acted on
@@ -36,6 +42,9 @@ import { useClipboardStore } from '@/stores/clipboard';
  * @property {() => boolean} [clipboardEmpty]  whether the Hub clipboard is empty (the store by default)
  * @property {'grid'|'table'} [viewMode]       toolbar only
  * @property {boolean} [expandedGrid]          toolbar only
+ * @property {boolean} [signedIn]              the user is signed in (reg.isLoggedIn() by default)
+ * @property {boolean} [unavailable]           the dataset did not load: no action on it (the header)
+ * @property {() => boolean} [downloadInProgress]  a download is under way (the session's archive by default)
  *
  * @typedef {object} ActionDefinition
  * @property {string} id
@@ -82,6 +91,21 @@ const hasDataset = (/** @type {any[]} */ s) => s.some(f => isDroneDB(f?.entry?.t
 const clipboardEmpty = (/** @type {ActionContext} */ c) => (c.clipboardEmpty ? c.clipboardEmpty() : useClipboardStore().isEmpty);
 const writer = (/** @type {ActionContext} */ c) => !!c.canWrite;
 const filesOnly = (/** @type {ActionContext} */ c) => sel(c).length > 0 && !hasDataset(sel(c));
+// A dataset that did not load (ResourceState) offers no action on it
+const available = (/** @type {ActionContext} */ c) => !c.unavailable;
+const signedIn = (/** @type {ActionContext} */ c) => (c.signedIn ?? reg.isLoggedIn());
+
+// A download of several files, a folder or the whole dataset (nothing selected) is an archive;
+// without the entry of the one selected item, count it as one
+const bulkDownload = (/** @type {ActionContext} */ c) => {
+    const s = sel(c);
+    if (s.length !== 1) return true;
+    return s[0]?.entry ? ddb.entry.isDirectory(s[0].entry) : true;
+};
+const downloadBlocked = (/** @type {ActionContext} */ c) => !signedIn(c)
+    && !!reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) && bulkDownload(c);
+const downloadInProgress = (/** @type {ActionContext} */ c) => (c.downloadInProgress
+    ? c.downloadInProgress() : useDatasetSessionStore().activeBulkDownload);
 
 /** The default viewer row of a single selected file, or null. */
 const defaultRow = (/** @type {ActionContext} */ c) => {
@@ -139,11 +163,37 @@ export const EXPLORER_ACTIONS = Object.freeze([
         group: 'share',
         label: 'Share/Embed',
         icon: 'fa-solid fa-share-nodes',
-        surfaces: ['toolbar', 'menu'],
+        surfaces: ['toolbar', 'menu', 'header'],
         priority: 2,
+        permitted: available,
         applies: c => !!single(c),
         reason: () => 'Select one file to share',
         run: c => { const f = single(c); if (f) c.emit('shareEmbed', f); }
+    },
+    {
+        // The selection, or in the header with nothing selected the whole dataset (the menu of an
+        // empty selection is the background menu, which has no Download)
+        id: 'download',
+        group: 'share',
+        label: 'Download',
+        icon: 'fa-solid fa-download',
+        surfaces: ['menu', 'header'],
+        permitted: available,
+        enabled: c => !downloadInProgress(c) && !downloadBlocked(c),
+        reason: c => (downloadInProgress(c)
+            ? 'A download archive is being prepared. Please wait for it to complete.'
+            : 'Login required to download multiple files or the entire dataset'),
+        run: c => c.emit('downloadItems', sel(c))
+    },
+    {
+        // The dataset's settings (read-only for a reader); the header only
+        id: 'settings',
+        group: 'tools',
+        label: 'Settings',
+        icon: 'fa-solid fa-wrench',
+        surfaces: ['header'],
+        permitted: c => available(c) && signedIn(c),
+        run: c => c.emit('settings')
     },
     {
         id: 'copy',

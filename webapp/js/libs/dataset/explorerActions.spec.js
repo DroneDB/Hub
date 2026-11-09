@@ -12,10 +12,13 @@ import {
 } from './explorerActions';
 import { explorerTools } from './explorerTools';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
+import { Features } from '@/libs/features';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 vi.mock('@/libs/build/buildManager', () => ({ default: { getBuildState: () => null }, BUILD_STATES: {} }));
 vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {} }));
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { isLoggedIn: () => true, features: { get: () => false, value: () => null } } }));
+const flags = vi.hoisted(() => new Set());
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { isLoggedIn: () => true, features: { get: name => flags.has(name), value: () => null } } }));
 vi.mock('@/libs/build/buildHelpers', () => ({
     isBuildableFile: () => false, hasActiveBuild: () => false, buildFile: vi.fn(), isFileBuilt: vi.fn(), isBuildComplete: () => false
 }));
@@ -169,5 +172,80 @@ describe('the action registry', () => {
         expect(openPresentation(file(T.GENERIC, 'r.pdf'))).toEqual({ label: 'Open', icon: 'fa-regular fa-file-pdf' });
         expect(openPresentation(file(T.IMAGE, 'a.jpg'))).toEqual({ label: 'Open', icon: 'fa-regular fa-folder-open' });
         expect(openPresentation(null).label).toBe('Open');
+    });
+});
+
+describe('the dataset actions of the header', () => {
+    beforeEach(() => { setActivePinia(createPinia()); flags.clear(); });
+    const header = (id, ctx) => resolveAction(id, ctx, 'header');
+    const HEADER_IDS = ['download', 'share-embed', 'settings'];
+
+    it('are actions of the registry, offered on the header surface', () => {
+        expect(EXPLORER_ACTIONS.filter(a => a.surfaces.includes('header')).map(a => a.id).sort()).toEqual([...HEADER_IDS].sort());
+    });
+
+    describe.each([true, false])('canWrite %s', canWrite => {
+        it.each(Object.keys(SELECTIONS).filter(n => n !== 'none'))('an action the header and another surface show has the same label and enabled state (%s)', name => {
+            const ctx = context(SELECTIONS[name], { canWrite });
+            const tools = explorerTools(ctx);
+            for (const id of HEADER_IDS) {
+                const a = header(id, ctx);
+                const item = actionMenuItem(id, ctx);
+                if (EXPLORER_ACTIONS.find(d => d.id === id).surfaces.includes('menu')) {
+                    expect(item.isVisible()).toBe(a.visible);
+                    if (a.visible) {
+                        expect(item.label).toBe(a.label);
+                        expect(item.isEnabled()).toBe(a.enabled);
+                    }
+                }
+                const tool = tools.find(t => t.id === id);
+                if (tool && a.visible) {
+                    expect(tool.title).toBe(a.label);
+                    expect(tool.disabled).toBe(!a.enabled);
+                }
+            }
+        });
+    });
+
+    it('the header downloads the whole dataset when nothing is selected; the menu of an empty selection has no Download', () => {
+        const ctx = context([]);
+        const download = header('download', ctx);
+        expect(download).toMatchObject({ visible: true, enabled: true, label: 'Download' });
+        download.run();
+        expect(ctx.emit).toHaveBeenCalledWith('downloadItems', []);
+        expect(actionMenuItem('download', ctx).isVisible()).toBe(false);
+        expect(header('share-embed', ctx).visible).toBe(false);
+    });
+
+    it('offers nothing on a dataset that did not load', () => {
+        const ctx = { ...context(SELECTIONS.image), unavailable: true, signedIn: true };
+        for (const id of HEADER_IDS) expect(header(id, ctx).visible).toBe(false);
+    });
+
+    it('Settings is for a signed-in user, reader or writer', () => {
+        expect(header('settings', { ...context([], { canWrite: false }), signedIn: true }).visible).toBe(true);
+        expect(header('settings', { ...context([]), signedIn: false }).visible).toBe(false);
+        const ctx = { ...context([]), signedIn: true };
+        header('settings', ctx).run();
+        expect(ctx.emit).toHaveBeenCalledWith('settings');
+    });
+
+    it('Download is disabled with its reason while an archive is prepared, or for an anonymous archive the server refuses', () => {
+        useDatasetSessionStore().setActiveBulkDownload(true);
+        const busy = context(SELECTIONS.image);
+        expect(header('download', busy)).toMatchObject({ enabled: false, disabledReason: 'A download archive is being prepared. Please wait for it to complete.' });
+        expect(actionMenuItem('download', busy).isEnabled()).toBe(false);
+        useDatasetSessionStore().setActiveBulkDownload(false);
+
+        flags.add(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS);
+        const anonymous = sel => ({ ...context(sel), signedIn: false });
+        expect(header('download', anonymous([]))).toMatchObject({ enabled: false, disabledReason: 'Login required to download multiple files or the entire dataset' });
+        expect(header('download', anonymous(SELECTIONS.folder)).enabled).toBe(false);
+        expect(header('download', anonymous(SELECTIONS.several)).enabled).toBe(false);
+        expect(header('download', anonymous(SELECTIONS.image)).enabled).toBe(true);
+        expect(header('download', { ...context([]), signedIn: true }).enabled).toBe(true);
+        const blocked = anonymous(SELECTIONS.folder);
+        header('download', blocked).run();
+        expect(blocked.emit).not.toHaveBeenCalled();
     });
 });
