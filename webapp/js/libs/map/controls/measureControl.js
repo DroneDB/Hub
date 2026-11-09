@@ -2,7 +2,6 @@ import { createUndoStack } from '@/libs/undoStack';
 import { controlButton, controlGroup } from './controlButton';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
-import Draw from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Translate from 'ol/interaction/Translate';
 import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
@@ -12,6 +11,7 @@ import { ANALYSIS_MEASUREMENT_TYPES, haloStyle } from '@/libs/map/analysisStyles
 import { Vector as VectorLayer } from 'ol/layer';
 import { unByKey } from 'ol/Observable';
 import { geodesicArea, geodesicLength } from '@/libs/map/geodesic';
+import { startDrawingSession } from '@/libs/map/drawingSession';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
@@ -47,8 +47,8 @@ class MeasureControls extends Control {
         const unitPref = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 
         const btnPoint = controlButton('Point Annotation', 'Click on the map to place an annotation.', '/images/measure-point.svg');
-        const btnLength = controlButton('Measure Length', 'Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.', '/images/measure-length.svg');
-        const btnArea = controlButton('Measure Area', 'Click on the map to draw a polygon. Double-click to finish and calculate the area. Press ESC to cancel.', '/images/measure-area.svg');
+        const btnLength = controlButton('Measure Length', 'Click on the map to place points along a line. Double-click, right-click or Enter to finish. Press ESC to cancel.', '/images/measure-length.svg');
+        const btnArea = controlButton('Measure Area', 'Click on the map to draw a polygon. Double-click, right-click or Enter to finish and calculate the area. Press ESC to cancel.', '/images/measure-area.svg');
         const btnErase = controlButton('Erase Measurement', 'Click on a measurement to delete it.', '/images/measure-erase.svg');
         const btnEdit = controlButton('Edit/Move Measurements', 'Click and drag measurement points to reposition them.', '/images/edit.svg');
         const btnStop = controlButton('Stop Measuring', 'Cancel the current measurement. Shortcut: ESC', '/images/measure-stop.svg');
@@ -162,8 +162,11 @@ class MeasureControls extends Control {
         // same time without one releasing it for the other.
         this._disableLockCount = 0;
 
-        // Store keyboard listener reference
+        // Store keyboard listener reference (the edit mode's; a drawing tool has its session)
         this.keyboardListener = null;
+
+        // The drawing session of the tool that is selected (libs/map/drawingSession), null with none
+        this.session = null;
 
         // Edit mode interactions
         this.modifyInteraction = null;
@@ -352,12 +355,8 @@ class MeasureControls extends Control {
         this.toggleEditMode();
     }
 
+    /** Stop Measuring: the measurement in progress is cancelled (nothing is added) and the tool is deselected. */
     handleStop() {
-        // Finish current drawing if in progress
-        if (this.draw) {
-            this.draw.finishDrawing();
-        }
-        // Deselect current tool
         this.deselectCurrent();
     }
 
@@ -1135,6 +1134,19 @@ class MeasureControls extends Control {
         if (this.selectedTool) this.onSelect(this.selectedTool);
     }
 
+    /**
+     * Drops what a line or an area tool leaves behind with no measurementType: a sketch that was cut short
+     * (the degenerate shape is removed just after OpenLayers adds it). A point or an eraser click is typed a
+     * moment after it is drawn, so those tools are left alone.
+     * @param {string | null} tool  the tool that is ending
+     */
+    _dropUntypedFeatures(tool) {
+        if (tool !== 'length' && tool !== 'area') return;
+        this.source.getFeatures()
+            .filter(f => !f.get('measurementType'))
+            .forEach(f => this.source.removeFeature(f));
+    }
+
     /** Draws the measurements again with the colour tokens (the colour scheme changed). */
     restyle() {
         this.vector?.changed();
@@ -1167,27 +1179,24 @@ class MeasureControls extends Control {
             if (!this.loaded) return;
 
             this.helpTooltipElement.classList.add('hidden');
-            map.removeInteraction(this.draw);
+            // The session leaves the map: its interaction, keys, crosshair and right click. A shape being
+            // drawn is cancelled, so it never reaches the source (the session was cleared first: its
+            // end must not deselect the tool a second time)
+            const session = this.session;
+            this.session = null;
             // CRITICAL: null the reference so the dblclick / pointermove
             // guards in setMap() know no Draw is active anymore. Without
             // this, hover highlight + double-click stay disabled forever
             // after the first measurement is drawn.
             this.draw = null;
+            if (session) session.end('stop');
             unByKey(this.pointerMoveListener);
-            if (this._contextMenuHandler) {
-                map.getViewport().removeEventListener('contextmenu', this._contextMenuHandler, true);
-                this._contextMenuHandler = null;
-            }
-
-            // Remove keyboard listener
-            if (this.keyboardListener) {
-                document.removeEventListener('keydown', this.keyboardListener, true);
-                this.keyboardListener = null;
-            }
+            this._dropUntypedFeatures(this.selectedTool);
 
             // Hide stop button
             this.btnStop.style.display = 'none';
-        };        if (!this.selectedTool || this.selectedTool !== tool) {
+        };
+        if (!this.selectedTool || this.selectedTool !== tool) {
             if (this.selectedTool !== tool) removeHandlers();
 
             const types = {
@@ -1235,17 +1244,8 @@ class MeasureControls extends Control {
                     return;
                 }
 
-                let helpMsg = 'Click to start drawing. Press ESC to cancel';
-                if (tool === 'point') helpMsg = 'Click on the map to place an annotation. Press ESC to exit';
-                else if (tool === 'erase') helpMsg = 'Click a measurement to remove it. Press ESC to exit';
-                else if (sketch) {
-                    const geom = sketch.getGeometry();
-                    if (geom instanceof Polygon) {
-                        helpMsg = 'Click to continue drawing the polygon. Double-click to finish. Press ESC to cancel';
-                    } else if (geom instanceof LineString) {
-                        helpMsg = 'Click to continue drawing the line. Double-click to finish. Press ESC to cancel';
-                    }
-                }
+                // One hint for the tool, with its gestures (D-027); the eraser is not a drawing
+                const helpMsg = tool === 'erase' ? 'Click a measurement to remove it. Esc exits.' : this.session ? this.session.hint : '';
 
                 this.helpTooltipElement.innerHTML = helpMsg;
                 // On the side of the pointer that has the room, so the hint is never cut by the map's edge
@@ -1259,31 +1259,26 @@ class MeasureControls extends Control {
 
             let self = this;
 
-            this.draw = new Draw({
-                source: this.source,
-                type: type,
-                style: new Style({
+            const sketchStyle = new Style({
+                fill: new Fill({
+                    color: tokenRgba('--ddb-glass-rgb', 0.4),
+                }),
+                stroke: new Stroke({
+                    color: tokenRgba('--ddb-measure-color', 0.7),
+                    lineDash: [10, 10],
+                    width: 2,
+                }),
+                image: new CircleStyle({
+                    radius: 5,
+                    stroke: new Stroke({
+                        color: tokenRgba('--ddb-shade-rgb', 0.9),
+                    }),
                     fill: new Fill({
                         color: tokenRgba('--ddb-glass-rgb', 0.4),
                     }),
-                    stroke: new Stroke({
-                        color: tokenRgba('--ddb-measure-color', 0.7),
-                        lineDash: [10, 10],
-                        width: 2,
-                    }),
-                    image: new CircleStyle({
-                        radius: 5,
-                        stroke: new Stroke({
-                            color: tokenRgba('--ddb-shade-rgb', 0.9),
-                        }),
-                        fill: new Fill({
-                            color: tokenRgba('--ddb-glass-rgb', 0.4),
-                        }),
-                    })
                 })
             });
-            // lifetime: owner (each Draw interaction is created per tool and dropped on stop)
-            this.draw.on('drawstart', function (evt) {
+            const onDrawStart = function (evt) {
                 sketch = evt.feature;
                 let tooltipCoord = evt.coordinate;
 
@@ -1300,9 +1295,8 @@ class MeasureControls extends Control {
                     self.measureTooltipElement.innerHTML = output;
                     self.measureTooltip.setPosition(tooltipCoord);
                 });
-            });
-            // lifetime: owner (each Draw interaction is created per tool and dropped on stop)
-            this.draw.on('drawend', function (evt) {
+            };
+            const onDrawEnd = function (evt) {
                 const feat = evt.feature;
                 if (tool === 'point') {
                     // Point annotation: open dialog before confirming the point
@@ -1378,8 +1372,9 @@ class MeasureControls extends Control {
                     }
 
                     if (isDegenerate) {
-                        // Remove degenerate measurement
-                        self.source.removeFeature(feat);
+                        // Remove degenerate measurement: OpenLayers adds the feature to the source after
+                        // this event, so it goes just after (it has no measurementType to be kept for)
+                        queueMicrotask(() => { try { self.source.removeFeature(feat); } catch { /* already gone */ } });
                         if (self.measureTooltipElement && self.measureTooltipElement.parentNode) {
                             self.measureTooltipElement.parentNode.removeChild(self.measureTooltipElement);
                         }
@@ -1413,39 +1408,40 @@ class MeasureControls extends Control {
 
                 sketch = null;
                 unByKey(listener);
-            });
-
-            // Right-click to stop measuring (use native DOM event on map viewport)
-            this._contextMenuHandler = (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                if (this.draw) {
-                    this.draw.finishDrawing();
-                }
-                this.deselectCurrent();
             };
-            map.getViewport().addEventListener('contextmenu', this._contextMenuHandler, true);
+            // Esc, Stop and the end of the session drop the shape being drawn: nothing is kept, and the
+            // measurement tooltip that followed the sketch goes with it
+            const onDrawAbort = function () {
+                sketch = null;
+                unByKey(listener);
+                if (self.measureTooltipElement) self.measureTooltipElement.innerHTML = '';
+                if (self.measureTooltip) self.measureTooltip.setPosition(undefined);
+            };
 
-            map.addInteraction(this.draw);
+            // The shared drawing session (D-027, FR-XC-17): double click, Enter and right click finish the
+            // shape, Esc and Stop cancel it, Space adds the point under the crosshair
+            let session = null;
+            session = this.session = startDrawingSession({
+                map,
+                type,
+                source: this.source,
+                style: sketchStyle,
+                hintKind: tool === 'erase' ? 'pick' : undefined,
+                onDrawStart,
+                onDrawEnd,
+                onDrawAbort,
+                // Esc ended the session: the tool is deselected with it
+                onEnd: () => {
+                    if (this.session !== session) return;
+                    this.session = null;
+                    this.deselectCurrent();
+                }
+            });
+            this.draw = session.draw;
             this.pointerMoveListener = map.on('pointermove', this.pointerMoveHandler.bind(this));
 
             // Show stop button when a tool is active
             this.btnStop.style.display = 'inline-block';
-
-            // Add ESC key listener to cancel drawing
-            this.keyboardListener = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    // Finish current drawing if in progress
-                    if (this.draw) {
-                        this.draw.finishDrawing();
-                    }
-                    // Deselect tool and go back to normal mode
-                    this.deselectCurrent();
-                }
-            };
-            document.addEventListener('keydown', this.keyboardListener, true);
 
             this.onToolSelected(tool);
         } else {

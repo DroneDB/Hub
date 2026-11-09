@@ -18,13 +18,11 @@
  * lowest perimeter (libs/stockpileBase). The panel shows the base of the pile, and picking
  * another one measures the pile again. The base is saved with the pile.
  */
-import Draw from 'ol/interaction/Draw';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Feature } from 'ol';
 import { Polygon } from 'ol/geom';
 import { transform } from 'ol/proj';
-import { unByKey } from 'ol/Observable';
 import { buildStockpileFeature, loadStockpile, STOCKPILE_PROPERTIES } from '@/libs/map/stockpileStorage';
 import {
     CUSTOM_MATERIAL_SLUG,
@@ -45,6 +43,7 @@ import { ANALYSIS_FILL, analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { BASE_METHOD, PILE_OUTLINE, baseMethodFor, isBaseMethod } from '@/libs/stockpileBase';
 import { createFeatureScope } from '@/composables/featureScope';
+import { startDrawingSession } from '@/libs/map/drawingSession';
 
 function stockpileStyle() {
     return analysisStyles({ width: 2, fill: ANALYSIS_FILL });
@@ -108,9 +107,9 @@ const definition = {
             // Non-reactive OL refs (mutated directly).
             _stockpileLayer: null,
             _stockpileSource: null,
-            _stockpileDraw: null,
-            _stockpileClickKey: null,
-            _stockpileEscKey: null,
+            // The drawing session of the Click map or the Draw mode (libs/map/drawingSession): it owns
+            // the interaction, the keys, the crosshair and the measurement toolbar's lock
+            _stockpileSession: null,
             _stockpilePrevCursor: '',
             // Id of the current draft stockpile feature in the shared
             // measurement layer. Tracks the polygon that has been auto-adopted
@@ -516,8 +515,8 @@ const definition = {
         },
 
         /**
-         * Engage "single click on map" capture: the next map click triggers
-         * `autoDetectAndCalculate` at the clicked coordinate.
+         * Engage "single click on map" capture: the next map click (or Space / Enter at the crosshair) triggers
+         * `autoDetectAndCalculate` at that coordinate. A drawing session of one point (FR-XC-17, D-027).
          * Acts as a toggle: a second invocation while already in click-mode cancels.
          */
         startStockpileClickMode() {
@@ -530,29 +529,24 @@ const definition = {
             this.stockpileMode = 'click';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
-            this._acquireStockpileToolLock();
             const mapProj = this.map.getView().getProjection();
-            this._stockpileClickKey = this.map.once('singleclick', (evt) => {
-                const [lon, lat] = transform(evt.coordinate, mapProj, EPSG.WGS84);
-                // Tear everything down (cursor, ESC handler, mode flag) BEFORE running
-                // detection so no interactions/listeners linger after the click.
-                this._stockpileClickKey = null;
-                this._stopStockpileInteractions();
-                this.stockpileError = null;
-                this.autoDetectAndCalculate(lon, lat);
-            });
-            this._stockpileEscKey = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    this._stopStockpileInteractions();
+            this._stockpileSession = this._startStockpileSession({
+                type: 'Point',
+                hintKind: 'pick',
+                onDrawEnd: (evt) => {
+                    const [lon, lat] = transform(evt.feature.getGeometry().getCoordinates(), mapProj, EPSG.WGS84);
+                    // The mode is over before the detection runs; the session leaves with this click
+                    this.stockpileMode = null;
                     this.stockpileError = null;
+                    this.autoDetectAndCalculate(lon, lat);
                 }
-            };
-            window.addEventListener('keydown', this._stockpileEscKey);
+            });
         },
 
         /**
-         * Activate an OpenLayers Polygon Draw interaction. On drawend the polygon
-         * is converted to WGS84 GeoJSON and passed to `calculateStockpileVolume`.
+         * Activate a Polygon drawing session (FR-XC-17, D-027): click (or Space at the crosshair) adds a corner, a
+         * double click, Enter or a right click finishes, Esc cancels. When the polygon is finished it is converted to
+         * WGS84 GeoJSON and passed to `calculateStockpileVolume`.
          */
         startStockpilePolygonDrawing() {
             if (!this.map) {
@@ -567,70 +561,53 @@ const definition = {
             this.stockpileMode = 'draw';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
-            this._acquireStockpileToolLock();
 
-            const draw = new Draw({
-                source: this._stockpileSource,
+            this._stockpileSession = this._startStockpileSession({
                 type: 'Polygon',
-                style: stockpileStyle()
-            });
-            this._stockpileDraw = draw;
-            this.map.addInteraction(draw);
-
-            draw.on('drawend', (evt) => {
-                this.stockpileError = null;
-                // Update UI state synchronously so the panel button highlight
-                // and tool lock release immediately, but defer interaction
-                // removal: OL Draw is still in the middle of finalising the
-                // sketch when drawend fires, and removing the interaction
-                // synchronously can leave the next pointer event (e.g. the
-                // user clicking the "Click on map" button) routed back to a
-                // half-alive Draw that starts a new polygon.
-                this.stockpileMode = null;
-                const mapProjForEnd = this.map.getView().getProjection();
-                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, EPSG.WGS84);
-                const coords = geom.getCoordinates();
-                // Detach the live reference synchronously so a quick
-                // user re-click on Draw / Click does not get clobbered by
-                // the deferred teardown below, and capture the specific
-                // interaction locally so we only remove THIS one.
-                const finishedDraw = draw;
-                if (this._stockpileDraw === finishedDraw) {
-                    this._stockpileDraw = null;
-                }
-                if (this._stockpileDrawTeardownTimer) {
-                    clearTimeout(this._stockpileDrawTeardownTimer);
-                    this._stockpileDrawTeardownTimer = null;
-                }
-                this._stockpileDrawTeardownTimer = setTimeout(() => {
-                    this._stockpileDrawTeardownTimer = null;
-                    if (this.map) {
-                        try { finishedDraw.abortDrawing(); } catch { /* noop */ }
-                        try { this.map.removeInteraction(finishedDraw); } catch { /* noop */ }
-                    }
-                    if (this._stockpileEscKey) {
-                        window.removeEventListener('keydown', this._stockpileEscKey);
-                        this._stockpileEscKey = null;
-                    }
-                    this._setStockpileCursor('');
-                    this._releaseStockpileToolLock();
-                }, 0);
-                if (!coords || !coords[0] || coords[0].length < 3) {
-                    this.stockpileError = 'A polygon with at least 3 vertices is required.';
-                    return;
-                }
-                const polygonGeoJson = { type: 'Polygon', coordinates: coords };
-                this.calculateStockpileVolume(polygonGeoJson);
-            });
-
-            this._stockpileEscKey = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    this._stopStockpileInteractions();
-                    this._stockpileSource && this._stockpileSource.clear();
+                source: this._stockpileSource,
+                style: stockpileStyle(),
+                onDrawEnd: (evt) => {
                     this.stockpileError = null;
+                    // The panel button shows the mode is over at once; the session leaves with this shape
+                    this.stockpileMode = null;
+                    const mapProjForEnd = this.map.getView().getProjection();
+                    const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, EPSG.WGS84);
+                    const coords = geom.getCoordinates();
+                    if (!coords || !coords[0] || coords[0].length < 4) {
+                        this.stockpileError = 'A polygon with at least 3 vertices is required.';
+                        return;
+                    }
+                    this.calculateStockpileVolume({ type: 'Polygon', coordinates: coords });
                 }
-            };
-            window.addEventListener('keydown', this._stockpileEscKey);
+            });
+        },
+
+        /**
+         * The drawing session of a stockpile mode. It locks the measurement toolbar while it runs, so a regular
+         * measurement cannot start on top, and ends by itself with the first shape. Esc ends the mode; what the
+         * mode showed goes with it.
+         */
+        _startStockpileSession(options) {
+            let session = null;
+            session = startDrawingSession({
+                map: this.map,
+                toolbar: () => this.measureControls,
+                once: true,
+                ...options,
+                onEnd: (reason) => {
+                    // Stopped from here (_stopStockpileInteractions): nothing more to do
+                    if (this._stockpileSession !== session) return;
+                    this._stockpileSession = null;
+                    this.stockpileMode = null;
+                    this._setStockpileCursor('');
+                    if (reason === 'abort') {
+                        // Esc: the polygon being drawn and the earlier overlay go, and so does the message
+                        if (this._stockpileSource) this._stockpileSource.clear();
+                        this.stockpileError = null;
+                    }
+                }
+            });
+            return session;
         },
 
         _ensureStockpileLayer() {
@@ -663,53 +640,12 @@ const definition = {
         },
 
         _stopStockpileInteractions() {
-            // Cancel any pending deferred Draw teardown so it cannot fire
-            // later and remove a freshly-installed interaction.
-            if (this._stockpileDrawTeardownTimer) {
-                clearTimeout(this._stockpileDrawTeardownTimer);
-                this._stockpileDrawTeardownTimer = null;
-            }
-            this._teardownStockpileDraw();
-            if (this._stockpileClickKey) {
-                try { unByKey(this._stockpileClickKey); } catch { /* noop */ }
-                this._stockpileClickKey = null;
-            }
+            const session = this._stockpileSession;
+            this._stockpileSession = null;
+            // Drops the shape being drawn, the interaction, the keys, the crosshair and the toolbar lock
+            if (session) session.end('abort');
             this.stockpileMode = null;
             this._setStockpileCursor('');
-            this._releaseStockpileToolLock();
-        },
-
-        /**
-         * Acquire / release a single lock on the measurement toolbar so the
-         * user can't start a regular measurement while a stockpile click or
-         * polygon draw is active. The flag prevents accidental double-locking
-         * when the same panel triggers both click and draw modes back to back.
-         */
-        _acquireStockpileToolLock() {
-            if (this._stockpileToolLockHeld) return;
-            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(true); } catch { /* noop */ }
-                this._stockpileToolLockHeld = true;
-            }
-        },
-        _releaseStockpileToolLock() {
-            if (!this._stockpileToolLockHeld) return;
-            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
-            }
-            this._stockpileToolLockHeld = false;
-        },
-
-        _teardownStockpileDraw() {
-            if (this._stockpileDraw && this.map) {
-                try { this._stockpileDraw.abortDrawing(); } catch { /* noop */ }
-                try { this.map.removeInteraction(this._stockpileDraw); } catch { /* noop */ }
-            }
-            this._stockpileDraw = null;
-            if (this._stockpileEscKey) {
-                window.removeEventListener('keydown', this._stockpileEscKey);
-                this._stockpileEscKey = null;
-            }
         },
 
         _setStockpileCursor(cursor) {

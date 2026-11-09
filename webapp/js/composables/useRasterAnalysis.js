@@ -1,4 +1,3 @@
-import Draw, { createBox } from 'ol/interaction/Draw';
 import Overlay from 'ol/Overlay';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
@@ -8,6 +7,7 @@ import { Point } from 'ol/geom';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import { geodesicLength } from '@/libs/map/geodesic';
+import { startDrawingSession } from '@/libs/map/drawingSession';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { PRIMARY } from '@/libs/palette';
 import { analysisStyles } from '@/libs/map/analysisStyles';
@@ -58,7 +58,7 @@ const definition = {
             // (the shared measurement layer) so it inherits hover, edit,
             // erase, save, export, and import for free. Only the ephemeral
             // chart-hover dot keeps its own dedicated overlay layer.
-            _rasterProfileDraw: null,
+            _rasterProfileSession: null,
             _rasterProfileHoverLayer: null,
             _rasterProfileHoverSource: null,
             _rasterProfileHoverFeature: null,
@@ -68,21 +68,15 @@ const definition = {
             // are reset by the `removefeature` watcher set up below.
             _currentProfileFeature: null,
             _rasterProfileSourceRemoveKey: null,
-            _rasterProfileKeyHandler: null,
-            // True while this feature keeps the measurement toolbar disabled (profile or
-            // rectangle drawing), so it is enabled again exactly once.
-            _rasterToolLockHeld: false,
-            // The statistics rectangle: its Draw interaction, its Esc handler and the layer
-            // that shows it until it is cleared or drawn again.
-            _rasterAreaDraw: null,
-            _rasterAreaKeyHandler: null,
+            // The statistics rectangle: its drawing session (which holds the measurement toolbar's
+            // lock) and the layer that shows it until it is cleared or drawn again.
+            _rasterAreaSession: null,
             _rasterAreaLayer: null,
             _rasterAreaSource: null,
             _rasterInspectMoveKey: null,
-            _rasterInspectKeyHandler: null,
+            _rasterInspectSession: null,
             _rasterInspectTooltipEl: null,
             _rasterInspectThrottle: null,
-            _rasterInspectClickKey: null,
             // VectorLayer / VectorSource that hold the click marker (red dot)
             // for the inspect-value tool. The dot is anchored to the map
             // coordinate so it pans/zooms with the map.
@@ -224,31 +218,22 @@ const definition = {
             this.handleClearAreaStats();
 
             this._ensureRasterAreaLayer();
-            const draw = new Draw({
+            // The shared drawing session: two clicks (or Space and Enter at the crosshair) draw the box; Esc cancels
+            this._rasterAreaSession = startDrawingSession({
+                map: this.map,
+                type: 'Box',
                 source: this._rasterAreaSource,
-                type: 'Circle',
-                geometryFunction: createBox(),
-                style: this._rasterAreaStyle(true)
+                style: this._rasterAreaStyle(true),
+                toolbar: () => this.measureControls,
+                once: true,
+                onDrawEnd: (evt) => {
+                    const geom = evt.feature.getGeometry();
+                    this.rasterAreaDrawing = false;
+                    this._onRasterAreaDrawn(geom ? geom.getExtent() : null);
+                },
+                onEnd: () => { this._rasterAreaSession = null; this.rasterAreaDrawing = false; }
             });
-            this._rasterAreaDraw = draw;
             this.rasterAreaDrawing = true;
-            this.map.addInteraction(draw);
-            this._holdMeasureToolLock();
-
-            this._rasterAreaKeyHandler = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) this._stopRasterAreaDrawing();
-            };
-            window.addEventListener('keydown', this._rasterAreaKeyHandler);
-
-            draw.on('drawend', (evt) => {
-                const geom = evt.feature.getGeometry();
-                // Ends the drawing on this click; the interaction leaves once OpenLayers has
-                // finished with the event (a microtask runs after its pointer handler returns)
-                try { draw.setActive(false); } catch { /* noop */ }
-                this.rasterAreaDrawing = false;
-                queueMicrotask(() => this._stopRasterAreaDrawing());
-                this._onRasterAreaDrawn(geom ? geom.getExtent() : null);
-            });
         },
 
         /**
@@ -309,36 +294,11 @@ const definition = {
         },
 
         _stopRasterAreaDrawing() {
-            if (this._rasterAreaDraw && this.map) {
-                try { this._rasterAreaDraw.setActive(false); } catch { /* noop */ }
-                try { this._rasterAreaDraw.abortDrawing(); } catch { /* noop */ }
-                try { this.map.removeInteraction(this._rasterAreaDraw); } catch { /* noop */ }
-            }
-            this._rasterAreaDraw = null;
+            const session = this._rasterAreaSession;
+            this._rasterAreaSession = null;
             this.rasterAreaDrawing = false;
-            if (this._rasterAreaKeyHandler) {
-                window.removeEventListener('keydown', this._rasterAreaKeyHandler);
-                this._rasterAreaKeyHandler = null;
-            }
-            this._releaseMeasureToolLock();
-        },
-
-        // The measurement toolbar is disabled while this feature draws on the map, so another
-        // measurement cannot start on top; held at most once
-        _holdMeasureToolLock() {
-            if (this._rasterToolLockHeld) return;
-            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                this.measureControls.setToolsDisabled(true);
-                this._rasterToolLockHeld = true;
-            }
-        },
-
-        _releaseMeasureToolLock() {
-            if (!this._rasterToolLockHeld) return;
-            this._rasterToolLockHeld = false;
-            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
-            }
+            // Drops the box being drawn, the keys and the crosshair, and gives the measurement toolbar back
+            if (session) session.end('abort');
         },
 
         /**
@@ -427,84 +387,65 @@ const definition = {
                 })
             });
 
-            const draw = new Draw({
-                source: this.measureControls.source,
+            // The shared drawing session: click (or Space at the crosshair) adds a vertex; a double click, Enter or a
+            // right click ends the line, Esc cancels it; the line is a measurement of the shared source
+            this._rasterProfileSession = startDrawingSession({
+                map: this.map,
                 type: 'LineString',
-                style: sketchStyle
+                source: this.measureControls.source,
+                style: sketchStyle,
+                toolbar: () => this.measureControls,
+                once: true,
+                onDrawEnd: (evt) => this._onRasterProfileDrawn(evt.feature),
+                onEnd: () => { this._rasterProfileSession = null; this.rasterProfileDrawing = false; }
             });
-            this._rasterProfileDraw = draw;
             this.rasterProfileDrawing = true;
-            this.map.addInteraction(draw);
+        },
 
-            this._holdMeasureToolLock();
+        /** The profile line is drawn: it becomes a measurement and its samples are asked. */
+        _onRasterProfileDrawn(feature) {
+            const geom = feature.getGeometry();
+            const mapProj = this.map.getView().getProjection();
+            const lineGeo = geom.clone().transform(mapProj, EPSG.WGS84);
+            const coords = lineGeo.getCoordinates();
 
-            const onKey = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    // ESC must abort the in-progress geometry AND fully exit
-                    // drawing mode. The sketch is not yet committed to the
-                    // source so there is nothing to clean up there.
-                    this.cancelRasterProfileDrawing();
-                }
-            };
-            this._rasterProfileKeyHandler = onKey;
-            window.addEventListener('keydown', onKey);
-
-            draw.on('drawend', (evt) => {
-                const feature = evt.feature;
-                const geom = feature.getGeometry();
-                const mapProj = this.map.getView().getProjection();
-                const lineGeo = geom.clone().transform(mapProj, EPSG.WGS84);
-                const coords = lineGeo.getCoordinates();
-
-                // Drop degenerate profiles (the user double-clicked without
-                // placing real vertices). The feature is in the measurement
-                // source already, so we have to remove it explicitly here.
-                if (!Array.isArray(coords) || coords.length < 2) {
-                    try { this.measureControls.source.removeFeature(feature); }
-                    catch { /* noop */ }
-                    this.cancelRasterProfileDrawing();
-                    return;
-                }
-
-                // Persist measurement metadata so the shared list, save/load,
-                // export, edit, and erase tools all treat the profile like a
-                // first-class measurement.
-                let lengthM = 0;
-                try { lengthM = geodesicLength(geom); } catch { /* noop */ }
-                // As the map writes every length (libs/format.js), in the user's units
-                const lengthLabel = lengthParts(lengthM, this.currentUnitPref).text;
-                feature.set('measurementType', 'profile');
-                feature.set('createdAt', new Date().toISOString());
-                feature.set('stroke', ANALYSIS_COLOR);
-                feature.set('stroke-width', 3);
-                feature.set('tooltipText', `Profile: ${lengthLabel}`);
-                if (this.rasterFilePath) feature.set('rasterFilePath', this.rasterFilePath);
-
-                this._currentProfileFeature = feature;
-                this._setupRasterProfileMeasurementWatcher();
-
-                // Floating tooltip on the line (matches length/area). Hidden
-                // by default; revealed on hover by the measure control's hover handler.
-                this._createProfileStaticTooltip(feature);
-
-                this.measureControls.refreshButtons();
-
-                // Synchronously suspend the Draw interaction so the upcoming
-                // pointer events can NOT start a new feature, and flip the UI
-                // flag right away so the panel button immediately shows
-                // "Redraw" instead of staying in "Stop drawing" mode.
-                if (this._rasterProfileDraw) {
-                    try { this._rasterProfileDraw.setActive(false); } catch { /* noop */ }
-                }
+            // Drop degenerate profiles (the user double-clicked without placing real vertices). OpenLayers
+            // adds the feature to the measurement source after this event, so it goes just after.
+            if (!Array.isArray(coords) || coords.length < 2) {
+                queueMicrotask(() => {
+                    try { this.measureControls.source.removeFeature(feature); } catch { /* noop */ }
+                });
                 this.rasterProfileDrawing = false;
+                return;
+            }
 
-                // Defer the actual interaction removal to the next tick so OL
-                // finishes processing the drawend event before we mutate the
-                // interaction stack.
-                setTimeout(() => { this._stopRasterProfileDrawing(); }, 0);
+            // Persist measurement metadata so the shared list, save/load,
+            // export, edit, and erase tools all treat the profile like a
+            // first-class measurement.
+            let lengthM = 0;
+            try { lengthM = geodesicLength(geom); } catch { /* noop */ }
+            // As the map writes every length (libs/format.js), in the user's units
+            const lengthLabel = lengthParts(lengthM, this.currentUnitPref).text;
+            feature.set('measurementType', 'profile');
+            feature.set('createdAt', new Date().toISOString());
+            feature.set('stroke', ANALYSIS_COLOR);
+            feature.set('stroke-width', 3);
+            feature.set('tooltipText', `Profile: ${lengthLabel}`);
+            if (this.rasterFilePath) feature.set('rasterFilePath', this.rasterFilePath);
 
-                this.queryRasterProfile(coords);
-            });
+            this._currentProfileFeature = feature;
+            this._setupRasterProfileMeasurementWatcher();
+
+            // Floating tooltip on the line (matches length/area). Hidden
+            // by default; revealed on hover by the measure control's hover handler.
+            this._createProfileStaticTooltip(feature);
+
+            this.measureControls.refreshButtons();
+
+            // The panel button shows "Redraw" at once, not "Stop drawing"
+            this.rasterProfileDrawing = false;
+
+            this.queryRasterProfile(coords);
         },
 
         _ensureRasterProfileHoverLayer() {
@@ -527,18 +468,12 @@ const definition = {
         },
 
         _stopRasterProfileDrawing() {
-            if (this._rasterProfileDraw && this.map) {
-                try { this._rasterProfileDraw.setActive(false); } catch { /* noop */ }
-                try { this._rasterProfileDraw.abortDrawing(); } catch { /* noop */ }
-                try { this.map.removeInteraction(this._rasterProfileDraw); } catch { /* noop */ }
-            }
-            this._rasterProfileDraw = null;
+            const session = this._rasterProfileSession;
+            this._rasterProfileSession = null;
             this.rasterProfileDrawing = false;
-            if (this._rasterProfileKeyHandler) {
-                window.removeEventListener('keydown', this._rasterProfileKeyHandler);
-                this._rasterProfileKeyHandler = null;
-            }
-            this._releaseMeasureToolLock();
+            // Drops the line being drawn (it never reaches the measurement source), the keys, the
+            // crosshair, and gives the measurement toolbar back
+            if (session) session.end('abort');
         },
 
         /**
@@ -725,19 +660,22 @@ const definition = {
             });
             this.map.addOverlay(this._rasterInspectTooltipOverlay);
 
-            // Single-click handler: place/move the marker at the clicked map
-            // coordinate, then fetch the value from the server.
-            const onClick = (evt) => {
-                if (!this.rasterInspectActive) return;
-                this._placeInspectMarker(evt.coordinate);
-                this._fetchInspectValueAtMapCoord(evt.coordinate);
-            };
-            this._rasterInspectClickKey = this.map.on('singleclick', onClick);
-
-            this._rasterInspectKeyHandler = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) this._stopRasterInspect();
-            };
-            window.addEventListener('keydown', this._rasterInspectKeyHandler);
+            // The shared drawing session: a click, or Space / Enter at the crosshair, places the marker at that
+            // map coordinate and fetches the value from the server; Esc ends the tool. The tool stays on for
+            // the next point.
+            this._rasterInspectSession = startDrawingSession({
+                map: this.map,
+                type: 'Point',
+                hintKind: 'pick',
+                toolbar: () => this.measureControls,
+                onDrawEnd: (evt) => {
+                    if (!this.rasterInspectActive) return;
+                    const coordinate = evt.feature.getGeometry().getCoordinates();
+                    this._placeInspectMarker(coordinate);
+                    this._fetchInspectValueAtMapCoord(coordinate);
+                },
+                onEnd: () => { this._rasterInspectSession = null; if (this.rasterInspectActive) this._stopRasterInspect(); }
+            });
         },
 
         /**
@@ -854,14 +792,10 @@ const definition = {
                 try { unByKey(this._rasterInspectMoveKey); } catch { /* noop */ }
             }
             this._rasterInspectMoveKey = null;
-            if (this._rasterInspectClickKey) {
-                try { unByKey(this._rasterInspectClickKey); } catch { /* noop */ }
-            }
-            this._rasterInspectClickKey = null;
-            if (this._rasterInspectKeyHandler) {
-                window.removeEventListener('keydown', this._rasterInspectKeyHandler);
-                this._rasterInspectKeyHandler = null;
-            }
+            // The drawing session: its keys, its crosshair and the measurement toolbar's lock
+            const session = this._rasterInspectSession;
+            this._rasterInspectSession = null;
+            if (session) session.end('abort');
             if (this._rasterInspectTooltipOverlay && this.map) {
                 try { this.map.removeOverlay(this._rasterInspectTooltipOverlay); } catch { /* noop */ }
             }

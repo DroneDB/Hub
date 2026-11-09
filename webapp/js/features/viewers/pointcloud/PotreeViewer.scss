@@ -163,13 +163,21 @@
     }
 
     /* Top-left toolbar container */
-    .top-left-toolbar {
+    // The tools at the top left, one under the other: undo and units, the measuring tools, Save and Delete saved
+    .top-left-column {
         position: absolute;
         top: var(--ddb-spacing-sm);
         left: var(--ddb-spacing-sm);
         // Leaves the menu button at the right edge free
         max-width: calc(100% - 4.5rem);
         z-index: 1001;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .top-left-toolbar {
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
@@ -228,10 +236,6 @@
 
     /* Toolbar for measurements */
     .measurements-toolbar {
-        position: absolute;
-        top: 3.75rem;
-        left: var(--ddb-spacing-sm);
-        z-index: 1000;
         background: var(--ddb-viewer-toolbar-bg);
         padding: var(--ddb-spacing-sm);
         border-radius: var(--ddb-radius-sm);
@@ -338,7 +342,8 @@
 
         // Out of the way of the toolbar above
         .measurements-toolbar {
-            top: auto;
+            position: absolute;
+            left: var(--ddb-spacing-sm);
             bottom: var(--ddb-spacing-sm);
             flex-wrap: wrap;
             max-width: calc(100% - 2 * var(--ddb-spacing-sm));

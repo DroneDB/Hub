@@ -69,15 +69,15 @@
             </div>
 
             <div class="section actions-grid">
-                <button class="panel-btn panel-btn--primary action-btn"
-                        :disabled="loading"
+                <button class="panel-btn action-btn" :class="{ active: mode === 'click', 'is-active': mode === 'click' }"
+                        :disabled="loading" :aria-pressed="mode === 'click'"
                         data-testid="stockpile-click-btn" title="Click on the map to detect a pile at that point"
                         @click="$emit('clickOnMap')">
                     <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'" />
                     <span class="action-label">{{ mode === 'click' ? 'Click map…' : 'Click map' }}</span>
                 </button>
-                <button class="panel-btn action-btn" :class="{ active: mode === 'draw' }"
-                        :disabled="loading"
+                <button class="panel-btn action-btn" :class="{ active: mode === 'draw', 'is-active': mode === 'draw' }"
+                        :disabled="loading" :aria-pressed="mode === 'draw'"
                         data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
                         @click="$emit('drawPolygon')">
                     <i class="fa-solid fa-draw-polygon" />
@@ -93,14 +93,14 @@
 
             <div v-if="mode === 'click'" class="section click-banner" data-testid="stockpile-click-banner">
                 <i class="fa-solid fa-crosshairs" />
-                <span>Click on the map to detect a pile (ESC to cancel).</span>
+                <span data-testid="stockpile-hint">{{ clickHint }}</span>
                 <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
                     <i class="fas fa-times" />
                 </button>
             </div>
             <div v-else-if="mode === 'draw'" class="section click-banner" data-testid="stockpile-draw-banner">
                 <i class="fa-solid fa-draw-polygon" />
-                <span>Draw a polygon around the pile (double-click to finish, ESC to cancel).</span>
+                <span data-testid="stockpile-hint">{{ drawHint }}</span>
                 <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
                     <i class="fas fa-times" />
                 </button>
@@ -185,6 +185,7 @@ import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, EMPTY_CELL, formatDensity, formatMoney, formatNumber, formatVolume, formatWeight } from '@/libs/format';
 import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
 import { BASE_METHOD, BASE_METHODS } from '@/libs/stockpileBase';
+import { drawingHint } from '@/libs/measureHints';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { currentLocation } from '@/libs/routeQuery';
 import { useAuthStore } from '@/stores/auth';
@@ -279,6 +280,9 @@ export default {
             set(v) { this.$emit('update:description', v); }
         },
         units() { return bulkUnits(this.unitPref); },
+        // The one hint of every drawing tool (libs/measureHints): how to place a point, finish and cancel
+        clickHint() { return drawingHint('pick', { crosshair: true }); },
+        drawHint() { return drawingHint('area', { crosshair: true }); },
         /** A restored pile's own material, offered as it was saved */
         savedMaterials() { return this.materials.filter(m => m.saved); },
         /** The built-in materials by category, in catalog order, then the user's own */

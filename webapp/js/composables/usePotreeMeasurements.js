@@ -169,6 +169,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         flash('Measurement deleted (Ctrl+Z to undo)', 'warning');
     }
 
+    // A drawing the user cancelled (Escape, Cancel): removed, and not a deletion that Ctrl+Z brings back. The
+    // entry of its start has no measure left, and undo goes by it
+    function discardMeasure(measure) {
+        if (viewer && sceneHas(measure)) replay(() => viewer.scene.removeMeasurement(measure));
+    }
+
     // A measure built outside Potree's measuring tool (from the file or a snapshot): its units, labels and look
     function finishRestored(measure) {
         measure.lengthUnit = viewer.lengthUnit;
@@ -351,7 +357,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     return {
         measurementCount, hasMeasurements: computed(() => measurementCount.value > 0),
         hasSavedMeasurements, savingMeasurements, deleteDialogOpen, deleteToolActive, canUndo, canRedo,
-        attach, onGuiLoaded, load, save, onDeleteDialogClose, undo, redo, toggleDeleteTool,
+        attach, onGuiLoaded, load, save, onDeleteDialogClose, undo, redo, toggleDeleteTool, discardMeasure,
         requestDelete: () => { deleteDialogOpen.value = true; }
     };
 }

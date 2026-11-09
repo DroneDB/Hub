@@ -6,7 +6,7 @@
  * The base of the volume: a pile found by a click is measured from the best-fit plane and a drawn
  * polygon from the lowest perimeter, until the user picks a base; a pick measures the pile again.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope, nextTick, ref, shallowRef } from 'vue';
 import { flushPromises } from '@vue/test-utils';
 import Feature from 'ol/Feature';
@@ -15,6 +15,9 @@ import { useStockpileVolume } from './useStockpileVolume';
 import { PREF, setPref, _resetPrefListenersForTests } from '@/libs/preferences';
 import { formatDensity, formatVolume } from '@/libs/format';
 import OlMap from 'ol/Map';
+import View from 'ol/View';
+import Draw from 'ol/interaction/Draw';
+import { toLonLat } from 'ol/proj';
 import { LineString } from 'ol/geom';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
@@ -37,6 +40,8 @@ let dataset;
 // The base of every volume asked for, and the volume of each base (a pile on a slope)
 let measuredBases;
 let netVolumeOf;
+// The measure control (or what stands for it) the composable locks while a mode draws
+let toolbar;
 
 /** @param {any} [controls]  the real measure control (default: one that does what the composable needs) */
 function start(controls) {
@@ -53,6 +58,7 @@ function start(controls) {
             }
         },
         refreshButtons() {},
+        setToolsDisabled: vi.fn(),
         // As the measure control does: in the saved file, whatever else changed on the map
         isSaved: id => savedIds.has(id),
         deleteMeasurement(feature) { source.removeFeature(feature); }
@@ -69,6 +75,7 @@ function start(controls) {
             return JSON.stringify(savedFile);
         }
     };
+    toolbar = measureControls;
     scope = effectScope();
     pile = scope.run(() => useStockpileVolume({
         dataset: () => dataset,
@@ -562,5 +569,112 @@ describe('the base of a pile', () => {
         await open();
         expect(pile.stockpileBaseMethod.value).toBe('average_perimeter');
         expect(measuredBases).toEqual([]);
+    });
+});
+
+// FR-MAP-06, FR-XC-17, D-027: Click map and Draw run in the shared drawing session
+describe('Click map and Draw (the shared drawing session)', () => {
+    const key = (k, on = document.body) => on.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    const drawOf = () => olMap.value.getInteractions().getArray().find(i => i instanceof Draw);
+    const rightClick = (x, y, upX = x, upY = y) => {
+        const vp = olMap.value.getViewport();
+        vp.dispatchEvent(new MouseEvent('pointerdown', { clientX: x, clientY: y, button: 2, bubbles: true }));
+        vp.dispatchEvent(new MouseEvent('pointerup', { clientX: upX, clientY: upY, button: 2, bubbles: true }));
+    };
+
+    beforeEach(async () => {
+        // No target: the map has no size and renders nothing, the interactions work all the same
+        olMap.value = new OlMap({ view: new View({ center: [1000000, 5600000], zoom: 10 }) });
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+        dataset.detectStockpile = vi.fn(async () => ({ polygon: POLYGON, confidence: 0.8, estimatedVolume: 8.7, basePlaneMethod: 'auto' }));
+    });
+
+    it('Click map: Space at the crosshair detects the pile at the centre of the view, and the mode ends', async () => {
+        pile.startStockpileClickMode();
+        expect(pile.stockpileMode.value).toBe('click');
+        expect(drawOf()).toBeDefined();
+        const [lon, lat] = toLonLat(olMap.value.getView().getCenter());
+        key(' ');
+        await new Promise(resolve => setTimeout(resolve, 30));
+        expect(dataset.detectStockpile).toHaveBeenCalledTimes(1);
+        const [path, calledLat, calledLon] = dataset.detectStockpile.mock.calls[0];
+        expect(path).toBe('dsm.tif');
+        expect(calledLon).toBeCloseTo(lon, 9);
+        expect(calledLat).toBeCloseTo(lat, 9);
+        expect(pile.stockpileMode.value).toBeNull();
+        await vi.waitFor(() => expect(drawOf()).toBeUndefined());
+    });
+
+    it('Click map: Esc ends the mode and detects nothing', async () => {
+        pile.startStockpileClickMode();
+        key('Escape');
+        await new Promise(resolve => setTimeout(resolve, 30));
+        expect(pile.stockpileMode.value).toBeNull();
+        expect(drawOf()).toBeUndefined();
+        expect(dataset.detectStockpile).not.toHaveBeenCalled();
+    });
+
+    it('Click map: a second press of the button cancels it', () => {
+        pile.startStockpileClickMode();
+        pile.startStockpileClickMode();
+        expect(pile.stockpileMode.value).toBeNull();
+        expect(drawOf()).toBeUndefined();
+    });
+
+    it('locks the measurement toolbar once while a mode runs and gives it back once, also when Click map follows Draw', () => {
+        pile.startStockpilePolygonDrawing();
+        expect(toolbar.setToolsDisabled.mock.calls).toEqual([[true]]);
+        pile.startStockpileClickMode();
+        expect(toolbar.setToolsDisabled.mock.calls).toEqual([[true], [false], [true]]);
+        key('Escape');
+        expect(toolbar.setToolsDisabled.mock.calls).toEqual([[true], [false], [true], [false]]);
+        expect(drawOf()).toBeUndefined();
+    });
+
+    it('Draw: Space adds the corners at the crosshair, Enter measures the polygon', async () => {
+        const calculate = vi.spyOn(dataset, 'calculateStockpileVolume');
+        pile.startStockpilePolygonDrawing();
+        expect(pile.stockpileMode.value).toBe('draw');
+        olMap.value.getPixelFromCoordinate = c => [c[0] / 10, c[1] / 10];
+        const view = olMap.value.getView();
+        [[1000000, 5600000], [1000500, 5600000], [1000500, 5600500]].forEach(c => { view.setCenter(c); key(' '); });
+        key('Enter');
+        await new Promise(resolve => setTimeout(resolve, 30));
+        expect(calculate).toHaveBeenCalledTimes(1);
+        const ring = calculate.mock.calls[0][1].coordinates[0];
+        expect(ring).toHaveLength(4);
+        expect(ring[0]).toEqual(ring[3]);
+        expect(pile.stockpileMode.value).toBeNull();
+        expect(pile.stockpileResult.value).not.toBeNull();
+    });
+
+    it('Draw: Esc cancels the polygon: nothing is measured, the overlay is empty', async () => {
+        const calculate = vi.spyOn(dataset, 'calculateStockpileVolume');
+        pile.startStockpilePolygonDrawing();
+        olMap.value.getPixelFromCoordinate = c => [c[0] / 10, c[1] / 10];
+        const view = olMap.value.getView();
+        [[1000000, 5600000], [1000500, 5600000]].forEach(c => { view.setCenter(c); key(' '); });
+        key('Escape');
+        await new Promise(resolve => setTimeout(resolve, 30));
+        expect(calculate).not.toHaveBeenCalled();
+        expect(pile.stockpileMode.value).toBeNull();
+        expect(drawOf()).toBeUndefined();
+        expect(olMap.value.getLayers().getArray().flatMap(l => (l.getSource?.().getFeatures?.() ?? []))).toHaveLength(0);
+    });
+
+    it('Draw: a right click finishes the polygon, a 20 px right-drag does not', async () => {
+        const calculate = vi.spyOn(dataset, 'calculateStockpileVolume');
+        pile.startStockpilePolygonDrawing();
+        olMap.value.getPixelFromCoordinate = c => [c[0] / 10, c[1] / 10];
+        const view = olMap.value.getView();
+        [[1000000, 5600000], [1000500, 5600000], [1000500, 5600500]].forEach(c => { view.setCenter(c); key(' '); });
+        rightClick(10, 10, 30, 10);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        expect(calculate).not.toHaveBeenCalled();
+        expect(pile.stockpileMode.value).toBe('draw');
+        rightClick(10, 10, 12, 11);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        expect(calculate).toHaveBeenCalledTimes(1);
     });
 });

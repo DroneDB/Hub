@@ -28,13 +28,22 @@
             </span>
         </div>
 
-        <!-- Draggable vertical handles (N-1) -->
+        <!-- Vertical dividers (N-1): dragged with a pointer, moved with the arrow keys, Home and End (FR-MAP-17) -->
+        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- a focusable separator is a widget: it has its role, its value and its arrow keys -->
         <div
             v-for="(pos, i) in positions"
             :key="'handle-' + i"
             class="split-handle"
+            role="separator"
+            aria-orientation="vertical"
+            tabindex="0"
+            :aria-label="handleLabel(i)"
+            :aria-valuenow="percent(pos)"
+            aria-valuemin="0"
+            aria-valuemax="100"
             :style="{ left: (pos * 100) + '%' }"
             @pointerdown="startDrag($event, i)"
+            @keydown="onHandleKey($event, i)"
         >
             <div class="split-handle-bar" />
             <div class="split-handle-grip"><i class="fa-solid fa-grip-lines-vertical" /></div>
@@ -46,8 +55,16 @@
 /**
  * RasterSplitOverlay - the labels and dividers of the split mode. A band label moves its layer
  * one band left or right (the band widths stay); with `removable` (the map viewer, not Viewer
- * only) it also removes it, and a missing layer's label picks another file.
+ * only) it also removes it, and a missing layer's label picks another file. A divider is a
+ * separator that a pointer drags and the keyboard moves: ArrowLeft and ArrowRight by 5 % (Shift:
+ * 1 %), Home and End to the end of its range; it never comes closer than 5 % to its neighbours.
  */
+
+// The least width of a band, as a fraction of the map
+const MIN_GAP = 0.05;
+// A key press moves a divider by this much, and by the fine step with Shift
+const STEP = 0.05;
+const FINE_STEP = 0.01;
 export default {
     name: 'RasterSplitOverlay',
     props: {
@@ -85,6 +102,46 @@ export default {
             };
         },
 
+        /** The divider as a whole percent, for the value a screen reader says */
+        percent(position) {
+            return Math.round(position * 100);
+        },
+
+        /** The name of divider i: the two bands it parts */
+        handleLabel(i) {
+            const name = j => {
+                const band = this.bands[j];
+                return band ? (band.placeholder ? band.placeholder.text : band.name) : `band ${j + 1}`;
+            };
+            return `Divider between ${name(i)} and ${name(i + 1)}`;
+        },
+
+        /** Where divider `index` may go: not closer than MIN_GAP to the edge of the map or to its neighbour. */
+        clamp(index, value) {
+            const low = index === 0 ? MIN_GAP : this.positions[index - 1] + MIN_GAP;
+            const high = index === this.positions.length - 1 ? 1 - MIN_GAP : this.positions[index + 1] - MIN_GAP;
+            return Math.max(low, Math.min(high, value));
+        },
+
+        move(index, value) {
+            const updated = [...this.positions];
+            updated[index] = this.clamp(index, value);
+            if (updated[index] !== this.positions[index]) this.$emit('update:positions', updated);
+        },
+
+        onHandleKey(event, index) {
+            const step = event.shiftKey ? FINE_STEP : STEP;
+            const current = this.positions[index];
+            let target;
+            if (event.key === 'ArrowLeft') target = current - step;
+            else if (event.key === 'ArrowRight') target = current + step;
+            else if (event.key === 'Home') target = 0;
+            else if (event.key === 'End') target = 1;
+            else return;
+            event.preventDefault();
+            this.move(index, target);
+        },
+
         startDrag(event, index) {
             event.preventDefault();
             this.draggingIndex = index;
@@ -104,13 +161,8 @@ export default {
             const newPos = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
 
             // Clamp so handles don't cross each other (minimum 5% gap)
-            const minGap = 0.05;
-            const leftBound = this.draggingIndex === 0 ? minGap : this.positions[this.draggingIndex - 1] + minGap;
-            const rightBound = this.draggingIndex === this.positions.length - 1 ? 1 - minGap : this.positions[this.draggingIndex + 1] - minGap;
-            const clamped = Math.max(leftBound, Math.min(rightBound, newPos));
-
             const updated = [...this.positions];
-            updated[this.draggingIndex] = clamped;
+            updated[this.draggingIndex] = this.clamp(this.draggingIndex, newPos);
             this.$emit('update:positions', updated);
         },
 
@@ -135,11 +187,11 @@ export default {
     overflow: hidden;
 }
 
-/* Below the row of buttons at the top centre of the map, so the label of a middle band is not
-   under them */
+/* Below the zoom control at the top left, and so below the row of buttons at the top centre of the
+   map: the label of a band is under neither */
 .split-band-label {
     position: absolute;
-    top: var(--map-top-reserve);
+    top: var(--map-zoom-reserve);
     pointer-events: none;
 }
 
@@ -222,6 +274,11 @@ export default {
     cursor: ew-resize;
     pointer-events: all;
     z-index: 3;
+}
+
+.split-handle:focus-visible {
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+    outline-offset: calc(-1 * var(--ddb-focus-ring-width));
 }
 
 .split-handle-bar {

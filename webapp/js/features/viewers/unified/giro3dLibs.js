@@ -57,6 +57,8 @@ export async function loadGiro3dLibs() {
         COPCSource: withColorDepth(COPCSource.default, THREE.Uint8BufferAttribute),
         Tiles3D: Tiles3D.default,
         DrawTool: DrawTool.default,
+        // The conditions of its end of a drawing (the double click is its own; the right click is ours, libs/mouse)
+        DrawConditions: DrawTool.conditions,
         XYZ: XYZ.default,
         OSM: OSM.default,
         olStyle,

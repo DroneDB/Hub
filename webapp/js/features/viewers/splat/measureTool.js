@@ -10,7 +10,9 @@
  * and the values are worked out from them every time they are drawn, so they follow a change of the
  * scale or of the up. Navigation is suspended while a shape is drawn (a drag would also move the
  * camera): a click adds a point, a double click, Enter or a right click ends the shape, Escape
- * cancels it. A shape with a fixed number of points (a point, a height) ends by itself.
+ * cancels it (the gesture rule of every measuring tool, D-027). A right click is a right-button release
+ * after a move of 4 CSS px or less (`isRightClick`), not the browser's `contextmenu`, which a
+ * right-drag also sends. A shape with a fixed number of points (a point, a height) ends by itself.
  *
  * A double click is two clicks before its dblclick: the second one lands where the first did and
  * would add the same point again (a segment of length 0 whose label covers the total), so a click
@@ -22,12 +24,15 @@
  * is kept.
  */
 import { measureColor } from '@/features/viewers/unified/sceneUtils';
+import { isRightClick, RIGHT_BUTTON } from '@/libs/mouse';
 import { MEASURE_KINDS, sceneLabels, shapeLabels } from './measureMath';
 import { newId } from './sceneData';
 
 // A press that moves more than this many pixels, or lasts longer than this, is a drag, not a click
 const CLICK_MOVE_PX = 6;
 const CLICK_MS = 600;
+// The contextmenu that follows the release of a right click that ended a shape is still the tool's, for this long
+const MENU_GUARD_MS = 500;
 // A click this close (in pixels) to the click that added the previous point picks that point again
 const SAME_POINT_PX = 5;
 
@@ -63,8 +68,11 @@ export class SplatMeasureTool {
         this.measurements = [];
         /** @type {Map<number | string, { group: any, labels: any[] }>} */
         this.shapes = new Map();
-        /** @type {{ kind: string, points: number[][], resolve: (m: any) => void, draft: { group: any, labels: any[] } | null, down: { x: number, y: number, at: number } | null, last: { x: number, y: number } | null } | null} */
+        /** @type {{ kind: string, points: number[][], resolve: (m: any) => void, draft: { group: any, labels: any[] } | null, down: { x: number, y: number, at: number } | null, rightDown: { button: number, clientX: number, clientY: number } | null, last: { x: number, y: number } | null } | null} */
         this.session = null;
+        // A browser sends its contextmenu after the release of the right button (Windows, macOS): it comes
+        // when the right click has already ended the shape, and is still the tool's, not the page's menu
+        this.menuGuardUntil = 0;
         this.disposed = false;
         this.labels = sceneLabels(() => host.getScale(), () => host.getCoordinateWriter?.() ?? null);
 
@@ -92,7 +100,7 @@ export class SplatMeasureTool {
         if (this.disposed || !Object.hasOwn(SPECS, kind)) return Promise.resolve(null);
         this.cancel();
         return new Promise(resolve => {
-            this.session = { kind, points: [], resolve, draft: null, down: null, last: null };
+            this.session = { kind, points: [], resolve, draft: null, down: null, rightDown: null, last: null };
             this.host.setNavigationEnabled(false);
             this.host.onActive?.(kind);
         });
@@ -252,14 +260,20 @@ export class SplatMeasureTool {
 
     /** @param {PointerEvent} e */
     onPointerDown(e) {
-        if (!this.session || e.button !== 0) return;
-        this.session.down = { x: e.clientX, y: e.clientY, at: performance.now() };
+        if (!this.session) return;
+        if (e.button === RIGHT_BUTTON) this.session.rightDown = { button: e.button, clientX: e.clientX, clientY: e.clientY };
+        else if (e.button === 0) this.session.down = { x: e.clientX, y: e.clientY, at: performance.now() };
     }
 
     /** A click (a press that stayed where it was) adds a point where the splats are under it. @param {PointerEvent} e */
     onPointerUp(e) {
         const s = this.session;
-        if (!s || e.button !== 0 || !s.down) return;
+        if (!s) return;
+        if (e.button === RIGHT_BUTTON) {
+            this.onRightUp(e);
+            return;
+        }
+        if (e.button !== 0 || !s.down) return;
         const { down } = s;
         s.down = null;
         if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_MOVE_PX || performance.now() - down.at > CLICK_MS) return;
@@ -282,13 +296,24 @@ export class SplatMeasureTool {
         if (s.points.length >= SPECS[s.kind].max) this.finish();
     }
 
-    /** A right click ends the shape (or drops it when it has too few points). @param {MouseEvent} e */
-    onContextMenu(e) {
+    /**
+     * A right click ends the shape (or drops it when it has too few points). A right-drag is not one: it
+     * moves the view where the viewer lets it. @param {PointerEvent} e
+     */
+    onRightUp(e) {
         const s = this.session;
         if (!s) return;
-        e.preventDefault();
+        const { rightDown } = s;
+        s.rightDown = null;
+        if (!isRightClick(rightDown, e)) return;
+        this.menuGuardUntil = performance.now() + MENU_GUARD_MS;
         if (s.points.length >= SPECS[s.kind].min) this.finish();
         else this.cancel();
+    }
+
+    /** The page's own menu has no place while a shape is drawn: the right click is the tool's. @param {MouseEvent} e */
+    onContextMenu(e) {
+        if (this.session || performance.now() < this.menuGuardUntil) e.preventDefault();
     }
 
     /**

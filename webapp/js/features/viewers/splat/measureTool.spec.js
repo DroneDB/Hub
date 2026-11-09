@@ -55,6 +55,13 @@ beforeEach(() => {
     tool = new SplatMeasureTool(host, n => counts.push(n));
 });
 
+/** A right click: the right button goes down and up within 4 px, as a browser sends it with its contextmenu. */
+function rightClick(x = 100, y = 50, upX = x, upY = y) {
+    fire('pointerdown', { clientX: x, clientY: y, button: 2 });
+    fire('pointerup', { clientX: upX, clientY: upY, button: 2 });
+    return fire('contextmenu', { clientX: upX, clientY: upY, button: 2 });
+}
+
 const hit = (x, y, z) => ({ point: new THREE.Vector3(x, y, z), distance: 1 });
 /** Picks these points, one per click, each click on a spot of its own as the user's would be. */
 const pick = (...points) => points.forEach(p => { hits.push(hit(...p)); click(10 + (clicks++ % 9) * 20, 50); });
@@ -79,7 +86,7 @@ describe('drawing a distance', () => {
         expect(dots()).toBe(3);
         expect(tool.measurements).toEqual([]);
 
-        const end = fire('contextmenu');
+        const end = rightClick();
         const measurement = await drawing;
 
         expect(end).toBe(false); // the page's own menu was prevented
@@ -93,7 +100,7 @@ describe('drawing a distance', () => {
     it('is cancelled by a right click that comes too early, or Escape, and keeps nothing', async () => {
         const first = tool.measure('distance');
         pick([0, 0, 0]);
-        fire('contextmenu');
+        rightClick();
         expect(await first).toBeNull();
 
         const second = tool.measure('distance');
@@ -103,6 +110,20 @@ describe('drawing a distance', () => {
         expect(tool.measurements).toEqual([]);
         expect(dots()).toBe(0);
         expect(host.onChange).not.toHaveBeenCalled();
+    });
+
+    it('is not ended by a right-drag of 20 px, or by the contextmenu alone: that only moves the view', async () => {
+        const drawing = tool.measure('distance');
+        pick([0, 0, 0], [0, 0, 2]);
+        rightClick(100, 50, 120, 50);
+        expect(tool.activeKind).toBe('distance');
+        // The browser's menu event with no press and release of the right button seen
+        const menu = fire('contextmenu', { button: 2 });
+        expect(menu).toBe(false);
+        expect(tool.activeKind).toBe('distance');
+        // 4 px away is still a click
+        rightClick(100, 50, 103, 52);
+        expect((await drawing).points).toHaveLength(2);
     });
 
     it('is ended by Enter', async () => {
@@ -172,7 +193,7 @@ describe('a second click', () => {
         hits.push(hit(0, 0, 0), hit(0, 0, 1));
         click(100, 50);
         click(108, 50);
-        fire('contextmenu');
+        rightClick();
         expect((await drawing).points).toEqual([[0, 0, 0], [0, 0, 1]]);
     });
 
@@ -183,7 +204,7 @@ describe('a second click', () => {
         click(20, 50);
         click(21, 50);
         expect(host.onMiss).toHaveBeenCalledTimes(1);
-        fire('contextmenu');
+        rightClick();
         expect((await drawing).points).toEqual([[0, 0, 0], [0, 0, 1]]);
     });
 });
@@ -212,12 +233,12 @@ describe('the other shapes', () => {
     it('need three points for an area, which is labelled with the area seen from above', async () => {
         const area = tool.measure('area');
         pick([0, 0, 0], [4, 0, 0]);
-        fire('contextmenu');
+        rightClick();
         expect(await area).toBeNull();
 
         const again = tool.measure('area');
         pick([0, 0, 0], [4, 0, 5], [4, 3, 5], [0, 3, 0]);
-        fire('contextmenu');
+        rightClick();
         expect(await again).toMatchObject({ kind: 'area' });
         expect(labels()).toEqual(['12 m²']);
     });
@@ -268,7 +289,7 @@ describe('clicks', () => {
 
     it('do nothing when no shape is being drawn', () => {
         click();
-        fire('contextmenu');
+        rightClick();
         expect(host.stage.pickSplat).not.toHaveBeenCalled();
     });
 });
@@ -316,7 +337,7 @@ describe('the scale and the places of pins', () => {
     it('changes the labels when the shapes are drawn again after a change of scale', async () => {
         const drawing = tool.measure('distance');
         pick([0, 0, 0], [0, 0, 2]);
-        fire('contextmenu');
+        rightClick();
         await drawing;
         expect(labels()).toEqual(['2.0 m']);
 

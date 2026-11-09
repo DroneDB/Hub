@@ -158,3 +158,40 @@ describe('StockpileVolumePanel elevation model', () => {
         expect(wrapper.emitted('selectTarget')).toEqual([['odm_dem/dtm.tif']]);
     });
 });
+
+// FR-MAP-06: the buttons show the tool the map is in; at rest none looks selected
+describe('StockpileVolumePanel Click map and Draw state', () => {
+    const click = () => wrapper.find('[data-testid="stockpile-click-btn"]');
+    const draw = () => wrapper.find('[data-testid="stockpile-draw-btn"]');
+
+    it('with no mode, no action button has the primary or the active class, and none is pressed', () => {
+        render({ mode: null });
+        [click(), draw()].forEach(btn => {
+            expect(btn.classes()).not.toContain('panel-btn--primary');
+            expect(btn.classes()).not.toContain('active');
+            expect(btn.classes()).not.toContain('is-active');
+            expect(btn.attributes('aria-pressed')).toBe('false');
+        });
+        expect(wrapper.find('[data-testid="stockpile-click-banner"]').exists()).toBe(false);
+    });
+
+    it('in click mode the Click map button is pressed and active, Draw is not, and the banner says how to cancel', () => {
+        render({ mode: 'click' });
+        expect(click().attributes('aria-pressed')).toBe('true');
+        expect(click().classes()).toContain('active');
+        expect(click().classes()).toContain('is-active');
+        expect(draw().attributes('aria-pressed')).toBe('false');
+        expect(draw().classes()).not.toContain('active');
+        expect(wrapper.find('[data-testid="stockpile-click-banner"]').text()).toContain('Esc cancels');
+    });
+
+    it('in draw mode the Draw button is pressed and active, and the banner says how to finish and cancel', () => {
+        render({ mode: 'draw' });
+        expect(draw().attributes('aria-pressed')).toBe('true');
+        expect(draw().classes()).toContain('active');
+        expect(click().attributes('aria-pressed')).toBe('false');
+        const hint = wrapper.find('[data-testid="stockpile-draw-banner"]').text();
+        expect(hint).toContain('Double-click, right-click or Enter finishes');
+        expect(hint).toContain('Esc cancels');
+    });
+});

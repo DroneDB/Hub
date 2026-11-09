@@ -15,20 +15,10 @@
             <i class="fa-solid fa-unlock" /> Local coordinates<span v-if="isLocalDrawing && localUnits">&nbsp;({{ localUnits }})</span>
         </div>
 
-        <!-- Measurement toolbar (top-left) -->
-        <div v-if="ready" class="toolbar">
-            <button :class="{ active: activeTool === 'point' }" title="Measure point" aria-label="Measure point" @click="measure('point')">
-                <i class="fa-solid fa-location-dot" />
-            </button>
-            <button :class="{ active: activeTool === 'distance' }" title="Measure distance" aria-label="Measure distance" @click="measure('distance')">
-                <i class="fa-solid fa-ruler" />
-            </button>
-            <button :class="{ active: activeTool === 'area' }" title="Measure area" aria-label="Measure area" @click="measure('area')">
-                <i class="fa-solid fa-draw-polygon" />
-            </button>
-            <button :disabled="measureCount === 0" title="Clear measurements" aria-label="Clear measurements" @click="clearMeasurements">
-                <i class="fa-solid fa-trash" />
-            </button>
+        <!-- Measurement toolbar (top-left): the one MeasureToolbar of the 3D, splat and point-cloud viewers -->
+        <div v-if="ready" class="measure-stack">
+            <MeasureToolbar :kinds="MEASURE_KINDS" :active-kind="activeTool" :count="measureCount"
+                            @measure="measure" @clear="clearMeasurements" @finish="finishMeasure" @cancel="cancelMeasure" />
         </div>
 
         <!-- Layer panel (top-right) -->
@@ -55,7 +45,7 @@
  * UnifiedViewer - one Giro3D scene for every DroneDB build artifact: OGC 3D Tiles (models,
  * .3tz archives, on a globe when georeferenced), COPC point clouds, georasters (server XYZ
  * tiles) and vectors (MVT, or local CAD drawings), over an OSM basemap, with point /
- * distance / area measurements. Opt-in ("Open in 3D Viewer"); the default viewers of each
+ * distance / area measurements (the gesture rule of D-027: click adds a point; double click, Enter or right click ends it; Escape cancels). Opt-in ("Open in 3D Viewer"); the default viewers of each
  * type are unchanged. The scene, the loaders and the measure tool are modules next
  * to this view.
  */
@@ -65,6 +55,7 @@ import { ref, reactive, toRefs, watch, onMounted, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';
 import ViewerShell from '@/components/ViewerShell.vue';
 import RangeSetting from '@/components/RangeSetting.vue';
+import MeasureToolbar from '@/components/MeasureToolbar.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { usePreference } from '@/composables/usePreference';
@@ -116,7 +107,16 @@ const GESTURES = [
     { input: 'Double click', action: 'Focus on the point' }
 ];
 
-const measure = kind => measureTool && measureTool.measure(kind);
+// The shapes of the 3D viewer: a height is the splat viewer's
+const MEASURE_KINDS = ['point', 'distance', 'area'];
+// Drawing a shape again while it is drawn ends it
+const measure = kind => {
+    if (!measureTool) return;
+    if (measureTool.activeKind === kind) measureTool.cancel();
+    else measureTool.measure(kind);
+};
+const finishMeasure = () => measureTool && measureTool.finish();
+const cancelMeasure = () => measureTool && measureTool.cancel();
 const clearMeasurements = () => measureTool && measureTool.clear();
 const goHome = () => scene && scene.goHome();
 const toggleLayer = layer => scene && scene.toggleLayer(layer);

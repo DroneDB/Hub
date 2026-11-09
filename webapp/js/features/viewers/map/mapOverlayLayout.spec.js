@@ -143,9 +143,11 @@ describe('the layers of the map', () => {
         expect(layer('split')).toBeGreaterThan(layer('bottom-panel'));
     });
 
-    it('put the labels of the split below the row of buttons at the top centre, and above the settings button on a phone', () => {
+    it('put the labels of the split below the zoom control at the top left (and so below the row of buttons at the top centre), and above the settings button on a phone', () => {
         expect(map).toMatch(/--map-top-reserve:\s*4rem/);
-        expect(ruleOf(splitStyle, '.split-band-label')).toMatch(/top:\s*var\(--map-top-reserve\)/);
+        // 0.5rem inset + 0.25rem padding + 2 x (2rem button + 2 x 0.25rem margin) + 0.25rem padding = 6rem, and air
+        expect(map).toMatch(/--map-zoom-reserve:\s*6\.25rem/);
+        expect(ruleOf(splitStyle, '.split-band-label')).toMatch(/top:\s*var\(--map-zoom-reserve\)/);
         expect(ruleOf(mediaBlock(splitStyle, 'max-width: 575.98px'), '.split-band-label'))
             .toMatch(/bottom:\s*var\(--map-bottom-reserve\)/);
     });

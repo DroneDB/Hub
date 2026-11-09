@@ -82,6 +82,9 @@
     --map-rail-reserve: 4rem;
     --map-bottom-reserve: 4rem;
     --map-top-reserve: 4rem;
+    /* The default zoom control of OpenLayers at the top left: 0.5rem (inset) + 0.25rem (padding) + two buttons of
+       2rem with 0.25rem of margin around each + 0.25rem (padding); the labels of the split go below it */
+    --map-zoom-reserve: 6.25rem;
     --map-sheet-peek: 3rem;
     --map-layer-bottom-panel: 1;
     --map-layer-split: 2;
@@ -246,6 +249,23 @@
     width: max-content;
     max-width: min(16rem, 60vw);
     white-space: normal;
+}
+
+/* The point of the keyboard (FR-XC-17): while a tool draws, Space adds the centre of the map. A cross with
+   a dark edge, so it shows on a light and on a dark map; it takes no click */
+.map-crosshair {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1.75rem;
+    height: 1.75rem;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+    background:
+        linear-gradient(var(--ddb-measure-color), var(--ddb-measure-color)) center / 2px 100% no-repeat,
+        linear-gradient(var(--ddb-measure-color), var(--ddb-measure-color)) center / 100% 2px no-repeat;
+    filter: drop-shadow(0 0 1px rgba(var(--ddb-shade-rgb), 0.9));
 }
 
 /* Panels over the bottom centre of the map (layer opacity): as wide as their content but never

@@ -270,6 +270,25 @@ describe('usePotreeMeasurements', () => {
             expect(loaded.canRedo.value).toBe(false);
         });
 
+        it('a drawing the user cancelled is removed, and Ctrl+Z does not bring it back (FR-VWR-10)', () => {
+            const m = start();
+            const real = startDrawing('real');
+            finishDrawing(real, 5);
+            const cancelled = startDrawing('cancelled');
+            finishDrawing(cancelled, 7);
+            m.discardMeasure(cancelled);
+            expect(viewer.scene.measurements).toEqual([real]);
+            expect(m.measurementCount.value).toBe(1);
+            flash.mockClear();
+            // The entry of the cancelled drawing is skipped: the undo takes the one before it
+            m.undo();
+            expect(viewer.scene.measurements).toEqual([]);
+            expect(flash).toHaveBeenCalledWith('Measurement removed');
+            expect(flash).not.toHaveBeenCalledWith('Measurement restored');
+            // A measure that is not in the scene is left alone
+            expect(() => m.discardMeasure(cancelled)).not.toThrow();
+        });
+
         it('a new action drops what was undone', () => {
             const m = start();
             const first = startDrawing('first');

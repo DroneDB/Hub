@@ -3,41 +3,46 @@
         <DialogHost :dialogs="dialogs" />
 
         <div class="potree-container" :class="{ loading, 'sidebar-open': sidebarOpen }">
-            <div v-if="loaded" class="top-left-toolbar">
-                <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
-                    <button :disabled="!canUndo" class="btn-undo-redo" title="Undo (Ctrl+Z)" aria-label="Undo" @click="undo">
-                        <i class="fa-solid fa-rotate-left" />
+            <div v-if="loaded" class="top-left-column">
+                <div class="top-left-toolbar">
+                    <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
+                        <button :disabled="!canUndo" class="btn-undo-redo" title="Undo (Ctrl+Z)" aria-label="Undo" @click="undo">
+                            <i class="fa-solid fa-rotate-left" />
+                        </button>
+                        <button :disabled="!canRedo" class="btn-undo-redo" title="Redo (Ctrl+Y)" aria-label="Redo" @click="redo">
+                            <i class="fa-solid fa-rotate-right" />
+                        </button>
+                        <button :class="{ active: deleteToolActive }" class="btn-undo-redo btn-delete-tool"
+                                title="Delete measurement tool (click on measurement to delete)" aria-label="Delete measurement tool"
+                                @click="toggleDeleteTool">
+                            <i class="fa-solid fa-trash" />
+                        </button>
+                    </div>
+
+                    <div class="unit-selector-toolbar">
+                        <label for="potree-unit-select">Units:</label>
+                        <select id="potree-unit-select" v-model="unitPref" aria-label="Units">
+                            <option value="metric">Metric (m)</option>
+                            <option value="imperial">Imperial (ft)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- The one MeasureToolbar of the 3D, splat and point-cloud viewers: the tools start the measures of Potree's own icons -->
+                <MeasureToolbar :active-kind="measureKind" :show-clear="false" @measure="startMeasure" @finish="finishMeasure" @cancel="cancelMeasure" />
+
+                <div v-if="hasMeasurements || hasSavedMeasurements" class="measurements-toolbar">
+                    <button v-if="(hasMeasurements || hasSavedMeasurements) && canWrite" :disabled="savingMeasurements" class="btn-measurement"
+                            title="Save measurements" @click="saveMeasurements">
+                        <i class="fa-solid fa-floppy-disk" />
+                        Save Measurements
                     </button>
-                    <button :disabled="!canRedo" class="btn-undo-redo" title="Redo (Ctrl+Y)" aria-label="Redo" @click="redo">
-                        <i class="fa-solid fa-rotate-right" />
-                    </button>
-                    <button :class="{ active: deleteToolActive }" class="btn-undo-redo btn-delete-tool"
-                            title="Delete measurement tool (click on measurement to delete)" aria-label="Delete measurement tool"
-                            @click="toggleDeleteTool">
+                    <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-measurement--danger"
+                            title="Delete the saved measurements" @click="requestDelete">
                         <i class="fa-solid fa-trash" />
+                        Delete Saved
                     </button>
                 </div>
-
-                <div class="unit-selector-toolbar">
-                    <label for="potree-unit-select">Units:</label>
-                    <select id="potree-unit-select" v-model="unitPref" aria-label="Units">
-                        <option value="metric">Metric (m)</option>
-                        <option value="imperial">Imperial (ft)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
-                <button v-if="(hasMeasurements || hasSavedMeasurements) && canWrite" :disabled="savingMeasurements" class="btn-measurement"
-                        title="Save measurements" @click="saveMeasurements">
-                    <i class="fa-solid fa-floppy-disk" />
-                    Save Measurements
-                </button>
-                <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-measurement--danger"
-                        title="Delete the saved measurements" @click="requestDelete">
-                    <i class="fa-solid fa-trash" />
-                    Delete Saved
-                </button>
             </div>
 
             <div id="potree_sidebar_container" ref="sidebar" />
@@ -56,16 +61,19 @@ import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import DeleteSavedMeasurementsDialog from '@/components/measurements/DeleteSavedMeasurementsDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
+import MeasureToolbar from '@/components/MeasureToolbar.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useDialogs } from '@/composables/useDialogs';
 import { usePreference } from '@/composables/usePreference';
 import { usePotreeMeasurements } from '@/composables/usePotreeMeasurements';
+import { useTimerGroup } from '@/composables/useTimers';
 import { loadResources } from '@/libs/lazy';
 import { isMobile } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { labelPotreeControls } from '@/libs/potree/potreeControls';
+import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 
 defineOptions({ name: 'PotreeViewer' });
@@ -77,8 +85,9 @@ const dialogs = useDialogs();
 const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs });
 const {
     hasMeasurements, hasSavedMeasurements, savingMeasurements, deleteDialogOpen, deleteToolActive, canUndo, canRedo,
-    undo, redo, toggleDeleteTool, save: saveMeasurements, requestDelete, onDeleteDialogClose
+    undo, redo, toggleDeleteTool, save: saveMeasurements, requestDelete, onDeleteDialogClose, discardMeasure
 } = m;
+const later = useTimerGroup();
 // Shared with the map's measure control
 const unitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 
@@ -89,6 +98,21 @@ const sidebarOpen = ref(false);
 // Owns the viewer and everything it creates (released on leave)
 let session = new PotreeSession();
 let viewer = null;
+
+// The measures follow the gesture rule of every measuring tool (D-027): click adds a point; double click, Enter or
+// right click ends it; Escape cancels it (libs/potree/measureGestures). The toolbar shows the kind being drawn; a
+// measure it has no button for (the angle, circle or azimuth of the Potree menu) is 'other': the general hint, Done
+// and Cancel, with no button pressed.
+let gestures = null;
+const measureKind = ref(null);
+// Drawing a measure again while it is drawn cancels it
+function startMeasure(kind) {
+    if (!gestures) return;
+    if (gestures.activeKind === kind) gestures.cancel();
+    else gestures.start(kind);
+}
+const finishMeasure = () => gestures?.finish({ dropShort: false });
+const cancelMeasure = () => gestures?.cancel();
 
 // Lengths in the chosen unit, for the viewer, the scene and every existing measure
 function applyUnits() {
@@ -151,6 +175,14 @@ async function loadViewer() {
     session.dispose();
     session = new PotreeSession();
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
+    // At once: a measure that the Potree menu starts while the cloud still loads is followed too. A measure that is
+    // dropped leaves without a step of the history; before the measurements are attached there is no history yet
+    const potree = viewer;
+    const discard = measure => {
+        discardMeasure(measure);
+        if (potree.scene.measurements.includes(measure)) potree.scene.removeMeasurement(measure);
+    };
+    gestures = new PotreeMeasureGestures({ viewer, session, onActive: kind => { measureKind.value = kind; }, discard, later });
 
     // The layout of the open menu (beside the view, or over it on phones) is the stylesheet's
     viewer.toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
@@ -201,7 +233,7 @@ onMounted(async () => {
 // the jQuery UI sidebar, window.viewer
 onBeforeUnmount(() => {
     session.dispose();
-    viewer = null;
+    viewer = gestures = null;
 });
 </script>
 

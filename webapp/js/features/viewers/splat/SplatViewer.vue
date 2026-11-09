@@ -24,9 +24,9 @@
             <div v-if="streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
                 <i class="fa-solid fa-tower-broadcast m-0" />
             </div>
-            <SplatMeasureToolbar :active-kind="measureKind" :count="measureCount" :metric="measureScale.metric"
-                                 :can-set-scale="canWrite && !georeferenced" :coordinate-mode="coordToggle" @toggle-coordinates="toggleCoordinates" @measure="startMeasure" @clear="clearMeasurements"
-                                 @finish="finishMeasure" @cancel="cancelMeasure" />
+            <MeasureToolbar :active-kind="measureKind" :count="measureCount" :metric="measureScale.metric"
+                            :can-set-scale="canWrite && !georeferenced" :coordinate-mode="coordToggle" @toggle-coordinates="toggleCoordinates" @measure="startMeasure"
+                            @clear="clearMeasurements" @finish="finishMeasure" @cancel="cancelMeasure" />
         </div>
 
         <div v-if="loaded" class="btn-stack">
@@ -107,7 +107,7 @@ import CameraManager from './CameraManager.vue';
 import PinCard from './PinCard.vue';
 import SplatInfoPanel from './SplatInfoPanel.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
-import SplatMeasureToolbar from './SplatMeasureToolbar.vue';
+import MeasureToolbar from '@/components/MeasureToolbar.vue';
 import SplatNavPad from './SplatNavPad.vue';
 import SplatSettings from './SplatSettings.vue';
 import { CameraRig, framingOf, tiltUp } from './cameraRig';
