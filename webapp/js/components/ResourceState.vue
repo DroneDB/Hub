@@ -27,7 +27,7 @@
  * table of an organization, the panels of a dataset, a viewer), names what was asked for, says
  * why in plain words, and gives the ways out (SPA links): the page's own back target, Sign in
  * (back to this page afterwards; the way out of a visitor without a session, who has no
- * Organizations to go to), the user's datasets, Organizations, and Back. Embedded (?embed=1 or an
+ * Organizations to go to), the user's datasets, home (homeLocation), and Back. Embedded (?embed=1 or an
  * iframe), the links open a new tab and the actions that would act in the frame are left out.
  *
  *   <ResourceState v-if="loadKind" :kind="loadKind" resource="dataset" :name="$route.params.ds" />
@@ -38,7 +38,7 @@
 import { computed, inject, watch, useId } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
-import { loginLocation } from '@/libs/authRoutes';
+import { homeLocation, loginLocation } from '@/libs/authRoutes';
 import { currentPath } from '@/libs/routeQuery';
 import { LoadErrorKind } from '@/libs/ddb/apiError';
 import { useAuthStore } from '@/stores/auth';
@@ -127,7 +127,10 @@ const links = computed(() => {
     if (back) list.push(back);
     const mine = props.kind === LoadErrorKind.NO_ACCESS ? myOrganization() : null;
     if (mine) list.push({ to: { name: 'Datasets', params: { org: mine } }, label: 'Go to my datasets', icon: 'fa-solid fa-database' });
-    list.push({ to: { name: 'Organizations' }, label: 'Go to Organizations', icon: 'fa-solid fa-sitemap' });
+    // Home: Organizations, or the datasets of a one-organization install (already there as mine)
+    const home = homeLocation();
+    if (home.name === 'Organizations') list.push({ to: home, label: 'Go to Organizations', icon: 'fa-solid fa-sitemap' });
+    else if (!mine) list.push({ to: home, label: 'Go to datasets', icon: 'fa-solid fa-database' });
     return list;
 });
 

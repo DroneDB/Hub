@@ -101,3 +101,17 @@ describe('TasksPage delete question', () => {
         expect(props.message).toContain('<strong>Build</strong> on a.tif');
     });
 });
+
+// FR-ACC-15: the server refuses the admin rights the client believed in
+describe('TasksPage refused (403)', () => {
+    it('goes home with the notice of the guard, not silently', async () => {
+        const { deniedLocation } = await import('@/libs/authRoutes');
+        reg.admin.adminTasks = vi.fn(() => Promise.reject(new ApiError('Forbidden', 403)));
+        const vm = { $router: { push: vi.fn(() => Promise.resolve()) }, loading: false, items: [], total: 0 };
+        const error = vi.spyOn(console, 'error').mockImplementation(() => { });
+        await TasksPage.methods.loadTasks.call(vm);
+        error.mockRestore();
+        expect(vm.$router.push).toHaveBeenCalledWith(deniedLocation('AdminTasks'));
+        expect(vm.$router.push).toHaveBeenCalledWith({ name: 'Organizations', query: { notice: 'denied:AdminTasks' } });
+    });
+});

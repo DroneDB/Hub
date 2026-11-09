@@ -197,6 +197,7 @@ import { useDialogs } from '@/composables/useDialogs';
 import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { copyText } from '@/composables/useCopyText';
 import { isForbidden } from '@/libs/ddb/apiError';
+import { deniedLocation } from '@/libs/authRoutes';
 import { settingPath, setSettingAt } from '@/libs/appSettingsJson';
 
 /**
@@ -259,8 +260,9 @@ export default {
                 this.sections = data.sections || [];
             } catch (e) {
                 console.error('Failed to load config:', e);
+                // The server refuses the admin rights the client believed in: home, saying why
                 if (isForbidden(e)) {
-                    this.$router.push({ name: 'Organizations' }).catch(() => { });
+                    this.$router.push(deniedLocation('AdminConfig')).catch(() => { });
                     return;
                 }
             } finally {

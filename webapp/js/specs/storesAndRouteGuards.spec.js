@@ -35,7 +35,7 @@ describe('router guard', () => {
         expect(guard(router.resolve('/admin/users'), anonymous)).toEqual({ name: 'Login', query: { redirect: '/admin/users' } });
         expect(guard(router.resolve('/upload'), anonymous)).toEqual({ name: 'Login', query: { redirect: '/upload' } });
         expect(guard(router.resolve('/r/public/ds'), anonymous)).toBe(true);
-        expect(guard(router.resolve('/admin/users'), { isLoggedIn: true, isAdmin: false })).toEqual({ name: 'Organizations' });
+        expect(guard(router.resolve('/admin/users'), { isLoggedIn: true, isAdmin: false })).toEqual({ name: 'Organizations', query: { notice: 'denied:Users' } });
         expect(guard(router.resolve('/admin/users'), { isLoggedIn: true, isAdmin: true })).toBe(true);
     });
 

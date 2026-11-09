@@ -1,13 +1,14 @@
 <template>
     <header id="header">
-        <a :href="homeUrl" class="logo">
+        <!-- Home without a reload: the same place as after sign-in (FR-NAV-06) -->
+        <RouterLink :to="homeTarget" class="logo">
             <img v-if="appLogo" :src="appLogo" :alt="appName || 'Home'">
             <template v-else>
                 <img v-if="appIconUrl" class="app-icon-img" :src="appIconUrl" alt="">
                 <i v-else class="app-icon" :class="appIcon" />
                 <div v-if="appName" class="app-name">{{ appName }}</div>
             </template>
-        </a>
+        </RouterLink>
 
         <nav class="right" aria-label="Main">
 
@@ -82,10 +83,11 @@
                 </div>
             </Alert>
 
-            <Button v-if="!loggedIn" size="small" title="Sign In" aria-label="Sign In" @click="login">
+            <!-- Not on Login itself: there it would start again without the page to come back to -->
+            <Button v-if="!loggedIn && !onLoginRoute" size="small" title="Sign In" aria-label="Sign In" @click="login">
                 <i class="fa-solid fa-lock" /><span class="d-none d-sm-inline ms-1">Sign In</span>
             </Button>
-            <Button v-else severity="secondary" size="small" text
+            <Button v-else-if="loggedIn" severity="secondary" size="small" text
                     :title="username" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
                 <i class="fa-solid fa-user" />
             </Button>
@@ -117,7 +119,7 @@ import { mapState } from 'pinia';
 import { isNavigationFailure, NavigationFailureType } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
-import { loginLocation, PREFERENCES_QUERY } from '@/libs/authRoutes';
+import { homeLocation, loginLocation, Notice, PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { currentLocation, currentPath } from '@/libs/routeQuery';
 import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
 
@@ -194,14 +196,11 @@ export default {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 0;
             return Math.min(this.storageInfo.usedPercentage * 100, 100);
         },
-        homeUrl: function () {
-            const org = HubOptions.singleOrganization !== undefined ?
-                HubOptions.singleOrganization :
-                this.username;
-
-            if (this.loggedIn) {
-                return `/r/${org}`;
-            } else return "/";
+        homeTarget: function () {
+            return homeLocation();
+        },
+        onLoginRoute: function () {
+            return this.$route.name === 'Login' || this.$route.name === 'LoginHome';
         },
 
         downloadUrl: function () {
@@ -460,8 +459,17 @@ export default {
         uploadFiles: function () {
             this.$router.push({ name: "Upload" });
         },
+        // The session may have gone since the menu was drawn (cleared storage, a sign-out
+        // elsewhere): then the header catches up and the user signs in again, coming back here
         myDatasets: function () {
-            this.$router.push({ name: "Datasets", params: { org: HubOptions.singleOrganization !== undefined ? HubOptions.singleOrganization : reg.getUsername() } });
+            if (!this.username || !reg.isLoggedIn()) {
+                useAuthStore().sync();
+                this.$router.push(loginLocation(currentPath(), Notice.EXPIRED)).catch(() => { });
+                return;
+            }
+            // A one-organization install: its datasets are home
+            const target = HubOptions.singleOrganization !== undefined ? homeLocation() : { name: 'Datasets', params: { org: this.username } };
+            this.$router.push(target);
         },
         myOrganizations: function () {
             this.$router.push({ name: "Organizations" });
@@ -588,8 +596,10 @@ export default {
         },
 
         login: function () {
-            // Back to the address as it is now, with what a map wrote without a navigation
-            this.$router.push(loginLocation(currentPath())).catch(() => { });
+            // On Login already: keep the page it returns to. Elsewhere: back to the address as it
+            // is now, with what a map wrote without a navigation
+            const redirect = this.onLoginRoute ? this.$route.query?.redirect : currentPath();
+            this.$router.push(loginLocation(typeof redirect === 'string' ? redirect : undefined)).catch(() => { });
         },
 
         toggleUserMenu: function (event) {

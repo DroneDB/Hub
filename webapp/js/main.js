@@ -28,7 +28,7 @@ import { notify, setToastService } from '@/libs/notify';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 
 import { createAppRouter } from './router';
-import { handleUnauthorized } from '@/libs/authRoutes';
+import { handleUnauthorized, markSessionExpired } from '@/libs/authRoutes';
 import { createPinia } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -52,10 +52,10 @@ window.addEventListener('load', function () {
     // Hide header if ?embed=1 is in URL
     const embed = !!params.embed || inIframe();
 
-    const router = createAppRouter(embed);
-
     // Refresh auth tokens and load features before mounting Vue
     async function boot() {
+        // A session was stored (its token may have expired since): ending it says why
+        const hadSession = reg.getAuthTokenExpiration() !== null;
         if (reg.ensureLoggedIn()) {
             try {
                 await reg.refreshToken();
@@ -69,6 +69,11 @@ window.addEventListener('load', function () {
         } else {
             reg.clearCredentials();
         }
+        // The session ended: a private page goes to Login with the notice, any other page shows
+        // it (an embedded view has no sign-in to offer). Before the router is made: it reads the
+        // address then.
+        if (hadSession && !reg.isLoggedIn() && !embed) markSessionExpired();
+        const router = createAppRouter(embed);
 
         // Always load features (the endpoint is anonymous): this populates
         // feature flags AND applies Hub branding (window.HubOptions, page

@@ -104,6 +104,17 @@ describe('ResourceState', () => {
         expect(wrapper.text()).not.toMatch(/Create|Import/);
     });
 
+    it('goes home: the datasets of a one-organization install, once (homeLocation, FR-NAV-06)', async () => {
+        h.loggedIn = true;
+        globalThis.HubOptions = { singleOrganization: 'acme' };
+        await render({ kind: 'not-found', resource: 'dataset', name: 'x' }, '/r/acme/x');
+        expect(links()).toEqual([['Go to datasets', '/r/acme']]);
+        wrapper.unmount();
+        // No access: my datasets are home, not listed twice
+        await render({ kind: 'no-access', resource: 'dataset', name: 'x' }, '/r/acme/x');
+        expect(links()).toEqual([['Go to my datasets', '/r/acme']]);
+    });
+
     it('Sign in as another user ends the session, then signs in coming back here', async () => {
         h.loggedIn = true;
         await render({ kind: 'no-access', resource: 'dataset', name: 'site' }, '/r/acme/site');
