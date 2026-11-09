@@ -74,7 +74,7 @@
  * A group is a list of controls (select, toggle, range) or, for a setting those cannot show, a
  * component of its own (the stockpile materials).
  */
-import { computed, nextTick, ref, toRef, watch } from 'vue';
+import { computed, nextTick, onScopeDispose, reactive, ref, toRef, watch } from 'vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Tab from 'primevue/tab';
@@ -99,7 +99,9 @@ import { currencyChoices, normalizeCurrency } from '@/libs/format';
 import { Basemaps } from '@/libs/map/basemaps';
 import { ORG_SORT_OPTIONS } from '@/libs/organizationList';
 import { DEVICE_PREF_DEFAULTS, PREF, PREF_DEFAULTS, prefChoice, removePref } from '@/libs/preferences';
-import { orgPageChoice } from '@/libs/storageUtils';
+import { followDatasetTablePreferences, followOrgPageSettings, getDatasetTablePreferences, getOrgPageSettings, orgPageChoice, saveDatasetTablePreferences,
+    saveOrgPageSettings } from '@/libs/storageUtils';
+import { isPageSize } from '@/libs/pageSize';
 import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -116,15 +118,55 @@ const auth = useAuthStore();
 const dialogs = useDialogs();
 const confirm = useConfirm(dialogs);
 
-const datasetTable = useViewerSettings(PREF.DATASET_TABLE, PREF_DEFAULTS[PREF.DATASET_TABLE]).settings;
-const orgPage = useViewerSettings(PREF.ORG_PAGE, PREF_DEFAULTS[PREF.ORG_PAGE]).settings;
+/**
+ * The list settings as the lists read them (libs/storageUtils): a page size that an older Hub stored without its mark
+ * reads as it meant (FR-XC-34), and a change here is saved with the mark. A change from elsewhere (another tab, the
+ * account, Reset section) is followed without being saved again.
+ * @template {Record<string, any>} T
+ * @param {() => T} read @param {(settings: T) => void} save @param {(apply: (settings: T) => void) => () => void} follow
+ * @returns {T}
+ */
+function useListSettings(read, save, follow) {
+    const settings = /** @type {T} */ (reactive(read()));
+    let applying = false;
+    watch(settings, () => { if (!applying) save({ ...settings }); }, { deep: true, flush: 'sync' });
+    onScopeDispose(follow(next => {
+        applying = true;
+        try {
+            Object.assign(settings, next);
+        } finally {
+            applying = false;
+        }
+    }));
+    return settings;
+}
+
+const datasetTable = useListSettings(getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences);
+const orgPage = useListSettings(getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings);
 const modelLighting = useViewerSettings(PREF.MODEL_LIGHTING, PREF_DEFAULTS[PREF.MODEL_LIGHTING]).settings;
 const unifiedViewer = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]).settings;
 
 /** @param {Array<string|number>} values @param {(v: any) => string} [label] */
 const optionsOf = (values, label = String) => values.map(value => ({ value, label: label(value) }));
 
-const PAGE_SIZES = optionsOf([5, 10, 25, 50, 100]);
+// No size chosen: a page holds the rows that fit the height of the list (FR-XC-34), which stores nothing
+const AUTO_PAGE_SIZE = 'auto';
+const PAGE_SIZES = [{ value: AUTO_PAGE_SIZE, label: 'Fit the screen' }, ...optionsOf([5, 10, 25, 50, 100])];
+
+/**
+ * The size is chosen only with its mark: the 10 that an older Hub stored with every save is no choice
+ * @param {import('vue').Reactive<{ itemsPerPage: number|null, pageSizeChosen: boolean }>} settings
+ */
+const pageSizeChoice = settings => computed({
+    get: () => (settings.pageSizeChosen === true && isPageSize(settings.itemsPerPage) ? settings.itemsPerPage : AUTO_PAGE_SIZE),
+    set: value => {
+        const size = value === AUTO_PAGE_SIZE ? null : Number(value);
+        settings.itemsPerPage = size;
+        settings.pageSizeChosen = size !== null;
+    }
+});
+const datasetsPerPage = pageSizeChoice(datasetTable);
+const orgsPerPage = pageSizeChoice(orgPage);
 
 /**
  * @param {string} id @param {string} label @param {import('vue').Ref} model @param {Array<{label: string, value: any}>} options
@@ -259,14 +301,14 @@ const TABS = [
             {
                 title: 'Datasets',
                 controls: [
-                    select('datasets-per-page', 'Datasets per page', toRef(datasetTable, 'itemsPerPage'), PAGE_SIZES),
+                    select('datasets-per-page', 'Datasets per page', datasetsPerPage, PAGE_SIZES),
                     toggle('open-after-create', 'Open a dataset after creating it', usePreference(PREF.OPEN_AFTER_CREATE, PREF_DEFAULTS[PREF.OPEN_AFTER_CREATE]))
                 ]
             },
             {
                 title: 'Organizations',
                 controls: [
-                    select('orgs-per-page', 'Organizations per page', toRef(orgPage, 'itemsPerPage'), PAGE_SIZES),
+                    select('orgs-per-page', 'Organizations per page', orgsPerPage, PAGE_SIZES),
                     select('orgs-sort-column', 'Sort organizations by', orgSortColumn, ORG_SORT_OPTIONS),
                     select('orgs-sort-direction', 'Organizations order', orgSortDirection, SORT_DIRECTION_OPTIONS),
                     toggle('orgs-owned-only', 'Show only organizations I own, belong to, or that are public', toRef(orgPage, 'ownedOnly'))

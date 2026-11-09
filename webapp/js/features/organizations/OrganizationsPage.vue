@@ -1,5 +1,5 @@
 <template>
-    <div id="organizations">
+    <div id="organizations" ref="page">
 
         <div v-if="!loadKind" class="org-page-header">
             <div class="org-header-layout">
@@ -48,7 +48,7 @@
         <ResourceState v-if="loadKind" :kind="loadKind" resource="page" />
 
         <!-- Skeleton loading state -->
-        <div v-else-if="showSkeleton" class="org-cards-area">
+        <div v-else-if="showSkeleton" ref="cardsArea" class="org-cards-area">
             <Card v-for="i in 4" :key="i" class="mb-3">
                 <template #content>
                     <div class="d-flex justify-content-between align-items-center">
@@ -132,8 +132,14 @@
         <!-- Sticky paginator -->
         <div v-if="!loadKind && !showSkeleton && view === 'list' && filteredOrganizations.length > 0" class="org-pagination">
             <Paginator :rows="Number(itemsPerPage)" :total-records="filteredOrganizations.length"
-                       :first="(currentPage - 1) * itemsPerPage"
-                       :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
+                       :first="(currentPage - 1) * itemsPerPage" @page="onPageChange">
+                <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+                <template #end>
+                    <Select :model-value="itemsPerPage" :options="pageSizeChoices" option-label="label" option-value="value"
+                            aria-label="Organizations per page" class="page-size-select"
+                            @update:model-value="size => onPageChange({ page: currentPage - 1, rows: size })" />
+                </template>
+            </Paginator>
         </div>
 
         <DialogHost :dialogs="dialogs" />
@@ -159,7 +165,7 @@ import ListToolbar from '@/components/ListToolbar.vue';
 import { DatasetLocationsMap } from '@/features/datasets/locationsMap';
 import UnlocatedDatasetsButton from '@/features/datasets/UnlocatedDatasetsButton.vue';
 import { createLocationFanOut } from '@/libs/locationFanOut';
-import { shallowRef } from 'vue';
+import { ref, shallowRef } from 'vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useEntityDelete } from '@/composables/useEntityDelete';
@@ -169,6 +175,8 @@ import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
 import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
 import { ORG_SORT_OPTIONS, organizationRow, sortOrganizations } from '@/libs/organizationList';
+import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
+import { pageAfterResize } from '@/libs/pageSize';
 import { getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition } from '@/libs/storageUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -178,6 +186,7 @@ import Tag from 'primevue/tag';
 import Skeleton from 'primevue/skeleton';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Paginator from 'primevue/paginator';
+import Select from 'primevue/select';
 import { loadErrorKind } from '@/libs/ddb/apiError';
 import { Visibility } from 'ddb';
 
@@ -213,13 +222,27 @@ export default {
         VisibilityTag,
         Skeleton,
         ToggleSwitch,
-        Paginator
+        Paginator,
+        Select
     },
 
     setup() {
         const dialogs = useDialogs();
+        // A page holds the cards that fit the height until the user chooses a size, which the preferences keep (FR-XC-34).
+        // The cards are one column: a card grid would pass its columns, and a page would hold whole grid rows
+        const cardsArea = ref(null);
+        const page = ref(null);
+        const sizing = usePageSize({
+            height: () => visibleListHeight({
+                area: page.value, list: cardsArea.value,
+                reserved: () => heightOfFirst(page.value, '.org-pagination', 49)
+            }),
+            rowHeight: () => averageRowHeight(cardsArea.value, ':scope > .org-card, :scope > .p-card', 100),
+            columns: 1,
+            initial: getOrgPageSettings().itemsPerPage
+        });
         // The locations are many small objects the map reads whole: not made reactive
-        return { dialogs, deleteEntity: useEntityDelete(dialogs), ORG_SORT_OPTIONS, Visibility, formatDateTime, formatTimeAgo, locationGroups: shallowRef([]) };
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), ORG_SORT_OPTIONS, Visibility, formatDateTime, formatTimeAgo, locationGroups: shallowRef([]), ...sizing, cardsArea, page };
     },
     data: function () {
         const settings = getOrgPageSettings();
@@ -247,8 +270,8 @@ export default {
 
             showAll: !settings.ownedOnly,
             searchQuery: '',
-            currentPage: getOrgPagePosition().currentPage || 1,
-            itemsPerPage: settings.itemsPerPage,
+            // The page the user left (getOrgPagePosition) is shown once the size that fits is known, in mounted
+            currentPage: 1,
 
             sortColumn: settings.sortColumn,
             sortDirection: settings.sortDirection,
@@ -285,6 +308,14 @@ export default {
         showSkeleton() {
             return this.loading && (!this.loaded || this.view !== 'map');
         },
+        // Cards per page: the size the user chose, else the cards that fit the height (FR-XC-34)
+        itemsPerPage() {
+            return this.pageSize;
+        },
+        // The last page of the filtered list at this size
+        lastPage() {
+            return Math.max(1, Math.ceil(this.filteredOrganizations.length / this.itemsPerPage));
+        },
         paginatedOrganizations() {
             const start = (this.currentPage - 1) * this.itemsPerPage;
             return this.filteredOrganizations.slice(start, start + this.itemsPerPage);
@@ -310,9 +341,17 @@ export default {
             this.saveSettings();
             await this.fetchOrganizations();
         },
-        itemsPerPage: function () {
-            this.currentPage = 1;
+        // Another size: the page that holds the first organization shown
+        itemsPerPage: function (size, previous) {
+            this.currentPage = pageAfterResize(this.currentPage, previous, size);
+        },
+        // Only a size the user chose is a preference
+        pageChoice: function () {
             this.saveSettings();
+        },
+        // A page the list no longer has (a position kept at another size, a list that shrank): the last one
+        lastPage: function (last) {
+            if (this.loaded && this.currentPage > last) this.currentPage = last;
         },
         sortColumn: function () {
             this.currentPage = 1;
@@ -328,8 +367,10 @@ export default {
         searchQuery: function () {
             this.currentPage = 1;
         },
-        view: function () {
+        view: function (view) {
             this.saveSettings();
+            // The cards are back on the page: measure them
+            if (view === 'list') this.$nextTick(() => this.measurePageSize());
             this.followLocations();
         },
         locatedKey: function () {
@@ -346,7 +387,7 @@ export default {
         // The list settings follow the Preferences page, other tabs and the account; the watchers
         // above do not store them again (saveOrgPageSettings skips the values already stored)
         this._stopFollowingSettings = followOrgPageSettings(settings => {
-            this.itemsPerPage = settings.itemsPerPage;
+            this.pageChoice = settings.itemsPerPage;
             this.showAll = !settings.ownedOnly;
             this.sortColumn = settings.sortColumn;
             this.sortDirection = settings.sortDirection;
@@ -356,11 +397,17 @@ export default {
     mounted: async function () {
         setTitle("Organizations");
         await this.fetchOrganizations();
-        const { scrollTop } = getOrgPagePosition();
+        // The cards are on the page: their height may differ from the one expected, and so the size that fits.
+        // The page the user left was counted in the cards of that size: it is shown once the size is known
+        await this.$nextTick();
+        this.measurePageSize();
+        await this.$nextTick();
+        const { currentPage, scrollTop } = getOrgPagePosition();
+        if (currentPage > 1) this.currentPage = Math.min(currentPage, this.lastPage);
         if (scrollTop) {
             this.$nextTick(() => {
-                if (this.$refs.cardsArea) {
-                    this.$refs.cardsArea.scrollTop = scrollTop;
+                if (this.cardsArea) {
+                    this.cardsArea.scrollTop = scrollTop;
                 }
             });
         }
@@ -402,6 +449,8 @@ export default {
             if (!isLatest()) return false;
             this.loading = false;
             this.loaded = true;
+            // A position kept at another size may be past the last page
+            if (this.currentPage > this.lastPage) this.currentPage = this.lastPage;
             return listed;
         },
 
@@ -409,7 +458,7 @@ export default {
         // the page or turning a page stores the position alone
         saveSettings() {
             saveOrgPageSettings({
-                itemsPerPage: this.itemsPerPage,
+                itemsPerPage: this.pageChoice,
                 ownedOnly: !this.showAll,
                 sortColumn: this.sortColumn,
                 sortDirection: this.sortDirection,
@@ -456,13 +505,13 @@ export default {
         },
 
         savePosition() {
-            saveOrgPagePosition(this.currentPage, this.$refs.cardsArea?.scrollTop ?? 0);
+            saveOrgPagePosition(this.currentPage, this.cardsArea?.scrollTop ?? 0);
         },
 
-        // The watchers store what changed
+        // The watchers store what changed, and keep the page that holds the first card shown when a size is picked
         onPageChange(event) {
-            this.currentPage = event.page + 1;
-            this.itemsPerPage = event.rows;
+            if (event.rows !== this.itemsPerPage) this.choosePageSize(event.rows);
+            else this.currentPage = event.page + 1;
         },
 
         handleDelete(org) {
@@ -672,8 +721,10 @@ export default {
 
     /* The focus ring of a card lies outside it: the box keeps the ring's reach clear above and beside
        the cards, so it does not clip the ring of the first one (FR-ORG-07) */
+    /* The cards keep their height, so the paginator is right below the last one; the area shrinks and
+       scrolls its cards only when they are more than the screen holds (FR-ORG-25) */
     .org-cards-area {
-        flex: 1;
+        flex: 0 1 auto;
         overflow-y: auto;
         min-height: 0;
         padding: var(--ddb-focus-ring-reach) var(--ddb-focus-ring-reach) 0;
@@ -684,6 +735,11 @@ export default {
         min-height: 0;
         display: flex;
         flex-direction: column;
+    }
+
+    /* The page size select follows the page links */
+    .org-pagination :deep(.p-paginator-content-end) {
+        margin-inline-start: 0;
     }
 
     .org-pagination {

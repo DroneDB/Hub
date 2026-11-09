@@ -5,23 +5,24 @@
  * shows the same list. A key at its default is left out of the address.
  */
 
+import { pageStart } from '@/libs/pageSize';
+
 /** The columns the server orders by (the whitelist of the Registry) */
 export const TASK_SORT_FIELDS = Object.freeze(['createdAt', 'state', 'toolId']);
 
-/** The page sizes of the list */
+/** The page sizes of the list that the paginator offers next to the one that fits the height (FR-XC-34) */
 export const TASK_PAGE_SIZES = Object.freeze([10, 25, 50, 100]);
 
 const DEFAULT_SORT_FIELD = 'createdAt';
 const DEFAULT_SORT_ORDER = -1;
-const DEFAULT_TAKE = 10;
 
 /**
  * @typedef {object} TaskFilters
  * @property {string} toolId  '' for all tools
  * @property {string} state   '' for all states
  * @property {string} userId  '' for all users
- * @property {number} skip
- * @property {number} take
+ * @property {number} skip  the offset of the first task of the page
+ * @property {number|null} take  the page size the user chose; null: the size that fits the height (FR-XC-34)
  * @property {string} sortField  one of TASK_SORT_FIELDS
  * @property {1|-1} sortOrder    1 ascending, -1 descending
  */
@@ -30,8 +31,10 @@ const DEFAULT_TAKE = 10;
 const first = value => (Array.isArray(value) ? value[0] : value);
 
 /**
- * The filters of an address' query; anything that is not valid is the default, and `skip` is the
- * start of the page it falls in.
+ * The filters of an address' query; anything that is not valid is the default. `take` is in the address
+ * only when the user chose a page size (null otherwise: the size that fits the height is calculated when
+ * the page is mounted). With a `take`, `skip` is the start of the page it falls in; without one it is the
+ * offset as it was written, and the page rounds it (`pageStart`, libs/pageSize.js) to the size it calculated.
  * @param {Record<string, any>} query
  * @returns {TaskFilters}
  */
@@ -40,13 +43,14 @@ export function readTaskFilters(query = {}) {
     const skip = Number.parseInt(text('skip'), 10);
     const take = Number.parseInt(text('take'), 10);
     const sortField = text('sortField');
-    const size = TASK_PAGE_SIZES.includes(take) ? take : DEFAULT_TAKE;
+    const size = TASK_PAGE_SIZES.includes(take) ? take : null;
+    const offset = Number.isInteger(skip) && skip > 0 ? skip : 0;
     return {
         toolId: text('toolId'),
         state: text('state'),
         userId: text('userId'),
         // The start of a page: an offset inside a page (?skip=7) is the page it falls in
-        skip: Number.isInteger(skip) && skip > 0 ? Math.floor(skip / size) * size : 0,
+        skip: size ? pageStart(offset, size) : offset,
         take: size,
         sortField: TASK_SORT_FIELDS.includes(sortField) ? sortField : DEFAULT_SORT_FIELD,
         sortOrder: text('sortOrder') === 'asc' ? 1 : DEFAULT_SORT_ORDER
@@ -64,7 +68,8 @@ export function taskFilterKeys(filters) {
         state: filters.state || null,
         userId: filters.userId || null,
         skip: filters.skip > 0 ? String(filters.skip) : null,
-        take: filters.take !== DEFAULT_TAKE ? String(filters.take) : null,
+        // A size the user chose stays in the address, even 10; the size that fits the height does not
+        take: filters.take != null ? String(filters.take) : null,
         sortField: filters.sortField !== DEFAULT_SORT_FIELD ? filters.sortField : null,
         sortOrder: filters.sortOrder === 1 ? 'asc' : null
     };

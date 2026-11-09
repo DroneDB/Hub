@@ -1,5 +1,5 @@
 <template>
-    <div id="admin-tasks" class="admin-tasks-page page-scroll">
+    <div id="admin-tasks" ref="page" class="admin-tasks-page page-scroll">
 
         <div class="top-banner d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
@@ -23,14 +23,21 @@
                     class="clear-filters" @click="clearFilters" />
         </div>
 
-        <TasksTable :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
+        <!-- The rows fill the height (the page size follows it) and the paginator is right below them (FR-ADM-29) -->
+        <TasksTable ref="table" :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
                     :total-records="total" :first="skip" :rows="pageSize" :filtered="filtered"
                     :sort-field="sortField" :sort-order="sortOrder"
                     :downloading-task-id="downloadingTaskId"
-                    style="flex: 1; min-height: 18rem;"
+                    class="tasks-list"
                     empty-message="No tasks match the current filters."
                     @page="onPage" @sort="onSort" @clear-filters="clearFilters" @view-log="openLog" @download-result="downloadResult"
-                    @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
+                    @cancel="cancelTask" @retry="retryTask" @delete="deleteTask">
+            <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+            <template #paginatorend>
+                <Select :model-value="pageSize" :options="pageSizeChoices" option-label="label" option-value="value"
+                        aria-label="Tasks per page" class="page-size-select" @update:model-value="take => onPage({ skip, take })" />
+            </template>
+        </TasksTable>
 
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
                        :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
@@ -60,8 +67,13 @@ import { deniedLocation } from '@/libs/authRoutes';
 import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
 import { cancelDialogProps } from '@/libs/tasks/cancelConfirmation';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
-import { readTaskFilters, taskFilterKeys, hasTaskFilters, lastPageSkip } from '@/libs/tasks/taskFilters';
+import { readTaskFilters, taskFilterKeys, hasTaskFilters, lastPageSkip, TASK_PAGE_SIZES } from '@/libs/tasks/taskFilters';
 import { currentLocation, replaceQueryKeys } from '@/libs/routeQuery';
+import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
+import { pageStart } from '@/libs/pageSize';
+import { PREF } from '@/libs/preferences';
+import { getAdminPageSize, saveAdminPageSize } from '@/libs/storageUtils';
+import { ref } from 'vue';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -74,7 +86,20 @@ export default {
     components: { Button, Select, TasksTable, TaskLogDialog, ConfirmDialog },
 
     setup() {
-        return { ...useTaskFormatting() };
+        // The size the user chose: the address (a link) or what the user kept; none: the rows that fit the height (FR-XC-34)
+        const table = ref(null);
+        const page = ref(null);
+        const sizing = usePageSize({
+            height: () => visibleListHeight({
+                area: page.value, list: table.value,
+                reserved: () => heightOfFirst(table.value, '.p-datatable-thead', 45) + heightOfFirst(table.value, '.p-paginator', 56)
+            }),
+            // The placeholder rows shown while the first page loads are not the height of task rows: the known one until rows are there
+            rowHeight: () => (/** @type {any} */ (table.value)?.tasks?.length ? averageRowHeight(table.value, 'tbody tr', 72) : 72),
+            sizes: TASK_PAGE_SIZES,
+            initial: readTaskFilters(currentLocation().query).take ?? getAdminPageSize(PREF.ADMIN_TASKS)
+        });
+        return { ...useTaskFormatting(), ...sizing, table, page };
     },
     data() {
         // The list as the address has it: a reload or a link opens the same filters, page and order
@@ -83,7 +108,6 @@ export default {
             items: [],
             total: 0,
             loading: false,
-            pageSize: read.take,
             skip: read.skip,
             sortField: read.sortField,
             sortOrder: read.sortOrder,
@@ -148,10 +172,35 @@ export default {
         }
     },
 
+    watch: {
+        // The size that fits changed (the window was resized): the page that holds the first task shown
+        pageSize(size) {
+            if (!this._started || size === this._requestedSize) return;
+            this.skip = pageStart(this.skip, size);
+            this.keepInAddress();
+            this.loadTasks();
+        }
+    },
+
     async mounted() {
+        // The table and its header are on the page (placeholder rows) while the users load: the first page is
+        // measured on them, so it asks for the size that fits once (FR-ADM-29)
+        this.loading = true;
         await this.loadUsers();
+        await this.$nextTick();
+        // An address without a page size holds the offset of its first task: the page of the size that fits holds it
+        this.measurePageSize();
+        const start = pageStart(this.skip, this.pageSize);
+        if (start !== this.skip) {
+            this.skip = start;
+            this.keepInAddress();
+        }
+        this._started = true;
         await this.loadTasks();
         this.scheduleAutoRefresh();
+        // The rows are on the page: their height may differ from the one expected, and so the size that fits
+        await this.$nextTick();
+        this.measurePageSize();
     },
 
     beforeUnmount() {
@@ -169,7 +218,12 @@ export default {
             }
         },
 
+        // One page of tasks. A resize, the auto-refresh, a page or a filter may ask while another request is in
+        // flight: only the answer of the latest request is shown, an older one arriving later is dropped
         async loadTasks() {
+            const request = (this._tasksRequest = (this._tasksRequest ?? 0) + 1);
+            const latest = () => request === this._tasksRequest && !this._unmounted;
+            this._requestedSize = this.pageSize;
             this.loading = true;
             try {
                 const res = await reg.admin.adminTasks({
@@ -181,6 +235,7 @@ export default {
                     sortField: this.sortField,
                     sortOrder: this.sortOrder === 1 ? 'asc' : 'desc'
                 });
+                if (!latest()) return;
                 this.items = (res && res.items) || [];
                 this.total = (res && res.total) || 0;
                 // Past the end (a link to a page the list no longer has): the last page, in the address too
@@ -191,6 +246,7 @@ export default {
                     return;
                 }
             } catch (e) {
+                if (!latest()) return;
                 console.error('Failed to load tasks:', e);
                 // The server refuses the admin rights the client believed in: home, saying why
                 if (isForbidden(e)) {
@@ -200,7 +256,7 @@ export default {
                 this.items = [];
                 this.total = 0;
             } finally {
-                this.loading = false;
+                if (latest()) this.loading = false;
             }
         },
 
@@ -223,7 +279,7 @@ export default {
         keepInAddress() {
             replaceQueryKeys(taskFilterKeys({
                 toolId: this.selectedTool || '', state: this.selectedState || '', userId: this.selectedUser || '',
-                skip: this.skip, take: this.pageSize, sortField: this.sortField, sortOrder: this.sortOrder === 1 ? 1 : -1
+                skip: this.skip, take: this.pageChoice, sortField: this.sortField, sortOrder: this.sortOrder === 1 ? 1 : -1
             }));
         },
 
@@ -241,9 +297,14 @@ export default {
             this.onFilterChange();
         },
 
+        /** A page, or a page size: the user's choice is kept, and the page that holds the first task shown stays shown */
         onPage({ skip, take }) {
-            this.skip = skip;
-            this.pageSize = take;
+            const resized = take !== this.pageSize;
+            if (resized) {
+                this.choosePageSize(take);
+                saveAdminPageSize(PREF.ADMIN_TASKS, this.pageChoice);
+            }
+            this.skip = resized ? pageStart(this.skip, take) : skip;
             this.keepInAddress();
             this.loadTasks();
         },
@@ -361,6 +422,13 @@ export default {
 
 .filter-select {
     min-width: 12rem;
+}
+
+/* The rows keep their height: the paginator is right below the last one. The table shrinks, and its
+   rows scroll above the paginator, only when they are more than the screen holds */
+.tasks-list {
+    flex: 0 1 auto;
+    min-height: 18rem;
 }
 
 /* On a phone each filter takes the whole row */

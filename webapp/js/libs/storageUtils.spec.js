@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences,
     getOpenAfterCreatePreference, saveOpenAfterCreatePreference,
-    getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition, orgPageChoice
+    getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition, orgPageChoice,
+    getAdminPageSize, saveAdminPageSize
 } from './storageUtils';
 import { PREF, setPref, applyAccountValue, onPrefChange, _resetPrefListenersForTests } from './preferences';
 
@@ -16,7 +17,7 @@ beforeEach(() => {
 });
 afterEach(() => { off(); _resetPrefListenersForTests(); });
 
-const ORG_DEFAULTS = { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' };
+const ORG_DEFAULTS = { itemsPerPage: null, pageSizeChosen: false, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' };
 
 describe('organisation page settings and position', () => {
     it('defaults when nothing is stored', () => {
@@ -24,9 +25,9 @@ describe('organisation page settings and position', () => {
         expect(getOrgPagePosition()).toEqual({ currentPage: undefined, scrollTop: undefined });
     });
 
-    it('reads an old combined value as settings and as position', () => {
+    it('reads an old combined value as settings and as position (its page size of 25, without the mark, as chosen)', () => {
         localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false, currentPage: 3, scrollTop: 120 }));
-        expect(getOrgPageSettings()).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 25, ownedOnly: false });
+        expect(getOrgPageSettings()).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false });
         expect(getOrgPagePosition()).toEqual({ currentPage: 3, scrollTop: 120 });
     });
 
@@ -51,23 +52,23 @@ describe('organisation page settings and position', () => {
 
     it('saving a changed value writes every setting, as local', () => {
         saveOrgPageSettings({ itemsPerPage: 50 });
-        const expected = { ...ORG_DEFAULTS, itemsPerPage: 50 };
+        const expected = { ...ORG_DEFAULTS, itemsPerPage: 50, pageSizeChosen: true };
         expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toEqual(expected);
         expect(events).toEqual([{ key: PREF.ORG_PAGE, value: expected, origin: 'local' }]);
     });
 
     it('saving the sort keeps the other settings, the view included', () => {
-        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false, view: 'map' }));
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, view: 'map' }));
         saveOrgPageSettings({ sortColumn: 'lastModified', sortDirection: 'desc' });
         expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toEqual({
-            itemsPerPage: 25, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc', view: 'map'
+            itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc', view: 'map'
         });
     });
 
     it('saving the settings over an old combined value rewrites it without the position', () => {
         localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false, currentPage: 3, scrollTop: 120 }));
         saveOrgPageSettings({ itemsPerPage: 50 });
-        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 50, ownedOnly: false });
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 50, pageSizeChosen: true, ownedOnly: false });
     });
 
     it('saving the position writes only ORG_PAGE_POSITION', () => {
@@ -88,8 +89,8 @@ describe('organisation page settings and position', () => {
     });
 
     it('a sort column, direction or view the list does not know reads as the default', () => {
-        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ sortColumn: 'size', sortDirection: 'sideways', view: 'globe', itemsPerPage: 25 }));
-        expect(getOrgPageSettings()).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 25 });
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ sortColumn: 'size', sortDirection: 'sideways', view: 'globe', itemsPerPage: 25, pageSizeChosen: true }));
+        expect(getOrgPageSettings()).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 25, pageSizeChosen: true });
         localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ sortColumn: 'datasetCount', sortDirection: 'desc', view: 'map' }));
         expect(getOrgPageSettings()).toEqual({ ...ORG_DEFAULTS, sortColumn: 'datasetCount', sortDirection: 'desc', view: 'map' });
     });
@@ -106,8 +107,8 @@ describe('organisation page settings and position', () => {
     it('follow* calls back with the settings after an account change, and stops after the unsubscribe', () => {
         const apply = vi.fn();
         const stop = followOrgPageSettings(apply);
-        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 100, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc' });
-        expect(apply).toHaveBeenCalledWith({ ...ORG_DEFAULTS, itemsPerPage: 100, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc' });
+        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 100, pageSizeChosen: true, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc' });
+        expect(apply).toHaveBeenCalledWith({ ...ORG_DEFAULTS, itemsPerPage: 100, pageSizeChosen: true, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc' });
         applyAccountValue(PREF.ORG_PAGE, null);
         expect(apply).toHaveBeenLastCalledWith(ORG_DEFAULTS);
         apply.mockClear();
@@ -120,12 +121,12 @@ describe('organisation page settings and position', () => {
 });
 
 describe('dataset table preferences', () => {
-    const DEFAULTS = { sortColumn: 'name', sortDirection: 'asc', itemsPerPage: 10, view: 'list' };
+    const DEFAULTS = { sortColumn: 'name', sortDirection: 'asc', itemsPerPage: null, pageSizeChosen: false, view: 'list' };
 
     it('returns the defaults over a partial stored value', () => {
         expect(getDatasetTablePreferences()).toEqual(DEFAULTS);
-        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 50 }));
-        expect(getDatasetTablePreferences()).toEqual({ ...DEFAULTS, itemsPerPage: 50 });
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 50, pageSizeChosen: true }));
+        expect(getDatasetTablePreferences()).toEqual({ ...DEFAULTS, itemsPerPage: 50, pageSizeChosen: true });
     });
 
     it('takes the stored view only when it is one of the views', () => {
@@ -136,7 +137,7 @@ describe('dataset table preferences', () => {
     });
 
     it('saving what is already effective writes nothing', () => {
-        saveDatasetTablePreferences({ sortColumn: 'name', sortDirection: 'asc', itemsPerPage: 10 });
+        saveDatasetTablePreferences({ sortColumn: 'name', sortDirection: 'asc', itemsPerPage: null });
         expect(events).toEqual([]);
         saveDatasetTablePreferences({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25 });
         expect(events).toHaveLength(1);
@@ -154,8 +155,8 @@ describe('dataset table preferences', () => {
     it('follows changes', () => {
         const apply = vi.fn();
         const stop = followDatasetTablePreferences(apply);
-        applyAccountValue(PREF.DATASET_TABLE, { sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
-        expect(apply).toHaveBeenCalledWith({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
+        applyAccountValue(PREF.DATASET_TABLE, { sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, pageSizeChosen: true, view: 'map' });
+        expect(apply).toHaveBeenCalledWith({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, pageSizeChosen: true, view: 'map' });
         stop();
     });
 });
@@ -172,5 +173,107 @@ describe('open dataset after create', () => {
     it('only the boolean true opens', () => {
         localStorage.setItem(PREF.OPEN_AFTER_CREATE, '"true"');
         expect(getOpenAfterCreatePreference()).toBe(false);
+    });
+});
+
+describe('the page size the user chose (FR-XC-34)', () => {
+    it('is none until the user chooses one: the sort changes store no size', () => {
+        saveDatasetTablePreferences({ sortColumn: 'size' });
+        expect(JSON.parse(localStorage.getItem(PREF.DATASET_TABLE)).itemsPerPage).toBeNull();
+        saveOrgPageSettings({ view: 'map' });
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE)).itemsPerPage).toBeNull();
+    });
+
+    it('reads a whole number of rows from 1 to 100, and a stored value that is not one as none', () => {
+        for (const [stored, read] of [[25, 25], [100, 100], [1, 1], [0, null], [101, null], [2.5, null], ['25', null], [false, null], [-10, null]]) {
+            localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: stored, pageSizeChosen: true }));
+            expect(getDatasetTablePreferences().itemsPerPage).toBe(read);
+        }
+    });
+
+    it('is kept for each admin list apart, and forgotten with null', () => {
+        expect(getAdminPageSize(PREF.ADMIN_USERS)).toBeNull();
+        saveAdminPageSize(PREF.ADMIN_USERS, 25);
+        saveAdminPageSize(PREF.ADMIN_TASKS, 50);
+        expect(getAdminPageSize(PREF.ADMIN_USERS)).toBe(25);
+        expect(getAdminPageSize(PREF.ADMIN_TASKS)).toBe(50);
+        expect(JSON.parse(localStorage.getItem(PREF.ADMIN_USERS))).toEqual({ itemsPerPage: 25, pageSizeChosen: true });
+        saveAdminPageSize(PREF.ADMIN_USERS, null);
+        expect(getAdminPageSize(PREF.ADMIN_USERS)).toBeNull();
+        expect(getAdminPageSize(PREF.ADMIN_TASKS)).toBe(50);
+    });
+
+    it('reads the 10 that an older Hub stored with the other settings (no mark) as no choice, for both lists', () => {
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 10, sortColumn: 'x' }));
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 10, sortColumn: 'name', ownedOnly: false }));
+        expect(getDatasetTablePreferences()).toMatchObject({ itemsPerPage: null, pageSizeChosen: false, sortColumn: 'x' });
+        expect(getOrgPageSettings()).toMatchObject({ itemsPerPage: null, pageSizeChosen: false, ownedOnly: false });
+        // A mark that is not true is no mark either
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 10, pageSizeChosen: 'yes' }));
+        expect(getDatasetTablePreferences().itemsPerPage).toBeNull();
+    });
+
+    it('reads a 10 stored with the mark as chosen', () => {
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 10, pageSizeChosen: true }));
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 10, pageSizeChosen: true }));
+        expect(getDatasetTablePreferences().itemsPerPage).toBe(10);
+        expect(getOrgPageSettings().itemsPerPage).toBe(10);
+    });
+
+    it('stores the mark with a size, and takes it away with the size; another change rewrites an old 10 as none', () => {
+        saveDatasetTablePreferences({ itemsPerPage: 10 });
+        expect(JSON.parse(localStorage.getItem(PREF.DATASET_TABLE))).toMatchObject({ itemsPerPage: 10, pageSizeChosen: true });
+        saveDatasetTablePreferences({ itemsPerPage: null });
+        expect(JSON.parse(localStorage.getItem(PREF.DATASET_TABLE))).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 10, sortColumn: 'name' }));
+        saveOrgPageSettings({ sortColumn: 'lastModified' });
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toMatchObject({ itemsPerPage: null, pageSizeChosen: false, sortColumn: 'lastModified' });
+    });
+
+    it('keeps any other size that an older Hub stored (no mark) as chosen, for every list', () => {
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 25, sortColumn: 'size' }));
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 50, ownedOnly: false }));
+        localStorage.setItem(PREF.ADMIN_USERS, JSON.stringify({ itemsPerPage: 5 }));
+        expect(getDatasetTablePreferences()).toEqual({ sortColumn: 'size', sortDirection: 'asc', itemsPerPage: 25, pageSizeChosen: true, view: 'list' });
+        expect(getOrgPageSettings()).toEqual({ ...ORG_DEFAULTS, itemsPerPage: 50, pageSizeChosen: true, ownedOnly: false });
+        expect(getAdminPageSize(PREF.ADMIN_USERS)).toBe(5);
+        // Not a page size: none, as with the mark
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 250 }));
+        expect(getDatasetTablePreferences()).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
+    });
+
+    it('a sort change writes an old unmarked 25 back as chosen, with the mark', () => {
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 25, sortColumn: 'name' }));
+        saveDatasetTablePreferences({ sortColumn: 'size', sortDirection: 'desc' });
+        expect(JSON.parse(localStorage.getItem(PREF.DATASET_TABLE)))
+            .toEqual({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, pageSizeChosen: true, view: 'list' });
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false }));
+        saveOrgPageSettings({ sortColumn: 'lastModified' });
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE)))
+            .toEqual({ ...ORG_DEFAULTS, itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, sortColumn: 'lastModified' });
+    });
+
+    it('reads the mark as stored: false is none whatever the size, true keeps a 10', () => {
+        localStorage.setItem(PREF.DATASET_TABLE, JSON.stringify({ itemsPerPage: 25, pageSizeChosen: false }));
+        expect(getDatasetTablePreferences()).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 10, pageSizeChosen: true }));
+        expect(getOrgPageSettings()).toMatchObject({ itemsPerPage: 10, pageSizeChosen: true });
+    });
+
+    it('reads an account copy of an older Hub (no mark) by the same rule', () => {
+        const apply = vi.fn();
+        const stop = followOrgPageSettings(apply);
+        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 25, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+        expect(apply).toHaveBeenLastCalledWith({ ...ORG_DEFAULTS, itemsPerPage: 25, pageSizeChosen: true });
+        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+        expect(apply).toHaveBeenLastCalledWith(ORG_DEFAULTS);
+        applyAccountValue(PREF.DATASET_TABLE, { itemsPerPage: 50, sortColumn: 'size' });
+        expect(getDatasetTablePreferences()).toMatchObject({ itemsPerPage: 50, pageSizeChosen: true, sortColumn: 'size' });
+        stop();
+    });
+
+    it('writes nothing for no size over nothing stored (a page that only read it)', () => {
+        saveAdminPageSize(PREF.ADMIN_TASKS, null);
+        expect(events).toEqual([]);
     });
 });

@@ -24,10 +24,12 @@
                    :sort-field="lazy ? sortField : 'createdAt'" :sort-order="lazy ? sortOrder : -1"
                    scrollable scroll-height="flex"
                    :paginator="lazy"
-                   paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                   :paginator-template="`FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink${$slots.paginatorend ? '' : ' RowsPerPageDropdown'}`"
                    :rows="lazy ? rows : undefined"
-                   :rows-per-page-options="lazy ? rowsPerPageOptions : undefined"
+                   :rows-per-page-options="lazy && !$slots.paginatorend ? rowsPerPageOptions : undefined"
                    :page-link-size="3" @page="onPage" @sort="onSort">
+            <!-- The parent's own page size select in place of the paginator's (Admin > Tasks labels the size that fits) -->
+            <template v-if="$slots.paginatorend" #paginatorend><slot name="paginatorend" /></template>
             <Column field="state" header="State" sortable v-bind="stackedColumn('State', undefined, {}, sortableHeaderPt(stacked))" style="width: 5rem;">
                 <template #body="slotProps">
                     <Tag :severity="stateTag(slotProps.data).severity"
@@ -307,6 +309,11 @@ export default {
 
 .tasks-table :deep(.p-paginator) {
     flex-wrap: wrap;
+}
+
+/* A page size select of the parent follows the page links */
+.tasks-table :deep(.p-paginator-content-end) {
+    margin-inline-start: 0;
 }
 
 .muted {

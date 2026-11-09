@@ -203,9 +203,17 @@ describe('catalog', () => {
         expect(prefChoice(PREF.APPEARANCE, null)).toBe('system');
     });
 
-    it('the organisation list defaults to name ascending, as a list', () => {
-        expect(PREF_DEFAULTS[PREF.ORG_PAGE]).toEqual({ itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' });
+    it('the organisation list defaults to name ascending, as a list, with no page size chosen (FR-XC-34)', () => {
+        expect(PREF_DEFAULTS[PREF.ORG_PAGE]).toEqual({ itemsPerPage: null, pageSizeChosen: false, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' });
         expect(ACCOUNT_SECTIONS[PREF.ORG_PAGE]).toEqual(['orgs', 'list']);
+    });
+
+    it('no page size is stored by default for the four paged lists, and the admin lists follow the account (FR-XC-34)', () => {
+        expect(PREF_DEFAULTS[PREF.DATASET_TABLE]).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
+        expect(PREF_DEFAULTS[PREF.ADMIN_USERS]).toEqual({ itemsPerPage: null, pageSizeChosen: false });
+        expect(PREF_DEFAULTS[PREF.ADMIN_TASKS]).toEqual({ itemsPerPage: null, pageSizeChosen: false });
+        expect(ACCOUNT_SECTIONS[PREF.ADMIN_USERS]).toEqual(['admin', 'users']);
+        expect(ACCOUNT_SECTIONS[PREF.ADMIN_TASKS]).toEqual(['admin', 'tasks']);
     });
 
     it('every ACCOUNT_OWNED key follows the account', () => {

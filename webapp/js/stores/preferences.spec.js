@@ -20,6 +20,7 @@ const { usePreferencesStore } = await import('./preferences');
 const {
     PREF, setPref, getPref, applyAccountValue, _resetPrefListenersForTests
 } = await import('@/libs/preferences');
+const { saveDatasetTablePreferences, saveOrgPageSettings } = await import('@/libs/storageUtils');
 
 const ENDPOINT = '/users/preferences';
 const OPTS = { invalidate: ENDPOINT };
@@ -211,7 +212,7 @@ describe('preferences store: load', () => {
 
     it('exposes the section names', async () => {
         await start();
-        expect(store.sections).toEqual(['units', 'map', 'explorer', 'datasets', 'orgs', 'viewers', 'notifications', 'stockpiles']);
+        expect(store.sections).toEqual(['units', 'map', 'explorer', 'datasets', 'orgs', 'admin', 'viewers', 'notifications', 'stockpiles']);
     });
 });
 
@@ -375,6 +376,15 @@ describe('preferences store: sending changes', () => {
         setPref(PREF.DATASET_TABLE, { sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
         await tick(600);
         expect(bodies()[0].datasets.table).toEqual({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
+    });
+
+    it('sends a page size the user chose with its mark, in both list sections (FR-XC-34)', async () => {
+        await start();
+        saveDatasetTablePreferences({ itemsPerPage: 10 });
+        saveOrgPageSettings({ itemsPerPage: 25 });
+        await tick(600);
+        expect(bodies()[0].datasets.table).toMatchObject({ itemsPerPage: 10, pageSizeChosen: true });
+        expect(bodies()[0].orgs.list).toMatchObject({ itemsPerPage: 25, pageSizeChosen: true });
     });
 
     it('applies the dataset table view of the account', async () => {
@@ -573,7 +583,7 @@ describe('preferences store: reset', () => {
         expect(localStorage.getItem(PREF.PANEL_SIZES)).not.toBeNull();
         await tick(600);
         expect(h.reg.patchRequest).toHaveBeenCalledTimes(1);
-        expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, viewers: null, notifications: null, stockpiles: null });
+        expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, admin: null, viewers: null, notifications: null, stockpiles: null });
     });
 
     describe('the lighting of the 3D models, stored as the Nexus lighting before', () => {

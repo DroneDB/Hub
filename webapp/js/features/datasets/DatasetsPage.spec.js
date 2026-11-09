@@ -303,7 +303,8 @@ describe('DatasetsPage map view', () => {
         await render();
         wrapper.vm.view = 'map';
         await flushPromises();
-        expect(stored()).toEqual({ sortColumn: 'name', sortDirection: 'asc', itemsPerPage: 10, view: 'map' });
+        // No page size was chosen: none is stored (FR-XC-34)
+        expect(stored()).toEqual({ sortColumn: 'name', sortDirection: 'asc', itemsPerPage: null, pageSizeChosen: false, view: 'map' });
     });
 
     it('follows a change of the view made elsewhere, and stores nothing back', async () => {

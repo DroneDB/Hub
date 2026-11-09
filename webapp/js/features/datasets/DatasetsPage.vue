@@ -1,38 +1,10 @@
 <template>
-    <div id="datasets">
+    <div id="datasets" ref="page">
         <Message v-model="error" />
 
-        <div v-if="loading" class="ds-content">
-            <div class="p-3">
-                <Skeleton width="16rem" height="2rem" class="mb-3" />
-                <DataTable :value="skeletonRows" striped-rows class="ds-table">
-                    <Column header="" style="width: 3.75rem;">
-                        <template #body><Skeleton width="2.5rem" height="2.5rem" /></template>
-                    </Column>
-                    <Column>
-                        <template #header><i class="fa-solid fa-database" /> Dataset</template>
-                        <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
-                    </Column>
-                    <Column header="Creation Date" v-bind="columnFrom(COLUMNS_FROM.creationDate)">
-                        <template #body><Skeleton width="6rem" /></template>
-                    </Column>
-                    <Column header="Modified" v-bind="columnFrom(COLUMNS_FROM.lastModified)">
-                        <template #body><Skeleton width="6rem" /></template>
-                    </Column>
-                    <Column header="Files" v-bind="columnFrom(COLUMNS_FROM.entries)">
-                        <template #body><Skeleton width="2rem" /></template>
-                    </Column>
-                    <Column header="Size" v-bind="columnFrom(COLUMNS_FROM.size)">
-                        <template #body><Skeleton width="4rem" /></template>
-                    </Column>
-                    <Column header="Visibility" v-bind="columnFrom(COLUMNS_FROM.visibility)">
-                        <template #body><Skeleton width="5rem" height="1.5rem" border-radius="1rem" /></template>
-                    </Column>
-                </DataTable>
-            </div>
-        </div>
-        <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table -->
-        <ResourceState v-else-if="loadKind" :kind="loadKind" resource="organization" :name="$route.params.org" />
+        <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table.
+             While the page loads, its frame is there with placeholder rows: the page size is measured on it (FR-XC-34) -->
+        <ResourceState v-if="loadKind" :kind="loadKind" resource="organization" :name="$route.params.org" />
         <div v-else class="ds-content">
             <!-- Organization header -->
             <div class="org-header">
@@ -45,15 +17,17 @@
                             </div>
                             <div>
                                 <div class="org-title-row">
-                                    <h1 class="my-0">{{ orgName }}</h1>
+                                    <Skeleton v-if="loading && !orgInfo" width="16rem" height="2rem" />
+                                    <h1 v-else class="my-0">{{ orgName }}</h1>
                                     <Button v-if="canManageOrg" severity="secondary" text rounded size="small" title="Edit Organization" aria-label="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
                                     <div class="org-tags d-flex align-items-center gap-2 flex-wrap">
                                         <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                             {{ orgInfo.owner }}
                                         </Tag>
                                         <VisibilityTag v-if="orgInfo" rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
+                                        <!-- (the count is not known before the first page) -->
                                         <Tag rounded severity="info" icon="fa-solid fa-database">
-                                            {{ totalDatasets }}
+                                            {{ loading ? '…' : totalDatasets }}
                                         </Tag>
                                         <Tag v-if="userRole" rounded severity="contrast" icon="fa-solid fa-shield-halved">
                                             {{ userRole }}
@@ -84,8 +58,33 @@
                 </template>
             </ListToolbar>
 
+            <!-- While the first page loads: placeholder rows in the place of the table, under its real header -->
+            <DataTable v-if="loading" ref="table" :value="skeletonRows" striped-rows class="ds-table ds-table-skeleton" aria-busy="true">
+                <Column header="" style="width: 3.75rem;">
+                    <template #body><Skeleton width="2.5rem" height="2.5rem" /></template>
+                </Column>
+                <Column>
+                    <template #header><i class="fa-solid fa-database" /> Dataset</template>
+                    <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
+                </Column>
+                <Column header="Creation Date" v-bind="columnFrom(COLUMNS_FROM.creationDate)">
+                    <template #body><Skeleton width="6rem" /></template>
+                </Column>
+                <Column header="Modified" v-bind="columnFrom(COLUMNS_FROM.lastModified)">
+                    <template #body><Skeleton width="6rem" /></template>
+                </Column>
+                <Column header="Files" v-bind="columnFrom(COLUMNS_FROM.entries)">
+                    <template #body><Skeleton width="2rem" /></template>
+                </Column>
+                <Column header="Size" v-bind="columnFrom(COLUMNS_FROM.size)">
+                    <template #body><Skeleton width="4rem" /></template>
+                </Column>
+                <Column header="Visibility" v-bind="columnFrom(COLUMNS_FROM.visibility)">
+                    <template #body><Skeleton width="5rem" height="1.5rem" border-radius="1rem" /></template>
+                </Column>
+            </DataTable>
             <!-- Where the datasets are -->
-            <DatasetLocationsMap v-if="view === 'map'" :groups="locationGroups" :loading="locationsLoading" />
+            <DatasetLocationsMap v-else-if="view === 'map'" :groups="locationGroups" :loading="locationsLoading" />
             <!-- Nothing to list: the empty state, not an empty table with its header (FR-ORG-13) -->
             <EmptyState v-else-if="datasets.length === 0" title="No datasets found" items="datasets" :query="searchQuery"
                         class="ds-empty" @clear="searchQuery = ''; $refs.searchField?.focus()">
@@ -97,7 +96,7 @@
                 </template>
             </EmptyState>
             <!-- Datasets Table -->
-            <DataTable v-else :value="datasets" :paginator="false" striped-rows
+            <DataTable v-else ref="table" :value="datasets" :paginator="false" striped-rows
                        row-hover class="ds-table" scrollable scroll-height="flex"
                        :sort-field="sortColumn" :sort-order="sortOrderPrimevue"
                        :pt="{ bodyRow: { style: 'cursor: pointer' } }" @row-click="onRowClick" @row-contextmenu="onRowContextMenu"
@@ -181,16 +180,23 @@
 
             <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" @show="rowMenuOpen = true" @hide="onRowMenuHide" />
 
-            <!-- Pagination -->
-            <div v-if="view === 'list' && totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
+            <!-- Pagination; while the first page loads the bar is there, hidden, so that the page size counts it -->
+            <div v-if="view === 'list' && (loading || totalPages > 0)" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2"
+                 :class="{ 'ds-pagination-placeholder': loading }" :aria-hidden="loading ? 'true' : undefined">
                 <span>
                     Showing {{ datasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
                     {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ totalDatasets }} datasets
                 </span>
-                <Paginator v-if="totalPages > 1"
+                <Paginator v-if="loading || totalPages > 1" class="ds-paginator"
                            :rows="Number(itemsPerPage)" :total-records="totalDatasets"
-                           :first="(currentPage - 1) * itemsPerPage"
-                           :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
+                           :first="(currentPage - 1) * itemsPerPage" @page="onPageChange">
+                    <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+                    <template #end>
+                        <Select :model-value="itemsPerPage" :options="pageSizeChoices" option-label="label" option-value="value"
+                                aria-label="Datasets per page" class="page-size-select"
+                                @update:model-value="size => onPageChange({ page: currentPage - 1, rows: size })" />
+                    </template>
+                </Paginator>
             </div>
         </div>
 
@@ -244,12 +250,16 @@ import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Paginator from 'primevue/paginator';
+import Select from 'primevue/select';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 import Skeleton from 'primevue/skeleton';
 import PrimeContextMenu from 'primevue/contextmenu';
 import reg from '@/libs/api/sharedRegistry';
 import { datasetListQuery } from '@/libs/datasetList';
+import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight, keptBarHeight, elementOf } from '@/composables/usePageSize';
+import { pageAfterResize } from '@/libs/pageSize';
+import { ref } from 'vue';
 
 // Typing in the search box asks the server once the user pauses
 const SEARCH_DELAY_MS = 300;
@@ -288,6 +298,7 @@ export default {
         DataTable,
         Column,
         Paginator,
+        Select,
         Tag,
         VisibilityTag,
         
@@ -297,8 +308,22 @@ export default {
     },
     setup() {
         const dialogs = useDialogs();
+        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep (FR-XC-34)
+        const table = ref(null);
+        const page = ref(null);
+        // The bar below the rows as it is with the paginator (shown, hidden, while the first page loads)
+        const paginatorBar = keptBarHeight(page, '.ds-pagination', '.ds-paginator', 80);
+        const sizing = usePageSize({
+            height: () => visibleListHeight({
+                area: page.value, list: table.value,
+                reserved: () => heightOfFirst(table.value, 'thead', 45) + paginatorBar()
+            }),
+            // The placeholder rows are not the height of dataset rows: the known one until the rows are there
+            rowHeight: () => (elementOf(table.value)?.classList.contains('ds-table-skeleton') ? 65 : averageRowHeight(table.value, 'tbody tr', 65)),
+            initial: getDatasetTablePreferences().itemsPerPage
+        });
         // The locations are many small objects the map reads whole: not made reactive
-        return { dialogs, deleteEntity: useEntityDelete(dialogs), columnFrom, COLUMNS_FROM, locationGroups: shallowRef([]) };
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), columnFrom, COLUMNS_FROM, locationGroups: shallowRef([]), ...sizing, table, page };
     },
     data: function () {
         // Load preferences from Local Storage
@@ -349,7 +374,6 @@ export default {
             locationsLoading: false,
             // Pagination - use saved preferences or defaults
             currentPage: 1,
-            itemsPerPage: prefs.itemsPerPage,
 
             // Filtering: what is typed, and what the server was asked for
             searchQuery: "",
@@ -433,6 +457,10 @@ export default {
 
             return items;
         },
+        // Rows per page: the size the user chose, else the rows that fit the height (FR-XC-34)
+        itemsPerPage: function () {
+            return this.pageSize;
+        },
         // What the server is asked for: changes to any of it load that page
         listQuery: function () {
             return datasetListQuery({
@@ -448,8 +476,9 @@ export default {
         }
     },
     watch: {
+        // (the first page is asked by mounted, once, with the size that fits by then)
         listQuery: function () {
-            this.reloadPage();
+            if (this._firstPageAsked) this.reloadPage();
         },
         searchQuery: function (value) {
             clearTimeout(this._searchTimer);
@@ -458,8 +487,12 @@ export default {
                 this.searchTerm = value;
             }, SEARCH_DELAY_MS);
         },
-        itemsPerPage: function () {
-            this.currentPage = 1; // Reset to first page when items per page changes
+        // Another size: the page that holds the first dataset shown
+        itemsPerPage: function (size, previous) {
+            this.currentPage = pageAfterResize(this.currentPage, previous, size);
+        },
+        // Only a size the user chose is a preference
+        pageChoice: function () {
             this.savePreferences();
         },
         sortColumn: function () {
@@ -472,6 +505,8 @@ export default {
         },
         view: function (view) {
             this.savePreferences();
+            // The list is back on the page: measure the rows it shows
+            if (view === 'list') this.$nextTick(() => this.measurePageSize());
             if (view === 'map') {
                 this.loadLocations();
             } else {
@@ -487,7 +522,7 @@ export default {
         this._stopFollowingPreferences = followDatasetTablePreferences(prefs => {
             this.sortColumn = prefs.sortColumn;
             this.sortDirection = prefs.sortDirection;
-            this.itemsPerPage = prefs.itemsPerPage;
+            this.pageChoice = prefs.itemsPerPage;
             this.view = prefs.view;
         });
     },
@@ -500,6 +535,13 @@ export default {
             setTitle(this.orgName);
             if (this.view === 'map') this.loadLocations();
 
+            // The header, the toolbar, the table header and the paginator bar are on the page (placeholder rows in
+            // the place of the table): the first page asks for the rows that fit, once (FR-XC-34)
+            await this.$nextTick();
+            this.measurePageSize();
+            // (the watchers of the size measured run before the first page is asked: they ask nothing)
+            await this.$nextTick();
+            this._firstPageAsked = true;
             await this.loadPage();
         } catch (e) {
             // Not there, not for this user, or sign in: the page state says so (with a session, a 401
@@ -508,6 +550,7 @@ export default {
             else this.error = e.message;
         }
         this.loading = false;
+        this.measureRows();
     },
     beforeUnmount() {
         this._stopFollowingPreferences?.();
@@ -520,7 +563,7 @@ export default {
          */
         savePreferences: function () {
             saveDatasetTablePreferences({
-                sortColumn: this.sortColumn, sortDirection: this.sortDirection, itemsPerPage: this.itemsPerPage, view: this.view
+                sortColumn: this.sortColumn, sortDirection: this.sortDirection, itemsPerPage: this.pageChoice, view: this.view
             });
         },
         bytesToSize,
@@ -848,9 +891,18 @@ export default {
             if (opener && opener.isConnected && lost && !hasOpenOverlay()) opener.focus();
         },
 
+        // A page of the paginator, or a size picked there (the watchers keep the page that holds the first
+        // dataset shown, and store the size the user chose)
         onPageChange(event) {
-            this.currentPage = event.page + 1;
-            this.itemsPerPage = event.rows;
+            if (event.rows !== this.itemsPerPage) this.choosePageSize(event.rows);
+            else this.currentPage = event.page + 1;
+        },
+
+        // The rows are on the page: their height may differ from the one expected, and so the size that fits
+        measureRows() {
+            if (this._rowsMeasured) return;
+            this._rowsMeasured = true;
+            this.$nextTick(() => this.measurePageSize());
         },
 
         upload: function () {
@@ -1124,8 +1176,12 @@ export default {
         }
     }
 
+    /* The rows keep their height, so the paginator is right below the last one; the table shrinks and
+       scrolls its rows (scroll-height="flex") only when they are more than the screen holds (FR-ORG-25) */
     .ds-table {
-        flex: 1;
+        flex: 0 1 auto;
+        /* scroll-height="flex" gives the table the height of its parent: the height of its rows is wanted */
+        height: auto;
         min-height: 0;
     }
 
@@ -1136,6 +1192,15 @@ export default {
 
     .ds-pagination {
         flex-shrink: 0;
+    }
+
+    .ds-pagination-placeholder {
+        visibility: hidden;
+    }
+
+    /* The page size select follows the page links */
+    .ds-pagination :deep(.p-paginator-content-end) {
+        margin-inline-start: 0;
     }
 
     @media screen and (max-width: 767.98px) {

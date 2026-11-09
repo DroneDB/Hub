@@ -1,5 +1,5 @@
 <template>
-    <div id="users" class="page-scroll">
+    <div id="users" ref="page" class="page-scroll">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
@@ -29,12 +29,18 @@
             </div>
 
             <!-- Users Table -->
-            <DataTable :value="filteredUsers" data-key="userName" :class="STACKED_TABLE_CLASS"
-                       paginator :rows="10" :rows-per-page-options="[5, 10, 25, 50, 100]" :page-link-size="3"
+            <!-- A page holds the rows that fit the height, or the rows the user chose (FR-ADM-29) -->
+            <DataTable ref="table" v-model:first="first" :value="filteredUsers" data-key="userName" :class="STACKED_TABLE_CLASS"
+                       paginator :rows="pageSize" :page-link-size="3"
                        :always-show-paginator="false"
-                       paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                       paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
                        sort-field="userName" :sort-order="1"
-                       striped-rows row-hover>
+                       striped-rows row-hover @page="onPage">
+                <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+                <template #paginatorend>
+                    <Select :model-value="pageSize" :options="pageSizeChoices" option-label="label" option-value="value"
+                            aria-label="Users per page" class="page-size-select" @update:model-value="rows => onPage({ rows })" />
+                </template>
                 <Column field="userName" :sortable="true" v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
                     <template #header>
                         <i class="fa-solid fa-user" /> Username
@@ -247,6 +253,11 @@ import { isDisabledUser, pickableRoles, publishesSystemRoles } from '@/libs/role
 import { escapeHtml } from '@/libs/sanitize';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
+import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
+import { pageStart } from '@/libs/pageSize';
+import { PREF } from '@/libs/preferences';
+import { getAdminPageSize, saveAdminPageSize } from '@/libs/storageUtils';
+import { ref } from 'vue';
 
 /**
  * Users - Admin panel for managing platform users.
@@ -281,8 +292,19 @@ export default {
     },
     setup() {
         const dialogs = useDialogs();
+        // A page holds the rows that fit the height until the user chooses a size, which stays across visits (FR-XC-34)
+        const table = ref(null);
+        const page = ref(null);
+        const sizing = usePageSize({
+            height: () => visibleListHeight({
+                area: page.value, list: table.value,
+                reserved: () => heightOfFirst(table.value, '.p-datatable-thead', 45) + heightOfFirst(table.value, '.p-paginator', 56)
+            }),
+            rowHeight: () => averageRowHeight(table.value, 'tbody tr', 60),
+            initial: getAdminPageSize(PREF.ADMIN_USERS)
+        });
         // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order (D-026)
-        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs) };
+        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), ...sizing, table, page };
     },
     data: function () {
         return {
@@ -305,6 +327,9 @@ export default {
             deleteSuccessor: null,
             deleteConflictResolution: 'Rename',
             deleteResult: null,
+
+            // The offset of the first user of the page shown
+            first: 0,
 
             // Filtering
             searchQuery: ""
@@ -347,8 +372,22 @@ export default {
             return { title, message, confirmText, cancelText, confirmButtonClass: 'danger' };
         }
     },
+    watch: {
+        // The size that fits changed (the window was resized): the page that holds the first user shown
+        pageSize(size) {
+            this.first = pageStart(this.first, size);
+        },
+        // Another search is another list: its first page
+        searchQuery() {
+            this.first = 0;
+        }
+    },
+
     mounted: async function () {
         await this.loadData();
+        // The rows are on the page: their height may differ from the one expected, and so the size that fits
+        await this.$nextTick();
+        this.measurePageSize();
     },
 
     methods: {
@@ -375,6 +414,13 @@ export default {
                 if (!isUnauthorized(e)) this.error = e.message;
             }
             this.loading = false;
+        },
+
+        /** A page of the paginator, or a size picked there: the user's choice is kept (the page itself is v-model:first) */
+        onPage(event) {
+            if (event.rows === this.pageSize) return;
+            this.choosePageSize(event.rows);
+            saveAdminPageSize(PREF.ADMIN_USERS, this.pageChoice);
         },
 
         async refreshRoles() {
@@ -569,6 +615,11 @@ export default {
     flex-wrap: wrap;
     align-items: center;
     gap: var(--ddb-spacing-xs);
+}
+
+/* The page size select follows the page links */
+#users :deep(.p-paginator-content-end) {
+    margin-inline-start: 0;
 }
 
 /* A phone shows 3 page links and no first/last jump, so the paginator stays on one row */

@@ -244,6 +244,97 @@ describe('PreferencesDialog', () => {
         });
     });
 
+    describe('Page sizes of the lists (FR-XC-34)', () => {
+        const datasets = () => document.getElementById('pref-datasets-per-page');
+        const orgs = () => document.getElementById('pref-orgs-per-page');
+        const open = async () => {
+            await render();
+            await tabs()[3].trigger('click');
+            await flushPromises();
+        };
+        beforeEach(() => { setPref(PREF.ORG_PAGE, null); setPref(PREF.DATASET_TABLE, null); });
+
+        it('fit the screen by default: the choice reads Fit the screen, and offers it with the sizes', async () => {
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('Fit the screen');
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+            datasets().closest('.p-select').click();
+            await flushPromises();
+            expect(Array.from(document.body.querySelectorAll('[role="option"]')).map(o => o.textContent.trim()))
+                .toEqual(['Fit the screen', '5', '10', '25', '50', '100']);
+        });
+
+        it('store the size that is chosen, and none for Fit the screen', async () => {
+            await open();
+            const select = id => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === id);
+            select('pref-datasets-per-page').vm.$emit('update:modelValue', 25);
+            select('pref-orgs-per-page').vm.$emit('update:modelValue', 50);
+            await flushPromises();
+            expect(getPref(PREF.DATASET_TABLE, null)).toMatchObject({ itemsPerPage: 25, pageSizeChosen: true });
+            expect(getPref(PREF.ORG_PAGE, null)).toMatchObject({ itemsPerPage: 50, pageSizeChosen: true });
+            expect(datasets().closest('.p-select').textContent).toContain('25');
+            select('pref-datasets-per-page').vm.$emit('update:modelValue', 'auto');
+            await flushPromises();
+            expect(getPref(PREF.DATASET_TABLE, null)).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
+            expect(datasets().closest('.p-select').textContent).toContain('Fit the screen');
+        });
+
+        it('read the 10 that an older Hub stored with the other settings, without the mark, as Fit the screen', async () => {
+            setPref(PREF.DATASET_TABLE, { itemsPerPage: 10, sortColumn: 'size' });
+            setPref(PREF.ORG_PAGE, { itemsPerPage: 10, sortColumn: 'name' });
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('Fit the screen');
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+        });
+
+        it('read any other size that an older Hub stored without the mark as chosen, and save it back with the mark', async () => {
+            setPref(PREF.DATASET_TABLE, { itemsPerPage: 25, sortColumn: 'size' });
+            setPref(PREF.ORG_PAGE, { itemsPerPage: 25, ownedOnly: false, sortColumn: 'name' });
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('25');
+            expect(datasets().closest('.p-select').textContent).not.toContain('Fit the screen');
+            expect(orgs().closest('.p-select').textContent).toContain('25');
+            const select = id => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === id);
+            select('pref-orgs-sort-column').vm.$emit('update:modelValue', 'lastModified');
+            await flushPromises();
+            expect(getPref(PREF.ORG_PAGE, null)).toEqual({
+                itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'asc', view: 'list'
+            });
+            expect(orgs().closest('.p-select').textContent).toContain('25');
+            // Nothing else changed in the datasets section: its old value is not written
+            expect(getPref(PREF.DATASET_TABLE, null)).toEqual({ itemsPerPage: 25, sortColumn: 'size' });
+        });
+
+        it('save the old unmarked 10 back as Fit the screen when another setting changes', async () => {
+            setPref(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name' });
+            await open();
+            const select = id => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === id);
+            select('pref-orgs-sort-direction').vm.$emit('update:modelValue', 'desc');
+            await flushPromises();
+            expect(getPref(PREF.ORG_PAGE, null)).toMatchObject({ itemsPerPage: null, pageSizeChosen: false, sortDirection: 'desc' });
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+        });
+
+        it('follow an older Hub\'s account value (no mark) by the same rule', async () => {
+            await open();
+            applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 50, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+            await flushPromises();
+            expect(orgs().closest('.p-select').textContent).toContain('50');
+            applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+            await flushPromises();
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+            // Followed, not written back as a local change
+            expect(getPref(PREF.ORG_PAGE, null)).toEqual({ itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+        });
+
+        it('read a 10 stored with the mark as chosen', async () => {
+            setPref(PREF.DATASET_TABLE, { itemsPerPage: 10, pageSizeChosen: true });
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('10');
+            expect(datasets().closest('.p-select').textContent).not.toContain('Fit the screen');
+        });
+    });
+
     describe('Currency', () => {
         const currency = () => document.getElementById('pref-currency');
         beforeEach(() => setPref(PREF.CURRENCY, null));

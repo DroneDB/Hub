@@ -5,12 +5,16 @@
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { ORG_SORT_FIELDS, SORT_DIRECTIONS } from '@/libs/organizationList';
 import { LIST_VIEWS } from '@/libs/listViews';
+import { isPageSize } from '@/libs/pageSize';
 
 /** @param {unknown} value @returns {Record<string, any>|null} */
 const asObject = value => (value && typeof value === 'object' && !Array.isArray(value) ? value : null);
 
-/** A stored field stands for its default when it has the default's type and, unless a boolean, is not empty. */
-const usable = (value, fallback) => typeof value === typeof fallback && (typeof value === 'boolean' || !!value);
+/**
+ * A stored field stands for its default when it has the default's type and, unless a boolean, is not empty.
+ * A field whose default is null is a page size the user chose (none by default): a whole number of rows.
+ */
+const usable = (value, fallback) => (fallback === null ? isPageSize(value) : typeof value === typeof fallback && (typeof value === 'boolean' || !!value));
 
 /**
  * The values a field of a settings object accepts when it has a fixed set (settings key -> field
@@ -27,15 +31,48 @@ const FIELD_CHOICES = {
 const allowed = (key, name, value) => !FIELD_CHOICES[key]?.[name] || FIELD_CHOICES[key][name].includes(/** @type {string} */ (value));
 
 /**
+ * Marks the page size of settings that keep one (FR-XC-34): `itemsPerPage` is a size the user chose when
+ * `pageSizeChosen` says so. An older Hub wrote no mark: it stored its default (10) with every save of the other
+ * settings, which is no choice (the list fits its height), and any other size only when the user picked it, which is
+ * kept as chosen (and written back with the mark by the next save).
+ */
+const PAGE_SIZE_CHOSEN = 'pageSizeChosen';
+
+/** The page size an older Hub stored by default, without a mark */
+const OLD_DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * Whether the stored settings hold a page size the user chose: the mark when there is one, else (an older Hub)
+ * any size other than the old default.
+ * @param {Record<string, any>} stored
+ */
+const pageSizeChosenIn = stored => (typeof stored[PAGE_SIZE_CHOSEN] === 'boolean'
+    ? stored[PAGE_SIZE_CHOSEN]
+    : stored.itemsPerPage !== OLD_DEFAULT_PAGE_SIZE);
+
+/**
+ * `settings` with the page size as chosen (`chosen` and a size) or as none, and the mark that says which.
+ * @param {string} key @param {Record<string, any>} settings @param {boolean} chosen
+ * @returns {Record<string, any>}
+ */
+function withPageSizeMark(key, settings, chosen) {
+    if (!Object.hasOwn(PREF_DEFAULTS[key], PAGE_SIZE_CHOSEN)) return settings;
+    const itemsPerPage = chosen && isPageSize(settings.itemsPerPage) ? settings.itemsPerPage : null;
+    return { ...settings, itemsPerPage, [PAGE_SIZE_CHOSEN]: itemsPerPage !== null };
+}
+
+/**
  * The settings object stored under `key` (a PREF key whose default is an object): every field of
- * the default, taken from storage when usable there.
+ * the default, taken from storage when usable there. A page size that an older Hub stored without
+ * its mark reads as it meant (pageSizeChosenIn).
  * @param {string} key
  * @returns {Record<string, any>}
  */
 function readSettings(key) {
     const stored = asObject(getPref(key, null)) ?? {};
-    return Object.fromEntries(Object.entries(PREF_DEFAULTS[key]).map(([name, fallback]) =>
+    const settings = Object.fromEntries(Object.entries(PREF_DEFAULTS[key]).map(([name, fallback]) =>
         [name, usable(stored[name], fallback) && allowed(key, name, stored[name]) ? stored[name] : fallback]));
+    return withPageSizeMark(key, settings, pageSizeChosenIn(stored));
 }
 
 /**
@@ -58,8 +95,10 @@ export function orgPageChoice(field, value) {
  */
 function saveSettings(key, settings) {
     const current = readSettings(key);
-    if (Object.keys(current).every(name => current[name] === settings[name])) return;
-    setPref(key, settings);
+    // The page size given is the one the user chose (none: null), so it carries the mark
+    const next = withPageSizeMark(key, settings, true);
+    if (Object.keys(current).every(name => current[name] === next[name])) return;
+    setPref(key, next);
 }
 
 /**
@@ -76,7 +115,8 @@ function followSettings(key, apply) {
  * @typedef {object} DatasetTableSettings
  * @property {string} sortColumn
  * @property {'asc'|'desc'} sortDirection
- * @property {number} itemsPerPage
+ * @property {number|null} itemsPerPage  the page size the user chose; null: the page fits its height (FR-XC-34)
+ * @property {boolean} pageSizeChosen  itemsPerPage is a size the user chose (written with it)
  * @property {'list'|'map'} view
  */
 
@@ -109,7 +149,8 @@ export function saveOpenAfterCreatePreference(value) {
 
 /**
  * @typedef {object} OrgPageSettings
- * @property {number} itemsPerPage
+ * @property {number|null} itemsPerPage  the page size the user chose; null: the page fits its height (FR-XC-34)
+ * @property {boolean} pageSizeChosen  itemsPerPage is a size the user chose (written with it)
  * @property {boolean} ownedOnly
  * @property {string} sortColumn one of ORG_SORT_FIELDS
  * @property {'asc'|'desc'} sortDirection
@@ -148,4 +189,22 @@ export function getOrgPagePosition() {
 
 export function saveOrgPagePosition(currentPage = 1, scrollTop = 0) {
     setPref(PREF.ORG_PAGE_POSITION, { currentPage, scrollTop });
+}
+
+/**
+ * The rows per page that the user chose for an admin list (PREF.ADMIN_USERS, PREF.ADMIN_TASKS).
+ * @param {string} key
+ * @returns {number|null} null when none: the list fits its height (FR-XC-34)
+ */
+export function getAdminPageSize(key) {
+    return readSettings(key).itemsPerPage;
+}
+
+/**
+ * Stores the rows per page that the user chose for an admin list; null forgets the choice.
+ * @param {string} key
+ * @param {number|null} itemsPerPage
+ */
+export function saveAdminPageSize(key, itemsPerPage) {
+    saveSettings(key, { ...readSettings(key), itemsPerPage });
 }

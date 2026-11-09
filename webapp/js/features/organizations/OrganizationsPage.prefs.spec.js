@@ -50,7 +50,9 @@ const localOrgSettingsWrites = () => events.filter(e => e.key === PREF.ORG_PAGE 
 
 describe('OrganizationsPage preferences', () => {
     it('starts from the stored settings and from an old combined value', async () => {
-        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false, currentPage: 2, scrollTop: 0 }));
+        // 30 organizations: at 25 a page, the page 2 that the old value holds is there
+        reg.orgs.getOrganizations = vi.fn(() => Promise.resolve(Array.from({ length: 30 }, (_, i) => ({ org: { slug: `org${i}`, name: `Org ${i}` } }))));
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, currentPage: 2, scrollTop: 0 }));
         await render();
         expect(wrapper.vm.itemsPerPage).toBe(25);
         expect(wrapper.vm.showAll).toBe(true);
@@ -60,7 +62,7 @@ describe('OrganizationsPage preferences', () => {
     it('an external change updates the page and writes no organisations setting back', async () => {
         await render();
         reg.orgs.getOrganizations.mockClear();
-        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 50, ownedOnly: false });
+        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 50, pageSizeChosen: true, ownedOnly: false });
         await flushPromises();
         expect(wrapper.vm.itemsPerPage).toBe(50);
         expect(wrapper.vm.showAll).toBe(true);
@@ -114,11 +116,11 @@ describe('OrganizationsPage preferences', () => {
     it('a change of the user is one local write of the settings', async () => {
         await render();
         events.length = 0;
-        wrapper.vm.itemsPerPage = 25;
+        wrapper.vm.choosePageSize(25);
         await flushPromises();
         expect(localOrgSettingsWrites()).toEqual([{
             key: PREF.ORG_PAGE,
-            value: { itemsPerPage: 25, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' },
+            value: { itemsPerPage: 25, pageSizeChosen: true, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' },
             origin: 'local'
         }]);
     });
@@ -154,14 +156,14 @@ describe('OrganizationsPage preferences', () => {
     });
 
     it('choosing a view is one local write that keeps the other settings', async () => {
-        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc' }));
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc' }));
         await render();
         events.length = 0;
         wrapper.vm.view = 'map';
         await flushPromises();
         expect(localOrgSettingsWrites()).toEqual([{
             key: PREF.ORG_PAGE,
-            value: { itemsPerPage: 25, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc', view: 'map' },
+            value: { itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc', view: 'map' },
             origin: 'local'
         }]);
     });

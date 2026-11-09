@@ -31,6 +31,8 @@ export const PREF = Object.freeze({
     OPEN_AFTER_CREATE: 'open_dataset_after_create',
     ORG_PAGE: 'org_page_prefs',
     ORG_PAGE_POSITION: 'org_page_position', // { currentPage, scrollTop } of the organisations page
+    ADMIN_USERS: 'admin_users_prefs', // { itemsPerPage, pageSizeChosen } of Admin > Users: the rows per page the user chose (FR-XC-34)
+    ADMIN_TASKS: 'admin_tasks_prefs', // { itemsPerPage } of Admin > Tasks
     UNIFIED_VIEWER: 'unified-viewer-settings',
     UNIFIED_NAV_HINT: 'ddb.unified.navHint', // true once the 3D viewer told the user how to move (keys, Controls help); device only
     MODEL_LIGHTING: 'model-lighting-settings',
@@ -164,6 +166,8 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.DATASET_TABLE]: ['datasets', 'table'],
     [PREF.OPEN_AFTER_CREATE]: ['datasets', 'openAfterCreate'],
     [PREF.ORG_PAGE]: ['orgs', 'list'],
+    [PREF.ADMIN_USERS]: ['admin', 'users'],
+    [PREF.ADMIN_TASKS]: ['admin', 'tasks'],
     [PREF.SPLAT_NAV_MODE]: ['viewers', 'splatNavMode'],
     [PREF.SPLAT_QUALITY]: ['viewers', 'splatQuality'],
     [PREF.MODEL_LIGHTING]: ['viewers', 'modelLighting'],
@@ -199,9 +203,13 @@ export const PREF_DEFAULTS = frozen({
     [PREF.FILE_VIEW_MODE]: 'grid',
     [PREF.TABLE_EXPANDED_GRID]: true,
     [PREF.SORT_DESCENDING]: false,
-    [PREF.DATASET_TABLE]: frozen({ sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), itemsPerPage: 10, view: DEFAULT_LIST_VIEW }),
+    // itemsPerPage is the page size the user chose: none by default, the list then shows the rows that fit its height (FR-XC-34).
+    // pageSizeChosen marks it as chosen: an older Hub stored its default 10 with every other setting, which is no choice
+    [PREF.DATASET_TABLE]: frozen({ sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), itemsPerPage: /** @type {number|null} */ (null), pageSizeChosen: false, view: DEFAULT_LIST_VIEW }),
     [PREF.OPEN_AFTER_CREATE]: false,
-    [PREF.ORG_PAGE]: frozen({ itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), view: DEFAULT_LIST_VIEW }),
+    [PREF.ORG_PAGE]: frozen({ itemsPerPage: /** @type {number|null} */ (null), pageSizeChosen: false, ownedOnly: true, sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), view: DEFAULT_LIST_VIEW }),
+    [PREF.ADMIN_USERS]: frozen({ itemsPerPage: /** @type {number|null} */ (null), pageSizeChosen: false }),
+    [PREF.ADMIN_TASKS]: frozen({ itemsPerPage: /** @type {number|null} */ (null), pageSizeChosen: false }),
     [PREF.SPLAT_NAV_MODE]: 'fly',
     [PREF.SPLAT_QUALITY]: 'auto',
     [PREF.MODEL_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),
