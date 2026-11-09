@@ -1,8 +1,8 @@
 // @ts-check
 /**
  * The quality of the splat viewer: three presets (low, medium, high) and "auto", which draws at
- * the preset the device keeps up with (qualityGovernor). A preset is the four things that decide
- * how much the GPU draws:
+ * the preset the device keeps up with (qualityGovernor). A preset is the five things that decide
+ * how much the GPU draws and how much memory the paged splats may take:
  *
  *  - `maxSh`: the spherical-harmonics degree of the view-dependent colour (0 = flat colour);
  *  - `lodScale`: the level-of-detail scale of the mesh, how fine the splats picked for the view are
@@ -11,9 +11,12 @@
  *  - `lodSplatScale`: the share of the platform's splat budget Spark spends on the level of detail
  *    (1 = its default for the device: 2.5 million splats on a desktop, less on a phone), a scale
  *    instead of a count so a preset means the same thing on every device;
- *  - `pixelRatio`: the cap on the pixel ratio the canvas is drawn at.
+ *  - `pixelRatio`: the cap on the pixel ratio the canvas is drawn at;
+ *  - `pagedScale`: the share of the memory budget of the paged splats (splatMemory.js) the preset
+ *    uses. Spark allocates that pool once, when the first chunk of a paged .rad is asked for, so
+ *    it is the preset in force when the scene opens that sizes it.
  *
- * Spark reads all of them again every frame (`maxSh` once the mesh is told its pipeline
+ * Spark reads the others again every frame (`maxSh` once the mesh is told its pipeline
  * changed), so a preset takes effect on a scene that is already open.
  */
 import { PREF, PREF_CHOICES, prefChoice } from '@/libs/preferences';
@@ -23,13 +26,13 @@ import { initialGovernor, stepGovernor } from './qualityGovernor';
 export const QUALITY_LEVELS = /** @type {const} */ (['low', 'medium', 'high']);
 
 /** @typedef {typeof QUALITY_LEVELS[number]} QualityLevel */
-/** @typedef {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number }} QualityPreset */
+/** @typedef {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number, pagedScale: number }} QualityPreset */
 
 /** @type {Readonly<Record<QualityLevel, Readonly<QualityPreset>>>} */
 export const QUALITY_PRESETS = Object.freeze({
-    low: Object.freeze({ maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1 }),
-    medium: Object.freeze({ maxSh: 1, lodScale: 0.75, lodSplatScale: 0.5, pixelRatio: 1.5 }),
-    high: Object.freeze({ maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2 })
+    low: Object.freeze({ maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1, pagedScale: 0.5 }),
+    medium: Object.freeze({ maxSh: 1, lodScale: 0.75, lodSplatScale: 0.5, pixelRatio: 1.5, pagedScale: 0.75 }),
+    high: Object.freeze({ maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2, pagedScale: 1 })
 });
 
 const LABELS = { auto: 'Auto', low: 'Low', medium: 'Medium', high: 'High' };

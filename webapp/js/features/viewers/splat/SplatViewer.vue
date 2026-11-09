@@ -53,7 +53,7 @@
             </button>
         </div>
 
-        <SplatInfoPanel v-if="loaded && showInfo" :info="infoSource" :read-pager="readPager" :downloads="downloads"
+        <SplatInfoPanel v-if="loaded && showInfo" :info="infoSource" :read-pager="readPager" :read-memory="readMemory" :downloads="downloads"
                         @download="startDownload" @close="showInfo = false" />
 
         <SplatCameraRail v-if="loaded" :cameras="cameras" :active-index="activeCameraIndex" :mode="presentationMode" :can-write="canWrite"
@@ -120,6 +120,7 @@ import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSet
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
+import { pagerMemory, sceneMemoryOf } from './splatMemory';
 import { createQualityController, describeQuality } from './qualityPresets';
 import { splatDownloadsOf, splatExportOffered } from './splatDownloads';
 import { useSplatDownloads } from './useSplatDownloads';
@@ -211,6 +212,12 @@ const infoSource = computed(() => ({
 }));
 // Spark's pager (the streaming of a paged .rad), for the popover; there is none before the stage
 const readPager = () => stage?.spark.pager ?? null;
+// The memory of the paged splats for the popover: the budget the stage sized the pool with, what Spark
+// holds, and the heap of the page where the browser reports it (Chromium)
+const readMemory = () => (stage ? {
+    budget: stage.memoryBudget, reported: stage.memoryReported, pager: pagerMemory(stage.spark.pager),
+    heapBytes: /** @type {any} */ (globalThis.performance)?.memory?.usedJSHeapSize ?? null
+} : null);
 const downloads = computed(() => splatDownloadsOf(entry.value, { canExport: splatExportOffered() }));
 const tourAvailable = computed(() => tourStops(cameras.value, annotations.value).length > 0);
 const activeCameraName = computed(() => {
@@ -352,7 +359,7 @@ async function loadSplat() {
 
     // The tilt is known before the controls exist: they are built on the final up (and follow setTilt)
     stage = createSplatStage({
-        ...libraries, canvas: canvas.value, labelLayer: labelLayer.value, streaming: streaming.value, up: tiltUp(THREE, tiltRoll.value, tiltPitch.value), onFrame: renderFrame,
+        ...libraries, canvas: canvas.value, labelLayer: labelLayer.value, streaming: streaming.value, memory: sceneMemoryOf(entry.value), up: tiltUp(THREE, tiltRoll.value, tiltPitch.value), onFrame: renderFrame,
         onContextLost: () => notify.warn('The browser took the graphics context away. The view comes back when it gives it back.', { summary: 'Graphics' }),
         onContextRestored: () => notify.info('The graphics context is back.', { summary: 'Graphics' })
     });

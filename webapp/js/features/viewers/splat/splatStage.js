@@ -27,6 +27,8 @@
 import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 import { tokenHex } from '@/libs/colorScheme';
 import { appliedPixelRatio, MAX_PIXEL_RATIO } from '@/libs/pixelRatio';
+import { deviceMemoryGb, isMobile, reportsDeviceMemory } from '@/libs/responsive';
+import { pagedSplatBudget } from './splatMemory';
 
 // Splat rendering is limited by fill rate: a phone at a ratio of 3 or more draws 2.25 times the
 // pixels of a ratio of 2 for a sharpness no one sees on soft splats (the cap lives in libs/pixelRatio.js)
@@ -82,6 +84,9 @@ export function progressFraction(event) {
  * @param {{ SparkRenderer: any, SplatMesh: any }} options.Spark
  * @param {HTMLCanvasElement} options.canvas
  * @param {boolean} options.streaming               a paged .rad: Spark spends its splat budget toward the view direction
+ * @param {{ splatCount?: number, shDegree?: number, memoryGb?: number, mobile?: boolean }} [options.memory]
+ *        what sizes the pool of paged splats (splatMemory.js): the splats and colour detail of the scene, and
+ *        the device (the memory the browser reports and whether it is a phone; both read from the browser by default)
  * @param {{ x: number, y: number, z: number }} [options.up]  the scene's up axis, set on the camera before the controls exist
  * @param {(time: number) => void} [options.onFrame]  called every frame, after the canvas was fitted and before it is drawn
  * @param {() => void} [options.onContextLost]
@@ -90,7 +95,7 @@ export function progressFraction(event) {
  * @param {HTMLElement} [options.labelLayer]        the element the labels are drawn in (over the canvas)
  */
 export function createSplatStage({
-    THREE, OrbitControls, Spark, canvas, streaming, up, onFrame, onContextLost, onContextRestored, CSS2DRenderer, labelLayer
+    THREE, OrbitControls, Spark, canvas, streaming, memory, up, onFrame, onContextLost, onContextRestored, CSS2DRenderer, labelLayer
 }) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     // The cap on the pixel ratio: the quality preset moves it (up to MAX_PIXEL_RATIO)
@@ -110,8 +115,16 @@ export function createSplatStage({
     const pickSplats = touch ? PICK_SPLATS_TOUCH : PICK_SPLATS;
     // No picking set until a measurement asks for one (setPicking): a worker pass every 500 ms that
     // nothing reads would be spent for the whole visit
+    // Spark allocates its pool of paged splats whole, at 16.7 million splats (more than a GB of
+    // memory) unless told: the budget is the device's, and the preset narrows it (applyQuality)
+    const device = { memoryGb: memory?.memoryGb ?? deviceMemoryGb(), mobile: memory?.mobile ?? isMobile(), shDegree: memory?.shDegree, splatCount: memory?.splatCount };
+    const memoryReported = memory?.memoryGb === undefined ? reportsDeviceMemory() : true;
+    let budget = pagedSplatBudget(device);
     const spark = new Spark.SparkRenderer(streaming
-        ? { renderer, lodRaycast: 0, pagedExtSplats: true, coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4 }
+        ? {
+            renderer, lodRaycast: 0, pagedExtSplats: true, maxPagedSplats: budget.maxPagedSplats,
+            coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4
+        }
         : { renderer, lodRaycast: 0 });
     scene.add(spark);
 
@@ -128,7 +141,7 @@ export function createSplatStage({
     controls.enableDamping = false;
 
     let mesh = null;
-    /** @type {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number } | null} */
+    /** @type {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number, pagedScale?: number } | null} */
     let quality = null;
     let disposed = false;
     let contextLost = false;
@@ -170,12 +183,18 @@ export function createSplatStage({
     /**
      * Puts a quality preset in force: now on a scene that is open, and on the mesh a later
      * `loadMesh` makes.
-     * @param {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number }} preset
+     * @param {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number, pagedScale?: number }} preset
      */
     function applyQuality(preset) {
         if (disposed) return;
         quality = preset;
         spark.lodSplatScale = preset.lodSplatScale;
+        // The pool of paged splats is allocated once, when Spark first needs it: until then the
+        // preset sizes it (the viewer applies the quality before it makes the mesh)
+        if (streaming && !spark.pager) {
+            budget = pagedSplatBudget({ ...device, scale: preset.pagedScale });
+            spark.maxPagedSplats = budget.maxPagedSplats;
+        }
         pixelCap = Math.min(preset.pixelRatio, MAX_PIXEL_RATIO);
         // The canvas follows the new ratio on the next frame (fitCanvas compares its buffer with it)
         const ratio = appliedPixelRatio(pixelCap);
@@ -272,6 +291,9 @@ export function createSplatStage({
 
     return {
         renderer, scene, camera, controls, spark, overlay, loadMesh, pickSplat, applyQuality, setPicking, start, dispose,
-        get disposed() { return disposed; }
+        get disposed() { return disposed; },
+        /** The budget of the pool of paged splats in force (splatMemory.js), and whether the memory it derives from was reported by the browser. */
+        get memoryBudget() { return budget; },
+        get memoryReported() { return memoryReported; }
     };
 }

@@ -11,6 +11,7 @@ import { measureFormatters } from '@/features/viewers/unified/sceneUtils';
 import { UP_AXES, ESTIMATE_LABELS, estimatedUp } from './upAxis';
 import { isVec3 } from './measureMath';
 import { formatNumber, UNKNOWN } from '@/libs/format';
+import { memoryRows } from './splatMemory';
 
 /** An estimated up within this angle of a world axis is named by the axis (cos 8 degrees). */
 const AXIS_COS = 0.99;
@@ -135,8 +136,9 @@ export function formatLodState(streaming, state) {
  * @param {boolean} source.streaming
  * @param {ReturnType<typeof pagerState>} [source.lod]
  * @param {string} [source.quality]                            the quality in force, e.g. "Auto (medium)"
+ * @param {Omit<Parameters<typeof memoryRows>[0], 'streaming'> | null} [source.memory]  the state of the memory (splatMemory.js memoryRows), when it is known
  */
-export function splatInfoRows({ entry, bounds, scale, streaming, lod = null, quality }) {
+export function splatInfoRows({ entry, bounds, scale, streaming, lod = null, quality, memory = null }) {
     const properties = entry?.properties;
     const rows = [
         { id: 'splats', label: 'Splats', value: formatSplatCount(properties?.splatCount) },
@@ -147,5 +149,6 @@ export function splatInfoRows({ entry, bounds, scale, streaming, lod = null, qua
         { id: 'up', label: 'Estimated up', value: formatEstimatedUp(bounds) }
     ];
     if (quality) rows.push({ id: 'quality', label: 'Quality', value: quality });
+    if (memory) rows.push(...memoryRows({ ...memory, streaming }));
     return rows;
 }

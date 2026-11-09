@@ -25,7 +25,8 @@
  * SplatInfoPanel - the popover of the splat viewer that says what the splat is (splat count, colour
  * detail, size, level of detail, georeference, estimated up, quality) and offers its downloads.
  * The level-of-detail line follows the streaming while the panel is open: the pager is read once
- * a second (the shared ticker, which stops with the page hidden), not on every frame.
+ * a second (the shared ticker, which stops with the page hidden), not on every frame, and so do
+ * the memory lines (the budget of the paged splats, what Spark holds, the heap of the page).
  */
 import { ref, computed, onBeforeUnmount } from 'vue';
 import { onTick } from '@/libs/clock';
@@ -36,16 +37,22 @@ const props = defineProps({
     info: { type: Object, required: true },
     /** Gives Spark's pager (null before there is one) */
     readPager: { type: Function, default: () => null },
+    /** Gives the memory state of splatInfoRows ({ budget, reported, pager, heapBytes }), or null before the stage exists */
+    readMemory: { type: Function, default: () => null },
     /** The downloads on offer (splatDownloadsOf) */
     downloads: { type: Array, default: () => [] }
 });
 const emit = defineEmits(['close', 'download']);
 
 const lod = ref(pagerState(props.readPager()));
-const stopTicking = onTick(() => { lod.value = pagerState(props.readPager()); });
+const memory = ref(props.readMemory());
+const stopTicking = onTick(() => {
+    lod.value = pagerState(props.readPager());
+    memory.value = props.readMemory();
+});
 onBeforeUnmount(stopTicking);
 
-const rows = computed(() => splatInfoRows({ ...props.info, lod: lod.value }));
+const rows = computed(() => splatInfoRows({ ...props.info, lod: lod.value, memory: memory.value }));
 </script>
 
 <style scoped>

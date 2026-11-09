@@ -478,6 +478,66 @@ describe('WebGL 2 check', () => {
     });
 });
 
+describe('memory budget of the paged splats (FR-VWR-22, NFR-003)', () => {
+    const LOW = { maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1, pagedScale: 0.5 };
+    const HIGH = { maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2, pagedScale: 1 };
+    const DESKTOP_4GB = { memoryGb: 4, mobile: false, shDegree: 3 };
+
+    it('gives Spark the pool of the device instead of its own 16.7 million splats', () => {
+        makeStage({ streaming: true, memory: DESKTOP_4GB });
+        expect(stage.spark.options.maxPagedSplats).toBe(4456448);
+        expect(stage.memoryBudget).toMatchObject({ pages: 68, maxPagedSplats: 4456448, bytes: 855638016 });
+    });
+
+    it('reads the memory of the device from the browser when it is not given: 4 GB, assumed, when the browser does not report it', () => {
+        vi.stubGlobal('screen', { width: 1280 });
+        vi.stubGlobal('navigator', { maxTouchPoints: 0 });
+        makeStage({ streaming: true, memory: { shDegree: 3 } });
+        expect(stage.spark.options.maxPagedSplats).toBe(4456448);
+        expect(stage.memoryReported).toBe(false);
+        stage.dispose();
+
+        vi.stubGlobal('navigator', { maxTouchPoints: 0, deviceMemory: 8 });
+        makeStage({ streaming: true, memory: { shDegree: 3 } });
+        expect(stage.spark.options.maxPagedSplats).toBe(8912896);
+        expect(stage.memoryReported).toBe(true);
+        stage.dispose();
+
+        // a phone that does not report its memory: half the share of 4 GB
+        vi.stubGlobal('screen', { width: 390 });
+        vi.stubGlobal('navigator', { maxTouchPoints: 5 });
+        makeStage({ streaming: true, memory: { shDegree: 3 } });
+        expect(stage.spark.options.maxPagedSplats).toBe(2228224);
+    });
+
+    it('sizes the pool from the splats of a scene that is small', () => {
+        makeStage({ streaming: true, memory: { ...DESKTOP_4GB, shDegree: 0, splatCount: 1100000 } });
+        expect(stage.spark.options.maxPagedSplats).toBe(34 * 65536);
+    });
+
+    it('narrows the pool in the low preset while Spark has not made it, and leaves it alone afterwards', () => {
+        makeStage({ streaming: true, memory: DESKTOP_4GB });
+        stage.applyQuality(LOW);
+        expect(stage.spark.maxPagedSplats).toBe(34 * 65536);
+        expect(stage.memoryBudget.pages).toBe(34);
+        stage.applyQuality(HIGH);
+        expect(stage.spark.maxPagedSplats).toBe(68 * 65536);
+
+        // Spark made the pool: its size is fixed, so the budget shown stays the one allocated
+        stage.spark.pager = { maxPages: 68 };
+        stage.applyQuality(LOW);
+        expect(stage.spark.maxPagedSplats).toBe(68 * 65536);
+        expect(stage.memoryBudget.pages).toBe(68);
+    });
+
+    it('does not ask Spark for a pool when the file is not paged', () => {
+        makeStage({ streaming: false, memory: DESKTOP_4GB });
+        expect(stage.spark.options).not.toHaveProperty('maxPagedSplats');
+        stage.applyQuality(LOW);
+        expect(stage.spark.maxPagedSplats).toBeUndefined();
+    });
+});
+
 describe('progressFraction', () => {
     it('is the fraction loaded, or null when the total is not known', () => {
         expect(progressFraction({ lengthComputable: true, loaded: 25, total: 100 })).toBe(0.25);

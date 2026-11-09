@@ -3,10 +3,10 @@ import { PREF_CHOICES, PREF } from '@/libs/preferences';
 import { QUALITY_LEVELS, QUALITY_PRESETS, QUALITY_CHOICES, presetOf, describeQuality, createQualityController } from './qualityPresets';
 
 describe('presets', () => {
-    it('map each level to the settings of the four things that decide the cost', () => {
-        expect(QUALITY_PRESETS.low).toEqual({ maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1 });
-        expect(QUALITY_PRESETS.medium).toEqual({ maxSh: 1, lodScale: 0.75, lodSplatScale: 0.5, pixelRatio: 1.5 });
-        expect(QUALITY_PRESETS.high).toEqual({ maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2 });
+    it('map each level to the settings of the five things that decide the cost', () => {
+        expect(QUALITY_PRESETS.low).toEqual({ maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1, pagedScale: 0.5 });
+        expect(QUALITY_PRESETS.medium).toEqual({ maxSh: 1, lodScale: 0.75, lodSplatScale: 0.5, pixelRatio: 1.5, pagedScale: 0.75 });
+        expect(QUALITY_PRESETS.high).toEqual({ maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2, pagedScale: 1 });
         expect(presetOf('medium')).toBe(QUALITY_PRESETS.medium);
     });
 

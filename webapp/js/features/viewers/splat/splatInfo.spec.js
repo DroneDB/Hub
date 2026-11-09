@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     formatSplatCount, formatShDegree, formatExtent, formatGeoreference, formatEstimatedUp, pagerState, formatLodState, splatInfoRows
 } from './splatInfo';
+import { pagedSplatBudget } from './splatMemory';
 
 const METRES = { metersPerUnit: 1, unit: 'm' };
 const UNITS = { metersPerUnit: 1, unit: 'units' };
@@ -155,6 +156,18 @@ describe('rows', () => {
             up: '+Z, 100% sure (georeferenced)',
             quality: 'Auto (high)'
         });
+    });
+
+    it('adds the memory rows when the memory state is known (FR-VWR-22)', () => {
+        const budget = pagedSplatBudget({ memoryGb: 4, mobile: false, shDegree: 3 });
+        const rows = splatInfoRows({
+            entry, bounds, scale: METRES, streaming: true, quality: 'High',
+            memory: { budget, pager: { bytes: 855638016, pages: 3, maxPages: 68 }, heapBytes: null }
+        });
+        expect(rows.slice(-2)).toEqual([
+            { id: 'memoryBudget', label: 'Splat memory budget', value: '816 MB (68 pages, 4 GB device)' },
+            { id: 'memory', label: 'Splat memory in use', value: '816 MB of 816 MB, 3 of 68 pages filled' }
+        ]);
     });
 
     it('labels the size as scene units when the scene has no scale, and survives an entry with nothing', () => {
