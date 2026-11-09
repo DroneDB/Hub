@@ -31,6 +31,12 @@
                                         class="fa-solid fa-arrow-right" /> Source Type Protocol: HTTP(s) <i
                                         class="fa-solid fa-arrow-right" /> copy/paste the URL below.
                                 </div>
+                                <div v-if="typeIs('VECTOR')" data-testid="qgis-steps-vector">
+                                    Layer → Add Layer → Add Vector Layer → Source Type Protocol: HTTP(S) → paste the URL below (GeoPackage).
+                                </div>
+                                <div v-if="!hasQgisSteps" data-testid="qgis-steps-generic">
+                                    Layer → Add Layer → choose the layer type that matches this file → Source Type Protocol: HTTP(S) → paste the URL below.
+                                </div>
                                 <div v-if="needsAuth" class="auth-note">
                                     <i class="fa-solid fa-lock" /> For Authentication choose Basic and use your username and password.
                                 </div>
@@ -278,6 +284,10 @@ export default {
                 }
             }
             return '';
+        },
+        // Types with their own QGIS steps in the template; any other gets the generic hint
+        hasQgisSteps() {
+            return ['POINTCLOUD', 'GEORASTER', 'VECTOR'].some(t => this.typeIs(t));
         },
         qgisUrl() {
             if (this.scope !== 'entry' || this.shareMode !== 'qgis' || !this.buildUrl) return '';

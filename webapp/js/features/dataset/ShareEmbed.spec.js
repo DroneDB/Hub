@@ -95,6 +95,43 @@ describe('ShareEmbed', () => {
         expect(wrapper.find('[data-title]').text()).toBe('Share Folder');
     });
 
+    describe('QGIS', () => {
+        const gpkg = { path: 'ddb://h/org/ds/bounds.gpkg', entry: { path: 'bounds.gpkg', type: ddb.entry.type.VECTOR } };
+        const steps = id => document.body.querySelector(`[data-testid="${id}"]`);
+        const qgisUrlInput = () => document.body.querySelector('input[aria-label="QGIS URL"]');
+
+        beforeEach(() => {
+            h.dataset.getVisibility = vi.fn(() => Promise.resolve(ddb.Visibility.UNLISTED));
+            h.dataset.Entry = e => ({ ...e, findArtifact: () => `/artifacts/${e.path}` });
+        });
+
+        it('shows the steps for a vector layer and the URL', async () => {
+            await open(gpkg);
+            await chooseMode('qgis');
+            expect(steps('qgis-steps-vector').textContent.replace(/\s+/g, ' ').trim()).toBe(
+                'Layer → Add Layer → Add Vector Layer → Source Type Protocol: HTTP(S) → paste the URL below (GeoPackage).');
+            expect(steps('qgis-steps-generic')).toBeNull();
+            expect(qgisUrlInput().value).toBe(`${origin()}/artifacts/bounds.gpkg`);
+        });
+
+        it('keeps the steps of a raster and shows no vector steps for it', async () => {
+            await open(ortho);
+            await chooseMode('qgis');
+            expect(document.body.textContent).toContain('Add Raster Layer');
+            expect(steps('qgis-steps-vector')).toBeNull();
+            expect(steps('qgis-steps-generic')).toBeNull();
+        });
+
+        it('shows a generic hint for a type with no steps of its own', async () => {
+            await open(photo);
+            await wrapper.setData({ buildUrl: '/artifacts/a.jpg' });
+            await chooseMode('qgis');
+            expect(steps('qgis-steps-generic').textContent).toContain('choose the layer type that matches this file');
+            expect(steps('qgis-steps-vector')).toBeNull();
+            expect(qgisUrlInput().value).toBe(`${origin()}/artifacts/a.jpg`);
+        });
+    });
+
     describe('Viewer only', () => {
         beforeEach(() => {
             // A link of a Private dataset is replaced by the prompt; these tests need the link
