@@ -5,6 +5,13 @@
  * - bundle: POST {dataset}/obj with `path`, `file` pairs, one result per file;
  * - chunked: POST {dataset}/obj/chunk per missing chunk, then POST .../commit.
  *
+ * A chunked upload's id (`fileId`) is made from the file, not drawn at random (FR-UPL-04, §7.1): the SHA-256 (hex)
+ * of the dataset, the destination path, the size and the last-modified time. The same file picked again after a
+ * reload therefore has the same id, and `GET .../obj/chunk/{fileId}` tells which chunks the server still has. An item
+ * that resumes a stored upload (`item.fileId`, set from the list of open uploads, valid for its path) keeps the id
+ * that upload has: Keep both renamed it, so the path alone would not give it back. The chunks carry the file's
+ * own name and last-modified time, which the server keeps to match a file selected again.
+ *
  * A file whose name exists is refused (409 with `conflictPath`, D-040) unless its item has
  * `overwrite: true`: then `overwrite=true` goes before its `file` part (and in every chunk and the
  * commit), as the Registry reads the flag sent before the file. A refused file's result carries
@@ -15,9 +22,14 @@
  * Every request carries an `X-Upload-Id`. When a request fails after the whole body was
  * sent (a proxy timeout while the server is still adding the file, a dropped connection),
  * the outcome is asked for by that id instead of sending the file again.
+ *
+ * The requests carry the session's bearer header themselves, so they do not pass through the client's 401 handling:
+ * a 401 goes to `onUnauthorized` (the session is no longer accepted), and `canSend` is asked before each request
+ * starts (a chunk, a commit, a status read): when it says no, the job stops with an AbortError and nothing is sent.
  */
 import { sendXhr } from './xhrTransport';
 import { newId } from '@/libs/ids';
+import { sha256Hex } from '@/libs/sha256';
 import { bearer, failureMessageOf } from '@/libs/ddb/http/httpClient';
 
 const CHUNK_BYTES = 64 * 1024 * 1024;
@@ -30,18 +42,20 @@ const AMBIGUOUS_STATUSES = new Set([0, 502, 504]);
 /**
  * @param {object} deps
  * @param {string} deps.baseUrl `${origin}/orgs/{org}/ds/{ds}`
+ * @param {string} [deps.datasetId] what names the dataset in a chunked upload's id (default: baseUrl)
  * @param {string} [deps.singleUrl] where single files go (default `${baseUrl}/obj`; the share page
  *   uploads to its batch instead)
  * @param {boolean} [deps.receipts] whether the endpoint keeps receipts by X-Upload-Id (default true)
  * @param {() => string|null} deps.authToken
  * @param {(url: string) => Promise<{status: number, body: any}>} deps.getJson GET with auth, never throws for HTTP statuses
  * @param {(item) => string} deps.destination the dataset path of an item
+ * @param {() => boolean} [deps.canSend] whether a request may start now (the session the upload belongs to goes on)
+ * @param {() => void} [deps.onUnauthorized] a request was refused with 401
  * @param {(ms: number) => Promise<void>} [deps.sleep]
  * @param {Function} [deps.transport] sendXhr
  * @param {number} [deps.chunkBytes]
  */
 export function createUploadRequests(deps) {
-    const transport = deps.transport ?? sendXhr;
     const sleep = deps.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
     const chunkBytes = deps.chunkBytes ?? CHUNK_BYTES;
     const now = deps.now ?? (() => Date.now());
@@ -52,6 +66,26 @@ export function createUploadRequests(deps) {
         return { 'X-Upload-Id': uploadId, ...bearer(deps.authToken()) };
     };
 
+    // Every request starts here: none once the session has ended, and a 401 is the session's, not the file's
+    function mayStart() {
+        if (deps.canSend && !deps.canSend())
+            throw Object.assign(new Error('The session ended'), { name: 'AbortError' });
+    }
+
+    async function transport(options) {
+        mayStart();
+        const res = await (deps.transport ?? sendXhr)(options);
+        if (res.status === 401) deps.onUnauthorized?.();
+        return res;
+    }
+
+    async function getJson(url) {
+        mayStart();
+        const res = await deps.getJson(url);
+        if (res.status === 401) deps.onUnauthorized?.();
+        return res;
+    }
+
     // One id per file and destination, kept across retries: the server answers a repeat from its
     // receipt, and a chunked upload's stored chunks belong to it
     function uploadIdOf(item) {
@@ -61,6 +95,19 @@ export function createUploadRequests(deps) {
             item.uploadDestination = destination;
         }
         return item.uploadId;
+    }
+
+    /**
+     * The id of a chunked upload (see the top): kept for the destination it was made for, remade when the destination
+     * changes (Keep both), unless the item resumes a stored upload at that very path.
+     */
+    function fileIdOf(item) {
+        const destination = deps.destination(item);
+        if (!item.fileId || item.fileIdFor !== destination) {
+            item.fileId = sha256Hex([deps.datasetId ?? deps.baseUrl, destination, item.size, item.file.lastModified ?? 0].join('\n'));
+            item.fileIdFor = destination;
+        }
+        return item.fileId;
     }
 
     async function send(job, hooks) {
@@ -126,11 +173,11 @@ export function createUploadRequests(deps) {
     }
 
     async function sendChunked(item, hooks) {
-        const fileId = uploadIdOf(item);
+        const fileId = fileIdOf(item);
         const totalChunks = Math.max(1, Math.ceil(item.size / chunkBytes));
 
         // Resuming: only the chunks the server does not have yet
-        const status = await deps.getJson(`${deps.baseUrl}/obj/chunk/${fileId}`);
+        const status = await getJson(`${deps.baseUrl}/obj/chunk/${fileId}`);
         let missing = status.status === 200 && status.body?.missing
             ? status.body.missing
             : Array.from({ length: totalChunks }, (_, i) => i);
@@ -147,6 +194,9 @@ export function createUploadRequests(deps) {
             form.append('totalFileSize', String(item.size));
             form.append('chunkSize', String(chunkBytes));
             form.append('path', deps.destination(item));
+            // The file as the user's disk has it: a file selected again after a reload is matched by them
+            form.append('fileName', item.file.name ?? item.name);
+            form.append('lastModified', String(item.file.lastModified ?? 0));
             // The first chunk fixes the flag; every chunk carries it, so any one can be the first
             appendOverwrite(form, item);
             form.append('chunk', item.file.slice(start, end), item.name);
@@ -184,7 +234,7 @@ export function createUploadRequests(deps) {
     async function fromReceipt(uploadId, items, hooks) {
         const deadline = now() + RECEIPT_MAX_WAIT_MS;
         while (!hooks.signal?.aborted) {
-            const res = await deps.getJson(`${deps.baseUrl}/obj/uploads/${uploadId}`);
+            const res = await getJson(`${deps.baseUrl}/obj/uploads/${uploadId}`);
             const receipt = res.body;
 
             if (res.status === 200 && receipt?.state === 'Done') return partResults(items, receipt.results ?? []);

@@ -66,7 +66,7 @@ async function render(info = AVAILABLE) {
         global: {
             plugins: [PrimeVue, createPinia()],
             mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: { push: vi.fn() } },
-            stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: { props: ['info'], template: '<div class="notes-stub">{{ info.latestVersion }}</div>' }, Menu: true, ShareEmbed: true }
+            stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: { props: ['info'], template: '<div class="notes-stub">{{ info.latestVersion }}</div>' }, Menu: true, ShareEmbed: true }
         }
     });
     await flushPromises();
@@ -99,6 +99,11 @@ describe('HubHeader update indicator', () => {
         const back = buttons.findIndex(b => b.getAttribute('title') === 'Back to organization');
         expect(back).toBeGreaterThanOrEqual(0);
         expect(buttons[back + 1].classList.contains('update-available-btn')).toBe(true);
+    });
+
+    it('has the upload indicator of the dataset page uploads (FR-UPL-04)', async () => {
+        await render();
+        expect(wrapper.find('.right upload-indicator-stub').exists()).toBe(true);
     });
 
     it('is hidden when Registry is up to date', async () => {
@@ -135,7 +140,7 @@ describe('HubHeader update indicator', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: { push: vi.fn() } },
-                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();
@@ -178,7 +183,7 @@ describe('HubHeader user menu: Preferences', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: {}, fullPath: '/r' }, $router: { push } },
-                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             },
             attachTo: document.body
         });
@@ -283,7 +288,7 @@ describe('HubHeader: a link to the Preferences window', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: route, $router: { push, replace } },
-                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             },
             attachTo: document.body
         });
@@ -596,7 +601,7 @@ describe('HubHeader back-to-organization look-up', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: { org: 'acme', ds: 'site' }, query: {} }, $router: { push, replace } },
-                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();
@@ -652,7 +657,7 @@ describe('HubHeader logout', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: router },
-                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();
@@ -734,7 +739,7 @@ describe('HubHeader: home and the session', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: reactive({ params: {}, query: {}, ...route }), $router: { push, replace: vi.fn() } },
-                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();

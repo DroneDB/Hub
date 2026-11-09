@@ -9,6 +9,11 @@
  * Counts and bytes are kept as the files change state; listeners get a snapshot at most
  * every `throttleMs`, so the dialog does not recompute anything per progress event.
  *
+ * Pause and resume (FR-UPL-04): `pause()` stops pumping and aborts the requests in flight whose files are still being
+ * sent; their files stay in the queue as pending (a chunked file goes on from the chunks the server stored, any other
+ * file is sent again). A file whose bytes are all sent is left to finish: aborting it could not tell whether the server
+ * added it. `resume()` pumps again.
+ *
  * No DOM, no HTTP: `send(job, hooks)` performs the request(s) of a job (see uploadRequests).
  */
 import { planNextJob } from './uploadPlanner';
@@ -57,6 +62,7 @@ export function createUploadScheduler(opts) {
     let lastNotify = -Infinity;
     let active = false;
     let stopped = false;
+    let paused = false;
     let startedAt = null;
     let endedAt = null;
 
@@ -83,6 +89,9 @@ export function createUploadScheduler(opts) {
                 path: f.path,
                 size: f.size,
                 overwrite: f.overwrite === true,
+                // Resuming a stored chunked upload: its id, valid for the path it was started at (uploadRequests)
+                fileId: f.fileId ?? null,
+                fileIdFor: f.fileId ? f.path : null,
                 conflictPath: null,
                 status: null,
                 progress: 0,
@@ -120,7 +129,7 @@ export function createUploadScheduler(opts) {
     // when a retry delay ends - never on a timer of its own
     function pump() {
         if (stopped) return;
-        while (inFlight.size < concurrency()) {
+        while (!paused && inFlight.size < concurrency()) {
             const ready = readyItems(clock.now());
             const job = plan(ready);
             if (!job) break;
@@ -132,7 +141,7 @@ export function createUploadScheduler(opts) {
     function start(job) {
         const id = ++jobSeq;
         const controller = new AbortController();
-        inFlight.set(id, { job, controller });
+        inFlight.set(id, { job, controller, pausedByUser: false });
         for (const item of job.items) {
             setStatus(item, STATUS.UPLOADING);
             setSent(item, 0);
@@ -166,8 +175,21 @@ export function createUploadScheduler(opts) {
     }
 
     function settle(id, job, results, error) {
+        const entry = inFlight.get(id);
         inFlight.delete(id);
         if (stopped) return;
+
+        // Aborted by pause(): its files wait for resume() as they were, not failed and not counted as a retry
+        if (entry?.pausedByUser) {
+            for (const item of job.items) {
+                if (item.status !== STATUS.UPLOADING) continue;
+                setSent(item, 0);
+                setStatus(item, STATUS.PENDING);
+            }
+            updateActivity();
+            notify(true);
+            return;
+        }
 
         const byItem = new Map((results ?? []).map(r => [r.id, r]));
         for (const item of job.items) {
@@ -271,6 +293,27 @@ export function createUploadScheduler(opts) {
         updateActivity();
     }
 
+    /** Stops sending: nothing new starts, and the requests whose files are still being sent are aborted. */
+    function pause() {
+        if (stopped || paused) return;
+        paused = true;
+        for (const entry of inFlight.values()) {
+            // All bytes sent (processing): the server is adding the file, let it finish
+            if (!entry.job.items.every(item => item.status === STATUS.UPLOADING)) continue;
+            entry.pausedByUser = true;
+            entry.controller.abort();
+        }
+        updateActivity();
+        notify(true);
+    }
+
+    function resume() {
+        if (stopped || !paused) return;
+        paused = false;
+        pump();
+        notify(true);
+    }
+
     function isIdle() {
         return counts.pending + counts.uploading + counts.processing === 0;
     }
@@ -306,18 +349,20 @@ export function createUploadScheduler(opts) {
             speed: bps,
             eta: bps > 0 ? remaining / bps : null,
             done: isIdle(),
+            paused,
             startedAt,
             endedAt,
             items
         };
     }
 
-    // Throttled: at most one snapshot per throttleMs, the last change always delivered
-    function notify() {
+    // Throttled: at most one snapshot per throttleMs, the last change always delivered; `immediate`: a change the
+    // user made (pause, resume) shows at once
+    function notify(immediate = false) {
         if (!opts.onChange || stopped) return;
         const now = clock.now();
         const wait = lastNotify + throttleMs - now;
-        if (wait <= 0 || isIdle()) {
+        if (wait <= 0 || immediate || isIdle()) {
             if (notifyTimer != null) {
                 clock.clearTimeout(notifyTimer);
                 notifyTimer = null;
@@ -341,6 +386,8 @@ export function createUploadScheduler(opts) {
         retryFailed,
         requeue,
         cancelAll,
+        pause,
+        resume,
         snapshot
     };
 }

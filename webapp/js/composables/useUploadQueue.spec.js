@@ -91,3 +91,64 @@ describe('useUploadQueue.cancel', () => {
         expect(aborted.length).toBeGreaterThan(0);
     });
 });
+
+describe('useUploadQueue pause and resume (FR-UPL-04)', () => {
+    it('pause aborts the file being sent and keeps it pending; resume sends it again', async () => {
+        const { queue, send } = heldQueue();
+        await flush();
+        const started = send.mock.calls.length;
+
+        queue.pause();
+        await flush();
+
+        expect(queue.state.value.paused).toBe(true);
+        expect(queue.state.value.counts.pending).toBe(2);
+        expect(queue.state.value.counts.error).toBe(0);
+
+        queue.resume();
+        await flush();
+
+        expect(queue.state.value.paused).toBe(false);
+        expect(send.mock.calls.length).toBeGreaterThan(started);
+    });
+
+    it('a file added with a fileId resumes that stored upload: the scheduler item keeps it for its path', async () => {
+        const send = vi.fn(() => new Promise(() => {}));
+        const queue = useUploadQueue({ send });
+
+        queue.add([{ file: { size: 10 }, path: 'orto/Lamb (2).tif', fileId: 'stored-id' }, { file: { size: 20 }, path: 'b.txt' }]);
+        await flush();
+
+        const items = queue.state.value.items;
+        expect(items.map(i => [i.path, i.fileId, i.fileIdFor])).toEqual([
+            ['orto/Lamb (2).tif', 'stored-id', 'orto/Lamb (2).tif'],
+            ['b.txt', null, null]
+        ]);
+    });
+});
+
+describe('useUploadQueue activity signal', () => {
+    it('announces it on the event bus by default, and not when the store announces it for all its queues', async () => {
+        const { default: emitter } = await import('@/libs/eventBus');
+        const heard = [];
+        const on = e => heard.push(e.active);
+        emitter.on('uploadActivity', on);
+        const answer = (job) => Promise.resolve(job.items.map(i => ({ id: i.id, ok: true, entry: {} })));
+
+        const own = useUploadQueue({ send: answer });
+        own.add([{ file: { size: 1 }, path: 'a' }]);
+        await flush();
+        const announced = [...heard];
+
+        heard.length = 0;
+        const quiet = [];
+        const store = useUploadQueue({ send: answer, announceActivity: false, onActivity: a => quiet.push(a) });
+        store.add([{ file: { size: 1 }, path: 'a' }]);
+        await flush();
+        emitter.off('uploadActivity', on);
+
+        expect(announced).toEqual([true, false]);
+        expect(heard).toEqual([]);
+        expect(quiet).toEqual([true, false]);
+    });
+});

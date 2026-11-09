@@ -9,7 +9,7 @@ import { ref, h, defineComponent, onMounted, effectScope } from 'vue';
 import PrimeVue from 'primevue/config';
 import { createPinia, setActivePinia } from 'pinia';
 
-const h_ = vi.hoisted(() => ({ dataset: null, showError: null, importFromUrl: null, loggedIn: true, gone: null }));
+const h_ = vi.hoisted(() => ({ dataset: null, showError: null, importFromUrl: null, loggedIn: true, gone: null, uploads: null, uploaded: null }));
 
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'r3sharing', ds: 'brighton-beach' } }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
@@ -33,11 +33,20 @@ vi.mock('@/libs/build/buildManager', () => ({
 }));
 vi.mock('@/composables/useDatasetListing', () => ({
     useDatasetListing: () => ({
-        files: ref([]), selected: ref([]), currentPath: ref(null), isLoading: ref(true), addEntry: vi.fn(), removed: vi.fn()
+        files: ref([]), selected: ref([]), currentPath: ref(null), isLoading: ref(true), addEntry: vi.fn(), removed: vi.fn(), uploaded: (...args) => h_.uploaded(...args)
     })
 }));
 vi.mock('@/composables/useDatasetActions', () => ({
     useDatasetActions: () => ({ showError: h_.showError, confirmBuild: vi.fn(), move: vi.fn(), upload: vi.fn(), importFromUrl: (...args) => h_.importFromUrl(...args) })
+}));
+// The app-wide upload store: what the page hears from it is the subject here (its own spec covers the store)
+vi.mock('@/stores/uploads', () => ({
+    useUploadsStore: () => ({
+        subscribe: (org, ds, listener) => {
+            h_.uploads = { org, ds, listener, stopped: false };
+            return () => { h_.uploads.stopped = true; };
+        }
+    })
 }));
 vi.mock('@/composables/useDatasetClipboard', () => ({ useDatasetClipboard: () => ({}) }));
 vi.mock('@/composables/useOpenItem', () => ({ useOpenItem: () => ({ openItem: vi.fn() }) }));
@@ -88,6 +97,8 @@ beforeEach(() => {
     h_.loggedIn = true;
     h_.showError = vi.fn();
     h_.importFromUrl = vi.fn();
+    h_.uploaded = vi.fn();
+    h_.uploads = null;
     vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
@@ -95,6 +106,22 @@ afterEach(() => {
     wrapper = null;
     document.body.innerHTML = '';
     vi.restoreAllMocks();
+});
+
+describe('ViewDataset and the uploads that go on in the background (FR-UPL-04)', () => {
+    it('shows the entries that an upload of this dataset added in its listing, and stops listening when it goes', async () => {
+        await open(Promise.resolve({ path: '', type: 3, properties: {}, size: 0 }));
+        const entries = [{ path: 'orto/a.tif' }, { path: 'b.txt' }];
+
+        expect(h_.uploads).toMatchObject({ org: 'r3sharing', ds: 'brighton-beach', stopped: false });
+        h_.uploads.listener.added(entries);
+
+        expect(h_.uploaded).toHaveBeenCalledWith(entries);
+
+        wrapper.unmount();
+        wrapper = null;
+        expect(h_.uploads.stopped).toBe(true);
+    });
 });
 
 describe('ViewDataset page states', () => {

@@ -335,6 +335,25 @@ export default class Dataset {
         return this.registry.deleteRequest(`${this.baseApi}`);
     }
 
+    /**
+     * The open chunked uploads of the caller in this dataset (FR-UPL-04, §7.1): `{ fileId, path, totalFileSize,
+     * totalChunks, chunkSize, sourceFileName, lastModified, received, missing, complete }` each. After a reload the
+     * upload dialog offers to resume them.
+     * @returns {Promise<Array<{ fileId: string, path: string, totalFileSize: number, totalChunks: number, chunkSize: number, sourceFileName: string|null, lastModified: number|null, received: number[], missing: number[], complete: boolean }>>}
+     */
+    async listChunkUploads() {
+        return this.registry.makeRequest(`${this.baseApi}/obj/chunk`, { method: 'GET', cache: false });
+    }
+
+    /**
+     * Removes the chunks that the server stores for a chunked upload (the Cancel of an upload, FR-UPL-04); the files
+     * that the batch already sent stay. An upload the server does not know (404) is already gone.
+     * @param {string} fileId
+     */
+    async deleteChunkUpload(fileId) {
+        return this.registry.makeRequest(`${this.baseApi}/obj/chunk/${encodeURIComponent(fileId)}`, 'DELETE');
+    }
+
     async deleteObj(path) {
         const formData = new FormData();
         formData.append('path', path);

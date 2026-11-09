@@ -82,6 +82,7 @@ import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
 import { splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
 import { explorerTools } from '@/libs/dataset/explorerTools';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
+import { useUploadsStore } from '@/stores/uploads';
 import { useRequestScope, isAbort } from '@/composables/useRequestScope';
 import { useBuildEvents } from '@/composables/useBuildEvents';
 import { useHeavyTask } from '@/composables/useHeavyTask';
@@ -190,6 +191,10 @@ const detailSide = ref(null);
 const detailReopen = ref(null);
 
 const listing = useDatasetListing(dataset);
+// An upload that ends while this dataset is open shows in its listing, also one that the user started on another page
+// and that went on in the background (FR-UPL-04)
+const stopHearingUploads = useUploadsStore().subscribe(params.org, params.ds, { added: entries => listing.uploaded(entries) });
+onBeforeUnmount(stopHearingUploads);
 const dialogs = useDialogs();
 // The tree that is on the page: the sidebar's, or on a phone the Browser tab's
 const refresh = () => {

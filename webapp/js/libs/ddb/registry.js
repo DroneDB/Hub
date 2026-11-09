@@ -310,6 +310,15 @@ export default class Registry {
         this.http.onUnauthorized(handler);
     }
 
+    /**
+     * Hands a 401 that did not come through this client's requests to the unauthorized handler: a
+     * refused token refresh, an upload request (it carries its own bearer header).
+     * @param {Error} error
+     */
+    reportUnauthorized(error) {
+        this.http.reportUnauthorized(error);
+    }
+
     addEventListener(event, cb) {
         this.eventListeners[event] = this.eventListeners[event] || [];
         if (!this.eventListeners[event].find(e => e === cb)) {

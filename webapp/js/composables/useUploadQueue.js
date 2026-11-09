@@ -23,6 +23,9 @@ let nextItemId = 0;
  * @param {(item, entry) => void} [opts.onItemDone]
  * @param {(item) => void} [opts.onItemFailed] a file failed for good (`item.conflictPath`: its name exists)
  * @param {(snapshot) => void} [opts.onIdle] the queue has nothing left to do
+ * @param {boolean} [opts.announceActivity] emit the "uploading" signal (default true); the app-wide store of the
+ *   dataset uploads (stores/uploads.js) has several queues and emits the one signal itself
+ * @param {(active: boolean) => void} [opts.onActivity] the queue started or stopped sending
  */
 export function useUploadQueue(opts) {
     const state = shallowRef(null);
@@ -36,7 +39,10 @@ export function useUploadQueue(opts) {
         maxConcurrency: () => uploadConcurrency(negotiatedProtocol()),
         onItemDone: opts.onItemDone,
         onItemFailed: opts.onItemFailed,
-        onActivity: active => emitter.emit(UPLOAD_ACTIVITY_EVENT, { active }),
+        onActivity: active => {
+            if (opts.announceActivity !== false) emitter.emit(UPLOAD_ACTIVITY_EVENT, { active });
+            opts.onActivity?.(active);
+        },
         onChange: snapshot => {
             state.value = snapshot;
             if (snapshot.done) opts.onIdle?.(snapshot);
@@ -46,19 +52,24 @@ export function useUploadQueue(opts) {
     return {
         state,
         /**
-         * @param {Array<{file: File, path: string, overwrite?: boolean}>} files  `path` is the dataset path
-         *   (the name it gets: Keep both changes it); `overwrite` replaces a file that has it (Replace)
+         * @param {Array<{file: File, path: string, overwrite?: boolean, fileId?: string}>} files  `path` is the dataset
+         *   path (the name it gets: Keep both changes it); `overwrite` replaces a file that has it (Replace);
+         *   `fileId` resumes the stored chunked upload that has it (at its `path`)
          */
         add(files) {
-            scheduler.add(files.map(({ file, path, overwrite }) => ({
+            scheduler.add(files.map(({ file, path, overwrite, fileId }) => ({
                 id: `u${++nextItemId}`,
                 file,
                 name: path,
                 path,
                 overwrite: overwrite === true,
+                fileId,
                 size: file.size
             })));
         },
+        /** Stops sending (FR-UPL-04): the file being sent is aborted and waits, a chunked one goes on where it was. */
+        pause: () => scheduler.pause(),
+        resume: () => scheduler.resume(),
         retry: id => scheduler.retry(id),
         retryFailed: () => scheduler.retryFailed(),
         /** @param {string} id @param {{ path?: string, overwrite?: boolean }} changes */
@@ -79,7 +90,7 @@ export function useUploadQueue(opts) {
             if (confirm && !(await confirm())) return { cancelled: false, cleanupError: null };
 
             scheduler.cancelAll();
-            emitter.emit(UPLOAD_ACTIVITY_EVENT, { active: false });
+            if (opts.announceActivity !== false) emitter.emit(UPLOAD_ACTIVITY_EVENT, { active: false });
 
             let cleanupError = null;
             if (cleanup) {

@@ -115,12 +115,24 @@ export default class AuthSession {
             }
         } catch (error) {
             if (error.status === 401) {
-                // Token is no longer valid, clear credentials
-                this.clearCredentials();
+                this.endRefusedSession(error);
                 throw new Error("logged out", { cause: error });
             }
             throw error;
         }
+    }
+
+    /**
+     * The server no longer accepts the session (its refresh was refused): it ends as a sign-out does, with the
+     * 'logout' event (what the session's listeners, the uploads among them, hear). The app's unauthorized handler
+     * goes first (main.js: handleUnauthorized signs out and sends the user to Login with the "expired" notice);
+     * when it has not ended the session (no handler yet at boot, where boot() says why; the Login page), it is
+     * ended here, once.
+     * @param {Error} error
+     */
+    endRefusedSession(error) {
+        this.registry.reportUnauthorized(error);
+        if (this._getUsernameFromStorage() !== null || storage.getItem(`${this.registry.url}_jwt_token`) !== null) this.logout();
     }
 
     setAutoRefreshToken(seconds = 3600) {

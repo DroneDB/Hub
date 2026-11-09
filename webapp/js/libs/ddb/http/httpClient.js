@@ -257,6 +257,8 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
         fetchRaw,
         authHeaders,
         /** @param {((error: Error) => void)|null} handler */
-        onUnauthorized(handler) { unauthorizedHandler = handler; }
+        onUnauthorized(handler) { unauthorizedHandler = handler; },
+        /** A 401 of a request made elsewhere (token refresh, uploads). @param {Error} error */
+        reportUnauthorized(error) { unauthorizedHandler?.(error); }
     };
 }

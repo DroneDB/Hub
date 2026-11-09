@@ -383,3 +383,102 @@ describe('protocol limits and probe hint', () => {
         expect(windowHint('http/1.1', 40, 1.6)).toBeNull();
     });
 });
+
+describe('uploadScheduler pause and resume (FR-UPL-04)', () => {
+    /** A server that ends a request with an AbortError when its signal aborts (as the XHR transport does) */
+    function abortableServer() {
+        const server = heldServer();
+        const send = (job, hooks) => new Promise((resolve, reject) => {
+            server.started.push(job);
+            hooks.signal.addEventListener('abort', () => reject(Object.assign(new Error('Upload aborted'), { name: 'AbortError' })));
+            server.pending.push({ job, hooks, resolve });
+        });
+        return { ...server, send };
+    }
+
+    it('pause stops new requests, aborts the file being sent and keeps it pending; resume sends it again', async () => {
+        const server = abortableServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 1, policy: policy() });
+        scheduler.add([file(0, 300 * 1024 * 1024), file(1, 300 * 1024 * 1024)]);
+        await flush();
+        server.pending[0].hooks.onProgress('f0', 100);
+        expect(server.started).toHaveLength(1);
+
+        scheduler.pause();
+        await flush();
+
+        const paused = scheduler.snapshot();
+        expect(paused.paused).toBe(true);
+        expect(paused.counts).toMatchObject({ pending: 2, uploading: 0, error: 0, done: 0 });
+        // Not failed, not a retry, and nothing else started while paused
+        expect(paused.items.map(i => [i.status, i.retryCount, i.errorMessage])).toEqual([['pending', 0, ''], ['pending', 0, '']]);
+        expect(paused.bytesSent).toBe(0);
+        expect(paused.done).toBe(false);
+        expect(server.started).toHaveLength(1);
+
+        scheduler.resume();
+        await flush();
+
+        expect(scheduler.snapshot().paused).toBe(false);
+        expect(server.started).toHaveLength(2);
+        expect(server.started[1].items[0].id).toBe('f0');
+    });
+
+    it('files added while paused wait for resume', async () => {
+        const server = abortableServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, policy: policy() });
+        scheduler.pause();
+        scheduler.add([file(0)]);
+        await flush();
+        expect(server.started).toHaveLength(0);
+
+        scheduler.resume();
+        await flush();
+        expect(server.started).toHaveLength(1);
+    });
+
+    it('a file whose bytes are all sent is left to finish: the server is adding it', async () => {
+        const server = abortableServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, policy: policy() });
+        scheduler.add([file(0)]);
+        await flush();
+        server.pending[0].hooks.onUploaded(['f0']);
+        expect(scheduler.snapshot().counts.processing).toBe(1);
+
+        scheduler.pause();
+        server.releaseNext();
+        await flush();
+
+        expect(scheduler.snapshot().counts).toMatchObject({ done: 1, pending: 0, processing: 0 });
+    });
+
+    it('reports idle activity once the aborted requests are gone, and busy again after resume', async () => {
+        const onActivity = vi.fn();
+        const server = abortableServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 1, onActivity, policy: policy() });
+        scheduler.add([file(0)]);
+        await flush();
+        expect(onActivity).toHaveBeenLastCalledWith(true);
+
+        scheduler.pause();
+        await flush();
+        expect(onActivity).toHaveBeenLastCalledWith(false);
+
+        scheduler.resume();
+        await flush();
+        expect(onActivity).toHaveBeenLastCalledWith(true);
+    });
+
+    it('pause after cancelAll does nothing', async () => {
+        const server = abortableServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 1, policy: policy() });
+        scheduler.add([file(0)]);
+        await flush();
+        scheduler.cancelAll();
+
+        scheduler.pause();
+        scheduler.resume();
+
+        expect(scheduler.snapshot().paused).toBe(false);
+    });
+});

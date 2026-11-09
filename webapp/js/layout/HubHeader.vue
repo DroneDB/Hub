@@ -12,6 +12,9 @@
 
         <nav class="right" aria-label="Main">
 
+            <!-- The uploads of the dataset page go on while the user is on another page (FR-UPL-04) -->
+            <UploadIndicator />
+
             <Button v-if="showBackToOrg" severity="secondary" size="small" text title="Back to organization"
                     aria-label="Back to organization" @click="goToOrganization">
                 <i class="fa-solid fa-sitemap" />
@@ -108,6 +111,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Alert from '@/components/HubAlert';
 import ActionButton from '@/components/ActionButton.vue';
+import UploadIndicator from '@/layout/UploadIndicator.vue';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { lazyComponent } from '@/libs/lazyComponent';
@@ -142,6 +146,7 @@ export default {
     name: 'HubHeader',
     components: {
         ActionButton,
+        UploadIndicator,
         Alert,
         ConfirmDialog,
         ShareEmbed,

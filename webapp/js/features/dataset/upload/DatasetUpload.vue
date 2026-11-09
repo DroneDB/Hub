@@ -14,6 +14,21 @@
                         <Button severity="secondary" icon="fa-solid fa-link" label="Import from URL" @click="$emit('importFromUrl')" />
                     </div>
                 </div>
+                <!-- Chunked uploads that the server still stores (a reload, a closed tab): select the same file again to go on -->
+                <section v-if="openUploads.length" class="open-uploads" aria-labelledby="open-uploads-title">
+                    <h4 id="open-uploads-title">Interrupted uploads</h4>
+                    <p>Select the same file again to go on from the part the server stored.</p>
+                    <ul>
+                        <li v-for="open in openUploads" :key="open.fileId" class="open-upload">
+                            <span class="open-upload-name" :title="open.path">{{ open.sourceFileName || open.path }}</span>
+                            <span class="open-upload-state">{{ bytesToSize(open.totalFileSize) }}, {{ storedPercent(open) }}% stored</span>
+                            <Button size="small" icon="fa-solid fa-play" label="Resume" @click="openFilePicker" />
+                            <Button size="small" severity="secondary" text icon="fa-regular fa-trash-can" label="Discard"
+                                    :aria-label="'Discard the interrupted upload of ' + (open.sourceFileName || open.path)"
+                                    @click="discardOpen(open)" />
+                        </li>
+                    </ul>
+                </section>
             </div>
         </template>
 
@@ -70,7 +85,8 @@
                     </div>
                     <div class="progress-speed-info">
                         <span><i class="fa-solid fa-gauge" /> {{ currentSpeedFormatted }}</span>
-                        <span v-if="allSent && counts.processing > 0"><i class="fa-solid fa-gears" /> Processing on server...</span>
+                        <span v-if="paused"><i class="fa-solid fa-circle-pause" /> Paused</span>
+                        <span v-else-if="allSent && counts.processing > 0"><i class="fa-solid fa-gears" /> Processing on server...</span>
                         <span v-else><i class="fa-regular fa-clock" /> {{ etaFormatted }}</span>
                     </div>
                     <div class="total-progress-bar">
@@ -116,8 +132,13 @@
                 </div>
 
                 <div class="upload-actions">
-                    <Button v-if="uploading" severity="danger" icon="fa-regular fa-circle-stop" label="Cancel Upload" :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : ''"
+                    <Button v-if="uploading" severity="danger" icon="fa-regular fa-circle-stop" label="Cancel Upload" :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : 'The files already sent stay in the dataset'"
                             @click="handleCancel" />
+                    <Button v-if="uploading" severity="secondary" :icon="paused ? 'fa-solid fa-play' : 'fa-solid fa-pause'"
+                            :label="paused ? 'Resume' : 'Pause'" @click="togglePause" />
+                    <!-- The upload goes on while the user uses the rest of the Hub; the header shows it -->
+                    <Button v-if="uploading" severity="secondary" icon="fa-solid fa-angles-down" label="Continue in background"
+                            title="The upload goes on; the header shows its progress" @click="runInBackground" />
 
                     <template v-if="done">
                         <Button v-if="retryableCount > 0" icon="fa-solid fa-rotate-right"
@@ -142,9 +163,9 @@ import Button from 'primevue/button';
 import { bytesToSize } from '@/libs/utils';
 import { freeName, namesClash } from '@/libs/nameRules';
 import { orderCompanionsFirst } from '@/libs/uploadOrder';
-import { useUploadQueue } from '@/composables/useUploadQueue';
-import { createUploadRequests } from '@/libs/upload/uploadRequests';
-import { authorizedGetJson } from '@/libs/upload/uploadFormat';
+import { useUploadsStore } from '@/stores/uploads';
+import { notify } from '@/libs/notify';
+import { matchOpenUploads, storedPercent } from '@/libs/upload/openUploads';
 import { formatDurationSeconds } from '@/libs/format';
 import reg from '@/libs/api/sharedRegistry';
 import { markRaw } from 'vue';
@@ -158,9 +179,15 @@ const joinPath = (folder, name) => (folder ? `${folder}/${name}` : name);
 /**
  * DatasetUpload - upload panel for adding files to a dataset.
  *
- * Presentation over the upload queue (useUploadQueue): requests start as soon as a
- * slot frees, small files go in bundles, large ones as resumable chunks, and a file whose
+ * Presentation over the upload queue of the dataset (useUploadQueue, kept by the app-wide store of stores/uploads.js):
+ * requests start as soon as a slot frees, small files go in bundles, large ones as resumable chunks, and a file whose
  * bytes are all sent shows "Processing on server" until the server has added it.
+ *
+ * The queue outlives this dialog (FR-UPL-04): "Continue in background" closes it and the upload goes on, also on
+ * another page (the header shows it); Pause and Resume stop and restart it; Cancel stops it and removes the chunks the
+ * server stores (the files already sent stay). After a reload the dialog offers the chunked uploads that the server
+ * still stores: a file selected again that has the source name, size and last-modified time of one of them resumes it,
+ * at the path it was started at, before the question about names that exist.
  *
  * Names that exist (FR-UPL-03, AC-023): before the files are queued, each destination folder is
  * listed once, and the files whose names exist there (by the case rule of D-040) go to one prompt:
@@ -189,11 +216,16 @@ export default {
             waitingForFiles: false,  // True when waiting for user to select files
             checkingNames: false,    // Listing the destination folders before the files are queued
             conflictPrompt: null,    // { items, resolve } while the conflict prompt is open
-            // Created with the data, before the watchers read it; raw: its state ref is the
-            // reactive part
-            queue: markRaw(this.createQueue()),
+            // The dataset's queue, kept by the store; read with the data, before the watchers read it; raw: its
+            // state ref is the reactive part
+            queue: markRaw(useUploadsStore().queueFor(this.organization, this.dataset)),
+            // The chunked uploads that the server stores for this dataset and no queue holds (the resume offer)
+            openUploads: [],
             // One prompt at a time; files that 409 wait here for it, each once (raw: bookkeeping)
-            prompts: markRaw({ chain: Promise.resolve(), raced: [], reprompted: new Set(), closed: false })
+            prompts: markRaw({ chain: Promise.resolve(), raced: [], reprompted: new Set(), closed: false }),
+            // Stops listening to the store; the list of open uploads being read; the session the dialog was opened
+            // in (raw: bookkeeping)
+            hooks: markRaw({ unsubscribe: null, opened: Promise.resolve(), session: 0 })
         }
     },
     computed: {
@@ -208,6 +240,9 @@ export default {
         },
         done() {
             return this.counts.total > 0 && this.snapshot?.done === true;
+        },
+        paused() {
+            return this.snapshot?.paused === true;
         },
         // Every byte is sent: what is left is the server adding the files
         allSent() {
@@ -269,7 +304,28 @@ export default {
             if (val) this.activeFilter = this.counts.error > 0 ? 'error' : 'done';
         }
     },
+    created() {
+        const uploads = useUploadsStore();
+        // Its queue is this session's: files chosen in it are not queued once it has ended (enqueue)
+        this.hooks.session = uploads.session();
+        uploads.attach(this.organization, this.dataset);
+        this.hooks.unsubscribe = uploads.subscribe(this.organization, this.dataset, {
+            added: entries => entries.forEach(entry => this.$emit('upload', entry)),
+            failed: item => this.onItemFailed(item)
+        });
+    },
     mounted() {
+        // The server's open uploads (after a reload): read once, before the files are matched to them
+        this.hooks.opened = this.loadOpenUploads();
+
+        // The dialog of a dataset that is uploading (opened again, or after "Continue in background"): its progress
+        if (this.counts.total > 0) {
+            this.waitingForFiles = false;
+            this.$emit('update:closable', !this.uploading);
+            if (this.filesToUpload != null && this.filesToUpload.length > 0) this.enqueue(this.filesToUpload);
+            return;
+        }
+
         // Dialog starts not closable during upload
         this.$emit('update:closable', false);
 
@@ -283,38 +339,60 @@ export default {
         }
     },
     beforeUnmount() {
-        // No ghost uploads: requests in flight and pending retries stop with the dialog
+        // The upload does not stop with the dialog (FR-UPL-04): the queue is the store's, and Cancel is a button
         this.prompts.closed = true;
-        this.queue.cancel();
+        this.hooks.unsubscribe?.();
+        useUploadsStore().detach(this.organization, this.dataset);
     },
     methods: {
-        createQueue() {
-            const requests = createUploadRequests({
-                baseUrl: `${reg.url}${reg.Organization(this.organization).Dataset(this.dataset).baseApi}`,
-                authToken: () => reg.getAuthToken(),
-                getJson: authorizedGetJson(reg),
-                destination: item => item.path
-            });
-            return useUploadQueue({
-                send: requests.send,
-                onItemDone: (_item, entry) => this.$emit('upload', entry),
-                onItemFailed: item => this.onItemFailed(item),
-                // Dataset size, entry count, storage: the cached reads are stale now
-                onIdle: () => reg.invalidateCache()
-            });
+        bytesToSize,
+        storedPercent,
+
+        async loadOpenUploads() {
+            this.openUploads = await useUploadsStore().listOpen(this.organization, this.dataset);
+        },
+
+        async discardOpen(open) {
+            try {
+                await useUploadsStore().discardOpen(this.organization, this.dataset, open.fileId);
+                this.openUploads = this.openUploads.filter(o => o.fileId !== open.fileId);
+            } catch (e) {
+                console.warn('Could not discard the interrupted upload:', e);
+                notify.error(e, { summary: 'Interrupted upload' });
+            }
         },
 
         datasetApi() {
             return reg.Organization(this.organization).Dataset(this.dataset);
         },
 
+        /**
+         * Whether what the dialog began must stop: it is closing, or the session it was opened in has ended (the
+         * listing and the prompt take time; signing out, or a 401 meanwhile, ends the session).
+         */
+        abandoned() {
+            return this.prompts.closed || useUploadsStore().session() !== this.hooks.session;
+        },
+
         // Companions (.mtl, textures, ...) are queued before 3D models (best effort)
         async enqueue(fileList) {
-            const files = orderCompanionsFirst(Array.from(fileList).map(file => {
+            const selected = orderCompanionsFirst(Array.from(fileList).map(file => {
                 // webkitRelativePath holds the folder structure of a folder pick
                 if (file.webkitRelativePath && !file.fullPath) file.fullPath = file.webkitRelativePath;
                 return file;
             }));
+
+            // A file that has the source name, size and last-modified time of an open upload resumes it, at the path it
+            // was started at (Keep both may have renamed it): before the names are checked, its own chunks are no clash
+            await this.hooks.opened;
+            if (this.abandoned()) return;
+            const { resumed, rest: files } = matchOpenUploads(this.openUploads, selected);
+            if (resumed.length) {
+                const used = new Set(resumed.map(r => r.open.fileId));
+                this.openUploads = this.openUploads.filter(o => !used.has(o.fileId));
+            }
+            const resuming = resumed.map(({ file, open }) => ({ file, path: open.path, fileId: open.fileId }));
+
             const planned = files.map(file => {
                 const filePath = file.fullPath || file.name;
                 return { file, path: !this.path ? filePath : (this.path + "/" + filePath) };
@@ -328,12 +406,18 @@ export default {
             } finally {
                 this.checkingNames = false;
             }
+            if (this.abandoned()) return;
             const conflicts = planned.filter(p => names.get(parentOf(p.path)).some(n => namesClash(n, nameOf(p.path))));
 
             let choices = [];
             if (conflicts.length) {
                 choices = await this.askConflicts(conflicts.map(p => ({ path: p.path })));
-                if (choices === 'cancel') return this.nothingQueued();
+                if (this.abandoned()) return;
+                if (choices === 'cancel') {
+                    // The files that resume are not part of the question: they go on
+                    if (resuming.length) useUploadsStore().add(this.organization, this.dataset, resuming, { session: this.hooks.session });
+                    return this.nothingQueued();
+                }
             }
             const choiceOf = new Map(conflicts.map((p, i) => [p, choices[i]]));
 
@@ -345,7 +429,7 @@ export default {
                 taken.get(folder).push(nameOf(p.path));
             }
 
-            const queued = [];
+            const queued = [...resuming];
             for (const p of planned) {
                 const choice = choiceOf.get(p);
                 if (choice === 'skip') continue;
@@ -361,7 +445,7 @@ export default {
                 }
             }
 
-            if (queued.length) this.queue.add(queued);
+            if (queued.length) useUploadsStore().add(this.organization, this.dataset, queued, { session: this.hooks.session });
             else this.nothingQueued();
         },
 
@@ -436,11 +520,12 @@ export default {
             const raced = this.prompts.raced.splice(0);
             if (!raced.length || this.prompts.closed) return;
             const choices = await this.askConflicts(raced.map(r => ({ path: r.path })));
-            if (choices === 'cancel' || this.prompts.closed) return;
+            if (choices === 'cancel' || this.abandoned()) return;
 
             // Keep both: a name that the folder, the files of this upload and the names chosen here do not have
             const keep = raced.filter((_, i) => choices[i] === 'keep');
             const listed = await this.namesInFolders(keep.map(r => parentOf(r.path)));
+            if (this.abandoned()) return;
             const queued = this.queue.rows().map(row => row.path);
             const taken = folder => {
                 const names = [...listed.get(folder)];
@@ -472,8 +557,21 @@ export default {
             this.queue.retryFailed();
         },
 
-        handleCancel() {
-            this.queue.cancel();
+        // Stops the queue and removes the chunks the server stores; the files already sent stay (D-045)
+        async handleCancel() {
+            await useUploadsStore().cancel(this.organization, this.dataset);
+            this.$emit('update:closable', true);
+            this.$emit('close');
+        },
+
+        togglePause() {
+            const uploads = useUploadsStore();
+            if (this.paused) uploads.resume(this.organization, this.dataset);
+            else uploads.pause(this.organization, this.dataset);
+        },
+
+        // The queue is the store's: closing the dialog leaves it running
+        runInBackground() {
             this.$emit('update:closable', true);
             this.$emit('close');
         },
@@ -739,6 +837,7 @@ export default {
 /* File selection screen */
 .file-selection-screen {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: var(--ddb-spacing-xl) 3.75rem;
@@ -763,6 +862,53 @@ export default {
 
 .selection-content p {
     margin: 0 0 var(--ddb-spacing-xl) 0;
+    color: var(--ddb-text-secondary);
+    font-size: var(--ddb-font-size-base);
+}
+
+/* Chunked uploads the server still stores (a reload, a closed tab) */
+.open-uploads {
+    width: 100%;
+    border-top: var(--ddb-border-width) solid var(--ddb-border);
+    padding-top: var(--ddb-spacing-md);
+}
+
+.open-uploads h4 {
+    margin: 0 0 var(--ddb-spacing-xs) 0;
+    font-size: var(--ddb-font-size-base);
+    color: var(--ddb-text);
+}
+
+.open-uploads p {
+    margin: 0 0 var(--ddb-spacing-sm) 0;
+    color: var(--ddb-text-secondary);
+    font-size: var(--ddb-font-size-base);
+}
+
+.open-uploads ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.open-upload {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-xs) 0;
+}
+
+.open-upload-name {
+    flex: 1 1 8rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ddb-text);
+}
+
+.open-upload-state {
     color: var(--ddb-text-secondary);
     font-size: var(--ddb-font-size-base);
 }

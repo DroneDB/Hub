@@ -150,3 +150,131 @@ describe('uploadRequests conflicts', () => {
         expect(result.noRetry).toBe(false);
     });
 });
+
+describe('uploadRequests chunk file id (FR-UPL-04, §7.1)', () => {
+    const LAMB = 'orthos/Lamb.tif';
+    const bigFile = (lastModified = 1731000000123, name = 'Lamb-Hill.tif', size = 35) =>
+        new File(['x'.repeat(size)], name, { lastModified });
+    const chunked = (path = LAMB, file = bigFile(), extra = {}) => ({ id: 'big', name: path, path, size: file.size, file, ...extra });
+
+    function chunkRequests() {
+        const calls = [];
+        const transport = vi.fn(async ({ url, body }) => {
+            calls.push({ url, body });
+            return url.endsWith('/commit') ? { status: 201, body: { path: 'x' }, uploaded: true } : { status: 200, body: {}, uploaded: true };
+        });
+        const getJson = vi.fn(async () => ({ status: 404, body: null }));
+        const r = requests(transport, getJson, { datasetId: 'o/d', chunkBytes: 10 });
+        return { r, calls, getJson };
+    }
+
+    it('makes the id from the dataset, the path, the size and the last-modified time: the same file gives the same id', async () => {
+        const first = chunkRequests();
+        await first.r.send({ kind: 'chunked', items: [chunked()] }, hooks());
+        // After a reload: a new File object of the same file, a new request layer
+        const second = chunkRequests();
+        await second.r.send({ kind: 'chunked', items: [chunked()] }, hooks());
+
+        const expected = '067e1f8df03556fe4190e13ec1e3964dcfe96fcb27d84d293694ee63bf016c7e';
+        expect(first.calls[0].body.get('fileId')).toBe(expected);
+        expect(second.calls[0].body.get('fileId')).toBe(expected);
+        // The state of the upload and its commit are asked for by that id
+        expect(first.getJson).toHaveBeenCalledWith(`http://hub/orgs/o/ds/d/obj/chunk/${expected}`);
+        expect(first.calls.at(-1).url).toBe(`http://hub/orgs/o/ds/d/obj/chunk/${expected}/commit`);
+    });
+
+    it('gives another id for another last-modified time, another size and another path (Keep both)', async () => {
+        const ids = [];
+        for (const item of [chunked(LAMB, bigFile(1731000000124)), chunked(LAMB, bigFile(1731000000123, 'Lamb-Hill.tif', 36)),
+            chunked('orthos/Lamb (2).tif')]) {
+            const { r, calls } = chunkRequests();
+            await r.send({ kind: 'chunked', items: [item] }, hooks());
+            ids.push(calls[0].body.get('fileId'));
+        }
+
+        expect(ids).toEqual([
+            'c45d8fabec5c39d2151f76dad84596fa96e5f4bfb2e46289cf00c97b0c3cbfd0',
+            'ce59c3fafd450744a9215a884bbf3fbe8c410ba420f1e30381669e734ade48dd',
+            '0b3635bba7b63828fa6c1f6e78e1e6ab6b4cddcd6d17eaa259ddab1f1fc882d8'
+        ]);
+    });
+
+    it('an item that resumes a stored upload keeps its id for its path, and gets the id of the file for another path', async () => {
+        const stored = 'aaaaaaaa-stored-upload-id';
+        const resumed = chunked('orthos/Lamb (2).tif', bigFile(), { fileId: stored, fileIdFor: 'orthos/Lamb (2).tif' });
+        const first = chunkRequests();
+        await first.r.send({ kind: 'chunked', items: [resumed] }, hooks());
+        expect(first.calls[0].body.get('fileId')).toBe(stored);
+
+        // Keep both after the resume's own conflict: another path, so the id of the file at that path
+        resumed.path = LAMB;
+        const second = chunkRequests();
+        await second.r.send({ kind: 'chunked', items: [resumed] }, hooks());
+        expect(second.calls[0].body.get('fileId')).toBe('067e1f8df03556fe4190e13ec1e3964dcfe96fcb27d84d293694ee63bf016c7e');
+    });
+
+    it('every chunk carries the file name and the last-modified time of the file on the disk', async () => {
+        const { r, calls } = chunkRequests();
+
+        await r.send({ kind: 'chunked', items: [chunked()] }, hooks());
+
+        const chunks = calls.filter(c => !c.url.endsWith('/commit'));
+        expect(chunks).toHaveLength(4);
+        for (const { body } of chunks) {
+            expect(body.get('fileName')).toBe('Lamb-Hill.tif');
+            expect(body.get('lastModified')).toBe('1731000000123');
+            expect(body.get('path')).toBe(LAMB);
+        }
+    });
+});
+
+describe('uploadRequests and the session', () => {
+    it('a 401 of a chunk goes to onUnauthorized (the requests carry their own bearer header), and the job stops there', async () => {
+        const onUnauthorized = vi.fn();
+        const transport = vi.fn(async () => ({ status: 401, body: { title: 'Unauthorized' }, uploaded: true }));
+
+        const [result] = await requests(transport, undefined, { chunkBytes: 4, onUnauthorized })
+            .send({ kind: 'chunked', items: [item('big')] }, hooks());
+
+        expect(onUnauthorized).toHaveBeenCalledTimes(1);
+        expect(transport).toHaveBeenCalledTimes(1);
+        expect(result).toMatchObject({ id: 'big', ok: false, status: 401 });
+    });
+
+    it('a 401 of a single file, and of a chunk status read, go to onUnauthorized too', async () => {
+        const onUnauthorized = vi.fn();
+        const transport = vi.fn(async () => ({ status: 401, body: null, uploaded: true }));
+        const getJson = vi.fn(async () => ({ status: 401, body: null }));
+        const r = requests(transport, getJson, { chunkBytes: 4, onUnauthorized });
+
+        await r.send({ kind: 'single', items: [item('a')] }, hooks());
+        expect(onUnauthorized).toHaveBeenCalledTimes(1);
+        await r.send({ kind: 'chunked', items: [item('big')] }, hooks());
+        // The status read, then the first chunk
+        expect(onUnauthorized).toHaveBeenCalledTimes(3);
+    });
+
+    it('asks canSend before each request: once it says no, nothing more is sent and the job ends as aborted', async () => {
+        let allowed = 2;
+        const canSend = vi.fn(() => allowed-- > 0);
+        const transport = vi.fn(async () => ({ status: 200, body: {}, uploaded: true }));
+        const getJson = vi.fn(async () => ({ status: 404, body: null }));
+
+        const sending = requests(transport, getJson, { chunkBytes: 4, canSend })
+            .send({ kind: 'chunked', items: [item('big')] }, hooks());
+
+        await expect(sending).rejects.toMatchObject({ name: 'AbortError' });
+        // The status read and the first chunk; the second chunk is not sent
+        expect(getJson).toHaveBeenCalledTimes(1);
+        expect(transport).toHaveBeenCalledTimes(1);
+        expect(canSend).toHaveBeenCalledTimes(3);
+    });
+
+    it('a refused single file is not sent at all', async () => {
+        const transport = vi.fn();
+
+        await expect(requests(transport, undefined, { canSend: () => false }).send({ kind: 'single', items: [item('a')] }, hooks()))
+            .rejects.toMatchObject({ name: 'AbortError' });
+        expect(transport).not.toHaveBeenCalled();
+    });
+});

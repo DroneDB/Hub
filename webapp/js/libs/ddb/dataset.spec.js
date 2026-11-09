@@ -300,3 +300,27 @@ describe('Dataset.search', () => {
         expect(options.signal).toBe(signal);
     });
 });
+
+describe('Dataset chunked upload sessions (FR-UPL-04, §7.1)', () => {
+    function setup(answer = []) {
+        const registry = { remote: 'hub.example.com', secure: true, makeRequest: vi.fn(async () => answer) };
+        return { ds: new Dataset(registry, 'my_org', 'my_ds'), request: registry.makeRequest };
+    }
+
+    it('lists the open uploads with GET obj/chunk, not from the cache', async () => {
+        const open = [{ fileId: 'a', path: 'x.tif' }];
+        const { ds, request } = setup(open);
+
+        expect(await ds.listChunkUploads()).toBe(open);
+
+        expect(request).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/obj/chunk', { method: 'GET', cache: false });
+    });
+
+    it('removes the chunks of an upload with DELETE obj/chunk/{fileId}, the id escaped', async () => {
+        const { ds, request } = setup();
+
+        await ds.deleteChunkUpload('a/b c');
+
+        expect(request).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/obj/chunk/a%2Fb%20c', 'DELETE');
+    });
+});
