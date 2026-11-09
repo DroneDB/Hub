@@ -274,7 +274,8 @@ export default {
             this.error = '';
 
             try {
-                await this.dataset.writeObj(this.entry.path, this.currentContent);
+                // The file that is open: saving replaces it
+                await this.dataset.writeObj(this.entry.path, this.currentContent, { overwrite: true });
                 this.originalContent = this.currentContent;
                 this.$emit('saved', this.entry.path);
             } catch (e) {

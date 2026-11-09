@@ -186,7 +186,9 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
         try {
             await dataset.value.writeObj(path, serializeCamerasFile(cameras.value, {
                 upAxis, up: orientation.autoUp?.value?.up ?? null, tiltRoll: orientation.tiltRoll.value, tiltPitch: orientation.tiltPitch.value
-            }, { scale: scale.value, annotations: annotations.value, measurements: measurements.value }));
+            }, { scale: scale.value, annotations: annotations.value, measurements: measurements.value }),
+            // Its own views file, or one the user agreed to replace above
+            { overwrite: true });
         } catch (e) {
             notify.error(`Failed to save the views: ${e instanceof Error ? e.message : e}`, { summary: 'Saved views' });
             return false;

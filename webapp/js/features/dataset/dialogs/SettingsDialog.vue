@@ -266,7 +266,8 @@ export default {
                           : 'jpg';
                 const path = `thumbnail.${ext}`;
 
-                await this.dataset.uploadObj(path, file);
+                // The dataset's thumbnail: a new one replaces it
+                await this.dataset.uploadObj(path, file, { overwrite: true });
 
                 // Refresh preview with cache-busting timestamp
                 this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
@@ -316,7 +317,7 @@ export default {
             try {
                 switch (document) {
                     case "README.md":
-                        entry = await this.dataset.writeObj(document, "\n");
+                        entry = await this.dataset.writeObj(document, "\n", { overwrite: true });
                         this.readme = document;
                         break;
                     default:

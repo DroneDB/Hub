@@ -373,16 +373,17 @@ export default class Dataset {
         return this.registry.postFormData(`${this.baseApi}/transfer`, formData);
     }
 
-    async writeObj(path, content) {
-        const formData = new FormData();
-        formData.append('path', path);
-        formData.append('file', new Blob([content]));
-        return this.registry.postFormData(`${this.baseApi}/obj`, formData);
+    // A file that exists at `path` (any letter case) is refused with 409 and `conflictPath` unless
+    // `overwrite` is true (D-040): a caller that saves a file it opened, or one it owns, replaces it
+    async writeObj(path, content, { overwrite = false } = {}) {
+        return this.uploadObj(path, new Blob([content]), { overwrite });
     }
 
-    async uploadObj(path, file) {
+    async uploadObj(path, file, { overwrite = false } = {}) {
         const formData = new FormData();
         formData.append('path', path);
+        // Before the file: the Registry reads the flag sent before the file part
+        if (overwrite) formData.append('overwrite', 'true');
         formData.append('file', file);
         return this.registry.postFormData(`${this.baseApi}/obj`, formData);
     }

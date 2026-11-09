@@ -55,10 +55,12 @@ describe('MeasurementStorage.load', () => {
 describe('MeasurementStorage.save', () => {
     it('writes the stockpiles, contours and profiles of the 2D map once (they are on the map and in the file)', async () => {
         const mine = () => [feature('length', 'l1'), feature('stockpile', 's1'), feature('contour', 'c1'), feature('profile', 'r1')];
-        const { storage, written } = storageWith(mine());
+        const { dataset, storage, written } = storageWith(mine());
         const result = await storage.save(collection(mine()));
         expect(ids(await written())).toEqual(['l1', 's1', 'c1', 'r1']);
         expect(result).toMatchObject({ count: 4, deleted: false });
+        // The file of the measurements is replaced, not refused as a name that exists (FR-UPL-03)
+        expect(dataset.writeObj.mock.calls[0][2]).toEqual({ overwrite: true });
     });
 
     it('removes a stockpile deleted on the map', async () => {

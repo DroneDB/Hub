@@ -246,3 +246,31 @@ describe('Dataset meta writes', () => {
         expect(post).not.toHaveBeenCalled();
     });
 });
+
+describe('Dataset file writes', () => {
+    function datasetPosting() {
+        const registry = { remote: 'hub.example.com', secure: true, postFormData: vi.fn(async () => ({ ok: true })) };
+        return { ds: new Dataset(registry, 'my_org', 'my_ds'), post: registry.postFormData };
+    }
+    const names = formData => [...formData.keys()];
+
+    // FR-UPL-03: the Registry refuses a name that exists unless overwrite comes before the file
+    it('writeObj and uploadObj send no overwrite unless asked', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.writeObj('notes.txt', 'text');
+        await ds.uploadObj('photo.jpg', new Blob(['x']));
+        expect(post.mock.calls[0][0]).toBe('/orgs/my_org/ds/my_ds/obj');
+        expect(names(post.mock.calls[0][1])).toEqual(['path', 'file']);
+        expect(names(post.mock.calls[1][1])).toEqual(['path', 'file']);
+    });
+
+    it('writeObj and uploadObj send overwrite=true before the file when they replace', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.writeObj('notes.txt', 'text', { overwrite: true });
+        await ds.uploadObj('photo.jpg', new Blob(['x']), { overwrite: true });
+        for (const [, formData] of post.mock.calls) {
+            expect(names(formData)).toEqual(['path', 'overwrite', 'file']);
+            expect(formData.get('overwrite')).toBe('true');
+        }
+    });
+});

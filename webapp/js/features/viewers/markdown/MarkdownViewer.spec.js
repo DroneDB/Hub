@@ -114,7 +114,7 @@ describe('MarkdownViewer', () => {
         await wrapper.find('button[aria-label="Save"]').trigger('click');
         await flushPromises();
 
-        expect(source.writeObj).toHaveBeenCalledWith('readme.md', '# New\n\n**bold** <script>alert(1)</script>');
+        expect(source.writeObj).toHaveBeenCalledWith('readme.md', '# New\n\n**bold** <script>alert(1)</script>', { overwrite: true });
         expect(wrapper.find('textarea').exists()).toBe(false);
         const content = wrapper.find('.content');
         expect(content.find('h1').text()).toBe('New');
@@ -204,7 +204,7 @@ describe('MarkdownViewer', () => {
         it('Ctrl+S (or Cmd+S) saves the text and confirms with a toast', async () => {
             await editAndType('# Old', '# New');
             await key('s', { ctrlKey: true });
-            expect(source.writeObj).toHaveBeenCalledWith('readme.md', '# New');
+            expect(source.writeObj).toHaveBeenCalledWith('readme.md', '# New', { overwrite: true });
             expect(notify.success).toHaveBeenCalledWith('Saved "readme.md"', { summary: 'File saved' });
             expect(wrapper.find('textarea').exists()).toBe(false);
 
@@ -212,7 +212,7 @@ describe('MarkdownViewer', () => {
             await flushPromises();
             await wrapper.find('textarea').setValue('# Newer');
             await key('s', { metaKey: true });
-            expect(source.writeObj).toHaveBeenLastCalledWith('readme.md', '# Newer');
+            expect(source.writeObj).toHaveBeenLastCalledWith('readme.md', '# Newer', { overwrite: true });
         });
 
         it('leaves Esc and Ctrl+S to another window of the app open over the editor', async () => {
@@ -266,7 +266,7 @@ describe('MarkdownViewer', () => {
             await flushPromises();
             await answer('Save');
             expect(await leaving).toBe(true);
-            expect(source.writeObj).toHaveBeenCalledWith('readme.md', '# New');
+            expect(source.writeObj).toHaveBeenCalledWith('readme.md', '# New', { overwrite: true });
         });
 
         it('asks nothing for an editor with no change', async () => {

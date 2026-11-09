@@ -314,7 +314,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 const res = await dataset.registry.fetchRaw(dataset.thumbUrl(file.entry.path, 1024));
                 if (!res.ok) throw new Error(`Failed to fetch thumbnail: ${res.statusText}`);
                 const blob = await res.blob();
-                await dataset.uploadObj(candidates[0], new File([blob], candidates[0], { type: blob.type }));
+                // The replace was confirmed above
+                await dataset.uploadObj(candidates[0], new File([blob], candidates[0], { type: blob.type }), { overwrite: true });
                 notify.success('Dataset cover set successfully', { summary: 'Cover Set' });
                 emitter.emit('addItems', []);
             });

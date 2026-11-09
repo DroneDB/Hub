@@ -128,8 +128,10 @@ describe('saving', () => {
         expect(cams.activeIndex.value).toBe(1);
 
         expect(await cams.save()).toBe(true);
-        const [path, content] = dataset.writeObj.mock.calls[0];
+        const [path, content, options] = dataset.writeObj.mock.calls[0];
         expect(path).toBe('scenes/site_cameras.json');
+        // Its own views file: the save replaces it (FR-UPL-03)
+        expect(options).toEqual({ overwrite: true });
         expect(JSON.parse(content)).toMatchObject({ orientation: { upAxis: '+z', flipped: false, tiltRoll: 3, tiltPitch: -2 } });
         expect(JSON.parse(content).cameras).toHaveLength(2);
         expect(cams.dirty.value).toBe(false);

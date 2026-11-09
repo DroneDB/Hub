@@ -49,6 +49,9 @@
             </div>
 
             <div class="upload-body">
+                <p v-if="checkingNames" class="checking-names">
+                    <i class="fa-solid fa-circle-notch fa-spin" /> Looking for files with the same names in the destination...
+                </p>
                 <VirtualScroller
                     v-slot="{ item }"
                     class="file-list-scroller"
@@ -86,7 +89,7 @@
                         <div class="summary-stat">
                             <i class="fa-solid fa-database" />
                             <span class="stat-label">Transferred:</span>
-                            <span class="stat-value">{{ humanTotalBytes }}</span>
+                            <span class="stat-value">{{ humanTransferred }}</span>
                         </div>
                         <div class="summary-stat">
                             <i class="fa-solid fa-gauge" />
@@ -102,6 +105,11 @@
                             <i class="fa-solid fa-triangle-exclamation" /> {{ counts.done }} succeeded, {{ counts.error }} failed
                         </template>
                     </div>
+                    <p v-if="counts.error > 0 && retryableCount === 0" class="no-retry-reason">
+                        <i class="fa-solid fa-circle-info" />
+                        {{ counts.error === 1 ? 'The failed file was refused' : 'The failed files were refused' }}:
+                        sending {{ counts.error === 1 ? 'it' : 'them' }} again would fail the same way. The reason is on each file.
+                    </p>
                     <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
                         <i class="fa-solid fa-stethoscope" /> Uploads slower than expected? Test the connection
                     </router-link>
@@ -112,21 +120,27 @@
                             @click="handleCancel" />
 
                     <template v-if="done">
-                        <Button v-if="counts.error > 0" icon="fa-solid fa-rotate-right"
-                                :label="'Retry Failed (' + counts.error + ')'" @click="retryAllFailed" />
+                        <Button v-if="retryableCount > 0" icon="fa-solid fa-rotate-right"
+                                :label="'Retry Failed (' + retryableCount + ')'" @click="retryAllFailed" />
                         <Button severity="secondary" icon="fa-solid fa-check" label="Close" @click="finishUpload" />
                     </template>
                 </div>
             </div>
         </template><!-- end upload progress view -->
+
+        <!-- Names that exist in the destination: asked before the files are queued (and again after a 409) -->
+        <PasteConflictDialog v-if="conflictPrompt" verb="upload" keep-both :items="conflictPrompt.items"
+                             @resolve="conflictPrompt.resolve" />
     </div>
 </template>
 
 <script>
 import FileUploadRow from './FileUploadRow.vue';
+import PasteConflictDialog from '@/features/dataset/dialogs/PasteConflictDialog.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import Button from 'primevue/button';
 import { bytesToSize } from '@/libs/utils';
+import { freeName, namesClash } from '@/libs/nameRules';
 import { orderCompanionsFirst } from '@/libs/uploadOrder';
 import { useUploadQueue } from '@/composables/useUploadQueue';
 import { createUploadRequests } from '@/libs/upload/uploadRequests';
@@ -137,17 +151,27 @@ import { markRaw } from 'vue';
 
 const EMPTY_COUNTS = { total: 0, pending: 0, uploading: 0, processing: 0, done: 0, error: 0 };
 
+const parentOf = path => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+const nameOf = path => path.slice(path.lastIndexOf('/') + 1);
+const joinPath = (folder, name) => (folder ? `${folder}/${name}` : name);
+
 /**
  * DatasetUpload - upload panel for adding files to a dataset.
  *
  * Presentation over the upload queue (useUploadQueue): requests start as soon as a
  * slot frees, small files go in bundles, large ones as resumable chunks, and a file whose
  * bytes are all sent shows "Processing on server" until the server has added it.
+ *
+ * Names that exist (FR-UPL-03, AC-023): before the files are queued, each destination folder is
+ * listed once, and the files whose names exist there (by the case rule of D-040) go to one prompt:
+ * Replace (sent with overwrite), Keep both (a free name from freeName) or Skip (not sent). A file
+ * the Registry still refuses with 409 and conflictPath (another upload took the name meanwhile)
+ * goes back to the prompt once.
  */
 export default {
     components: {
-        
         FileUploadRow,
+        PasteConflictDialog,
         VirtualScroller,
         Button
     },
@@ -163,9 +187,13 @@ export default {
             error: null,
             activeFilter: 'uploading',
             waitingForFiles: false,  // True when waiting for user to select files
+            checkingNames: false,    // Listing the destination folders before the files are queued
+            conflictPrompt: null,    // { items, resolve } while the conflict prompt is open
             // Created with the data, before the watchers read it; raw: its state ref is the
             // reactive part
-            queue: markRaw(this.createQueue())
+            queue: markRaw(this.createQueue()),
+            // One prompt at a time; files that 409 wait here for it, each once (raw: bookkeeping)
+            prompts: markRaw({ chain: Promise.resolve(), raced: [], reprompted: new Set(), closed: false })
         }
     },
     computed: {
@@ -192,6 +220,15 @@ export default {
         },
         humanTotalBytes() {
             return bytesToSize(this.snapshot?.totalBytes ?? 0);
+        },
+        // What was added to the dataset: the files that are done, not what was sent and refused
+        humanTransferred() {
+            return bytesToSize(this.snapshot?.doneBytes ?? 0);
+        },
+        // The failed files that can succeed when sent again (a refusal has noRetry)
+        retryableCount() {
+            if (!this.counts.error) return 0;
+            return (this.snapshot?.items ?? []).filter(i => i.status === 'error' && i.canRetry).length;
         },
         humanBytesSent() {
             return bytesToSize(this.snapshot?.bytesSent ?? 0);
@@ -247,6 +284,7 @@ export default {
     },
     beforeUnmount() {
         // No ghost uploads: requests in flight and pending retries stop with the dialog
+        this.prompts.closed = true;
         this.queue.cancel();
     },
     methods: {
@@ -260,22 +298,170 @@ export default {
             return useUploadQueue({
                 send: requests.send,
                 onItemDone: (_item, entry) => this.$emit('upload', entry),
+                onItemFailed: item => this.onItemFailed(item),
                 // Dataset size, entry count, storage: the cached reads are stale now
                 onIdle: () => reg.invalidateCache()
             });
         },
 
+        datasetApi() {
+            return reg.Organization(this.organization).Dataset(this.dataset);
+        },
+
         // Companions (.mtl, textures, ...) are queued before 3D models (best effort)
-        enqueue(fileList) {
+        async enqueue(fileList) {
             const files = orderCompanionsFirst(Array.from(fileList).map(file => {
                 // webkitRelativePath holds the folder structure of a folder pick
                 if (file.webkitRelativePath && !file.fullPath) file.fullPath = file.webkitRelativePath;
                 return file;
             }));
-            this.queue.add(files.map(file => {
+            const planned = files.map(file => {
                 const filePath = file.fullPath || file.name;
                 return { file, path: !this.path ? filePath : (this.path + "/" + filePath) };
+            });
+
+            // The names in each destination folder, before a byte is sent
+            this.checkingNames = true;
+            let names;
+            try {
+                names = await this.namesInFolders(planned.map(p => parentOf(p.path)));
+            } finally {
+                this.checkingNames = false;
+            }
+            const conflicts = planned.filter(p => names.get(parentOf(p.path)).some(n => namesClash(n, nameOf(p.path))));
+
+            let choices = [];
+            if (conflicts.length) {
+                choices = await this.askConflicts(conflicts.map(p => ({ path: p.path })));
+                if (choices === 'cancel') return this.nothingQueued();
+            }
+            const choiceOf = new Map(conflicts.map((p, i) => [p, choices[i]]));
+
+            // Keep both: a name that neither the folder nor another file of this upload has
+            const taken = new Map();
+            for (const p of planned) {
+                const folder = parentOf(p.path);
+                if (!taken.has(folder)) taken.set(folder, [...names.get(folder)]);
+                taken.get(folder).push(nameOf(p.path));
+            }
+
+            const queued = [];
+            for (const p of planned) {
+                const choice = choiceOf.get(p);
+                if (choice === 'skip') continue;
+                if (choice === 'replace') {
+                    queued.push({ ...p, overwrite: true });
+                } else if (choice === 'keep') {
+                    const folder = parentOf(p.path);
+                    const name = freeName(nameOf(p.path), taken.get(folder));
+                    taken.get(folder).push(name);
+                    queued.push({ file: p.file, path: joinPath(folder, name) });
+                } else {
+                    queued.push(p);
+                }
+            }
+
+            if (queued.length) this.queue.add(queued);
+            else this.nothingQueued();
+        },
+
+        // Every file was skipped (or the prompt cancelled): back to the file selection when nothing runs
+        nothingQueued() {
+            if (this.counts.total > 0) return;
+            this.waitingForFiles = true;
+            this.$emit('update:closable', true);
+        },
+
+        /**
+         * The entry names of each folder (one listing per folder). A folder that its parent does not
+         * have is new: nothing to list. A listing that fails counts as empty (the Registry still refuses
+         * a name that exists, and the file comes back to the prompt).
+         * @param {string[]} folders
+         * @returns {Promise<Map<string, string[]>>}
+         */
+        async namesInFolders(folders) {
+            const dataset = this.datasetApi();
+            const base = this.path || '';
+            const memo = new Map();
+            const namesIn = folder => {
+                if (!memo.has(folder)) memo.set(folder, (async () => {
+                    if (folder !== base && folder !== '') {
+                        const parentNames = await namesIn(parentOf(folder));
+                        if (!parentNames.some(n => namesClash(n, nameOf(folder)))) return [];
+                    }
+                    try {
+                        return ((await dataset.list(folder || undefined)) || []).map(e => nameOf(e.path));
+                    } catch (e) {
+                        console.warn(`Could not list the upload destination "${folder}":`, e);
+                        return [];
+                    }
+                })());
+                return memo.get(folder);
+            };
+
+            const unique = [...new Set(folders)];
+            const lists = await Promise.all(unique.map(namesIn));
+            return new Map(unique.map((folder, i) => [folder, lists[i]]));
+        },
+
+        /**
+         * Opens the conflict prompt for `items` (after any prompt already open).
+         * @param {Array<{ path: string }>} items
+         * @returns {Promise<'cancel'|Array<'replace'|'keep'|'skip'>>}
+         */
+        askConflicts(items) {
+            const asked = this.prompts.chain.then(() => new Promise(resolve => {
+                this.conflictPrompt = {
+                    items,
+                    resolve: choice => {
+                        this.conflictPrompt = null;
+                        resolve(choice);
+                    }
+                };
             }));
+            this.prompts.chain = asked.catch(() => {});
+            return asked;
+        },
+
+        // A 409 with conflictPath: another upload took the name after the check; ask once more
+        onItemFailed(item) {
+            if (!item.conflictPath || this.prompts.reprompted.has(item.id)) return;
+            this.prompts.reprompted.add(item.id);
+            this.prompts.raced.push({ id: item.id, path: item.path, conflictPath: item.conflictPath });
+            // Several files of one run that clash go to one prompt
+            if (this.prompts.raced.length === 1) queueMicrotask(() => this.askRaced());
+        },
+
+        async askRaced() {
+            const raced = this.prompts.raced.splice(0);
+            if (!raced.length || this.prompts.closed) return;
+            const choices = await this.askConflicts(raced.map(r => ({ path: r.path })));
+            if (choices === 'cancel' || this.prompts.closed) return;
+
+            // Keep both: a name that the folder, the files of this upload and the names chosen here do not have
+            const keep = raced.filter((_, i) => choices[i] === 'keep');
+            const listed = await this.namesInFolders(keep.map(r => parentOf(r.path)));
+            const queued = this.queue.rows().map(row => row.path);
+            const taken = folder => {
+                const names = [...listed.get(folder)];
+                for (const path of queued) if (parentOf(path) === folder) names.push(nameOf(path));
+                return names;
+            };
+            const takenIn = new Map();
+
+            for (const [i, r] of raced.entries()) {
+                // Skip: the row keeps its reason
+                if (choices[i] === 'replace') {
+                    this.queue.requeue(r.id, { overwrite: true });
+                } else if (choices[i] === 'keep') {
+                    const folder = parentOf(r.path);
+                    if (!takenIn.has(folder)) takenIn.set(folder, taken(folder));
+                    const siblings = takenIn.get(folder);
+                    const name = freeName(nameOf(r.path), [...siblings, nameOf(r.conflictPath)]);
+                    siblings.push(name);
+                    this.queue.requeue(r.id, { path: joinPath(folder, name), overwrite: false });
+                }
+            }
         },
 
         retryFile(file) {
@@ -463,6 +649,17 @@ export default {
 .upload-body {
     flex: 0 0 22rem; /* Fixed height - doesn't change when filtering */
     overflow-y: auto;
+}
+
+.checking-names {
+    margin: var(--ddb-spacing-md);
+    color: var(--ddb-text-secondary);
+}
+
+.no-retry-reason {
+    margin: var(--ddb-spacing-sm) 0 0 0;
+    font-size: var(--ddb-font-size-sm);
+    color: var(--ddb-text-secondary);
 }
 
 .file-list-scroller {

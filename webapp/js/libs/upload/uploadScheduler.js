@@ -26,13 +26,15 @@ const SPEED_WINDOW_MS = 5000;
 /**
  * @param {object} opts
  * @param {(job, hooks) => Promise<Array<object>>} opts.send performs a job; resolves with one
- *   result per item: `{ id, ok: true, entry }` or `{ id, ok: false, status, error, noRetry, retryAfter }`
+ *   result per item: `{ id, ok: true, entry }` or `{ id, ok: false, status, error, noRetry, retryAfter, conflictPath }`
  * @param {() => number} opts.maxConcurrency protocol limit (read on every scheduling decision)
  * @param {object} opts.policy useResilientUpload(): maxRetries, shouldRetryStatus, computeRetryDelayMs, aimd
  * @param {(job) => object} [opts.plan] groups ready items into a job (default: uploadPlanner)
  * @param {(snapshot) => void} [opts.onChange]
  * @param {(active: boolean) => void} [opts.onActivity] true when the first request starts, false when the queue is idle
  * @param {(item, entry) => void} [opts.onItemDone]
+ * @param {(item) => void} [opts.onItemFailed] a file failed for good (after its retries); `item.conflictPath`
+ *   is set when its name exists (409, D-040)
  * @param {number} [opts.throttleMs]
  * @param {{now: () => number, setTimeout: Function, clearTimeout: Function}} [opts.clock]
  */
@@ -49,6 +51,7 @@ export function createUploadScheduler(opts) {
     const samples = [];
     let totalBytes = 0;
     let bytesSent = 0;
+    let doneBytes = 0;
     let jobSeq = 0;
     let notifyTimer = null;
     let lastNotify = -Infinity;
@@ -79,6 +82,8 @@ export function createUploadScheduler(opts) {
                 name: f.name,
                 path: f.path,
                 size: f.size,
+                overwrite: f.overwrite === true,
+                conflictPath: null,
                 status: null,
                 progress: 0,
                 bytesSent: 0,
@@ -179,6 +184,7 @@ export function createUploadScheduler(opts) {
     function succeed(item, entry) {
         setSent(item, item.size);
         setStatus(item, STATUS.DONE);
+        doneBytes += item.size;
         item.entry = entry ?? null;
         item.errorMessage = '';
         opts.policy.aimd.onSuccess();
@@ -213,7 +219,9 @@ export function createUploadScheduler(opts) {
 
         item.errorMessage = r.error || 'Upload failed';
         item.canRetry = !r.noRetry;
+        item.conflictPath = r.conflictPath ?? null;
         setStatus(item, STATUS.ERROR);
+        opts.onItemFailed?.(item);
     }
 
     function retry(id) {
@@ -223,14 +231,32 @@ export function createUploadScheduler(opts) {
         item.notBefore = 0;
         item.canRetry = false;
         item.errorMessage = '';
+        item.conflictPath = null;
         setStatus(item, STATUS.PENDING);
         endedAt = null;
         pump();
         notify();
     }
 
+    // Only what can succeed when sent again: a refusal (noRetry) stays failed with its reason
     function retryFailed() {
-        for (const item of items) if (item.status === STATUS.ERROR) retry(item.id);
+        for (const item of items) if (item.status === STATUS.ERROR && item.canRetry) retry(item.id);
+    }
+
+    /**
+     * Sends a failed file again with a new decision: another dataset path (Keep both) or
+     * `overwrite` (Replace), after the conflict prompt answered a 409.
+     * @param {string} id @param {{ path?: string, overwrite?: boolean }} changes
+     */
+    function requeue(id, changes) {
+        const item = byId.get(id);
+        if (!item || item.status !== STATUS.ERROR) return;
+        if (changes.path != null) {
+            item.path = changes.path;
+            item.name = changes.path;
+        }
+        if (changes.overwrite != null) item.overwrite = changes.overwrite;
+        retry(id);
     }
 
     // Stops everything: requests in flight are aborted, queued and retrying files are dropped
@@ -275,6 +301,8 @@ export function createUploadScheduler(opts) {
             counts: { ...counts },
             totalBytes,
             bytesSent,
+            // What was added to the dataset: the sizes of the files that are done
+            doneBytes,
             speed: bps,
             eta: bps > 0 ? remaining / bps : null,
             done: isIdle(),
@@ -311,6 +339,7 @@ export function createUploadScheduler(opts) {
         add,
         retry,
         retryFailed,
+        requeue,
         cancelAll,
         snapshot
     };

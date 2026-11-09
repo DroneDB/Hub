@@ -21,6 +21,7 @@ let nextItemId = 0;
  * @param {(job, hooks) => Promise<Array>} opts.send the request layer (uploadRequests().send)
  * @param {(job) => object} [opts.plan] request planning (default: bundles and chunks)
  * @param {(item, entry) => void} [opts.onItemDone]
+ * @param {(item) => void} [opts.onItemFailed] a file failed for good (`item.conflictPath`: its name exists)
  * @param {(snapshot) => void} [opts.onIdle] the queue has nothing left to do
  */
 export function useUploadQueue(opts) {
@@ -34,6 +35,7 @@ export function useUploadQueue(opts) {
         policy: resilience,
         maxConcurrency: () => uploadConcurrency(negotiatedProtocol()),
         onItemDone: opts.onItemDone,
+        onItemFailed: opts.onItemFailed,
         onActivity: active => emitter.emit(UPLOAD_ACTIVITY_EVENT, { active }),
         onChange: snapshot => {
             state.value = snapshot;
@@ -43,18 +45,24 @@ export function useUploadQueue(opts) {
 
     return {
         state,
-        /** @param {Array<{file: File, path: string}>} files */
+        /**
+         * @param {Array<{file: File, path: string, overwrite?: boolean}>} files  `path` is the dataset path
+         *   (the name it gets: Keep both changes it); `overwrite` replaces a file that has it (Replace)
+         */
         add(files) {
-            scheduler.add(files.map(({ file, path }) => ({
+            scheduler.add(files.map(({ file, path, overwrite }) => ({
                 id: `u${++nextItemId}`,
                 file,
                 name: path,
                 path,
+                overwrite: overwrite === true,
                 size: file.size
             })));
         },
         retry: id => scheduler.retry(id),
         retryFailed: () => scheduler.retryFailed(),
+        /** @param {string} id @param {{ path?: string, overwrite?: boolean }} changes */
+        requeue: (id, changes) => scheduler.requeue(id, changes),
         cancel() {
             scheduler.cancelAll();
             emitter.emit(UPLOAD_ACTIVITY_EVENT, { active: false });

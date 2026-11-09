@@ -128,7 +128,8 @@ export class MeasurementStorage {
                 features
             };
             const blob = new Blob([JSON.stringify(merged, null, 2)], { type: 'application/geo+json' });
-            await this.dataset.writeObj(this.measurementPath, blob);
+            // The measurement file of this view: merged above, replaced here
+            await this.dataset.writeObj(this.measurementPath, blob, { overwrite: true });
             return { ...result, deleted: false };
         } catch (error) {
             console.error('Failed to save measurements:', error);

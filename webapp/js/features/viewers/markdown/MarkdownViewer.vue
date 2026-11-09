@@ -106,7 +106,8 @@ async function save() {
     const text = rawContent.value;
     saving.value = true;
     try {
-        await dataset.value.writeObj(entry.value.path, text);
+        // The file that is open: saving replaces it
+        await dataset.value.writeObj(entry.value.path, text, { overwrite: true });
         original.value = text;
         editing.value = false;
         notify.success(`Saved "${ddb.pathutils.basename(entry.value.path)}"`, { summary: 'File saved' });

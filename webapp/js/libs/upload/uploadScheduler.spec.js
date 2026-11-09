@@ -137,6 +137,63 @@ describe('uploadScheduler', () => {
         expect(scheduler.snapshot().items[1].status).toBe(STATUS.DONE);
     });
 
+    // FR-UPL-07: a refusal (noRetry) is never sent again by Retry Failed
+    it('marks a 403 as not retryable, and Retry Failed skips it', async () => {
+        const server = heldServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, throttleMs: 0, policy: policy() });
+        scheduler.add([file(0), file(1)]);
+        await flush();
+
+        server.releaseNext({ ok: false, status: 403, error: 'You do not have write access to this dataset', noRetry: true });
+        server.releaseNext({ ok: false, status: 400, error: 'Bad request' });
+        await flush();
+        const [f0, f1] = scheduler.snapshot().items;
+        expect(f0.canRetry).toBe(false);
+        expect(f1.canRetry).toBe(true);
+
+        scheduler.retryFailed();
+        await flush();
+        expect(server.started.slice(2).map(j => j.items[0].id)).toEqual(['f1']);
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.ERROR);
+    });
+
+    it('counts as transferred only the sizes of the files that are done', async () => {
+        const server = heldServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, throttleMs: 0, policy: policy() });
+        scheduler.add([file(0, 2_000_000), file(1, 3_000_000)]);
+        await flush();
+        server.pending[1].hooks.onUploaded(['f1']);
+
+        server.releaseNext();
+        server.releaseNext({ ok: false, status: 403, noRetry: true, error: 'Forbidden' });
+        await flush();
+
+        expect(scheduler.snapshot().doneBytes).toBe(2_000_000);
+    });
+
+    // FR-UPL-03: a 409 with conflictPath goes back to the conflict prompt, whose answer sends it again
+    it('reports a name clash, and sends the file again with the decision of the prompt', async () => {
+        const server = heldServer();
+        const failed = [];
+        const scheduler = createUploadScheduler({
+            send: server.send, maxConcurrency: () => 1, throttleMs: 0, policy: policy(), onItemFailed: item => failed.push({ ...item })
+        });
+        scheduler.add([{ ...file(0), overwrite: false }]);
+        await flush();
+
+        server.releaseNext({ ok: false, status: 409, noRetry: true, error: 'exists', conflictPath: 'F0.jpg' });
+        await flush();
+        expect(failed).toMatchObject([{ id: 'f0', conflictPath: 'F0.jpg', canRetry: false }]);
+
+        scheduler.requeue('f0', { path: 'f0 (2).jpg', overwrite: false });
+        await flush();
+        const again = server.pending[0].job.items[0];
+        expect(again).toMatchObject({ path: 'f0 (2).jpg', name: 'f0 (2).jpg', overwrite: false, conflictPath: null });
+        server.releaseNext();
+        await flush();
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.DONE);
+    });
+
     it('throttles snapshots but always delivers the last change', async () => {
         let t = 0;
         const timers = [];

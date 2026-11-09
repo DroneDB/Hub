@@ -5,6 +5,13 @@
  * - bundle: POST {dataset}/obj with `path`, `file` pairs, one result per file;
  * - chunked: POST {dataset}/obj/chunk per missing chunk, then POST .../commit.
  *
+ * A file whose name exists is refused (409 with `conflictPath`, D-040) unless its item has
+ * `overwrite: true`: then `overwrite=true` goes before its `file` part (and in every chunk and the
+ * commit), as the Registry reads the flag sent before the file. A refused file's result carries
+ * `conflictPath`. An upload id belongs to one destination: Keep both (another path) starts a new
+ * upload, Replace (the same path) keeps the id, so a chunked upload refused at its commit is
+ * committed again with overwrite, without sending its chunks again.
+ *
  * Every request carries an `X-Upload-Id`. When a request fails after the whole body was
  * sent (a proxy timeout while the server is still adding the file, a dropped connection),
  * the outcome is asked for by that id instead of sending the file again.
@@ -45,6 +52,17 @@ export function createUploadRequests(deps) {
         return { 'X-Upload-Id': uploadId, ...bearer(deps.authToken()) };
     };
 
+    // One id per file and destination, kept across retries: the server answers a repeat from its
+    // receipt, and a chunked upload's stored chunks belong to it
+    function uploadIdOf(item) {
+        const destination = deps.destination(item);
+        if (!item.uploadId || item.uploadDestination !== destination) {
+            item.uploadId = newUploadId();
+            item.uploadDestination = destination;
+        }
+        return item.uploadId;
+    }
+
     async function send(job, hooks) {
         if (job.kind === 'chunked') return [await sendChunked(job.items[0], hooks)];
         if (job.kind === 'bundle') return sendBundle(job.items, hooks);
@@ -54,10 +72,11 @@ export function createUploadRequests(deps) {
     async function sendSingle(item, hooks) {
         const form = new FormData();
         form.append('path', deps.destination(item));
+        appendOverwrite(form, item);
         form.append('file', item.file, item.name);
 
         // One id per file, kept across retries: the server answers a repeat from its receipt
-        item.uploadId ??= newUploadId();
+        uploadIdOf(item);
         const res = await transport({
             url: singleUrl,
             body: form,
@@ -77,6 +96,7 @@ export function createUploadRequests(deps) {
         const form = new FormData();
         for (const item of items) {
             form.append('path', deps.destination(item));
+            appendOverwrite(form, item);
             form.append('file', item.file, item.name);
         }
 
@@ -106,8 +126,7 @@ export function createUploadRequests(deps) {
     }
 
     async function sendChunked(item, hooks) {
-        item.uploadId ??= newUploadId();
-        const fileId = item.uploadId;
+        const fileId = uploadIdOf(item);
         const totalChunks = Math.max(1, Math.ceil(item.size / chunkBytes));
 
         // Resuming: only the chunks the server does not have yet
@@ -128,6 +147,8 @@ export function createUploadRequests(deps) {
             form.append('totalFileSize', String(item.size));
             form.append('chunkSize', String(chunkBytes));
             form.append('path', deps.destination(item));
+            // The first chunk fixes the flag; every chunk carries it, so any one can be the first
+            appendOverwrite(form, item);
             form.append('chunk', item.file.slice(start, end), item.name);
 
             const base = stored;
@@ -143,9 +164,12 @@ export function createUploadRequests(deps) {
         }
 
         hooks.onUploaded([item.id]);
+        // Replace after a refused commit: the stored chunks are committed with the flag
+        const commitForm = new FormData();
+        appendOverwrite(commitForm, item);
         const commit = await transport({
             url: `${deps.baseUrl}/obj/chunk/${fileId}/commit`,
-            body: new FormData(),
+            body: commitForm,
             headers: headers(fileId),
             signal: hooks.signal
         });
@@ -181,24 +205,36 @@ function ok(item, entry) {
     return { id: item.id, ok: true, entry };
 }
 
+// Before the file part: the Registry reads the flag that comes before the file
+function appendOverwrite(form, item) {
+    if (item.overwrite) form.append('overwrite', 'true');
+}
+
+// The path of the entry that refused the name (D-040), or null
+function conflict(conflictPath) {
+    return typeof conflictPath === 'string' && conflictPath ? conflictPath : null;
+}
+
 // The server's per-file results (bundle or receipt), matched to items by path order
 function partResults(items, results) {
     return items.map((item, i) => {
         const r = results[i];
         if (r && r.status === 201) return { id: item.id, ok: true, entry: r.entry };
-        return {
+        const result = {
             id: item.id,
             ok: false,
             status: r?.status ?? 500,
             error: r?.error || 'Upload failed',
             noRetry: r ? !r.retryable : false
         };
+        const conflictPath = r?.status === 409 ? conflict(r.conflictPath) : null;
+        return conflictPath ? { ...result, conflictPath } : result;
     });
 }
 
 function failure(item, res) {
     const body = res.body && typeof res.body === 'object' ? res.body : null;
-    return {
+    const result = {
         id: item.id,
         ok: false,
         status: res.status,
@@ -206,6 +242,8 @@ function failure(item, res) {
         noRetry: body?.noRetry === true,
         retryAfter: res.retryAfter
     };
+    const conflictPath = res.status === 409 ? conflict(body?.conflictPath) : null;
+    return conflictPath ? { ...result, conflictPath } : result;
 }
 
 function statusText(status) {

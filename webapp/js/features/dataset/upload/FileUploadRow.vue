@@ -24,8 +24,13 @@
             <div v-else-if="file.status === 'pending' && file.errorMessage" class="pending-message" :title="file.errorMessage">
                 {{ file.errorMessage }}
             </div>
-            <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
-                <span class="error-text">{{ truncatedError }}</span>
+            <div v-else-if="file.status === 'error'" class="error-message">
+                <!-- The whole reason: two lines, all of it on click (or Enter), and read in full by a screen reader -->
+                <button type="button" class="error-text" :class="{ expanded }" :aria-expanded="expanded"
+                        :aria-describedby="reasonId" @click="expanded = !expanded">
+                    {{ reason }}
+                </button>
+                <span :id="reasonId" class="visually-hidden">{{ reason }}</span>
                 <Button v-if="file.canRetry" size="small" severity="danger" outlined title="Retry upload" aria-label="Retry upload" icon="fa-solid fa-rotate-right"
                         class="retry-btn" @click="$emit('retry', file)" />
             </div>
@@ -54,6 +59,9 @@ export default {
         }
     },
     emits: ['retry'],
+    data() {
+        return { expanded: false };
+    },
     computed: {
         humanSize() {
             return bytesToSize(this.file.size);
@@ -61,10 +69,11 @@ export default {
         statusClass() {
             return `status-${this.file.status}`;
         },
-        truncatedError() {
-            if (!this.file.errorMessage) return 'Upload failed';
-            const msg = this.file.errorMessage;
-            return msg.length > 40 ? msg.substring(0, 40) + '...' : msg;
+        reason() {
+            return this.file.errorMessage || 'Upload failed';
+        },
+        reasonId() {
+            return `upload-reason-${this.file.id}`;
         }
     }
 }
@@ -169,7 +178,13 @@ export default {
     color: var(--ddb-text);
 }
 
+/* An error needs room for its reason */
+.status-error .file-progress {
+    width: min(20rem, 55%);
+}
+
 .error-message {
+    position: relative;
     display: flex;
     align-items: center;
     min-width: 0;
@@ -177,11 +192,55 @@ export default {
     font-size: 0.75rem;
 }
 
+/* Two lines in the row; expanded, the whole text over the rows below (the rows keep their height) */
 .error-text {
+    flex: 1;
     min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 1.2;
+    text-align: left;
+    cursor: pointer;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+}
+
+.error-text.expanded {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    display: block;
+    padding: var(--ddb-spacing-xs);
+    background: var(--ddb-bg-surface);
+    border: var(--ddb-border-width) solid var(--ddb-danger);
+    border-radius: var(--ddb-radius-sm);
+    box-shadow: var(--ddb-shadow-md);
+}
+
+.error-text:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: 1px;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
     white-space: nowrap;
+    border: 0;
 }
 
 .retry-btn {
