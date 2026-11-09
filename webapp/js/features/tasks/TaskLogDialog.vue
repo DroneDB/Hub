@@ -1,8 +1,8 @@
 <template>
-    <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position
-            width="48rem" max-width="95vw" height="auto"
+    <!-- The wide size of FR-XC-20: a log line fits without a break; the window can be maximized (FR-PRC-44) -->
+    <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position size-class="dialog-wide" maximizable
             @update:visible="$emit('update:visible', $event)" @show="onShow">
-        <pre ref="logContainer" class="task-log">{{ shownText || 'No log output.' }}</pre>
+        <pre ref="logContainer" class="task-log" :class="{ 'no-wrap': !wrapLines }">{{ shownText || 'No log output.' }}</pre>
         <template #footer>
             <!-- Toggles on the left -->
             <div class="d-flex align-items-center gap-3 me-auto">
@@ -13,6 +13,11 @@
                 <div class="d-flex align-items-center gap-2">
                     <ToggleSwitch v-model="autoScroll" input-id="task-log-auto-scroll" />
                     <label for="task-log-auto-scroll" class="muted" style="font-size: 0.8rem;">Auto-scroll</label>
+                </div>
+                <!-- Off: a line stays one line, and the log scrolls sideways -->
+                <div class="d-flex align-items-center gap-2">
+                    <ToggleSwitch v-model="wrapLines" input-id="task-log-wrap-lines" />
+                    <label for="task-log-wrap-lines" class="muted" style="font-size: 0.8rem;">Wrap lines</label>
                 </div>
             </div>
             <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
@@ -40,6 +45,7 @@ const UTC_LINE_TIME = /^\[(\d{2}:\d{2}:\d{2})\]/gm;
  * Auto-refresh: polls every 2s for active tasks only (no polling for terminal).
  * Auto-scroll: scrolls to bottom on new content when user is near the bottom.
  * Both default to enabled and reset on each dialog open.
+ * Wrap lines: on (the default) a long line wraps; off it stays one line and the log scrolls sideways.
  * The time at the start of each line, which the Registry writes in UTC, shows in local time, as
  * the dates of the task table do (libs/format.js).
  */
@@ -61,7 +67,8 @@ export default {
     data() {
         return {
             autoRefresh: true,
-            autoScroll: true
+            autoScroll: true,
+            wrapLines: true
         };
     },
 
@@ -107,6 +114,7 @@ export default {
             // Reset toggles to enabled on each open
             this.autoRefresh = true;
             this.autoScroll = true;
+            this.wrapLines = true;
             this._wasNearBottom = true;
 
             // Start auto-refresh only for active tasks
@@ -179,14 +187,26 @@ export default {
 
 <style scoped>
 .task-log {
-    max-height: 24rem;
+    /* As high as the screen permits: what the header, the footer and the margins of the window leave */
+    max-height: calc(90vh - 10rem);
     overflow: auto;
     background: var(--ddb-console-bg);
     color: var(--ddb-console-text);
     padding: 0.75rem;
     border-radius: 4px;
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* Wrap lines off: a line is one line, the log scrolls sideways */
+.task-log.no-wrap {
+    white-space: pre;
+    word-break: normal;
+}
+
+/* The window maximized: the log takes the screen */
+:global(.p-dialog-maximized .task-log) {
+    max-height: calc(100vh - 10rem);
 }
 </style>

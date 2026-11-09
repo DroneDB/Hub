@@ -221,7 +221,7 @@ export default {
     gap: 0.25rem;
     background: rgba(var(--ddb-shade-rgb), 0.65);
     color: var(--ddb-text-on-dark);
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 500;
     padding: 0.2rem 0.55rem;
     border-radius: 1rem;

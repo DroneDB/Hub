@@ -545,12 +545,16 @@ export default {
 
 <style scoped>
 .odm-options-editor {
+    /* A column: the options list takes the height the editor is given (FR-PRC-45) */
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--ddb-border);
     border-radius: 6px;
     background: var(--ddb-bg-light);
 }
 
 .odm-editor-toolbar {
+    flex: none;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -581,8 +585,10 @@ export default {
     border-bottom: 1px solid var(--ddb-border);
 }
 
+/* The list takes the free height of the window and scrolls on its own: no maximum height (FR-PRC-45) */
 .odm-options-content {
-    max-height: 28rem;
+    flex: 1 1 0px;
+    min-height: 12rem;
     overflow-y: auto;
 }
 

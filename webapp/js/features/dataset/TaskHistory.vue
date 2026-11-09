@@ -39,120 +39,130 @@
         </div>
 
         <!-- Photogrammetry launcher -->
+        <!-- The form dialog size below the wide breakpoint; from it the wide size, the fields and the options side by side
+             (FR-PRC-45, FR-XC-33). The window is 90vh high from sm up (css below): the options list takes the free height -->
         <Window id="photogrammetry" v-model:visible="photogrammetryDialogOpen" modal title="Run Photogrammetry (NodeODX)"
-                fixed-position width="52rem" max-width="95vw" height="auto">
-            <div class="mb-3">
-                <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
-                <div class="d-flex gap-2">
-                    <InputText id="task-history-image-folder" v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
-                               placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
-                    <Button icon="fa-regular fa-folder-open" severity="secondary"
-                            title="Browse dataset" aria-label="Browse dataset" @click="openImageFolderPicker" />
-                </div>
-                <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
-                <small v-else class="muted">All images under this folder will be processed.</small>
-            </div>
+                fixed-position :size-class="wideScreen ? 'dialog-wide' : 'dialog-xl'">
+            <div class="pg-layout">
+                <div class="pg-fields">
+                    <div class="mb-3">
+                        <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
+                        <div class="d-flex gap-2">
+                            <InputText id="task-history-image-folder" v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
+                                       placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
+                            <Button icon="fa-regular fa-folder-open" severity="secondary"
+                                    title="Browse dataset" aria-label="Browse dataset" @click="openImageFolderPicker" />
+                        </div>
+                        <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
+                        <small v-else class="muted">All images under this folder will be processed.</small>
+                    </div>
 
-            <!-- Processing node: dropdown when several are configured, details for a single one -->
-            <div class="mb-3">
-                <label id="task-history-processing-node-label" for="task-history-processing-node" class="d-block mb-1"><strong>Processing node</strong></label>
-                <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId" input-id="task-history-processing-node" aria-labelledby="task-history-processing-node-label"
-                        :options="photogrammetryNodes" option-label="label" option-value="value"
-                        class="w-100" @change="onNodeChanged" />
-                <div v-else-if="photogrammetryNodes.length === 1" class="pg-node-details">
-                    <div><strong>{{ photogrammetryNodes[0].title }}</strong></div>
-                    <div class="muted">ID: {{ photogrammetryNodes[0].id }}</div>
-                </div>
-            </div>
+                    <!-- Processing node: dropdown when several are configured, details for a single one -->
+                    <div class="mb-3">
+                        <label id="task-history-processing-node-label" for="task-history-processing-node" class="d-block mb-1"><strong>Processing node</strong></label>
+                        <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId" input-id="task-history-processing-node" aria-labelledby="task-history-processing-node-label"
+                                :options="photogrammetryNodes" option-label="label" option-value="value"
+                                class="w-100" @change="onNodeChanged" />
+                        <div v-else-if="photogrammetryNodes.length === 1" class="pg-node-details">
+                            <div><strong>{{ photogrammetryNodes[0].title }}</strong></div>
+                            <div class="muted">ID: {{ photogrammetryNodes[0].id }}</div>
+                        </div>
+                    </div>
 
-            <!-- Node status (populated by "Check Node") -->
-            <div v-if="nodeStatus" class="mb-3">
-                <PrimeMessage :severity="nodeStatus.reachable ? 'success' : 'error'" :closable="false">
-                    <template v-if="nodeStatus.reachable">
-                        Node reachable - {{ nodeStatus.taskQueueCount }} task(s) queued,
-                        max {{ nodeStatus.maxParallelTasks }} parallel.<span v-if="nodeStatus.engine">
-                            Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
-                    </template>
-                    <template v-else>
-                        Node unreachable: {{ nodeStatus.errorMessage }}
-                    </template>
-                </PrimeMessage>
-            </div>
-            <div class="mb-3">
-                <label for="task-history-task-name" class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
-                <InputText id="task-history-task-name" v-model="photogrammetryForm.name" class="w-100" placeholder="Auto-generated" />
-            </div>
-            <!-- Processing profile -->
-            <div class="mb-3">
-                <label id="task-history-processing-profile-label" for="task-history-processing-profile" class="d-block mb-1"><strong>Processing profile</strong></label>
-                <Select v-model="photogrammetryForm.preset" input-id="task-history-processing-profile" aria-labelledby="task-history-processing-profile-label"
-                        :options="odmPresetOptions" option-label="label" option-value="id"
-                        class="w-100" />
-                <small class="d-block muted mt-1">{{ selectedPreset.description }}</small>
-            </div>
-
-            <!-- Options editor (non-custom presets) -->
-            <template v-if="photogrammetryForm.preset !== 'custom'">
-                <OdxOptionsEditor v-if="availableOdmOptions.length > 0"
-                                  ref="odmEditor"
-                                  v-model="customOptions"
-                                  :available-options="availableOdmOptions"
-                                  :preset-options="selectedPreset.options" class="mb-3" />
-                <div v-if="customOptions.length > 0" class="mb-3 pg-preset-tags">
-                    <strong class="d-block mb-1">Customized options ({{ customOptions.length }})</strong>
-                    <div class="d-flex flex-wrap gap-1">
-                        <button v-for="opt in customOptions" :key="opt.name" type="button"
-                                class="btn-reset pg-option-chip pg-option-chip-clickable"
-                                title="Go to this option"
-                                @click="scrollToPresetOption(opt.name)">
-                            {{ opt.name }}: {{ opt.value }}
-                        </button>
+                    <!-- Node status (populated by "Check Node") -->
+                    <div v-if="nodeStatus" class="mb-3">
+                        <PrimeMessage :severity="nodeStatus.reachable ? 'success' : 'error'" :closable="false">
+                            <template v-if="nodeStatus.reachable">
+                                Node reachable - {{ nodeStatus.taskQueueCount }} task(s) queued,
+                                max {{ nodeStatus.maxParallelTasks }} parallel.<span v-if="nodeStatus.engine">
+                                    Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
+                            </template>
+                            <template v-else>
+                                Node unreachable: {{ nodeStatus.errorMessage }}
+                            </template>
+                        </PrimeMessage>
+                    </div>
+                    <div class="mb-3">
+                        <label for="task-history-task-name" class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
+                        <InputText id="task-history-task-name" v-model="photogrammetryForm.name" class="w-100" placeholder="Auto-generated" />
+                    </div>
+                    <!-- Processing profile -->
+                    <div class="mb-3">
+                        <label id="task-history-processing-profile-label" for="task-history-processing-profile" class="d-block mb-1"><strong>Processing profile</strong></label>
+                        <Select v-model="photogrammetryForm.preset" input-id="task-history-processing-profile" aria-labelledby="task-history-processing-profile-label"
+                                :options="odmPresetOptions" option-label="label" option-value="id"
+                                class="w-100" />
+                        <small class="d-block muted mt-1">{{ selectedPreset.description }}</small>
                     </div>
                 </div>
-            </template>
 
-            <!-- Custom JSON (only when Custom preset is selected) -->
-            <div v-if="photogrammetryForm.preset === 'custom'" class="mb-2">
-                <label for="task-history-options" class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
-                <Textarea id="task-history-options" v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
-                          placeholder="[{&quot;name&quot;:&quot;fast-orthophoto&quot;,&quot;value&quot;:true},{&quot;name&quot;:&quot;dsm&quot;,&quot;value&quot;:true}]" />
-            </div>
-            <small v-if="optionsError" class="error-text">{{ optionsError }}</small>
+                <div class="pg-options">
+                    <!-- Options editor (non-custom presets) -->
+                    <template v-if="photogrammetryForm.preset !== 'custom'">
+                        <OdxOptionsEditor v-if="availableOdmOptions.length > 0"
+                                          ref="odmEditor"
+                                          v-model="customOptions"
+                                          :available-options="availableOdmOptions"
+                                          :preset-options="selectedPreset.options" class="mb-3" />
+                        <div v-if="customOptions.length > 0" class="mb-3 pg-preset-tags">
+                            <strong class="d-block mb-1">Customized options ({{ customOptions.length }})</strong>
+                            <div class="d-flex flex-wrap gap-1">
+                                <button v-for="opt in customOptions" :key="opt.name" type="button"
+                                        class="btn-reset pg-option-chip pg-option-chip-clickable"
+                                        title="Go to this option"
+                                        @click="scrollToPresetOption(opt.name)">
+                                    {{ opt.name }}: {{ opt.value }}
+                                </button>
+                            </div>
+                        </div>
+                    </template>
 
-            <!-- Output destination -->
-            <div class="mb-3">
-                <Checkbox v-model="photogrammetryForm.createNewDataset" :binary="true"
-                          input-id="pg-create-new-dataset" />
-                <label for="pg-create-new-dataset" class="d-inline-block ms-2"><strong>Create new dataset for results</strong></label>
-                <small class="d-block muted mt-1">If unchecked, results are extracted into a folder in this dataset.</small>
-            </div>
-
-            <div v-if="!photogrammetryForm.createNewDataset" class="mb-3">
-                <label for="task-history-output-folder" class="d-block mb-1"><strong>Output folder</strong></label>
-                <div class="d-flex gap-2">
-                    <InputText id="task-history-output-folder" v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
-                               placeholder="photogrammetry_output" @input="destPathError = ''" />
-                    <Button icon="fa-regular fa-folder-open" severity="secondary"
-                            title="Browse dataset" aria-label="Browse dataset" @click="openOutputFolderPicker" />
+                    <!-- Custom JSON (only when Custom preset is selected) -->
+                    <div v-if="photogrammetryForm.preset === 'custom'" class="mb-2">
+                        <label for="task-history-options" class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
+                        <Textarea id="task-history-options" v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
+                                  placeholder="[{&quot;name&quot;:&quot;fast-orthophoto&quot;,&quot;value&quot;:true},{&quot;name&quot;:&quot;dsm&quot;,&quot;value&quot;:true}]" />
+                    </div>
+                    <small v-if="optionsError" class="error-text">{{ optionsError }}</small>
                 </div>
-                <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
-                <small v-else class="muted">Extracted files will be placed in this folder.</small>
-            </div>
 
-            <template v-if="photogrammetryForm.createNewDataset">
-                <div class="mb-3">
-                    <label for="task-history-new-dataset-name" class="d-block mb-1"><strong>New dataset name</strong></label>
-                    <InputText id="task-history-new-dataset-name" v-model="photogrammetryForm.newDatasetName" class="w-100"
-                               placeholder="photogrammetry-results" />
-                    <small class="muted">A slug: {{ slugRuleText }}</small>
+                <div class="pg-output">
+                    <!-- Output destination -->
+                    <div class="mb-3">
+                        <Checkbox v-model="photogrammetryForm.createNewDataset" :binary="true"
+                                  input-id="pg-create-new-dataset" />
+                        <label for="pg-create-new-dataset" class="d-inline-block ms-2"><strong>Create new dataset for results</strong></label>
+                        <small class="d-block muted mt-1">If unchecked, results are extracted into a folder in this dataset.</small>
+                    </div>
+
+                    <div v-if="!photogrammetryForm.createNewDataset" class="mb-3">
+                        <label for="task-history-output-folder" class="d-block mb-1"><strong>Output folder</strong></label>
+                        <div class="d-flex gap-2">
+                            <InputText id="task-history-output-folder" v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
+                                       placeholder="photogrammetry_output" @input="destPathError = ''" />
+                            <Button icon="fa-regular fa-folder-open" severity="secondary"
+                                    title="Browse dataset" aria-label="Browse dataset" @click="openOutputFolderPicker" />
+                        </div>
+                        <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
+                        <small v-else class="muted">Extracted files will be placed in this folder.</small>
+                    </div>
+
+                    <template v-if="photogrammetryForm.createNewDataset">
+                        <div class="mb-3">
+                            <label for="task-history-new-dataset-name" class="d-block mb-1"><strong>New dataset name</strong></label>
+                            <InputText id="task-history-new-dataset-name" v-model="photogrammetryForm.newDatasetName" class="w-100"
+                                       placeholder="photogrammetry-results" />
+                            <small class="muted">A slug: {{ slugRuleText }}</small>
+                        </div>
+                        <div class="mb-3">
+                            <label id="task-history-visibility-label" for="task-history-visibility" class="d-block mb-1"><strong>Visibility</strong></label>
+                            <Select v-model="photogrammetryForm.newDatasetVisibility" input-id="task-history-visibility" aria-labelledby="task-history-visibility-label"
+                                    :options="visibilityOptions" option-label="label" option-value="value"
+                                    class="w-100" />
+                        </div>
+                    </template>
                 </div>
-                <div class="mb-3">
-                    <label id="task-history-visibility-label" for="task-history-visibility" class="d-block mb-1"><strong>Visibility</strong></label>
-                    <Select v-model="photogrammetryForm.newDatasetVisibility" input-id="task-history-visibility" aria-labelledby="task-history-visibility-label"
-                            :options="visibilityOptions" option-label="label" option-value="value"
-                            class="w-100" />
-                </div>
-            </template>
+            </div>
 
             <template #footer>
                 <Button label="Cancel" severity="secondary" @click="photogrammetryDialogOpen = false" />
@@ -207,6 +217,8 @@ import FolderPicker from '@/components/FolderPicker.vue';
 import Paginator from 'primevue/paginator';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { slugProblem, slugDescription } from '@/libs/slug';
+import { useMediaMatch } from '@/composables/useStackedLayout';
+import { WIDE_MEDIA_QUERY } from '@/libs/responsiveColumns';
 
 // Curated processing profiles based on standard OpenDroneMap presets.
 const ODM_PRESETS = [
@@ -279,7 +291,7 @@ export default {
     setup() {
         const { trackHeavyTask } = useHeavyTask();
         const dialogs = useDialogs();
-        return { trackHeavyTask, dialogs, confirm: useConfirm(dialogs), ...useTaskFormatting() };
+        return { trackHeavyTask, dialogs, confirm: useConfirm(dialogs), wideScreen: useMediaMatch(WIDE_MEDIA_QUERY), ...useTaskFormatting() };
     },
     data() {
         return {
@@ -907,7 +919,9 @@ export default {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../css/breakpoints' as *;
+
 .task-history-page {
     height: 100%;
     display: flex;
@@ -973,6 +987,84 @@ export default {
 
 .pg-option-chip-clickable:hover {
     background-color: var(--ddb-primary-hover);
+}
+
+/* The photogrammetry window (FR-PRC-45). From sm the window is 90vh high and its content a column: the form fields do
+   not grow, the options list takes the free height (at least 12rem), so the only scroll area is the list. When the
+   screen is too small for the fields and 12rem of list, the window scrolls as a whole, and nothing overlaps.
+   Below sm (a phone) the window is as high as its content, and the list keeps its own height. */
+.pg-layout {
+    display: flex;
+    flex-direction: column;
+}
+
+.pg-options {
+    display: flex;
+    flex-direction: column;
+}
+
+.pg-options > :deep(.odm-options-editor) {
+    flex: 1 1 0px;
+}
+
+@media (max-width: 575.98px) {
+    .pg-options :deep(.odm-options-content) {
+        flex: none;
+        max-height: 28rem;
+    }
+}
+
+@media (min-width: 576px) {
+    :global(#photogrammetry.p-dialog.window-dialog) {
+        height: 90vh;
+    }
+
+    :global(#photogrammetry .p-dialog-content) {
+        display: flex;
+        flex-direction: column;
+    }
+
+    :global(#photogrammetry .window-footer) {
+        flex: none;
+    }
+
+    .pg-layout {
+        flex: 1 1 auto;
+    }
+
+    .pg-fields,
+    .pg-output {
+        flex: none;
+    }
+
+    .pg-options {
+        flex: 1 1 0px;
+    }
+}
+
+/* From the wide breakpoint (FR-XC-33) the fields are on the left and the options on the right, twice as wide */
+@include wide-up {
+    .pg-layout {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        grid-template-rows: auto 1fr;
+        column-gap: 1.5rem;
+    }
+
+    .pg-fields {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .pg-output {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .pg-options {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+    }
 }
 
 .duration {

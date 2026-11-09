@@ -41,3 +41,28 @@ describe('TaskLogDialog', () => {
         expect(await show('')).toBe('No log output.');
     });
 });
+
+describe('TaskLogDialog window (FR-PRC-44)', () => {
+    it('is the wide window with a maximize button', async () => {
+        await show('line');
+        const dialog = document.querySelector('#task-log');
+        expect(dialog.classList.contains('dialog-wide')).toBe(true);
+        expect(dialog.getAttribute('style') || '').not.toContain('--window-width');
+        expect(dialog.querySelector('.p-dialog-maximize-button')).not.toBeNull();
+    });
+
+    it('wraps lines by default and keeps a line whole with Wrap lines off', async () => {
+        await show('x'.repeat(1000));
+        const log = document.querySelector('.task-log');
+        expect(log.classList.contains('no-wrap')).toBe(false);
+        const label = [...document.querySelectorAll('label')].find(l => l.textContent === 'Wrap lines');
+        expect(label).toBeDefined();
+        const input = document.getElementById(label.getAttribute('for'));
+        input.click();
+        await flushPromises();
+        expect(log.classList.contains('no-wrap')).toBe(true);
+        input.click();
+        await flushPromises();
+        expect(log.classList.contains('no-wrap')).toBe(false);
+    });
+});

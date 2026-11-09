@@ -1,5 +1,5 @@
 <template>
-    <div v-if="profile && hasSamples" class="raster-profile-chart">
+    <div v-if="profile && hasSamples" class="raster-profile-chart" :class="{ expanded }">
         <!-- Summary stats -->
         <div class="profile-summary" :class="{ 'thermal': isThermal }">
             <span v-if="profile.min !== null && profile.min !== undefined">Min: {{ formatValue(profile.min) }}</span>
@@ -60,10 +60,25 @@
         <div class="profile-actions">
             <span v-if="hoveredSample" class="hover-info">{{ hoverText }}</span>
             <span v-else class="hover-info placeholder">Hover or focus the chart for details</span>
-            <button class="panel-btn" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
-                <i class="fas fa-file-csv" aria-hidden="true" />
-            </button>
+            <span class="profile-buttons">
+                <button v-if="expandable" class="panel-btn" title="Show the chart larger" aria-label="Expand the chart" @click="expandedOpen = true">
+                    <i class="fas fa-expand" aria-hidden="true" />
+                </button>
+                <button class="panel-btn" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
+                    <i class="fas fa-file-csv" aria-hidden="true" />
+                </button>
+            </span>
         </div>
+
+        <!-- The same chart in a window of the wide size, 40vh high (FR-RAS-35); the panel's colours come with the
+             classes of the panel, the window is outside it -->
+        <Window v-if="expandedOpen" id="raster-profile-expanded" :title="title" modal size-class="dialog-wide" close-button
+                @close="expandedOpen = false">
+            <div class="profile-expanded analysis-panel analysis-panel--raster">
+                <RasterProfileChart :profile="profile" :unit="unit" :is-thermal="isThermal" :expandable="false" expanded
+                                    @active-sample="sample => $emit('activeSample', sample)" />
+            </div>
+        </Window>
     </div>
 </template>
 
@@ -72,6 +87,7 @@ import { downloadCsv, toCsv } from '@/libs/csv';
 import { formatLength } from '@/libs/format';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import Window from '@/components/HubWindow.vue';
 
 /**
  * Elevation / value profile chart.
@@ -86,10 +102,15 @@ import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
  */
 export default {
     name: 'RasterProfileChart',
+    components: { Window },
     props: {
         profile: { type: Object, default: null },
         unit: { type: String, default: '' },
-        isThermal: { type: Boolean, default: false }
+        isThermal: { type: Boolean, default: false },
+        /** Show the Expand button, which opens the chart in a larger window */
+        expandable: { type: Boolean, default: true },
+        /** The chart of the larger window: 40vh high instead of 160 px */
+        expanded: { type: Boolean, default: false }
     },
     emits: ['activeSample'],
     setup() {
@@ -97,19 +118,22 @@ export default {
     },
     data() {
         return {
-            // The drawing's width: the panel's, once measured (a phone's bottom sheet and the
-            // desktop panel differ), so the text and the line keep their proportions
+            // The drawing's size: the chart's own, once measured (a phone's bottom sheet, the desktop panel and the
+            // larger window differ), so the text and the line keep their proportions. The paddings leave room for the
+            // axis text, 12px (FR-RAS-35)
             width: 320,
             height: 160,
-            padTop: 8,
-            padBottom: 14,
-            padLeft: 38,
-            padRight: 6,
-            hoverIdx: null
+            padTop: 12,
+            padBottom: 20,
+            padLeft: 56,
+            padRight: 8,
+            hoverIdx: null,
+            expandedOpen: false
         };
     },
     computed: {
         viewBox() { return `0 0 ${this.width} ${this.height}`; },
+        title() { return this.isThermal ? 'Thermal Profile' : 'Value Profile'; },
         chartWidth() { return this.width - this.padLeft - this.padRight; },
         chartHeight() { return this.height - this.padTop - this.padBottom; },
         samples() { return (this.profile && this.profile.samples) || []; },
@@ -188,9 +212,11 @@ export default {
     },
     beforeUnmount() {
         this.observeWidth(null);
+        // A chart that goes (the expanded window closes) while it shows a hover: the map marker goes with it
+        if (this.hoverIdx !== null) this.$emit('activeSample', null);
     },
     methods: {
-        // Ref of the chart: follows its width for as long as it is shown (called on every render)
+        // Ref of the chart: follows its size for as long as it is shown (called on every render)
         observeWidth(el) {
             if (el === this.observedEl) return;
             if (this.resizeObserver) this.resizeObserver.disconnect();
@@ -199,7 +225,9 @@ export default {
             if (!el || typeof ResizeObserver === 'undefined') return;
             this.resizeObserver = new ResizeObserver(([entry]) => {
                 const width = Math.round(entry.contentRect.width);
+                const height = Math.round(entry.contentRect.height);
                 if (width > 0) this.width = width;
+                if (height > 0) this.height = height;
             });
             this.resizeObserver.observe(el);
         },
@@ -283,7 +311,7 @@ export default {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    font-size: 11px;
+    font-size: 0.75rem;
     color: var(--panel-text-soft);
 }
 
@@ -316,7 +344,7 @@ export default {
 }
 
 .profile-svg .label {
-    font-size: 9px;
+    font-size: 0.75rem;
     fill: var(--panel-text-soft);
     font-family: inherit;
 }
@@ -349,12 +377,32 @@ export default {
     stroke: var(--panel-thermal-strong);
 }
 
+.raster-profile-chart.expanded .profile-svg {
+    height: 40vh;
+}
+
 .profile-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 11px;
+    gap: 0.5rem;
+    font-size: 0.75rem;
     color: var(--panel-text-soft);
+}
+
+.profile-buttons {
+    display: inline-flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+/* The panel's colours in a window: the classes of the panel, without its place on the map */
+.profile-expanded {
+    position: static;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 0.75rem;
 }
 
 .hover-info.placeholder {

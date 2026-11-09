@@ -550,6 +550,12 @@ $window-margin-wide: 2rem; // and on a tablet or a desktop
     }
 }
 
+// A window the user maximized (HubWindow maximizable, FR-PRC-44) fills the screen: PrimeVue sets its size, the maximum
+// width of its size class must not stop it
+.p-dialog.window-dialog.p-dialog-maximized {
+    max-width: none;
+}
+
 @media only screen and (max-width: 575.98px) {
     .p-dialog.window-dialog {
         --p-dialog-header-padding: 1rem;

@@ -46,3 +46,22 @@ describe('HubWindow size-class', () => {
         expect(footer.classList.contains('mt-3')).toBe(false);
     });
 });
+
+describe('HubWindow maximizable (FR-PRC-44)', () => {
+    it('has no maximize button by default', async () => {
+        const dialog = await show({ sizeClass: 'dialog-wide', fixedSize: true });
+        expect(dialog.querySelector('.p-dialog-maximize-button')).toBeNull();
+    });
+
+    it('has the maximize button of the Dialog, which makes the window fill the screen and back', async () => {
+        const dialog = await show({ sizeClass: 'dialog-wide', fixedSize: true, maximizable: true });
+        const button = dialog.querySelector('.p-dialog-maximize-button');
+        expect(button).not.toBeNull();
+        button.click();
+        await wrapper.vm.$nextTick();
+        expect(dialog.classList.contains('p-dialog-maximized')).toBe(true);
+        button.click();
+        await wrapper.vm.$nextTick();
+        expect(dialog.classList.contains('p-dialog-maximized')).toBe(false);
+    });
+});

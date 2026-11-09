@@ -1,6 +1,6 @@
 <template>
     <Dialog :visible="visible" :header="title" :modal="modal" :closable="closable && !busy"
-            :draggable="!fixedPosition" :style="dialogStyle" :content-style="contentStyle"
+            :draggable="!fixedPosition" :maximizable="maximizable" :style="dialogStyle" :content-style="contentStyle"
             :dismissable-mask="closeModalOnClick && !busy" :close-on-escape="false"
             :pt="dialogPt" @update:visible="v => { if (!v) close(); }" @show="onShow">
         <div ref="contentRoot" style="display: contents;">
@@ -28,6 +28,7 @@
  * - `busy` disables closing and the footer buttons.
  * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-wide) gives the window a stable width, the same
  *   whatever its content; a form dialog uses `dialog-xl`, a log or a two-column form `dialog-wide`.
+ * - `maximizable`: the header has a button that makes the window fill the screen.
  * - A footer, which stays in view while the content scrolls: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
  *   just the Cancel (`cancelLabel`) button with `closeButton`. A footer of its own marks its
  *   buttons [data-cancel] and [data-confirm].
@@ -66,6 +67,8 @@ const props = defineProps({
     /** CSS size class (dialog-xs ... dialog-xl, dialog-wide): a stable width, min(<class width>, 100vw - 2rem), not
      * only a maximum (FR-XC-20); dialog-xl and dialog-wide read the width tokens of FR-XC-33. No inline size. */
     sizeClass: { type: String, default: null },
+    /** A button in the header makes the window fill the screen (and brings it back): the PrimeVue Dialog option, for a log or a chart */
+    maximizable: { type: Boolean, default: false },
     /** Focus the first field (or [data-autofocus]) when shown */
     focusOnShow: { type: Boolean, default: true },
     busy: { type: Boolean, default: false },

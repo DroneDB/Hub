@@ -1,7 +1,7 @@
 <template>
     <!-- Below `sm` with mobileCollapsed the first pane and the handle are hidden (FR-EXP-29), not removed: the second
          pane stays the same element whatever the width, so a phone that rotates keeps what it shows (its tabs, the map) -->
-    <Splitter :layout="layout" class="panel-splitter" :class="{ 'panel-collapsed': collapsed }" :pt="splitterPt"
+    <Splitter ref="splitter" :layout="layout" class="panel-splitter" :class="{ 'panel-collapsed': collapsed }" :pt="splitterPt"
               @resizeend="onResizeEnd">
         <SplitterPanel :size="size0" :min-size="2">
             <slot v-if="firstShown" name="first" />
@@ -18,9 +18,12 @@ import SplitterPanel from 'primevue/splitterpanel';
 import { isMobile, isTablet } from '@/libs/responsive';
 import { useStackedLayout } from '@/composables/useStackedLayout';
 import { PREF, getPref, setPref } from '@/libs/preferences';
+import { resolveLengthPx, pxToPercent, percentToPx, capPaneWidth } from '@/libs/panelSize';
 
 /** The smallest size of a pane, in percent (SplitterPanel min-size). */
 const MIN_PANE = 2;
+/** What the second pane keeps when the first one is wider than the container allows */
+const OTHER_PANE_MIN = '20rem';
 
 /**
  * Panel - Two-pane resizable split layout backed by PrimeVue Splitter.
@@ -29,9 +32,16 @@ const MIN_PANE = 2;
  * (PREF.PANEL_SIZES), once for desktop and once for tablet screens, and restored on
  * the next visit. Phones always start from mobileAmount.
  *
+ * With firstSize, the first pane of a desktop screen has a width, not a share: the extra width of a large screen
+ * goes to the content (FR-EXP-40). The width is resolved to px, converted to the percent the Splitter needs when
+ * the panel mounts and every time its container changes size (ResizeObserver), and the width the user drags the pane
+ * to is kept in px (`<storageKey>.desktop.px`), so it is the same width on another window size.
+ *
  * Props:
  *   split        - Orientation: 'vertical' (default) or 'horizontal'.
  *   amount       - Initial size of the first pane as a percentage (default: '50%').
+ *   firstSize    - The width of the first pane on a desktop screen: px, rem or any CSS length, such as
+ *                  'var(--ddb-panel-tree-width)'; amount is what a first render and a failed measure use.
  *   mobileAmount, tabletAmount - The same on phones and tablets (default: amount).
  *   storageKey   - Name under which the size is kept; none: not kept.
  *   mobileCollapsed - Below `sm` (the phone breakpoint of libs/responsiveColumns.js, the width of the window, not
@@ -63,6 +73,10 @@ export default {
             type: String,
             default: "50%"
         },
+        firstSize: {
+            type: String,
+            default: ""
+        },
         mobileAmount: {
             type: String,
             default: ""
@@ -84,7 +98,7 @@ export default {
         return { phoneWidth: useStackedLayout() };
     },
     data: function () {
-        const size = this.storedSize() ?? parseFloat(this.panelSize());
+        const size = this.initialSize();
         return {
             size0: size,
             size1: 100 - size,
@@ -122,11 +136,90 @@ export default {
             this.$nextTick(() => this.onPanelResized());
         }
     },
+    created: function () {
+        // Instance state, not reactive: the width the user dragged the first pane to in this session, in px
+        this.draggedPx = null;
+        this.resizeObserver = null;
+    },
+    mounted: function () {
+        if (!this.pxMode()) return;
+        this.fitFirstPane();
+        if (typeof ResizeObserver !== 'undefined') {
+            // lifetime: this component (disconnected in beforeUnmount)
+            this.resizeObserver = new ResizeObserver(() => this.fitFirstPane());
+            this.resizeObserver.observe(this.splitterEl());
+        }
+    },
+    beforeUnmount: function () {
+        this.resizeObserver?.disconnect();
+        this.resizeObserver = null;
+    },
     methods: {
         panelSize: function () {
             if (isMobile() && this.mobileAmount) return this.mobileAmount;
             else if (isTablet() && this.tabletAmount) return this.tabletAmount;
             else return this.amount;
+        },
+
+        /** The element of the Splitter (the root of this component can be a fragment: the comment above it stays in a development build) */
+        splitterEl: function () {
+            return this.$refs.splitter?.$el ?? null;
+        },
+        /** Whether the first pane has a width in px (firstSize, on a desktop screen) and not a share of the container */
+        pxMode: function () {
+            return !!this.firstSize && !isMobile() && !isTablet();
+        },
+        /** @returns {number} the size of the first pane for the first render, in percent */
+        initialSize: function () {
+            if (!this.pxMode()) return this.storedSize() ?? parseFloat(this.panelSize());
+            // The container is not measured yet: the window stands for it, the mount corrects it (fitFirstPane)
+            const px = this.storedPx() ?? resolveLengthPx(this.firstSize, null);
+            const container = typeof window !== 'undefined' ? window.innerWidth : 0;
+            return (px !== null && pxToPercent(capPaneWidth(px, container, resolveLengthPx(OTHER_PANE_MIN, null) ?? 320, MIN_PANE), container, MIN_PANE)) || parseFloat(this.amount);
+        },
+        /** The width in px the first pane has now: what the user dragged it to, else firstSize */
+        wantedPx: function () {
+            return this.draggedPx ?? this.storedPx() ?? resolveLengthPx(this.firstSize, this.splitterEl());
+        },
+        /** Put the first pane at its width in px in the container it has now (mount, and a change of its size) */
+        fitFirstPane: function () {
+            const container = this.splitterEl()?.clientWidth ?? 0;
+            const wanted = this.wantedPx();
+            // A width kept from a wider window (dragged, or stored) leaves the other pane its minimum, but stays kept as it is
+            const px = wanted === null ? null : capPaneWidth(wanted, container, resolveLengthPx(OTHER_PANE_MIN, null) ?? 320, MIN_PANE);
+            const percent = px === null ? null : pxToPercent(px, container, MIN_PANE);
+            if (percent === null) return;
+            const changed = Math.abs(percent - this.size0) > 0.001;
+            this.size0 = percent;
+            this.size1 = 100 - percent;
+            this.setPaneBasis(percent);
+            if (changed) this.onPanelResized();
+        },
+        /**
+         * The Splitter takes the sizes of its panes when it mounts and from the handle: a size set afterwards goes to the
+         * panes and to its own list of sizes (what the next drag and resizeend start from)
+         * @param {number} percent
+         */
+        setPaneBasis: function (percent) {
+            const splitter = this.$refs.splitter;
+            const panels = [...(this.splitterEl()?.children ?? [])].filter(c => c.getAttribute('data-pc-name') === 'splitterpanel');
+            if (panels.length !== 2) return;
+            const gutter = Number.isFinite(splitter?.gutterSize) ? splitter.gutterSize : 4;
+            [percent, 100 - percent].forEach((p, i) => { panels[i].style.flexBasis = `calc(${p}% - ${gutter}px)`; });
+            if (splitter) splitter.panelSizes = [percent, 100 - percent];
+        },
+        /** @returns {number|null} the kept width of the first pane in px, if a valid one is kept */
+        storedPx: function () {
+            const key = this.sizeKey();
+            if (!key) return null;
+            const px = getPref(PREF.PANEL_SIZES, {})?.[`${key}.px`];
+            return Number.isFinite(px) && px > 0 ? px : null;
+        },
+        storePx: function (px) {
+            const key = this.sizeKey();
+            if (!key || !Number.isFinite(px)) return;
+            const sizes = getPref(PREF.PANEL_SIZES, {});
+            setPref(PREF.PANEL_SIZES, { ...(sizes && typeof sizes === 'object' ? sizes : {}), [`${key}.px`]: Math.round(px) });
         },
 
         /** Where the size is kept for this screen class; null: not kept (no storageKey, or a phone). */
@@ -176,7 +269,16 @@ export default {
             if (Number.isFinite(size)) {
                 this.size0 = size;
                 this.size1 = 100 - size;
-                this.storeSize(size);
+                if (this.pxMode()) {
+                    // The width is what the user chose: it is kept, and held when the container changes
+                    const px = Math.round(percentToPx(size, this.splitterEl().clientWidth));
+                    if (px > 0) {
+                        this.draggedPx = px;
+                        this.storePx(px);
+                    }
+                } else {
+                    this.storeSize(size);
+                }
             }
             this.onPanelResized();
         }

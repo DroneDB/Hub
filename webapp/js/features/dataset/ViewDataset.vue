@@ -5,7 +5,7 @@
         <ResourceState v-if="loadKind" :kind="loadKind" resource="dataset" :name="params.ds" />
         <!-- One layout decision, from the window's width (phoneLayout, below sm): the panel hides its first pane and the
              tabs get Browser and Properties; the tabs (the second pane) are never rendered again when it changes -->
-        <Panel v-else split="vertical" class="main" amount="23.6%" tablet-amount="30%" storage-key="dataset" :mobile-collapsed="phoneLayout">
+        <Panel v-else split="vertical" class="main" amount="23.6%" first-size="var(--ddb-panel-tree-width)" tablet-amount="30%" storage-key="dataset" :mobile-collapsed="phoneLayout">
             <template #first>
                 <div class="sidebar">
                     <FileBrowser ref="fileBrowser" v-bind="treeProps" v-on="treeEvents" />
@@ -548,20 +548,18 @@ onBeforeUnmount(() => {
     overflow: hidden;
 }
 
+/* The file list keeps a width of its own: the panel gives way before it (below) */
 .detail-main {
     flex: 1;
-    min-width: 0;
+    min-width: 12rem;
     overflow: auto;
 }
 
-.detail-main.with-detail {
-    flex: 7;
-}
-
+/* The width of the panel is the token of FR-XC-33: it grows with the window up to 45rem, and the file list takes the
+   rest (FR-EXP-40); in a narrow row it shrinks, to 15rem at the least */
 .detail-side {
-    flex: 3;
+    flex: 0 1 var(--ddb-panel-detail-width);
     min-width: 15rem;
-    max-width: 25rem;
     overflow-x: hidden;
     overflow-y: auto;
     border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
