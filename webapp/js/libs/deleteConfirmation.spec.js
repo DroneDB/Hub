@@ -33,6 +33,12 @@ describe('deleteConfirmation', () => {
         expect(folder.message).toContain('<strong>newdir</strong> and everything inside it');
     });
 
+    it('shows a line of summary (escaped) under the items, before what goes with them', () => {
+        const q = deleteConfirmation({ kind: 'file', items: ['a', 'b'], summary: 'Total size: 9 <MB>', lost: ['x'] });
+        expect(q.message.indexOf('Total size: 9 &lt;MB&gt;')).toBeGreaterThan(q.message.indexOf('</ul>'));
+        expect(q.message.indexOf('Total size')).toBeLessThan(q.message.indexOf('Also deleted'));
+    });
+
     it('asks for the name of one item, the count of several, or the given text', () => {
         expect(deleteConfirmation({ kind: 'user', items: ['alice'], typed: true }).requireText).toBe('alice');
         expect(deleteConfirmation({ kind: 'file', items: ['a', 'b', 'c'], typed: true }).requireText).toBe('3');

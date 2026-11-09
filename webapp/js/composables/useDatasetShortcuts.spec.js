@@ -3,15 +3,16 @@ import { effectScope, ref } from 'vue';
 import ddb from 'ddb';
 import { useDatasetShortcuts } from './useDatasetShortcuts';
 
-function setup({ selected = [{ path: 'a.tif' }], canWrite = true } = {}) {
-    const actions = { remove: vi.fn(), upload: vi.fn(), importFromUrl: vi.fn() };
+function setup({ selected = [{ path: 'a.tif' }], canWrite = true, files = [{ path: 'a.tif' }, { path: 'b.tif' }] } = {}) {
+    const actions = { remove: vi.fn(), upload: vi.fn(), importFromUrl: vi.fn(), rename: vi.fn() };
     const clipboard = { copy: vi.fn(), cut: vi.fn(), paste: vi.fn() };
+    const selectAll = vi.fn();
     const scope = effectScope();
     scope.run(() => useDatasetShortcuts({
-        blocked: () => false, canWrite: ref(canWrite), selected: () => selected, treeFor: () => null,
+        blocked: () => false, canWrite: ref(canWrite), selected: () => selected, files: () => files, selectAll, treeFor: () => null,
         actions, clipboard
     }));
-    return { actions, clipboard, scope };
+    return { actions, clipboard, selectAll, scope };
 }
 
 const press = (key, mods = {}) => document.body.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...mods }));
@@ -71,5 +72,76 @@ describe('useDatasetShortcuts', () => {
         expect(reader.actions.remove).not.toHaveBeenCalled();
         expect(reader.clipboard.cut).not.toHaveBeenCalled();
         reader.scope.stop();
+    });
+
+    // FR-EXP-09: Ctrl/Cmd+A and F2 are accelerators of the registry, bound here
+    describe('Select all and Rename', () => {
+        const dispatch = (target, key, mods = {}) => {
+            const e = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mods });
+            target.dispatchEvent(e);
+            return e;
+        };
+
+        it('selects every file on Ctrl+A or Cmd+A and keeps the page text unselected', () => {
+            const { selectAll, scope } = setup();
+            expect(dispatch(document.body, 'a', { ctrlKey: true }).defaultPrevented).toBe(true);
+            expect(selectAll).toHaveBeenLastCalledWith(true);
+            dispatch(document.body, 'a', { metaKey: true });
+            expect(selectAll).toHaveBeenCalledTimes(2);
+            scope.stop();
+        });
+
+        it('selects from inside the file list, but leaves the text of anything else (a panel)', () => {
+            const { selectAll, scope } = setup();
+            const list = document.createElement('div');
+            list.setAttribute('data-file-list', '');
+            list.tabIndex = 0;
+            const panel = document.createElement('div');
+            panel.tabIndex = 0;
+            document.body.append(list, panel);
+            expect(dispatch(list, 'a', { ctrlKey: true }).defaultPrevented).toBe(true);
+            expect(selectAll).toHaveBeenCalledTimes(1);
+            expect(dispatch(panel, 'a', { ctrlKey: true }).defaultPrevented).toBe(false);
+            expect(selectAll).toHaveBeenCalledTimes(1);
+            list.remove();
+            panel.remove();
+            scope.stop();
+        });
+
+        it('keeps the browser from selecting the page when every file is already selected', () => {
+            const all = [{ path: 'a.tif' }, { path: 'b.tif' }];
+            const { selectAll, scope } = setup({ selected: all, files: all });
+            expect(dispatch(document.body, 'a', { ctrlKey: true }).defaultPrevented).toBe(true);
+            expect(selectAll).not.toHaveBeenCalled();
+            scope.stop();
+        });
+
+        it('does not select all in a text field, and plain A is not a shortcut', () => {
+            const { selectAll, scope } = setup();
+            const input = document.createElement('input');
+            document.body.appendChild(input);
+            expect(dispatch(input, 'a', { ctrlKey: true }).defaultPrevented).toBe(false);
+            expect(dispatch(document.body, 'a').defaultPrevented).toBe(false);
+            expect(selectAll).not.toHaveBeenCalled();
+            input.remove();
+            scope.stop();
+        });
+
+        it('renames the one item selected on F2, and no other selection', () => {
+            const one = setup();
+            expect(dispatch(document.body, 'F2').defaultPrevented).toBe(true);
+            expect(one.actions.rename).toHaveBeenCalledWith({ path: 'a.tif' });
+            one.scope.stop();
+
+            const two = setup({ selected: [{ path: 'a.tif' }, { path: 'b.tif' }] });
+            dispatch(document.body, 'F2');
+            expect(two.actions.rename).not.toHaveBeenCalled();
+            two.scope.stop();
+
+            const reader = setup({ canWrite: false });
+            dispatch(document.body, 'F2');
+            expect(reader.actions.rename).not.toHaveBeenCalled();
+            reader.scope.stop();
+        });
     });
 });

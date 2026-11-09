@@ -7,8 +7,14 @@ import ddb from 'ddb';
 
 const h = vi.hoisted(() => ({
     reg: null,
-    auth: null
+    auth: null,
+    download: null
 }));
+// What the download does is not the subject here: that it starts, or asks first, and with what
+vi.mock('@/libs/datasetDownloads', async importOriginal => {
+    h.download = vi.fn(() => Promise.resolve());
+    return { ...(await importOriginal()), downloadFromDataset: h.download };
+});
 vi.mock('@/libs/api/sharedRegistry', () => {
     h.reg = {
         isLoggedIn: () => true,
@@ -354,7 +360,8 @@ describe('HubHeader accessible names', () => {
         useDatasetSessionStore(wrapper.vm.$pinia).activeTab = 'explorer';
         await flushPromises();
         expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(true);
-        expect(wrapper.find('[aria-label="Download"]').attributes('title')).toBe('Download');
+        // Nothing selected: the whole dataset (FR-EXP-27)
+        expect(wrapper.find('[aria-label="Download entire dataset"]').attributes('title')).toBe('Download entire dataset');
     });
 
     it('offers no Download, Share or Settings on a dataset that did not load (FR-ACC-18)', async () => {
@@ -440,7 +447,7 @@ describe('HubHeader dataset actions', () => {
         session.setSelectedFiles([]);
         await flushPromises();
         expect(button('Share/Embed').exists()).toBe(false);
-        expect(button('Download').attributes('title')).toBe('Download');
+        expect(button('Download entire dataset').attributes('title')).toBe('Download entire dataset');
     });
 
     it('keeps Download in place, disabled with its reason, while an archive is prepared', async () => {
@@ -455,14 +462,109 @@ describe('HubHeader dataset actions', () => {
         expect(wrapper.vm.downloadConfirmOpen).toBe(false);
     });
 
-    it('runs the action of the registry: Download asks first, Share/Embed opens the window, Settings asks the page', async () => {
+    it('runs the action of the registry: Share/Embed opens the window, Settings asks the page', async () => {
         const session = await onDataset();
-        await button('Download').trigger('click');
-        expect(wrapper.vm.downloadConfirmOpen).toBe(true);
         await button('Share/Embed').trigger('click');
         expect(wrapper.vm.shareFile).toStrictEqual(tif);
         await button('Settings').trigger('click');
         expect(session.settingsRequests).toBe(1);
+    });
+
+    // FR-EXP-27: one file downloads at once; several items, a folder or the dataset ask, with their size
+    describe('Download', () => {
+        const sized = (name, size) => ({ path: `ddb://acme/site/${name}`, entry: { path: name, type: ddb.entry.type.IMAGE, size } });
+        const folder = { path: 'ddb://acme/site/newdir', entry: { path: 'newdir', type: ddb.entry.type.DIRECTORY, size: 0 } };
+        const dialog = () => wrapper.findComponent({ name: 'ConfirmDialog' });
+        let search;
+        beforeEach(() => {
+            h.download.mockClear();
+            search = vi.fn(() => Promise.resolve([]));
+            h.reg.Organization = () => ({ info: () => Promise.resolve({ isPublic: true }), Dataset: () => ({ name: 'site', search }) });
+        });
+
+        it('starts at once, without a question, for one file', async () => {
+            await onDataset({ selected: [{ path: 'ddb://h/acme/site/sub/b.jpg', entry: jpg.entry }] });
+            await button('Download').trigger('click');
+            await flushPromises();
+            expect(wrapper.vm.downloadConfirmOpen).toBe(false);
+            expect(dialog().exists()).toBe(false);
+            expect(h.download).toHaveBeenCalledTimes(1);
+            expect(h.download.mock.calls[0][0].paths).toEqual(['sub/b.jpg']);
+        });
+
+        it('asks for several files with their count and total size, and downloads on Download only', async () => {
+            await onDataset({ selected: [sized('a.jpg', 1048576), sized('b.jpg', 2097152)] });
+            await button('Download').trigger('click');
+            await flushPromises();
+            expect(dialog().exists()).toBe(true);
+            expect(dialog().props('message')).toBe('Download 2 files (3 MB) as a ZIP?');
+            expect(h.download).not.toHaveBeenCalled();
+            await dialog().vm.$emit('close', 'confirm');
+            await flushPromises();
+            expect(h.download).toHaveBeenCalledTimes(1);
+        });
+
+        it('asks for a folder with "Calculating size…", then its total size, and stops reading it on Cancel', async () => {
+            let found;
+            search.mockImplementation(() => new Promise(resolve => { found = resolve; }));
+            await onDataset({ selected: [folder, sized('a.jpg', 1048576)] });
+            await button('Download').trigger('click');
+            await flushPromises();
+            expect(search).toHaveBeenCalledWith('*', expect.objectContaining({ path: 'newdir', recursive: true }));
+            expect(dialog().props('message')).toBe('Download 2 items as a ZIP? A folder goes with everything inside it. Calculating size…');
+            found([{ path: 'newdir/b.jpg', type: ddb.entry.type.IMAGE, size: 1572864 }, { path: 'newdir/sub', type: ddb.entry.type.DIRECTORY, size: 0 }]);
+            await flushPromises();
+            expect(dialog().props('message')).toBe('Download 2 items (2.5 MB) as a ZIP? A folder goes with everything inside it.');
+            const { signal } = search.mock.calls[0][1];
+            expect(signal.aborted).toBe(false);
+            await dialog().vm.$emit('close', 'cancel');
+            await flushPromises();
+            expect(signal.aborted).toBe(true);
+            expect(wrapper.vm.downloadConfirmOpen).toBe(false);
+            expect(h.download).not.toHaveBeenCalled();
+        });
+
+        it('asks for one folder by name, and a late size does not reach a closed question', async () => {
+            let found;
+            search.mockImplementation(() => new Promise(resolve => { found = resolve; }));
+            await onDataset({ selected: [folder] });
+            await button('Download').trigger('click');
+            await flushPromises();
+            expect(dialog().props('message')).toBe('Download the folder <strong>newdir</strong> and everything inside it as a ZIP? Calculating size…');
+            await dialog().vm.$emit('close', 'confirm');
+            found([{ path: 'newdir/b.jpg', type: ddb.entry.type.IMAGE, size: 10 }]);
+            await flushPromises();
+            expect(h.download).toHaveBeenCalledTimes(1);
+            expect(wrapper.vm.downloadSize).toBeNull();
+        });
+
+        it('says when the size of a folder could not be read', async () => {
+            search.mockImplementation(() => Promise.reject(new Error('offline')));
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            await onDataset({ selected: [folder] });
+            await button('Download').trigger('click');
+            await flushPromises();
+            expect(dialog().props('message')).toBe('Download the folder <strong>newdir</strong> and everything inside it as a ZIP? The size could not be calculated.');
+            expect(warn).toHaveBeenCalled();
+            warn.mockRestore();
+        });
+
+        it('reads no size for files only', async () => {
+            await onDataset({ selected: [sized('a.jpg', 1048576), sized('b.jpg', 2097152)] });
+            await button('Download').trigger('click');
+            await flushPromises();
+            expect(search).not.toHaveBeenCalled();
+        });
+
+        it('asks for the whole dataset with its item count (folders included) and size', async () => {
+            const session = await onDataset({ selected: [] });
+            // ddb's root entry counts every entry: here 12 files and 4 folders
+            session.setRootEntry({ path: 'ddb://acme/site', size: 42050000, properties: { entries: 16 } });
+            await button('Download entire dataset').trigger('click');
+            await flushPromises();
+            expect(dialog().props('message')).toBe('Download all 16 items (40.1 MB) as a ZIP?');
+            expect(search).not.toHaveBeenCalled();
+        });
     });
 
     it('offers no Settings to a visitor who is not signed in', async () => {

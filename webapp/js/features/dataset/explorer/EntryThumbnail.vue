@@ -1,8 +1,11 @@
 <template>
-    <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
-         role="option" tabindex="0" :aria-selected="!!file.selected"
-         :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick"
-         @keydown.enter.self.prevent="onDblClick" @keydown.space.self.prevent="onClick">
+    <!-- Not a tab stop, and its keys are the list's: the list holds the focus and names its active tile (useListNavigation, FR-EXP-09) -->
+    <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/interactive-supports-focus -- the listbox is the focusable element (aria-activedescendant) -->
+    <div class="thumbnail" :class="{ selected: file.selected, active }" :title="getTitleText"
+         role="option" :aria-selected="!!file.selected"
+         :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
+        <!-- A second cue of the selection besides the tint and the outline (FR-EXP-10) -->
+        <span v-if="file.selected" class="selected-badge" aria-hidden="true"><i class="fa-solid fa-check" /></span>
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
@@ -67,6 +70,11 @@ export default {
         dataset: {
             type: Object,
             default: null
+        },
+        // The tile the keyboard is on (the list's aria-activedescendant)
+        active: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ['clicked', 'open'],
@@ -410,6 +418,7 @@ export default {
 
 <style scoped>
 .thumbnail {
+    position: relative;
     width: 100%;
     margin: var(--tile-spacing);
     padding-top: var(--tile-spacing);
@@ -446,8 +455,35 @@ export default {
     outline-offset: -2px;
 }
 
+/* Selected (FR-EXP-10): the primary tint, a 2px primary outline (3:1 or more against the page and
+   against the hover grey) and a check badge; it is declared after :hover, so a selected tile keeps its tint
+   under the pointer and never reads as hovered */
 .thumbnail.selected {
-    background: var(--ddb-border);
+    background: var(--ddb-selected-bg);
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: -2px;
+}
+
+.thumbnail .selected-badge {
+    position: absolute;
+    top: var(--ddb-spacing-xs);
+    left: var(--ddb-spacing-xs);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--ddb-primary);
+    color: var(--ddb-text-on-color);
+    font-size: var(--ddb-font-size-sm);
+    pointer-events: none;
+}
+
+.thumbnail .selected-badge i {
+    margin: 0;
+    line-height: 1;
 }
 
 .thumbnail .container {

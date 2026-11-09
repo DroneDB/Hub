@@ -10,7 +10,8 @@
  * A definition says:
  *   - `surfaces`: where it is offered ('toolbar', 'menu' for a selection, 'background' for the menu
  *     of an empty selection, 'shortcut', 'header' for the dataset actions of the page header, which
- *     like a menu shows only what applies);
+ *     like a menu shows only what applies, 'panel' for the actions of the detail panel's summary of a
+ *     selection of several items);
  *   - `permitted(ctx)`: false hides it on every surface (a reader has no Delete);
  *   - `applies(ctx)`: whether it applies to the selection. The menus show only the actions that
  *     apply; the toolbar keeps a fixed list and disables the others, with `reason(ctx)`;
@@ -21,16 +22,15 @@
  * the menu offers one "Open ..." item per row, the toolbar has one Open slot labelled by the
  * file's default row.
  */
-import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
-import { Features } from '@/libs/features';
 import { isDroneDB } from '@/libs/entryTypes';
 import { VIEWERS, defaultViewerFor } from '@/libs/openItemDefaults';
+import { isBulkBlocked } from '@/libs/datasetDownloads';
 import { useClipboardStore } from '@/stores/clipboard';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 /**
- * @typedef {'toolbar'|'menu'|'background'|'shortcut'|'header'} Surface
+ * @typedef {'toolbar'|'menu'|'background'|'shortcut'|'header'|'panel'} Surface
  *
  * @typedef {object} ActionContext
  * @property {() => any[]} getSelectedEntries   the explorer items acted on
@@ -95,15 +95,9 @@ const filesOnly = (/** @type {ActionContext} */ c) => sel(c).length > 0 && !hasD
 const available = (/** @type {ActionContext} */ c) => !c.unavailable;
 const signedIn = (/** @type {ActionContext} */ c) => (c.signedIn ?? reg.isLoggedIn());
 
-// A download of several files, a folder or the whole dataset (nothing selected) is an archive;
-// without the entry of the one selected item, count it as one
-const bulkDownload = (/** @type {ActionContext} */ c) => {
-    const s = sel(c);
-    if (s.length !== 1) return true;
-    return s[0]?.entry ? ddb.entry.isDirectory(s[0].entry) : true;
-};
-const downloadBlocked = (/** @type {ActionContext} */ c) => !signedIn(c)
-    && !!reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) && bulkDownload(c);
+// A download of several files, a folder or the whole dataset (nothing selected) is an archive; whether
+// an anonymous visitor may is the download module's rule (libs/datasetDownloads.js)
+const downloadBlocked = (/** @type {ActionContext} */ c) => isBulkBlocked(sel(c), { signedIn: signedIn(c) });
 const downloadInProgress = (/** @type {ActionContext} */ c) => (c.downloadInProgress
     ? c.downloadInProgress() : useDatasetSessionStore().activeBulkDownload);
 
@@ -151,7 +145,8 @@ export const EXPLORER_ACTIONS = Object.freeze([
         group: 'edit',
         label: 'Rename',
         icon: 'fa-solid fa-pencil',
-        surfaces: ['toolbar', 'menu'],
+        accelerator: 'F2',
+        surfaces: ['toolbar', 'menu', 'shortcut'],
         priority: 2,
         permitted: writer,
         applies: c => !!single(c),
@@ -175,9 +170,10 @@ export const EXPLORER_ACTIONS = Object.freeze([
         // empty selection is the background menu, which has no Download)
         id: 'download',
         group: 'share',
-        label: 'Download',
+        // Nothing selected: the whole dataset (the header's tooltip and name)
+        label: c => (sel(c).length ? 'Download' : 'Download entire dataset'),
         icon: 'fa-solid fa-download',
-        surfaces: ['menu', 'header'],
+        surfaces: ['menu', 'header', 'panel'],
         permitted: available,
         enabled: c => !downloadInProgress(c) && !downloadBlocked(c),
         reason: c => (downloadInProgress(c)
@@ -257,7 +253,8 @@ export const EXPLORER_ACTIONS = Object.freeze([
         group: 'folder',
         label: 'Select all',
         icon: 'fa-regular fa-square-check',
-        surfaces: ['toolbar', 'menu', 'background'],
+        accelerator: 'CmdOrCtrl+A',
+        surfaces: ['toolbar', 'menu', 'background', 'shortcut'],
         priority: 3,
         applies: c => {
             if (!c.getFiles) return true;
@@ -294,7 +291,7 @@ export const EXPLORER_ACTIONS = Object.freeze([
         icon: 'fa-solid fa-trash',
         danger: true,
         accelerator: 'Delete',
-        surfaces: ['toolbar', 'menu', 'shortcut'],
+        surfaces: ['toolbar', 'menu', 'shortcut', 'panel'],
         priority: 2,
         permitted: writer,
         applies: filesOnly,

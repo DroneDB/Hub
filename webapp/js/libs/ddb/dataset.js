@@ -318,10 +318,17 @@ export default class Dataset {
         }
     }
 
-    async search(query){
+    /**
+     * @param {string} [query]  a file name pattern ('*' is any)
+     * @param {{ path?: string, recursive?: boolean, signal?: AbortSignal }} [options]  the folder to search in (the whole
+     *   dataset by default) and whether to go into its subfolders (the server's default is yes)
+     */
+    async search(query, { path, recursive, signal } = {}){
         const formData = new FormData();
         if (query !== undefined && query !== null) formData.append('query', query);
-        return this.registry.postFormData(`${this.baseApi}/search`, formData, { readOnly: true });
+        if (path !== undefined && path !== null) formData.append('path', path);
+        if (recursive !== undefined) formData.append('recursive', String(!!recursive));
+        return this.registry.postFormData(`${this.baseApi}/search`, formData, { readOnly: true, signal });
     }
 
     async delete() {

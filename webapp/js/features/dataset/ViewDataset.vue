@@ -28,7 +28,7 @@
                                 <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
                             </div>
                             <div v-if="detailFile && !isMobile" class="detail-side">
-                                <DetailPanel :file="detailFile" :dataset="dataset" :views="views" v-on="detailEvents" />
+                                <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
                             </div>
                         </div>
                     </template>
@@ -36,7 +36,7 @@
                         <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :can-write="canWrite" />
                     </template>
                     <template v-if="isMobile" #properties>
-                        <DetailPanel :file="detailFile" :dataset="dataset" :views="views" v-on="detailEvents" />
+                        <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
                     </template>
                 </TabSwitcher>
             </template>
@@ -72,7 +72,8 @@ import { loadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
-import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError } from '@/libs/datasetDownloads';
+import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
+import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
 import { splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
 import { explorerTools } from '@/libs/dataset/explorerTools';
@@ -99,6 +100,7 @@ import Panel from '@/features/dataset/HubPanel.vue';
 import TabSwitcher from '@/features/dataset/TabSwitcher.vue';
 import Loader from '@/components/HubLoader.vue';
 import DialogHost from '@/components/DialogHost.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import ClipboardPanel from '@/features/dataset/ClipboardPanel.vue';
 import FileBrowser from './explorer/FileBrowser.vue';
 import Explorer from './explorer/DatasetExplorer.vue';
@@ -212,6 +214,8 @@ useDatasetShortcuts({
     blocked: () => dialogs.stack.value.length > 0 || hasOpenModalOverlay(),
     canWrite,
     selected: () => listing.selected.value,
+    files: () => listing.files.value,
+    selectAll: on => selectAll(on),
     treeFor: target => (target.closest && target.closest('.tree-view')
         ? [fileBrowser.value, mobileFileBrowser.value].find(fb => fb && fb.$el && fb.$el.contains(target)) || null
         : null),
@@ -232,6 +236,8 @@ async function downloadItems(files) {
         notify.warn('A download archive is already being prepared. Please wait for it to complete.', { summary: 'Download in progress' });
         return;
     }
+    // A single file downloads at once, like the header's Download; several items or a folder ask (FR-EXP-27)
+    if (needsConfirm(files) && !await askDownload(files)) return;
     const paths = files.map(f => (f.entry && f.entry.path !== undefined ? f.entry.path : ddb.utils.parseUri(f.path).path));
     try {
         await downloadFromDataset({
@@ -241,6 +247,28 @@ async function downloadItems(files) {
     } catch (e) {
         notifyDownloadError(e);
     }
+}
+
+/**
+ * The question before an archive download, with the count and the total size. A folder's size is
+ * read from the server meanwhile ("Calculating size…"), as the delete question does; the user can
+ * answer before it arrives.
+ */
+async function askDownload(files) {
+    const size = ref(null);
+    const failed = ref(false);
+    const reading = new AbortController();
+    if (describeSelection(files).hasFolder) {
+        selectionSize(dataset, files, { signal: reading.signal })
+            .then(total => { size.value = total; })
+            .catch(e => { if (!reading.signal.aborted) { failed.value = true; console.warn('Cannot read the size of the selection:', e); } });
+    }
+    const answer = await dialogs.open(ConfirmDialog, () => ({
+        title: 'Download', confirmText: 'Download', cancelText: 'Cancel', confirmButtonClass: 'primary',
+        message: confirmMessage(describeSelection(files), {}, { size: size.value, failed: failed.value })
+    }));
+    reading.abort();
+    return answer === 'confirm';
 }
 
 // Build output: re-checks that the build exists (the entry's artifacts), then downloads its artifact of `role`
@@ -301,7 +329,10 @@ function onCurrentUriChanged(uri) {
 async function rootNodes() {
     try {
         const entries = await dataset.info({ signal: requestSignal });
-        if (entries.length) rootEntry.value = entries[0];
+        if (entries.length) {
+            rootEntry.value = entries[0];
+            session.setRootEntry(entries[0]);
+        }
         const name = entries[0]?.properties?.meta?.name;
         if (name) setTitle(name.data);
         return entries.map(e => ({
@@ -388,7 +419,12 @@ const treeEvents = {
     deleteView: viewActions.remove
 };
 const fileEvents = { ...commonEvents(() => listing.selected.value), selectionChanged: onSelectionChanged };
-const detailEvents = { close: closeDetail, open: file => onOpenItem(file), share: actions.share, buildStarted: handleBuildStarted, buildError: handleBuildError };
+const detailEvents = {
+    close: closeDetail, open: file => onOpenItem(file), share: actions.share,
+    // The summary of a selection of several items: the registry's Download and Delete
+    downloadItems, deleteSelecteditems: () => actions.remove(listing.selected.value),
+    buildStarted: handleBuildStarted, buildError: handleBuildError
+};
 
 const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, views: views.value }));
 // The toolbar runs the actions of the registry with the handlers of the file list
@@ -448,6 +484,7 @@ onBeforeUnmount(() => {
     document.getElementById('app').classList.remove('fullpage');
     BuildManager.unregisterDataset(dataset);
     session.setUnavailable(false);
+    session.setRootEntry(null);
 });
 </script>
 

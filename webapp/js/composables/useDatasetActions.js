@@ -6,6 +6,7 @@
  *   const actions = useDatasetActions({ dataset, listing, dialogs, busy, route });
  *   actions.rename(file);  actions.remove(files);  actions.upload();
  */
+import { ref } from 'vue';
 import ddb from 'ddb';
 import { countOf } from '@/libs/format';
 import reg from '@/libs/api/sharedRegistry';
@@ -17,13 +18,14 @@ import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import emitter from '@/libs/eventBus';
 import { itemFor } from '@/libs/dataset/explorerItems';
-import { CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
-import { deleteConfirmation } from '@/libs/deleteConfirmation';
+import { CONFIRM_RESCAN, CONFIRM_REBUILD, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
+import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import { useConfirmReplace } from '@/composables/useConfirmReplace';
 import Alert from '@/components/HubAlert.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DeleteResultDialog from '@/features/dataset/dialogs/DeleteResultDialog.vue';
 import RenameDialog from '@/features/dataset/dialogs/RenameDialog.vue';
 import NewFolderDialog from '@/features/dataset/dialogs/NewFolderDialog.vue';
@@ -114,15 +116,27 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     // ---- Delete --------------------------------------------------------------------------
 
+    /**
+     * Asks, then deletes (FR-EXP-08, D-011): the question names the items and gives their total
+     * size. A folder's size is read from the server meanwhile ("Calculating size…"); the user can
+     * delete before it arrives.
+     */
     async function remove(files) {
         if (!files.length) return;
-        // A folder goes with everything inside it
-        const folder = f => ddb.entry.isDirectory(f.entry);
-        const question = deleteConfirmation({
-            kind: folder(files[0]) ? 'folder' : 'file',
-            items: files.map(f => ({ name: f.label, note: folder(f) ? 'and everything inside it' : '' }))
+        const size = ref(null);
+        const failed = ref(false);
+        const reading = new AbortController();
+        if (describeSelection(files).hasFolder) {
+            selectionSize(dataset, files, { signal: reading.signal })
+                .then(total => { size.value = total; })
+                .catch(e => { if (!reading.signal.aborted) { failed.value = true; console.warn('Cannot read the size of the selection:', e); } });
+        }
+        const answer = await dialogs.open(ConfirmDialog, () => {
+            const { danger, ...question } = deleteFilesConfirmation(files, { size: size.value, failed: failed.value });
+            return { ...question, confirmButtonClass: danger ? 'danger' : 'primary' };
         });
-        if (await confirm(question)) deleteFiles(files);
+        reading.abort();
+        if (answer === 'confirm') deleteFiles(files);
     }
 
     async function deleteFiles(files) {

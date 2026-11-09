@@ -274,3 +274,29 @@ describe('Dataset file writes', () => {
         }
     });
 });
+
+// FR-EXP-08: the size of a folder is read with one recursive search of its path
+describe('Dataset.search', () => {
+    function datasetPosting() {
+        const registry = { remote: 'hub.example.com', secure: true, postFormData: vi.fn(async () => []) };
+        return { ds: new Dataset(registry, 'my_org', 'my_ds'), post: registry.postFormData };
+    }
+    const names = formData => [...formData.keys()];
+
+    it('posts only the query when it has no options, as before', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.search('*IMG*');
+        expect(post.mock.calls[0][0]).toBe('/orgs/my_org/ds/my_ds/search');
+        expect(names(post.mock.calls[0][1])).toEqual(['query']);
+    });
+
+    it('posts the folder, the recursion and the signal when asked', async () => {
+        const { ds, post } = datasetPosting();
+        const signal = new AbortController().signal;
+        await ds.search('*', { path: 'newdir', recursive: true, signal });
+        const [, formData, options] = post.mock.calls[0];
+        expect(names(formData)).toEqual(['query', 'path', 'recursive']);
+        expect([formData.get('query'), formData.get('path'), formData.get('recursive')]).toEqual(['*', 'newdir', 'true']);
+        expect(options.signal).toBe(signal);
+    });
+});

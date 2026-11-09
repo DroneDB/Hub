@@ -157,6 +157,11 @@ const PAIRS = [
     ['--ddb-focus-ring-color', '--ddb-bg', UI],
     ['--ddb-focus-ring-color', '--ddb-bg-surface', UI],
     ['--ddb-focus-ring-color', '--ddb-focus-ring-halo', UI],
+    // FR-EXP-10: the 2px outline of a selected tile against the page, the hover grey and the selected tint,
+    // and the white check of its badge on the primary fill
+    ['--ddb-primary', '--ddb-bg', UI],
+    ['--ddb-primary', '--ddb-bg-hover', UI],
+    ['--ddb-primary', '--ddb-selected-bg', UI],
     // Text in the success colour (the fill --ddb-success is 3:1 on white)
     ['--ddb-success-text', '--ddb-bg', TEXT],
     ['--ddb-success-text', '--ddb-bg-surface', TEXT],

@@ -1,5 +1,31 @@
 <template>
-    <div v-if="file" class="detail-panel" role="region" aria-label="File details">
+    <!-- Several items selected: the summary of the selection, not the properties of one file (FR-EXP-32) -->
+    <div v-if="multiple" class="detail-panel" role="region" aria-label="Selection">
+        <div class="detail-header">
+            <h3 class="ui header">
+                <i class="icon fa-regular fa-square-check" aria-hidden="true" />
+                <div class="content">
+                    {{ summary.summary }}
+                </div>
+            </h3>
+            <Button severity="secondary" outlined title="Close" aria-label="Close" icon="fa-solid fa-xmark" @click="handleClose" />
+        </div>
+        <div class="detail-content selection-summary">
+            <p v-if="summary.hasFolder" class="selection-note">The size does not count what is inside the folders.</p>
+            <p class="selection-types">{{ summary.typesText }}</p>
+            <ul class="selection-names text-selectable">
+                <li v-for="name in summary.names" :key="name">{{ name }}</li>
+                <li v-if="summary.more">and {{ summary.more }} more</li>
+            </ul>
+            <div class="actions-section">
+                <div class="action-buttons">
+                    <Button v-for="a in selectionActions" :key="a.id" :severity="a.danger ? 'danger' : 'secondary'" :outlined="a.danger"
+                            :icon="a.icon" :label="a.label" :disabled="!a.enabled" :title="a.disabledReason || undefined" @click="a.run()" />
+                </div>
+            </div>
+        </div>
+    </div>
+    <div v-else-if="file" class="detail-panel" role="region" aria-label="File details">
         <div class="detail-header">
             <h3 class="ui header">
                 <i class="icon" :class="file.icon" />
@@ -83,7 +109,8 @@ import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { isGeoraster as isGeorasterEntry } from '@/libs/entryTypes';
-import { openPresentation } from '@/libs/dataset/explorerActions';
+import { openPresentation, resolveAction } from '@/libs/dataset/explorerActions';
+import { describeSelection } from '@/libs/dataset/selection';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
@@ -115,9 +142,18 @@ export default {
         views: {
             type: Array,
             default: () => []
+        },
+        // The items selected now (listing.selected): with several, the panel summarizes them
+        selection: {
+            type: Array,
+            default: () => []
+        },
+        canWrite: {
+            type: Boolean,
+            default: false
         }
     },
-    emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
+    emits: ['close', 'open', 'share', 'buildStarted', 'buildError', 'downloadItems', 'deleteSelecteditems'],
     setup() {
         // Lengths, speeds and areas follow the measurement units preference as it changes
         return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
@@ -132,6 +168,21 @@ export default {
         }
     },
     computed: {
+        multiple() {
+            return this.selection.length > 1;
+        },
+        summary() {
+            return describeSelection(this.selection);
+        },
+        // The registry's Download and Delete, as the panel shows them for the selection
+        selectionActions() {
+            const ctx = {
+                getSelectedEntries: () => this.selection,
+                canWrite: this.canWrite,
+                emit: (event, ...args) => this.$emit(event, ...args)
+            };
+            return ['download', 'delete'].map(id => resolveAction(id, ctx, 'panel')).filter(a => a.visible);
+        },
         // Open says where the file opens, as the toolbar's Open does (the viewer table)
         openAction() {
             return openPresentation(this.file);
@@ -513,6 +564,20 @@ export default {
         padding: 0.15rem 0;
         overflow-wrap: anywhere;
     }
+}
+
+.selection-summary {
+    padding: var(--ddb-spacing-lg);
+}
+
+.selection-note {
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
+}
+
+.selection-names {
+    padding-left: 1.25rem;
+    overflow-wrap: anywhere;
 }
 
 .detail-panel-empty {

@@ -7,8 +7,9 @@
         </div>
         <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }"
              :style="{ '--grid-cell-width': gridCellWidth + 'px' }"
-             role="listbox" aria-label="Files" aria-multiselectable="true" tabindex="-1"
-             @click="onClick" @contextmenu="onBackgroundContextMenu" @keydown.esc="clearSelection"
+             role="listbox" aria-label="Files" aria-multiselectable="true" tabindex="0" data-file-list
+             :aria-activedescendant="nav.activeId.value"
+             @click="onClick" @contextmenu="onBackgroundContextMenu" @focus="onFocus" @keydown="onKeydown" @keydown.esc="clearSelection"
              @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)" @dragover.prevent>
             <div v-if="isLoadingFiles && files.length === 0" class="explorer-notice m-3">
@@ -26,7 +27,7 @@
                          @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                          @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                          @dragleave="itemDragLeave($event, f)">
-                        <Thumbnail ref="thumbs" :file="f" :data-idx="idx" :lazy-load="true" :dataset="dataset"
+                        <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset"
                                    @clicked="handleSelection" @open="handleOpen" />
                     </div>
                 </div>
@@ -36,7 +37,7 @@
                      @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                      @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                      @dragleave="itemDragLeave($event, f)">
-                    <Thumbnail ref="thumbs" :file="f" :data-idx="idx" :lazy-load="true" :dataset="dataset"
+                    <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset"
                                @clicked="handleSelection" @open="handleOpen" />
                 </div>
             </template>
@@ -72,9 +73,10 @@ const { pathutils } = ddb;
 import { entry } from 'ddb';
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
-import { getCurrentInstance } from 'vue';
+import { getCurrentInstance, nextTick, useId } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
+import { useListNavigation } from '@/composables/useListNavigation';
 
 export default {
     name: 'DatasetExplorer',
@@ -102,9 +104,19 @@ export default {
     emits: ['upload', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
+        // One tab stop: the list holds the focus and names its active tile (aria-activedescendant), FR-EXP-09
+        const nav = useListNavigation({
+            count: () => props.files.length,
+            columns: () => instance.proxy.columnCount(),
+            idPrefix: `${useId()}-tile`,
+            move: (index, mods) => instance.proxy.moveTo(index, mods),
+            open: index => instance.proxy.openAt(index),
+            toggle: index => instance.proxy.toggleAt(index)
+        });
         return {
             ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
-            selection: useFileSelection(() => props.files, f => f.path)
+            selection: useFileSelection(() => props.files, f => f.path),
+            nav
         };
     },
     data: function () {
@@ -156,6 +168,12 @@ export default {
             }
             return rows;
         },
+    },
+    watch: {
+        // Another folder: the keyboard starts again from its first tile
+        files() {
+            this.nav.active.value = -1;
+        }
     },
     mounted: function () {
         this.measureFonts();
@@ -227,9 +245,63 @@ export default {
                 this.$emit('openItem', file);
             }
         },
+        // ---- Keyboard (useListNavigation) ----
+        onKeydown: function (e) {
+            // Keys of the list itself, not of something inside it
+            if (e.target === e.currentTarget) this.nav.onKeydown(e);
+        },
+        // Focus enters on the first selected tile, else the first
+        onFocus: function (e) {
+            if (e.target !== e.currentTarget || this.nav.active.value >= 0) return;
+            this.nav.setActive(Math.max(0, this.files.findIndex(f => f.selected)));
+        },
+        // Tiles per row: the columns the grid lays out (the virtual grid counts them itself)
+        columnCount: function () {
+            if (!this.virtualGrid && this.$refs.explorer) {
+                const tracks = getComputedStyle(this.$refs.explorer).gridTemplateColumns.split(' ').filter(t => /^[\d.]+px$/.test(t)).length;
+                if (tracks > 0) return tracks;
+            }
+            return this.gridColumns;
+        },
+        // The arrows move the selection with the active tile; Ctrl+arrow moves the active tile only
+        moveTo: function (index, { extend, keepSelection }) {
+            const file = this.files[index];
+            if (!file) return;
+            if (!keepSelection) {
+                this.selection.load(this.selectedFiles);
+                this.selection.toggle(index, { shift: extend });
+                this.applySelection();
+                this.$emit('selectionChanged', file);
+            }
+            this.reveal(index);
+        },
+        toggleAt: function (index) {
+            const file = this.files[index];
+            if (!file) return;
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(index, { ctrl: true });
+            this.applySelection();
+            this.$emit('selectionChanged', file);
+        },
+        openAt: function (index) {
+            const file = this.files[index];
+            if (file) this.handleOpen({ file });
+        },
+        // Scrolls the active tile into view (the virtual grid renders only the rows on screen)
+        reveal: async function (index) {
+            const el = () => document.getElementById(this.nav.idOf(index));
+            if (!el() && this.virtualGrid) {
+                this.$refs.grid?.scrollToIndex(Math.floor(index / this.columnCount()));
+                await nextTick();
+            }
+            el()?.scrollIntoView?.({ block: 'nearest' });
+        },
+
         handleSelection: function (thumb, mouseBtn) {
             if (!thumb) return;
             const file = thumb.file;
+            // A click makes its tile the active one
+            this.nav.setActive(this.files.indexOf(file));
             this.selection.load(this.selectedFiles);
             this.selection.toggle(this.files.indexOf(file),
                 { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isToggleSelectPressed(), right: mouseBtn === Mouse.RIGHT });
@@ -290,6 +362,16 @@ export default {
         grid-column: 1 / -1;
     }
 
+}
+
+/* The list holds the focus; its active tile shows the focus ring, only while the list has it (FR-EXP-09) */
+#explorer:focus-visible {
+    outline: none;
+}
+
+#explorer:focus-visible :deep(.thumbnail.active) {
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+    outline-offset: calc(-1 * var(--ddb-focus-ring-width));
 }
 
 #explorer-container {

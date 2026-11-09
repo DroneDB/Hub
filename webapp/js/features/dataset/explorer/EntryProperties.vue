@@ -20,8 +20,8 @@ import Window from '@/components/HubWindow.vue';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-import { buildAllProperties, buildCopyableValues, buildRowNotes, getFileTypeName } from '@/libs/propertiesUtils';
-import { bytesToSize } from '@/libs/utils';
+import { buildAllProperties, buildCopyableValues, buildRowNotes } from '@/libs/propertiesUtils';
+import { describeSelection } from '@/libs/dataset/selection';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
@@ -51,26 +51,12 @@ export default {
         },
         multiFileRows() {
             if (!this.files || this.files.length < 2) return [];
+            // The counts and the types are the selection summary's (libs/dataset/selection.js)
+            const summary = describeSelection(this.files);
             return [
-                { key: 'Size', value: this.sumSizes(this.files) },
-                { key: 'Type', value: this.typesToHuman(this.files) }
+                { key: 'Size', value: summary.sizeText },
+                { key: 'Type', value: summary.typesSummary }
             ];
-        }
-    },
-    methods: {
-        typesToHuman(files) {
-            if (!files || !files.length) return "";
-            const types = {};
-            files.forEach(f => types[getFileTypeName(f.entry.type)] = true);
-            const keys = Object.keys(types);
-            if (keys.length >= 2) return "Multiple types";
-            return "All of type " + getFileTypeName(files[0].entry.type);
-        },
-
-        sumSizes(files) {
-            let sum = 0;
-            files.forEach(f => { if (f.entry) sum += f.entry.size; });
-            return bytesToSize(sum);
         }
     }
 }

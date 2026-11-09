@@ -84,20 +84,23 @@ describe('the action registry', () => {
     it('every accelerator it names is bound: a keydown runs the action, Ctrl/Cmd+V is the paste event', () => {
         const withKeys = EXPLORER_ACTIONS.filter(a => a.accelerator);
         expect(withKeys.map(a => [a.id, a.accelerator])).toEqual([
-            ['copy', 'CmdOrCtrl+C'], ['cut', 'CmdOrCtrl+X'], ['paste', 'CmdOrCtrl+V'], ['delete', 'Delete']
+            ['rename', 'F2'], ['copy', 'CmdOrCtrl+C'], ['cut', 'CmdOrCtrl+X'], ['paste', 'CmdOrCtrl+V'], ['select-all', 'CmdOrCtrl+A'], ['delete', 'Delete']
         ]);
         const sel = [file(T.IMAGE, 'a.jpg')];
-        const events = { copy: 'copySelectedItems', cut: 'cutSelectedItems', delete: 'deleteSelecteditems' };
+        const events = { rename: 'moveSelectedItems', copy: 'copySelectedItems', cut: 'cutSelectedItems', delete: 'deleteSelecteditems' };
+        // Select all has something to select: another file is on show
+        const more = { files: [...sel, file(T.IMAGE, 'b.jpg')] };
         for (const action of withKeys.filter(a => !a.pasteEvent)) {
-            const ctx = context(sel);
+            const ctx = context(sel, more);
             const [k, ...mods] = action.accelerator.split('+').reverse();
             const e = key(k.toLowerCase(), mods.length ? { ctrlKey: true } : {});
             expect(runShortcut(e, ctx)).toBe(true);
             expect(e.preventDefault).toHaveBeenCalled();
-            expect(ctx.emit).toHaveBeenCalledWith(events[action.id]);
+            if (action.id === 'select-all') expect(ctx.selectAll).toHaveBeenCalledWith(true);
+            else expect(ctx.emit).toHaveBeenCalledWith(events[action.id]);
             // Cmd on a Mac
             if (mods.length) {
-                const mac = context(sel);
+                const mac = context(sel, more);
                 expect(runShortcut(key(k.toLowerCase(), { metaKey: true }), mac)).toBe(true);
             }
         }
@@ -210,7 +213,7 @@ describe('the dataset actions of the header', () => {
     it('the header downloads the whole dataset when nothing is selected; the menu of an empty selection has no Download', () => {
         const ctx = context([]);
         const download = header('download', ctx);
-        expect(download).toMatchObject({ visible: true, enabled: true, label: 'Download' });
+        expect(download).toMatchObject({ visible: true, enabled: true, label: 'Download entire dataset' });
         download.run();
         expect(ctx.emit).toHaveBeenCalledWith('downloadItems', []);
         expect(actionMenuItem('download', ctx).isVisible()).toBe(false);

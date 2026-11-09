@@ -126,7 +126,8 @@ import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { homeLocation, loginLocation, PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { currentLocation, currentPath } from '@/libs/routeQuery';
-import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
+import { downloadFromDataset, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
+import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { resolveAction } from '@/libs/dataset/explorerActions';
 
 // The dataset actions of the header, in the registry (libs/dataset/explorerActions.js)
@@ -168,6 +169,11 @@ export default {
             orgInfoCache: {},
             isDownloading: false,
             downloadConfirmOpen: false,
+            // The size of a selection with a folder, read while the question is open (null: not yet)
+            downloadSize: null,
+            downloadSizeFailed: false,
+            // Stops that reading when the question closes
+            stopSizeReading: null,
             storageInfo: null,
             storageInfoDialogOpen: false,
             usersManagement: false,
@@ -192,7 +198,7 @@ export default {
         },
         ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
         // `unavailable`: the dataset did not load (ResourceState), so it has no Download, Share or Settings
-        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload', 'unavailable', 'canWrite']),
+        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload', 'unavailable', 'canWrite', 'rootEntry']),
         // Download, Share/Embed and Settings as the registry resolves them for the dataset and the
         // selection (the 'header' surface: shown where they apply, Download disabled with its reason)
         datasetActions: function () {
@@ -203,7 +209,11 @@ export default {
                 unavailable: this.unavailable,
                 downloadInProgress: () => this.isDownloading || this.activeBulkDownload,
                 emit: (event, ...args) => {
-                    if (event === 'downloadItems') this.downloadConfirmOpen = true;
+                    // A single file downloads at once; an archive asks first (FR-EXP-27)
+                    if (event === 'downloadItems') {
+                        if (needsConfirm(this.selectedFiles)) this.askDownload();
+                        else this.startDownload();
+                    }
                     else if (event === 'shareEmbed') this.shareFile = args[0];
                     else if (event === 'settings') useDatasetSessionStore().requestSettings();
                 }
@@ -289,11 +299,11 @@ export default {
         updateLabel: function () {
             return `Registry ${this.updateInfo.latestVersion} is available, show what's new`;
         },
+        // The size and the count of the question: the selection's, or the dataset's root entry's
         downloadConfirmMessage: function () {
-            if (this.selectedFiles.length > 0) {
-                return `Are you sure you want to download ${this.selectedFiles.length} selected file${this.selectedFiles.length !== 1 ? 's' : ''}?`;
-            }
-            return 'Are you sure you want to download the entire dataset?';
+            const root = this.rootEntry;
+            return confirmMessage(describeSelection(this.selectedFiles), { count: root?.properties?.entries, size: root?.size },
+                { size: this.downloadSize, failed: this.downloadSizeFailed });
         },
         // Download/Share toolbar actions are only meaningful on the file-listing
         // tabs (Files explorer, or the mobile FileBrowser). They are hidden on
@@ -414,6 +424,7 @@ export default {
 
         emitter.off('addItems', this._onAddItems);
         emitter.off('deleteEntries', this._onDeleteEntries);
+        this.stopDownloadSizeReading();
     },
     methods: {
         handleStorageInfoDialogClose: function () {
@@ -508,10 +519,37 @@ export default {
             this.openPreferences(typeof tab === 'string' && tab ? tab : undefined);
             this.$router.replace({ path, query: rest, hash }).catch(() => { });
         },
-        handleDownloadConfirmClose: async function (action) {
+        // Asks before an archive download. A folder's size is read from the server meanwhile
+        // ("Calculating size…"), as the delete question does; the user can answer before it arrives.
+        askDownload: function () {
+            this.stopDownloadSizeReading();
+            this.downloadSize = null;
+            this.downloadSizeFailed = false;
+            if (describeSelection(this.selectedFiles).hasFolder) {
+                const { org, ds } = this.params;
+                const reading = new AbortController();
+                this.stopSizeReading = () => reading.abort();
+                selectionSize(reg.Organization(org).Dataset(ds), this.selectedFiles, { signal: reading.signal })
+                    .then(total => { if (!reading.signal.aborted) this.downloadSize = total; })
+                    .catch(e => {
+                        if (reading.signal.aborted) return;
+                        this.downloadSizeFailed = true;
+                        console.warn('Cannot read the size of the selection:', e);
+                    });
+            }
+            this.downloadConfirmOpen = true;
+        },
+        stopDownloadSizeReading: function () {
+            if (this.stopSizeReading) this.stopSizeReading();
+            this.stopSizeReading = null;
+        },
+        handleDownloadConfirmClose: function (action) {
             this.downloadConfirmOpen = false;
+            this.stopDownloadSizeReading();
+            if (action === 'confirm') return this.startDownload();
+        },
 
-            if (action !== 'confirm') return;
+        startDownload: async function () {
             if (this.isDownloading) return;
             if (this.activeBulkDownload) return;
 

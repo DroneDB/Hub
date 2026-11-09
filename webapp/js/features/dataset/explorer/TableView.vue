@@ -17,7 +17,7 @@
             <DataTable :value="sortedFiles" :paginator="false" scrollable scroll-height="flex" size="small"
                        data-key="path" striped-rows
                        :row-class="rowClass"
-                       :pt="{ bodyRow: rowPt }"
+                       :pt="{ bodyRow: rowPt, table: tablePt }"
                        @row-click="onRowClick"
                        @row-dblclick="onRowDblClick"
                        @row-contextmenu="onRowContextMenu">
@@ -99,9 +99,10 @@ import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
 import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-import { getCurrentInstance } from 'vue';
+import { getCurrentInstance, nextTick, useId } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
+import { useListNavigation } from '@/composables/useListNavigation';
 import { columnFrom } from '@/libs/responsiveColumns';
 
 /**
@@ -128,10 +129,20 @@ export default {
     emits: ['upload', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
+        // One tab stop: the table holds the focus and names its active row (aria-activedescendant), FR-EXP-09
+        const nav = useListNavigation({
+            count: () => instance.proxy.sortedFiles.length,
+            horizontal: false,
+            idPrefix: `${useId()}-row`,
+            move: (index, mods) => instance.proxy.moveTo(index, mods),
+            open: index => instance.proxy.openAt(index),
+            toggle: index => instance.proxy.toggleAt(index)
+        });
         return {
             ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
             // Ranges follow the rows as sorted on screen
             selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path),
+            nav,
             columnFrom
         };
     },
@@ -169,27 +180,41 @@ export default {
         sortedFiles: function() {
             return sortFileRows(this.files, this.sortColumn, this.sortDirection);
         },
-        // Row events find their file by the row's position (the header is row 0)
+        // The row the keyboard is on
+        activePath: function () {
+            return this.sortedFiles[this.nav.active.value]?.path;
+        },
+        // The table is the list: one tab stop, an ARIA grid of rows that can be selected
+        tablePt: function () {
+            return {
+                role: 'grid',
+                'aria-label': 'Files',
+                'aria-multiselectable': 'true',
+                'aria-activedescendant': this.nav.activeId.value,
+                tabindex: 0,
+                'data-file-list': '',
+                onFocus: e => {
+                    if (e.target !== e.currentTarget || this.nav.active.value >= 0) return;
+                    this.nav.setActive(Math.max(0, this.sortedFiles.findIndex(f => f.selected)));
+                },
+                // The keys of the table or of a row, not of a sort button in the header
+                onKeydown: e => {
+                    if (e.target === e.currentTarget || e.target.closest('tbody tr')) this.nav.onKeydown(e);
+                }
+            };
+        },
+        // Row events find their file by the row's position (the header is row 0); the row's pass-through
+        // options say whether it is selected (aria-selected) and name it for aria-activedescendant
         rowPt: function () {
             const fileOf = e => {
                 const row = e.target.closest('tr');
                 return row ? this.sortedFiles[row.rowIndex - 1] : undefined;
             };
-            return {
-                tabindex: 0,
-                // Enter opens, Space selects (with Shift/Ctrl like a click)
-                onKeydown: e => {
-                    if (e.target.tagName !== 'TR') return;
-                    const file = fileOf(e);
-                    if (!file) return;
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        this.handleOpen(file);
-                    } else if (e.key === ' ') {
-                        e.preventDefault();
-                        this.handleSelection(e, file);
-                    }
-                },
+            return ({ context }) => ({
+                // Not a tab stop: the table holds the focus
+                tabindex: -1,
+                id: this.nav.idOf(context.index),
+                'aria-selected': !!this.sortedFiles[context.index]?.selected,
                 onDragstart: e => {
                     const file = fileOf(e);
                     if (file) this.startDrag(e, file);
@@ -213,7 +238,7 @@ export default {
                     if (file) this.itemDragLeave(e, file);
                 },
                 draggable: this.canWrite
-            };
+            });
         }
     },
     watch: {
@@ -246,6 +271,7 @@ export default {
         rowClass(data) {
             const classes = [];
             if (data.selected) classes.push('row-selected');
+            if (this.activePath === data.path) classes.push('row-active');
             if (data.entry && this.dropTargetPath === data.entry.path) classes.push('drop-target');
             return classes.join(' ');
         },
@@ -317,13 +343,50 @@ export default {
             }
         },
 
+        // ---- Keyboard (useListNavigation) ----
+        // The arrows move the selection with the active row; Ctrl+arrow moves the active row only
+        moveTo: function (index, { extend, keepSelection }) {
+            const file = this.sortedFiles[index];
+            if (!file) return;
+            if (!keepSelection) {
+                this.selection.load(this.selectedFiles);
+                this.selection.toggle(index, { shift: extend });
+                this.applySelection();
+                this.$emit('selectionChanged', file);
+            }
+            this.reveal(index);
+        },
+        toggleAt: function (index) {
+            const file = this.sortedFiles[index];
+            if (!file) return;
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(index, { ctrl: true });
+            this.applySelection();
+            this.$emit('selectionChanged', file);
+        },
+        openAt: function (index) {
+            const file = this.sortedFiles[index];
+            if (file) this.handleOpen(file);
+        },
+        reveal: async function (index) {
+            await nextTick();
+            document.getElementById(this.nav.idOf(index))?.scrollIntoView?.({ block: 'nearest' });
+        },
+        // The row clicked is the active one, and the table has the focus (not the row)
+        activate: function (file) {
+            this.nav.setActive(this.sortedFiles.indexOf(file));
+            this.$refs.tableview?.querySelector('table')?.focus({ preventScroll: true });
+        },
+
         handleSelection: function (evt, file) {
+            this.activate(file);
             Keyboard.updateState(evt);
             this.select(file, { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isToggleSelectPressed() });
             this.$emit('selectionChanged', file);
         },
 
         handleRightClick: function (evt, file) {
+            this.activate(file);
             Keyboard.updateState(evt);
             this.select(file, { right: true });
         },
@@ -453,9 +516,19 @@ export default {
         cursor: pointer;
     }
 
-    tr:focus-visible {
-        outline: 2px solid var(--ddb-primary);
-        outline-offset: -2px;
+    /* The table holds the focus; its active row shows the focus ring, only while the table has it (FR-EXP-09) */
+    table:focus-visible {
+        outline: none;
+    }
+
+    table:focus-visible tr.row-active {
+        outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+        outline-offset: calc(-1 * var(--ddb-focus-ring-width));
+    }
+
+    /* A second cue of the selection besides the tint (FR-EXP-10): a bar on its left edge */
+    tr.row-selected > td:first-child {
+        box-shadow: inset 0.25rem 0 0 var(--ddb-primary);
     }
 
     tr.row-selected {

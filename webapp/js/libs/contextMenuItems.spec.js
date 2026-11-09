@@ -64,10 +64,10 @@ describe('the context menu of a dataset the user can write', () => {
 describe('the shortcuts the menu names', () => {
     beforeEach(() => setActivePinia(createPinia()));
 
-    it('are only the keys the dataset page binds: Ctrl/Cmd+C, +X, +V and Delete', () => {
+    it('are only the keys the dataset page binds: Ctrl/Cmd+C, +X, +V and +A, F2 and Delete', () => {
         const { all } = menu(true);
         const named = Object.fromEntries(all.filter(i => i.accelerator).map(i => [i.label, i.accelerator]));
-        expect(named).toEqual({ Copy: 'CmdOrCtrl+C', Cut: 'CmdOrCtrl+X', Paste: 'CmdOrCtrl+V', Delete: 'Delete' });
+        expect(named).toEqual({ Rename: 'F2', Copy: 'CmdOrCtrl+C', Cut: 'CmdOrCtrl+X', Paste: 'CmdOrCtrl+V', 'Select all': 'CmdOrCtrl+A', Delete: 'Delete' });
     });
 });
 

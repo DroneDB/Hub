@@ -20,6 +20,9 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
     const unavailable = ref(false);
     // The user may write the dataset (the page's permissions): the header's actions follow them
     const canWrite = ref(false);
+    // The dataset's root entry: its file count (properties.entries) and total size, for the header's
+    // whole-dataset download question (FR-EXP-27)
+    const rootEntry = shallowRef(null);
 
     /** @param {Array<object>} files */
     function setSelectedFiles(files) {
@@ -50,6 +53,11 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
         canWrite.value = !!value;
     }
 
+    /** @param {object|null} entry  the dataset's root entry, null when there is none */
+    function setRootEntry(entry) {
+        rootEntry.value = entry || null;
+    }
+
     /** Leaving the dataset: nothing selected, no tab, no archive in progress, nothing refused. */
     function reset() {
         selectedFiles.value = [];
@@ -57,10 +65,11 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
         activeBulkDownload.value = false;
         unavailable.value = false;
         canWrite.value = false;
+        rootEntry.value = null;
     }
 
     return {
-        selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable, canWrite,
-        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, reset
+        selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable, canWrite, rootEntry,
+        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, setRootEntry, reset
     };
 });
