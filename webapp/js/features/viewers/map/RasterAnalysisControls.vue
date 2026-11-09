@@ -58,6 +58,21 @@
                 <RescaleFields v-model="rescale" id-prefix="raster-analysis-controls-rescale" @commit="onRescaleChange" />
             </div>
 
+            <!-- NoData value: replaces the one of the file (FR-RAS-31), for the tiles and for every number the panel shows -->
+            <div class="section" data-testid="raster-nodata-section">
+                <label for="raster-analysis-controls-nodata" class="section-label">NoData value</label>
+                <input id="raster-analysis-controls-nodata" v-model="nodata" class="panel-input"
+                       inputmode="decimal" :placeholder="nodataPlaceholder"
+                       data-testid="raster-nodata-input" @change="onNodataChange">
+                <div v-if="nodataError" class="profile-error" data-testid="raster-nodata-error">
+                    <i class="fas fa-exclamation-triangle" /> {{ nodataError }}
+                </div>
+                <div v-else-if="nodataInvalid" class="no-calibration-info" data-testid="raster-nodata-invalid">
+                    <i class="fas fa-info-circle" />&nbsp;The NoData value of the file ({{ fileNodataText }}) cannot be held
+                    by its data type: no pixel is treated as no data. Enter the value of the background (for example 0).
+                </div>
+            </div>
+
             <!-- Spot Info: the last value read with Inspect -->
             <div v-if="spotInfo" class="section" data-testid="raster-spot-value">
                 <span class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</span>
@@ -198,7 +213,8 @@ import { bytesToSize } from '@/libs/utils';
 import RasterProfileChart from './RasterProfileChart.vue';
 import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
-import { noDataPixelCount } from '@/libs/map/rasterPixels';
+import { noDataPixelCount } from '@/libs/map/rasterAreaStats';
+import { nodataNumber } from '@/libs/ddb/dataset';
 import { rasterValueUnit } from '@/libs/map/rasterUnit';
 import { formatNumber, formatNumberList } from '@/libs/format';
 
@@ -243,6 +259,8 @@ export default {
             selectedFormula: 'CELSIUS',
             selectedColormap: 'ironbow',
             rescale: '',
+            // The NoData value typed in the panel ('' keeps the one of the file)
+            nodata: '',
             unitLabel: '',
             exporting: false,
             originalView: false
@@ -268,6 +286,10 @@ export default {
         spotPlace() {
             const s = this.spotInfo;
             if (!s) return '';
+            // The point that was clicked (the server answers with it); the centre of its pixel for an answer that has none
+            if (typeof s.lon === 'number' && typeof s.lat === 'number') {
+                return formatNumberList([s.lat, s.lon], 6);
+            }
             if (s.hasGeo && typeof s.geoX === 'number' && typeof s.geoY === 'number') {
                 return formatNumberList([s.geoY, s.geoX], 6);
             }
@@ -289,6 +311,27 @@ export default {
             const noData = noDataPixelCount(s);
             if (noData) rows.push({ label: 'No data', value: formatCount(noData) });
             return rows;
+        },
+        // The NoData value of the panel as a number; null for none or for text that is not a number
+        nodataValue() {
+            return nodataNumber(this.nodata);
+        },
+        nodataError() {
+            const text = String(this.nodata ?? '').trim();
+            return text !== '' && this.nodataValue === null ? 'The NoData value must be a number.' : '';
+        },
+        // True when the NoData value of the file cannot be held by its data type (65536 in a UInt16 band) and none was typed
+        nodataInvalid() {
+            return !!(this.rasterInfo && this.rasterInfo.nodataInvalid && !this.rasterInfo.nodataOverridden);
+        },
+        fileNodataText() {
+            const v = this.rasterInfo && this.rasterInfo.nodata;
+            // As typed, so that it can be entered again (no thousands separator)
+            return typeof v === 'number' ? String(v) : 'none';
+        },
+        nodataPlaceholder() {
+            const v = this.rasterInfo && !this.rasterInfo.nodataOverridden ? this.rasterInfo.nodata : null;
+            return typeof v === 'number' ? `${v} (of the file)` : 'e.g. 0 (none if empty)';
         },
         displayUnit() {
             if (this.isThermal) {
@@ -325,7 +368,7 @@ export default {
 
             this.loadError = false;
             try {
-                this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath);
+                this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath, { nodata: this.nodataValue ?? undefined });
 
                 // Default colormap and unit based on raster kind (metres only for an elevation model)
                 if (this.isThermal) {
@@ -346,6 +389,9 @@ export default {
                     if (this.initialParams.formula) this.selectedFormula = this.initialParams.formula;
                     if (this.initialParams.colormap) this.selectedColormap = this.initialParams.colormap;
                     if (this.initialParams.rescale) this.rescale = this.initialParams.rescale;
+                    if (this.initialParams.nodata !== undefined && this.initialParams.nodata !== null) {
+                        this.nodata = String(this.initialParams.nodata);
+                    }
                 }
 
                 this.apply();
@@ -367,6 +413,23 @@ export default {
             this.debouncedApply();
         },
 
+        // A NoData value changes which pixels have a value: the range of the info is that of the new ones
+        async onNodataChange() {
+            if (this.nodataError || !this.filePath || !this.dataset) return;
+            try {
+                this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath,
+                    { nodata: this.nodataValue ?? undefined });
+                if (this.rasterInfo.valueMin !== undefined && this.rasterInfo.valueMax !== undefined) {
+                    this.rescale = `${this.rasterInfo.valueMin.toFixed(1)},${this.rasterInfo.valueMax.toFixed(1)}`;
+                }
+            } catch (e) {
+                console.error('Failed to reload the raster info with the NoData value:', e);
+                this.$notify.error(e, { summary: 'NoData value' });
+                return;
+            }
+            this.apply();
+        },
+
         apply() {
             this.originalView = false;
             const params = {
@@ -374,6 +437,8 @@ export default {
                 colormap: this.selectedColormap,
                 rescale: this.rescale
             };
+            // Sent with the vizParams of the layer (FR-RAS-31): tiles, the numbers and the export read the same pixels
+            if (this.nodataValue !== null) params.nodata = this.nodataValue;
             this.$emit('vizParamsChanged', params);
         },
 
@@ -385,6 +450,7 @@ export default {
         reset() {
             this.selectedFormula = 'CELSIUS';
             this.selectedColormap = this.isThermal ? 'ironbow' : 'viridis';
+            this.nodata = '';
             this.originalView = false;
             if (this.rasterInfo) {
                 this.rescale = `${this.rasterInfo.valueMin.toFixed(1)},${this.rasterInfo.valueMax.toFixed(1)}`;
@@ -440,7 +506,8 @@ export default {
             const vizParams = {
                 formula: this.selectedFormula,
                 colormap: this.selectedColormap,
-                rescale: this.rescale
+                rescale: this.rescale,
+                nodata: this.nodataValue ?? undefined
             };
 
             const url = this.dataset.exportUrl(this.filePath, vizParams);

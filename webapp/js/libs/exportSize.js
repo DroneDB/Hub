@@ -42,7 +42,9 @@ function bytesPerPixel(dataType) {
 
 /**
  * Estimates the GeoTIFF export output size (in bytes) for a raster.
- * Accepts a raster info object as returned by the server (rasterInfo or thermalInfo).
+ * Accepts a raster info object as returned by the server (rasterInfo or thermalInfo). The estimate of the value info
+ * (`estimatedExportBytes`, U-201) is used when it has one; the size of the raw raster is the fallback for an info that
+ * has none (a raster-info of a multispectral raster).
  *
  * Missing bandCount defaults to 1 (typical for thermal rasters).
  * Missing dataType defaults to Float32 (4 bytes/pixel) - conservative.
@@ -52,6 +54,10 @@ function bytesPerPixel(dataType) {
  */
 function estimateExportSize(info) {
     if (!info) return 0;
+    // The Registry computes the size of an export (the pixels that are not NoData x 4 bytes, D-023): the Hub does not
+    if (typeof info.estimatedExportBytes === 'number' && Number.isFinite(info.estimatedExportBytes)) {
+        return Math.max(0, info.estimatedExportBytes);
+    }
     const width = Number(info.width) || 0;
     const height = Number(info.height) || 0;
     const bandCount = Number(info.bandCount) || 1;

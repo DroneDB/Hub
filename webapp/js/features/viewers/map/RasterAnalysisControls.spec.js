@@ -112,6 +112,12 @@ describe('RasterAnalysisControls spot value', () => {
         expect(byId('raster-spot-value').text()).toContain('50.981127, 21.430550');
     });
 
+    // Spot coordinates are the clicked point (FR-RAS-02): the server answers with it
+    it('shows the clicked point, not the centre of its pixel', async () => {
+        await render({ spotInfo: { value: 12.9, x: 50, y: 50, hasGeo: true, geoX: 15.0012848, geoY: 45.152568, lon: 15.0012849, lat: 45.1525681 } });
+        expect(byId('raster-spot-value').text()).toContain('45.152568, 15.001285');
+    });
+
     it('shows the pixel of a value without georeference', async () => {
         await render({ spotInfo: { value: 3, x: 4, y: 5, hasGeo: false } });
         expect(byId('raster-spot-value').text()).toContain('pixel 4, 5');
@@ -179,3 +185,46 @@ describe('RasterAnalysisControls rescale fields', () => {
         expect(wrapper.emitted('vizParamsChanged').at(-1)[0].rescale).toBe('0,12.5');
     });
 });
+
+// FR-RAS-31: the NoData value of the panel goes with the vizParams of the layer, and the file's own is explained
+describe('RasterAnalysisControls NoData value', () => {
+    const input = () => byId('raster-nodata-input');
+
+    it('is sent with the vizParams of the layer, and the value info is read with it', async () => {
+        await render();
+        const dataset = wrapper.props('dataset');
+        await input().setValue('0');
+        await input().trigger('change');
+        await flushPromises();
+        expect(dataset.getRasterValueInfo).toHaveBeenLastCalledWith('odm_dem/dsm.tif', { nodata: 0 });
+        const params = wrapper.emitted('vizParamsChanged').at(-1)[0];
+        expect(params.nodata).toBe(0);
+    });
+
+    it('is not in the vizParams without a value', async () => {
+        await render();
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).not.toHaveProperty('nodata');
+    });
+
+    it('refuses text that is not a number, without a request', async () => {
+        await render();
+        const dataset = wrapper.props('dataset');
+        const before = dataset.getRasterValueInfo.mock.calls.length;
+        await input().setValue('abc');
+        await input().trigger('change');
+        await flushPromises();
+        expect(byId('raster-nodata-error').text()).toContain('must be a number');
+        expect(dataset.getRasterValueInfo.mock.calls.length).toBe(before);
+    });
+
+    it('explains a NoData value of the file that its data type cannot hold', async () => {
+        await render({}, { ...RAW_INFO, nodata: 65536, nodataInvalid: true, nodataOverridden: false });
+        expect(byId('raster-nodata-invalid').text()).toContain('(65536)');
+    });
+
+    it('shows the NoData value of the file as the placeholder', async () => {
+        await render({}, { ...DSM_INFO, nodata: -9999, nodataInvalid: false, nodataOverridden: false });
+        expect(input().attributes('placeholder')).toContain('-9999');
+    });
+});
+

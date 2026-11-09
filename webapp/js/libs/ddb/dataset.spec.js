@@ -356,3 +356,78 @@ describe('Dataset.detectAllStockpiles (FR-MAP-25)', () => {
         expect(ds.registry.postRequest.mock.calls[0][1]).toEqual({ path: 'dsm.tif', sensitivity: 0.5, minAreaM2: 5, maxResults: 50 });
     });
 });
+
+// U-201 (D-021, FR-RAS-02, FR-RAS-31): the value calls send map coordinates and the options of the values, never pixels
+describe('Dataset raster value calls', () => {
+    const base = '/orgs/my_org/ds/my_ds';
+    function datasetGetting() {
+        const get = vi.fn(async () => ({}));
+        const post = vi.fn(async () => ({}));
+        const ds = new Dataset({ remote: 'h', secure: true, getRequest: get, postRequest: post }, 'my_org', 'my_ds');
+        return { ds, get, post };
+    }
+
+    it('a point is asked by longitude and latitude, with the NoData value when there is one', async () => {
+        const { ds, get } = datasetGetting();
+        await ds.getRasterPointValueAt('t.tif', 15.0012848916515, 45.152568005955);
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-point-value?path=t.tif&lon=15.0012848916515&lat=45.152568005955`);
+        await ds.getRasterPointValueAt('t.tif', 1, 2, { nodata: 0, formula: 'KELVIN' });
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-point-value?path=t.tif&lon=1&lat=2&nodata=0&formula=KELVIN`);
+    });
+
+    it('an R-JPEG point keeps its pixel coordinates, with the options of the values', async () => {
+        const { ds, get } = datasetGetting();
+        await ds.getRasterPointValue('r.jpg', 320, 256);
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-point-value?path=r.jpg&x=320&y=256`);
+        await ds.getRasterPointValue('r.jpg', 320, 256, { nodata: -9999, formula: 'CELSIUS' });
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-point-value?path=r.jpg&x=320&y=256&nodata=-9999&formula=CELSIUS`);
+    });
+
+    it('an R-JPEG area keeps its pixel coordinates, with the options of the values', async () => {
+        const { ds, get } = datasetGetting();
+        await ds.getRasterAreaStats('r.jpg', 0, 1, 5, 6);
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-area-stats?path=r.jpg&x0=0&y0=1&x1=5&y1=6`);
+        await ds.getRasterAreaStats('r.jpg', 0, 1, 5, 6, { nodata: '0', formula: 'KELVIN' });
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-area-stats?path=r.jpg&x0=0&y0=1&x1=5&y1=6&nodata=0&formula=KELVIN`);
+    });
+
+    it('an area is asked by its window in longitude and latitude', async () => {
+        const { ds, get } = datasetGetting();
+        await ds.getRasterAreaStatsOfWindow('t.tif', [15.0020449, 45.1523636, 15.0022245, 45.1524903], { nodata: '0' });
+        expect(get).toHaveBeenLastCalledWith(
+            `${base}/raster-area-stats?path=t.tif&bbox=15.0020449,45.1523636,15.0022245,45.1524903&nodata=0`);
+    });
+
+    it('the value info takes the options and a window for the export estimate', async () => {
+        const { ds, get } = datasetGetting();
+        await ds.getRasterValueInfo('t.tif');
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-value-info?path=t.tif`);
+        await ds.getRasterValueInfo('t.tif', { nodata: -9999, formula: 'NDVI', bbox: [1, 2, 3, 4] });
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-value-info?path=t.tif&nodata=-9999&formula=NDVI&bbox=1,2,3,4`);
+    });
+
+    it('a NoData value written with a comma is read as a decimal; text that is not a number is not sent', async () => {
+        const { ds, get } = datasetGetting();
+        await ds.getRasterValueInfo('t.tif', { nodata: '-0,5' });
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-value-info?path=t.tif&nodata=-0.5`);
+        await ds.getRasterValueInfo('t.tif', { nodata: 'abc' });
+        expect(get).toHaveBeenLastCalledWith(`${base}/raster-value-info?path=t.tif`);
+    });
+
+    it('a profile sends the NoData value in its body', async () => {
+        const { ds, post } = datasetGetting();
+        await ds.getRasterProfile('t.tif', { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, 64, { nodata: 0 });
+        expect(post).toHaveBeenLastCalledWith(`${base}/raster-profile`, expect.objectContaining({ path: 't.tif', samples: 64, nodata: 0 }));
+        await ds.getRasterProfile('t.tif', '{}', 8);
+        expect(post.mock.calls[1][1]).not.toHaveProperty('nodata');
+    });
+
+    it('the tiles and the export of a layer with a NoData value carry it', () => {
+        const { ds } = datasetGetting();
+        expect(ds.tileExUrl('t.tif', 1, 2, 3, { colormap: 'ironbow', nodata: 0 })).toBe(
+            `${base}/tiles-ex/1/2/3.webp?path=t.tif&colormap=ironbow&nodata=0`);
+        expect(ds.tileExUrl('t.tif', 1, 2, 3, { colormap: 'ironbow' })).not.toContain('nodata');
+        expect(ds.exportUrl('t.tif', { rescale: '0,1', nodata: 65535 })).toContain('&nodata=65535');
+    });
+});
+

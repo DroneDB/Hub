@@ -12,6 +12,36 @@ const TILE_FORMAT = "webp";
 // `totalFound` after that cut, so a list this long may be the largest of more piles
 export const DETECT_ALL_MAX_RESULTS = 50;
 
+/**
+ * A NoData value as the number the server takes: a finite number or the text of one; null for an empty or invalid entry.
+ * @param {number|string|null|undefined} value
+ * @returns {number|null}
+ */
+export function nodataNumber(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = typeof value === 'number' ? value : Number(String(value).trim().replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * The query part of the NoData option of every raster call (tiles, thumbnails, export and the value calls: FR-RAS-31).
+ * @param {{ nodata?: number|string|null }} [options]
+ */
+export function rasterOptionsQuery(options = {}) {
+    const nodata = nodataNumber(options && options.nodata);
+    return nodata === null ? '' : `&nodata=${encodeURIComponent(String(nodata))}`;
+}
+
+/**
+ * The query part of the options the raster value calls (info, point, area) share: the NoData value, and the formula of
+ * the values (D-022).
+ * @param {{ nodata?: number|string|null, formula?: string }} [options]
+ */
+function valueOptionsQuery(options = {}) {
+    const formula = options && options.formula ? `&formula=${encodeURIComponent(options.formula)}` : '';
+    return rasterOptionsQuery(options) + formula;
+}
+
 export default class Dataset {
     constructor(registry, org, ds) {
         this.registry = registry;
@@ -98,6 +128,7 @@ export default class Dataset {
         if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
         if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
         if (vizParams.stretch) url += `&stretch=${encodeURIComponent(vizParams.stretch)}`;
+        url += rasterOptionsQuery(vizParams);
         return url;
     }
 
@@ -138,19 +169,68 @@ export default class Dataset {
         return this.registry.postRequest(`${this.baseApi}/align/validate`, { sourcePath, referencePath });
     }
 
-    async getRasterValueInfo(path) {
-        return this.registry.getRequest(`${this.baseApi}/raster-value-info?path=${encodeURIComponent(path)}`);
+    /**
+     * The value info of a raster file (U-201, D-021): its exact range in the units of the band, NoData, the default
+     * stretch (D-041) and the size of an export with its limit (D-023). `bbox` is a WGS 84 window
+     * [minLon, minLat, maxLon, maxLat]: the estimate is that of the window.
+     * @param {string} path
+     * @param {{ nodata?: number|string|null, formula?: string, bbox?: number[] }} [options]
+     */
+    async getRasterValueInfo(path, options = {}) {
+        let url = `${this.baseApi}/raster-value-info?path=${encodeURIComponent(path)}`;
+        url += valueOptionsQuery(options);
+        if (Array.isArray(options.bbox) && options.bbox.length === 4) url += `&bbox=${options.bbox.join(',')}`;
+        return this.registry.getRequest(url);
     }
 
-    async getRasterPointValue(path, x, y) {
-        return this.registry.getRequest(`${this.baseApi}/raster-point-value?path=${encodeURIComponent(path)}&x=${x}&y=${y}`);
+    /**
+     * The value at a pixel of the raw thermal grid of an R-JPEG, which has no geotransform (§7.1), with the options of the
+     * values (FR-RAS-31, D-022). A georeferenced raster takes map coordinates: getRasterPointValueAt.
+     * @param {string} path
+     * @param {number} x
+     * @param {number} y
+     * @param {{ nodata?: number|string|null, formula?: string }} [options]
+     */
+    async getRasterPointValue(path, x, y, options = {}) {
+        return this.registry.getRequest(`${this.baseApi}/raster-point-value?path=${encodeURIComponent(path)}&x=${x}&y=${y}${valueOptionsQuery(options)}`);
     }
 
-    async getRasterAreaStats(path, x0, y0, x1, y1) {
-        return this.registry.getRequest(`${this.baseApi}/raster-area-stats?path=${encodeURIComponent(path)}&x0=${x0}&y0=${y0}&x1=${x1}&y1=${y1}`);
+    /**
+     * The value at a map coordinate (WGS 84): libddb finds the pixel of the file under it (U-201, D-021).
+     * @param {string} path
+     * @param {number} lon
+     * @param {number} lat
+     * @param {{ nodata?: number|string|null, formula?: string }} [options]
+     */
+    async getRasterPointValueAt(path, lon, lat, options = {}) {
+        return this.registry.getRequest(`${this.baseApi}/raster-point-value?path=${encodeURIComponent(path)}&lon=${lon}&lat=${lat}${valueOptionsQuery(options)}`);
     }
 
-    async getRasterProfile(path, lineStringGeoJson, samples = 256) {
+    /**
+     * The statistics of a rectangle of pixels of the raw thermal grid of an R-JPEG, with the options of the values. A
+     * georeferenced raster takes a WGS 84 window: getRasterAreaStatsOfWindow.
+     * @param {string} path
+     * @param {number} x0
+     * @param {number} y0
+     * @param {number} x1
+     * @param {number} y1
+     * @param {{ nodata?: number|string|null, formula?: string }} [options]
+     */
+    async getRasterAreaStats(path, x0, y0, x1, y1, options = {}) {
+        return this.registry.getRequest(`${this.baseApi}/raster-area-stats?path=${encodeURIComponent(path)}&x0=${x0}&y0=${y0}&x1=${x1}&y1=${y1}${valueOptionsQuery(options)}`);
+    }
+
+    /**
+     * The statistics of the pixels of the file under a WGS 84 window [minLon, minLat, maxLon, maxLat] (U-201, D-021).
+     * @param {string} path
+     * @param {number[]} bbox
+     * @param {{ nodata?: number|string|null, formula?: string }} [options]
+     */
+    async getRasterAreaStatsOfWindow(path, bbox, options = {}) {
+        return this.registry.getRequest(`${this.baseApi}/raster-area-stats?path=${encodeURIComponent(path)}&bbox=${bbox.join(',')}${valueOptionsQuery(options)}`);
+    }
+
+    async getRasterProfile(path, lineStringGeoJson, samples = 256, options = {}) {
         // POST: GeoJSON geometries can exceed the URL length budget.
         const body = {
             path,
@@ -159,6 +239,9 @@ export default class Dataset {
                 : JSON.stringify(lineStringGeoJson),
             samples,
         };
+        const nodata = nodataNumber(options.nodata);
+        if (nodata !== null) body.nodata = nodata;
+        if (options.formula) body.formula = options.formula;
         return this.registry.postRequest(`${this.baseApi}/raster-profile`, body);
     }
 
@@ -243,6 +326,7 @@ export default class Dataset {
         if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
         if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
         if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        url += rasterOptionsQuery({ nodata: vizParams.nodata });
         return url;
     }
 

@@ -4,7 +4,8 @@ import { Vector as VectorSource } from 'ol/source';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
-import { transform } from 'ol/proj';
+import { transform, transformExtent } from 'ol/proj';
+import { containsCoordinate } from 'ol/extent';
 import { unByKey } from 'ol/Observable';
 import { geodesicLength } from '@/libs/map/geodesic';
 import { startDrawingSession } from '@/libs/map/drawingSession';
@@ -13,7 +14,6 @@ import { PRIMARY } from '@/libs/palette';
 import { analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
-import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/rasterPixels';
 import { rasterValueUnit } from '@/libs/map/rasterUnit';
 import { rasterLayerPath } from '@/libs/map/rasterLayers';
 import { formatNumber, lengthParts } from '@/libs/format';
@@ -153,29 +153,55 @@ const definition = {
         },
 
         /**
-         * The value of the raster at a pixel; the panel shows it as the spot value.
-         * Errors reach the caller.
+         * The NoData value the layer is styled with (FR-RAS-31): the value calls read the file with it, so the
+         * numbers and the tiles agree on which pixels have no value.
+         * @returns {number|string|undefined}
+         */
+        _rasterNodata() {
+            const params = this.vizParamsByPath && this.rasterFilePath ? this.vizParamsByPath[this.rasterFilePath] : null;
+            return params && params.nodata !== undefined && params.nodata !== '' ? params.nodata : undefined;
+        },
+
+        /**
+         * The value of the raster at a map coordinate of the view (D-021): the server finds the pixel of the file under
+         * it; the panel shows the answer as the spot value. Errors reach the caller.
+         * @param {number[]} mapCoord  [x, y] in the projection of the map view
          * @returns {Promise<any>} the server's answer
          */
-        async queryRasterPoint(x, y) {
+        async queryRasterPointAt(mapCoord) {
             if (!this.rasterFilePath || !this.dataset) return null;
-            const result = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y);
+            const [lon, lat] = transform(mapCoord, this.map.getView().getProjection(), EPSG.WGS84);
+            const result = await this.dataset.getRasterPointValueAt(this.rasterFilePath, lon, lat,
+                { nodata: this._rasterNodata() });
             this.rasterSpotInfo = result;
             return result;
         },
 
         /**
-         * The statistics of the raster values in a window of pixels, corners included.
+         * The value of the raster at a pixel of an R-JPEG's raw thermal grid (it has no geotransform), read with the NoData
+         * value of the layer as the map calls are; the panel shows it as the spot value. Errors reach the caller.
+         * @returns {Promise<any>} the server's answer
+         */
+        async queryRasterPoint(x, y) {
+            if (!this.rasterFilePath || !this.dataset) return null;
+            const result = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y, { nodata: this._rasterNodata() });
+            this.rasterSpotInfo = result;
+            return result;
+        },
+
+        /**
+         * The statistics of the raster values under a rectangle of the map: its WGS 84 window
+         * [minLon, minLat, maxLon, maxLat], the pixels of the file under it (D-021).
          * An answer that comes after the panel moved to another raster is dropped.
          */
-        async queryRasterArea(x0, y0, x1, y1) {
+        async queryRasterArea(bbox) {
             const path = this.rasterFilePath;
             if (!path || !this.dataset) return;
             this.rasterAreaStatsLoading = true;
             this.rasterAreaStatsError = null;
             this.rasterAreaStats = null;
             try {
-                const stats = await this.dataset.getRasterAreaStats(path, x0, y0, x1, y1);
+                const stats = await this.dataset.getRasterAreaStatsOfWindow(path, bbox, { nodata: this._rasterNodata() });
                 if (path === this.rasterFilePath) this.rasterAreaStats = stats;
             } catch (e) {
                 if (path !== this.rasterFilePath) return;
@@ -185,20 +211,6 @@ const definition = {
             } finally {
                 if (path === this.rasterFilePath) this.rasterAreaStatsLoading = false;
             }
-        },
-
-        /**
-         * The raster's map extent and pixel size, to turn map coordinates into pixels;
-         * null while the raster's layer or its size is not known.
-         * @returns {Promise<{ extent: number[], width: number, height: number }|null>}
-         */
-        async _rasterPixelGrid() {
-            const tileLayer = this._findRasterTileLayer();
-            const extent = tileLayer && tileLayer.getExtent ? tileLayer.getExtent() : null;
-            if (!extent) return null;
-            const dims = await this._ensureRasterDimsCache();
-            if (!dims) return null;
-            return { extent, width: dims.width, height: dims.height };
         },
 
         // ----- Area statistics (a rectangle drawn on the map) -----
@@ -244,17 +256,10 @@ const definition = {
         async _onRasterAreaDrawn(box) {
             if (!box) return;
             this.rasterAreaStatsError = null;
-            const grid = await this._rasterPixelGrid();
-            if (!grid) {
-                this.rasterAreaStatsError = 'The raster is not on the map yet.';
-                return;
-            }
-            const pixels = rasterPixelWindow(grid.extent, grid.width, grid.height, box);
-            if (!pixels) {
-                this.rasterAreaStatsError = 'The rectangle is outside the raster.';
-                return;
-            }
-            await this.queryRasterArea(pixels.x0, pixels.y0, pixels.x1, pixels.y1);
+            // The rectangle of the map as the longitude and latitude window of its corners: the server places it on the
+            // pixels of the file
+            const bbox = transformExtent(box, this.map.getView().getProjection(), EPSG.WGS84);
+            await this.queryRasterArea(bbox);
         },
 
         /** Removes the rectangle and its statistics. */
@@ -323,7 +328,7 @@ const definition = {
             this.rasterProfileError = null;
             try {
                 this.rasterProfile = await this.dataset.getRasterProfile(
-                    this.rasterFilePath, lineGeoJson, samples);
+                    this.rasterFilePath, lineGeoJson, samples, { nodata: this._rasterNodata() });
             } catch (e) {
                 console.error('Failed to query raster profile:', e);
                 this.rasterProfileError = (e && e.message) ? e.message : 'Failed to compute profile';
@@ -719,7 +724,7 @@ const definition = {
                 return this._rasterDimsCache;
             }
             try {
-                const info = await this.dataset.getRasterValueInfo(this.rasterFilePath);
+                const info = await this.dataset.getRasterValueInfo(this.rasterFilePath, { nodata: this._rasterNodata() });
                 if (!info || !info.width || !info.height) return null;
                 this._rasterDimsCache = {
                     path: this.rasterFilePath,
@@ -738,13 +743,15 @@ const definition = {
         async _fetchInspectValueAtMapCoord(mapCoord) {
             if (!this.rasterFilePath || !this.dataset) return;
             try {
-                const grid = await this._rasterPixelGrid();
-                if (!grid || !isInsideExtent(grid.extent, mapCoord)) {
+                // A coordinate beside the raster is not asked: the server would answer that it is outside
+                const tileLayer = this._findRasterTileLayer();
+                const extent = tileLayer && tileLayer.getExtent ? tileLayer.getExtent() : null;
+                if (extent && !containsCoordinate(extent, mapCoord)) {
                     if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
                     return;
                 }
-                const [px, py] = rasterPixelAt(grid.extent, grid.width, grid.height, mapCoord);
-                const result = await this.queryRasterPoint(px, py);
+                await this._ensureRasterDimsCache();
+                const result = await this.queryRasterPointAt(mapCoord);
                 if (!this.rasterInspectActive || !this._rasterInspectTooltipEl) return;
                 if (!result || result.value == null || !isFinite(result.value)) {
                     this._rasterInspectTooltipEl.style.display = 'none';
