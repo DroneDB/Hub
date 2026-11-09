@@ -15,7 +15,7 @@ const { default: TasksTable } = await import('./TasksTable.vue');
 
 const task = {
     taskId: '1', toolId: 'build', version: '2', state: 'Processing', progressPercent: 40, path: 'flights/2026/north/site/ortho.tif',
-    orgSlug: 'acme', dsSlug: 'site', owner: 'alice', createdAt: '2026-10-31T00:58:56Z'
+    orgSlug: 'acme', dsSlug: 'site', owner: 'alice', createdAt: '2026-10-31T00:58:56Z', actions: ['viewLog', 'cancel']
 };
 
 let wrapper;
@@ -73,7 +73,10 @@ describe('TasksTable below sm', () => {
         const row = mountTable().find('tbody tr');
         expect(row.find('.path-full').text().replace(/\u200B/g, '')).toBe('flights/2026/north/site/ortho.tif');
         expect(row.find('.path-details').text().replace(/\u200B/g, '')).toBe('.../north/site/ortho.tif');
-        expect(mountTable({ tasks: [{ ...task, path: '' }] }).find('.path-full').text()).toBe('Whole dataset');
+        // No special case for a task without a path (FR-PRC-43): the tool's label, else nothing
+        expect(mountTable({ tasks: [{ ...task, path: '' }] }).find('.path-full').exists()).toBe(false);
+        expect(mountTable({ tasks: [{ ...task, path: '', targetLabel: 'Pending builds check' }] }).find('.path-full').text())
+            .toBe('Pending builds check');
     });
 
     it('takes the sortable headers out of the tab order on a phone, where the header is hidden, and not from sm up', () => {

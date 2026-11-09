@@ -5,6 +5,7 @@
  */
 import { formatTimeAgo, formatDateTime, formatDuration } from '@/libs/format';
 import { describePendingBuild } from '@/libs/build/pendingBuild';
+import { isActiveState } from '@/libs/tasks/taskStates';
 
 /** @typedef {{ id: string, title?: string, resultExtension?: string, producesArtifact?: boolean, hidden?: boolean, disabled?: boolean }} TaskTool */
 /** @typedef {{ value: string, terminal: boolean }} TaskState */
@@ -46,6 +47,47 @@ export function stateIcon(state) {
 export const isWaitingForFiles = task => task?.state === 'Succeeded' && task.waitingForFiles === true;
 
 /**
+ * Whether a processing node holds the task in its queue: the server says so (waitingForNode, D-024) while the
+ * node has not started it. The Hub reads the flag, never the phase message.
+ * @param {{ state?: string, waitingForNode?: boolean } | null | undefined} task
+ */
+export const isWaitingForNode = task => task?.waitingForNode === true && isActiveState(task.state ?? '');
+
+/**
+ * Whether a user cancelled the task: the stored state of a cancelled task stays Deleted, and the server names
+ * who cancelled it (cancelledBy, D-038). Other Deleted tasks (ended by the server) were not cancelled.
+ * @param {{ state?: string, cancelledBy?: string | null } | null | undefined} task
+ */
+export const isCancelled = task => task?.state === 'Deleted' && !!task.cancelledBy;
+
+/**
+ * The state of a task in words, for every list, tag and tooltip (FR-PRC-20, FR-PRC-37): "Cancelled" for a task
+ * a user cancelled, "Queued on node" while a processing node keeps it queued, else the state.
+ * @param {{ state: string, waitingForNode?: boolean, cancelledBy?: string | null }} task
+ */
+export function stateLabel(task) {
+    if (isCancelled(task)) return 'Cancelled';
+    if (isWaitingForNode(task)) return 'Queued on node';
+    return task.state;
+}
+
+/** Label of a state filter value: Deleted selects the cancelled tasks too. @param {string} state */
+export const stateFilterLabel = state => (state === 'Deleted' ? 'Cancelled or deleted' : state);
+
+/**
+ * Whether a task is one the state filter `state` selects, by the rule of the Registry's filter (FR-PRC-37, D-024):
+ * a task a processing node keeps queued is Enqueued, not Processing.
+ * @param {{ state?: string, waitingForNode?: boolean }} task
+ * @param {string} state
+ */
+export function matchesStateFilter(task, state) {
+    const waiting = task.state === 'Processing' && task.waitingForNode === true;
+    if (state === 'Enqueued') return task.state === 'Enqueued' || waiting;
+    if (state === 'Processing') return task.state === 'Processing' && !waiting;
+    return task.state === state;
+}
+
+/**
  * @typedef {object} TaskStateTag
  * @property {string} severity  PrimeVue Tag severity
  * @property {string} icon  Font Awesome icon
@@ -56,8 +98,9 @@ export const isWaitingForFiles = task => task?.state === 'Succeeded' && task.wai
 
 /**
  * The state tag of a task: its state's, except for a task that waits for files, which is a warning (yellow) with the
- * words of a deferred build (libs/build/pendingBuild), the same the file list shows for its entry.
- * @param {{ state: string, waitingForFiles?: boolean, missingFiles?: string[] | null }} task
+ * words of a deferred build (libs/build/pendingBuild), the same the file list shows for its entry; a task queued on
+ * a processing node, which waits (clock); and a task a user cancelled, which says who (stateLabel).
+ * @param {{ state: string, waitingForFiles?: boolean, missingFiles?: string[] | null, waitingForNode?: boolean, cancelledBy?: string | null }} task
  * @returns {TaskStateTag}
  */
 export function stateTag(task) {
@@ -65,8 +108,19 @@ export function stateTag(task) {
         const pending = describePendingBuild(task.missingFiles, true);
         return { severity: 'warn', icon: 'fa-solid fa-hourglass-half', label: pending.label, title: pending.text, files: pending.files };
     }
+    if (isWaitingForNode(task))
+        return { severity: 'info', icon: 'fa-regular fa-clock', label: stateLabel(task), title: 'Queued on node: it starts when the processing node is free', files: [] };
+    if (isCancelled(task))
+        return { severity: 'secondary', icon: stateIcon(task.state), label: stateLabel(task), title: `Cancelled by ${task.cancelledBy}`, files: [] };
     return { severity: tagSeverity(task.state), icon: stateIcon(task.state), label: task.state, title: task.state, files: [] };
 }
+
+/**
+ * The files a task works on, in words: the label the tool gives them (targetLabel, FR-XC-25), else the task's
+ * path, else nothing (a task of the whole dataset).
+ * @param {{ targetLabel?: string | null, path?: string | null }} task
+ */
+export const taskTarget = task => task?.targetLabel || task?.path || '';
 
 /**
  * Whether a state is still running; unknown states (e.g. the client-side "Reused") are.
@@ -84,8 +138,13 @@ export const taskDateTime = value => formatDateTime(value, { seconds: true });
 /** @param {string|null|undefined} value */
 export const taskTimeAgo = value => (value ? formatTimeAgo(new Date(value).getTime()) : '');
 
-/** Elapsed time of a task in flight. @param {{ startedAt?: string, createdAt?: string }} task @param {number} now */
+/**
+ * Elapsed time of a task in flight; "waiting" while a processing node keeps it queued, as its processing starts
+ * when the node starts it (startedAt).
+ * @param {{ startedAt?: string, createdAt?: string, state?: string, waitingForNode?: boolean }} task @param {number} now
+ */
 export function runningTime(task, now) {
+    if (isWaitingForNode(task)) return 'waiting';
     const start = task.startedAt || task.createdAt;
     return start ? formatDuration(now - new Date(start).getTime()) : '';
 }

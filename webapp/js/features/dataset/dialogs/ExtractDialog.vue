@@ -226,11 +226,10 @@ export default {
 
             try {
                 // Offloaded to the archive-extract heavy task. Awaits completion so the
-                // file listing can be refreshed when the dialog closes.
-                // Pass sourcePath as the task's `path` field so TasksTable shows the
-                // archive name instead of "Whole dataset".
+                // file listing can be refreshed when the dialog closes. The task lists
+                // name it by the label the tool gives it (archive → folder, FR-PRC-22):
+                // no `path` is sent only for that.
                 await this.runHeavyTask(this.dataset, 'archive-extract', {
-                    path: sourcePath,
                     params: {
                         sourcePath,
                         destPath: this.destPath || '',

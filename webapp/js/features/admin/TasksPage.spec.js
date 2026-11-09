@@ -1,104 +1,61 @@
 /**
- * Admin > Tasks, handleCancelDialogClose (FR-PRC-10, D-002): a cancel refused for a task that has
- * already ended is a neutral message, a refusal for an active task or another error is an error,
- * a 200 that deleted nothing says nothing, and the list is reloaded whatever the answer.
+ * Admin > Tasks runs the row actions of the dataset Tasks tab (useTaskActions, FR-XC-15) on the task's own dataset:
+ * a cancel, a retry and the log go through the per-dataset endpoints of the row's organization and dataset, a
+ * delete through the admin endpoint, and the list is read again after each. The behaviour of the actions themselves
+ * is in useTaskActions.spec.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { mount, flushPromises } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
 import { ApiError } from '@/libs/ddb/apiError';
 
-const reg = vi.hoisted(() => ({ Organization: null, admin: {} }));
+const reg = vi.hoisted(() => ({ Organization: null, admin: {}, features: { value: () => [] } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: TasksPage } = await import('./TasksPage.vue');
-const { handleCancelDialogClose, datasetFor } = TasksPage.methods;
 
-const TASK = { taskId: 't1', orgSlug: 'org', dsSlug: 'ds', toolId: 'build', state: 'Processing' };
+const TASK = {
+    taskId: 't1', orgSlug: 'org', dsSlug: 'ds', toolId: 'merge', version: '1', state: 'Failed',
+    createdAt: '2026-11-09T10:00:00Z', targetLabel: '→ out.tif', actions: ['viewLog', 'retry', 'delete']
+};
 
-function cancelVm(answer, read = () => Promise.resolve({ state: 'Succeeded' })) {
-    const dataset = { cancelTask: vi.fn(() => answer), getTask: vi.fn(read) };
+let wrapper;
+afterEach(() => wrapper?.unmount());
+
+async function mountPage() {
+    const dataset = { retryTask: vi.fn(() => Promise.resolve()), getTask: vi.fn(() => Promise.resolve({ logTail: [] })) };
     reg.Organization = vi.fn(() => ({ Dataset: vi.fn(() => dataset) }));
-    const vm = {
-        dataset,
-        cancelDialogOpen: true,
-        cancellingTask: { ...TASK },
-        loadTasks: vi.fn(() => Promise.resolve()),
-        scheduleAutoRefresh: vi.fn(),
-        $notify: { info: vi.fn(), error: vi.fn(), success: vi.fn() }
+    reg.admin = {
+        usersDetailed: vi.fn(() => Promise.resolve([])),
+        adminTasks: vi.fn(() => Promise.resolve({ items: [{ ...TASK }], total: 1 })),
+        adminDeleteTask: vi.fn(() => Promise.resolve(true))
     };
-    vm.datasetFor = task => datasetFor.call(vm, task);
-    return vm;
-}
-
-function expectRefreshed(vm) {
-    expect(vm.loadTasks).toHaveBeenCalled();
-    expect(vm.scheduleAutoRefresh).toHaveBeenCalled();
-}
-
-describe('TasksPage handleCancelDialogClose', () => {
-    it('shows a neutral message when the server refuses the cancel of a task that has already ended', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('The task has already ended (Succeeded)', 400)));
-        await handleCancelDialogClose.call(vm, 'confirm');
-        expect(reg.Organization).toHaveBeenCalledWith('org');
-        expect(vm.dataset.cancelTask).toHaveBeenCalledWith('t1');
-        expect(vm.dataset.getTask).toHaveBeenCalledWith('t1');
-        expect(vm.$notify.info).toHaveBeenCalledWith('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expect(vm.cancelDialogOpen).toBe(false);
-        expect(vm.cancellingTask).toBeNull();
-        expectRefreshed(vm);
-    });
-
-    it('shows the refusal as an error when the task is still active', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.resolve({ state: 'Enqueued' }));
-        await handleCancelDialogClose.call(vm, 'confirm');
-        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows an error when the task cannot be read again after a 400', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.reject(new ApiError('Not found', 404)));
-        await handleCancelDialogClose.call(vm, 'confirm');
-        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows an error on another status', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Server error', 500)));
-        await handleCancelDialogClose.call(vm, 'confirm');
-        expect(vm.$notify.error).toHaveBeenCalledWith('Server error', { summary: 'Cancel failed' });
-        expect(vm.dataset.getTask).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('says nothing when the task was cancelled or the server deleted nothing', async () => {
-        for (const deleted of [true, false]) {
-            const vm = cancelVm(Promise.resolve({ deleted }));
-            await handleCancelDialogClose.call(vm, 'confirm');
-            expect(vm.$notify.info).not.toHaveBeenCalled();
-            expect(vm.$notify.error).not.toHaveBeenCalled();
-            expect(vm.$notify.success).not.toHaveBeenCalled();
-            expectRefreshed(vm);
+    wrapper = mount(TasksPage, {
+        global: {
+            plugins: [PrimeVue],
+            stubs: { TasksTable: true, TaskLogDialog: true, DialogHost: true },
+            mocks: { $router: { push: vi.fn(() => Promise.resolve()) }, $notify: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }
         }
     });
+    await flushPromises();
+    return { dataset };
+}
 
-    it('does nothing when the cancel is not confirmed', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        await handleCancelDialogClose.call(vm, 'cancel');
-        expect(vm.dataset.cancelTask).not.toHaveBeenCalled();
-        expect(vm.loadTasks).not.toHaveBeenCalled();
-        expect(vm.cancelDialogOpen).toBe(false);
-        expect(vm.cancellingTask).toBeNull();
+describe('TasksPage row actions', () => {
+    it('retries on the row\'s dataset and reads the list again', async () => {
+        const { dataset } = await mountPage();
+        const calls = reg.admin.adminTasks.mock.calls.length;
+
+        expect(await wrapper.vm.taskActions.retry(wrapper.vm.items[0])).toBe(true);
+
+        expect(reg.Organization).toHaveBeenCalledWith('org');
+        expect(dataset.retryTask).toHaveBeenCalledWith('t1');
+        expect(reg.admin.adminTasks.mock.calls.length).toBeGreaterThan(calls);
     });
-});
 
-describe('TasksPage delete question', () => {
-    it('uses the shared delete wording: the task by its tool and path, Delete / Cancel', () => {
-        const vm = { deletingTask: { ...TASK, path: 'a.tif' }, taskTools: [], toolTitle: () => 'Build' };
-        const props = TasksPage.computed.deleteDialog.call(vm);
-        expect(props).toMatchObject({ title: 'Delete task “Build”', confirmText: 'Delete', cancelText: 'Cancel', confirmButtonClass: 'danger' });
-        expect(props.message).toContain('<strong>Build</strong> on a.tif');
+    it('titles the log with the tool, the target and the dataset', async () => {
+        await mountPage();
+        expect(wrapper.vm.taskActions.logTitle(TASK)).toMatch(/^merge · → out\.tif · org\/ds · /);
     });
 });
 
@@ -116,18 +73,28 @@ describe('TasksPage refused (403)', () => {
     });
 });
 
+// The cancel question of the page is the one of every task cancel (useTaskActions, libs/tasks/cancelConfirmation)
 describe('TasksPage cancel question', () => {
-    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', () => {
-        const vm = { cancellingTask: { ...TASK, toolId: 'import-dataset' }, taskTools: [], toolTitle: () => 'Import dataset' };
-        const props = TasksPage.computed.cancelDialog.call(vm);
+    // The question the page opens for a cancel of `task`, answered "Don't Cancel"
+    async function questionFor(task) {
+        await mountPage();
+        const asked = wrapper.vm.taskActions.cancel(task);
+        await flushPromises();
+        const [dialog] = wrapper.vm.dialogs.stack.value;
+        dialog.finish('cancel');
+        expect(await asked).toBeNull();
+        return dialog.props;
+    }
+
+    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', async () => {
+        const props = await questionFor({ ...TASK, state: 'Processing', toolId: 'import-dataset', targetLabel: null });
         expect(props).toMatchObject({ title: 'Cancel Task', confirmText: 'Cancel Task', cancelText: "Don't Cancel", confirmButtonClass: 'danger' });
         expect(props.warningMessage).toBe('The files imported so far are deleted, and so is the dataset that this import created.');
     });
 
-    it('asks the plain question for another task', () => {
-        const vm = { cancellingTask: { ...TASK, path: 'a.tif' }, taskTools: [], toolTitle: () => 'Build' };
-        const props = TasksPage.computed.cancelDialog.call(vm);
+    it('asks the plain question for another task, naming its target', async () => {
+        const props = await questionFor({ ...TASK, state: 'Processing', toolId: 'build', targetLabel: null, path: 'a.tif' });
         expect(props.warningMessage).toBeUndefined();
-        expect(props.message).toContain('<strong>Build</strong> (path: a.tif) will be stopped.');
+        expect(props.message).toContain('<strong>build</strong> (path: a.tif) will be stopped.');
     });
 });

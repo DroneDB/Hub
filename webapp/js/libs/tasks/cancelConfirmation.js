@@ -36,12 +36,14 @@ export function cancelRollbackNote(task) {
 }
 
 /**
- * @param {{ toolId?: string, path?: string|null }} task
+ * The task is named by its tool and its target: the label the tool gives it (FR-PRC-22), else its path.
+ * @param {{ toolId?: string, path?: string|null, targetLabel?: string|null }} task
  * @param {string} toolName  the title of the task's tool, as the user sees it
  * @returns {{ title: string, message: string, confirmText: string, cancelText: string, danger: true, warningTitle?: string, warningMessage?: string }}
  */
 export function cancelConfirmation(task, toolName) {
-    const what = `<strong>${escapeHtml(toolName)}</strong>${task.path ? ` (path: ${escapeHtml(task.path)})` : ''}`;
+    const target = task.targetLabel ? ` (${escapeHtml(task.targetLabel)})` : task.path ? ` (path: ${escapeHtml(task.path)})` : '';
+    const what = `<strong>${escapeHtml(toolName)}</strong>${target}`;
     const rollback = cancelRollbackNote(task);
     return {
         title: 'Cancel Task',

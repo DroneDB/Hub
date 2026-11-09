@@ -1,7 +1,7 @@
 /**
- * The Cancel action of a task row (FR-XC-27, FR-UPL-05): shown for an active task, hidden (not
- * disabled) when the Registry says that the task cannot be cancelled (`cancellable` false: a
- * committed task), and unchanged for a Registry that does not send the field.
+ * The Cancel action of a task row (FR-XC-27, FR-UPL-05, D-024): shown when the Registry lists
+ * `cancel` in the row's actions, hidden (not disabled) when it does not: a committed task, an ended
+ * one, or a reader who may not cancel it. The row does not decide it from the state.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -33,25 +33,25 @@ function cancelButtonOf(task) {
 }
 
 describe('TasksTable Cancel action', () => {
-    it('is offered for an active task that is cancellable', () => {
-        expect(cancelButtonOf(row('1', { state: 'Processing', cancellable: true })).exists()).toBe(true);
+    it('is offered for an active task whose actions list it', () => {
+        expect(cancelButtonOf(row('1', { state: 'Processing', cancellable: true, actions: ['viewLog', 'cancel'] })).exists()).toBe(true);
     });
 
-    it('is offered for an active task when the Registry does not send the field', () => {
-        expect(cancelButtonOf(row('2', { state: 'Processing' })).exists()).toBe(true);
+    it('is not offered from the state alone: a row without actions offers nothing', () => {
+        expect(cancelButtonOf(row('2', { state: 'Processing' })).exists()).toBe(false);
     });
 
-    it('is hidden, not disabled, for a task that cannot be cancelled', () => {
-        expect(cancelButtonOf(row('3', { state: 'Processing', cancellable: false })).exists()).toBe(false);
+    it('is hidden, not disabled, for a committed task, whose actions leave it out', () => {
+        expect(cancelButtonOf(row('3', { state: 'Processing', cancellable: false, actions: ['viewLog'] })).exists()).toBe(false);
         expect(wrapper.find('button[title="Cancel"]').exists()).toBe(false);
     });
 
     it('is not offered for an ended task', () => {
-        expect(cancelButtonOf(row('4', { state: 'Succeeded', cancellable: true })).exists()).toBe(false);
+        expect(cancelButtonOf(row('4', { state: 'Succeeded', actions: ['viewLog', 'delete'] })).exists()).toBe(false);
     });
 
     it('asks to cancel the row when clicked', async () => {
-        const button = cancelButtonOf(row('5', { state: 'Enqueued', cancellable: true }));
+        const button = cancelButtonOf(row('5', { state: 'Enqueued', cancellable: true, actions: ['viewLog', 'cancel'] }));
         await button.trigger('click');
         expect(wrapper.emitted('cancel')[0][0]).toMatchObject({ taskId: '5' });
     });

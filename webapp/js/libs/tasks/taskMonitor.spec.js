@@ -96,6 +96,22 @@ describe('tasksUpdated event', () => {
         error.mockRestore();
     });
 
+    it.each([
+        ['actions', { actions: ['viewLog', 'cancel'] }, { actions: ['viewLog'] }],
+        ['waitingForNode', { waitingForNode: false }, { waitingForNode: true }],
+        ['cancelledBy', { cancelledBy: null }, { cancelledBy: 'alice' }],
+        ['targetLabel', { targetLabel: 'a' }, { targetLabel: 'b' }],
+    ])('emits when a poll changes only the %s of a task', async (_name, before, after) => {
+        const dataset = makeDataset();
+        dataset.getTasks.mockResolvedValueOnce([makeTask(before)]).mockResolvedValueOnce([makeTask(after)]);
+        const seen = watch('tasksUpdated');
+
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(seen).toHaveLength(2);
+    });
+
     it('does not emit when the fetched snapshot is identical to the previous one', async () => {
         const dataset = makeDataset();
         const snapshot = [makeTask(), makeTask({ taskId: 't2', state: 'Succeeded' })];

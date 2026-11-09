@@ -45,6 +45,8 @@ describe('ExtractDialog submit', () => {
         expect(toolId).toBe('archive-extract');
         expect(options.force).toBeUndefined();
         expect(options.params).toMatchObject({ sourcePath: 'archives/a.zip', destPath: 'archives', overwrite: false });
+        // The task is named by the tool's label (FR-PRC-22): no path is sent only for that
+        expect(options.path).toBeUndefined();
         expect(window.props('busy')).toBe(true);
     });
 

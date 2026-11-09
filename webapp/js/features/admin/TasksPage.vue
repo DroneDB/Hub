@@ -27,11 +27,11 @@
         <TasksTable ref="table" :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
                     :total-records="total" :first="skip" :rows="pageSize" :filtered="filtered"
                     :sort-field="sortField" :sort-order="sortOrder"
-                    :downloading-task-id="downloadingTaskId"
+                    :downloading-task-id="downloadingTaskId" :busy-task-ids="[...taskActions.busyIds]"
                     class="tasks-list"
                     empty-message="No tasks match the current filters."
                     @page="onPage" @sort="onSort" @clear-filters="clearFilters" @view-log="openLog" @download-result="downloadResult"
-                    @cancel="cancelTask" @retry="retryTask" @delete="deleteTask">
+                    @cancel="taskActions.cancel" @retry="taskActions.retry" @delete="taskActions.remove">
             <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
             <template #paginatorend>
                 <Select :model-value="pageSize" :options="pageSizeChoices" option-label="label" option-value="value"
@@ -39,41 +39,33 @@
             </template>
         </TasksTable>
 
-        <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
+        <TaskLogDialog v-model:visible="logDialogOpen" :title="taskActions.logTitle(logTask)" :log-text="logText"
                        :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
-        <!-- Cancel task confirmation -->
-        <ConfirmDialog v-if="cancelDialogOpen"
-                       v-bind="cancelDialog"
-                       @close="handleCancelDialogClose" />
-
-        <!-- Delete task confirmation -->
-        <ConfirmDialog v-if="deleteDialogOpen"
-                       v-bind="deleteDialog"
-                       @close="handleDeleteDialogClose" />
+        <DialogHost :dialogs="dialogs" />
     </div>
 </template>
 
 <script>
+import { getCurrentInstance, ref } from 'vue';
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
+import { useTaskActions } from '@/composables/useTaskActions';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import reg from '@/libs/api/sharedRegistry';
 import { isForbidden } from '@/libs/ddb/apiError';
 import { deniedLocation } from '@/libs/authRoutes';
-import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
-import { cancelDialogProps } from '@/libs/tasks/cancelConfirmation';
-import { confirmDialogProps } from '@/libs/deleteConfirmation';
 import { readTaskFilters, taskFilterKeys, hasTaskFilters, lastPageSkip, TASK_PAGE_SIZES } from '@/libs/tasks/taskFilters';
 import { currentLocation, replaceQueryKeys } from '@/libs/routeQuery';
 import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
 import { pageStart } from '@/libs/pageSize';
 import { PREF } from '@/libs/preferences';
 import { getAdminPageSize, saveAdminPageSize } from '@/libs/storageUtils';
-import { ref } from 'vue';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -83,7 +75,7 @@ import { ref } from 'vue';
 export default {
     name: 'TasksPage',
 
-    components: { Button, Select, TasksTable, TaskLogDialog, ConfirmDialog },
+    components: { Button, Select, TasksTable, TaskLogDialog, DialogHost },
 
     setup() {
         // The size the user chose: the address (a link) or what the user kept; none: the rows that fit the height (FR-XC-34)
@@ -99,7 +91,22 @@ export default {
             sizes: TASK_PAGE_SIZES,
             initial: readTaskFilters(currentLocation().query).take ?? getAdminPageSize(PREF.ADMIN_TASKS)
         });
-        return { ...useTaskFormatting(), ...sizing, table, page };
+        const dialogs = useDialogs();
+        const formatting = useTaskFormatting();
+        // The same row actions as the dataset Tasks tab (FR-XC-15), on the task's own dataset
+        const vm = /** @type {any} */ (getCurrentInstance()?.proxy);
+        const taskActions = useTaskActions({
+            datasetOf: task => reg.Organization(task.orgSlug).Dataset(task.dsSlug),
+            deleteTask: task => reg.admin.adminDeleteTask(task.taskId),
+            refresh: async () => {
+                await vm.loadTasks();
+                vm.scheduleAutoRefresh();
+            },
+            confirm: useConfirm(dialogs),
+            toolTitle: task => formatting.toolTitle(task.toolId),
+            datasetName: task => `${task.orgSlug}/${task.dsSlug}`
+        });
+        return { dialogs, taskActions, ...formatting, ...sizing, table, page };
     },
     data() {
         // The list as the address has it: a reload or a link opens the same filters, page and order
@@ -121,33 +128,11 @@ export default {
             logTask: null,
             logText: '',
 
-            downloadingTaskId: null,
-
-            cancelDialogOpen: false,
-            cancellingTask: null,
-
-            deleteDialogOpen: false,
-            deletingTask: null
+            downloadingTaskId: null
         };
     },
 
     computed: {
-        // The cancel question; an import says that its files (and the dataset it created) are deleted (FR-UPL-05)
-        cancelDialog() {
-            const task = this.cancellingTask;
-            if (!task) return { message: '' };
-            return cancelDialogProps(task, this.toolTitle(task.toolId, this.taskTools));
-        },
-        // The concluded task leaves the history with its results
-        deleteDialog() {
-            const task = this.deletingTask;
-            if (!task) return { message: '' };
-            return confirmDialogProps({
-                kind: 'task',
-                items: [{ name: this.toolTitle(task.toolId, this.taskTools), note: task.path ? `on ${task.path}` : '' }],
-                lost: ['the results it produced that are still available for download']
-            });
-        },
         userOptions() {
             const opts = [{ label: 'All users', value: '' }];
             this.users.forEach(u => {
@@ -166,9 +151,6 @@ export default {
         },
         hasActiveTasks() {
             return this.items.some(t => this.isActive(t.state));
-        },
-        logTaskTitle() {
-            return this.logTask ? this.toolTitle(this.logTask.toolId) : '';
         }
     },
 
@@ -318,68 +300,10 @@ export default {
             this.loadTasks();
         },
 
-        // Per-task actions reuse the existing per-dataset endpoints, which already
+        // Per-task actions (cancel, retry, delete: useTaskActions) reuse the per-dataset endpoints, which
         // authorize admins via dataset ownership.
         datasetFor(task) {
             return reg.Organization(task.orgSlug).Dataset(task.dsSlug);
-        },
-
-        cancelTask(task) {
-            this.cancellingTask = task;
-            this.cancelDialogOpen = true;
-        },
-
-        async handleCancelDialogClose(buttonId) {
-            this.cancelDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.cancellingTask) {
-                this.cancellingTask = null;
-                return;
-            }
-            const task = this.cancellingTask;
-            this.cancellingTask = null;
-            try {
-                const result = await cancelTaskOutcome(this.datasetFor(task), task.taskId);
-                if (result.outcome === 'alreadyEnded')
-                    this.$notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
-                else if (result.outcome === 'failed')
-                    this.$notify.error(result.error?.message, { summary: 'Cancel failed' });
-            } finally {
-                // The row shows the real state at once, whatever the answer (D-002)
-                await this.loadTasks();
-                this.scheduleAutoRefresh();
-            }
-        },
-
-        async retryTask(task) {
-            try {
-                await this.datasetFor(task).retryTask(task.taskId);
-                await this.loadTasks();
-                this.scheduleAutoRefresh();
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Retry failed' });
-            }
-        },
-
-        deleteTask(task) {
-            this.deletingTask = task;
-            this.deleteDialogOpen = true;
-        },
-
-        async handleDeleteDialogClose(buttonId) {
-            this.deleteDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.deletingTask) {
-                this.deletingTask = null;
-                return;
-            }
-            const task = this.deletingTask;
-            this.deletingTask = null;
-            try {
-                await reg.admin.adminDeleteTask(task.taskId);
-                await this.loadTasks();
-                this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Delete failed' });
-            }
         },
 
         async downloadResult(task) {

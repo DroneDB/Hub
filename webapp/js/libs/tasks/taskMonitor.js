@@ -78,13 +78,15 @@ function hasActive(ent) {
 }
 
 // Cheap snapshot signature: which task carries which state/progress/phase/error, and the files a
-// succeeded build waits for (they arrive without a change of the task's state).
+// succeeded build waits for (they arrive without a change of the task's state), what the row offers
+// (`actions`), whether a node keeps it queued, who cancelled it and the label of its target.
 // Lets us tell (in O(n) string compare) whether a fetch actually changed anything.
 function computeSignature(ent) {
     return Array.from(ent.tasks.values())
         .sort((a, b) => String(a.taskId).localeCompare(String(b.taskId)))
         .map(t => `${t.taskId}:${t.state}:${t.progressPercent ?? ''}:${t.phaseMessage ?? ''}:${t.errorType ?? ''}:` +
-            `${t.waitingForFiles ? (t.missingFiles ?? []).join(',') : '-'}`)
+            `${t.waitingForFiles ? (t.missingFiles ?? []).join(',') : '-'}:` +
+            `${(t.actions ?? []).join(',')}:${t.waitingForNode ? 1 : 0}:${t.cancelledBy ?? ''}:${t.targetLabel ?? ''}`)
         .join('|');
 }
 

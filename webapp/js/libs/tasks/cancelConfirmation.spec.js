@@ -44,6 +44,13 @@ describe('cancelConfirmation', () => {
         }
     });
 
+    it('names the task by the label its tool gives it, before its path (FR-PRC-22)', () => {
+        const q = cancelConfirmation({ toolId: 'photogrammetry', path: null, targetLabel: 'limit-1 · images/ → out (Fast Orthophoto)' }, 'Photogrammetry');
+        expect(q.message).toBe('Are you sure you want to cancel this task?<br/><strong>Photogrammetry</strong> (limit-1 · images/ → out (Fast Orthophoto)) will be stopped.');
+        expect(cancelConfirmation({ toolId: 'merge-multispectral', path: 'a.tif', targetLabel: '→ <b>.tif' }, 'Merge').message)
+            .toContain('(→ &lt;b&gt;.tif)');
+    });
+
     it('escapes the tool title and the path, which come from the user', () => {
         const q = cancelConfirmation({ toolId: 'build', path: '<img src=x>' }, '<b>x</b>');
         expect(q.message).not.toContain('<img');

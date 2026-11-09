@@ -3,18 +3,20 @@
  * - filter changes reset back to the first page (via onFilterChange)
  * - background store refreshes (applyFilters(false)) keep the current page
  * - a shrinking list clamps onto the last valid page
- * and cancelTask (FR-PRC-10): a cancel refused for a task that has already ended is a neutral message,
- * and the row is refreshed whatever the answer
+ * (the row actions, cancel, retry and delete, are useTaskActions': useTaskActions.spec)
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { mount, flushPromises } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
 import TaskHistory from './TaskHistory.vue';
-import taskMonitor from '@/libs/tasks/taskMonitor';
-import { ApiError } from '@/libs/ddb/apiError';
 
-// cancelTask refreshes the shared task store: the calls are asserted, the store is not under test
+// The tab refreshes the shared task store: the store is not under test
 vi.mock('@/libs/tasks/taskMonitor', () => ({
-    default: { forceRefresh: vi.fn(() => Promise.resolve()), on: vi.fn(), off: vi.fn() },
+    default: {
+        forceRefresh: vi.fn(() => Promise.resolve()), on: vi.fn(), off: vi.fn(),
+        getTasks: vi.fn(() => [{ taskId: 't1', toolId: 'build', state: 'Succeeded', actions: [] }])
+    },
     datasetKey: vi.fn()
 }));
 
@@ -99,6 +101,20 @@ describe('applyFilters — filtering', () => {
         expect(vm.filteredTasks[0].taskId).toBe('t2');
     });
 
+    it('lists a task queued on a processing node under Enqueued, not Processing (FR-PRC-37)', () => {
+        const tasks = [
+            fixedTask(1, { state: 'Processing', waitingForNode: true }),
+            fixedTask(2, { state: 'Processing' }),
+            fixedTask(3, { state: 'Enqueued' })
+        ];
+        const enqueued = fakeVm(tasks, { selectedState: 'Enqueued' });
+        applyFilters.call(enqueued);
+        expect(enqueued.filteredTasks.map(t => t.taskId)).toEqual(['t1', 't3']);
+        const processing = fakeVm(tasks, { selectedState: 'Processing' });
+        applyFilters.call(processing);
+        expect(processing.filteredTasks.map(t => t.taskId)).toEqual(['t2']);
+    });
+
     it('returns everything when no filter is set', () => {
         const vm = fakeVm(manyTasks);
         applyFilters.call(vm);
@@ -117,103 +133,6 @@ describe('onFilterChange', () => {
         const vm = fakeVm(manyTasks, { page: 40, selectedState: 'Processing' });
         onFilterChange.call(vm, 'Processing');
         expect(vm.currentPageFirst).toBe(0);
-    });
-});
-
-describe('cancelTask', () => {
-    const { cancelTask } = TaskHistory.methods;
-
-    beforeEach(() => taskMonitor.forceRefresh.mockClear());
-
-    function cancelVm(answer, read = () => Promise.resolve({ state: 'Succeeded' })) {
-        return {
-            tools: [],
-            toolTitle: id => id,
-            confirm: vi.fn(() => Promise.resolve(true)),
-            dataset: { cancelTask: vi.fn(() => answer), getTask: vi.fn(read) },
-            loadTasks: vi.fn(() => Promise.resolve()),
-            $notify: { info: vi.fn(), error: vi.fn(), success: vi.fn() }
-        };
-    }
-
-    function expectRefreshed(vm) {
-        expect(taskMonitor.forceRefresh).toHaveBeenCalledWith(vm.dataset);
-        expect(vm.loadTasks).toHaveBeenCalled();
-    }
-
-    it('shows a neutral message when the server refuses the cancel of a task that has already ended', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('The task has already ended (Succeeded)', 400)));
-        await cancelTask.call(vm, fixedTask(1, { state: 'Processing' }));
-        expect(vm.dataset.cancelTask).toHaveBeenCalledWith('t1');
-        expect(vm.dataset.getTask).toHaveBeenCalledWith('t1');
-        expect(vm.$notify.info).toHaveBeenCalledWith('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows the refusal as an error when the task is still active', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.resolve({ state: 'Processing' }));
-        await cancelTask.call(vm, fixedTask(2, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows an error when the task cannot be read again after a 400', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.reject(new ApiError('Not found', 404)));
-        await cancelTask.call(vm, fixedTask(6, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows an error on another status, without reading the task again', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Server error', 500)));
-        await cancelTask.call(vm, fixedTask(7, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('Server error', { summary: 'Cancel failed' });
-        expect(vm.dataset.getTask).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('says nothing more when the task was cancelled', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        await cancelTask.call(vm, fixedTask(3, { state: 'Processing' }));
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('says nothing when the server deleted nothing, the refreshed row showing how the task ended', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: false }));
-        await cancelTask.call(vm, fixedTask(4, { state: 'Processing' }));
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        await cancelTask.call(vm, fixedTask(8, { state: 'Processing', toolId: 'import-dataset' }));
-        expect(vm.confirm).toHaveBeenCalledWith(expect.objectContaining({
-            title: 'Cancel Task', danger: true,
-            warningMessage: 'The files imported so far are deleted, and so is the dataset that this import created.'
-        }));
-    });
-
-    it('asks the plain question for a task that is not an import', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        await cancelTask.call(vm, fixedTask(9, { state: 'Processing', toolId: 'build' }));
-        const question = vm.confirm.mock.calls[0][0];
-        expect(question).toMatchObject({ title: 'Cancel Task', danger: true });
-        expect(question.warningMessage).toBeUndefined();
-    });
-
-    it('does nothing when the cancel is not confirmed', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        vm.confirm = vi.fn(() => Promise.resolve(false));
-        await cancelTask.call(vm, fixedTask(5, { state: 'Processing' }));
-        expect(vm.dataset.cancelTask).not.toHaveBeenCalled();
-        expect(vm.loadTasks).not.toHaveBeenCalled();
     });
 });
 
@@ -268,22 +187,27 @@ describe('processing nodes', () => {
     });
 });
 
-describe('deleteTask', () => {
-    const { deleteTask } = TaskHistory.methods;
+// FR-PRC-21: a reader who cannot write to the dataset is not offered Clear Concluded, which the server refuses
+describe('Clear Concluded', () => {
+    let wrapper;
+    afterEach(() => wrapper?.unmount());
 
-    it('asks with the shared delete wording: the task by its tool and path, Delete / Cancel', async () => {
-        const vm = {
-            tools: [],
-            toolTitle: () => 'Build <3D>',
-            confirm: vi.fn(() => Promise.resolve(false)),
-            dataset: { deleteTask: vi.fn() }
-        };
-        await deleteTask.call(vm, fixedTask(1, { state: 'Succeeded', path: 'a.tif' }));
-        const question = vm.confirm.mock.calls[0][0];
-        expect(question).toMatchObject({ title: 'Delete task “Build <3D>”', confirmText: 'Delete', cancelText: 'Cancel', danger: true });
-        expect(question.message).toContain('<strong>Build &lt;3D&gt;</strong> on a.tif');
-        expect(question.message).toContain('results it produced');
-        expect(vm.dataset.deleteTask).not.toHaveBeenCalled();
+    async function clearButton(canWrite) {
+        const dataset = { org: 'org', ds: 'ds', getTaskTools: vi.fn(() => Promise.resolve([])), registry: { sys: { processingNodes: vi.fn(() => Promise.resolve([])) } } };
+        wrapper = mount(TaskHistory, {
+            props: { dataset, canWrite },
+            global: { plugins: [PrimeVue], stubs: { TasksTable: true, TaskLogDialog: true, DialogHost: true, Window: true } }
+        });
+        await flushPromises();
+        return wrapper.findAll('button').filter(b => b.text().includes('Clear Concluded'));
+    }
+
+    it('is hidden for a reader without write access', async () => {
+        expect(await clearButton(false)).toHaveLength(0);
+    });
+
+    it('is offered to a writer', async () => {
+        expect(await clearButton(true)).toHaveLength(1);
     });
 });
 
@@ -306,6 +230,8 @@ describe('photogrammetry new dataset name', () => {
     const build = newDatasetName => {
         const vm = {
             optionsError: '',
+            selectedPreset: { label: 'Custom (JSON array)' },
+            customOptions: [],
             photogrammetryForm: { preset: 'custom', optionsText: '', createNewDataset: true, newDatasetName, newDatasetVisibility: 0 }
         };
         return { params: TaskHistory.methods._buildSubmitParams.call(vm), error: vm.optionsError };
@@ -323,5 +249,22 @@ describe('photogrammetry new dataset name', () => {
             expect(build(name).params).toMatchObject({ createNewDataset: true, newDatasetName: name });
             expect(build(name).error).toBe('');
         }
+    });
+});
+
+// FR-PRC-22: the profile names the run in the task lists (the label the server gives the task)
+describe('photogrammetry profile', () => {
+    const build = (preset, customOptions = []) => TaskHistory.methods._buildSubmitParams.call({
+        optionsError: '', destPathError: '', customOptions,
+        selectedPreset: { label: 'Fast Orthophoto', options: [{ name: 'fast-orthophoto', value: true }] },
+        photogrammetryForm: { preset, optionsText: '', createNewDataset: false, destPath: 'out' }
+    });
+
+    it('sends the profile of the options', () => {
+        expect(build('fast').profile).toBe('Fast Orthophoto');
+    });
+
+    it('says when the options of the profile were changed', () => {
+        expect(build('fast', [{ name: 'dsm', value: true }]).profile).toBe('Fast Orthophoto, customized');
     });
 });

@@ -15,7 +15,7 @@
                                 icon="fa-solid fa-camera"
                                 label="Run Photogrammetry" @click="openPhotogrammetryDialog" />
                     </span>
-                    <Button severity="danger" :disabled="concludedCount === 0" icon="fa-solid fa-trash"
+                    <Button v-if="canWrite" severity="danger" :disabled="concludedCount === 0" icon="fa-solid fa-trash"
                             label="Clear Concluded" @click="showClearDialog" />
                 </div>
             </div>
@@ -24,10 +24,10 @@
         <div class="content">
             <TasksTable :tasks="filteredTasks" :tools="tools" :loading="loading" :rows="pageSize"
                         :current-page-first="currentPageFirst"
-                        :downloading-task-id="downloadingTaskId"
+                        :downloading-task-id="downloadingTaskId" :busy-task-ids="[...taskActions.busyIds]"
                         empty-message="No processing tasks have been run for this dataset yet."
                         @view-log="openLog" @download-result="downloadResult"
-                        @cancel="cancelTask" @retry="retryTask" @delete="deleteTask"
+                        @cancel="taskActions.cancel" @retry="taskActions.retry" @delete="taskActions.remove"
                         @page-reset="onPageReset" />
         </div>
 
@@ -173,7 +173,7 @@
         </Window>
 
         <!-- Log viewer -->
-        <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
+        <TaskLogDialog v-model:visible="logDialogOpen" :title="taskActions.logTitle(logTask)" :log-text="logText"
                        :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
         <DialogHost :dialogs="dialogs" />
@@ -191,11 +191,12 @@
 </template>
 
 <script>
+import { getCurrentInstance } from 'vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
-import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
-import { cancelConfirmation } from '@/libs/tasks/cancelConfirmation';
+import { useTaskActions } from '@/composables/useTaskActions';
+import { matchesStateFilter } from '@/libs/tasks/taskFormat';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -288,10 +289,25 @@ export default {
         canWrite: { type: Boolean, default: false }
     },
 
-    setup() {
+    setup(props) {
         const { trackHeavyTask } = useHeavyTask();
         const dialogs = useDialogs();
-        return { trackHeavyTask, dialogs, confirm: useConfirm(dialogs), wideScreen: useMediaMatch(WIDE_MEDIA_QUERY), ...useTaskFormatting() };
+        const confirm = useConfirm(dialogs);
+        const formatting = useTaskFormatting();
+        // The row actions read the tab when they run: its tool catalog and its reload (FR-XC-15)
+        const vm = /** @type {any} */ (getCurrentInstance()?.proxy);
+        const taskActions = useTaskActions({
+            datasetOf: () => props.dataset,
+            deleteTask: task => props.dataset.deleteTask(task.taskId),
+            refresh: async () => {
+                await taskMonitor.forceRefresh(props.dataset);
+                await vm.loadTasks();
+            },
+            confirm,
+            toolTitle: task => formatting.toolTitle(task.toolId, vm.tools),
+            datasetName: () => `${props.dataset.org}/${props.dataset.ds}`
+        });
+        return { trackHeavyTask, dialogs, confirm, taskActions, wideScreen: useMediaMatch(WIDE_MEDIA_QUERY), ...formatting };
     },
     data() {
         return {
@@ -385,9 +401,6 @@ export default {
         odmPresetOptions() {
             // sort by label for better UX
             return [...ODM_PRESETS].sort((a, b) => a.label.localeCompare(b.label));;
-        },
-        logTaskTitle() {
-            return this.logTask ? this.toolTitle(this.logTask.toolId, this.tools) : '';
         }
     },
 
@@ -519,7 +532,8 @@ export default {
         // background store update (resetPage = false, keeps the current page).
         applyFilters(resetPage = true) {
             let filtered = [...this.tasks];
-            if (this.selectedState) filtered = filtered.filter(t => t.state === this.selectedState);
+            // A task queued on a processing node is Enqueued, as the Registry filters it (FR-PRC-37)
+            if (this.selectedState) filtered = filtered.filter(t => matchesStateFilter(t, this.selectedState));
             if (this.selectedTool) filtered = filtered.filter(t => t.toolId === this.selectedTool);
             this.filteredTasks = filtered;
 
@@ -691,6 +705,9 @@ export default {
             if (this.photogrammetryForm.nodeId) params.nodeId = this.photogrammetryForm.nodeId;
             if (this.photogrammetryForm.name) params.name = this.photogrammetryForm.name;
             if (options) params.options = options;
+            // The profile names the run in the task lists (its label, FR-PRC-22)
+            const customized = this.photogrammetryForm.preset !== 'custom' && this.customOptions.length > 0;
+            params.profile = customized ? `${this.selectedPreset.label}, customized` : this.selectedPreset.label;
 
             params.createNewDataset = this.photogrammetryForm.createNewDataset;
             if (!this.photogrammetryForm.createNewDataset) {
@@ -789,33 +806,7 @@ export default {
             }
         },
 
-        // ---- per-task actions ----
-
-        async cancelTask(task) {
-            // An import says that its files (and the dataset it created) are deleted (FR-UPL-05)
-            if (!await this.confirm(cancelConfirmation(task, this.toolTitle(task.toolId, this.tools)))) return;
-            try {
-                const result = await cancelTaskOutcome(this.dataset, task.taskId);
-                if (result.outcome === 'alreadyEnded')
-                    this.$notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
-                else if (result.outcome === 'failed')
-                    this.$notify.error(result.error?.message, { summary: 'Cancel failed' });
-            } finally {
-                // The row shows the real state at once, whatever the answer (D-002)
-                await taskMonitor.forceRefresh(this.dataset);
-                await this.loadTasks();
-            }
-        },
-
-        async retryTask(task) {
-            try {
-                await this.dataset.retryTask(task.taskId);
-                await taskMonitor.forceRefresh(this.dataset);
-                await this.loadTasks();
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Retry failed' });
-            }
-        },
+        // ---- per-task actions (cancel, retry, delete: useTaskActions) ----
 
         async downloadResult(task) {
             // Navigate to the authenticated result URL (cookie auth); the server
@@ -857,23 +848,6 @@ export default {
                 this.$notify.error(e.message, { summary: 'Clear failed' });
             } finally {
                 this.loading = false;
-            }
-        },
-
-        async deleteTask(task) {
-            // The concluded task leaves the history with its results
-            if (!await this.confirm(deleteConfirmation({
-                kind: 'task',
-                items: [{ name: this.toolTitle(task.toolId, this.tools), note: task.path ? `on ${task.path}` : '' }],
-                lost: ['the results it produced that are still available for download']
-            }))) return;
-            try {
-                await this.dataset.deleteTask(task.taskId);
-                await taskMonitor.forceRefresh(this.dataset);
-                await this.loadTasks();
-                this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Delete failed' });
             }
         },
 

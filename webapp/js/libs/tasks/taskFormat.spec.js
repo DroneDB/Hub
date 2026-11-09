@@ -53,3 +53,47 @@ describe('taskFormat', () => {
         expect(f.isWaitingForFiles(null)).toBe(false);
     });
 });
+
+describe('taskFormat, cancelled and node-queued tasks', () => {
+    it('labels a Deleted task "Cancelled" only when a user cancelled it (FR-PRC-20, D-038)', () => {
+        const cancelled = { state: 'Deleted', cancelledBy: 'admin' };
+        expect(f.stateLabel(cancelled)).toBe('Cancelled');
+        expect(f.stateTag(cancelled)).toMatchObject({ label: 'Cancelled', title: 'Cancelled by admin', icon: 'fa-solid fa-ban' });
+        expect(f.stateLabel({ state: 'Deleted', cancelledBy: null })).toBe('Deleted');
+        expect(f.stateTag({ state: 'Deleted' }).label).toBe('Deleted');
+        expect(f.isCancelled({ state: 'Failed', cancelledBy: 'admin' })).toBe(false);
+    });
+
+    it('labels the Deleted filter value "Cancelled or deleted", the others by their state', () => {
+        expect(f.stateFilterLabel('Deleted')).toBe('Cancelled or deleted');
+        expect(f.stateFilterLabel('Enqueued')).toBe('Enqueued');
+    });
+
+    it('shows a task a processing node keeps queued as waiting, from the server flag (FR-PRC-37, D-024)', () => {
+        const queued = { state: 'Processing', waitingForNode: true, startedAt: '2026-10-20T10:00:00Z', phaseMessage: 'processing' };
+        expect(f.stateTag(queued)).toMatchObject({ severity: 'info', icon: 'fa-regular fa-clock', label: 'Queued on node' });
+        expect(f.runningTime(queued, Date.parse('2026-10-20T10:05:00Z'))).toBe('waiting');
+        // The flag of an ended task is not read; the phase message never makes a task waiting
+        expect(f.isWaitingForNode({ state: 'Succeeded', waitingForNode: true })).toBe(false);
+        expect(f.isWaitingForNode({ state: 'Processing', phaseMessage: 'queued' })).toBe(false);
+        expect(f.stateTag({ state: 'Processing' }).label).toBe('Processing');
+    });
+
+    it('filters a task queued on a node as Enqueued, not Processing, as the Registry does (FR-PRC-37)', () => {
+        const queued = { state: 'Processing', waitingForNode: true };
+        const running = { state: 'Processing', waitingForNode: false };
+        expect(f.matchesStateFilter(queued, 'Enqueued')).toBe(true);
+        expect(f.matchesStateFilter(queued, 'Processing')).toBe(false);
+        expect(f.matchesStateFilter(running, 'Processing')).toBe(true);
+        expect(f.matchesStateFilter(running, 'Enqueued')).toBe(false);
+        expect(f.matchesStateFilter({ state: 'Enqueued' }, 'Enqueued')).toBe(true);
+        expect(f.matchesStateFilter({ state: 'Deleted', cancelledBy: 'admin' }, 'Deleted')).toBe(true);
+    });
+
+    it('names the target of a task by the tool label, else its path, else nothing', () => {
+        expect(f.taskTarget({ targetLabel: '→ out.tif', path: 'a.tif' })).toBe('→ out.tif');
+        expect(f.taskTarget({ path: 'a.tif' })).toBe('a.tif');
+        expect(f.taskTarget({ path: null })).toBe('');
+    });
+});
+
