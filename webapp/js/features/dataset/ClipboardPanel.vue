@@ -80,7 +80,7 @@ export default {
     background: var(--ddb-bg-surface);
     border: 1px solid var(--ddb-border);
     border-radius: var(--ddb-radius-md);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 16px rgba(var(--ddb-shade-rgb), 0.15);
     padding: 0.6rem 0.8rem;
     font-size: 0.85rem;
 }
@@ -106,14 +106,14 @@ export default {
 .clipboard-panel-mode {
     font-size: 0.7rem;
     text-transform: uppercase;
-    background: rgba(0, 0, 0, 0.08);
+    background: rgba(var(--ddb-ink-rgb), 0.08);
     padding: 0.1rem 0.4rem;
     border-radius: 999px;
     margin-left: 0.3rem;
 }
 
 .cut-mode .clipboard-panel-mode {
-    background: rgba(245, 158, 11, 0.18);
+    background: rgba(var(--ddb-warning-rgb), 0.18);
     color: var(--ddb-warning-text);
 }
 
@@ -127,7 +127,7 @@ export default {
 }
 
 .clipboard-panel-close:hover {
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(var(--ddb-ink-rgb), 0.06);
     color: var(--ddb-text);
 }
 

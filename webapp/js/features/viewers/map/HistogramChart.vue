@@ -270,8 +270,8 @@ export default {
     transform: translate(-50%, -50%);
     width: 4px;
     height: 24px;
-    background: var(--ddb-text-on-color);
-    border: 1px solid rgba(0,0,0,0.5);
+    background: var(--ddb-text-on-dark);
+    border: 1px solid rgba(var(--ddb-shade-rgb), 0.5);
     border-radius: 2px;
 }
 
@@ -289,7 +289,7 @@ export default {
     position: absolute;
     top: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(var(--ddb-shade-rgb), 0.4);
     pointer-events: none;
 }
 

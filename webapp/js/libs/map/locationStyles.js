@@ -9,6 +9,7 @@
 import { Fill, Stroke, Style, Text } from 'ol/style';
 import { FILE_COLORS, clusterStyle } from '@/libs/map/fileLayerStyles';
 import { isMobile } from '@/libs/responsive';
+import { colorToken, tokenRgba } from '@/libs/colorScheme';
 
 // A cluster names this many of its datasets; the label says how many more it holds
 const NAMED_IN_CLUSTER = 3;
@@ -60,7 +61,7 @@ export function createLocationStyles({ coloured = () => false } = {}) {
             const colour = coloured() ? box.get('colour') || FILE_COLORS.shot : FILE_COLORS.shot;
             return remember(`box|${colour}`, () => new Style({
                 stroke: new Stroke({ color: colour, width: 3 }),
-                fill: new Fill({ color: 'rgba(255, 255, 255, 0.15)' })
+                fill: new Fill({ color: tokenRgba('--ddb-glass-rgb', 0.15) })
             }));
         },
 
@@ -74,9 +75,10 @@ export function createLocationStyles({ coloured = () => false } = {}) {
                     textBaseline: 'top',
                     // Below the pin (its radius and stroke) with a small gap
                     offsetY: isMobile() ? 15 : 13,
-                    fill: new Fill({ color: '#1a1a2e' }),
-                    backgroundFill: new Fill({ color: 'rgba(255, 255, 255, 0.92)' }),
-                    backgroundStroke: new Stroke({ color: 'rgba(0, 0, 0, 0.15)', width: 1 }),
+                    // A light label on the map's imagery, in both themes
+                    fill: new Fill({ color: colorToken('--ddb-tooltip-text-dark') }),
+                    backgroundFill: new Fill({ color: colorToken('--ddb-tooltip-bg-light') }),
+                    backgroundStroke: new Stroke({ color: tokenRgba('--ddb-shade-rgb', 0.15), width: 1 }),
                     padding: [2, 5, 1, 5]
                 })
             }));

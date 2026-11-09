@@ -294,7 +294,7 @@ export default {
 .profile-svg {
     width: 100%;
     height: 160px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(var(--ddb-glass-rgb), 0.03);
     border-radius: 3px;
     cursor: crosshair;
     display: block;
@@ -306,12 +306,12 @@ export default {
 }
 
 .profile-svg .grid {
-    stroke: rgba(255, 255, 255, 0.08);
+    stroke: rgba(var(--ddb-glass-rgb), 0.08);
     stroke-width: 0.5;
 }
 
 .profile-svg .axis {
-    stroke: rgba(255, 255, 255, 0.25);
+    stroke: rgba(var(--ddb-glass-rgb), 0.25);
     stroke-width: 0.75;
 }
 
@@ -330,17 +330,17 @@ export default {
 }
 
 .null-bands rect {
-    fill: rgba(255, 82, 82, 0.15);
+    fill: rgba(var(--panel-danger-rgb), 0.15);
 }
 
 .hover-line {
-    stroke: rgba(255, 255, 255, 0.5);
+    stroke: rgba(var(--ddb-glass-rgb), 0.5);
     stroke-dasharray: 2 2;
     stroke-width: 0.75;
 }
 
 .hover-dot {
-    fill: var(--ddb-text-on-color);
+    fill: var(--ddb-text-on-dark);
     stroke: var(--panel-accent);
     stroke-width: 1.5;
 }

@@ -23,6 +23,7 @@
 
 @use 'variables';
 @use 'analysis-panel';
+@use 'focus-ring' as *;
 
 html {
     font-size: 16px;
@@ -47,15 +48,24 @@ body {
     accent-color: var(--ddb-primary);
 }
 
-// The keyboard focus ring of the Hub: the brand blue, not the browser's.
-@mixin focus-ring {
-    outline: 2px solid var(--ddb-primary, currentColor);
-    outline-offset: 2px;
+// The keyboard focus ring of the Hub: the focus-ring mixin of _focus-ring.scss
+//
+// The surfaces that are dark in both themes take the ring of the dark surfaces (the ring of the
+// light theme is about 2:1 on them): the viewers (3D, point cloud, splat, panorama, model), the
+// lightboxes and the overlays over the map. The map panels and the overlay buttons say so in
+// _analysis-panel.scss, ol-controls.css and _overlay-button.scss.
+.viewer-shell.dark,
+.video-lightbox-overlay,
+.lightbox-toolbar-extra,
+.split-overlay {
+    --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
 }
 
-// Native fields (sliders included) take it; :where() gives the rule no specificity, so the
-// PrimeVue fields keep the focus style of the theme.
-:where(input, select, textarea):focus-visible {
+
+// Every element the keyboard focuses takes it (native fields, sliders, links, the Hub's own
+// buttons); :where() gives the rule no specificity, so the PrimeVue components keep the focus
+// style of the theme, which is the same ring.
+:where(:focus-visible) {
     @include focus-ring;
 }
 
@@ -155,7 +165,7 @@ h4, h5, h6 { font-size: var(--ddb-font-size-base); }
 // ============================================================
 // Text helpers
 // ============================================================
-.text-success { color: var(--ddb-success) !important; }
+.text-success { color: var(--ddb-success-text) !important; }
 .text-danger { color: var(--ddb-danger) !important; }
 .text-warning { color: var(--ddb-warning-text) !important; }
 .text-muted { color: var(--ddb-text-muted) !important; }
@@ -421,7 +431,7 @@ $window-margin: 1rem; // the space left around a window on a phone
 
     &--dark {
         background: var(--ddb-tooltip-bg);
-        color: var(--ddb-text-on-color);
+        color: var(--ddb-text-on-dark);
         border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.2);
     }
 

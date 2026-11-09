@@ -137,8 +137,9 @@ useEventListener(document, 'click', e => {
     align-items: center;
     gap: 0.35rem;
     width: 100%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
+    /* The field of the panels (.panel-select in css/_analysis-panel.scss): one look for every list */
+    background: var(--panel-field-bg);
+    border: 1px solid var(--panel-field-border);
     color: var(--panel-text);
     border-radius: 0.25rem;
     padding: 0.25rem 0.4rem;
@@ -147,9 +148,9 @@ useEventListener(document, 'click', e => {
     text-align: left;
 }
 
+/* The ring is the Hub's (app.scss); the border takes the panel's accent, as a focused select does */
 .colormap-trigger:focus-visible {
-    outline: none;
-    border-color: rgba(76, 175, 80, 0.6);
+    border-color: rgba(var(--panel-accent-rgb), 0.6);
 }
 
 .colormap-arrow {
@@ -167,12 +168,12 @@ useEventListener(document, 'click', e => {
     right: 0;
     z-index: 10;
     background: var(--panel-option-bg);
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid var(--panel-field-border);
     border-radius: 0.25rem;
     margin-top: 2px;
     max-height: 12rem;
     overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 12px rgba(var(--ddb-shade-rgb), 0.5);
 }
 
 .colormap-option {
@@ -187,11 +188,11 @@ useEventListener(document, 'click', e => {
 
 .colormap-option:hover,
 .colormap-option.active {
-    background: rgba(255,255,255,0.1);
+    background: var(--panel-field-bg);
 }
 
 .colormap-option.selected {
-    background: rgba(76, 175, 80, 0.25);
+    background: rgba(var(--panel-accent-rgb), 0.25);
 }
 
 .colormap-preview {

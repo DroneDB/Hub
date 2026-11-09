@@ -84,7 +84,7 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 .measure-hint {
     pointer-events: auto;
     background: var(--ddb-overlay-bg);
-    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25);
     border-radius: var(--ddb-border-radius, 4px);
     color: var(--ddb-text-on-dark);
 }
@@ -117,7 +117,7 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 }
 
 .hint-action {
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    border: 1px solid rgba(var(--ddb-glass-rgb), 0.35);
     border-radius: var(--ddb-border-radius, 4px);
     background: transparent;
     color: inherit;
@@ -126,6 +126,6 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 }
 
 .hint-action:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(var(--ddb-glass-rgb), 0.15);
 }
 </style>

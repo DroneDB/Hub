@@ -48,7 +48,7 @@ export default {
 }
 
 #loader-backdrop {
-  background: rgba(100, 100, 100, 0.2);
+  background: rgba(var(--ddb-shade-rgb), 0.15);
   position: absolute;
   right: 0;
   top: 0;
@@ -69,9 +69,9 @@ export default {
   font-size: var(--ddb-font-size-sm);
   position: relative;
   text-indent: -9999rem;
-  border-top: 1.25rem solid rgba(255, 255, 255, 0.2);
-  border-right: 1.25rem solid rgba(255, 255, 255, 0.2);
-  border-bottom: 1.25rem solid rgba(255, 255, 255, 0.2);
+  border-top: 1.25rem solid rgba(var(--ddb-glass-rgb), 0.2);
+  border-right: 1.25rem solid rgba(var(--ddb-glass-rgb), 0.2);
+  border-bottom: 1.25rem solid rgba(var(--ddb-glass-rgb), 0.2);
   border-left: 1.25rem solid var(--ddb-primary);
   -webkit-transform: translateZ(0);
   -ms-transform: translateZ(0);

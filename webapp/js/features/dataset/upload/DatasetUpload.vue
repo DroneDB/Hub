@@ -581,7 +581,7 @@ export default {
     border-color: var(--ddb-text-secondary);
 }
 .filter-btn.filter-all.active .filter-count {
-    background-color: rgba(255,255,255,0.3);
+    background-color: rgba(var(--ddb-glass-rgb), 0.3);
     color: var(--ddb-text-on-color);
 }
 
@@ -600,18 +600,18 @@ export default {
     border-color: var(--ddb-primary);
 }
 .filter-btn.filter-uploading.active .filter-count {
-    background-color: rgba(255,255,255,0.3);
+    background-color: rgba(var(--ddb-glass-rgb), 0.3);
     color: var(--ddb-text-on-color);
 }
 
 /* Done filter */
 .filter-btn.filter-done {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
     border-color: rgba(var(--ddb-success-rgb), 0.3);
 }
 .filter-btn.filter-done .filter-count {
     background-color: rgba(var(--ddb-success-rgb), 0.1);
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 .filter-btn.filter-done.active {
     background-color: var(--ddb-success);
@@ -619,7 +619,7 @@ export default {
     border-color: var(--ddb-success);
 }
 .filter-btn.filter-done.active .filter-count {
-    background-color: rgba(255,255,255,0.3);
+    background-color: rgba(var(--ddb-glass-rgb), 0.3);
     color: var(--ddb-text-on-color);
 }
 
@@ -641,7 +641,7 @@ export default {
     border-color: var(--ddb-danger);
 }
 .filter-btn.filter-error.active .filter-count {
-    background-color: rgba(255,255,255,0.3);
+    background-color: rgba(var(--ddb-glass-rgb), 0.3);
     color: var(--ddb-text-on-color);
 }
 
@@ -728,11 +728,11 @@ export default {
 }
 
 .upload-result.success {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 
 .upload-result.has-errors {
-    color: var(--ddb-warning);
+    color: var(--ddb-warning-text);
 }
 
 /* Spinning animation */

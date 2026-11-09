@@ -17,7 +17,7 @@
                     <i class="fa-solid fa-pencil" /> Measurement Units
                 </label>
                 <Select input-id="map-settings-dialog-measurement-units" aria-labelledby="map-settings-dialog-measurement-units-label" :model-value="unitPref"
-                        :options="UNIT_OPTIONS" option-label="label" option-value="value" class="setting-select ms-3" @update:model-value="onUnitsChange" />
+                        :options="UNIT_OPTIONS" option-label="label" option-value="value" class="setting-select" @update:model-value="onUnitsChange" />
             </div>
         </div>
         <div class="d-flex justify-content-end mt-3" style="padding: 0 0.75rem;">
@@ -78,9 +78,9 @@ function onUnitsChange(value) {
     padding: 0 0.75rem;
 }
 
+/* The labels and the selects of the custom basemap editor below (CustomBasemapEditor.vue): one
+   label size and one select, of one width (17rem when there is room), in the whole window */
 .setting-label {
-    font-size: 0.75rem;
-    font-weight: 500;
     color: var(--ddb-text);
     display: flex;
     align-items: center;
@@ -88,7 +88,8 @@ function onUnitsChange(value) {
 }
 
 .setting-select {
-    font-size: 0.75rem;
+    flex: 0 1 17rem;
+    min-width: 0;
 }
 
 .custom-basemap-editor {

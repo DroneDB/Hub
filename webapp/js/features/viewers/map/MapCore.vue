@@ -154,6 +154,7 @@ import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
+import { onColorSchemeChange } from '@/libs/colorScheme';
 
 // Pointer over one of these: no feature tooltip
 const MAP_CONTROLS = '.ol-map-display-buttons, .ol-map-buttons, .ol-measure-control, .ol-selection, .ol-zoom, .ol-settings';
@@ -330,6 +331,8 @@ export default {
         if (!this.deferLoad) this.activate();
     },
     beforeUnmount: function () {
+        if (this.stopColorScheme) this.stopColorScheme();
+        this.stopColorScheme = null;
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
         if (this.viewZoomCap) this.viewZoomCap.dispose();
@@ -358,11 +361,22 @@ export default {
             if (this.map) this.map.updateSize();
         },
 
+        // The styles of the file layers, the measurements and the selection, made again from the
+        // colour tokens, and the map drawn with them
+        restyleCanvas: function () {
+            if (this.fileLayers) this.fileLayers.restyle();
+            if (this.measureControls) this.measureControls.restyle();
+            if (this.selectionControl) this.selectionControl.restyle();
+            if (this.map) this.map.render();
+        },
+
         loadMap: function () {
             this.loaded = true;
             // A view fits once, unless its state has a position; the standalone map fits once
             this.fitPending = this.view ? !this.view.view : this.standalone;
             this.vectorLayers = [];
+            // The canvas colours are tokens (FR-XC-21): draw again with the values of a new scheme
+            this.stopColorScheme = onColorSchemeChange(() => this.restyleCanvas());
             this.fileLayers = new FileLayers();
             this.fileLayers.setFlightPathVisible(this.showFlightPath);
             // Shared with the raster features (plant health, raster analysis)
@@ -749,7 +763,7 @@ export default {
 }
 
 .map-container {
-    -webkit-tap-highlight-color: rgba(255, 255, 255, 0);
+    -webkit-tap-highlight-color: transparent;
     position: relative;
     width: 100%;
     height: 100%;

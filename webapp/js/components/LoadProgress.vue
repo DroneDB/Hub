@@ -32,7 +32,7 @@ const percent = computed(() => (props.progress === null || !Number.isFinite(prop
     width: 12rem;
     height: 0.4rem;
     margin: 0.5rem auto 0;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(var(--ddb-glass-rgb), 0.2);
     border-radius: 0.2rem;
     overflow: hidden;
 }

@@ -3,7 +3,7 @@
  * with Giro3D's DrawTool. The labels are in the user's units (measureFormatters). Navigation is suspended while a shape is drawn (the DrawTool does
  * not do it, so a drag would also move the camera); right click ends a shape.
  */
-import { measureFormatters, MEASURE_COLOR as COLOR } from './sceneUtils';
+import { measureFormatters, measureColor } from './sceneUtils';
 
 export class MeasureTool {
     /**
@@ -33,12 +33,12 @@ export class MeasureTool {
         let shape = null;
         try {
             if (kind === 'point') {
-                shape = await this.drawTool.createPoint({ signal, color: COLOR });
+                shape = await this.drawTool.createPoint({ signal, color: measureColor() });
             } else if (kind === 'distance') {
-                shape = await this.drawTool.createLineString({ signal, color: COLOR, showVertices: true, showSegmentLabels: true,
+                shape = await this.drawTool.createLineString({ signal, color: measureColor(), showVertices: true, showSegmentLabels: true,
                     segmentLabelFormatter: this.format.length });
             } else if (kind === 'area') {
-                shape = await this.drawTool.createPolygon({ signal, color: COLOR, showSurface: true, showSurfaceLabel: true,
+                shape = await this.drawTool.createPolygon({ signal, color: measureColor(), showSurface: true, showSurfaceLabel: true,
                     surfaceLabelFormatter: this.format.area });
             }
         } catch {

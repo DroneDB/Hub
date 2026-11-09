@@ -25,8 +25,8 @@ defineProps({
     align-items: center;
     gap: 0.4rem;
     background: none;
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(var(--ddb-glass-rgb), 0.4);
+    color: rgba(var(--ddb-glass-rgb), 0.9);
     cursor: pointer;
     padding: 0.15rem 0.6rem;
     border-radius: 0.2rem;
@@ -34,8 +34,8 @@ defineProps({
     white-space: nowrap;
 
     &:hover:not(:disabled) {
-        color: white;
-        background: rgba(255, 255, 255, 0.15);
+        color: var(--ddb-text-on-dark);
+        background: rgba(var(--ddb-glass-rgb), 0.15);
     }
 
     &:disabled {

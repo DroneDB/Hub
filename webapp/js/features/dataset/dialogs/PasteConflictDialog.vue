@@ -147,7 +147,7 @@ export default {
     gap: var(--ddb-spacing-sm);
 }
 
-.amber { color: var(--ddb-warning); }
+.amber { color: var(--ddb-warning-text); }
 
 .file-path {
     word-break: break-all;

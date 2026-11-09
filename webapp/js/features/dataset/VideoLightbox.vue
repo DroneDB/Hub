@@ -106,7 +106,7 @@ export default {
 .video-lightbox-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.92);
+    background: rgba(var(--ddb-shade-rgb), 0.92);
     z-index: 10000;
     display: flex;
     flex-direction: column;
@@ -119,7 +119,7 @@ export default {
     justify-content: space-between;
     padding: 8px 16px;
     color: var(--ddb-text-on-dark);
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(var(--ddb-shade-rgb), 0.4);
 }
 
 .video-lightbox-name {
@@ -145,7 +145,7 @@ export default {
 }
 
 .video-lightbox-action:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(var(--ddb-glass-rgb), 0.15);
 }
 
 .video-lightbox-content {
@@ -160,14 +160,14 @@ export default {
 .video-lightbox-player {
     max-width: 100%;
     max-height: 100%;
-    background: #000;
+    background: rgb(var(--ddb-shade-rgb));
     outline: none;
 }
 
 .video-lightbox-error {
     position: absolute;
     color: var(--ddb-text-on-dark);
-    background: rgba(180, 30, 30, 0.85);
+    background: var(--ddb-viewer-btn-danger);
     padding: 12px 18px;
     border-radius: 6px;
     font-size: 0.95rem;

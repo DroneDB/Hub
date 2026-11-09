@@ -34,7 +34,9 @@
                             <Tag v-else :id="`config-section-state-${sIdx}`" value="Default" severity="secondary" size="small" class="ms-2" />
                         </span>
                     </template>
-                    <div :class="['config-section-content', isSectionActive(sIdx) ? '' : 'config-section-inactive']">
+                    <!-- A section in its default state is as legible and editable as a custom one: the tag says
+                         which it is, and a custom one has a bar along its edge (FR-ADM-15) -->
+                    <div :class="['config-section-content', { 'config-section-custom': isSectionActive(sIdx) }]">
                         <p class="section-description">{{ section.description }}</p>
 
                         <div class="config-fields-grid">
@@ -496,9 +498,9 @@ export default {
     border-bottom: 1px solid var(--ddb-border);
 }
 
-.config-section-inactive {
-    opacity: 0.5;
-    filter: grayscale(30%);
+.config-section-custom {
+    border-left: 0.25rem solid var(--ddb-primary);
+    padding-left: var(--ddb-spacing-md);
 }
 
 .config-fields-grid {

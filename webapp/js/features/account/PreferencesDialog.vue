@@ -39,7 +39,7 @@
 
                     <div class="pref-actions">
                         <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left" label="Reset section"
-                                @click="resetSections(tab.sections)" />
+                                @click="resetTab(tab)" />
                     </div>
                 </TabPanel>
             </TabPanels>
@@ -64,6 +64,9 @@
  * here reaches the open views, and a change there (another tab, the account) shows here.
  * The preferences store sends what changes to the account. Each tab resets its own sections;
  * "Reset all" asks first, with a confirm window that opens above this one.
+ *
+ * The Appearance tab (the light or dark theme, D-044) is kept on this device, not with the account:
+ * its "Reset section" and "Reset all" remove it here.
  *
  * The Notifications tab exists only on a server that sends e-mail; its setting is disabled,
  * with the reason, when the server cannot e-mail this account.
@@ -95,7 +98,7 @@ import { Features } from '@/libs/features';
 import { currencyChoices, normalizeCurrency } from '@/libs/format';
 import { Basemaps } from '@/libs/map/basemaps';
 import { ORG_SORT_OPTIONS } from '@/libs/organizationList';
-import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
+import { DEVICE_PREF_DEFAULTS, PREF, PREF_DEFAULTS, prefChoice, removePref } from '@/libs/preferences';
 import { orgPageChoice } from '@/libs/storageUtils';
 import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
@@ -140,6 +143,15 @@ const splatQuality = computed({
     get: () => prefChoice(PREF.SPLAT_QUALITY, storedQuality.value),
     set: value => { storedQuality.value = value; }
 });
+
+// The theme (libs/colorScheme.js applies it): a stored value that is not a choice shows as System,
+// which is what the page follows then
+const storedAppearance = usePreference(PREF.APPEARANCE, DEVICE_PREF_DEFAULTS[PREF.APPEARANCE]);
+const appearance = computed({
+    get: () => prefChoice(PREF.APPEARANCE, storedAppearance.value),
+    set: value => { storedAppearance.value = value; }
+});
+const APPEARANCE_OPTIONS = [{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }];
 
 // A stored sort that is not one the list knows shows as the default, which is what the list uses
 const orgSortColumn = computed({
@@ -203,8 +215,8 @@ async function loadNotificationStatus() {
 }
 
 /**
- * `sections` are the account sections the tab shows: its "Reset section" returns them to the defaults.
- * `shown`, when set, says whether the tab is there.
+ * `sections` are the account sections the tab shows and `devicePrefs` the device-only preferences:
+ * its "Reset section" returns them to the defaults. `shown`, when set, says whether the tab is there.
  */
 const TABS = [
     {
@@ -297,6 +309,15 @@ const TABS = [
         groups: [{ title: 'Materials', component: StockpileMaterialsEditor }]
     },
     {
+        value: 'appearance', label: 'Appearance', icon: 'fa-solid fa-circle-half-stroke', sections: [], devicePrefs: [PREF.APPEARANCE],
+        groups: [{
+            controls: [
+                select('appearance', 'Theme', appearance, APPEARANCE_OPTIONS,
+                    { hint: ref('System follows the light or dark setting of your device. The choice is kept on this device only.') })
+            ]
+        }]
+    },
+    {
         value: 'notifications', label: 'Notifications', icon: 'fa-solid fa-envelope', sections: ['notifications'],
         shown: notificationsShown,
         groups: [{
@@ -340,9 +361,10 @@ const STATUS = {
 const statusIcon = computed(() => STATUS[store.status].icon);
 const statusText = computed(() => STATUS[store.status].text);
 
-/** @param {string[]} sections */
-function resetSections(sections) {
-    sections.forEach(section => store.resetSection(section));
+/** @param {{ sections: string[], devicePrefs?: string[] }} tab */
+function resetTab(tab) {
+    tab.sections.forEach(section => store.resetSection(section));
+    tab.devicePrefs?.forEach(key => removePref(key));
 }
 
 async function resetAll() {
@@ -352,7 +374,9 @@ async function resetAll() {
         confirmText: 'Reset all',
         danger: true
     });
-    if (confirmed) store.resetAll();
+    if (!confirmed) return;
+    store.resetAll();
+    TABS.forEach(tab => tab.devicePrefs?.forEach(key => removePref(key)));
 }
 </script>
 

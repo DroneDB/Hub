@@ -53,7 +53,7 @@
 
         .c {
             select {
-                color: black;
+                color: rgb(var(--ddb-shade-rgb));
             }
         }
     }
@@ -188,7 +188,7 @@
 
     .btn-undo-redo {
         background: var(--ddb-viewer-btn-bg);
-        color: white;
+        color: var(--ddb-text-on-dark);
         border: none;
         padding: var(--ddb-spacing-sm) var(--ddb-spacing-sm);
         border-radius: var(--ddb-radius-sm);
@@ -242,7 +242,7 @@
 
     .btn-measurement {
         background: var(--ddb-viewer-btn-primary);
-        color: white;
+        color: var(--ddb-text-on-dark);
         border: none;
         padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
         border-radius: var(--ddb-radius-sm);
@@ -279,7 +279,7 @@
         display: flex;
         gap: 0.5rem;
         align-items: center;
-        color: white;
+        color: var(--ddb-text-on-dark);
         font-size: var(--ddb-font-size-base);
     }
 
@@ -290,7 +290,7 @@
 
     .unit-selector-toolbar select {
         background: var(--ddb-viewer-select-bg);
-        color: white;
+        color: var(--ddb-text-on-dark);
         border: var(--ddb-border-width) solid var(--ddb-viewer-select-border);
         padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
         border-radius: var(--ddb-radius-sm);

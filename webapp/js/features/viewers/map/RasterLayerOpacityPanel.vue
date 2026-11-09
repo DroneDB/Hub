@@ -224,9 +224,9 @@ export default {
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0 0.4rem;
-    border: 1px solid rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(var(--ddb-glass-rgb), 0.4);
     border-radius: 0.6rem;
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(var(--ddb-glass-rgb), 0.12);
     font-size: 0.65rem;
     line-height: 1.4;
 }
@@ -251,15 +251,15 @@ export default {
     flex-shrink: 0;
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(var(--ddb-glass-rgb), 0.8);
     cursor: pointer;
     padding: 0.1rem 0.25rem;
     border-radius: 0.2rem;
     line-height: 1;
 
     &:hover {
-        color: white;
-        background: rgba(255, 255, 255, 0.15);
+        color: var(--ddb-text-on-dark);
+        background: rgba(var(--ddb-glass-rgb), 0.15);
     }
 }
 
@@ -285,7 +285,7 @@ export default {
     justify-content: center;
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(var(--ddb-glass-rgb), 0.8);
     cursor: pointer;
     padding: 0.05rem 0.2rem;
     border-radius: 0.2rem;
@@ -295,8 +295,8 @@ export default {
 }
 
 .order-btn:hover:not(:disabled) {
-    color: white;
-    background: rgba(255, 255, 255, 0.15);
+    color: var(--ddb-text-on-dark);
+    background: rgba(var(--ddb-glass-rgb), 0.15);
 }
 
 .order-btn--hidden {
@@ -324,7 +324,7 @@ export default {
         justify-content: center;
         background: none;
         border: none;
-        color: rgba(255, 255, 255, 0.8);
+        color: rgba(var(--ddb-glass-rgb), 0.8);
         cursor: pointer;
         padding: 0.1rem 0.25rem;
         border-radius: 0.2rem;
@@ -332,8 +332,8 @@ export default {
     }
 
     .fold-toggle:hover {
-        color: white;
-        background: rgba(255, 255, 255, 0.15);
+        color: var(--ddb-text-on-dark);
+        background: rgba(var(--ddb-glass-rgb), 0.15);
     }
 
     .raster-opacity-panel.is-folded > :not(.layers-header) {

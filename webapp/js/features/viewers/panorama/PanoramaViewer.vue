@@ -17,6 +17,7 @@ import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { loadResources } from '@/libs/lazy';
+import { colorToken } from '@/libs/colorScheme';
 import { useResizeObserver } from '@/composables/useEventListener';
 
 defineOptions({ name: 'PanoramaViewer' });
@@ -44,7 +45,8 @@ onMounted(async () => {
             panorama: dataset.value.downloadUrl(entry.value.path, { inline: true }),
             loadingTxt: 'Loading ...',
             useXmpData: false,
-            canvasBackground: '#030A03',
+            // The viewers are dark in both themes: the token has one value
+            canvasBackground: colorToken('--ddb-viewer-canvas-bg'),
             minFov: 1,
             defaultZoomLvl: 60,
             panoData: {

@@ -148,8 +148,8 @@ export default {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
-    background: rgba(0, 0, 0, 0.65);
-    color: var(--ddb-text-on-color);
+    background: rgba(var(--ddb-shade-rgb), 0.65);
+    color: var(--ddb-text-on-dark);
     font-size: 0.7rem;
     font-weight: 500;
     padding: 0.2rem 0.55rem;
@@ -157,12 +157,12 @@ export default {
     white-space: nowrap;
     max-width: 18rem;
     user-select: none;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    box-shadow: 0 1px 4px rgba(var(--ddb-shade-rgb), 0.35);
 
     /* A missing or unavailable file: the Hub's warning look, yellow with dark text */
     &.placeholder {
         background: var(--ddb-warning);
-        color: var(--ddb-text);
+        color: var(--ddb-text-on-warning);
     }
 }
 
@@ -230,19 +230,19 @@ export default {
     bottom: 0;
     left: 50%;
     width: 2px;
-    background: rgba(255, 255, 255, 0.85);
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+    background: rgba(var(--ddb-glass-rgb), 0.85);
+    box-shadow: 0 0 4px rgba(var(--ddb-shade-rgb), 0.5);
     pointer-events: none;
 }
 
 .split-handle-grip {
     position: relative;
-    background: rgba(0, 0, 0, 0.6);
-    color: var(--ddb-text-on-color);
+    background: rgba(var(--ddb-shade-rgb), 0.6);
+    color: var(--ddb-text-on-dark);
     border-radius: 0.4rem;
     padding: 0.3rem 0.35rem;
     font-size: 0.75rem;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 1px 4px rgba(var(--ddb-shade-rgb), 0.4);
     user-select: none;
     pointer-events: none;
 }

@@ -380,8 +380,8 @@ export default {
 .fill-hint {
     margin-top: 0.35rem;
     padding: 0.35rem 0.5rem;
-    background: rgba(255,255,255,0.06);
-    border-left: 2px solid rgba(255, 183, 77, 0.6);
+    background: rgba(var(--ddb-glass-rgb), 0.06);
+    border-left: 2px solid rgba(var(--panel-warn-rgb), 0.6);
     color: var(--panel-text-soft);
     font-size: 0.72rem;
     line-height: 1.3;
@@ -466,7 +466,7 @@ export default {
     padding: 0;
     font-size: 0.85rem;
 }
-.banner-cancel:hover { color: var(--ddb-text-on-color); }
+.banner-cancel:hover { color: var(--ddb-text-on-dark); }
 
 .section-label-row {
     display: flex;
@@ -503,8 +503,8 @@ export default {
     color: var(--panel-muted);
 }
 .custom-material-grid input {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(var(--ddb-glass-rgb), 0.1);
+    border: 1px solid rgba(var(--ddb-glass-rgb), 0.2);
     color: var(--panel-text);
     border-radius: 0.25rem;
     padding: 0.25rem 0.4rem;

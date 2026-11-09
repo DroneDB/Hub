@@ -33,6 +33,24 @@
     box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5);
 }
 
+/* The keyboard focus ring: the --ddb-focus-ring-* set (FR-XC-21), with its halo, as the button sits
+   on the map, whose colours are not known: the ring and the halo are 3:1 or more against each other,
+   so one of them always shows. A mouse focus draws no ring (OpenLayers draws a 1px one on :focus). */
+.ol-control button:hover,
+.ol-control button:focus:not(:focus-visible) {
+    outline: none !important;
+}
+
+.ol-control button:focus-visible {
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color) !important;
+    outline-offset: var(--ddb-focus-ring-offset) !important;
+    box-shadow: 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
+}
+
+.ol-control button.active:focus-visible {
+    box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5), 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
+}
+
 /* ---------------------------------------------------------------------------
    Toolbar zones
    ---------------------------------------------------------------------------
@@ -245,6 +263,8 @@
     color: white;
     font-size: 0.75rem;
     user-select: none;
+    /* Dark in both themes: the ring of the dark surfaces */
+    --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
 }
 
 .map-bottom-panel .opacity-value {
@@ -267,7 +287,7 @@
 }
 
 .map-bottom-panel .ph-btn:hover {
-    color: var(--ddb-text-on-color);
+    color: var(--ddb-text-on-dark);
 }
 
 .map-bottom-panel .ph-btn.active {
@@ -415,7 +435,7 @@
 }
 
 .ol-point-popup-copy .icon.check {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 
 .ol-point-popup-description {

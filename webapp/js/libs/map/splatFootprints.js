@@ -28,7 +28,7 @@ import ddb from 'ddb';
 import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 import { EPSG } from '@/libs/constants';
 import { FILE_COLORS } from '@/libs/map/fileLayerStyles';
-import { primaryRgba } from '@/libs/palette';
+import { tokenRgba } from '@/libs/colorScheme';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
 const geoJson = new GeoJSON();
@@ -85,12 +85,12 @@ function createStyles() {
     const point = new Style({
         image: new CircleStyle({
             radius: 7,
-            fill: new Fill({ color: primaryRgba(0.35, 300) }),
+            fill: new Fill({ color: tokenRgba('--ddb-map-shot', 0.35) }),
             stroke: new Stroke({ color: FILE_COLORS.shot, width: 3 })
         })
     });
     const polygon = new Style({
-        fill: new Fill({ color: primaryRgba(0.2, 300) }),
+        fill: new Fill({ color: tokenRgba('--ddb-map-shot', 0.2) }),
         stroke: new Stroke({ color: FILE_COLORS.shot, width: 2 })
     });
     return { point, polygon };
@@ -98,11 +98,11 @@ function createStyles() {
 
 export class SplatFootprints {
     constructor() {
-        const styles = createStyles();
+        this.styles = createStyles();
         this.source = new VectorSource();
         this.layer = new VectorLayer({
             source: this.source,
-            style: feature => (feature.getGeometry()?.getType() === 'Point' ? styles.point : styles.polygon)
+            style: feature => (feature.getGeometry()?.getType() === 'Point' ? this.styles.point : this.styles.polygon)
         });
         /** The feature of each splat on show. @type {Map<any, Feature>} */
         this.features = new Map();
@@ -112,6 +112,12 @@ export class SplatFootprints {
          * @type {Map<string, Promise<{ footprint: any } | null>>}
          */
         this.footprints = new Map();
+    }
+
+    /** Makes the styles again from the colour tokens (the colour scheme changed), and redraws. */
+    restyle() {
+        this.styles = createStyles();
+        this.layer.changed();
     }
 
     /**

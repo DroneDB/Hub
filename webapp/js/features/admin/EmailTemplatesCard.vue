@@ -369,7 +369,7 @@ h3 {
     height: 32rem;
     border: 1px solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
-    background: #fff;
+    background: var(--ddb-paper);
 }
 
 .preview-text {

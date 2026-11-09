@@ -109,7 +109,7 @@ export default {
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(var(--ddb-ink-rgb), 0.03);
 }
 
 .method-card h4 {
@@ -135,7 +135,7 @@ export default {
     border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(var(--ddb-ink-rgb), 0.03);
 }
 
 .param-card p {

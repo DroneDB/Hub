@@ -18,6 +18,7 @@ vi.mock('@/libs/api/sharedRegistry', () => ({ default: h.reg }));
 
 const { default: PreferencesDialog } = await import('./PreferencesDialog.vue');
 const { PREF, getPref, setPref, applyAccountValue, _resetPrefListenersForTests } = await import('@/libs/preferences');
+const { DARK_CLASS, startColorScheme } = await import('@/libs/colorScheme');
 
 // The window is teleported to the body: everything is looked up there
 let wrapper;
@@ -35,6 +36,7 @@ beforeEach(() => {
     setPref(PREF.MEASURE_UNIT, null);
     setPref(PREF.CUSTOM_BASEMAP, null);
     setPref(PREF.BUILD_NOTIFICATIONS, null);
+    setPref(PREF.APPEARANCE, null);
     h.auth.flags.emailEnabled = true;
     h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: true, reason: null }));
     h.store.status = 'idle';
@@ -54,7 +56,7 @@ describe('PreferencesDialog', () => {
         expect(document.body.querySelector('#preferencesDialog')).not.toBeNull();
         expect(document.body.querySelector('.p-dialog-mask')).not.toBeNull();
         expect(dom().find('.p-dialog-title').text()).toBe('User preferences');
-        expect(tabs().map(t => t.text())).toEqual(['Units', 'Map', 'Files', 'Lists', 'Viewers', 'Stockpiles', 'Notifications']);
+        expect(tabs().map(t => t.text())).toEqual(['Units', 'Map', 'Files', 'Lists', 'Viewers', 'Stockpiles', 'Appearance', 'Notifications']);
         expect(dom().find('.sync-status').text()).toContain('Saved to your account');
         h.store.status = 'error';
         await flushPromises();
@@ -417,6 +419,90 @@ describe('PreferencesDialog', () => {
             const resets = dom().findAll('button').filter(b => b.text().includes('Reset section'));
             await resets.at(-1).trigger('click');
             expect(h.store.resetSection).toHaveBeenCalledWith('notifications');
+        });
+    });
+
+    // FR-NAV-07, D-044: the theme, System by default, kept on this device; libs/colorScheme.js applies it
+    describe('Appearance', () => {
+        const appearanceSelect = () => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-appearance');
+        const choose = async value => {
+            appearanceSelect().vm.$emit('update:modelValue', value);
+            await flushPromises();
+        };
+        const isDark = () => document.documentElement.classList.contains(DARK_CLASS);
+        let media;
+        let stopScheme;
+        const realMatchMedia = window.matchMedia;
+        beforeEach(() => {
+            const listeners = new Set();
+            media = {
+                matches: false,
+                addEventListener: (_type, fn) => listeners.add(fn),
+                removeEventListener: (_type, fn) => listeners.delete(fn),
+                set(dark) { media.matches = dark; listeners.forEach(fn => fn()); }
+            };
+            window.matchMedia = vi.fn(() => media);
+            document.documentElement.classList.remove(DARK_CLASS);
+            stopScheme = startColorScheme();
+        });
+        afterEach(() => {
+            stopScheme();
+            window.matchMedia = realMatchMedia;
+            document.documentElement.classList.remove(DARK_CLASS);
+        });
+        const open = async () => {
+            await render({ initialTab: 'appearance' });
+            await flushPromises();
+        };
+
+        it('is a theme select with System, Light and Dark, System by default, kept on this device', async () => {
+            await open();
+            const select = appearanceSelect();
+            expect(select.props('options').map(o => o.label)).toEqual(['System', 'Light', 'Dark']);
+            expect(select.props('modelValue')).toBe('system');
+            expect(document.getElementById('pref-appearance-hint').textContent).toContain('on this device only');
+        });
+
+        it('choosing Dark applies the dark theme, Light the light one, and System follows the system', async () => {
+            await open();
+            await choose('dark');
+            expect(getPref(PREF.APPEARANCE, '')).toBe('dark');
+            expect(isDark()).toBe(true);
+            media.set(false);
+            expect(isDark()).toBe(true);
+            await choose('light');
+            expect(isDark()).toBe(false);
+            await choose('system');
+            media.set(true);
+            expect(isDark()).toBe(true);
+            media.set(false);
+            expect(isDark()).toBe(false);
+        });
+
+        it('shows System for a stored value that is not a choice', async () => {
+            setPref(PREF.APPEARANCE, 'sepia');
+            await open();
+            expect(appearanceSelect().props('modelValue')).toBe('system');
+        });
+
+        it('Reset section removes the choice from this device, and sends nothing to the account', async () => {
+            setPref(PREF.APPEARANCE, 'dark');
+            await open();
+            const resets = dom().findAll('button').filter(b => b.text().includes('Reset section'));
+            await resets.at(-2).trigger('click');
+            expect(getPref(PREF.APPEARANCE, null)).toBeNull();
+            expect(h.store.resetSection).not.toHaveBeenCalled();
+            expect(isDark()).toBe(false);
+        });
+
+        it('Reset all removes it too', async () => {
+            setPref(PREF.APPEARANCE, 'dark');
+            await render();
+            await buttonWith('Reset all').trigger('click');
+            await flushPromises();
+            await buttonWith('Reset all', new DOMWrapper(confirmWindow())).trigger('click');
+            await flushPromises();
+            expect(getPref(PREF.APPEARANCE, null)).toBeNull();
         });
     });
 

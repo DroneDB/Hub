@@ -65,7 +65,7 @@
 }
 
 #splat .streaming-badge {
-    background: rgba(0, 0, 0, 0.55);
+    background: rgba(var(--ddb-shade-rgb), 0.55);
     color: var(--ddb-text-on-dark);
     padding: 0.25rem 0.6rem;
     border-radius: var(--ddb-border-radius, 4px);
@@ -88,8 +88,8 @@
     @include overlay-button(
         $size: 2.25rem,
         $radius: 50%,
-        $background: rgba(0, 0, 0, 0.55),
-        $hover-background: rgba(0, 0, 0, 0.75),
+        $background: rgba(var(--ddb-shade-rgb), 0.55),
+        $hover-background: rgba(var(--ddb-shade-rgb), 0.75),
         $active-background: rgba(var(--ddb-primary-rgb), 0.85)
     );
 }

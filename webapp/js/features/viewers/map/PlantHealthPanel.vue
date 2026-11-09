@@ -536,8 +536,8 @@ export default {
     gap: 0.4rem;
     font-size: 0.75rem;
     color: var(--panel-text-soft);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(var(--ddb-glass-rgb), 0.05);
+    border: 1px solid rgba(var(--ddb-glass-rgb), 0.1);
     border-radius: 4px;
     padding: 0.4rem 0.5rem;
     line-height: 1.3;

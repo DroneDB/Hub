@@ -501,8 +501,8 @@ export default {
 
 
 .sensor-badge.thermal {
-    background: rgba(255, 87, 34, 0.25);
-    border-color: rgba(255, 87, 34, 0.5);
+    background: rgba(var(--panel-thermal-strong-rgb), 0.25);
+    border-color: rgba(var(--panel-thermal-strong-rgb), 0.5);
 }
 
 .spot-info {

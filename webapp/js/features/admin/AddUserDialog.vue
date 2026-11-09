@@ -171,6 +171,6 @@ export default {
 }
 
 .password-requirements small.met {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 </style>
