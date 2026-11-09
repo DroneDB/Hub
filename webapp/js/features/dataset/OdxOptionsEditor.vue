@@ -19,7 +19,7 @@
         <!-- Toolbar -->
         <div class="odm-editor-toolbar">
             <div class="odm-toolbar-left">
-                <Button type="button" severity="secondary" text :icon="showSearch ? 'fa-solid fa-xmark' : 'fa-solid fa-magnifying-glass'"
+                <Button ref="searchToggle" type="button" severity="secondary" text :icon="showSearch ? 'fa-solid fa-xmark' : 'fa-solid fa-magnifying-glass'"
                         :label="showSearch ? 'Close Search' : 'Search'"
                         class="odm-toolbar-btn" @click="toggleSearch" />
                 <Button type="button" severity="secondary" text :icon="viewMode === 'grouped' ? 'fa-solid fa-list' : 'fa-solid fa-layer-group'"
@@ -36,14 +36,20 @@
         </div>
 
         <!-- Search -->
-        <div v-if="showSearch" class="odm-search-bar">
-            <InputText v-model="searchQuery" placeholder="Search options by name..." aria-label="Search options" class="w-100" />
+        <!-- Escape belongs to the search while it is open (data-owns-escape): the SearchField clears its text,
+             an empty one closes the search; the dialog around the editor stays open with every field it holds (FR-PRC-25) -->
+        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- it only keeps Escape for the search; the field inside is the control -->
+        <div v-if="showSearch" class="odm-search-bar" data-owns-escape @keydown.esc="onSearchEscape">
+            <SearchField ref="searchField" v-model="searchQuery" label="Search options" placeholder="Search options by name..." />
         </div>
 
         <!-- Options content -->
         <div class="odm-options-content" :class="{ 'odm-scroll': true }">
+            <!-- A search that matches no option says so (FR-PRC-38) -->
+            <EmptyState v-if="searchQuery && filteredOptions.length === 0" title="No options" items="options" :query="searchQuery"
+                        class="odm-no-match" @clear="clearSearch" />
             <!-- Grouped view -->
-            <template v-if="viewMode === 'grouped'">
+            <template v-else-if="viewMode === 'grouped'">
                 <div v-for="group in groupsWithContent" :key="group.id" class="odm-option-group">
                     <button type="button" class="btn-reset odm-option-group-header" :aria-expanded="!collapsedGroups[group.id]" @click="toggleGroup(group.id)">
                         <i :class="collapsedGroups[group.id] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"
@@ -85,7 +91,7 @@
             <!-- Flat view -->
             <template v-else>
                 <div class="odm-flat-list">
-                    <OdxOptionRow v-for="opt in allMergedOptions" :key="opt.name" :option="opt"
+                    <OdxOptionRow v-for="opt in filteredOptions" :key="opt.name" :option="opt"
                                   @update:value="(val) => onOptionChange(opt.name, val)" />
                 </div>
             </template>
@@ -96,7 +102,8 @@
 <script>
 import OdxOptionRow from '@/features/dataset/OdxOptionRow.vue';
 import Button from 'primevue/button';
-import InputText from 'primevue/inputtext';
+import SearchField from '@/components/SearchField.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import { useTimerGroup } from '@/composables/useTimers';
 
 // Option groups (ported from WebODM EditPresetDialog.jsx)
@@ -272,7 +279,7 @@ const OPTION_GROUP_MAP = {
 export default {
     name: 'OdxOptionsEditor',
 
-    components: { OdxOptionRow, Button, InputText },
+    components: { OdxOptionRow, Button, SearchField, EmptyState },
 
     props: {
         availableOptions: { type: Array, required: true },
@@ -294,6 +301,8 @@ export default {
             collapsedGroups,
             searchQuery: '',
             showSearch: false,
+            // The groups' open state before a search expanded them, back when the search ends
+            collapsedBeforeSearch: null,
             viewMode: 'grouped'
         };
     },
@@ -397,6 +406,16 @@ export default {
     },
 
     watch: {
+        // The options that match are shown, not the headers of collapsed groups (FR-PRC-38)
+        searchQuery(query, previous) {
+            if (query && !previous) {
+                this.collapsedBeforeSearch = { ...this.collapsedGroups };
+                this.expandAll();
+            } else if (!query && previous && this.collapsedBeforeSearch) {
+                Object.assign(this.collapsedGroups, this.collapsedBeforeSearch);
+                this.collapsedBeforeSearch = null;
+            }
+        },
         // A new profile replaces the profile options: what the user changed by hand stays, unless the new profile
         // sets the same value
         presetOptions() {
@@ -419,7 +438,21 @@ export default {
         },
         toggleSearch() {
             this.showSearch = !this.showSearch;
-            if (!this.showSearch) this.searchQuery = '';
+            if (this.showSearch) this.$nextTick(() => this.$refs.searchField?.focus());
+            else this.searchQuery = '';
+        },
+        // Escape with an empty search field (a field with text clears it first, in the SearchField): close the search.
+        // The key stays here: the dialog around the editor is not closed.
+        onSearchEscape(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showSearch = false;
+            this.searchQuery = '';
+            this.$nextTick(() => this.$refs.searchToggle?.$el?.focus());
+        },
+        clearSearch() {
+            this.searchQuery = '';
+            this.$nextTick(() => this.$refs.searchField?.focus());
         },
         toggleViewMode() {
             this.viewMode = this.viewMode === 'grouped' ? 'flat' : 'grouped';

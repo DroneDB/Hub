@@ -1,5 +1,5 @@
 <template>
-    <div class="tab-switcher" :class="{ 'position-top': position === 'top' }">
+    <div class="tab-switcher" :class="{ 'position-top': position === 'top', 'bottom-nav-phone': bottomNavPhone }">
         <div v-if="showStrip" class="tab-buttons-strip">
             <Tabs :value="activeTab" @update:value="onTabChange">
                 <TabList>
@@ -49,6 +49,9 @@ import Tab from 'primevue/tab';
  *   defaultTab - Key of the tab to activate on mount.
  *   position   - Tab strip position: 'top' (default) or 'bottom'.
  *   hideSingle - Hide the tab strip when only one tab is present (default: false).
+ *   bottomNavPhone - Below `sm` (576px, the phone breakpoint of libs/responsiveColumns.js) the strip is a bottom
+ *                navigation: equal cells, each with its icon and its short label (FR-EXP-29). From `sm` up it
+ *                is the strip of `position`.
  */
 export default {
     components: {
@@ -68,6 +71,10 @@ export default {
             required: true
         },
         hideSingle: {
+            type: Boolean,
+            default: false
+        },
+        bottomNavPhone: {
             type: Boolean,
             default: false
         },
@@ -97,6 +104,23 @@ export default {
     computed: {
         showStrip: function () {
             return !this.hideSingle || this.dynTabs.length > 1;
+        }
+    },
+    watch: {
+        // The page's tabs change (the dataset page below and from `sm`): the ones that left go, a new one comes in
+        // after the page's tab before it; the tabs kept (their panels not rendered again) and those of addTab stay.
+        // When the tab on show left, the page's first tab is shown.
+        tabs: function (next, prev) {
+            const leaving = new Set(prev.map(t => t.key));
+            next.forEach(t => leaving.delete(t.key));
+            const tabs = this.dynTabs.filter(t => !leaving.has(t.key));
+            next.forEach((t, i) => {
+                if (tabs.some(d => d.key === t.key)) return;
+                const before = next.slice(0, i).reverse().find(p => tabs.some(d => d.key === p.key));
+                tabs.splice(before ? tabs.findIndex(d => d.key === before.key) + 1 : 0, 0, clone(t));
+            });
+            this.dynTabs = tabs;
+            if (!tabs.some(t => t.key === this.activeTab) && tabs.length) this.setActiveTab(tabs.find(t => t.key === next[0]?.key) || tabs[0]);
         }
     },
     mounted: function () {
@@ -339,5 +363,62 @@ export default {
         }
     }
 
+}
+
+/* Below sm: the strip is the bottom navigation, five equal cells that all show their icon and label (the global rule
+   that leaves a phone only the label of the active tab does not apply here, FR-EXP-29) */
+@media only screen and (max-width: 575.98px) {
+    .tab-switcher.bottom-nav-phone .tab-buttons-strip {
+        order: 1;
+        border-top: var(--ddb-border-width) solid var(--ddb-border-medium);
+    }
+
+    .tab-switcher.bottom-nav-phone :deep(.p-tabs),
+    .tab-switcher.bottom-nav-phone :deep(.p-tablist),
+    .tab-switcher.bottom-nav-phone :deep(.p-tablist-content),
+    .tab-switcher.bottom-nav-phone :deep(.p-tablist-viewport) {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .tab-switcher.bottom-nav-phone :deep(.p-tablist-tab-list) {
+        width: 100%;
+    }
+
+    .tab-switcher.bottom-nav-phone :deep(.p-tablist-nav-button) {
+        display: none;
+    }
+
+    .tab-switcher.bottom-nav-phone :deep(.p-tablist-active-bar) {
+        top: 0;
+        bottom: auto;
+    }
+
+    .tab-switcher.bottom-nav-phone :deep(.p-tab) {
+        flex: 1 1 0;
+        min-width: 0;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.125rem;
+        padding: 0.5rem 0.125rem;
+        font-size: 0.75rem;
+    }
+
+    .tab-switcher.bottom-nav-phone .tab-label {
+        position: static;
+        width: auto;
+        height: auto;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        clip: auto;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    .tab-switcher.bottom-nav-phone .icon.padded {
+        margin-right: 0;
+        padding-left: 0;
+    }
 }
 </style>

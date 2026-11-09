@@ -17,7 +17,7 @@ vi.mock('ddb', async importOriginal => {
 const { default: ShareEmbed } = await import('./ShareEmbed.vue');
 const { VIEWER_ONLY_HELP } = await import('@/libs/views/viewLinks');
 
-const WindowStub = { props: ['title'], template: '<div><h1 data-title>{{ title }}</h1><slot /><slot name="footer" /></div>' };
+const WindowStub = { props: ['title', 'sizeClass', 'fixedSize'], template: '<div :data-size-class="sizeClass"><h1 data-title>{{ title }}</h1><slot /><slot name="footer" /></div>' };
 const photo = { path: 'ddb://h/org/ds/a.jpg', entry: { path: 'a.jpg', type: ddb.entry.type.GEOIMAGE } };
 const ortho = { path: 'ddb://h/org/ds/flights/ortho.tif', entry: { path: 'flights/ortho.tif', type: ddb.entry.type.GEORASTER } };
 const folder = { path: 'ddb://h/org/ds/images', entry: { path: 'images', type: ddb.entry.type.DIRECTORY } };
@@ -87,12 +87,25 @@ describe('ShareEmbed', () => {
         expect(document.body.textContent).not.toContain('This dataset is Private');
     });
 
-    it('titles the window by what it shares', async () => {
+    it('names the item in the title (FR-SHR-06): the file, or the folder', async () => {
         await open(photo);
-        expect(wrapper.find('[data-title]').text()).toBe('Share / Embed');
+        expect(wrapper.find('[data-title]').text()).toBe('Share a.jpg');
+        wrapper.unmount();
+        await open(ortho);
+        expect(wrapper.find('[data-title]').text()).toBe('Share ortho.tif');
         wrapper.unmount();
         await open(folder);
-        expect(wrapper.find('[data-title]').text()).toBe('Share Folder');
+        expect(wrapper.find('[data-title]').text()).toBe('Share Folder images');
+    });
+
+    it('gives the window the size class dialog-xl, so its width does not change with the share type (FR-SHR-06)', async () => {
+        await open(ortho);
+        const size = () => wrapper.find('[data-size-class]').attributes('data-size-class');
+        expect(size()).toBe('dialog-xl');
+        await chooseMode('tms');
+        expect(size()).toBe('dialog-xl');
+        await chooseMode('link');
+        expect(size()).toBe('dialog-xl');
     });
 
     describe('QGIS', () => {

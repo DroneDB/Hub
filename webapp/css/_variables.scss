@@ -171,6 +171,11 @@
     --ddb-login-max-width: 26.25rem;   // 420px
     --ddb-page-padding-x: var(--ddb-spacing-md); // 12px - side padding of the routed pages
 
+    // The width of a dialog comes from its size class (HubWindow size-class, FR-XC-20), not from its content.
+    // The other width tokens of FR-XC-33 (prose, forms, panels) come with the wide layout (U-503).
+    --ddb-dialog-form-max: 47rem;      // 752px - a form dialog (dialog-xl)
+    --ddb-dialog-wide-max: 120rem;     // 1920px - a log, a chart or a form in two columns (dialog-wide)
+
     // ── Status ─────────────────────────────────────────────
     --ddb-success: #20a96b;
     --ddb-success-rgb: 32, 169, 107;

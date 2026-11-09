@@ -1,5 +1,5 @@
 <template>
-    <Window id="share-embed" :title="windowTitle" modal fixed-size @close="$emit('close')">
+    <Window id="share-embed" :title="windowTitle" modal fixed-size size-class="dialog-xl" @close="$emit('close')">
         <div class="content">
             <Message v-model="error" no-dismiss />
             <LoadingSpinner v-if="loading" />
@@ -175,8 +175,11 @@ export default {
         scope() {
             return ddb.entry.isDirectory(this.file.entry) ? 'folder' : 'entry';
         },
+        // Names the item, so a wrong target is seen (FR-SHR-06): 'Share odm_orthophoto.tif', 'Share Folder images'
         windowTitle() {
-            return this.scope === 'folder' ? 'Share Folder' : 'Share / Embed';
+            const name = ddb.pathutils.basename(this.file.entry.path || '');
+            if (this.scope === 'folder') return name ? `Share Folder ${name}` : 'Share Folder';
+            return name ? `Share ${name}` : 'Share / Embed';
         },
         unlistedMessage() {
             return `This changes the visibility of the whole dataset <strong>${escapeHtml(this.ds)}</strong> from Private to Unlisted: ` +
@@ -348,7 +351,6 @@ export default {
 <style scoped>
 .share-type { margin-bottom: 0.75rem; display: flex; align-items: center; }
 label { font-weight: bold; }
-.content { min-width: min(26.25rem, var(--window-content-width, 100%)); }
 .auth-note { margin-top: 0.5rem; }
 .share-url-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }
 .share-embed-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }

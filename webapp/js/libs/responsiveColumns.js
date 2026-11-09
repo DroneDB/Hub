@@ -59,6 +59,9 @@ export const STACKED_TABLE_CLASS = 'stacked-table';
 /** The media query of the stacked cards: below `sm`, as the renderer of css/app.scss (575.98 px) */
 export const STACKED_MEDIA_QUERY = `(max-width: ${BREAKPOINT_PX[STACK_BELOW] - 0.02}px)`;
 
+/** The media query of the tablet layout: below `lg` (991.98 px), where a side panel opens over the content as a drawer */
+export const TABLET_MEDIA_QUERY = `(max-width: ${BREAKPOINT_PX.lg - 0.02}px)`;
+
 /**
  * The `pt` of a sortable PrimeVue Column of a stacked table: on a phone the header is hidden (a card has
  * no header), so its sortable cells leave the tab order, where they would take an invisible focus.

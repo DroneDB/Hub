@@ -1,6 +1,6 @@
 <template>
-    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
-        <div class="ds-dialog">
+    <Window id="datasetDialog" :title="title" modal size-class="dialog-lg" fixed-size :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
+        <div>
             <form class="me-2" :class="{ error: !isValid() }" @submit.prevent>
                 <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
                     <template v-if="changesSlug">A dataset with this slug already exists in this organization.</template>
@@ -211,9 +211,3 @@ export default {
     }
 }
 </script>
-
-<style scoped>
-.ds-dialog {
-    min-width: min(20rem, var(--window-content-width, 100%));
-}
-</style>

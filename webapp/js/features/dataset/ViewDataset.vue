@@ -3,16 +3,18 @@
         <Message v-model="error" />
         <!-- The dataset is not there, not for this user, or needs a sign-in: the page state in place of the panels -->
         <ResourceState v-if="loadKind" :kind="loadKind" resource="dataset" :name="params.ds" />
-        <Panel v-else split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%" storage-key="dataset" mobile-collapsed>
+        <!-- One layout decision, from the window's width (phoneLayout, below sm): the panel hides its first pane and the
+             tabs get Browser and Properties; the tabs (the second pane) are never rendered again when it changes -->
+        <Panel v-else split="vertical" class="main" amount="23.6%" tablet-amount="30%" storage-key="dataset" :mobile-collapsed="phoneLayout">
             <template #first>
                 <div class="sidebar">
-                    <FileBrowser v-show="!isMobile" ref="fileBrowser" v-bind="treeProps" v-on="treeEvents" />
+                    <FileBrowser ref="fileBrowser" v-bind="treeProps" v-on="treeEvents" />
                 </div>
             </template>
             <template #second>
                 <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="mainTabs[0].key" position="top"
-                             :hide-single="false" @tab-change="onTabChange">
-                    <template v-if="isMobile" #filebrowser>
+                             :hide-single="false" bottom-nav-phone @tab-change="onTabChange">
+                    <template v-if="phoneLayout" #filebrowser>
                         <FileBrowser ref="mobileFileBrowser" v-bind="treeProps" v-on="treeEvents" />
                     </template>
                     <template #map>
@@ -23,19 +25,22 @@
                     </template>
                     <template #explorer>
                         <div class="detail-layout">
-                            <div class="detail-main" :class="{ 'with-detail': detailFile && !isMobile }">
+                            <div class="detail-main" :class="{ 'with-detail': showDetail }">
                                 <Explorer v-if="viewMode === 'grid'" ref="explorer" v-bind="explorerProps" v-on="fileEvents" />
                                 <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
                             </div>
-                            <div v-if="detailFile && !isMobile" class="detail-side">
+                            <div v-if="showDetail" id="dataset-detail-side" ref="detailSide" class="detail-side">
                                 <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
                             </div>
+                            <!-- Below lg, the drawer the user closed comes back from here, not with the next selection -->
+                            <Button v-if="detailReopenable" ref="detailReopen" class="detail-reopen" icon="fa-solid fa-circle-info" label="Details"
+                                    severity="secondary" aria-controls="dataset-detail-side" aria-expanded="false" @click="openDrawer" />
                         </div>
                     </template>
                     <template #tasks>
                         <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :can-write="canWrite" />
                     </template>
-                    <template v-if="isMobile" #properties>
+                    <template v-if="phoneLayout" #properties>
                         <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
                     </template>
                 </TabSwitcher>
@@ -63,7 +68,6 @@ import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import icons from '@/libs/icons';
 import { setTitle } from '@/libs/utils';
-import { isMobile as detectMobile } from '@/libs/responsive';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { Features } from '@/libs/features';
 import { PREF } from '@/libs/preferences';
@@ -92,8 +96,11 @@ import { useOpenItem } from '@/composables/useOpenItem';
 import { useDatasetShortcuts } from '@/composables/useDatasetShortcuts';
 import { useViewActions } from '@/composables/useViewActions';
 import { useEventListener } from '@/composables/useEventListener';
-import { hasOpenModalOverlay } from '@/composables/useOverlay';
+import { useStackedLayout, useMediaMatch } from '@/composables/useStackedLayout';
+import { hasOpenModalOverlay, useOverlay } from '@/composables/useOverlay';
+import { TABLET_MEDIA_QUERY } from '@/libs/responsiveColumns';
 import { listViews } from '@/libs/views/viewStore';
+import Button from 'primevue/button';
 import Message from '@/components/HubMessage.vue';
 import ResourceState from '@/components/ResourceState.vue';
 import Panel from '@/features/dataset/HubPanel.vue';
@@ -132,20 +139,33 @@ const loadError = shallowRef(null);
 const loadKind = computed(() => loadErrorKind(loadError.value));
 // A dataset opened after one that did not load starts with the toolbar's actions
 session.setUnavailable(false);
-const isMobile = detectMobile();
-const mainTabs = [
-    ...(isMobile ? [{ label: 'Browser', icon: 'fa-solid fa-sitemap', key: 'filebrowser' }] : []),
+// The phone layout (FR-EXP-29): a window below `sm`, the breakpoint of libs/responsiveColumns.js (as the bottom
+// navigation), not the screen of libs/responsive's isMobile. It follows the window (a phone that rotates, a window
+// resized): there the tree is the Browser tab and the detail of a file the Properties tab, and the splitter hides its
+// first pane (HubPanel mobile-collapsed). The tabs change around the ones they keep, which are not rendered again.
+const phoneLayout = useStackedLayout();
+const mainTabs = computed(() => [
+    ...(phoneLayout.value ? [{ label: 'Browser', icon: 'fa-solid fa-sitemap', key: 'filebrowser' }] : []),
     { label: 'Files', icon: 'fa-solid fa-folder-open', key: 'explorer' },
-    ...(isMobile ? [{ label: 'Properties', icon: 'fa-solid fa-circle-info', key: 'properties' }] : []),
+    ...(phoneLayout.value ? [{ label: 'Properties', icon: 'fa-solid fa-circle-info', key: 'properties' }] : []),
     { label: 'Map', icon: 'fa-solid fa-map', key: 'map' },
     { label: 'Tasks', icon: 'fa-solid fa-list-check', key: 'tasks' }
-];
+]);
+// The tab on show
+const activeTab = ref(null);
 // Tabs whose code loads on first use stay mounted once opened
 const openedTabs = reactive({ map: false, tasks: false });
 const viewMode = usePreference(PREF.FILE_VIEW_MODE, 'grid');
 // Table view: thumbnails and relative times, or icons and dates
 const expandedGrid = usePreference(PREF.TABLE_EXPANDED_GRID, true);
 const detailFile = ref(null);
+// Below lg (and from sm) the detail panel is a drawer over the list (FR-EXP-17). Once the user closes it, a selection
+// does not open it again: its Details button does. From lg it is a column that follows the selection, as before.
+const belowLg = useMediaMatch(TABLET_MEDIA_QUERY);
+const drawerMode = computed(() => belowLg.value && !phoneLayout.value);
+const drawerClosed = ref(false);
+const showDetail = computed(() => !!detailFile.value && !phoneLayout.value && !(drawerMode.value && drawerClosed.value));
+const detailReopenable = computed(() => drawerMode.value && drawerClosed.value && !!detailFile.value);
 
 // Permissions are on the dataset's root entry
 const rootEntry = ref(null);
@@ -161,10 +181,16 @@ const fileBrowser = ref(null);
 const mobileFileBrowser = ref(null);
 const mapViewer = ref(null);
 const lightbox = ref(null);
+const detailSide = ref(null);
+const detailReopen = ref(null);
 
 const listing = useDatasetListing(dataset);
 const dialogs = useDialogs();
-const refresh = () => { if (fileBrowser.value) fileBrowser.value.refreshAndNavigate(listing.currentPath.value); };
+// The tree that is on the page: the sidebar's, or on a phone the Browser tab's
+const refresh = () => {
+    const tree = (phoneLayout.value ? mobileFileBrowser.value : fileBrowser.value) || fileBrowser.value || mobileFileBrowser.value;
+    if (tree) tree.refreshAndNavigate(listing.currentPath.value);
+};
 const actions = useDatasetActions({ dataset, listing, dialogs, busy, canWrite, route: params, refresh, openItem: node => openItem(node) });
 const clipboard = useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite, showError: actions.showError });
 
@@ -194,6 +220,7 @@ function onMapFileWritten(path) {
 }
 
 function onTabChange(key) {
+    activeTab.value = key;
     if (key in openedTabs) openedTabs[key] = true;
     // The header gates Download / Share on the Files tab
     session.setActiveTab(key);
@@ -304,8 +331,33 @@ function onSelectionChanged(file) {
 
 function closeDetail() {
     later.clear();
-    detailFile.value = null;
+    if (drawerMode.value) closeDrawer();
+    else detailFile.value = null;
 }
+
+// The drawer keeps following the selection while it is closed, for its Details button
+function closeDrawer() {
+    const hadFocus = !!detailSide.value && detailSide.value.contains(document.activeElement);
+    drawerClosed.value = true;
+    // The focus was in the drawer and had nowhere to go back to (the overlay stack gave it to the page): the button
+    nextTick(() => {
+        const active = document.activeElement;
+        const lost = !active || active === document.body || active.matches('h1, main');
+        if (hadFocus && lost) detailReopen.value?.$el?.focus?.();
+    });
+}
+
+function openDrawer() {
+    drawerClosed.value = false;
+}
+
+// The drawer is a non-modal overlay (composables/useOverlay): Escape closes it, the page keeps its shortcuts. Only
+// while the Files tab is on show, so a drawer on a hidden tab never takes the key.
+useOverlay({
+    active: () => drawerMode.value && showDetail.value && activeTab.value === 'explorer',
+    container: () => detailSide.value,
+    onEscape: e => { e.preventDefault(); closeDrawer(); }
+});
 
 function onOpenItem(node, view, options) {
     later.clear();
@@ -510,7 +562,46 @@ onBeforeUnmount(() => {
     flex: 3;
     min-width: 15rem;
     max-width: 25rem;
+    overflow-x: hidden;
     overflow-y: auto;
     border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
+}
+
+/* What the panel holds wraps inside it: a value never makes the panel wider than its column */
+.detail-side > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Below lg (992px, libs/responsiveColumns.js) the panel does not share a narrow row with the file list (the values
+   of the file clipped there, FR-EXP-17): it opens over the list as a drawer */
+@media (max-width: 991.98px) {
+    .detail-layout {
+        position: relative;
+    }
+
+    .detail-main.with-detail {
+        flex: 1;
+    }
+
+    .detail-side {
+        position: absolute;
+        inset-block: 0;
+        inset-inline-end: 0;
+        z-index: 3;
+        width: min(26rem, 100%);
+        max-width: 100%;
+        background: var(--ddb-bg-surface);
+        box-shadow: var(--ddb-shadow-md);
+    }
+
+    /* The drawer the user closed: its button, in the corner the drawer opens from */
+    .detail-reopen {
+        position: absolute;
+        inset-block-end: var(--ddb-spacing-md);
+        inset-inline-end: var(--ddb-spacing-md);
+        z-index: 2;
+        box-shadow: var(--ddb-shadow-md);
+    }
 }
 </style>

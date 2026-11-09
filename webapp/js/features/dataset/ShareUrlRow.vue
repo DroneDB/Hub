@@ -1,6 +1,6 @@
 <template>
     <div class="share-url-row">
-        <InputText :model-value="value" readonly :aria-label="label" title="Copy to clipboard" style="flex: 1;" @click="$emit('copy')" />
+        <InputText :model-value="value" readonly :aria-label="label" title="Copy to clipboard" style="flex: 1; min-width: 0;" @click="$emit('copy')" />
         <Button title="Copy to clipboard" aria-label="Copy to clipboard" :icon="copyIcon" text @click="$emit('copy')" />
     </div>
 </template>

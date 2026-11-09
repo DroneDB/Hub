@@ -5,7 +5,7 @@
             :pt="dialogPt" @update:visible="v => { if (!v) close(); }" @show="onShow">
         <div ref="contentRoot" style="display: contents;">
             <slot />
-            <div v-if="$slots.footer || confirmLabel || closeButton" class="window-footer d-flex justify-content-end gap-2 mt-3 w-100">
+            <div v-if="$slots.footer || confirmLabel || closeButton" class="window-footer d-flex justify-content-end gap-2 w-100">
                 <slot name="footer">
                     <Button :label="cancelLabel" severity="secondary" :disabled="busy" data-cancel @click="close()" />
                     <Button v-if="confirmLabel" :label="confirmLabel" :severity="confirmSeverity" :icon="confirmIcon" data-confirm
@@ -26,7 +26,9 @@
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
  *   something else; never with `enterConfirms` false or `confirmDisabled`).
  * - `busy` disables closing and the footer buttons.
- * - A footer: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
+ * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-wide) gives the window a stable width, the same
+ *   whatever its content; a form dialog uses `dialog-xl`, a log or a two-column form `dialog-wide`.
+ * - A footer, which stays in view while the content scrolls: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
  *   just the Cancel (`cancelLabel`) button with `closeButton`. A footer of its own marks its
  *   buttons [data-cancel] and [data-confirm].
  * - The overlay stack (composables/useOverlay) owns the rest: only the topmost open overlay
@@ -61,7 +63,8 @@ const props = defineProps({
     maxWidth: { type: String, default: 'auto' },
     width: { type: String, default: '30%' },
     height: { type: String, default: '40%' },
-    /** CSS size class (dialog-xs ... dialog-xl): no inline size */
+    /** CSS size class (dialog-xs ... dialog-xl, dialog-wide): a stable width, min(<class width>, 100vw - 2rem), not
+     * only a maximum (FR-XC-20); dialog-xl and dialog-wide read the width tokens of FR-XC-33. No inline size. */
     sizeClass: { type: String, default: null },
     /** Focus the first field (or [data-autofocus]) when shown */
     focusOnShow: { type: Boolean, default: true },

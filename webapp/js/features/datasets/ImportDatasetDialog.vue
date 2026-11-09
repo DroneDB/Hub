@@ -1,6 +1,6 @@
 <template>
-    <Window id="importDatasetDialog" :title="title" modal max-width="70%" fixed-size @close="onWindowClose">
-        <div class="import-dialog">
+    <Window id="importDatasetDialog" :title="title" modal size-class="dialog-xl" fixed-size @close="onWindowClose">
+        <div>
             <!-- Configure + verify -->
             <div v-if="!importing">
                 <div class="mb-3">
@@ -19,16 +19,27 @@
                                    @keyup.enter="applyRegistryLink(); canVerify && verify()" />
                         <small class="text-muted">The address of the registry, or paste the link of a dataset (https://hub.dronedb.app/r/odm/brighton-beach) to fill in every field.</small>
                     </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col">
-                            <label for="import-dataset-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
-                            <InputText id="import-dataset-dialog-username" v-model="params.username" placeholder="optional" class="w-100"
-                                       :disabled="verifying" @keyup.enter="canVerify && verify()" />
-                        </div>
-                        <div class="col">
-                            <label for="import-dataset-dialog-password" class="d-block mb-1 fw-semibold">Password</label>
-                            <InputText id="import-dataset-dialog-password" v-model="params.password" type="password" placeholder="optional" class="w-100"
-                                       :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                    <!-- Most registries are public: the credentials stay folded until they are needed. They open when a
+                         Verify fails, and stay open while they hold a value: nothing is sent that the user cannot see -->
+                    <div class="mb-3">
+                        <button type="button" class="btn-reset import-credentials-toggle" :aria-expanded="credentialsOpen"
+                                aria-controls="import-dataset-dialog-credentials" :disabled="hasCredentials"
+                                :title="hasCredentials ? 'Clear the username and the password to fold the credentials' : undefined"
+                                @click="showCredentials = !showCredentials">
+                            <i :class="credentialsOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" aria-hidden="true" />
+                            Credentials (optional)
+                        </button>
+                        <div v-show="credentialsOpen" id="import-dataset-dialog-credentials" class="row g-2 mt-1">
+                            <div class="col-sm">
+                                <label for="import-dataset-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
+                                <InputText id="import-dataset-dialog-username" v-model="params.username" placeholder="optional" class="w-100"
+                                           :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                            </div>
+                            <div class="col-sm">
+                                <label for="import-dataset-dialog-password" class="d-block mb-1 fw-semibold">Password</label>
+                                <InputText id="import-dataset-dialog-password" v-model="params.password" type="password" placeholder="optional" class="w-100"
+                                           :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -90,7 +101,7 @@
                     {{ verifyError }}
                 </PrimeMessage>
 
-                <div v-if="verifyResult && verifyResult.reachable" class="verify-result mt-3">
+                <div v-if="verifyResult && verifyResult.reachable" ref="verifyPanel" class="verify-result mt-3">
                     <PrimeMessage severity="success" :closable="false">Source reachable</PrimeMessage>
 
                     <div class="verify-stats mt-2 d-flex flex-wrap gap-3">
@@ -109,7 +120,7 @@
                     <div class="row g-3 mt-1">
                         <div class="col-md-6">
                             <label for="import-dataset-dialog-dataset-name" class="d-block mb-1 fw-semibold">Dataset Name</label>
-                            <InputText id="import-dataset-dialog-dataset-name" v-model="name" placeholder="Dataset name" class="w-100" />
+                            <InputText id="import-dataset-dialog-dataset-name" ref="datasetName" v-model="name" placeholder="Dataset name" class="w-100" />
                         </div>
                         <div class="col-md-6">
                             <label id="import-dataset-dialog-visibility-label" for="import-dataset-dialog-visibility" class="d-block mb-1 fw-semibold">Visibility</label>
@@ -143,14 +154,15 @@
                 </div>
             </div>
 
-            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
-                <Button v-if="!importing" severity="secondary" label="Close" @click="emitClose('close')" />
-                <Button v-if="!importing" severity="primary" icon="fa-solid fa-download" :disabled="!canImport"
-                        :loading="submitting" label="Import" @click="startImport" />
-                <Button v-if="importing" severity="secondary" label="Run in background"
-                        @click="emitClose('background')" />
-            </div>
         </div>
+        <!-- Outside the scrolling content: Import is in view after Verify (FR-UPL-08) -->
+        <template #footer>
+            <Button v-if="!importing" severity="secondary" label="Close" data-cancel @click="emitClose('close')" />
+            <Button v-if="!importing" severity="primary" icon="fa-solid fa-download" :disabled="!canImport" data-confirm
+                    :loading="submitting" label="Import" @click="startImport" />
+            <Button v-if="importing" severity="secondary" label="Run in background" data-cancel
+                    @click="emitClose('background')" />
+        </template>
     </Window>
 </template>
 
@@ -203,6 +215,8 @@ export default {
             params: {},
 
             verifying: false,
+            // Username and password: folded until the user opens them, a Verify fails or they hold a value
+            showCredentials: false,
             verifyResult: null,
             verifyError: null,
 
@@ -234,6 +248,13 @@ export default {
     computed: {
         selectedSource() {
             return getImportSource(this.sourceType);
+        },
+        // A username or a password is sent: the user sees it
+        hasCredentials() {
+            return !!(this.params.username || this.params.password);
+        },
+        credentialsOpen() {
+            return this.showCredentials || this.hasCredentials;
         },
         canBrowseOrgs() {
             return !!(this.params.url || '').trim();
@@ -441,14 +462,27 @@ export default {
                     this.name = res.suggestedName || this.name || '';
                     this.slugEdited = false;
                     this.slug = this.uniqueSlug(res.suggestedSlug || slugFromName(this.name) || '');
+                    this.showNextStep();
                 } else {
                     this.verifyError = res.note || 'The source is not reachable.';
+                    // A private source: the credentials may be what is missing
+                    this.showCredentials = true;
                 }
             } catch (e) {
                 this.verifyError = e.message || 'Verification failed.';
+                this.showCredentials = true;
             } finally {
                 this.verifying = false;
             }
+        },
+
+        // After a reachable Verify the next step (name, slug, Import) is brought into view and the name takes the focus
+        showNextStep() {
+            this.$nextTick(() => {
+                const panel = this.$refs.verifyPanel;
+                if (panel && typeof panel.scrollIntoView === 'function') panel.scrollIntoView({ block: 'nearest' });
+                this.$refs.datasetName?.$el?.focus?.({ preventScroll: true });
+            });
         },
 
         async startImport() {
@@ -524,8 +558,12 @@ export default {
 </script>
 
 <style scoped>
-.import-dialog {
-    min-width: min(24rem, var(--window-content-width, 100%));
+.import-credentials-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
 }
 
 .verify-stats {

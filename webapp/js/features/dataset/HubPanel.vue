@@ -1,8 +1,10 @@
 <template>
-    <Splitter :layout="layout" class="panel-splitter" :pt="splitterPt"
+    <!-- Below `sm` with mobileCollapsed the first pane and the handle are hidden (FR-EXP-29), not removed: the second
+         pane stays the same element whatever the width, so a phone that rotates keeps what it shows (its tabs, the map) -->
+    <Splitter :layout="layout" class="panel-splitter" :class="{ 'panel-collapsed': collapsed }" :pt="splitterPt"
               @resizeend="onResizeEnd">
         <SplitterPanel :size="size0" :min-size="2">
-            <slot name="first" />
+            <slot v-if="firstShown" name="first" />
         </SplitterPanel>
         <SplitterPanel :size="size1" :min-size="2">
             <slot name="second" />
@@ -14,6 +16,7 @@
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import { isMobile, isTablet } from '@/libs/responsive';
+import { useStackedLayout } from '@/composables/useStackedLayout';
 import { PREF, getPref, setPref } from '@/libs/preferences';
 
 /** The smallest size of a pane, in percent (SplitterPanel min-size). */
@@ -31,6 +34,12 @@ const MIN_PANE = 2;
  *   amount       - Initial size of the first pane as a percentage (default: '50%').
  *   mobileAmount, tabletAmount - The same on phones and tablets (default: amount).
  *   storageKey   - Name under which the size is kept; none: not kept.
+ *   mobileCollapsed - Below `sm` (the phone breakpoint of libs/responsiveColumns.js, the width of the window, not
+ *                  the screen of `isMobile`) show only the second pane: the first pane and the handle are hidden.
+ *                  It follows the window (a phone that rotates): the second pane is never rendered again, only
+ *                  what is around it changes. The first pane's content is rendered once the pane is shown (a
+ *                  phone in portrait does not load it). The page gives that content another place below `sm`
+ *                  (the dataset page: its Browser tab).
  */
 export default {
     name: 'HubPanel',
@@ -65,17 +74,29 @@ export default {
         storageKey: {
             type: String,
             default: ""
+        },
+        mobileCollapsed: {
+            type: Boolean,
+            default: false
         }
+    },
+    setup() {
+        return { phoneWidth: useStackedLayout() };
     },
     data: function () {
         const size = this.storedSize() ?? parseFloat(this.panelSize());
         return {
             size0: size,
             size1: 100 - size,
+            // The first pane's content, rendered from the first time the pane is shown
+            firstShown: !(this.mobileCollapsed && this.phoneWidth),
             registeredChildren: []
         };
     },
     computed: {
+        collapsed: function () {
+            return this.mobileCollapsed && this.phoneWidth;
+        },
         layout: function () {
             return this.split === "horizontal" ? "vertical" : "horizontal";
         },
@@ -92,6 +113,13 @@ export default {
                     'aria-valuemax': 100
                 }
             };
+        }
+    },
+    watch: {
+        collapsed: function (collapsed) {
+            if (!collapsed) this.firstShown = true;
+            // The second pane changed size
+            this.$nextTick(() => this.onPanelResized());
         }
     },
     methods: {
@@ -173,5 +201,16 @@ export default {
 
 .panel-splitter :deep(.panel-gutter) {
     background: var(--ddb-border-separator) !important;
+}
+
+/* Collapsed (mobileCollapsed below sm): no first pane and no handle, the second pane takes the whole width (over the
+   flex-basis the Splitter sets inline) */
+.panel-splitter.panel-collapsed > :deep(.p-splitterpanel:first-child),
+.panel-splitter.panel-collapsed > :deep(.panel-gutter) {
+    display: none;
+}
+
+.panel-splitter.panel-collapsed > :deep(.p-splitterpanel:last-child) {
+    flex-basis: 100% !important;
 }
 </style>

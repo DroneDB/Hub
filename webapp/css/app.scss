@@ -457,22 +457,35 @@ body:fullscreen {
 // ============================================================
 //
 // HubWindow passes the size it was asked for as --window-width, --window-height and
-// --window-max-width; the .dialog-* size classes set --window-max-width. The rules below turn
-// them into sizes that never exceed the screen (also on a tablet or a narrow desktop window)
+// --window-max-width; the .dialog-* size classes set --window-width, a width that is stable (the
+// same whatever the content, FR-XC-20): min(<class width>, 100vw - 2rem). The rules below turn them
+// into sizes that never exceed the screen (also on a tablet or a narrow desktop window)
 // and give phones their own layout from a media query, so nothing has to override inline styles.
+// The widths of dialog-xl and dialog-wide are the tokens of css/_variables.scss (FR-XC-33).
 
 $window-margin: 1rem; // the space left around a window on a phone
+$window-margin-wide: 2rem; // and on a tablet or a desktop
 
-.dialog-xs  { --window-max-width: 17.5rem;  }  // 280px
-.dialog-sm  { --window-max-width: 25rem;    }  // 400px
-.dialog-md  { --window-max-width: 31.25rem; }  // 500px
-.dialog-lg  { --window-max-width: 37.5rem;  }  // 600px
-.dialog-xl  { --window-max-width: 47rem;    }  // ~750px
+@mixin dialog-width($width) {
+    --window-max-width: #{$width};
+    --window-width: min(#{$width}, calc(100vw - #{$window-margin-wide}));
+}
+
+.dialog-xs   { @include dialog-width(17.5rem); }                    // 280px
+.dialog-sm   { @include dialog-width(25rem); }                      // 400px
+.dialog-md   { @include dialog-width(31.25rem); }                   // 500px
+.dialog-lg   { @include dialog-width(37.5rem); }                    // 600px
+.dialog-xl   { @include dialog-width(var(--ddb-dialog-form-max)); } // 47rem, a form
+.dialog-wide { @include dialog-width(var(--ddb-dialog-wide-max)); } // 120rem, a log, a chart, two columns
 
 .p-dialog.window-dialog {
     // What the content of a window can use on the narrowest screens, for the minimum widths of
     // forms: min-width: min(25rem, var(--window-content-width, 100%))
     --window-content-width: calc(100vw - 4rem);
+    // The padding of the content of a window, below it too: the footer takes the space under the content (its
+    // negative margin), so the content's padding comes from it, not from the theme's dialog padding
+    --window-pad: 1.5rem;
+    --p-dialog-content-padding: 0 var(--window-pad) var(--window-pad) var(--window-pad);
 
     width: var(--window-width, auto);
     height: var(--window-height, auto);
@@ -483,15 +496,29 @@ $window-margin: 1rem; // the space left around a window on a phone
         overflow-wrap: anywhere;
     }
 
+    // The buttons stay in view while the content scrolls (FR-UPL-08): the footer sticks to the
+    // bottom edge of the scrolling content. Its padding takes the space of the content's bottom
+    // padding (the negative margin), so the buttons do not move when the content ends.
     .window-footer {
         flex-wrap: wrap;
+        position: sticky;
+        bottom: 0;
+        z-index: 1;
+        margin-bottom: calc(-1 * var(--window-pad));
+        padding-top: var(--ddb-spacing-md);
+        padding-bottom: var(--window-pad);
+        background: var(--p-dialog-background);
     }
 }
 
 @media only screen and (max-width: 575.98px) {
     .p-dialog.window-dialog {
         --p-dialog-header-padding: 1rem;
-        --p-dialog-content-padding: 0 1rem 1rem 1rem;
+        // and with it the content's padding (--p-dialog-content-padding above)
+        --window-pad: 1rem;
+
+        // The same width whatever the size class: the phone's screen
+        --window-width: calc(100vw - #{$window-margin});
 
         width: calc(100vw - #{$window-margin});
         max-width: none;

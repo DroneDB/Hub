@@ -343,6 +343,12 @@ export default {
     padding-right: 8px;
 }
 
+.copyable-row > span,
+.copyable-row > a {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 /* A small icon button after a value (copy, what is this type) */
 .row-action-btn {
     flex-shrink: 0;
@@ -399,6 +405,17 @@ export default {
 
 .props-datatable :deep(.p-datatable-thead) {
     display: none;
+}
+
+/* The table is as wide as its panel, never wider: a long value wraps in its cell (FR-EXP-17) */
+.props-datatable :deep(table) {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.props-datatable :deep(.p-datatable-tbody > tr > td) {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 /* Long labels wrap at spaces, so the table never gets wider than a narrow panel */

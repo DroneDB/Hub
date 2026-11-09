@@ -1,6 +1,6 @@
 <template>
-    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
-        <div class="org-dialog">
+    <Window id="organizationDialog" :title="title" modal size-class="dialog-lg" fixed-size :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
+        <div>
             <form @submit.prevent>
                 <div class="mb-3">
                     <label for="organization-dialog-name" class="d-block mb-1 fw-semibold">Name</label>
@@ -104,9 +104,3 @@ export default {
     }
 }
 </script>
-
-<style scoped>
-.org-dialog {
-    min-width: min(20rem, var(--window-content-width, 100%));
-}
-</style>

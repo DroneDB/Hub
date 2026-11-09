@@ -115,12 +115,15 @@
                     </template>
                     <template #body="slotProps">
                         <!-- A link (Tab, Enter, open in a new tab) over the whole cell; Shift+F10 or the Menu key opens the row menu -->
-                        <router-link :to="{ name: 'ViewDataset', params: { org: $route.params.org, ds: slotProps.data.slug } }"
-                                     class="ds-name stretched-link" @keydown="onNameKeydown($event, slotProps.data)">
-                            {{ slotProps.data.name || slotProps.data.slug }}
-                        </router-link>
-                        <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none ms-1"
-                           role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
+                        <!-- The lock first, on the line of the name: it never wraps alone (FR-ORG-20) -->
+                        <span class="ds-name-line">
+                            <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none"
+                               role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
+                            <router-link :to="{ name: 'ViewDataset', params: { org: $route.params.org, ds: slotProps.data.slug } }"
+                                         class="ds-name stretched-link" @keydown="onNameKeydown($event, slotProps.data)">
+                                {{ slotProps.data.name || slotProps.data.slug }}
+                            </router-link>
+                        </span>
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
                     </template>
                 </Column>
@@ -1107,6 +1110,11 @@ export default {
 
     /* A phone: the secondary actions as icons (their name stays in aria-label and title), as high as Create */
     @media screen and (max-width: 575.98px) {
+        /* The tags are a group on their own line under the title: they wrap together, not one by one */
+        .org-header .org-tags {
+            flex-basis: 100%;
+        }
+
         .org-header .org-secondary-action {
             align-self: stretch;
         }
@@ -1188,6 +1196,12 @@ export default {
     /* The stretched link of the name covers its cell */
     .ds-table :deep(.ds-name-cell) {
         position: relative;
+    }
+
+    .ds-name-line {
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--ddb-spacing-xs);
     }
 
     .ds-name:hover {

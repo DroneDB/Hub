@@ -11,14 +11,24 @@ import { STACKED_MEDIA_QUERY } from '@/libs/responsiveColumns';
 
 /** @returns {import('vue').Ref<boolean>} */
 export function useStackedLayout() {
+    return useMediaMatch(STACKED_MEDIA_QUERY);
+}
+
+/**
+ * Whether the window matches a media query of libs/responsiveColumns.js (STACKED_MEDIA_QUERY, TABLET_MEDIA_QUERY): a
+ * ref that follows the window, its listener removed with the component. False where there is no matchMedia.
+ * @param {string} query
+ * @returns {import('vue').Ref<boolean>}
+ */
+export function useMediaMatch(query) {
     const media = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        ? window.matchMedia(STACKED_MEDIA_QUERY) : null;
-    const stacked = ref(!!media?.matches);
+        ? window.matchMedia(query) : null;
+    const matches = ref(!!media?.matches);
     if (media) {
         /** @param {MediaQueryListEvent} e */
-        const onChange = e => { stacked.value = e.matches; };
+        const onChange = e => { matches.value = e.matches; };
         media.addEventListener('change', onChange);
         if (getCurrentScope()) onScopeDispose(() => media.removeEventListener('change', onChange));
     }
-    return stacked;
+    return matches;
 }
