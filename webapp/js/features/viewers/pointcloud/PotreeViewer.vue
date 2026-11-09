@@ -28,8 +28,13 @@
                     </div>
                 </div>
 
-                <!-- The one MeasureToolbar of the 3D, splat and point-cloud viewers: the tools start the measures of Potree's own icons -->
-                <MeasureToolbar :active-kind="measureKind" :show-clear="false" @measure="startMeasure" @finish="finishMeasure" @cancel="cancelMeasure" />
+                <!-- The one MeasureToolbar of the 3D, splat and point-cloud viewers: the tools start the measures of Potree's own icons;
+                     the clip volume, the views and the colour of the points are its extra tools, once the cloud is there -->
+                <MeasureToolbar :active-kind="measureKind" :show-clear="false" labelled @measure="startMeasure" @finish="finishMeasure" @cancel="cancelMeasure">
+                    <template #extra>
+                        <PotreeTools v-if="toolsViewer" :viewer="toolsViewer" @before-clip="endMeasure" />
+                    </template>
+                </MeasureToolbar>
 
                 <div v-if="hasMeasurements || hasSavedMeasurements" class="measurements-toolbar">
                     <button v-if="(hasMeasurements || hasSavedMeasurements) && canWrite" :disabled="savingMeasurements" class="btn-measurement"
@@ -56,12 +61,13 @@
 /**
  * PotreeViewer - a point cloud (COPC) in Potree 1.8 with its measuring tools (the measurements live in usePotreeMeasurements and libs/potree/*; the viewer and everything it creates belong to a PotreeSession, released on leave).
  */
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, shallowRef, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import DeleteSavedMeasurementsDialog from '@/components/measurements/DeleteSavedMeasurementsDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import MeasureToolbar from '@/components/MeasureToolbar.vue';
+import PotreeTools from './PotreeTools.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useDialogs } from '@/composables/useDialogs';
 import { usePreference } from '@/composables/usePreference';
@@ -95,6 +101,8 @@ const container = ref(null);
 const sidebar = ref(null);
 const loaded = ref(false);
 const sidebarOpen = ref(false);
+// The viewer once its point cloud is loaded: the tools of the point cloud (clip volume, views, colours) need it
+const toolsViewer = shallowRef(null);
 // Owns the viewer and everything it creates (released on leave)
 let session = new PotreeSession();
 let viewer = null;
@@ -112,6 +120,8 @@ function startMeasure(kind) {
     else gestures.start(kind);
 }
 const finishMeasure = () => gestures?.finish({ dropShort: false });
+// A measure that is drawn when another tool starts ends as a right click ends it
+const endMeasure = () => gestures?.finish({ dropShort: true });
 const cancelMeasure = () => gestures?.cancel();
 
 // Lengths in the chosen unit, for the viewer, the scene and every existing measure
@@ -174,6 +184,7 @@ async function loadViewer() {
     // A previous viewer of this component is released completely first
     session.dispose();
     session = new PotreeSession();
+    toolsViewer.value = null;
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
     // At once: a measure that the Potree menu starts while the cloud still loads is followed too. A measure that is
     // dropped leaves without a step of the history; before the measurements are attached there is no history yet
@@ -208,6 +219,7 @@ async function loadViewer() {
     loaded.value = true;
 
     const coordinateSystem = await addPointCloud(dataset.value.Entry(entry.value));
+    toolsViewer.value = viewer;
     m.attach(viewer, session, coordinateSystem);
     viewer.fitToScreen();
     await m.load();
@@ -232,6 +244,7 @@ onMounted(async () => {
 // Everything the viewer created goes with it: listeners, render loop, WebGL context,
 // the jQuery UI sidebar, window.viewer
 onBeforeUnmount(() => {
+    toolsViewer.value = null;
     session.dispose();
     viewer = gestures = null;
 });

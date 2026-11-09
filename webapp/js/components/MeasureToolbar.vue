@@ -1,13 +1,15 @@
 <template>
-    <div class="measure-toolbar" data-testid="measure-toolbar">
+    <div class="measure-toolbar" :class="{ labelled: showLabels }" data-testid="measure-toolbar">
         <div class="toolbar-buttons" role="toolbar" aria-label="Measure">
             <button v-for="tool in shownTools" :key="tool.kind" type="button" :class="{ active: activeKind === tool.kind }" :title="tool.title"
                     :aria-label="tool.title" :aria-pressed="activeKind === tool.kind" :data-testid="`measure-${tool.kind}`" @click="emit('measure', tool.kind)">
                 <i :class="tool.icon" />
+                <span v-if="showLabels" class="tool-label">{{ tool.label }}</span>
             </button>
             <button v-if="showClear" type="button" :disabled="!canClear" title="Clear measurements" aria-label="Clear measurements" data-testid="measure-clear"
                     @click="emit('clear')">
                 <i class="fa-solid fa-trash" />
+                <span v-if="showLabels" class="tool-label">Clear</span>
             </button>
             <button v-if="canSetScale" type="button" :class="{ active: activeKind === 'scale' }" title="Set the scale: pick two points on something of a known length"
                     aria-label="Set the scale" :aria-pressed="activeKind === 'scale'" @click="emit('measure', 'scale')">
@@ -38,16 +40,19 @@
  * setting the scale. A georeferenced scene also has a button for the coordinates of a point: in its CRS or in
  * WGS84. While a shape is drawn it says how to end it (the one hint text of libs/measureHints), with Done and
  * Cancel for a screen that has no right click, Enter or Escape. Clear is on while a shape is drawn, and
- * cancels it. A viewer puts its own tools in the `extra` slot, after the measuring ones.
+ * cancels it. A viewer puts its own tools in the `extra` slot, after the measuring ones. With `labelled` the tools
+ * show their name beside the icon (a button keeps its aria-label either way); below sm (useStackedLayout, a phone)
+ * they are icons again, so the toolbar does not cover the view.
  */
 import { computed } from 'vue';
 import { drawingHint } from '@/libs/measureHints';
+import { useStackedLayout } from '@/composables/useStackedLayout';
 
 const ALL_TOOLS = [
-    { kind: 'point', title: 'Measure a point', icon: 'fa-solid fa-location-dot' },
-    { kind: 'distance', title: 'Measure a distance', icon: 'fa-solid fa-ruler' },
-    { kind: 'height', title: 'Measure a height', icon: 'fa-solid fa-ruler-vertical' },
-    { kind: 'area', title: 'Measure an area', icon: 'fa-solid fa-draw-polygon' }
+    { kind: 'point', label: 'Point', title: 'Measure a point', icon: 'fa-solid fa-location-dot' },
+    { kind: 'distance', label: 'Distance', title: 'Measure a distance', icon: 'fa-solid fa-ruler' },
+    { kind: 'height', label: 'Height', title: 'Measure a height', icon: 'fa-solid fa-ruler-vertical' },
+    { kind: 'area', label: 'Area', title: 'Measure an area', icon: 'fa-solid fa-draw-polygon' }
 ];
 
 const props = defineProps({
@@ -64,9 +69,15 @@ const props = defineProps({
     /** What the coordinates of a point are shown in ("EPSG:32632", "WGS84"), empty when the scene has no choice to offer */
     coordinateMode: { type: String, default: '' },
     /** Whether the toolbar has a Clear button (the point-cloud viewer has its own delete tool and Delete saved) */
-    showClear: { type: Boolean, default: true }
+    showClear: { type: Boolean, default: true },
+    /** The tools say their name beside the icon (the point-cloud viewer's panel), except below sm; a tool of the `extra` slot does the same by its own markup */
+    labelled: { type: Boolean, default: false }
 });
 const emit = defineEmits(['measure', 'clear', 'finish', 'cancel', 'toggle-coordinates']);
+
+// Names beside the icons, but not on a phone
+const compact = useStackedLayout();
+const showLabels = computed(() => props.labelled && !compact.value);
 
 const shownTools = computed(() => props.kinds.map(kind => ALL_TOOLS.find(t => t.kind === kind)).filter(Boolean));
 // Clear takes the shapes and the one being drawn
@@ -114,6 +125,15 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 
 .toolbar-buttons :deep(button) {
     @include toolbar-button;
+}
+
+// Tools with their name: as wide as the name, with the icon before it
+.labelled .toolbar-buttons :deep(button) {
+    width: auto;
+    padding: 0 0.6rem;
+    gap: 0.4rem;
+    white-space: nowrap;
+    font-size: var(--ddb-font-size-sm, 0.8rem);
 }
 
 .toolbar-buttons .coordinate-mode {

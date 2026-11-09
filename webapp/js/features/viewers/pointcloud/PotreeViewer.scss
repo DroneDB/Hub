@@ -117,6 +117,43 @@
         overflow-x: hidden;
         background-color: var(--ddb-viewer-sidebar-bg);
         right: 0;
+        border-right: none;
+        border-left: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.2);
+
+        // The menu of Potree 1.8 (kept for the advanced settings) in the colours and the font of the Hub: Potree's own
+        // custom properties take the Hub's tokens, so every panel that reads them follows
+        --bg-color: var(--ddb-viewer-sidebar-bg);
+        --bg-color-2: rgba(var(--ddb-glass-rgb), 0.1);
+        --bg-light-color: rgba(var(--ddb-glass-rgb), 0.06);
+        --bg-dark-color: rgba(var(--ddb-shade-rgb), 0.25);
+        --bg-hover-color: rgba(var(--ddb-glass-rgb), 0.16);
+        --font-color: var(--ddb-text-on-dark);
+        --font-color-2: var(--ddb-text-on-dark);
+        --border-color: rgba(var(--ddb-glass-rgb), 0.25);
+
+        // The section headings: flat bars with the radius of the Hub's buttons, no shadow or outlined text
+        .accordion > h3 {
+            border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.15);
+            border-radius: var(--ddb-radius-sm);
+            box-shadow: none;
+            text-shadow: none;
+            font-weight: 600;
+        }
+
+        // The selects and buttons of jQuery UI
+        .ui-selectmenu-button.ui-button,
+        .ui-button {
+            background: var(--ddb-viewer-select-bg);
+            color: var(--ddb-text-on-dark);
+            border: var(--ddb-border-width) solid var(--ddb-viewer-select-border);
+            border-radius: var(--ddb-radius-sm);
+            font-family: inherit;
+        }
+
+        .ui-slider {
+            border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25) !important;
+            border-radius: var(--ddb-radius-sm);
+        }
 
         a {
             color: var(--ddb-text);
@@ -144,6 +181,7 @@
             position: absolute;
             min-height: 100%;
             height: 100%;
+            font-family: inherit;
 
             .potree_sidebar_brand {
                 display: flex;

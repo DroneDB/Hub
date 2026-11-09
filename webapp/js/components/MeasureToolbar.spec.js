@@ -2,7 +2,7 @@
  * The one measuring toolbar of the 3D, splat and point-cloud viewers (FR-XC-17, D-027): the tools it is given, Clear
  * (on while a shape is drawn), the hint with Done and Cancel while one is, and a slot for the tools of a viewer.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import MeasureToolbar from './MeasureToolbar.vue';
 
@@ -53,6 +53,44 @@ describe('MeasureToolbar tools', () => {
         expect(labels()).toContain('Coordinates are shown in EPSG:32632: click to change');
         await wrapper.find('.coordinate-mode').trigger('click');
         expect(wrapper.emitted('toggle-coordinates')).toHaveLength(1);
+    });
+});
+
+describe('MeasureToolbar labelled tools', () => {
+    const texts = () => wrapper.findAll('[role="toolbar"] button').map(b => b.text());
+
+    it('shows only icons by default', () => {
+        render();
+        expect(texts()).toEqual(['', '', '', '', '']);
+        expect(wrapper.classes()).not.toContain('labelled');
+    });
+
+    it('says the name of each tool beside its icon when labelled, keeping the accessible names', () => {
+        render({ labelled: true });
+        expect(texts()).toEqual(['Point', 'Distance', 'Height', 'Area', 'Clear']);
+        expect(wrapper.classes()).toContain('labelled');
+        expect(labels()).toEqual(['Measure a point', 'Measure a distance', 'Measure a height', 'Measure an area', 'Clear measurements']);
+    });
+
+    it('starts the same kind from a labelled button', async () => {
+        render({ labelled: true });
+        await tool('distance').trigger('click');
+        expect(wrapper.emitted('measure')).toEqual([['distance']]);
+    });
+    it('shows only the icons on a phone (below sm), with the same accessible names', () => {
+        // The media query of useStackedLayout (below sm) matches
+        const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+            matches: query === '(max-width: 575.98px)', media: query, addEventListener: vi.fn(), removeEventListener: vi.fn()
+        }));
+        try {
+            render({ labelled: true });
+            expect(wrapper.findAll('.tool-label')).toHaveLength(0);
+            expect(texts()).toEqual(['', '', '', '', '']);
+            expect(wrapper.classes()).not.toContain('labelled');
+            expect(labels()).toEqual(['Measure a point', 'Measure a distance', 'Measure a height', 'Measure an area', 'Clear measurements']);
+        } finally {
+            media.mockRestore();
+        }
     });
 });
 
