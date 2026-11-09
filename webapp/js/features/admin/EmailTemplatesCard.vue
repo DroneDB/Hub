@@ -260,6 +260,9 @@ async function save() {
 watch(emailEnabled, enabled => {
     if (enabled && !templates.value.length) void loadTemplates();
 }, { immediate: true });
+
+// The Configuration page asks before it is left with unsaved text (its one leave guard)
+defineExpose({ dirty });
 </script>
 
 <style scoped>

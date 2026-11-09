@@ -114,6 +114,7 @@ import PrimeMessage from 'primevue/message';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useUpdateCheck } from '@/composables/useUpdateCheck';
 import { mapState } from 'pinia';
+import { isNavigationFailure, NavigationFailureType } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { loginLocation, PREFERENCES_QUERY } from '@/libs/authRoutes';
@@ -544,14 +545,44 @@ export default {
             this.shareFile = null;
         },
 
+        // To Login first: a page with unsaved edits asks, and Cancel keeps the page and the
+        // session. The session ends once nothing stops the navigation, before Login shows (Login
+        // sends a signed-in user back to where they came from).
         logout: async function () {
+            let signedOut = false;
+            const endSession = () => {
+                if (signedOut) return;
+                signedOut = true;
+                try {
+                    useAuthStore().logout();
+                } catch (e) {
+                    console.warn('Logout error:', e.message);
+                }
+            };
+            const removeHook = this.$router.beforeResolve(to => {
+                if (to.name !== 'Login') return;
+                removeHook();
+                endSession();
+            });
+            let failure;
             try {
-                useAuthStore().logout();
+                failure = await this.$router.push(loginLocation(currentPath()));
+            } catch (e) {
+                failure = e;
+            } finally {
+                removeHook();
+            }
+            // Already on that address (nothing to leave), or Login could not be reached (its code
+            // did not load): sign out all the same. Only a guard's Cancel keeps the session.
+            if (isNavigationFailure(failure, NavigationFailureType.duplicated) || (failure instanceof Error && !isNavigationFailure(failure))) {
+                if (!signedOut) console.warn('Logout error:', failure.message);
+                endSession();
+            }
+            if (!signedOut) return;
+            try {
                 await xAuthLogout();
             } catch (e) {
                 console.warn('Logout error:', e.message);
-            } finally {
-                this.login();
             }
         },
 

@@ -9,7 +9,14 @@ import { permissionsOf } from '@/libs/datasetPermissions';
 const ctx = vi.hoisted(() => ({ route: null, dataset: null }));
 const notify = vi.hoisted(() => ({ warn: vi.fn(), error: vi.fn(), success: vi.fn() }));
 
-vi.mock('vue-router', async importOriginal => ({ ...(await importOriginal()), useRoute: () => ctx.route }));
+// The page's leave guard (useLeaveGuard), kept to be called as the router would
+const guards = vi.hoisted(() => ({ leave: null, update: null }));
+vi.mock('vue-router', async importOriginal => ({
+    ...(await importOriginal()),
+    useRoute: () => ctx.route,
+    onBeforeRouteLeave: fn => { guards.leave = fn; },
+    onBeforeRouteUpdate: fn => { guards.update = fn; }
+}));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { Organization: () => ({ Dataset: () => ctx.dataset }), getUsername: () => 'user' } }));
 vi.mock('@/stores/datasetSession', () => ({ useDatasetSessionStore: () => ({ setSelectedFiles: vi.fn() }) }));
 vi.mock('@/libs/utils', () => ({ setTitle: vi.fn() }));
@@ -838,5 +845,112 @@ describe('useSavedView and the saves of other writers', () => {
         dialogs.open.mockResolvedValue(null);
         await view.save();
         expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'View changed' });
+    });
+});
+
+describe('useSavedView leaving with unsaved changes', () => {
+    const dsRoute = { path: '/r/o/d', fullPath: '/r/o/d', params: { org: 'o', ds: 'd' } };
+    const here = () => ({ path: route.fullPath.split('?')[0], fullPath: route.fullPath, params: { ...route.params } });
+    const ConfirmDialog = { name: 'ConfirmDialog' };
+    async function openChanged(options = {}) {
+        const dataset = fakeDataset({ items: [savedItem('v_1', 'Ortho over DSM', twoLayers())], ...options.dataset });
+        const opened = await open(viewUrl('v_1'), { dataset, embed: options.embed });
+        const state = opened.view.state.value;
+        opened.view.setState({ ...state, layers: state.layers.map((l, i) => (i ? l : { ...l, opacity: 0.5 })) });
+        return opened;
+    }
+    const isQuestion = call => call[0].name === ConfirmDialog.name && /^Save changes to/.test(call[1].title);
+
+    it('asks "Save changes to <view>?" with Save, Discard and Cancel; Cancel stays', async () => {
+        const { view } = await openChanged();
+        dialogs.open.mockResolvedValue('cancel');
+        expect(await guards.leave(dsRoute, here())).toBe(false);
+        expect(dialogs.open).toHaveBeenCalledTimes(1);
+        expect(dialogs.open.mock.calls[0][1]).toMatchObject({
+            title: 'Save changes to Ortho over DSM?', confirmText: 'Save', secondaryText: 'Discard', cancelText: 'Cancel'
+        });
+        // The name goes into the title (text), not the message (HTML)
+        expect(dialogs.open.mock.calls[0][1].message).not.toContain('Ortho');
+        expect(view.dirty.value).toBe(true);
+        expect(view.saved.value.data.layers[0].opacity).not.toBe(0.5);
+    });
+
+    it('Discard leaves without saving', async () => {
+        const { dataset } = await openChanged();
+        dialogs.open.mockResolvedValue('secondary');
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(dataset.metaAdd).not.toHaveBeenCalled();
+    });
+
+    it('Save saves, then leaves', async () => {
+        const { view, dataset } = await openChanged();
+        dialogs.open.mockResolvedValue('confirm');
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(dataset.items[0].data.layers[0].opacity).toBe(0.5);
+        expect(view.dirty.value).toBe(false);
+        expect(notify.success).toHaveBeenCalledWith('Saved "Ortho over DSM"', { summary: 'View saved' });
+    });
+
+    it('stays when the save moves the page to a new view (the view was deleted), and lets that move go', async () => {
+        const { view, dataset } = await openChanged();
+        dataset.items = [];
+        dialogs.open.mockImplementation(async (component, props) => (isQuestion([component, props]) ? 'confirm' : 'Back again'));
+        const routeGuard = guards.update;
+        router.replace.mockImplementation(async location => {
+            // The router asks the page's guard first: the move is to the page's own identity
+            expect(await routeGuard({ path: location.path, fullPath: location.path, params: { org: 'o', ds: 'd', uid: location.path.split('/').pop() } }, here())).toBe(true);
+            window.history.replaceState({ ...window.history.state, ...location.state }, '', location.path);
+            setRoute(route, location.path);
+        });
+        expect(await guards.leave(dsRoute, here())).toBe(false);
+        expect(view.saved.value.name).toBe('Back again');
+        expect(router.replace).toHaveBeenCalledTimes(1);
+        expect(dialogs.open.mock.calls.filter(isQuestion)).toHaveLength(1);
+    });
+
+    it('stays when the save saved nothing (the name was cancelled)', async () => {
+        const { view, dataset } = await openChanged();
+        dataset.items = [];
+        dialogs.open.mockImplementation(async (component, props) => (isQuestion([component, props]) ? 'confirm' : null));
+        expect(await guards.leave(dsRoute, here())).toBe(false);
+        expect(view.dirty.value).toBe(true);
+    });
+
+    it('does not ask for a route change to its own identity (a query key, the move of a save)', async () => {
+        await openChanged();
+        expect(await guards.update({ ...here(), fullPath: `${route.fullPath}?preferences=general` }, here())).toBe(true);
+        expect(await guards.update({ path: '/r/o/d/views/v_1', params: { org: 'o', ds: 'd', uid: 'v_1' } }, dsRoute)).toBe(true);
+        expect(dialogs.open).not.toHaveBeenCalled();
+    });
+
+    it('asks for another view of the same dataset', async () => {
+        await openChanged();
+        dialogs.open.mockResolvedValue('cancel');
+        expect(await guards.update({ path: '/r/o/d/views/v_2', params: { org: 'o', ds: 'd', uid: 'v_2' } }, here())).toBe(false);
+        expect(dialogs.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks nothing for a clean view, a reader or Viewer only', async () => {
+        const clean = await open(viewUrl('v_1'), { dataset: fakeDataset({ items: [savedItem('v_1', 'S', twoLayers())] }) });
+        expect(clean.view.dirty.value).toBe(false);
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        scope.stop();
+
+        await openChanged({ dataset: { canWrite: false } });
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        scope.stop();
+
+        const embedded = await openChanged({ embed: true });
+        expect(embedded.view.dirty.value).toBe(true);
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(dialogs.open).not.toHaveBeenCalled();
+    });
+
+    it('shows the browser question on a page unload while the view has unsaved changes', async () => {
+        await openChanged();
+        await nextTick();
+        const unload = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(unload);
+        expect(unload.defaultPrevented).toBe(true);
     });
 });

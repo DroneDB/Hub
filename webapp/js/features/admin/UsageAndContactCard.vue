@@ -82,6 +82,14 @@ const inputsDisabled = computed(() =>
     !updateCheckEnabled.value || loading.value || !updateInfo.value || !!error.value || saving.value);
 const canSave = computed(() => !inputsDisabled.value && (!hasEmail.value || consent.value));
 const links = computed(() => updateLinks(updateInfo.value));
+// The form differs from the saved values (the Configuration page asks before it is left then)
+const dirty = computed(() => {
+    const info = updateInfo.value;
+    if (!info) return false;
+    return declaration.value !== (info.useDeclaration || NOT_STATED)
+        || email.value.trim() !== (info.contactEmail || '')
+        || consent.value !== !!info.contactEmail;
+});
 
 // The saved values fill the form (also after a save: the server's answer replaces them)
 watch(updateInfo, info => {
@@ -115,6 +123,8 @@ async function save() {
         saving.value = false;
     }
 }
+
+defineExpose({ dirty });
 </script>
 
 <style scoped>

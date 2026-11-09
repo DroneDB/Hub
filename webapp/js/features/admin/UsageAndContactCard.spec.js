@@ -175,6 +175,35 @@ describe('UsageAndContactCard', () => {
         expect(saveButton().disabled).toBe(false);
     });
 
+    it('exposes whether the form differs from the saved values (the page asks before it is left)', async () => {
+        const w = await show({ useDeclaration: 'nonprofit', contactEmail: 'it@acme.test' });
+        expect(w.vm.dirty).toBe(false);
+
+        await typeEmail(' it@acme.test ');
+        expect(w.vm.dirty).toBe(false);
+        await typeEmail('ops@acme.test');
+        expect(w.vm.dirty).toBe(true);
+        await typeEmail('it@acme.test');
+        // The consent of the saved address was taken off by the other address
+        expect(w.vm.dirty).toBe(true);
+        consentBox().click();
+        await flushPromises();
+        expect(w.vm.dirty).toBe(false);
+
+        await w.findComponent(Select).vm.$emit('update:modelValue', 'personal');
+        expect(w.vm.dirty).toBe(true);
+        saveButton().click();
+        await flushPromises();
+        expect(w.vm.dirty).toBe(false);
+    });
+
+    it('is not dirty before the saved values have arrived', async () => {
+        h.sys.updateInfo = vi.fn(() => new Promise(() => {}));
+        wrapper = mount(UsageAndContactCard, { attachTo: document.body, global: { plugins: [PrimeVue] } });
+        await flushPromises();
+        expect(wrapper.vm.dirty).toBe(false);
+    });
+
     it('links to the licence request unless the deployment is licensed', async () => {
         await show();
         expect(licenceLink().getAttribute('href')).toBe(INFO.licenseRequestUrl);

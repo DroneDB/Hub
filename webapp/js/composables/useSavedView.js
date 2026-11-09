@@ -16,8 +16,11 @@
  *   a view moves the page to the saved view's route. Both go through the router, with the working
  *   state in the new entry, and neither reloads: a route change to the identity the page already
  *   has is not a new page.
+ * - Leaving a saved view with unsaved changes (another page, a reload, closing the tab) asks
+ *   first: Save, Discard or Cancel (useLeaveGuard). A route change to the identity the page has is
+ *   not a leave, and an embedded view never asks.
  * - Names are only ever given to dialogs and toasts as text (a ConfirmDialog renders its message
- *   as HTML, so no name goes into one).
+ *   as HTML, so no name goes into one; its title is text).
  *
  *   const hashOf = shallowRef(null);                 // set to useViewLayers' hashOf once it exists
  *   const view = useSavedView({ route: useRoute(), router: useRouter(), dialogs, embed, hashOf });
@@ -34,6 +37,7 @@ import { fileViewUrl, savedViewUrl } from '@/libs/views/viewLinks';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { askViewName } from '@/composables/useViewActions';
 import { useNotify } from '@/composables/useNotify';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 /** @typedef {import('@/libs/views/viewState').ViewState} ViewState */
@@ -97,7 +101,7 @@ function openProblem(view) {
 /**
  * @param {object} ctx
  * @param {any} ctx.route  useRoute()
- * @param {{ replace: (location: any) => Promise<any> }} ctx.router  useRouter()
+ * @param {{ replace: (location: any) => Promise<any>, currentRoute?: { value: { fullPath: string } } }} ctx.router  useRouter()
  * @param {{ open: (component: any, props: any) => Promise<any> }} ctx.dialogs
  * @param {boolean} [ctx.embed]  Viewer only: nothing is saved
  * @param {((path: string) => string|undefined) | import('vue').Ref<((path: string) => string|undefined) | null>} [ctx.hashOf]
@@ -390,6 +394,20 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
             notify.success(`Saved "${updated.name}"`, { summary: 'View saved' });
         });
     }
+
+    // ---- Leave -----------------------------------------------------------------------------
+
+    // The changes the view bar calls unsaved; a save that does not save (a cancelled name, a
+    // refused write) leaves them dirty, so the page stays
+    useLeaveGuard({
+        isDirty: () => !embed && canWrite.value && dirty.value,
+        save,
+        dialogs,
+        router,
+        ignore: to => routeIdentity(to) === identity.value,
+        title: () => `Save changes to ${name.value}?`,
+        message: 'This view has changes that are not saved. Save them before you leave?'
+    });
 
     return {
         dataset, loading, error, loaded, canWrite, canDelete, state, setState, saved, isNew, dirty, shareNote, name, pageTitle, identity,

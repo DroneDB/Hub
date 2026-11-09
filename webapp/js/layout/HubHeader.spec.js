@@ -40,6 +40,8 @@ vi.mock('@/stores/preferences', async () => {
     const store = reactive({ status: 'idle', resetSection() {}, resetAll() {} });
     return { usePreferencesStore: () => store };
 });
+const xauth = vi.hoisted(() => ({ logout: vi.fn(() => Promise.resolve()) }));
+vi.mock('@/libs/api/xauth', async importOriginal => ({ ...(await importOriginal()), xAuthLogout: () => xauth.logout() }));
 
 const { default: HubHeader } = await import('./HubHeader.vue');
 const { resetUpdateCheck } = await import('@/composables/useUpdateCheck');
@@ -410,5 +412,102 @@ describe('HubHeader back-to-organization look-up', () => {
         expect(backButton().exists()).toBe(false);
         expect(push).not.toHaveBeenCalled();
         expect(replace).not.toHaveBeenCalled();
+    });
+});
+
+describe('HubHeader logout', () => {
+    let router;
+    let view;
+    // Whether the session was there when Login showed (Login sends a signed-in user back)
+    let signedInAtLogin;
+    // The answer of the page's leave guard (unsaved edits)
+    let pageLets;
+
+    async function signedInOnAPage({ loginFails = false } = {}) {
+        const vueRouter = await import('vue-router');
+        const { defineComponent, h: render } = await import('vue');
+        const Page = defineComponent({ beforeRouteLeave: () => pageLets, render: () => render('div', 'page') });
+        const Login = defineComponent({ setup() { signedInAtLogin = h.auth.isLoggedIn; }, render: () => render('div', 'login') });
+        router = vueRouter.createRouter({
+            history: vueRouter.createMemoryHistory(),
+            routes: [
+                { path: '/r/acme/site', component: Page },
+                // A lazy page whose code cannot be loaded (offline, a deployment replaced the chunks)
+                { path: '/login', name: 'Login', component: loginFails ? () => Promise.reject(new Error('Loading chunk auth failed')) : Login }
+            ]
+        });
+        await router.push('/r/acme/site');
+        window.history.replaceState({}, '', '/r/acme/site');
+        view = mount({ template: '<RouterView />' }, { global: { plugins: [router] } });
+        h.reg.sys.updateInfo = vi.fn(() => Promise.resolve({ ...AVAILABLE, isUpdateAvailable: false }));
+        wrapper = mount(HubHeader, {
+            global: {
+                plugins: [PrimeVue, createPinia()],
+                mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: router },
+                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+            }
+        });
+        await flushPromises();
+    }
+
+    beforeEach(() => {
+        signedInAtLogin = undefined;
+        pageLets = true;
+        xauth.logout.mockClear();
+        h.auth.logout = vi.fn(() => { h.auth.isLoggedIn = false; });
+    });
+    afterEach(() => {
+        view?.unmount();
+        h.auth.logout = () => {};
+    });
+
+    it('goes to Login first and ends the session before Login shows', async () => {
+        await signedInOnAPage();
+        await wrapper.vm.logout();
+        await flushPromises();
+        expect(router.currentRoute.value.name).toBe('Login');
+        expect(router.currentRoute.value.query).toEqual({ redirect: '/r/acme/site' });
+        expect(h.auth.logout).toHaveBeenCalledTimes(1);
+        expect(signedInAtLogin).toBe(false);
+        expect(xauth.logout).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the session (and the page) when the page cancels the navigation', async () => {
+        await signedInOnAPage();
+        pageLets = false;
+        await wrapper.vm.logout();
+        await flushPromises();
+        expect(router.currentRoute.value.path).toBe('/r/acme/site');
+        expect(h.auth.logout).not.toHaveBeenCalled();
+        expect(xauth.logout).not.toHaveBeenCalled();
+        expect(h.auth.isLoggedIn).toBe(true);
+    });
+
+    it('ends the session all the same when Login cannot be reached (an error, not a guard)', async () => {
+        await signedInOnAPage({ loginFails: true });
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        await wrapper.vm.logout();
+        await flushPromises();
+        expect(h.auth.logout).toHaveBeenCalledTimes(1);
+        expect(h.auth.isLoggedIn).toBe(false);
+        expect(xauth.logout).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith('Logout error:', 'Loading chunk auth failed');
+        warn.mockRestore();
+    });
+
+    it('does not end the session on another navigation that comes while the page asks', async () => {
+        await signedInOnAPage();
+        let release;
+        pageLets = new Promise(resolve => { release = resolve; });
+        const loggingOut = wrapper.vm.logout();
+        await flushPromises();
+        router.addRoute({ path: '/r/acme', component: { render: () => null } });
+        const other = router.push('/r/acme');
+        release(true);
+        await other;
+        await loggingOut;
+        await flushPromises();
+        expect(router.currentRoute.value.path).toBe('/r/acme');
+        expect(h.auth.logout).not.toHaveBeenCalled();
     });
 });

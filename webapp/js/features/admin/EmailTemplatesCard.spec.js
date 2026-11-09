@@ -165,6 +165,16 @@ describe('EmailTemplatesCard', () => {
             await type(bodyInput(), 'Changed');
             expect(button('Reset to default').attributes('disabled')).toBeUndefined();
         });
+
+        it('exposes its dirty state to the page (its leave guard), clean again after a save', async () => {
+            await show();
+            expect(wrapper.vm.dirty).toBe(false);
+            await type(bodyInput(), 'Changed');
+            expect(wrapper.vm.dirty).toBe(true);
+            await button('Save').trigger('click');
+            await flushPromises();
+            expect(wrapper.vm.dirty).toBe(false);
+        });
     });
 
     it('saves the text, takes the server\'s answer and says so', async () => {

@@ -6,18 +6,22 @@
                 <h1>Configuration</h1>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <Button severity="secondary" icon="fa-solid fa-rotate-left" label="Reset to Defaults"
-                        :disabled="loading" @click="resetToDefaults" />
+                <Button severity="secondary" icon="fa-solid fa-rotate-left" label="Discard edits"
+                        :disabled="loading || !editCount" @click="resetToDefaults" />
                 <Button severity="primary" icon="fa-solid fa-copy" label="Copy AppSettings JSON"
                         :disabled="loading" @click="copyToClipboard" />
             </div>
         </div>
 
+        <PrimeMessage severity="info" :closable="false" class="config-notice">
+            This page does not change the server. Merge the copied keys into appsettings.json, then restart the Registry. Do not replace the file with them.
+        </PrimeMessage>
+
         <LoadingSpinner v-if="loading" size="lg" label="Loading configuration..." />
 
         <div v-else class="config-scroll-container">
-            <UsageAndContactCard />
-            <EmailTemplatesCard />
+            <UsageAndContactCard ref="usageCard" />
+            <EmailTemplatesCard ref="emailTemplatesCard" />
 
             <Accordion :active-index="activeIndex" class="config-accordion">
                 <!-- The header is named by the section title alone (the Custom/Default tag describes it) -->
@@ -153,16 +157,26 @@
 
                         <div class="section-actions mt-3">
                             <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left"
-                                    label="Reset Section" @click="resetSection(sIdx)" />
+                                    label="Discard section edits" @click="resetSection(sIdx)" />
                         </div>
                     </div>
                 </AccordionTab>
             </Accordion>
+
+            <div v-if="editCount" class="edits-bar" role="status">
+                <span class="edits-count">{{ editCount === 1 ? '1 edit' : `${editCount} edits` }}, not on the server until you merge them into appsettings.json</span>
+                <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left" label="Discard edits" @click="resetToDefaults" />
+                <Button severity="primary" size="small" icon="fa-solid fa-copy" label="Copy AppSettings JSON" @click="copyToClipboard" />
+            </div>
         </div>
+
+        <DialogHost :dialogs="dialogs" />
     </div>
 </template>
 
 <script>
+import { getCurrentInstance } from 'vue';
+import DialogHost from '@/components/DialogHost.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import EmailTemplatesCard from '@/features/admin/EmailTemplatesCard.vue';
 import UsageAndContactCard from '@/features/admin/UsageAndContactCard.vue';
@@ -178,21 +192,39 @@ import Password from 'primevue/password';
 import Chips from 'primevue/chips';
 import Textarea from 'primevue/textarea';
 import Tag from 'primevue/tag';
+import PrimeMessage from 'primevue/message';
+import { useDialogs } from '@/composables/useDialogs';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { copyText } from '@/composables/useCopyText';
 import { isForbidden } from '@/libs/ddb/apiError';
 import { settingPath, setSettingAt } from '@/libs/appSettingsJson';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
- * section, with typed inputs and JSON generation for appsettings.json.
+ * section, with typed inputs and JSON generation for appsettings.json. The page changes
+ * nothing on the server (D-005): it says so, and asks before it is left with edits, its own or
+ * the unsaved ones of the usage and e-mail template cards (one leave guard for the page).
  */
 export default {
     name: 'AdminConfig',
 
     components: {
-        LoadingSpinner, UsageAndContactCard, EmailTemplatesCard,
+        DialogHost, LoadingSpinner, UsageAndContactCard, EmailTemplatesCard,
         Accordion, AccordionTab, Button, InputText, InputNumber,
-        ToggleSwitch, Select, Password, Chips, Textarea, Tag
+        ToggleSwitch, Select, Password, Chips, Textarea, Tag, PrimeMessage
+    },
+
+    setup() {
+        const dialogs = useDialogs();
+        const vm = /** @type {any} */ (getCurrentInstance()?.proxy);
+        useLeaveGuard({
+            dialogs,
+            // `loading` first: the cards mount after the load, and the guard reads them again then
+            isDirty: () => !vm.loading && (vm.editCount > 0
+                || !!vm.$refs.usageCard?.dirty || !!vm.$refs.emailTemplatesCard?.dirty),
+            message: 'The edits on this page are lost when you leave. Leave and discard them?'
+        });
+        return { dialogs };
     },
 
     data() {
@@ -206,6 +238,13 @@ export default {
             // Set of section indices that became active due to editing
             modifiedSections: {}
         };
+    },
+
+    computed: {
+        // The fields edited on this page (not yet merged into appsettings.json)
+        editCount() {
+            return Object.keys(this.modifiedFields).length;
+        }
     },
 
     async mounted() {
@@ -302,7 +341,7 @@ export default {
         resetToDefaults() {
             this.modifiedFields = {};
             this.modifiedSections = {};
-            this.$notify.info('All fields restored to defaults.', { summary: 'Reset' });
+            this.$notify.info('The fields are back to the values of the server.', { summary: 'Edits discarded' });
         },
 
         resetSection(sIdx) {
@@ -310,7 +349,7 @@ export default {
             const keysToRemove = Object.keys(this.modifiedFields).filter(k => k.startsWith(sIdx + '-'));
             keysToRemove.forEach(k => delete this.modifiedFields[k]);
             delete this.modifiedSections[sIdx];
-            this.$notify.info('Section restored to defaults.', { summary: 'Reset Section' });
+            this.$notify.info('The fields of this section are back to the values of the server.', { summary: 'Edits discarded' });
         },
 
         // ---- JSON generation ----
@@ -409,10 +448,34 @@ export default {
     overflow: hidden;
 }
 
+.config-notice {
+    margin: 0.5rem 0;
+}
+
 .config-scroll-container {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+}
+
+.edits-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--ddb-spacing-xs);
+    margin-top: 1rem;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    background: var(--ddb-bg-surface);
+    border-top: 1px solid var(--ddb-border);
+}
+
+.edits-count {
+    margin-right: auto;
+    font-weight: 600;
 }
 
 .config-accordion {
