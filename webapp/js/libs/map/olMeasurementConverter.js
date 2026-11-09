@@ -2,7 +2,6 @@
  * Utility to convert OpenLayers measurements to GeoJSON and vice versa
  */
 
-import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import Feature from 'ol/Feature';
 import Overlay from 'ol/Overlay';
@@ -12,6 +11,7 @@ import { pointCoordinates, showPointPopup } from './pointPopup';
 import { copyText } from '@/composables/useCopyText';
 import { areaParts, lengthParts, stockpileLabel } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
+import { geodesicArea, geodesicLength } from './geodesic';
 import { STOCKPILE_PROPERTIES } from './stockpileStorage';
 import { write, sectionOf, VIEW } from './measurementFormat';
 import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
@@ -64,16 +64,16 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
         // Raster profile: keep the type and the saved tooltip; reuse length
         // calculations so we still record the polyline length for export.
         if (geometryType === 'LineString') {
-            const length = getLength(geometry);
+            const length = geodesicLength(geometry);
             calculatedValues = calculateLengthValues(length, unitPref);
         }
     } else if (geometryType === 'Polygon') {
         measurementType = 'area';
-        const area = getArea(geometry);
+        const area = geodesicArea(geometry);
         calculatedValues = calculateAreaValues(area, unitPref);
     } else if (geometryType === 'LineString') {
         measurementType = 'length';
-        const length = getLength(geometry);
+        const length = geodesicLength(geometry);
         calculatedValues = calculateLengthValues(length, unitPref);
     } else if (geometryType === 'Point') {
         measurementType = 'point';
@@ -139,8 +139,8 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
  * @returns {string|null}
  */
 export function measurementSizeText(geometry, measurementType, unitPref) {
-    if (measurementType === 'area' && geometry instanceof Polygon) return areaParts(getArea(geometry), unitPref).text;
-    if (measurementType === 'length' && geometry instanceof LineString) return lengthParts(getLength(geometry), unitPref).text;
+    if (measurementType === 'area' && geometry instanceof Polygon) return areaParts(geodesicArea(geometry), unitPref).text;
+    if (measurementType === 'length' && geometry instanceof LineString) return lengthParts(geodesicLength(geometry), unitPref).text;
     return null;
 }
 

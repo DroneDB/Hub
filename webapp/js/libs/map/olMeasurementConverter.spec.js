@@ -5,7 +5,11 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
-import { importMeasurements, measurementSizeText } from './olMeasurementConverter';
+import proj4 from 'proj4';
+import { fromLonLat } from 'ol/proj';
+import Feature from 'ol/Feature';
+import { LineString, Polygon } from 'ol/geom';
+import { exportMeasurements, importMeasurements, measurementSizeText } from './olMeasurementConverter';
 import { ANALYSIS_COLOR } from './mapUtils';
 import { ANALYSIS_FILL } from './analysisStyles';
 
@@ -92,5 +96,60 @@ describe('importMeasurements colours of the analysis overlays', () => {
         expect(pile.get('stroke')).toBe('#00cc66');
         const length = importOne(featureOf('LineString', LINE, { measurementType: 'length', stroke: '#ff9800' }));
         expect(length.get('stroke')).toBe('#ff9800');
+    });
+});
+
+// FR-MAP-15: a length and an area on the WGS84 ellipsoid, at 56°N where a sphere is 0.34% / 0.5% short.
+// The shapes are built from a transverse Mercator grid, k=1, on the UTM 32N central meridian (9°E): not
+// UTM, which has k0 = 0.9996, but a grid of scale 1 like SWEREF99, so 100 grid metres are 100 ground metres.
+describe('measurements at 56°N on the ellipsoid (FR-MAP-15)', () => {
+    /** Transverse Mercator, k=1, on the UTM 32N central meridian */
+    const GRID = '+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=500000 +y_0=0 +ellps=WGS84 +units=m +no_defs';
+    const LONLAT = '+proj=longlat +datum=WGS84 +no_defs';
+    const [E, N] = proj4(LONLAT, GRID, [9.001, 56]);
+    const at = (de, dn) => fromLonLat(proj4(GRID, LONLAT, [E + de, N + dn]));
+
+    const line = () => new LineString([at(0, 0), at(100, 0)]);
+    const square = () => new Polygon([[at(0, 0), at(100, 0), at(100, 100), at(0, 100), at(0, 0)]]);
+
+    function exportedProperties(geometry, properties, unitPref = 'metric') {
+        const source = new VectorSource();
+        const f = new Feature(geometry);
+        f.setProperties(properties);
+        source.addFeature(f);
+        return exportMeasurements(source, 'ortho.tif', unitPref).features[0].properties;
+    }
+
+    it('stores a 100 m line as 100 m (a sphere gave 99.66 m)', () => {
+        const props = exportedProperties(line(), { measurementType: 'length' });
+        expect(Math.abs(props.length - 100)).toBeLessThan(0.01);
+        expect(props.length).toBe(100);
+        expect(props.lengthValue).toBe(100);
+        expect(props.unit).toBe('m');
+        expect(props.displayValue).toBe('100 m');
+        expect(props.unitPreference).toBe('metric');
+    });
+
+    it('stores a 100 x 100 m square as 10,000 m2 (a sphere gave 9,952.68 m2)', () => {
+        const props = exportedProperties(square(), { measurementType: 'area' });
+        expect(Math.abs(props.area - 10000)).toBeLessThan(1);
+        expect(props.area).toBe(10000);
+        expect(props.unit).toBe('m²');
+        expect(props.areaValue).toBe(10000);
+        expect(props.displayValue).toBe('10,000 m²');
+    });
+
+    it('stores the line of a profile as its length, and keeps its type', () => {
+        const props = exportedProperties(line(), { measurementType: 'profile', tooltipText: 'Profile: 100 m' });
+        expect(props.measurementType).toBe('profile');
+        expect(props.length).toBe(100);
+        expect(props.tooltipText).toBe('Profile: 100 m');
+    });
+
+    it('labels the line and the square from the geometry, in metric and in imperial', () => {
+        expect(measurementSizeText(line(), 'length', 'metric')).toBe('100 m');
+        expect(measurementSizeText(line(), 'length', 'imperial')).toBe('328.08 ft');
+        expect(measurementSizeText(square(), 'area', 'metric')).toBe('10,000 m²');
+        expect(measurementSizeText(square(), 'area', 'imperial')).toBe('2.47 acres');
     });
 });

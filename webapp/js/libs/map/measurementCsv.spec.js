@@ -16,7 +16,7 @@ const feature = (geometry, props) => {
     Object.entries(props).forEach(([k, v]) => f.set(k, v));
     return f;
 };
-// About 100 m x 100 m at the equator: 1 ha
+// About 100 m x 100 m at the equator: 9,999.06 m² on the WGS84 ellipsoid (the sphere of ol/sphere gave 10,0xx)
 const square = new Polygon([[[0, 0], [0.0008983, 0], [0.0008983, 0.0009043], [0, 0.0009043], [0, 0]].map(c => fromLonLat(c))]);
 const line = new LineString([[0, 0], [0.0004492, 0]].map(c => fromLonLat(c)));
 
@@ -38,7 +38,7 @@ describe('measurementsToCsv', () => {
         expect(header).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,createdAt,length_m,area_m2');
         expect(point).toMatch(/^Site A,"Gate, north",point,,,11\.25,43\.5,POINT \(11\.25\d* 43\.5\d*\),"Say ""open""",t0,,$/);
         expect(length).toMatch(/^,Fence,length,(49\.9\d|50(\.0\d?)?),m,,,"LINESTRING \(0 0, 0\.000449\d* 0\)",,t1,(49\.9\d|50(\.0\d?)?),$/);
-        expect(area).toMatch(/^Site A,Field,area,1(\.0\d?)?,ha,,,"POLYGON \(\(0 0, .*\)\)",,t2,,100\d\d(\.\d+)?$/);
+        expect(area).toMatch(/^Site A,Field,area,9999\.06,m²,,,"POLYGON \(\(0 0, .*\)\)",,t2,,9999\.06$/);
     });
 
     it('gives the values in the units the map shows: the same area scale as the labels', () => {

@@ -11,7 +11,7 @@ import { Vector as VectorSource } from 'ol/source';
 import { ANALYSIS_MEASUREMENT_TYPES, haloStyle } from '@/libs/map/analysisStyles';
 import { Vector as VectorLayer } from 'ol/layer';
 import { unByKey } from 'ol/Observable';
-import { getArea, getLength } from 'ol/sphere';
+import { geodesicArea, geodesicLength } from '@/libs/map/geodesic';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
@@ -1372,9 +1372,9 @@ class MeasureControls extends Control {
                     const geom = feat.getGeometry();
                     let isDegenerate = false;
                     if (geom instanceof LineString) {
-                        isDegenerate = getLength(geom) < 0.01; // less than 1cm
+                        isDegenerate = geodesicLength(geom) < 0.01; // less than 1cm
                     } else if (geom instanceof Polygon) {
-                        isDegenerate = getArea(geom) < 0.01; // less than 1cm²
+                        isDegenerate = geodesicArea(geom) < 0.01; // less than 1cm²
                     }
 
                     if (isDegenerate) {

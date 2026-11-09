@@ -7,7 +7,7 @@ import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
-import { getLength as olGetLength } from 'ol/sphere';
+import { geodesicLength } from '@/libs/map/geodesic';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { PRIMARY } from '@/libs/palette';
 import { analysisStyles } from '@/libs/map/analysisStyles';
@@ -470,7 +470,7 @@ const definition = {
                 // export, edit, and erase tools all treat the profile like a
                 // first-class measurement.
                 let lengthM = 0;
-                try { lengthM = olGetLength(geom); } catch { /* noop */ }
+                try { lengthM = geodesicLength(geom); } catch { /* noop */ }
                 // As the map writes every length (libs/format.js), in the user's units
                 const lengthLabel = lengthParts(lengthM, this.currentUnitPref).text;
                 feature.set('measurementType', 'profile');
