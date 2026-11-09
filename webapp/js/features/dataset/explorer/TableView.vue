@@ -479,7 +479,22 @@ export default {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../../css/breakpoints' as *;
+
+/* On a very wide screen the table has the width of its content: the Name column is at most 40rem and the other
+   columns follow it, so a name and its type are not 2000 px apart (FR-EXP-42, FR-XC-33) */
+@include xwide-up {
+    #table-view :deep(.p-datatable-table) {
+        width: auto;
+    }
+
+    #table-view :deep(.file-name) {
+        display: block;
+        max-width: 40rem;
+    }
+}
+
 #table-view-container {
     width: 100%;
     height: 100%;

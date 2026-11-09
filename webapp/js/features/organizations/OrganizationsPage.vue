@@ -1,5 +1,6 @@
 <template>
-    <div id="organizations" ref="page">
+    <div id="organizations" ref="page" :class="{ 'page-column': view !== 'map' }">
+        <!-- A list keeps the width of --ddb-page-max-width, centred (FR-XC-33, FR-ORG-24); the map takes the whole screen -->
 
         <div v-if="!loadKind" class="org-page-header">
             <div class="org-header-layout">
@@ -176,6 +177,8 @@ import { setTitle } from '@/libs/utils';
 import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
 import { ORG_SORT_OPTIONS, organizationRow, sortOrganizations } from '@/libs/organizationList';
 import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
+import { useMediaMatch } from '@/composables/useStackedLayout';
+import { XWIDE_MEDIA_QUERY } from '@/libs/responsiveColumns';
 import { pageAfterResize } from '@/libs/pageSize';
 import { getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition } from '@/libs/storageUtils';
 import reg from '@/libs/api/sharedRegistry';
@@ -229,16 +232,18 @@ export default {
     setup() {
         const dialogs = useDialogs();
         // A page holds the cards that fit the height until the user chooses a size, which the preferences keep (FR-XC-34).
-        // The cards are one column: a card grid would pass its columns, and a page would hold whole grid rows
+        // The cards are one column, two from xwide (the grid of .org-cards-area, FR-ORG-24): a page holds whole grid rows,
+        // the rows that fit times the cards in a row. The column change comes with a resize, which measures again
         const cardsArea = ref(null);
         const page = ref(null);
+        const twoColumns = useMediaMatch(XWIDE_MEDIA_QUERY);
         const sizing = usePageSize({
             height: () => visibleListHeight({
                 area: page.value, list: cardsArea.value,
                 reserved: () => heightOfFirst(page.value, '.org-pagination', 49)
             }),
             rowHeight: () => averageRowHeight(cardsArea.value, ':scope > .org-card, :scope > .p-card', 100),
-            columns: 1,
+            columns: () => (twoColumns.value ? 2 : 1),
             initial: getOrgPageSettings().itemsPerPage
         });
         // The locations are many small objects the map reads whole: not made reactive
@@ -661,9 +666,13 @@ export default {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../css/breakpoints' as *;
+
 #organizations {
-    margin: 0.75rem;
+    /* The space around the page is its padding, so the column of .page-column keeps it on a narrow screen */
+    padding: 0.75rem;
+    box-sizing: border-box;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -728,6 +737,18 @@ export default {
         overflow-y: auto;
         min-height: 0;
         padding: var(--ddb-focus-ring-reach) var(--ddb-focus-ring-reach) 0;
+
+        /* A 4K screen shows two columns of cards, not one card with its name and its buttons far apart (FR-ORG-24) */
+        @include xwide-up {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40rem, 1fr));
+            column-gap: var(--ddb-spacing-md);
+            align-content: start;
+
+            > :not(.org-card) {
+                grid-column: 1 / -1;
+            }
+        }
     }
 
     .org-map-area {

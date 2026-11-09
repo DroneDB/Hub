@@ -66,7 +66,7 @@ describe('OrganizationMembersDialog as stacked cards', () => {
     it('has a Remove button per member named for it, which a phone shows as its icon', async () => {
         await render();
         const buttons = [...table().querySelectorAll('tbody button')];
-        expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Remove me', 'Remove bob']);
+        expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Remove bob', 'Remove me']); // by user name (FR-ORG-26)
         expect(buttons.every(b => b.classList.contains('member-remove'))).toBe(true);
         expect(buttons[0].textContent.trim()).toBe('Remove');
     });

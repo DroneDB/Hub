@@ -24,6 +24,7 @@
 @use 'variables';
 @use 'analysis-panel';
 @use 'focus-ring' as *;
+@use 'breakpoints' as *;
 
 html {
     font-size: 16px;
@@ -243,7 +244,7 @@ h4, h5, h6 { font-size: var(--ddb-font-size-base); }
 // the ones that join the table later too (`.stack-col`, responsiveColumns.js stackedCell and
 // stackedColumn). From `sm` up the table is a table, and a `.stack-col-<breakpoint>` column is
 // hidden until that width.
-@each $name, $px in (md: 768px, lg: 992px, xl: 1200px, xxl: 1400px) {
+@each $name, $px in (md: 768px, lg: 992px, xl: 1200px, xxl: 1400px, wide: $wide, xwide: $xwide) {
     @media only screen and (min-width: 576px) and (max-width: #{$px - 0.02px}) {
         .stack-col-#{$name} { display: none; }
     }
@@ -413,6 +414,44 @@ div.loading {
         height: 100%;
         overflow-y: auto;
         box-sizing: border-box;
+    }
+}
+
+// ============================================================
+// Maximum widths on a wide screen (FR-XC-33)
+// ============================================================
+//
+// A page does not spread its content over the whole width when the content does not need it. The widths are
+// the tokens of css/_variables.scss: a component puts one of these classes on the element that has to keep a
+// readable width and gives no width of its own. Each one centres the element in its parent.
+//   .page-column    a list, a table with few columns, a form or a settings page with more columns
+//   .form-column    a form with one column
+//   .prose-column   running text (Markdown, a description, a hint)
+//   .editor-column  a text editor
+@mixin width-column($max) {
+    width: 100%;
+    max-width: $max;
+    margin-inline: auto;
+    box-sizing: border-box;
+}
+
+.page-column   { @include width-column(var(--ddb-page-max-width)); }
+.form-column   { @include width-column(var(--ddb-form-max)); }
+.prose-column  { @include width-column(var(--ddb-prose-max)); }
+.editor-column { @include width-column(var(--ddb-editor-max)); }
+
+// A page (or a box) that scrolls itself (.page-scroll) keeps its scroll bar at the edge of the screen: its content is
+// centred by the side padding, which is at least --ddb-page-padding-x (or --page-column-pad, when the box sets it)
+// and grows when the box is wider than --ddb-page-max-width. The box sets no side padding of its own.
+.page-scroll-column {
+    padding-inline: max(var(--page-column-pad, var(--ddb-page-padding-x)), calc((100% - var(--ddb-page-max-width)) / 2));
+}
+
+// A column that shows from `wide` or `xwide` up (responsiveColumns.js showFrom, columnFrom): Bootstrap has
+// no such utility. The doubled class outranks `d-none` whatever the order of the style sheets.
+@each $name, $px in (wide: $wide, xwide: $xwide) {
+    @media only screen and (min-width: $px) {
+        .d-none.d-#{$name}-table-cell { display: table-cell !important; }
     }
 }
 

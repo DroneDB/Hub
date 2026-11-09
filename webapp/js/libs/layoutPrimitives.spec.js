@@ -46,11 +46,11 @@ describe('stacked cards', () => {
         expect(phoneBlock).toMatch(/width: auto !important;/);
     });
 
-    it('hide a column that joins the table at md, lg, xl or xxl only between sm and that width', () => {
-        for (const [name, px] of Object.entries({ md: 768, lg: 992, xl: 1200, xxl: 1400 })) {
+    it('hide a column that joins the table at md, lg, xl, xxl, wide or xwide only between sm and that width', () => {
+        for (const [name, px] of Object.entries({ md: 768, lg: 992, xl: 1200, xxl: 1400, wide: 1600, xwide: 2560 })) {
             expect(px).toBe(BREAKPOINT_PX[name]);
         }
-        expect(scss).toContain('@each $name, $px in (md: 768px, lg: 992px, xl: 1200px, xxl: 1400px)');
+        expect(scss).toContain('@each $name, $px in (md: 768px, lg: 992px, xl: 1200px, xxl: 1400px, wide: $wide, xwide: $xwide)');
         expect(scss).toContain('@media only screen and (min-width: 576px) and (max-width: #{$px - 0.02px}) {\n        .stack-col-#{$name} { display: none; }');
     });
 

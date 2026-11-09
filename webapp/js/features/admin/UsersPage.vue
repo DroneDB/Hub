@@ -1,5 +1,5 @@
 <template>
-    <div id="users" ref="page" class="page-scroll">
+    <div id="users" ref="page" class="page-scroll page-scroll-column">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
@@ -67,14 +67,14 @@
                         <span v-else class="text-muted">No roles</span>
                     </template>
                 </Column>
-                <Column field="organizationCount" header="Organizations" :sortable="true" v-bind="stackedColumn('Organizations', 'md', {}, sortableHeaderPt(stacked))">
+                <Column field="organizationCount" header="Organizations" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Organizations', 'md', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         <Button size="small" title="Manage Organizations" severity="secondary" icon="fa-solid fa-sitemap"
                                 :label="String(slotProps.data.organizationCount)" @click="showUserOrganizations(slotProps.data)" />
                     </template>
                 </Column>
-                <Column field="datasetCount" header="Datasets" :sortable="true" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
-                <Column field="storageUsed" header="Storage" :sortable="true" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
+                <Column field="datasetCount" header="Datasets" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
+                <Column field="storageUsed" header="Storage" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         <div v-if="slotProps.data.storageQuota">
                             {{ bytesToSize(slotProps.data.storageUsed) }} / {{ bytesToSize(slotProps.data.storageQuota) }}
@@ -85,12 +85,12 @@
                         </div>
                     </template>
                 </Column>
-                <Column field="createdDate" header="Created" :sortable="true" v-bind="stackedColumn('Created', 'xl', {}, sortableHeaderPt(stacked))">
+                <Column field="createdDate" header="Created" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Created', 'xl', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         {{ formatCreated(slotProps.data.createdDate) }}
                     </template>
                 </Column>
-                <Column header="Actions" v-bind="stackedColumn(undefined, undefined, { style: 'text-align: center' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
+                <Column header="Actions" class="users-col-fit" v-bind="stackedColumn(undefined, undefined, { style: 'text-align: center' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
                     <template #body="slotProps">
                         <div class="d-flex gap-1 justify-content-center">
                             <Button size="small" :loading="slotProps.data.editing"
@@ -602,12 +602,32 @@ export default {
 </script>
 
 <style scoped>
+/* The side padding is .page-scroll-column's: the content keeps the width of --ddb-page-max-width (FR-ADM-27) */
 #users {
-    padding: 2.25rem var(--ddb-page-padding-x) var(--ddb-spacing-md);
+    padding-block: 2.25rem var(--ddb-spacing-md);
 }
 
 .search-col {
     min-width: 12rem;
+    max-width: 28rem;
+}
+
+/* The buttons stay at the right edge of the column, not beside the search field */
+.actions-col {
+    margin-inline-start: auto;
+}
+
+/* The columns after Email take the width of their content, so Email is the flexible column and the name and
+   its buttons stay near each other; the storage bar is at most 20rem */
+@media only screen and (min-width: 576px) {
+    #users :deep(.users-col-fit) {
+        width: 1%;
+        white-space: nowrap;
+    }
+}
+
+#users :deep(.p-progressbar) {
+    max-width: 20rem;
 }
 
 .user-name {

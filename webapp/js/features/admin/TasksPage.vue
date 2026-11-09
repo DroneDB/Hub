@@ -1,5 +1,5 @@
 <template>
-    <div id="admin-tasks" ref="page" class="admin-tasks-page page-scroll">
+    <div id="admin-tasks" ref="page" class="admin-tasks-page page-scroll page-scroll-column">
 
         <div class="top-banner d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
@@ -410,8 +410,9 @@ export default {
 </script>
 
 <style scoped>
+/* The side padding is .page-scroll-column's: the content keeps the width of --ddb-page-max-width (FR-ADM-27) */
 .admin-tasks-page {
-    padding: var(--ddb-spacing-lg) var(--ddb-page-padding-x);
+    padding-block: var(--ddb-spacing-lg);
     display: flex;
     flex-direction: column;
 }

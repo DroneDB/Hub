@@ -1,5 +1,5 @@
 <template>
-    <div class="tasks-table">
+    <div class="tasks-table page-column">
         <!-- Skeleton while first load is in flight -->
         <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows :class="STACKED_TABLE_CLASS">
             <Column header="State" v-bind="stackedColumn('State')" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
@@ -49,17 +49,17 @@
                     </div>
                 </template>
             </Column>
-            <Column v-if="showDataset" header="Dataset" v-bind="stackedColumn('Dataset', 'md')">
+            <Column v-if="showDataset" header="Dataset" class="col-dataset" v-bind="stackedColumn('Dataset', 'md')">
                 <template #body="slotProps">
                     <span class="dataset-cell" :title="`${slotProps.data.orgSlug}/${slotProps.data.dsSlug}`">{{ slotProps.data.orgSlug }}/{{ slotProps.data.dsSlug }}</span>
                 </template>
             </Column>
-            <Column v-if="showOwner" header="Owner" v-bind="stackedColumn('Owner', 'xl')">
+            <Column v-if="showOwner" header="Owner" class="col-owner" v-bind="stackedColumn('Owner', 'xl')">
                 <template #body="slotProps">
                     <span class="owner-cell" :title="slotProps.data.owner || slotProps.data.userId || 'System'">{{ slotProps.data.owner || slotProps.data.userId || 'System' }}</span>
                 </template>
             </Column>
-            <Column header="Progress" v-bind="stackedColumn('Progress', 'md')">
+            <Column header="Progress" class="col-progress" v-bind="stackedColumn('Progress', 'md')">
                 <template #body="slotProps">
                     <div v-if="progressKind(slotProps.data) === 'waiting'" class="waiting-for-files"
                          :title="stateTag(slotProps.data).title">
@@ -78,7 +78,7 @@
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column field="createdAt" header="Created" sortable v-bind="stackedColumn('Created', 'lg', {}, sortableHeaderPt(stacked))">
+            <Column field="createdAt" header="Created" sortable class="col-created" v-bind="stackedColumn('Created', 'lg', {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
                     <div class="date-time">
                         <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
@@ -282,7 +282,9 @@ export default {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../css/breakpoints' as *;
+
 .tasks-table {
     display: flex;
     flex-direction: column;
@@ -337,8 +339,19 @@ export default {
     overflow-wrap: anywhere;
 }
 
+/* The bar is at most 20rem wide, whatever the column (FR-EXP-42) */
 .task-progress {
     min-width: 0;
+    max-width: 20rem;
+}
+
+/* On a very wide screen only Tool is flexible: the other columns have the width of their content, so a row reads
+   in one look and the name and its data are not 2000 px apart (FR-EXP-42, FR-ADM-27) */
+@include xwide-up {
+    .tasks-table :deep(.col-progress) { width: 16rem; }
+    .tasks-table :deep(.col-created) { width: 11rem; }
+    .tasks-table :deep(.col-dataset),
+    .tasks-table :deep(.col-owner) { width: 14rem; }
 }
 
 .waiting-for-files {

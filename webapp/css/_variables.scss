@@ -172,9 +172,21 @@
     --ddb-page-padding-x: var(--ddb-spacing-md); // 12px - side padding of the routed pages
 
     // The width of a dialog comes from its size class (HubWindow size-class, FR-XC-20), not from its content.
-    // The other width tokens of FR-XC-33 (prose, forms, panels) come with the wide layout (U-503).
     --ddb-dialog-form-max: 47rem;      // 752px - a form dialog (dialog-xl)
     --ddb-dialog-wide-max: 120rem;     // 1920px - a log, a chart or a form in two columns (dialog-wide)
+
+    // The maximum widths of the content on a wide screen (FR-XC-33). A page, a text or a panel takes its width from
+    // one of these, never from a value of its own: css/app.scss has the classes (.page-column, .prose-column,
+    // .editor-column, .form-column) and the breakpoints they change at (wide 1600px, xwide 2560px) are in
+    // css/_breakpoints.scss and libs/responsiveColumns.js.
+    --ddb-prose-max: 72ch;             // running text: Markdown, descriptions, hints
+    --ddb-editor-max: 100ch;           // a text editor
+    --ddb-form-max: 960px;             // a form with one column
+    --ddb-page-max-width: 100rem;      // 1600px - a list, a table with few columns, a form or a settings page with more columns
+    --ddb-panel-tree-width: clamp(15rem, 18vw, 22.5rem);      // the tree beside the explorer
+    --ddb-panel-detail-width: clamp(20rem, 22vw, 45rem);      // the detail panel
+    --ddb-panel-analysis-width: clamp(16rem, 18vw, 28rem);    // an analysis panel of the map
+    --ddb-popup-width: clamp(20rem, 22vw, 40rem);             // a popup of the map
 
     // ── Status ─────────────────────────────────────────────
     --ddb-success: #20a96b;

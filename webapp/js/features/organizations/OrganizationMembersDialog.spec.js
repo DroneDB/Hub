@@ -62,6 +62,38 @@ afterEach(() => {
 });
 
 describe('OrganizationMembersDialog', () => {
+    // FR-ORG-26: 30 members must not grow the window or push Close away
+    it('shows the members in user name order, whatever the order the server sends (FR-ORG-26)', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve([
+            { userName: 'Zed', permissions: 1 }, { userName: 'bob', permissions: 1 }, { userName: 'Alice', permissions: 1 }, { userName: 'me', permissions: ADMIN }
+        ]));
+        await render();
+        const names = [...document.body.querySelectorAll('.members-scroll tbody tr td:first-child')].map(td => td.textContent.trim());
+        expect(names).toEqual(['Alice', 'bob', 'me', 'Zed']);
+        expect(wrapper.vm.members.map(m => m.userName)).toEqual(['Alice', 'bob', 'me', 'Zed']);
+    });
+
+    it('puts Close in the footer of the window, outside the box that scrolls the table (FR-ORG-26)', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+        await render();
+        const dialog = document.querySelector('.p-dialog.window-dialog');
+        const close = [...dialog.querySelectorAll('button')].find(b => b.textContent.trim() === 'Close');
+        expect(close.closest('.window-footer')).not.toBeNull();
+        expect(close.closest('.members-scroll')).toBeNull();
+        // the table is in the scroll box, the Add Member form is not
+        expect(dialog.querySelector('.members-scroll table')).not.toBeNull();
+        expect(nameInput().closest('.members-scroll')).toBeNull();
+        close.click();
+        expect(wrapper.emitted('close')).toHaveLength(1);
+    });
+
+    it('takes its width from the dialog-xl size class, with no width of its own (FR-XC-33)', async () => {
+        await render();
+        const dialog = document.querySelector('.p-dialog.window-dialog');
+        expect(dialog.classList.contains('dialog-xl')).toBe(true);
+        expect(dialog.getAttribute('style') || '').not.toContain('width');
+    });
+
     it('does not read the user list', async () => {
         await render();
         expect(reg.admin.users).not.toHaveBeenCalled();

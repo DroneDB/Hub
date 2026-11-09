@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { showFrom, columnFrom, stackedFrom, stackedCell, stackedColumn, STACK_BELOW, STACKED_TABLE_CLASS, STACKED_MEDIA_QUERY, sortableHeaderPt, BREAKPOINT_PX, breakAfterHyphens } from './responsiveColumns';
+import { showFrom, columnFrom, stackedFrom, stackedCell, stackedColumn, STACK_BELOW, STACKED_TABLE_CLASS, STACKED_MEDIA_QUERY, sortableHeaderPt, BREAKPOINT_PX, WIDE_MEDIA_QUERY, XWIDE_MEDIA_QUERY, breakAfterHyphens } from './responsiveColumns';
 
 describe('responsiveColumns', () => {
     it('hides a cell below the breakpoint and shows it as a table cell from it up', () => {
@@ -61,5 +61,27 @@ describe('responsiveColumns: stacked cards (D-026)', () => {
         expect(breakAfterHyphens('long-organization-name--2')).toEqual(['long-', 'organization-', 'name--', '2']);
         expect(breakAfterHyphens('acme')).toEqual(['acme']);
         expect(breakAfterHyphens('')).toEqual([]);
+    });
+});
+
+describe('responsiveColumns: the wide screens (FR-XC-33)', () => {
+    it('has the wide breakpoint at 1600 px and xwide at 2560 px, above Bootstrap\'s xxl of 1400 px', () => {
+        expect(BREAKPOINT_PX.xxl).toBe(1400);
+        expect(BREAKPOINT_PX.wide).toBe(1600);
+        expect(BREAKPOINT_PX.xwide).toBe(2560);
+        expect(Object.keys(BREAKPOINT_PX)).toEqual(['sm', 'md', 'lg', 'xl', 'xxl', 'wide', 'xwide']);
+    });
+
+    it('has the media queries of a wide and a very wide screen', () => {
+        expect(WIDE_MEDIA_QUERY).toBe('(min-width: 1600px)');
+        expect(XWIDE_MEDIA_QUERY).toBe('(min-width: 2560px)');
+    });
+
+    it('shows a column from wide or xwide with the classes of css/app.scss', () => {
+        expect(showFrom('wide')).toBe('d-none d-wide-table-cell');
+        expect(showFrom('xwide')).toBe('d-none d-xwide-table-cell');
+        expect(columnFrom('xwide')).toEqual({ headerClass: 'd-none d-xwide-table-cell', bodyClass: 'd-none d-xwide-table-cell' });
+        expect(stackedFrom('wide')).toBe('stack-col stack-col-wide');
+        expect(stackedFrom('xwide')).toBe('stack-col stack-col-xwide');
     });
 });

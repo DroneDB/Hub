@@ -1,5 +1,6 @@
 <template>
-    <div id="datasets" ref="page">
+    <div id="datasets" ref="page" :class="{ 'page-column': view !== 'map' }">
+        <!-- A list keeps the width of --ddb-page-max-width, centred (FR-XC-33, FR-ORG-24); the map takes the whole screen -->
         <Message v-model="error" />
 
         <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table.
@@ -126,7 +127,7 @@
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
                     </template>
                 </Column>
-                <Column field="creationDate" header="Creation Date" :sortable="true"
+                <Column field="creationDate" header="Creation Date" :sortable="true" class="ds-col-date"
                         v-bind="columnFrom(COLUMNS_FROM.creationDate)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
@@ -136,7 +137,7 @@
                         </div>
                     </template>
                 </Column>
-                <Column field="lastModified" header="Modified" :sortable="true"
+                <Column field="lastModified" header="Modified" :sortable="true" class="ds-col-date"
                         v-bind="columnFrom(COLUMNS_FROM.lastModified)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
@@ -146,15 +147,15 @@
                         </div>
                     </template>
                 </Column>
-                <Column field="entries" header="Files" :sortable="true"
+                <Column field="entries" header="Files" :sortable="true" class="ds-col-count"
                         v-bind="columnFrom(COLUMNS_FROM.entries)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
-                <Column field="size" header="Size" :sortable="true"
+                <Column field="size" header="Size" :sortable="true" class="ds-col-count"
                         v-bind="columnFrom(COLUMNS_FROM.size)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
                 </Column>
-                <Column field="visibility" header="Visibility" :sortable="true"
+                <Column field="visibility" header="Visibility" :sortable="true" class="ds-col-visibility"
                         v-bind="columnFrom(COLUMNS_FROM.visibility)" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
                         <VisibilityTag :visibility="slotProps.data.visibility" />
@@ -1085,7 +1086,9 @@ export default {
 
 <style scoped>
 #datasets {
-    margin: 0.75rem;
+    /* The space around the page is its padding, so the column of .page-column keeps it on a narrow screen */
+    padding: 0.75rem;
+    box-sizing: border-box;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -1184,6 +1187,12 @@ export default {
         height: auto;
         min-height: 0;
     }
+
+    /* The columns take the width of their content, so the free width goes to the Dataset column and a row
+       reads in one look on a wide screen (FR-ORG-24) */
+    .ds-table :deep(.ds-col-date) { width: 11rem; }
+    .ds-table :deep(.ds-col-count) { width: 6rem; }
+    .ds-table :deep(.ds-col-visibility) { width: 8rem; }
 
     /* A header never wraps; the columns that do not fit leave the table instead */
     .ds-table :deep(th) {

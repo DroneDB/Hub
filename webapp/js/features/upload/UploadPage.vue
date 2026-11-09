@@ -5,7 +5,7 @@
         </div>
 
         <!-- Where the files go, before the upload starts (FR-UPL-02): organization, name, visibility -->
-        <form v-if="!batchOpen" class="upload-form" novalidate @submit.prevent="startUpload">
+        <form v-if="!batchOpen" class="upload-form form-column" novalidate @submit.prevent="startUpload">
             <div v-if="orgsLoaded && organizationOptions.length === 0" class="field">
                 <Message :model-value="NO_WRITABLE_ORG" no-dismiss />
             </div>
@@ -437,7 +437,7 @@ export default {
     display: flex;
     flex-direction: column;
     gap: var(--ddb-spacing-lg);
-    max-width: 36rem;
+    /* One column of --ddb-form-max (.form-column of css/app.scss, FR-XC-33) */
     margin: var(--ddb-spacing-xl) auto;
     padding: 0 var(--ddb-spacing-lg);
     text-align: left;
@@ -459,6 +459,9 @@ export default {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    /* A zone of its own, not a strip under the fields: half the height of the screen (FR-NAV-10) */
+    min-height: 50vh;
     gap: var(--ddb-spacing-sm);
     padding: var(--ddb-spacing-xl);
     border: 2px dashed var(--ddb-border-medium);

@@ -93,6 +93,31 @@ const away = { path: '/r/o/d', fullPath: '/r/o/d' };
 const here = { path: '/r/o/d/view/x/markdown', fullPath: '/r/o/d/view/x/markdown' };
 
 describe('MarkdownViewer', () => {
+    // FR-EXP-39, FR-XC-33: the text and the editor are centred columns of the shared width tokens, the toolbar is in the column
+    it('puts the text in the prose column and Edit in a toolbar row of the same column', async () => {
+        source.canWrite = true;
+        const content = await render('# Title\n\nA paragraph.');
+        expect(content.classes()).toContain('prose-column');
+        const toolbar = wrapper.find('.view-toolbar');
+        expect(toolbar.classes()).toContain('prose-column');
+        expect(toolbar.find('button[aria-label="Edit"]').exists()).toBe(true);
+        // before the text, so it is the first row of the column
+        expect(toolbar.element.nextElementSibling).toBe(content.element);
+    });
+
+    it('has no toolbar row for a user who cannot write', async () => {
+        const content = await render('# Title');
+        expect(wrapper.find('.view-toolbar').exists()).toBe(false);
+        expect(content.classes()).toContain('prose-column');
+    });
+
+    it('puts the editor and its Cancel and Save toolbar in the editor column', async () => {
+        await editAndType('# Old');
+        expect(wrapper.find('textarea').classes()).toContain('editor-column');
+        expect(wrapper.find('.edit-toolbar').classes()).toContain('editor-column');
+        expect(wrapper.find('.content').exists()).toBe(false);
+    });
+
     it('renders the file as sanitised HTML', async () => {
         const content = await render('# Title\n\n**bold** <script>alert(1)</script>');
         expect(content.find('h1').text()).toBe('Title');

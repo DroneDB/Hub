@@ -146,7 +146,9 @@ export default {
 
 <style scoped>
 #login {
-    padding-top: 2rem;
+    /* The card sits at a quarter of the height on a tall screen, not in a thin strip at the top (FR-NAV-10) */
+    min-height: 100%;
+    padding-top: clamp(2rem, 18vh, 20rem);
     text-align: center;
     display: flex;
     justify-content: center;

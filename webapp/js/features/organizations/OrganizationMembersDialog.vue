@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @close="$emit('close')">
+        <Window id="organizationMembersDialog" title="Manage Members" modal size-class="dialog-xl" fixed-size @close="$emit('close')">
             <div class="members-dialog">
                 <!-- Loading state -->
                 <div v-if="loading" class="ui active centered inline loader" />
@@ -40,46 +40,50 @@
 
                     <!-- Current members table -->
                     <h3>Current Members</h3>
-                    <table v-if="members.length > 0" class="ui celled table stacked-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th :class="stackedFrom('sm')">Email</th>
-                                <th>Permissions</th>
-                                <th :class="stackedFrom('sm')">Granted</th>
-                                <th v-if="canManageMembers">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="member in members" :key="member.userName">
-                                <td><strong>{{ member.userName }}</strong></td>
-                                <td v-bind="stackedCell('Email', 'sm')">{{ member.email }}</td>
-                                <td v-bind="stackedCell('Permissions')">
-                                    <Select v-if="canManageMembers"
-                                            :model-value="member.permissions"
-                                            :aria-label="`Permissions of ${member.userName}`"
-                                            :options="permissionsOptions"
-                                            option-label="label"
-                                            option-value="value"
-                                            class="w-100"
-                                            @update:model-value="value => changePermission(member, value)" />
-                                    <span v-else>{{ member.permissionName }}</span>
-                                </td>
-                                <td v-bind="stackedCell('Granted', 'sm')">
-                                    <span v-if="member.grantedAt">
-                                        {{ formatDate(member.grantedAt) }}
-                                        <span v-if="member.grantedBy"> by {{ member.grantedBy }}</span>
-                                    </span>
-                                    <span v-else>-</span>
-                                </td>
-                                <td v-if="canManageMembers">
-                                    <!-- On a phone only the icon, named for the member -->
-                                    <Button severity="danger" size="small" class="member-remove" :disabled="removingMember === member.userName"
-                                            icon="fa-solid fa-trash" label="Remove" :aria-label="`Remove ${member.userName}`" @click="removeMember(member)" />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <!-- The table scrolls in a box of its own with a sticky header: the Add Member form above and the
+                         Close button in the footer stay in view however many members there are (FR-ORG-26) -->
+                    <div v-if="members.length > 0" class="members-scroll">
+                        <table class="ui celled table stacked-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th :class="stackedFrom('sm')">Email</th>
+                                    <th>Permissions</th>
+                                    <th :class="stackedFrom('sm')">Granted</th>
+                                    <th v-if="canManageMembers">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="member in members" :key="member.userName">
+                                    <td><strong>{{ member.userName }}</strong></td>
+                                    <td v-bind="stackedCell('Email', 'sm')">{{ member.email }}</td>
+                                    <td v-bind="stackedCell('Permissions')">
+                                        <Select v-if="canManageMembers"
+                                                :model-value="member.permissions"
+                                                :aria-label="`Permissions of ${member.userName}`"
+                                                :options="permissionsOptions"
+                                                option-label="label"
+                                                option-value="value"
+                                                class="w-100"
+                                                @update:model-value="value => changePermission(member, value)" />
+                                        <span v-else>{{ member.permissionName }}</span>
+                                    </td>
+                                    <td v-bind="stackedCell('Granted', 'sm')">
+                                        <span v-if="member.grantedAt">
+                                            {{ formatDate(member.grantedAt) }}
+                                            <span v-if="member.grantedBy"> by {{ member.grantedBy }}</span>
+                                        </span>
+                                        <span v-else>-</span>
+                                    </td>
+                                    <td v-if="canManageMembers">
+                                        <!-- On a phone only the icon, named for the member -->
+                                        <Button severity="danger" size="small" class="member-remove" :disabled="removingMember === member.userName"
+                                                icon="fa-solid fa-trash" label="Remove" :aria-label="`Remove ${member.userName}`" @click="removeMember(member)" />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div v-else>
                         <PrimeMessage severity="info" :closable="false">
@@ -88,11 +92,11 @@
                     </div>
                 </div>
 
-                <!-- Footer -->
-                <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
-                    <Button severity="secondary" label="Close" @click="$emit('close')" />
-                </div>
             </div>
+
+            <template #footer>
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
+            </template>
 
             <ConfirmDialog v-if="removeMemberDialogOpen"
                            title="Remove Member"
@@ -126,6 +130,10 @@ import { formatDate } from '@/libs/format';
 import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
 
 const ADMIN = 3;
+
+// The server sends the members in the order of its table (the Registry sorts them too, but an older one does not):
+// by user name, upper and lower case alike
+const sortByUserName = members => [...members].sort((a, b) => a.userName.localeCompare(b.userName, undefined, { sensitivity: 'base' }));
 
 export default {
     components: { Window, ConfirmDialog, Select, InputText, Button, PrimeMessage },
@@ -195,7 +203,7 @@ export default {
                     return;
                 }
 
-                this.members = await reg.orgs.getOrganizationMembers(this.orgSlug);
+                this.members = sortByUserName(await reg.orgs.getOrganizationMembers(this.orgSlug));
 
             } catch (e) {
                 this.error = e.message || 'Failed to load members';
@@ -310,7 +318,23 @@ export default {
 <style scoped>
 
 table.ui.celled.table {
+    margin-top: 0;
+}
+
+/* The member table: at most half the screen (and 28rem) high, scrolling inside; its header sticks to the top */
+.members-scroll {
     margin-top: 0.5rem;
+    max-height: min(28rem, 50vh);
+    overflow-y: auto;
+}
+
+@media only screen and (min-width: 576px) {
+    .members-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--ddb-bg-light);
+    }
 }
 
 /* A phone card: Remove is its icon (named for the member by its aria-label) */

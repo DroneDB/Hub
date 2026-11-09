@@ -3,19 +3,22 @@
         <!-- No entry when it did not load (a file of another type): ViewerShell shows the error -->
         <div v-if="!loading && entry" class="md-container">
             <div v-if="editing" class="edit-container">
-                <div class="edit-toolbar" role="toolbar" aria-label="Markdown editor">
+                <div class="edit-toolbar editor-column" role="toolbar" aria-label="Markdown editor">
                     <span v-if="dirty" class="unsaved me-auto" role="status">Unsaved changes</span>
                     <Button severity="secondary" label="Cancel" title="Cancel (Esc)" :disabled="saving" @click="cancel" />
                     <Button icon="fa-solid fa-floppy-disk" :label="saving ? 'Saving...' : 'Save'" title="Save (Ctrl+S)"
                             :disabled="saving || !dirty" @click="save" />
                 </div>
-                <textarea ref="editor" v-model="rawContent" aria-label="Markdown source" :readonly="saving" />
+                <textarea ref="editor" v-model="rawContent" class="editor-column" aria-label="Markdown source" :readonly="saving" />
             </div>
             <template v-else>
-                <Button v-if="canWrite" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" label="Edit"
-                        @click="edit" />
+                <!-- Edit is in the toolbar row of the text column, at its right edge, and stays in view (FR-EXP-39) -->
+                <div v-if="canWrite" class="view-toolbar prose-column">
+                    <Button severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" label="Edit"
+                            @click="edit" />
+                </div>
                 <!-- eslint-disable-next-line vue/no-v-html -- sanitised by renderMarkdown -->
-                <div class="content" v-html="content" />
+                <div class="content prose-column" v-html="content" />
             </template>
         </div>
         <DialogHost :dialogs="dialogs" />
@@ -165,9 +168,16 @@ useEventListener(document, 'keydown', e => {
     font-size: var(--ddb-font-size-sm);
 }
 
-.edit {
-    float: right;
-    margin: var(--ddb-spacing-md);
+/* The text is one centred column of --ddb-prose-max and the editor one of --ddb-editor-max (.prose-column and
+   .editor-column of css/app.scss, FR-XC-33); the toolbar row is in the same column */
+.view-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    justify-content: flex-end;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    background: var(--ddb-bg);
 }
 
 textarea {

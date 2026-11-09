@@ -19,9 +19,12 @@
 
         <LoadingSpinner v-if="loading" size="lg" label="Loading configuration..." />
 
-        <div v-else class="config-scroll-container">
-            <UsageAndContactCard ref="usageCard" />
-            <EmailTemplatesCard ref="emailTemplatesCard" />
+        <div v-else class="config-scroll-container page-scroll-column">
+            <!-- The two cards share one row from 2 x 30rem up (FR-ADM-28) -->
+            <div class="config-cards">
+                <UsageAndContactCard ref="usageCard" />
+                <EmailTemplatesCard ref="emailTemplatesCard" />
+            </div>
 
             <Accordion :active-index="activeIndex" class="config-accordion">
                 <!-- The header is named by the section title alone (the Custom/Default tag describes it) -->
@@ -456,10 +459,26 @@ export default {
     margin: 0.5rem 0;
 }
 
+/* One column of --ddb-page-max-width, centred (the side padding is .page-scroll-column's; the page has its own) (FR-ADM-28) */
 .config-scroll-container {
+    --page-column-pad: 0px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+}
+
+.config-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(30rem, 1fr));
+    column-gap: var(--ddb-spacing-lg);
+    align-items: start;
+}
+
+/* A card in the row has no width of its own: the row gives it one; on a phone it is one column */
+@media only screen and (max-width: 575.98px) {
+    .config-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .edits-bar {
@@ -507,7 +526,8 @@ export default {
 
 .config-fields-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
+    /* At most 3 columns: a column is at least 380px and at least a third of the row */
+    grid-template-columns: repeat(auto-fill, minmax(max(min(380px, 100%), calc((100% - 2 * 1.5rem) / 3)), 1fr));
     gap: 1.5rem;
 }
 

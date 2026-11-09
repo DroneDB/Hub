@@ -1,5 +1,5 @@
 <template>
-    <Window id="preferencesDialog" title="User preferences" modal fixed-size size-class="dialog-lg" @close="$emit('close')">
+    <Window id="preferencesDialog" title="User preferences" modal fixed-size size-class="dialog-xl" @close="$emit('close')">
         <Tabs ref="tabsRef" v-model:value="activeTab" class="pref-tabs">
             <TabList>
                 <Tab v-for="tab in visibleTabs" :key="tab.value" :value="tab.value">
@@ -423,9 +423,10 @@ async function resetAll() {
 </script>
 
 <style scoped>
-/* The window keeps one size for every tab: the panels scroll inside it, not the page */
+/* The window keeps one size for every tab: the panels scroll inside it, not the page. Its width is the size class's
+   (dialog-xl, --ddb-dialog-form-max, FR-XC-33), the tabs take all of it so the 7 labels fit (FR-ACC-23) */
 .pref-tabs {
-    width: min(34rem, calc(100vw - 4rem));
+    width: 100%;
 }
 
 .pref-tabs :deep(.p-tabpanels) {

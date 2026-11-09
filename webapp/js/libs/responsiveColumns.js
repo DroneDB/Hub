@@ -8,23 +8,26 @@
  */
 
 /**
- * @typedef {'sm'|'md'|'lg'|'xl'|'xxl'} Breakpoint  Bootstrap breakpoint the column appears from:
- *   sm 576px, md 768px, lg 992px, xl 1200px, xxl 1400px
+ * @typedef {'sm'|'md'|'lg'|'xl'|'xxl'|'wide'|'xwide'} Breakpoint  The breakpoint a column appears from:
+ *   Bootstrap's sm 576px, md 768px, lg 992px, xl 1200px, xxl 1400px, and the two of the wide screens
+ *   (FR-XC-33): wide 1600px and xwide 2560px
  */
 
-const BREAKPOINTS = Object.freeze(['sm', 'md', 'lg', 'xl', 'xxl']);
+const BREAKPOINTS = Object.freeze(['sm', 'md', 'lg', 'xl', 'xxl', 'wide', 'xwide']);
 
 /**
  * The width in px each breakpoint starts at. A phone layout is below `sm`, a tablet layout below
- * `lg`: the toolbars that move tools into an overflow menu (HubToolbar) read these too.
+ * `lg`: the toolbars that move tools into an overflow menu (HubToolbar) read these too. Above `xxl`: on a screen
+ * wider than `wide` a page keeps the maximum width of its content (the width tokens and the .page-column classes of
+ * css/app.scss), and a layout change above it uses `xwide` (FR-XC-33). css/_breakpoints.scss has the same two widths.
  * @type {Readonly<Record<Breakpoint, number>>}
  */
-export const BREAKPOINT_PX = Object.freeze({ sm: 576, md: 768, lg: 992, xl: 1200, xxl: 1400 });
+export const BREAKPOINT_PX = Object.freeze({ sm: 576, md: 768, lg: 992, xl: 1200, xxl: 1400, wide: 1600, xwide: 2560 });
 
 /**
  * The classes of a cell (<th>, <td> or a Column's header/body) shown from `breakpoint` up.
  * @param {Breakpoint} breakpoint
- * @returns {string} e.g. 'd-none d-md-table-cell'
+ * @returns {string} e.g. 'd-none d-md-table-cell' (`wide` and `xwide` have their own class in css/app.scss)
  */
 export function showFrom(breakpoint) {
     // A misspelt breakpoint would hide the column on every screen: fail where it is written
@@ -58,6 +61,12 @@ export const STACKED_TABLE_CLASS = 'stacked-table';
 
 /** The media query of the stacked cards: below `sm`, as the renderer of css/app.scss (575.98 px) */
 export const STACKED_MEDIA_QUERY = `(max-width: ${BREAKPOINT_PX[STACK_BELOW] - 0.02}px)`;
+
+/** The media query of a wide screen: from `wide` (1600 px) up, where a page keeps its maximum width (FR-XC-33) */
+export const WIDE_MEDIA_QUERY = `(min-width: ${BREAKPOINT_PX.wide}px)`;
+
+/** The media query of a very wide screen (a 4K screen): from `xwide` (2560 px) up */
+export const XWIDE_MEDIA_QUERY = `(min-width: ${BREAKPOINT_PX.xwide}px)`;
 
 /** The media query of the tablet layout: below `lg` (991.98 px), where a side panel opens over the content as a drawer */
 export const TABLET_MEDIA_QUERY = `(max-width: ${BREAKPOINT_PX.lg - 0.02}px)`;
