@@ -122,3 +122,83 @@ describe('wheel zoom', () => {
         expect(onInteract).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('the shared constrained orbit with the splat viewer\'s options (FR-XC-18)', () => {
+    const UP = new THREE.Vector3(0, 0, 1);
+    const POLE = 0.996;
+
+    function pointer(type, x, y, { button = 0, pointerType = 'mouse' } = {}) {
+        return new PointerEvent(type, {
+            clientX: x, clientY: y, button, buttons: 1 << button, pointerId: 1,
+            pointerType, isPrimary: true, bubbles: true, cancelable: true
+        });
+    }
+
+    // From the middle of the view (the pivot is the look target there), in 20 moves
+    function drag(canvas, dx, dy, options) {
+        canvas.dispatchEvent(pointer('pointerdown', 400, 300, options));
+        for (let i = 1; i <= 20; i++) canvas.dispatchEvent(pointer('pointermove', 400 + (dx * i) / 20, 300 + (dy * i) / 20, options));
+        canvas.dispatchEvent(pointer('pointerup', 400 + dx, 300 + dy, options));
+    }
+
+    // The pitch of the view above the scene's horizon, in degrees
+    const pitch = (camera, target) => Math.asin(target.clone().sub(camera.position).normalize().dot(UP)) * 180 / Math.PI;
+    // Pixels of drag for a turn of `degrees` (0.005 rad a pixel)
+    const px = degrees => (degrees * Math.PI / 180) / 0.005;
+
+    it('orbits on a right-drag, the view down to 80° below the horizon, never past the pole', () => {
+        const { earth, camera, rig, canvas } = makeEarth();
+        expect(earth.orbit.tiltRange.pole).toBe(POLE);
+        expect(pitch(camera, rig.controls.target)).toBeCloseTo(-45, 9);
+        // A drag down raises the camera: the view goes 35° farther down
+        drag(canvas, 0, px(35), { button: 2 });
+        expect(pitch(camera, rig.controls.target)).toBeCloseTo(-80, 6);
+        drag(canvas, 0, 200, { button: 2 });
+        expect(Math.abs(Math.sin(pitch(camera, rig.controls.target) * Math.PI / 180))).toBeLessThanOrEqual(POLE);
+        // OrbitControls' target is the one that moved: the earth controls share it
+        expect(earth.orbit.target).toBe(rig.controls.target);
+    });
+
+    it('can still look up from below the ground (its pitch limit both ways), unlike the 3D viewer\'s geo scenes', () => {
+        const { camera, rig, canvas } = makeEarth();
+        drag(canvas, 0, -px(125), { button: 2 });
+        expect(pitch(camera, rig.controls.target)).toBeCloseTo(80, 6);
+        expect(camera.position.z).toBeLessThan(0);
+    });
+
+    it('turns the heading on a horizontal right-drag', () => {
+        const { camera, rig, canvas } = makeEarth();
+        const before = camera.position.clone().sub(rig.controls.target);
+        drag(canvas, px(30), 0, { button: 2 });
+        const after = camera.position.clone().sub(rig.controls.target);
+        // About the scene up: 30° around it, the height kept
+        const flat = v => new THREE.Vector3(v.x, v.y, 0);
+        expect(flat(before).angleTo(flat(after)) * 180 / Math.PI).toBeCloseTo(30, 6);
+        expect(after.z).toBeCloseTo(before.z, 9);
+    });
+
+    it('pans on a left-drag and on one finger: the grabbed ground point stays under the pointer, the view direction kept', () => {
+        for (const options of [{ button: 0 }, { pointerType: 'touch' }]) {
+            const { earth, camera, rig, canvas } = makeEarth();
+            const dir = rig.controls.target.clone().sub(camera.position).normalize();
+            const grabbed = earth.groundPoint(400, 300);
+            drag(canvas, 120, -80, options);
+            expect(earth.groundPoint(520, 220).distanceTo(grabbed)).toBeLessThan(1e-6);
+            expect(rig.controls.target.clone().sub(camera.position).normalize().distanceTo(dir)).toBeLessThan(1e-9);
+        }
+    });
+
+    it('tells the viewer that the user took over on a press', () => {
+        const { canvas, onInteract } = makeEarth();
+        drag(canvas, 10, 0, { button: 2 });
+        expect(onInteract).toHaveBeenCalledTimes(1);
+    });
+
+    it('is left alone when earth mode is off', () => {
+        const { camera, canvas, onInteract } = makeEarth({ enabled: false });
+        const start = camera.position.clone();
+        drag(canvas, 100, 50, { button: 2 });
+        expect(camera.position.equals(start)).toBe(true);
+        expect(onInteract).not.toHaveBeenCalled();
+    });
+});

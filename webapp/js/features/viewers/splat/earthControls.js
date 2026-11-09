@@ -2,15 +2,27 @@
  * Earth navigation of the splat viewer, Potree style: left-drag
  * (or one finger) grabs and pans the ground, right-drag orbits the pivot under the
  * pointer, the wheel and a pinch zoom toward the pointer. A marker shows the pivot.
+ *
+ * The shared constrained orbit of the 3D viewers (D-019) with the splat viewer's own values: its
+ * pitch limit (POLE, which lets the view look up from below as well as down), its buttons and its
+ * wheel step. It moves the camera position and the OrbitControls target (shared with it); the
+ * orientation stays the rig's, which looks at that target every frame (syncYawPitch).
  */
-import { PRIMARY } from '@/libs/palette';
-import { groundPlaneHit, wheelNotches } from '@/features/viewers/unified/navControls';
+import { ConstrainedOrbit } from '@/features/viewers/unified/constrainedOrbit';
 
-const ROTATE_SPEED = 0.005;
-// Fraction of the distance to the point under the pointer that one wheel notch moves the camera
-const WHEEL_ZOOM = 0.15;
 // Pitch stops ~5° from straight up/down so the view cannot flip over
 const POLE = 0.996;
+
+/** The constrained orbit's options of the splat viewer's earth mode (FR-XC-18). */
+export const SPLAT_EARTH = Object.freeze({
+    tilt: Object.freeze({ pole: POLE }),
+    // Left button, middle button and one finger pan; the right button orbits; two fingers orbit
+    // and pinch; the wheel (Shift or not) steps toward the pointer
+    buttons: Object.freeze({
+        left: 'pan', ctrlLeft: null, middle: 'pan', right: 'orbit', touch: 'pan',
+        twoFinger: 'orbit', twist: false, wheel: 'dolly', shiftWheel: 'dolly'
+    })
+});
 
 export class EarthControls {
     /**
@@ -22,64 +34,37 @@ export class EarthControls {
      * @param {() => void} hooks.onInteract
      */
     constructor(rig, canvas, scene, { enabled, onInteract }) {
-        const { THREE } = rig;
         this.rig = rig;
-        this.canvas = canvas;
-        this.scene = scene;
-        this.enabled = enabled;
-        this.onInteract = onInteract;
-        this.pointers = new Map();
-        this.gesture = null;   // null | 'pan' | 'rotate' | 'twofinger'
-        this.pivot = null;
-        this.camStart = null;
-        this.targetStart = null;
-        this.lastX = 0;
-        this.lastY = 0;
-        this.lastDist = 0;
-        this.plane = new THREE.Plane();
-        this._raycaster = new THREE.Raycaster();
-        this._ray = new THREE.Ray();
-        // What groundPlaneHit needs of a viewer: the element its events are relative to
-        this._surface = { domElement: canvas };
-        this._v = [1, 2, 3, 4].map(() => new THREE.Vector3());
-        this._q = [1, 2, 3].map(() => new THREE.Quaternion());
-
-        // Pivot marker, drawn on top
-        this.marker = new THREE.Mesh(
-            new THREE.SphereGeometry(1, 16, 16),
-            new THREE.MeshBasicMaterial({ color: PRIMARY[300], transparent: true, opacity: 0.9, depthTest: false, depthWrite: false })
-        );
-        this.marker.renderOrder = 999;
-        this.marker.visible = false;
-        scene.add(this.marker);
-
-        this.handlers = {
-            pointerdown: e => this.onPointerDown(e),
-            pointermove: e => this.onPointerMove(e),
-            pointerup: e => this.onPointerUp(e),
-            pointercancel: e => this.onPointerUp(e)
-        };
-        this.onWheelBound = e => this.onWheel(e);
+        this.orbit = new ConstrainedOrbit({ THREE: rig.THREE }, rig.camera, canvas, scene, {
+            ...SPLAT_EARTH,
+            getUp: () => rig.sceneUp,
+            target: rig.controls.target,
+            canNavigate: enabled,
+            // The viewer registers the listeners (attach)
+            listen: false
+        });
+        // lifetime: owner (the orbit goes with these controls). A press or a wheel step takes over
+        this.orbit.addEventListener('start', () => onInteract());
     }
+
+    /** The marker of the pivot. */
+    get marker() { return this.orbit.marker; }
+
+    /** The ground point the gesture turns around or grabbed (null before a gesture). */
+    get pivot() { return this.orbit.gesturePivot; }
 
     /** Registers the canvas listeners through `listen(target, type, fn, options)`. */
     attach(listen) {
-        Object.entries(this.handlers).forEach(([type, fn]) => listen(this.canvas, type, fn));
-        listen(this.canvas, 'wheel', this.onWheelBound, { passive: false });
+        this.orbit.attach(listen);
     }
 
     /** Leaves earth mode: no gesture, no marker. */
     reset() {
-        this.pointers.clear();
-        this.gesture = null;
-        this.marker.visible = false;
+        this.orbit.reset();
     }
 
     dispose() {
-        this.reset();
-        this.scene.remove(this.marker);
-        this.marker.geometry.dispose();
-        this.marker.material.dispose();
+        this.orbit.dispose();
     }
 
     /**
@@ -87,182 +72,16 @@ export class EarthControls {
      * target perpendicular to the scene up (a new vector, or null).
      */
     groundPoint(clientX, clientY) {
-        const { camera, controls } = this.rig;
-        return groundPlaneHit(this.rig.THREE, this._surface, camera, controls, { clientX, clientY });
-    }
-
-    /**
-     * Where the ray through a screen point meets `plane`, the ray starting at the gesture's start
-     * camera so a pan stays stable while the camera moves (a new vector, or null).
-     */
-    screenToPlaneFromStart(clientX, clientY, plane) {
-        const rect = this.canvas.getBoundingClientRect();
-        const ndc = { x: ((clientX - rect.left) / (rect.width || 1)) * 2 - 1, y: -((clientY - rect.top) / (rect.height || 1)) * 2 + 1 };
-        this._raycaster.setFromCamera(ndc, this.rig.camera);
-        this._ray.direction.copy(this._raycaster.ray.direction);
-        this._ray.origin.copy(this.camStart || this._raycaster.ray.origin);
-        const hit = this._ray.intersectPlane(plane, this._v[0]);
-        return hit ? hit.clone() : null;
+        return this.orbit.groundPoint(clientX, clientY);
     }
 
     // Ground plane through the look target; pivot = ground point under the pointer
     begin(clientX, clientY) {
-        const { camera, controls, sceneUp } = this.rig;
-        this.plane.setFromNormalAndCoplanarPoint(sceneUp, controls.target);
-        this.camStart = camera.position.clone();
-        this.targetStart = controls.target.clone();
-        this.pivot = this.groundPoint(clientX, clientY) || controls.target.clone();
-        this.lastX = clientX;
-        this.lastY = clientY;
-    }
-
-    midpoint() {
-        let x = 0, y = 0;
-        this.pointers.forEach(p => { x += p.x; y += p.y; });
-        const n = this.pointers.size || 1;
-        return { x: x / n, y: y / n };
-    }
-
-    spread() {
-        const [a, b] = [...this.pointers.values()];
-        return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
-    }
-
-    onPointerDown(e) {
-        if (!this.enabled()) return;
-        try { this.canvas.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
-        this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        this.onInteract();
-        if (this.pointers.size === 1) {
-            // Right mouse button orbits; left button and one finger pan
-            this.gesture = e.pointerType === 'mouse' && e.button === 2 ? 'rotate' : 'pan';
-            this.begin(e.clientX, e.clientY);
-        } else if (this.pointers.size === 2) {
-            this.gesture = 'twofinger';
-            const mid = this.midpoint();
-            this.lastDist = this.spread();
-            this.begin(mid.x, mid.y);
-        }
-        e.preventDefault();
-    }
-
-    onPointerMove(e) {
-        if (!this.enabled() || !this.pointers.has(e.pointerId)) return;
-        this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        const one = this.pointers.size === 1;
-        if (this.gesture === 'pan' && one) {
-            this.pan(e.clientX, e.clientY);
-        } else if (this.gesture === 'rotate' && one) {
-            this.rotate(e.clientX - this.lastX, e.clientY - this.lastY);
-            this.lastX = e.clientX;
-            this.lastY = e.clientY;
-        } else if (this.gesture === 'twofinger' && this.pointers.size >= 2) {
-            const mid = this.midpoint();
-            const dist = this.spread();
-            this.rotate(mid.x - this.lastX, mid.y - this.lastY);
-            if (this.lastDist > 0 && dist > 0) this.zoomToward(this.pivot, dist / this.lastDist - 1);
-            this.lastX = mid.x;
-            this.lastY = mid.y;
-            this.lastDist = dist;
-        }
-        e.preventDefault();
-    }
-
-    onPointerUp(e) {
-        if (!this.pointers.has(e.pointerId)) return;
-        try { this.canvas.releasePointerCapture(e.pointerId); } catch { /* not captured */ }
-        this.pointers.delete(e.pointerId);
-        if (this.pointers.size === 1) {
-            // Two fingers down to one: a clean pan from the remaining finger
-            this.gesture = 'pan';
-            const p = this.pointers.values().next().value;
-            this.begin(p.x, p.y);
-        } else if (this.pointers.size === 0) {
-            this.gesture = null;
-            this.marker.visible = false;
-        }
-    }
-
-    onWheel(e) {
-        if (!this.enabled()) return;
-        e.preventDefault();
-        this.onInteract();
-        // Notches, not events: a trackpad sends many small deltas for one gesture, and Firefox
-        // reports lines where Chrome reports pixels. Wheel up (negative delta) zooms in.
-        const notches = wheelNotches(e);
-        if (!notches) return;
-        const point = this.groundPoint(e.clientX, e.clientY) || this.rig.controls.target.clone();
-        this.zoomToward(point, -notches * WHEEL_ZOOM);
-    }
-
-    // Keeps the ground point grabbed at the start under the pointer
-    pan(clientX, clientY) {
-        const hit = this.screenToPlaneFromStart(clientX, clientY, this.plane);
-        if (!hit || !this.pivot || !this.camStart) return;
-        const moved = this._v[1].subVectors(hit, this.pivot);
-        this.rig.camera.position.copy(this.camStart).sub(moved);
-        this.rig.controls.target.copy(this.targetStart).sub(moved);
-        this.updateMarker();
-    }
-
-    // Orbits camera and target about the pivot: yaw about scene up, pitch about the view's right
-    rotate(dx, dy) {
-        const { camera, controls, sceneUp: up } = this.rig;
-        const pivot = this.pivot;
-        if (!pivot) return;
-        const [v1, v2, v3, v4] = this._v;
-        const [q1, q2, q3] = this._q;
-        const yaw = -dx * ROTATE_SPEED;
-        const fwd = v1.subVectors(controls.target, camera.position);
-        if (fwd.lengthSq() < 1e-8) fwd.set(0, 0, -1);
-        fwd.normalize();
-        const side = v2.crossVectors(fwd, up);
-        if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
-        side.normalize();
-
-        const q = q3.copy(q1.setFromAxisAngle(up, yaw)).multiply(q2.setFromAxisAngle(side, -dy * ROTATE_SPEED));
-        const offP = v3.subVectors(camera.position, pivot).applyQuaternion(q);
-        const offT = v4.subVectors(controls.target, pivot).applyQuaternion(q);
-        const newFwd = v1.copy(offT).sub(offP);
-        if (newFwd.lengthSq() > 1e-12 && Math.abs(newFwd.normalize().dot(up)) > POLE) {
-            // Too close to a pole: yaw only
-            const qy = q1.setFromAxisAngle(up, yaw);
-            offP.subVectors(camera.position, pivot).applyQuaternion(qy);
-            offT.subVectors(controls.target, pivot).applyQuaternion(qy);
-        }
-        camera.position.copy(pivot).add(offP);
-        controls.target.copy(pivot).add(offT);
-        this.updateMarker();
-    }
-
-    // Dollies camera and target toward a point; amount > 0 moves closer
-    zoomToward(point, amount) {
-        if (!point || !amount) return;
-        const { camera, controls } = this.rig;
-        const toPoint = this._v[0].subVectors(point, camera.position);
-        const distToPoint = toPoint.length();
-        if (distToPoint < 1e-6) return;
-        const dir = toPoint.multiplyScalar(1 / distToPoint);
-        const distToTarget = camera.position.distanceTo(controls.target) || distToPoint;
-        // A cursor near the horizon hits the ground very far away: bound the step by the target distance
-        const ref = Math.min(distToPoint, distToTarget * 3);
-        let step = Math.max(-ref * 0.4, Math.min(ref * 0.4, ref * amount));
-        if (step > 0) step = Math.min(step, distToPoint * 0.9);
-        camera.position.addScaledVector(dir, step);
-        controls.target.addScaledVector(dir, step);
-        this.updateMarker();
+        this.orbit.beginGesture(clientX, clientY);
     }
 
     // The marker follows the pivot at a constant ~8 px radius
     updateMarker() {
-        if (this.gesture && this.pivot) {
-            this.marker.position.copy(this.pivot);
-            this.marker.visible = true;
-        }
-        if (!this.marker.visible) return;
-        const camera = this.rig.camera;
-        const h = this.canvas.clientHeight || 1;
-        const worldPerPixel = (2 * Math.tan((camera.fov * Math.PI) / 360) * camera.position.distanceTo(this.marker.position)) / h;
-        this.marker.scale.setScalar(Math.max(worldPerPixel * 8, 1e-4));
+        this.orbit.updateMarker();
     }
 }

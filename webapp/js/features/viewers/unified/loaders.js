@@ -3,6 +3,11 @@
  * a new format adds an entry to LOADERS. Each loader builds the scene it needs (flat or
  * globe), adds its data and frames it. Rasters, vectors and models are placed in Web
  * Mercator (the server serves them so); point clouds in their own CRS, for precision.
+ *
+ * The loader also picks the navigation of the scene it builds, once (FR-XC-18, D-001): a geo
+ * scene (a georeferenced orthophoto, DEM, vector, point cloud or 3D Tiles set) gets the
+ * constrained orbit, every other one the free trackball; a 3D model keeps the free trackball even
+ * when it is georeferenced.
  */
 import ddb from 'ddb';
 import { isLocalVector } from '@/libs/openItemDefaults';
@@ -32,7 +37,7 @@ async function loadGeoraster(scene, entry, dataset) {
     scene.view.loadingText = 'Loading orthophoto...';
     const data = scene.computeExtent(entry);
     if (!data) throw new Error('This georaster has no geographic footprint');
-    scene.setupInstance(scene.libs.CoordinateSystem.epsg3857);
+    scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'constrained' });
     scene.addBasemap(data.extent);
     const { ColorLayer, TiledImageSource, XYZ } = scene.libs;
     const url = dataset.tileUrl(entry.path, '{z}', '{x}', '{y}', { hash: entry.hash });
@@ -51,7 +56,7 @@ async function loadVector(scene, entry, dataset) {
     scene.view.loadingText = 'Loading vector data...';
     const data = scene.computeExtent(entry);
     if (!data) throw new Error('This vector layer has no geographic footprint');
-    scene.setupInstance(scene.libs.CoordinateSystem.epsg3857);
+    scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'constrained' });
     scene.addBasemap(data.extent);
     const { ColorLayer, VectorTileSource, olStyle } = scene.libs;
     const layer = new ColorLayer({
@@ -96,7 +101,7 @@ async function loadLocalVector(scene, entry, dataset) {
     const crs = CoordinateSystem.unknown;
     scene.view.isLocalDrawing = true;
     scene.view.localUnits = vector.units || '';
-    scene.setupInstance(crs);
+    scene.setupInstance(crs, { nav: 'free' });
     const collection = new FeatureCollection({
         source,
         extent: new Extent(crs, minX - pad, maxX + pad, minY - pad, maxY + pad),
@@ -119,7 +124,8 @@ async function loadModel(scene, entry, dataset) {
     scene.view.loadingText = 'Loading 3D model...';
     const url = dataset.Entry(entry).get3DTiles();
     if (!url) throw new Error(`The 3D model '${name(entry)}' is not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been produced for this model yet.`);
-    scene.setupInstance(scene.libs.CoordinateSystem.epsg3857);
+    // A model keeps the free trackball, georeferenced or not (D-001)
+    scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'free' });
     const tileset = await addTileset(scene, url, MODEL_TILES_ERROR_TARGET);
     // Obj2Tiles can emit an empty tileset (infinite volume): it "loads" and shows nothing
     const box = tileset.getBoundingBox();
@@ -139,8 +145,8 @@ async function loadTiles3D(scene, entry, dataset) {
     const url = dataset.Entry(entry).get3DTiles();
     if (!url) throw new Error(`The 3D Tiles '${name(entry)}' are not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been extracted for this archive yet.`);
     const georeferenced = !(entry.properties && entry.properties.georeferenced === false);
-    if (georeferenced) scene.setupGlobe();
-    else scene.setupInstance(scene.libs.CoordinateSystem.epsg3857);
+    if (georeferenced) scene.setupGlobe({ nav: 'constrained' });
+    else scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'free' });
 
     const tileset = await addTileset(scene, url, 8);
     let box = tileset.getBoundingBox();
@@ -171,9 +177,10 @@ async function loadPointCloud(scene, entry, dataset) {
     source.addEventListener('progress', () => { scene.view.progress = source.progress; });
     await source.initialize();
     const crs = (await source.getMetadata()).crs || CoordinateSystem.epsg3857;
-    const crsRegistered = scene.registerCrs(crs);
+    // On the ground of a map (a basemap, the constrained orbit) only with a CRS proj4 can use
+    const geo = scene.registerCrs(crs) && scene.isGeoreferenced(entry);
     scene.view.isLocalPointCloud = crs === CoordinateSystem.unknown;
-    scene.setupInstance(crs);
+    scene.setupInstance(crs, { nav: geo ? 'constrained' : 'free' });
     if (scene.instance.renderingOptions) scene.instance.renderingOptions.enableEDL = true;
 
     const entity = new PointCloud({ source });
@@ -184,7 +191,7 @@ async function loadPointCloud(scene, entry, dataset) {
     scene.registerLayer(name(entry), 'fa-solid fa-braille', () => entity.visible, v => { entity.visible = v; });
 
     const box = entity.getBoundingBox();
-    if (box && crsRegistered && scene.isGeoreferenced(entry)) {
+    if (box && geo) {
         const { Extent } = scene.libs;
         scene.addBasemap(new Extent(crs, box.min.x, box.max.x, box.min.y, box.max.y), box.min.z);
     }

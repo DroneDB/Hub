@@ -1,14 +1,15 @@
 /**
  * The 3D viewer's Giro3D scene: the instance in a flat
- * CRS or on the globe, lights, the OSM basemap, the navigation control (the bm3d viewer's, in
- * every scene), framing and the Home pose, the layer list and teardown. The loaders (loaders.js) put the data in it.
+ * CRS or on the globe, lights, the OSM basemap, the navigation control (the strategy the loader
+ * picks: the constrained orbit of a geo scene or the bm3d viewer's free trackball, see
+ * navControls), framing and the Home pose, the layer list and teardown. The loaders (loaders.js) put the data in it.
  *
  * `view` is the component's reactive state the scene reports into: loadingText, progress,
  * layers, isLocalPointCloud, isLocalDrawing, localUnits, activeTool.
  */
 import ddb from 'ddb';
 import {
-    createNavControls, aimCamera, navPivot, orbitTweenStep, stopNavAnimation, focusPosition,
+    createNavControls, navPivot, orbitTweenStep, stopNavAnimation, focusPosition,
     applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV
 } from './navControls';
 import { alignContentUpAxis } from './contentOrientation';
@@ -42,7 +43,8 @@ export class UnifiedScene {
         this.map = null;
         this.controls = null;
         // The scene's up axis: Z in a flat scene, the local vertical of the data on the globe
-        // (camera.up is the screen's: see navControls)
+        // (camera.up is the screen's with the free trackball, this one with the constrained orbit:
+        // see navControls)
         this.sceneUp = null;
         this.globe = null;
         this.globeUpSet = false;
@@ -54,14 +56,20 @@ export class UnifiedScene {
         this.userInteracted = false;
         // Web Mercator length correction (cos of the centre latitude); 1 in metric CRSs
         this.mercatorScale = 1;
-        this.tweener = createCameraTweener();
+        // Giro3D renders on demand: every step of a flight asks for its frame
+        this.tweener = createCameraTweener({
+            onFrame: () => { if (this.instance) this.instance.notifyChange(this.instance.view.camera); }
+        });
         this.dblClickDispose = null;
     }
 
     // ---- Instance --------------------------------------------------------------------
 
-    /** A flat scene in `crs` (every type but georeferenced 3D Tiles), Z up. */
-    setupInstance(crs) {
+    /**
+     * A flat scene in `crs` (every type but georeferenced 3D Tiles), Z up. `nav` is the
+     * navigation strategy of the scene the loader builds: 'constrained' (a geo scene) or 'free'.
+     */
+    setupInstance(crs, { nav = 'free' } = {}) {
         const instance = new this.libs.Instance({ target: this.container, crs, backgroundColor: 0x1a1a2e });
         this.instance = instance;
         instance.view.camera.up.set(0, 0, 1);
@@ -69,14 +77,15 @@ export class UnifiedScene {
         this.addLights({ fill: true });
         // Focusable: a click on the view takes the keyboard focus
         instance.domElement.tabIndex = 0;
-        this.attachControls();
+        this.attachControls(nav);
     }
 
     /**
      * A globe (EPSG:4978) with the OSM basemap on the ellipsoid. Its up axis is the ellipsoid
-     * normal under the data, which frameGlobe knows.
+     * normal under the data, which frameGlobe knows. A globe is a geo scene: the constrained
+     * orbit unless `nav` says otherwise.
      */
-    setupGlobe() {
+    setupGlobe({ nav = 'constrained' } = {}) {
         const { Instance, Globe, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
         const instance = new Instance({ target: this.container, crs: CoordinateSystem.epsg4978, backgroundColor: 0x0b1021 });
         this.instance = instance;
@@ -94,18 +103,23 @@ export class UnifiedScene {
             // The basemap is optional
         }
         this.globeUpSet = false;
-        this.attachControls();
+        this.attachControls(nav);
     }
 
-    /** The navigation control and its double-click focus; replaces the previous ones. */
-    attachControls() {
+    /**
+     * The navigation control and its double-click focus; replaces the previous ones. `strategy`
+     * is picked once per scene ('constrained' or 'free'); the scene's up axis is read at every
+     * use (frameGlobe sets the globe's after this).
+     */
+    attachControls(strategy = 'free') {
         const { instance } = this;
         const camera = instance.view.camera;
         if (this.dblClickDispose) this.dblClickDispose();
         if (this.controls) {
             try { this.controls.dispose(); } catch { /* already gone */ }
         }
-        const controls = createNavControls(this.libs, camera, instance.domElement, instance.scene);
+        const controls = createNavControls(this.libs, camera, instance.domElement, instance.scene,
+            { strategy, getUp: () => this.sceneUp });
         // Giro3D then updates it every frame and relays its changes (what keeps 3D Tiles streaming)
         instance.view.setControls(controls);
         this.controls = controls;
@@ -359,13 +373,13 @@ export class UnifiedScene {
         const cy = (ymin + ymax) / 2;
         const span = Math.max(xmax - xmin, ymax - ymin) || 100;
         const dist = span * 1.2;
+        const { THREE } = this.libs;
         this.mercatorScale = Math.cos(centerLat * Math.PI / 180);
-        this.instance.view.camera.position.set(cx, cy - dist, dist);
         this.instance.view.minNearPlane = Math.max(dist / 1000, 0.1);
-        this.controls.target.set(cx, cy, 0);
         applySceneMetrics(this.controls, span);
-        aimCamera(this.instance.view.camera, this.controls, this.sceneUp);
-        this.savePose(this.controls.target);
+        const target = new THREE.Vector3(cx, cy, 0);
+        this.controls.setPose({ position: new THREE.Vector3(cx, cy - dist, dist), target, up: this.sceneUp }, { save: true });
+        this.savePose(target);
         this.instance.notifyChange();
     }
 
@@ -382,10 +396,9 @@ export class UnifiedScene {
         // Far enough for the whole box to fit the screen, narrow (a phone upright) or wide
         const camera = this.instance.view.camera;
         const distance = fitDistance(size.length() / 2 || maxDim / 2, camera.fov, camera.aspect);
-        camera.position.set(THREE_QUARTER_VIEW[0], THREE_QUARTER_VIEW[1], THREE_QUARTER_VIEW[2]).normalize().multiplyScalar(distance).add(center);
-        this.controls.target.copy(center);
+        const position = new THREE.Vector3(...THREE_QUARTER_VIEW).normalize().multiplyScalar(distance).add(center);
         applySceneMetrics(this.controls, maxDim);
-        aimCamera(camera, this.controls, this.sceneUp);
+        this.controls.setPose({ position, target: center, up: this.sceneUp }, { save: true });
         this.savePose(center);
         this.instance.notifyChange();
     }
@@ -404,15 +417,16 @@ export class UnifiedScene {
         const camera = this.instance.view.camera;
         this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.5);
         this.instance.view.maxFarPlane = Math.max(maxDim * 1000, 5.0e7);
-        camera.position.copy(center).add(up.clone().multiplyScalar(maxDim * 2.5));
+        const position = center.clone().add(up.clone().multiplyScalar(maxDim * 2.5));
         if (!this.globeUpSet) {
             this.sceneUp = up.clone();
             this.globeUpSet = true;
         }
-        this.controls.target.copy(center);
         // Pulling back to the continent is legitimate on a globe
         applySceneMetrics(this.controls, maxDim, NAV.globeMaxDistanceFactor);
-        aimCamera(camera, this.controls, northOf(THREE, up));
+        // Straight down, north up (the constrained orbit stops it at its 89° tilt, north still up:
+        // Home is that pose)
+        this.controls.setPose({ position, target: center, up: northOf(THREE, up) }, { save: true });
         this.savePose(center);
         this.instance.notifyChange(camera);
     }
@@ -420,6 +434,8 @@ export class UnifiedScene {
     /**
      * Focuses on a point (double click), as the bm3d viewer does: the point becomes the pivot,
      * in the middle of the view, which keeps its direction and comes closer by a wheel notch.
+     * The flight goes through the strategy's setPose: its last step is saved, so the next
+     * gesture starts from the focus.
      */
     flyTo(point) {
         if (!this.instance || !this.controls) return;
@@ -429,14 +445,14 @@ export class UnifiedScene {
         const position = focusPosition(camera, controls, point);
         controls.target.copy(navPivot(controls));
         this.tweener.tweenTo(camera, controls, position, point, NAV.dblClickDurationMs, () => {
-            controls.updateMatrixState();
             this.userInteracted = true;
         });
     }
 
     /**
      * Back to the pose the last framing computed: the camera turns around the pivot to it (and
-     * rolls back upright), from wherever a pan or a focus left the pivot.
+     * rolls back upright), from wherever a pan or a focus left the pivot. As the focus, through
+     * setPose; a flight is not an input, so it never fires 'start'.
      */
     goHome() {
         if (!this.instance || !this.homePose || !this.controls) return;
@@ -447,7 +463,6 @@ export class UnifiedScene {
         controls.target.copy(navPivot(controls));
         const onStep = orbitTweenStep(this.libs.THREE, camera, controls, quaternion, position.distanceTo(target));
         this.tweener.tweenTo(camera, controls, position.clone(), target.clone(), NAV.dblClickDurationMs, () => {
-            controls.updateMatrixState();
             this.userInteracted = false;
         }, onStep);
     }
