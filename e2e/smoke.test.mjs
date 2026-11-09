@@ -491,6 +491,59 @@ test('admin users: Disable asks, tags the user and refuses their sign-in; Enable
     }
 });
 
+test('organizations: a new member sees the organization at once; a non-member sees a Public one, read-only (D-003)', async () => {
+    const other = `smoke${Date.now().toString(36)}m`;
+    const password = 'a-long-passw0rd';
+    const team = `${DS}-team`;
+    const open = `${DS}-open`;
+    const res = await fetch(`${URL_}/users`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: other, password, email: '', roles: [] })
+    });
+    assert.ok(res.ok, `POST /users -> ${res.status}`);
+    const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+    try {
+        await api('POST', '/orgs', form({ slug: team, name: team, isPublic: false }));
+        await api('POST', '/orgs', form({ slug: open, name: open, isPublic: true }));
+        const added = await fetch(`${URL_}/orgs/${team}/members`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userName: other, permissions: 1 })
+        });
+        assert.ok(added.ok, `POST /orgs/${team}/members -> ${added.status}`);
+
+        const userPage = await context.newPage();
+        userPage.on('pageerror', e => pageErrors.push(e.message));
+        await userPage.goto(`${URL_}/login`);
+        await userPage.waitForFunction(() => document.getElementById('main-loading')?.style.display === 'none', null, { timeout: 30000 });
+        await userPage.fill('input[type=text], input[placeholder*="sername"]', other);
+        await userPage.fill('input[type=password]', password);
+        await Promise.all([userPage.waitForURL(/\/r(\/|$)/, { timeout: 30000 }), userPage.click('button:has-text("Login")')]);
+        await userPage.goto(`${URL_}/r`);
+
+        // The default list (Show all off) holds the member organization and the Public one, on the first visit
+        const teamCard = userPage.locator('.org-card', { hasText: team });
+        const openCard = userPage.locator('.org-card', { hasText: open });
+        await teamCard.waitFor({ timeout: 15000 });
+        await openCard.waitFor({ timeout: 15000 });
+        assert.equal(await userPage.locator('#organizations-show-all').isChecked(), false);
+        // Read-only: no edit, delete or members action on the Public organization
+        assert.equal(await openCard.locator('.org-card-actions button').count(), 0);
+
+        // The Public organization opens for the non-member (GET /orgs/{org} answers, read-only)
+        await openCard.locator('a.org-name').click();
+        await userPage.waitForURL(new RegExp(`/r/${open}$`), { timeout: 15000 });
+        await userPage.waitForSelector(`text=${open}`, { timeout: 15000 });
+    } finally {
+        await context.close();
+        for (const slug of [team, open]) {
+            try { await api('DELETE', `/orgs/${slug}`); } catch { /* best effort */ }
+        }
+        try { await api('DELETE', `/users/${other}`); } catch { /* best effort */ }
+    }
+});
+
 test('a session the server rejects goes to Login', async () => {
     await page.goto(`${URL_}/r/${USER}`);
     await page.waitForSelector(`text=${DS}`, { timeout: 15000 });

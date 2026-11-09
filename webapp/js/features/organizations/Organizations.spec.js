@@ -3,13 +3,21 @@
  * 401s to the app's handler (reg.onUnauthorized -> handleUnauthorized) instead of showing
  * a "Temporary authentication issue".
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
 import { ApiError } from '@/libs/ddb/apiError';
 
-const reg = vi.hoisted(() => ({ isAdmin: () => false, orgs: { getOrganizations: null } }));
+const reg = vi.hoisted(() => ({
+    isAdmin: () => false,
+    getUsername: () => 'ann',
+    features: { get: () => true },
+    orgs: { getOrganizations: null }
+}));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: Organizations } = await import('./OrganizationsPage.vue');
+const { default: OrganizationDialog } = await import('./OrganizationDialog.vue');
 
 function fakeView() {
     return {
@@ -106,5 +114,69 @@ describe('handleUnauthorized', () => {
         const r = router('/login');
         handleUnauthorized(r, { isLoggedIn: false, logout: vi.fn() });
         expect(r.push).not.toHaveBeenCalled();
+    });
+});
+
+// What the page and the dialog show now that Public organizations are listed and readable for everyone (D-003)
+describe('Public organizations (D-003)', () => {
+    let wrapper;
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        localStorage.clear();
+    });
+
+    async function renderPage(orgs, { readOnlyOrgs = false } = {}) {
+        globalThis.HubOptions = { readOnlyOrgs };
+        localStorage.clear();
+        reg.orgs.getOrganizations = vi.fn(() => Promise.resolve(orgs.map(org => ({ org }))));
+        wrapper = mount(Organizations, {
+            global: {
+                plugins: [PrimeVue],
+                mocks: { $router: { push: vi.fn() }, $notify: { error: vi.fn() } },
+                stubs: { OrganizationDialog: true, OrganizationMembersDialog: true, MessageDialog: true, DialogHost: true, Paginator: true, RouterLink: { template: '<a><slot /></a>' } }
+            }
+        });
+        await flushPromises();
+    }
+    const card = slug => wrapper.findAll('.org-card').find(c => c.text().includes(slug));
+    const actions = slug => card(slug).findAll('.org-card-actions button').map(b => b.attributes('aria-label'));
+
+    it('shows no write action on a Public organization the user can only read', async () => {
+        const readOnly = { canRead: true, canWrite: false, canDelete: false, canManageMembers: false };
+        const owner = { canRead: true, canWrite: true, canDelete: true, canManageMembers: true };
+        await renderPage([
+            { slug: 'mine', name: 'Mine', owner: 'ann', isPublic: false, permissions: owner },
+            { slug: 'open', name: 'Open', owner: 'bob', isPublic: true, permissions: readOnly }
+        ]);
+        expect(reg.orgs.getOrganizations).toHaveBeenCalledWith(true);
+        expect(actions('Mine')).toEqual(['Manage members', 'Edit organization', 'Delete organization']);
+        expect(actions('Open')).toEqual([]);
+        expect(card('Open').text()).toContain('Public');
+    });
+
+    it('says what the default list holds when it is empty, and offers to create one', async () => {
+        await renderPage([]);
+        expect(wrapper.find('[data-org-empty-hint]').text())
+            .toBe("No organizations yet: you don't own or belong to any, and none is public.");
+        expect(wrapper.text()).not.toContain('enable Show all');
+        expect(wrapper.find('[data-org-empty-create]').exists()).toBe(true);
+    });
+
+    it('offers no create action in the empty list when organizations are read-only', async () => {
+        await renderPage([], { readOnlyOrgs: true });
+        expect(wrapper.find('[data-org-empty-hint]').exists()).toBe(true);
+        expect(wrapper.find('[data-org-empty-create]').exists()).toBe(false);
+    });
+
+    it('the dialog explains Public under its checkbox', async () => {
+        wrapper = mount(OrganizationDialog, {
+            props: { mode: 'new' },
+            global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /></div>' } } }
+        });
+        await flushPromises();
+        const hint = wrapper.find('#organization-dialog-public-hint');
+        expect(hint.text()).toBe('Anyone, signed in or not, can see this organization and its public datasets.');
+        expect(wrapper.find('#orgPublic').attributes('aria-describedby')).toBe('organization-dialog-public-hint');
     });
 });

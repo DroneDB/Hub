@@ -16,9 +16,11 @@
                     <Textarea id="organization-dialog-description" v-model="org.description" placeholder="Description" rows="3" auto-resize class="w-100" />
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-2">
-                    <Checkbox v-model="org.isPublic" :binary="true" input-id="orgPublic" />
+                    <Checkbox v-model="org.isPublic" :binary="true" input-id="orgPublic" :pt="{ input: { 'aria-describedby': 'organization-dialog-public-hint' } }" />
                     <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
                 </div>
+                <!-- What Public means (D-003): readable and listed for everyone -->
+                <small id="organization-dialog-public-hint" class="d-block text-muted mt-1">Anyone, signed in or not, can see this organization and its public datasets.</small>
             </form>
         </div>
     </Window>

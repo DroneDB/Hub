@@ -257,7 +257,7 @@ const TABS = [
                     select('orgs-per-page', 'Organizations per page', toRef(orgPage, 'itemsPerPage'), PAGE_SIZES),
                     select('orgs-sort-column', 'Sort organizations by', orgSortColumn, ORG_SORT_OPTIONS),
                     select('orgs-sort-direction', 'Organizations order', orgSortDirection, SORT_DIRECTION_OPTIONS),
-                    toggle('orgs-owned-only', 'Show only the organizations I own', toRef(orgPage, 'ownedOnly'))
+                    toggle('orgs-owned-only', 'Show only organizations I own, belong to, or that are public', toRef(orgPage, 'ownedOnly'))
                 ]
             }
         ]

@@ -75,8 +75,11 @@
         <!-- Data loaded -->
         <div v-else ref="cardsArea" class="org-cards-area">
             <EmptyState v-if="paginatedOrganizations.length === 0" title="No organizations found" :filtered="!!searchQuery">
-                <p v-if="!showAll">You don't own any organizations yet. You may have access to organizations owned by others: enable <b>Show all</b> above to see them. You can also create a new organization.</p>
-                <p v-else>You can create a new organization by clicking the create organization button.</p>
+                <!-- The default list holds the organizations the user owns, belongs to, or that are Public (D-003) -->
+                <p v-if="!showAll" data-org-empty-hint>No organizations yet: you don't own or belong to any, and none is public.</p>
+                <p v-else data-org-empty-hint>No organizations yet.</p>
+                <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization"
+                        data-org-empty-create :loading="creatingOrganization" :disabled="creatingOrganization" @click.stop="handleNew()" />
             </EmptyState>
             <div v-for="org in paginatedOrganizations" :key="org.slug" class="org-card">
                 <Card>

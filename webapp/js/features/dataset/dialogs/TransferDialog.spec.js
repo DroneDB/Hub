@@ -3,10 +3,17 @@ import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import TransferDialog from './TransferDialog.vue';
 
-const transferObj = vi.fn();
+const { transferObj, writable, getOrganizations } = vi.hoisted(() => {
+    const writable = { canRead: true, canWrite: true, canDelete: false, canManageMembers: false };
+    return {
+        transferObj: vi.fn(),
+        writable,
+        getOrganizations: vi.fn(async () => [{ org: { slug: 'dest', name: 'Dest', permissions: writable } }])
+    };
+});
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
-        orgs: { getOrganizations: vi.fn(async () => [{ org: { slug: 'dest', name: 'Dest' } }]) },
+        orgs: { getOrganizations },
         Organization: () => ({ Dataset: () => ({ transferObj }), datasets: async () => [] })
     }
 }));
@@ -62,5 +69,20 @@ describe('TransferDialog', () => {
         await w.find('[data-confirm]').trigger('click');
         await flushPromises();
         expect(w.vm.errorMessage).toBe('Copy failed: Forbidden');
+    });
+
+    it('offers only the organizations the user may write: not the Public ones they can only read', async () => {
+        const readOnly = { canRead: true, canWrite: false, canDelete: false, canManageMembers: false };
+        getOrganizations.mockResolvedValueOnce([
+            { org: { slug: 'mine', name: 'Mine', permissions: { ...writable, canDelete: true, canManageMembers: true } } },
+            { org: { slug: 'team', name: 'Team', permissions: writable } },
+            { org: { slug: 'open', name: 'Open', isPublic: true, permissions: readOnly } },
+            { org: { slug: 'bare', name: 'Bare' } }
+        ]);
+        const w = await open({});
+        expect(w.vm.organizationOptions).toEqual([
+            { label: 'Mine', value: 'mine' },
+            { label: 'Team', value: 'team' }
+        ]);
     });
 });

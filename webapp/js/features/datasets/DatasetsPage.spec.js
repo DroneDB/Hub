@@ -8,6 +8,7 @@ import PrimeVue from 'primevue/config';
 
 const reg = vi.hoisted(() => ({
     isAdmin: () => false,
+    isLoggedIn: () => true,
     features: { get: () => false },
     Organization: null
 }));
@@ -379,5 +380,70 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(dialog.vm.isValid()).toBe(false);
         await dialog.find('#dataset-dialog-dataset-name').setValue('Survey Team');
         expect(dialog.vm.isValid()).toBe(true);
+    });
+});
+
+// A Public organization of another user is readable (D-003): its permissions, not an empty list, decide the create actions
+describe('DatasetsPage create actions', () => {
+    let wrapper;
+    beforeEach(() => {
+        globalThis.HubOptions = {};
+        _resetPrefListenersForTests();
+        localStorage.clear();
+    });
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        reg.isLoggedIn = () => true;
+        _resetPrefListenersForTests();
+    });
+
+    async function renderEmpty(permissions) {
+        reg.Organization = vi.fn(() => ({
+            info: () => Promise.resolve({ name: 'Org', slug: 'org', isPublic: true, ...(permissions ? { permissions } : {}) }),
+            datasetsPage: () => Promise.resolve({ items: [], total: 0 }),
+            datasetLocations: vi.fn(() => Promise.resolve([])),
+            datasets: () => Promise.resolve([])
+        }));
+        wrapper = mount(DatasetsPage, {
+            global: {
+                plugins: [PrimeVue],
+                mocks: { $route: { params: { org: 'org' } }, $router: { push: vi.fn() }, $notify: { success: vi.fn(), error: vi.fn() } },
+                stubs: {
+                    DatasetDialog: true, ImportDatasetDialog: true, OrganizationDialog: true, OrganizationMembersDialog: true, MessageDialog: true,
+                    DialogHost: true, Paginator: true, DatasetLocationsMap: true
+                }
+            }
+        });
+        await flushPromises();
+    }
+    const createActions = () => wrapper.findAll('button').map(b => b.attributes('title') || b.text())
+        .filter(t => t === 'Import Dataset' || t === 'Create Dataset');
+
+    it('shows no create or import action in a read-only Public organization without datasets', async () => {
+        await renderEmpty({ canRead: true, canWrite: false, canDelete: false, canManageMembers: false });
+        expect(wrapper.vm.canCreateDataset).toBe(false);
+        expect(createActions()).toEqual([]);
+        expect(wrapper.text()).not.toContain('create a new dataset');
+    });
+
+    it('shows them in an empty organization the user may write', async () => {
+        await renderEmpty({ canRead: true, canWrite: true, canDelete: false, canManageMembers: false });
+        expect(createActions()).toEqual(['Import Dataset', 'Create Dataset']);
+        expect(wrapper.text()).toContain('create a new dataset');
+    });
+
+    it('shows none to an anonymous visitor of an empty Public organization (the Registry sends them no permissions)', async () => {
+        reg.isLoggedIn = () => false;
+        await renderEmpty(null);
+        expect(wrapper.vm.canCreateDataset).toBe(false);
+        expect(createActions()).toEqual([]);
+        expect(wrapper.text()).not.toContain('create a new dataset');
+    });
+
+    it('keeps offering them in an empty organization of an older Registry that sends no permissions', async () => {
+        await renderEmpty(null);
+        expect(wrapper.vm.canCreateDataset).toBe(true);
+        expect(createActions()).toEqual(['Import Dataset', 'Create Dataset']);
     });
 });

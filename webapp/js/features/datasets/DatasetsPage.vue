@@ -355,8 +355,14 @@ export default {
         // OR if there are no datasets yet (server will validate permission)
         canCreateDataset: function () {
             if (HubOptions.disableDatasetCreation) return false;
-            // If user has write permission on the org, they can create datasets
-            if (this.orgInfo?.permissions?.canWrite) return true;
+            // An anonymous visitor (a Public organization opens without signing in) creates nothing: the Registry
+            // sends them no permissions, which the fallback below would read as an older Registry
+            if (!reg.isLoggedIn()) return false;
+            // The organization says what the user may do: write creates, read only (a Public organization of
+            // another user, D-003) does not. Without permissions for a signed-in user (an older Registry) the
+            // rules below decide
+            const orgPermissions = this.orgInfo?.permissions;
+            if (orgPermissions) return orgPermissions.canWrite === true;
             if (this.datasets.length === 0) return true;
             return this.datasets.some(ds => ds.permissions && ds.permissions.canWrite);
         },

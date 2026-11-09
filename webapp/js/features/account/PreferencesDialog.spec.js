@@ -225,6 +225,14 @@ describe('PreferencesDialog', () => {
             expect(direction().closest('.p-select').textContent).toContain('Ascending');
         });
 
+        it('names the default list for what it holds: owned, member and public organizations (D-003)', async () => {
+            await open();
+            const label = document.getElementById('pref-orgs-owned-only-label');
+            expect(label.textContent.trim()).toBe('Show only organizations I own, belong to, or that are public');
+            expect(label.getAttribute('for')).toBe('pref-orgs-owned-only');
+            expect(document.getElementById('pref-orgs-owned-only').checked).toBe(true);
+        });
+
         it('follows a change that comes from the account', async () => {
             await open();
             applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'datasetCount', sortDirection: 'desc' });

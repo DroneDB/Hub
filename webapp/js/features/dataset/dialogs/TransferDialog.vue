@@ -154,8 +154,11 @@ export default {
         try {
             // Load organizations - getOrganizations returns Organization instances
             const orgInstances = await reg.orgs.getOrganizations();
-            // Extract the org data from each Organization instance
-            this.organizations = orgInstances.map(orgInstance => orgInstance.org);
+            // Extract the org data from each Organization instance. Only the organizations the user may write
+            // are destinations: the list also holds the Public ones they can only read (D-003, FR-ORG-02)
+            this.organizations = orgInstances
+                .map(orgInstance => orgInstance.org)
+                .filter(org => org.permissions?.canWrite === true);
 
         } catch (e) {
             console.error("Error loading organizations:", e);
