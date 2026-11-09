@@ -71,11 +71,15 @@ const T = ddb.entry.type;
 const file = name => ({ label: name, path: `ddb://h/acme/site/${name}`, selected: true, entry: { path: name, type: T.GEORASTER, size: 1 } });
 const ROOT = { path: 'ddb://h/acme/site', type: T.DRONEDB, size: 1, properties: { entries: 1, permissions: { canRead: true, canWrite: true } } };
 
-// ---- The window: matchMedia of the max-width queries of libs/responsiveColumns.js, resizable --------------------
+// ---- The window: matchMedia of the queries of libs/responsiveColumns.js, resizable --------------------
 
 let width = 1280;
 const queries = [];
-const matches = query => width <= Number(/max-width:\s*([\d.]+)px/.exec(query)[1]);
+// The max-width queries (phone, tablet) and the min-width one of the wide screens (the tile size of the grid, FR-EXP-43)
+const matches = query => {
+    const max = /max-width:\s*([\d.]+)px/.exec(query);
+    return max ? width <= Number(max[1]) : width >= Number(/min-width:\s*([\d.]+)px/.exec(query)[1]);
+};
 function fakeMatchMedia(query) {
     const media = { query, matches: matches(query), listeners: [] };
     media.addEventListener = (_, fn) => media.listeners.push(fn);
@@ -265,5 +269,55 @@ describe('ViewDataset detail drawer below lg (FR-EXP-17)', () => {
         await select(b);
         expect(wrapper.find('.detail-side .panel-stub').exists()).toBe(true);
         expect(wrapper.find('.detail-reopen').exists()).toBe(false);
+    });
+});
+
+describe('ViewDataset thumbnail size of the grid (FR-EXP-43)', () => {
+    const tileSize = () => h_.explorerAttrs['tile-size'] ?? h_.explorerAttrs.tileSize;
+    const tool = id => h_.explorerAttrs.tools.find(t => t.id === id);
+
+    beforeEach(() => localStorage.clear());
+    afterEach(() => localStorage.clear());
+
+    it('is S on a 1920 px screen until the user chooses, and M from the xwide breakpoint (2560 px)', async () => {
+        await open(1920);
+        expect(tileSize()).toBe('s');
+        expect(tool('tile-size-s').pressed).toBe(true);
+        wrapper.unmount();
+        document.body.innerHTML = '';
+        await open(2560);
+        expect(tileSize()).toBe('m');
+        expect(tool('tile-size-m').pressed).toBe(true);
+    });
+
+    it('follows the window across the xwide breakpoint while nothing is chosen', async () => {
+        await open(1920);
+        await resizeTo(3840);
+        expect(tileSize()).toBe('m');
+        await resizeTo(1280);
+        expect(tileSize()).toBe('s');
+    });
+
+    it('takes the size of the toolbar, keeps it on the device and holds to it on any screen', async () => {
+        await open(3840);
+        tool('tile-size-l').onClick();
+        await flushPromises();
+        expect(tileSize()).toBe('l');
+        expect(localStorage.getItem('explorerTileSize')).toBe('l');
+        expect(tool('tile-size-l').pressed).toBe(true);
+        expect(tool('tile-size-m').pressed).toBe(false);
+        await resizeTo(1280);
+        expect(tileSize()).toBe('l');
+    });
+
+    it('reads a stored size, and ignores one that is not S, M or L', async () => {
+        localStorage.setItem('explorerTileSize', 's');
+        await open(3840);
+        expect(tileSize()).toBe('s');
+        wrapper.unmount();
+        document.body.innerHTML = '';
+        localStorage.setItem('explorerTileSize', 'huge');
+        await open(3840);
+        expect(tileSize()).toBe('m');
     });
 });

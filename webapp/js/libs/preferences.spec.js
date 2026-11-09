@@ -160,7 +160,7 @@ describe('catalog', () => {
     it('ACCOUNT_SECTIONS keys are PREF values, and the device-only keys are not mapped', () => {
         const known = new Set(Object.values(PREF));
         for (const key of Object.keys(ACCOUNT_SECTIONS)) expect(known.has(key)).toBe(true);
-        for (const local of [PREF.PANEL_SIZES, PREF.ORG_PAGE_POSITION, PREF.HUB_UPDATE_NOTICE, PREF.CLIPBOARD, PREF.HUB_UPDATE_ATTEMPTED, PREF.SPLAT_VIEW_SETTINGS, PREF.APPEARANCE]) {
+        for (const local of [PREF.PANEL_SIZES, PREF.ORG_PAGE_POSITION, PREF.HUB_UPDATE_NOTICE, PREF.CLIPBOARD, PREF.HUB_UPDATE_ATTEMPTED, PREF.SPLAT_VIEW_SETTINGS, PREF.APPEARANCE, PREF.TILE_SIZE]) {
             expect(ACCOUNT_SECTIONS).not.toHaveProperty(local);
         }
     });
@@ -191,6 +191,14 @@ describe('catalog', () => {
 
     it('every preference with choices has its default among them', () => {
         for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key] ?? DEVICE_PREF_DEFAULTS[key]);
+    });
+
+    // FR-EXP-43: a thumbnail size follows the screen: it stays on the device, and nothing is stored until the user chooses
+    it('the tile size is a device preference with no stored default (M on a 4K screen, S below, until chosen)', () => {
+        expect(PREF.TILE_SIZE).toBe('explorerTileSize');
+        expect(ACCOUNT_SECTIONS).not.toHaveProperty(PREF.TILE_SIZE);
+        expect(PREF_DEFAULTS).not.toHaveProperty(PREF.TILE_SIZE);
+        expect(getPref(PREF.TILE_SIZE, '')).toBe('');
     });
 
     // D-044: the choice is stored per device, not with the account; System until the user picks one

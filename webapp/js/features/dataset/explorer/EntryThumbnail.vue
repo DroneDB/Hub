@@ -88,20 +88,24 @@ export default {
             error: null,
             buildState: null,
             buildLoading: false,
-            iconStyle: {
-                fontSize: (parseInt(this.size / 3) / 16) + 'rem'
-            },
-            sizeStyle: {
-                width: (this.size / 16) + 'rem',
-                height: (this.size / 16) + 'rem'
-            },
             loading: false,
             // Bounded retry state (see libs/build/thumbRetryPolicy)
             retryNumber: 0,
-            loadTimeout: null
+            loadTimeout: null,
+            // Within the scroll viewport (plus margin) as the Explorer's visibility tracker says; every tile is without one
+            inView: true,
+            // The size changed while the tile was out of view: its thumbnail comes again at the new size when it is back
+            stale: false
         }
     },
     computed: {
+        // The box of the thumbnail and its fallback icon follow the size (the user changes it: S, M, L)
+        iconStyle() {
+            return { fontSize: (parseInt(this.size / 3) / 16) + 'rem' };
+        },
+        sizeStyle() {
+            return { width: (this.size / 16) + 'rem', height: (this.size / 16) + 'rem' };
+        },
         // The spacing and the name height come from the tile geometry the virtual grid sizes its rows by
         tileStyle() {
             return { ...tileCssVars(), maxWidth: (this.size / 16) + 'rem' };
@@ -154,13 +158,29 @@ export default {
             }
         }
     },
+    watch: {
+        // Another tile size: a thumbnail shown comes again at the step of the new size (FR-EXP-43, FR-XC-32), now
+        // when the tile is in view, else when it comes into view. A tile still waiting for its turn needs nothing:
+        // its URL is built when the turn comes.
+        size(size, before) {
+            if (!this.thumbnail || thumbnailRequestSize(size) === thumbnailRequestSize(before)) return;
+            if (this.inView) this.refreshSize();
+            else this.stale = true;
+        }
+    },
     mounted: async function () {
         if (!this.lazyLoad) await this.loadThumbnail();
         else if (this.thumbnailLoader) {
             this.thumbnailLoader.visibility.observe(this.$el, visible => {
-                if (visible) this.loadThumbnail();
-                // Scrolled away before its turn: it asks again when it comes back
-                else if (this.imageTicket?.state === 'waiting') this.cancelImageRequest();
+                this.inView = visible;
+                if (visible) {
+                    if (this.stale) this.refreshSize();
+                    else this.loadThumbnail();
+                } else if (this.imageTicket?.state === 'waiting') {
+                    // Scrolled away before its turn: it asks again when it comes back (at the size of then)
+                    if (this.thumbnail) this.stale = true;
+                    this.cancelImageRequest();
+                }
             });
         }
 
@@ -176,18 +196,60 @@ export default {
         if (this.loadTimeout) clearTimeout(this.loadTimeout);
     },
     methods: {
-        // Shows `url` once the loader grants a slot (at once without a loader)
-        showImage: function (url) {
+        // The thumbnail URL at the size the tile has now: the tile's size times the pixel ratio, not a fixed 256 px
+        thumbnailUrl: function () {
+            return thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
+        },
+        // Shows the thumbnail once the loader grants a slot (at once without a loader). The URL is built then, not
+        // before: the size may change while the tile waits for its turn (FR-EXP-43).
+        showImage: function () {
             this.cancelImageRequest();
             if (!this.thumbnailLoader) {
-                this.thumbnail = url;
-                this.loading = false;
+                try {
+                    this.applyImage(this.thumbnailUrl());
+                } catch (e) {
+                    this.failLoad(e);
+                }
                 return;
             }
-            this.imageTicket = this.thumbnailLoader.queue.enqueue(() => {
-                this.thumbnail = url;
-                this.loading = false;
+            // The queue may grant the slot at once, inside enqueue()
+            let ticket = null;
+            let ended = false;
+            ticket = this.thumbnailLoader.queue.enqueue(() => {
+                let url;
+                try {
+                    url = this.thumbnailUrl();
+                } catch (e) {
+                    this.failLoad(e);
+                    throw e; // the queue gives the slot to the next tile
+                }
+                if (this.applyImage(url)) return;
+                // Nothing to load: the slot goes to the next tile
+                ended = true;
+                ticket?.release();
             });
+            if (ended) ticket.release();
+            else this.imageTicket = ticket;
+        },
+        // The <img> takes `url`, false when it already has it. A thumbnail shown stays until the new one has
+        // loaded (the browser keeps the current image while the next one loads): a size change draws no spinner.
+        applyImage: function (url) {
+            this.loading = false;
+            if (url === this.thumbnail) return false;
+            this.thumbnail = url;
+            return true;
+        },
+        // The size changed: the thumbnail shown comes again at the new size, the old one shown meanwhile. A request
+        // still waiting for its turn takes the size of then.
+        refreshSize: function () {
+            this.stale = false;
+            if (!this.thumbnail || this.imageTicket?.state === 'waiting') return;
+            this.retryNumber = 0;
+            if (this.loadTimeout) {
+                clearTimeout(this.loadTimeout);
+                this.loadTimeout = null;
+            }
+            this.showImage();
         },
         cancelImageRequest: function () {
             if (!this.imageTicket) return;
@@ -199,6 +261,8 @@ export default {
         },
         // The image request ended (loaded or failed): its slot goes to the next tile
         releaseImageSlot: function () {
+            // Not a request still waiting for its turn (the image of before ended meanwhile)
+            if (this.imageTicket?.state === 'waiting') return;
             this.imageTicket?.release();
             this.imageTicket = null;
         },
@@ -335,26 +399,28 @@ export default {
 
             try {
                 if (hasThumbnail(this.file.entry.type)) {
-                    // The tile's size times the pixel ratio, not a fixed 256 px
-                    const url = await thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
                     this.buildLoading = false; // Clear build loading when thumbnail succeeds
-                    this.showImage(url);
+                    this.showImage();
                 } else {
                     this.icon = this.file.icon;
                     this.loading = false;
                     this.buildLoading = false; // Clear build loading when using icon
                 }
             } catch (e) {
-                this.loading = false; // Reset loading state on error
+                this.failLoad(e);
+            }
+        },
+        // No thumbnail URL for the file
+        failLoad: function (e) {
+            this.loading = false; // Reset loading state on error
 
-                // For buildable files without a build yet, show the icon and let the
-                // queued/pending badge explain the state instead of a perpetual spinner.
-                if (this.dataset && isBuildableType(this.file.entry.type) && !this.buildState) {
-                    this.icon = this.file.icon;
-                } else {
-                    this.buildLoading = false;
-                    this.showError(e);
-                }
+            // For buildable files without a build yet, show the icon and let the
+            // queued/pending badge explain the state instead of a perpetual spinner.
+            if (this.dataset && isBuildableType(this.file.entry.type) && !this.buildState) {
+                this.icon = this.file.icon;
+            } else {
+                this.buildLoading = false;
+                this.showError(e);
             }
         },
         onClick: function (e) {
@@ -403,6 +469,8 @@ export default {
 
         onBuildStarted(data) {
             if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                // The image goes away (no load or error event will come): its turn goes to the next tile
+                this.cancelImageRequest();
                 this.buildLoading = true;
                 this.loading = false;
                 this.error = null;

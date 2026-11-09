@@ -4,7 +4,7 @@
  * whose JSON is the same as before (Rename of README.md, then of newdir).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import HubToolbar from './HubToolbar.vue';
 
@@ -66,6 +66,21 @@ describe('HubToolbar', () => {
         expect(button(w, 'Thumbnails').attributes('aria-pressed')).toBe('false');
     });
 
+    it('shows the short text of a tool instead of its icon, and keeps the title as its name (S, M, L)', async () => {
+        const onClick = vi.fn();
+        const sizes = pressed => ['s', 'm', 'l'].map(k => ({
+            id: `tile-size-${k}`, title: { s: 'Small thumbnails', m: 'Medium thumbnails', l: 'Large thumbnails' }[k],
+            icon: 'fa-regular fa-image', text: k.toUpperCase(), pressed: k === pressed, onClick
+        }));
+        const w = mountToolbar([{ id: 'spacer' }, ...sizes('m')]);
+        expect(w.findAll('button[data-tool^="tile-size"]').map(b => b.text())).toEqual(['S', 'M', 'L']);
+        const medium = w.find('button[aria-label="Medium thumbnails"]');
+        expect(medium.attributes('aria-pressed')).toBe('true');
+        expect(medium.find('.fa-image').exists()).toBe(false);
+        await w.find('button[aria-label="Large thumbnails"]').trigger('click');
+        expect(onClick).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps a disabled tool focusable and gives its reason, and does not run it', async () => {
         const onClick = vi.fn();
         const w = mountToolbar([{ id: 'delete', title: 'Delete', icon: 'fa-solid fa-trash', disabled: true, disabledReason: 'Select the files to delete', onClick }]);
@@ -120,6 +135,40 @@ describe('HubToolbar', () => {
             more.find(i => i.label === 'Refresh').command();
             expect(a.refresh).toHaveBeenCalledTimes(1);
             expect(w.find('[data-tool="more"]').attributes('aria-haspopup')).toBe('true');
+        });
+
+        it('shows the state of a toggle in More: a check item, checked where the toolbar shows it pressed (S, M, L on a tablet)', async () => {
+            const onClick = vi.fn();
+            const w = mount(HubToolbar, {
+                props: {
+                    tools: [
+                        { id: 'spacer' },
+                        { id: 'refresh', title: 'Refresh', icon: 'fa-solid fa-rotate-right', priority: 3, onClick },
+                        { id: 'thumbnails', title: 'Thumbnails', icon: 'fa-regular fa-image', priority: 3, pressed: false, onClick },
+                        { id: 'tile-size-s', title: 'Small thumbnails', icon: 'fa-solid fa-table-cells', text: 'S', priority: 3, pressed: false, onClick },
+                        { id: 'tile-size-m', title: 'Medium thumbnails', icon: 'fa-solid fa-table-cells-large', text: 'M', priority: 3, pressed: true, onClick },
+                        { id: 'tile-size-l', title: 'Large thumbnails', icon: 'fa-regular fa-square', text: 'L', priority: 3, pressed: false, onClick }
+                    ]
+                },
+                global: { plugins: [PrimeVue] },
+                attachTo: document.body
+            });
+            await w.setData({ width: 800 });
+            await w.find('[data-tool="more"]').trigger('click');
+            await flushPromises();
+
+            const items = [...document.body.querySelectorAll('.p-menu-item')];
+            expect(items.map(i => i.getAttribute('aria-label'))).toEqual(
+                ['Refresh', 'Thumbnails', 'Small thumbnails', 'Medium thumbnails', 'Large thumbnails']);
+            expect(items.map(i => i.getAttribute('role'))).toEqual(
+                ['menuitem', 'menuitemcheckbox', 'menuitemcheckbox', 'menuitemcheckbox', 'menuitemcheckbox']);
+            expect(items.map(i => i.getAttribute('aria-checked'))).toEqual([null, 'false', 'false', 'true', 'false']);
+            const icon = i => i.querySelector('.p-menu-item-icon');
+            expect(icon(items[0]).classList.contains('fa-rotate-right')).toBe(true);
+            expect(icon(items[3]).classList.contains('fa-check')).toBe(true);
+            expect(icon(items[3]).style.visibility).toBe('');
+            expect(icon(items[2]).style.visibility).toBe('hidden');
+            w.unmount();
         });
     });
 });

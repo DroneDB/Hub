@@ -39,7 +39,7 @@
         <div class="detail-content">
             <!-- Thumbnail section -->
             <div v-if="hasThumbnailSupport" class="thumbnail-section">
-                <div class="thumbnail-container">
+                <div ref="thumbnailContainer" class="thumbnail-container">
                     <img v-if="thumbnail && !loading && !buildLoading"
                          :src="thumbnail" alt="Preview"
                          class="detail-thumbnail"
@@ -106,6 +106,7 @@
 
 <script>
 import { thumbs } from 'ddb';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { isGeoraster as isGeorasterEntry } from '@/libs/entryTypes';
@@ -123,6 +124,11 @@ import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { savedViewUrl, fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { viewsUsing } from '@/libs/views/viewStore';
+
+// The preview box is as wide as the panel, and as high as 18.75rem at most (css); a box that is not measured
+// yet (the panel is not on the page) is taken as 400 CSS px wide
+const PREVIEW_FALLBACK_CSS_PX = 400;
+const PREVIEW_MAX_HEIGHT_CSS_PX = 300;
 
 export default {
     components: { PropsTable, Button, Message },
@@ -161,6 +167,8 @@ export default {
     data: function () {
         return {
             thumbnail: null,
+            // The size the shown thumbnail was requested at (the long side, px)
+            thumbnailSize: 0,
             loading: false,
             buildState: null,
             buildLoading: false,
@@ -303,11 +311,46 @@ export default {
         if (this.dataset && this.file) {
             this.setupBuildListeners();
         }
+        this.observePreviewBox();
+    },
+    updated() {
+        // The box exists once a file is selected, and is another element when the panel changes its root
+        this.observePreviewBox();
     },
     beforeUnmount() {
         this.cleanupBuildListeners();
+        this._boxObserver?.disconnect();
     },
     methods: {
+        // The size to request for the preview: the box's width times the pixel ratio, in the steps of
+        // FR-XC-32 (a bitmap of the box's CSS size is soft on a 2x screen, FR-EXP-41)
+        previewRequestSize() {
+            const box = this.$refs.thumbnailContainer;
+            const width = box ? box.clientWidth : 0;
+            return thumbnailRequestSize(Math.max(width > 0 ? width : PREVIEW_FALLBACK_CSS_PX, PREVIEW_MAX_HEIGHT_CSS_PX));
+        },
+
+        // The panel can be dragged wider (or the window resized) after the preview came: a box that needs
+        // a larger step loads that one (a smaller box keeps the bitmap it has)
+        observePreviewBox() {
+            const box = this.$refs.thumbnailContainer || null;
+            if (box === this._observedBox) return;
+            this._boxObserver?.disconnect();
+            this._boxObserver = null;
+            this._observedBox = box;
+            if (!box || typeof ResizeObserver === 'undefined') return;
+            this._boxObserver = new ResizeObserver(() => this.onPreviewBoxResize());
+            this._boxObserver.observe(box);
+        },
+
+        onPreviewBoxResize() {
+            if (!this.thumbnail || this.loading || !this.file || !hasThumbnail(this.file.entry.type)) return;
+            const size = this.previewRequestSize();
+            if (size <= this.thumbnailSize) return;
+            this.thumbnailSize = size;
+            this.thumbnail = thumbs.fetch(this.file.path, size, this.file.entry.hash);
+        },
+
         async loadDetails() {
             this.resetDetails();
 
@@ -333,6 +376,7 @@ export default {
 
         resetDetails() {
             this.thumbnail = null;
+            this.thumbnailSize = 0;
             this.loading = false;
             this.buildState = null;
             this.buildLoading = false;
@@ -346,7 +390,11 @@ export default {
 
             try {
                 if (hasThumbnail(this.file.entry.type)) {
-                    this.thumbnail = await thumbs.fetch(this.file.path, 512, this.file.entry.hash);
+                    // The box is on the page after a render: measure it, not the fallback
+                    if (!this.$refs.thumbnailContainer) await this.$nextTick();
+                    const size = this.previewRequestSize();
+                    this.thumbnail = await thumbs.fetch(this.file.path, size, this.file.entry.hash);
+                    this.thumbnailSize = size;
                     this.buildLoading = false;
                 }
             } catch (e) {

@@ -6,7 +6,9 @@
                 <ActionButton v-else :label="tool.title || ''" :icon="tool.icon" :show-label="labelled(tool)"
                               :disabled="!!tool.disabled" :disabled-reason="tool.disabledReason || ''" :pressed="tool.pressed"
                               :severity="tool.pressed ? 'contrast' : 'secondary'" text size="small"
-                              :data-tool="tool.id" @click="runTool(tool)" />
+                              :data-tool="tool.id" @click="runTool(tool)">
+                    <template v-if="tool.text" #default>{{ tool.text }}</template>
+                </ActionButton>
             </template>
         </template>
         <template #end>
@@ -15,13 +17,15 @@
                 <ActionButton v-else :label="tool.title || ''" :icon="tool.icon" :show-label="labelled(tool)"
                               :disabled="!!tool.disabled" :disabled-reason="tool.disabledReason || ''" :pressed="tool.pressed"
                               :severity="tool.pressed ? 'contrast' : 'secondary'" text size="small"
-                              :data-tool="tool.id" @click="runTool(tool)" />
+                              :data-tool="tool.id" @click="runTool(tool)">
+                    <template v-if="tool.text" #default>{{ tool.text }}</template>
+                </ActionButton>
             </template>
             <template v-if="overflowTools.length">
                 <ActionButton label="More" icon="fa-solid fa-ellipsis-vertical" severity="secondary" text size="small"
                               aria-haspopup="true" :aria-controls="moreMenuId" :aria-expanded="String(moreOpen)"
                               data-tool="more" @click="toggleMore" />
-                <PvMenu :id="moreMenuId" ref="moreMenu" :model="overflowModel" popup
+                <PvMenu :id="moreMenuId" ref="moreMenu" :model="overflowModel" :pt="moreMenuPt" popup
                         @show="moreOpen = true" @hide="moreOpen = false" />
             </template>
         </template>
@@ -62,7 +66,7 @@ const collapseSeparators = tools => tools.filter((t, i) => t.id !== 'separator'
  * than the `sm` breakpoint (a phone), 2 when it is narrower than `lg` (a tablet), 3 only when it is
  * wider; the tools that do not fit go into a "More" menu built from the same descriptors. A tool
  * with `showLabel` shows its title next to its icon on a wide toolbar. A disabled tool stays
- * focusable and gives its `disabledReason` (ActionButton); a toggle gives `pressed`.
+ * focusable and gives its `disabledReason` (ActionButton); a toggle gives `pressed` (a check item in More).
  *
  * Props:
  *   tools - Array of { id, icon, title, disabled, disabledReason, pressed, priority, showLabel, onClick }.
@@ -99,13 +103,25 @@ export default {
         overflowTools() {
             return (this.tools || []).filter(t => !STRUCTURAL.has(t.id) && (t.priority ?? 1) > this.level);
         },
+        // A toggle (a tool with `pressed`) is a check item: a check where the toolbar shows it pressed, in place of its icon
         overflowModel() {
             return this.overflowTools.map(tool => ({
                 label: tool.disabled && tool.disabledReason ? `${tool.title} (${tool.disabledReason})` : tool.title,
-                icon: tool.icon,
+                icon: tool.pressed === undefined ? tool.icon : 'fa-solid fa-check',
                 disabled: !!tool.disabled,
+                ...(tool.pressed === undefined ? {} : { checked: !!tool.pressed }),
                 command: () => this.runTool(tool)
             }));
+        },
+        // The check items say their state (menuitemcheckbox, aria-checked); an unchecked one keeps the room of its check
+        moreMenuPt() {
+            const checkable = item => typeof item?.checked === 'boolean';
+            return {
+                item: ({ context }) => (checkable(context.item)
+                    ? { role: 'menuitemcheckbox', 'aria-checked': String(context.item.checked) } : {}),
+                itemIcon: ({ context }) => (checkable(context.item) && !context.item.checked
+                    ? { style: { visibility: 'hidden' } } : {})
+            };
         },
         spacerIndex() {
             return this.shownTools.findIndex(t => t.id === 'spacer');

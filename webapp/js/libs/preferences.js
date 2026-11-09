@@ -22,6 +22,7 @@ export const PREF = Object.freeze({
     SHOW_FLIGHT_PATH: 'showFlightPath',
     FILE_VIEW_MODE: 'fileViewMode',
     TABLE_EXPANDED_GRID: 'tableExpandedGrid',
+    TILE_SIZE: 'explorerTileSize', // 's' | 'm' | 'l': the thumbnails of the grid view; device only (a size follows the screen), M from a 4K screen until chosen (FR-EXP-43)
     SORT_DESCENDING: 'sortDescending',
     LOCATIONS_MAP_NAMES: 'locationsMapNames', // true: the map of dataset locations shows the names of its pins
     SPLAT_NAV_MODE: 'ddb.splat.navMode',

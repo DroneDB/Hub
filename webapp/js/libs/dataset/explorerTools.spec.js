@@ -12,15 +12,15 @@ const file = (type, path = 'x') => ({ path: `ddb://h/o/d/${path}`, entry: { type
 const ids = tools => tools.map(t => t.id);
 const byId = (tools, id) => tools.find(t => t.id === id);
 
-function context({ canWrite = true, files = [], selected = [], viewMode = 'grid', expandedGrid = false } = {}) {
+function context({ canWrite = true, files = [], selected = [], viewMode = 'grid', expandedGrid = false, tileSize = 's' } = {}) {
     return {
-        getSelectedEntries: () => selected, getFiles: () => files, canWrite, viewMode, expandedGrid,
+        getSelectedEntries: () => selected, getFiles: () => files, canWrite, viewMode, expandedGrid, tileSize,
         selectAll: vi.fn(), emit: vi.fn(), clipboardEmpty: () => true
     };
 }
 
 const WRITER_IDS = ['upload', 'new-folder', 'separator', 'open', 'share-embed', 'rename', 'delete', 'separator',
-    'select-all', 'clear-selection', 'spacer', 'refresh', 'view-grid', 'view-list', 'thumbnails'];
+    'select-all', 'clear-selection', 'spacer', 'refresh', 'view-grid', 'view-list', 'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l'];
 
 describe('explorerTools', () => {
     const a = file(T.GENERIC, 'a.bin'), b = file(T.GEOIMAGE, 'b.jpg'), c = file(T.IMAGE, 'c.png');
@@ -56,7 +56,7 @@ describe('explorerTools', () => {
         const tools = explorerTools(context({ canWrite: false, files, selected: [a] }));
         // HubToolbar drops the separator left at the start
         expect(ids(tools)).toEqual(['separator', 'open', 'share-embed', 'separator', 'select-all', 'clear-selection', 'spacer',
-            'refresh', 'view-grid', 'view-list', 'thumbnails']);
+            'refresh', 'view-grid', 'view-list', 'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l']);
         expect(byId(tools, 'share-embed').disabled).toBe(false);
     });
 
@@ -101,6 +101,37 @@ describe('explorerTools', () => {
         const table = explorerTools(context({ viewMode: 'table', expandedGrid: true }));
         expect([byId(table, 'view-grid').pressed, byId(table, 'view-list').pressed, byId(table, 'thumbnails').pressed]).toEqual([false, true, true]);
         expect(byId(table, 'thumbnails').disabled).toBe(false);
+    });
+
+    it('offers the thumbnail size S | M | L in the grid view, the size in force pressed (FR-EXP-43)', () => {
+        for (const tileSize of ['s', 'm', 'l']) {
+            const tools = explorerTools(context({ viewMode: 'grid', tileSize }));
+            const sizes = ['tile-size-s', 'tile-size-m', 'tile-size-l'].map(id => byId(tools, id));
+            expect(sizes.map(t => t.pressed)).toEqual(['s', 'm', 'l'].map(k => k === tileSize));
+            expect(sizes.map(t => t.disabled)).toEqual([false, false, false]);
+            expect(sizes.map(t => t.text)).toEqual(['S', 'M', 'L']);
+            expect(sizes.map(t => t.title)).toEqual(['Small thumbnails', 'Medium thumbnails', 'Large thumbnails']);
+        }
+    });
+
+    it('disables the thumbnail size in the list view, where the thumbnails are fixed, with its reason', () => {
+        const tools = explorerTools(context({ viewMode: 'table', tileSize: 'm' }));
+        for (const id of ['tile-size-s', 'tile-size-m', 'tile-size-l']) {
+            expect(byId(tools, id)).toMatchObject({ disabled: true, disabledReason: 'The thumbnail size is an option of the grid view', pressed: false });
+        }
+    });
+
+    it('sets the size through the page handler, and only on the wide screens (priority 3)', () => {
+        const ctx = context({ viewMode: 'grid', tileSize: 's' });
+        const tools = explorerTools(ctx);
+        byId(tools, 'tile-size-l').onClick();
+        byId(tools, 'tile-size-m').onClick();
+        expect(ctx.emit.mock.calls).toEqual([['setTileSize', 'l'], ['setTileSize', 'm']]);
+        expect(['tile-size-s', 'tile-size-m', 'tile-size-l'].map(id => byId(tools, id).priority)).toEqual([3, 3, 3]);
+
+        const list = context({ viewMode: 'table' });
+        byId(explorerTools(list), 'tile-size-l').onClick();
+        expect(list.emit).not.toHaveBeenCalled();
     });
 
     it('keeps Upload, New folder and the view toggle on a phone, and labels Upload and New folder', () => {

@@ -8,6 +8,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import VideoLightbox from './VideoLightbox.vue';
 import { DOWNLOAD_LIMIT_MESSAGE } from '@/libs/constants';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const notifyError = vi.hoisted(() => vi.fn());
 vi.mock('@/libs/notify', async importOriginal => {
@@ -160,5 +162,25 @@ describe('VideoLightbox', () => {
             await w.setProps({ visible: true });
             expect(document.querySelector('.video-lightbox-error')).toBeNull();
         });
+    });
+});
+
+// jsdom has no layout: the rule of the player is read from the component's style (FR-VWR-35)
+describe('VideoLightbox player size (FR-VWR-35)', () => {
+    const css = fs.readFileSync(path.join(__dirname, 'VideoLightbox.vue'), 'utf8').split('<style')[1];
+    const rule = selector => new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+
+    it('fills the free area and keeps the aspect ratio, so a 320x240 clip grows on a 4K screen', () => {
+        const player = rule('.video-lightbox-player');
+        expect(player).toMatch(/width:\s*100%/);
+        expect(player).toMatch(/height:\s*100%/);
+        expect(player).toMatch(/object-fit:\s*contain/);
+        // Only a maximum would leave the video at its pixel size
+        expect(player).not.toMatch(/max-width/);
+        expect(player).not.toMatch(/max-height/);
+    });
+
+    it('lets its content area shrink under the toolbar, so the video follows a window size change', () => {
+        expect(rule('.video-lightbox-content')).toMatch(/min-height:\s*0/);
     });
 });

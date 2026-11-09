@@ -64,6 +64,7 @@ import { pointLonLat } from '@/libs/ddb/pointGeom';
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import { formatDateTime, UNKNOWN } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
 import { useTimeout } from '@/composables/useTimers';
@@ -101,6 +102,20 @@ useOverlay({
     onEscape: e => { e.preventDefault(); dismiss(); },
     returnTo: () => props.map?.getTargetElement?.() || null
 });
+
+// The widest the popup gets, in CSS px, when its box cannot be measured (the largest --ddb-popup-width, 40rem)
+const POPUP_FALLBACK_CSS_PX = 640;
+
+/**
+ * The size to request for the photo (FR-MAP-31, FR-XC-32): the popup is as wide as its max-width allows
+ * (--ddb-popup-width, which grows with the screen) and the photo fills it, so the bitmap has that CSS width
+ * times the pixel ratio, in the steps of the helper, not a fixed 512 px.
+ */
+function photoRequestSize() {
+    const el = element.value;
+    const max = el && typeof getComputedStyle === 'function' ? parseFloat(getComputedStyle(el).maxWidth) : NaN;
+    return thumbnailRequestSize(max > 0 ? max : POPUP_FALLBACK_CSS_PX);
+}
 
 // Where the popup sits from its point before it is dragged, in pixels
 const DEFAULT_OFFSET = [150, -150];
@@ -145,7 +160,7 @@ function show(file, coordinate) {
     nextTick(() => {
         // Set after the tick so v-show hides the previous image while this one loads
         if (!isVideo) {
-            if (hasThumbnail(file.entry.type)) popup.thumbnail = thumbs.fetch(file.path, 512, file.entry.hash);
+            if (hasThumbnail(file.entry.type)) popup.thumbnail = thumbs.fetch(file.path, photoRequestSize(), file.entry.hash);
             else popup.loading = false;
         }
         if (!overlay && props.map) {
@@ -266,7 +281,8 @@ defineExpose({ show, close, closeUnlessIn });
     border-radius: var(--ddb-radius-md);
     box-shadow: var(--ddb-shadow-md);
     min-width: min(16.25rem, calc(100vw - 2rem));
-    max-width: min(20rem, calc(100vw - 2rem));
+    /* The width of a map popup is a token of the layout (FR-XC-33): 20rem on a phone, up to 40rem on a 4K screen */
+    max-width: min(var(--ddb-popup-width), calc(100vw - 2rem));
     overflow: hidden;
     z-index: 1001;
     font-family: inherit;
@@ -337,7 +353,7 @@ defineExpose({ show, close, closeUnlessIn });
 
 .image-popup-img {
     max-width: 100%;
-    max-height: 15rem;
+    max-height: clamp(15rem, 25vh, 28rem);
     border-radius: var(--ddb-radius-sm);
     object-fit: contain;
 }

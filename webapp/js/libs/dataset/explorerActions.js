@@ -42,6 +42,7 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
  * @property {() => boolean} [clipboardEmpty]  whether the Hub clipboard is empty (the store by default)
  * @property {'grid'|'table'} [viewMode]       toolbar only
  * @property {boolean} [expandedGrid]          toolbar only
+ * @property {'s'|'m'|'l'} [tileSize]          the thumbnail size of the grid view in force, toolbar only
  * @property {boolean} [signedIn]              the user is signed in (reg.isLoggedIn() by default)
  * @property {boolean} [unavailable]           the dataset did not load: no action on it (the header)
  * @property {() => boolean} [downloadInProgress]  a download is under way (the session's archive by default)
@@ -57,6 +58,7 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
  * @property {boolean} [pasteEvent]   the accelerator is the browser's paste event, not a keydown
  * @property {1|2|3} [priority]       toolbar overflow: 1 stays on a phone, 2 on a tablet, 3 on a wide screen
  * @property {boolean} [showLabel]    the toolbar shows the label next to the icon where there is room
+ * @property {string} [text]          the toolbar shows this short text instead of the icon (S, M, L); the label stays the name
  * @property {(c: ActionContext) => boolean} [permitted]
  * @property {(c: ActionContext) => boolean} [applies]
  * @property {(c: ActionContext, surface: Surface) => boolean} [shownIn]  a further per-surface rule
@@ -78,6 +80,7 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
  * @property {boolean} [pressed]
  * @property {number} priority
  * @property {boolean} showLabel
+ * @property {string} [text]
  * @property {() => void} run          does nothing when disabled
  */
 
@@ -122,6 +125,28 @@ const viewerActions = VIEWERS.map(row => /** @type {ActionDefinition} */ ({
         else c.emit('openItem', f);
     }
 }));
+
+/** The toolbar's S | M | L of the grid view: a pressed one is the size in force; the list view has fixed thumbnails. */
+function tileSizeActions() {
+    const sizes = /** @type {const} */ ([
+        ['s', 'Small thumbnails', 'S', 'fa-solid fa-table-cells'],
+        ['m', 'Medium thumbnails', 'M', 'fa-solid fa-table-cells-large'],
+        ['l', 'Large thumbnails', 'L', 'fa-regular fa-square']
+    ]);
+    return sizes.map(([size, label, text, icon]) => /** @type {ActionDefinition} */ ({
+        id: `tile-size-${size}`,
+        group: 'view',
+        label,
+        icon,
+        text,
+        surfaces: ['toolbar'],
+        priority: 3,
+        applies: c => c.viewMode !== 'table',
+        pressed: c => c.viewMode !== 'table' && c.tileSize === size,
+        reason: () => 'The thumbnail size is an option of the grid view',
+        run: c => c.emit('setTileSize', size)
+    }));
+}
 
 /** @type {ReadonlyArray<ActionDefinition>} */
 export const EXPLORER_ACTIONS = Object.freeze([
@@ -331,7 +356,9 @@ export const EXPLORER_ACTIONS = Object.freeze([
         pressed: c => c.viewMode === 'table' && !!c.expandedGrid,
         reason: () => 'Thumbnails are an option of the list view',
         run: c => c.emit('toggleExpandedGrid')
-    }
+    },
+    // The size of the thumbnails of the grid view: S, M, L (FR-EXP-43)
+    ...tileSizeActions()
 ]);
 
 const BY_ID = new Map(EXPLORER_ACTIONS.map(a => [a.id, a]));
@@ -373,6 +400,7 @@ export function resolveAction(action, ctx, surface) {
         pressed: def.pressed ? def.pressed(ctx) : undefined,
         priority: def.priority ?? 3,
         showLabel: !!def.showLabel,
+        text: def.text,
         run: () => { if (enabled) def.run(ctx); }
     };
 }

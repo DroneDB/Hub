@@ -83,7 +83,10 @@
 
                 <!-- Column 3: Preview -->
                 <div v-if="previewUrl" class="col-preview">
-                    <img :src="previewUrl" class="preview-thumb" alt="Merge preview">
+                    <button type="button" class="btn-reset preview-open" title="Show the preview at full size"
+                            aria-label="Show the preview at full size" @click="previewOpen = true">
+                        <img :src="previewUrl" class="preview-thumb" alt="Merge preview">
+                    </button>
                 </div>
             </div>
 
@@ -113,6 +116,10 @@
                 </div>
             </div>
         </div>
+        <Window v-if="previewOpen && previewUrl" title="Merge preview" modal width="1100px" height="auto" close-button cancel-label="Close"
+                @close="previewOpen = false">
+            <img :src="previewUrl" class="preview-full" alt="Merge preview at full size">
+        </Window>
         <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
@@ -131,7 +138,13 @@ import {
 } from '@/composables/useConfirmReplace';
 import { freeName, namesClash, nameClashMessage } from '@/libs/nameRules';
 import { shortenMiddle, groupWarnings, cameraBandName } from '@/libs/dataset/mergeBands';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import ddb, { pathutils } from 'ddb';
+
+// The preview is drawn at 28rem at most (.preview-thumb): its bitmap has that CSS width times the pixel ratio,
+// in the steps of FR-XC-32 (440 px at 2x is 512, 28rem at 2x is 1024), and never more than 1024 px (FR-PRC-46)
+const PREVIEW_CSS_PX = 448;
+const PREVIEW_MAX_PX = 1024;
 
 /**
  * MergeMultispectralDialog - Dialog for merging multispectral bands into a
@@ -169,6 +182,8 @@ export default {
             validating: false,
             validationResult: null,
             previewUrl: null,
+            // The preview at full size is open (a click on the preview)
+            previewOpen: false,
             outputName: '',
             outputNameError: null,
             deleteSource: false,
@@ -304,6 +319,7 @@ export default {
             this.validating = true;
             this.validationResult = null;
             this.previewUrl = null;
+            this.previewOpen = false;
 
             try {
                 const paths = this.orderedFiles.map(f => f.entry.path);
@@ -335,7 +351,7 @@ export default {
         async loadPreview(request) {
             try {
                 const paths = this.orderedFiles.map(f => f.entry.path);
-                const result = await this.dataset.previewMergeMultispectral(paths, '1,2,3', 256);
+                const result = await this.dataset.previewMergeMultispectral(paths, '1,2,3', Math.min(PREVIEW_MAX_PX, thumbnailRequestSize(PREVIEW_CSS_PX)));
                 if (request !== this.validationRequest) return;
                 if (result instanceof Blob) {
                     this.previewUrl = URL.createObjectURL(result);
@@ -475,10 +491,20 @@ export default {
 }
 
 .col-preview {
-    flex: 0 0 auto;
+    /* The preview shares the free width with the details and grows with the dialog, up to 28rem (FR-PRC-46) */
+    flex: 1 1 14rem;
+    max-width: 28rem;
+    min-width: 0;
     text-align: center;
     display: flex;
     align-items: flex-start;
+}
+
+.preview-open {
+    display: block;
+    width: 100%;
+    padding: 0;
+    cursor: zoom-in;
 }
 
 .section-label {
@@ -583,10 +609,19 @@ export default {
 }
 
 .preview-thumb {
-    max-width: 220px;
-    max-height: 220px;
+    display: block;
+    max-width: min(100%, 28rem);
+    max-height: 28rem;
+    margin: 0 auto;
     border: 1px solid var(--p-surface-200);
     border-radius: 0.375rem;
+}
+
+.preview-full {
+    display: block;
+    max-width: 100%;
+    max-height: 75vh;
+    margin: 0 auto;
 }
 
 .bottom-row {

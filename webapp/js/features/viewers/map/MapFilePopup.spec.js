@@ -4,10 +4,13 @@ import PrimeVue from 'primevue/config';
 import ddb from 'ddb';
 import Window from '@/components/HubWindow.vue';
 import { hasOpenOverlay } from '@/composables/useOverlay';
+import { thumbs } from 'ddb';
+import fs from 'node:fs';
+import path from 'node:path';
 
 vi.mock('ddb', async importOriginal => {
     const actual = await importOriginal();
-    return { ...actual, thumbs: { fetch: () => '/thumb.webp' } };
+    return { ...actual, thumbs: { fetch: vi.fn(() => '/thumb.webp') } };
 });
 
 const { default: MapFilePopup } = await import('./MapFilePopup.vue');
@@ -120,5 +123,45 @@ describe('MapFilePopup in the overlay stack (MAP-20)', () => {
             expect(w.emitted('dismiss')).toHaveLength(1);
             w.unmount();
         });
+    });
+});
+
+describe('MapFilePopup photo size (FR-MAP-31)', () => {
+    afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); thumbs.fetch.mockClear(); });
+
+    /** The popup is `maxWidth` CSS px wide at most (--ddb-popup-width: jsdom has no layout) */
+    async function requestedSize(maxWidth, ratio) {
+        vi.stubGlobal('devicePixelRatio', ratio);
+        const real = globalThis.getComputedStyle.bind(globalThis);
+        vi.spyOn(globalThis, 'getComputedStyle').mockImplementation((el, ...rest) => (
+            el?.classList?.contains('image-popup') ? { maxWidth: `${maxWidth}px` } : real(el, ...rest)));
+        const w = await popupOf(photo('a.jpg'));
+        const size = thumbs.fetch.mock.calls.at(-1)[1];
+        w.unmount();
+        return size;
+    }
+
+    it('asks for the drawn width times the pixel ratio: a 422 px popup is 512 px at ratio 1 and 1024 px at ratio 2', async () => {
+        expect(await requestedSize(422, 1)).toBe(512);
+        expect(await requestedSize(422, 2)).toBe(1024);
+    });
+
+    it('asks for 1024 px for the 640 px popup of a 4K screen at ratio 1 (not the fixed 512 px)', async () => {
+        expect(await requestedSize(640, 1)).toBe(1024);
+    });
+
+    it('takes the widest popup (640 px) when its width cannot be measured', async () => {
+        vi.stubGlobal('devicePixelRatio', 1);
+        const w = await popupOf(photo('a.jpg'));
+        expect(thumbs.fetch.mock.calls.at(-1)[1]).toBe(1024);
+        w.unmount();
+    });
+
+    it('takes its width from the popup token and its photo height from the viewport', () => {
+        const css = fs.readFileSync(path.join(__dirname, 'MapFilePopup.vue'), 'utf8').split('<style')[1];
+        expect(css).toMatch(/max-width:\s*min\(var\(--ddb-popup-width\),\s*calc\(100vw - 2rem\)\)/);
+        expect(css).toMatch(/max-height:\s*clamp\(15rem,\s*25vh,\s*28rem\)/);
+        // The 20rem limit of before
+        expect(css).not.toMatch(/max-width:\s*min\(20rem/);
     });
 });

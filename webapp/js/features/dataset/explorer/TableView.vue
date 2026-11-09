@@ -90,6 +90,7 @@ import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuil
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { sortFileRows, nextSort } from '@/libs/dataset/fileSort';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 
 import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
@@ -104,6 +105,10 @@ import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
 import { useListNavigation } from '@/composables/useListNavigation';
 import { columnFrom } from '@/libs/responsiveColumns';
+
+// The preview of a row is a 48 px box that `object-fit: cover` fills along the long side of a 16:9 photo:
+// 48 x 16 / 9 = 85.3, so 86 CSS px of bitmap (FR-EXP-41); the request adds the pixel ratio (128 at 1x, 256 at 2x)
+const ROW_PREVIEW_CSS_PX = 86;
 
 /**
  * TableView - Flat-list table view for dataset files.
@@ -438,7 +443,7 @@ export default {
                 // instance; they heal on remount / dataset switch.
                 if (this.failedThumbs.has(file.entry.path)) continue;
                 try {
-                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48, file.entry.hash));
+                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, thumbnailRequestSize(ROW_PREVIEW_CSS_PX), file.entry.hash));
                 } catch {
                     // Unsupported URI scheme or fetch error - fall back to icon
                 }

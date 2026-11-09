@@ -204,6 +204,7 @@ export default {
 
 .video-lightbox-content {
     flex: 1;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -211,9 +212,13 @@ export default {
     overflow: hidden;
 }
 
+/* The video fills the free area and keeps its aspect ratio (FR-VWR-35): a 320x240 clip is not 0.9% of a 4K screen */
 .video-lightbox-player {
-    max-width: 100%;
-    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    object-fit: contain;
     background: rgb(var(--ddb-shade-rgb));
     outline: none;
 }

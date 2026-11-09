@@ -14,7 +14,7 @@ export const TOOLBAR_IDS = Object.freeze([
     'open', 'share-embed', 'rename', 'delete', 'separator',
     'select-all', 'clear-selection',
     'spacer',
-    'refresh', 'view-grid', 'view-list', 'thumbnails'
+    'refresh', 'view-grid', 'view-list', 'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l'
 ]);
 
 const STRUCTURAL = new Set(['separator', 'spacer']);
@@ -29,6 +29,7 @@ const STRUCTURAL = new Set(['separator', 'spacer']);
  * @property {boolean} [pressed]     a toggle's state
  * @property {number} [priority]     1 stays on a phone, 2 on a tablet, 3 on a wide screen
  * @property {boolean} [showLabel]
+ * @property {string} [text]         a short text the button shows instead of its icon (S, M, L)
  * @property {() => void} [onClick]
  */
 
@@ -48,7 +49,7 @@ export function explorerTools(ctx) {
         if (!a.visible) continue;
         tools.push({
             id: a.id, title: a.label, icon: a.icon, disabled: !a.enabled, disabledReason: a.disabledReason,
-            pressed: a.pressed, priority: a.priority, showLabel: a.showLabel, onClick: a.run
+            pressed: a.pressed, priority: a.priority, showLabel: a.showLabel, text: a.text, onClick: a.run
         });
     }
     // HubToolbar drops a separator left with nothing on one side (a reader has no Upload)

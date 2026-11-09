@@ -4,7 +4,9 @@
  * applies, and sends the user to the Hub's own Run Photogrammetry for accurate results.
  * The submit starts one task per click and replaces an existing file only after the user confirmed it.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import ddb from 'ddb';
@@ -133,7 +135,7 @@ describe('MergeMultispectralDialog check', () => {
             .toEqual(['IMG_0001_2.tif', 'IMG_0001_3.tif', 'IMG_0001_1.tif']);
         expect(w.findAll('[data-testid="band-camera-name"]').map(x => x.text())).toEqual(['Green', 'Red', 'Blue']);
         expect(w.vm.dataset.previewMergeMultispectral).toHaveBeenLastCalledWith(
-            ['IMG_0001_2.tif', 'IMG_0001_3.tif', 'IMG_0001_1.tif'], '1,2,3', 256);
+            ['IMG_0001_2.tif', 'IMG_0001_3.tif', 'IMG_0001_1.tif'], '1,2,3', 512);
         expect(w.vm.validating).toBe(false);
     });
 
@@ -157,6 +159,59 @@ describe('MergeMultispectralDialog check', () => {
 
     it('shows the size of the merged raster that the check reports', async () => {
         expect((await mountDialog()).find('.merge-summary').text()).toContain('1261×942');
+    });
+});
+
+// ---- The preview is requested at the size it is shown (FR-PRC-46) ------------------------------
+
+describe('MergeMultispectralDialog preview', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    async function mountWithPreview(ratio) {
+        vi.stubGlobal('devicePixelRatio', ratio);
+        const dataset = {
+            validateMergeMultispectral: vi.fn().mockResolvedValue(validation(true)),
+            previewMergeMultispectral: vi.fn().mockResolvedValue('/preview.png')
+        };
+        const w = mount(MergeMultispectralDialog, {
+            props: { files: BANDS.map(path => ({ label: path, entry: { path } })), dataset },
+            global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /><slot name="footer" /></div>' } } }
+        });
+        await flushPromises();
+        return { w, dataset };
+    }
+
+    it('asks for 512 px at ratio 1: the preview is drawn 28rem (448 px) at most, not 256 px upscaled', async () => {
+        const { dataset } = await mountWithPreview(1);
+        expect(dataset.previewMergeMultispectral).toHaveBeenCalledWith(BANDS, '1,2,3', 512);
+    });
+
+    it('asks for 1024 px at ratio 2, the most it asks for', async () => {
+        const { dataset } = await mountWithPreview(2);
+        expect(dataset.previewMergeMultispectral).toHaveBeenCalledWith(BANDS, '1,2,3', 1024);
+        const size = dataset.previewMergeMultispectral.mock.calls[0][2];
+        expect(size).toBeGreaterThanOrEqual(440);
+    });
+
+    it('grows with the dialog, up to 28rem', async () => {
+        const css = fs.readFileSync(path.join(__dirname, 'MergeMultispectralDialog.vue'), 'utf8').split('<style')[1];
+        expect(css).toMatch(/\.preview-thumb\s*\{[^}]*max-width:\s*min\(100%,\s*28rem\)/);
+        expect(css).not.toMatch(/max-width:\s*220px/);
+    });
+
+    it('opens at full size on a click, and not before', async () => {
+        const { w } = await mountWithPreview(1);
+        expect(w.find('.preview-full').exists()).toBe(false);
+        await w.find('.preview-open').trigger('click');
+        expect(w.find('.preview-full').attributes('src')).toBe('/preview.png');
+    });
+
+    it('closes the full size when the bands are checked again', async () => {
+        const { w } = await mountWithPreview(1);
+        await w.find('.preview-open').trigger('click');
+        await w.findAll('.band-move button')[1].trigger('click');
+        await flushPromises();
+        expect(w.find('.preview-full').exists()).toBe(false);
     });
 });
 

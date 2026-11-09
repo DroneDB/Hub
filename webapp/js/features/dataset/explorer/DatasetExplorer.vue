@@ -31,7 +31,7 @@
                          @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                          @dragleave="itemDragLeave($event, f)">
                         <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset"
-                                   @clicked="handleSelection" @open="handleOpen" />
+                                   :size="thumbnailSize" @clicked="handleSelection" @open="handleOpen" />
                     </div>
                 </div>
             </VirtualScroller>
@@ -41,7 +41,7 @@
                      @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                      @dragleave="itemDragLeave($event, f)">
                     <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset"
-                               @clicked="handleSelection" @open="handleOpen" />
+                               :size="thumbnailSize" @clicked="handleSelection" @open="handleOpen" />
                 </div>
             </template>
         </div>
@@ -54,7 +54,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import FolderEmptyState from './FolderEmptyState.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import { createThumbnailQueue, createVisibilityTracker } from '@/libs/thumbnailQueue';
-import { GRID_CELL_WIDTH, tileHeight } from './tileGeometry';
+import { gridCellWidth as cellWidthOf, tileHeight, tileThumbnailSize } from './tileGeometry';
 
 // Folders at least this large render as a virtual grid
 const VIRTUAL_GRID_MIN_FILES = 200;
@@ -103,7 +103,9 @@ export default {
         tools: { type: Array, default: null },
         dataset: { type: Object, required: true },
         canWrite: { type: Boolean, default: false },
-        isLoadingFiles: { type: Boolean, default: false }
+        isLoadingFiles: { type: Boolean, default: false },
+        // The size of the thumbnails: 's' (128 px), 'm' (192) or 'l' (256), FR-EXP-43
+        tileSize: { type: String, default: 's' }
     },
     emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
@@ -143,7 +145,8 @@ export default {
             loading: false,
             contextMenu,
             gridColumns: 6,
-            gridCellWidth: GRID_CELL_WIDTH,
+            // The width of the explorer, 0 until measured
+            gridWidth: 0,
             // The font sizes the tiles are laid out with (the body font grows on phones)
             rootFontPx: 16,
             fontPx: 16
@@ -160,9 +163,17 @@ export default {
         virtualGrid: function () {
             return this.files.length >= VIRTUAL_GRID_MIN_FILES;
         },
+        // The side of the thumbnail, in px at a 16 px root font
+        thumbnailSize: function () {
+            return tileThumbnailSize(this.tileSize);
+        },
+        // The narrowest grid column: the thumbnail and what is around it
+        gridCellWidth: function () {
+            return cellWidthOf(this.thumbnailSize);
+        },
         // As tall as a tile: the rows are placed absolutely, a taller tile would draw into the next one
         gridRowHeight: function () {
-            return tileHeight({ rootFontPx: this.rootFontPx, fontPx: this.fontPx });
+            return tileHeight({ rootFontPx: this.rootFontPx, fontPx: this.fontPx, size: this.thumbnailSize });
         },
         // The files in rows of `gridColumns`, each with its index in `files` (range selection)
         gridRows: function () {
@@ -178,6 +189,17 @@ export default {
         },
     },
     watch: {
+        // Another thumbnail size: the cells are another width, and the tile the keyboard is on (else the first one on
+        // screen in the virtual grid) stays in view once the grid is laid out again
+        thumbnailSize: async function (size, before) {
+            const active = this.nav.active.value;
+            const first = active < 0 && this.virtualGrid ? this.firstShownIndex(before) : -1;
+            this.fitColumns();
+            if (active < 0 && first < 0) return;
+            await nextTick();
+            if (active >= 0) this.reveal(active);
+            else this.$refs.grid?.scrollToIndex(Math.floor(first / this.gridColumns));
+        },
         // Another folder: the keyboard starts again from its first tile
         files() {
             this.nav.active.value = -1;
@@ -190,7 +212,7 @@ export default {
         if (typeof ResizeObserver !== 'undefined') {
             this._resizeObserver = new ResizeObserver(entries => {
                 const width = entries[0]?.contentRect?.width ?? 0;
-                if (width > 0) this.gridColumns = Math.max(1, Math.floor(width / GRID_CELL_WIDTH));
+                if (width > 0) { this.gridWidth = width; this.fitColumns(); }
                 this.measureFonts();
             });
             this._resizeObserver.observe(this.$refs.explorer);
@@ -201,6 +223,18 @@ export default {
         this.thumbnailLoader.visibility.disconnect();
     },
     methods: {
+        // The columns of the virtual grid: as many cells as the width holds
+        fitColumns: function () {
+            if (this.gridWidth > 0) this.gridColumns = Math.max(1, Math.floor(this.gridWidth / this.gridCellWidth));
+        },
+        // The first file of the top row on screen in the virtual grid laid out at the thumbnail side `size`
+        // (-1 at the top: nothing to keep in view)
+        firstShownIndex: function (size) {
+            const top = this.$refs.grid?.scrollElement?.scrollTop ?? 0;
+            if (top <= 0) return -1;
+            const row = Math.floor(top / tileHeight({ rootFontPx: this.rootFontPx, fontPx: this.fontPx, size }));
+            return Math.min(this.files.length - 1, row * this.gridColumns);
+        },
         // The tile names inherit the explorer's font size; the tile spacing is in rem
         measureFonts: function () {
             this.rootFontPx = fontSizePx(document.documentElement);

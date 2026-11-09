@@ -26,7 +26,7 @@
                     <template #explorer>
                         <div class="detail-layout">
                             <div class="detail-main" :class="{ 'with-detail': showDetail }">
-                                <Explorer v-if="viewMode === 'grid'" ref="explorer" v-bind="explorerProps" v-on="fileEvents" />
+                                <Explorer v-if="viewMode === 'grid'" ref="explorer" v-bind="explorerProps" :tile-size="tileSize" v-on="fileEvents" />
                                 <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
                             </div>
                             <div v-if="showDetail" id="dataset-detail-side" ref="detailSide" class="detail-side">
@@ -98,7 +98,8 @@ import { useViewActions } from '@/composables/useViewActions';
 import { useEventListener } from '@/composables/useEventListener';
 import { useStackedLayout, useMediaMatch } from '@/composables/useStackedLayout';
 import { hasOpenModalOverlay, useOverlay } from '@/composables/useOverlay';
-import { TABLET_MEDIA_QUERY } from '@/libs/responsiveColumns';
+import { TABLET_MEDIA_QUERY, XWIDE_MEDIA_QUERY } from '@/libs/responsiveColumns';
+import { tileSizeChoice } from './explorer/tileGeometry';
 import { listViews } from '@/libs/views/viewStore';
 import Button from 'primevue/button';
 import Message from '@/components/HubMessage.vue';
@@ -158,6 +159,10 @@ const openedTabs = reactive({ map: false, tasks: false });
 const viewMode = usePreference(PREF.FILE_VIEW_MODE, 'grid');
 // Table view: thumbnails and relative times, or icons and dates
 const expandedGrid = usePreference(PREF.TABLE_EXPANDED_GRID, true);
+// The size of the grid's thumbnails (FR-EXP-43): S, M or L as the user chose, else M on a 4K screen and S below it
+const tileSizePref = usePreference(PREF.TILE_SIZE, '');
+const xwide = useMediaMatch(XWIDE_MEDIA_QUERY);
+const tileSize = computed(() => tileSizeChoice(tileSizePref.value, xwide.value));
 const detailFile = ref(null);
 // Below lg (and from sm) the detail panel is a drawer over the list (FR-EXP-17). Once the user closes it, a selection
 // does not open it again: its Details button does. From lg it is a column that follows the selection, as before.
@@ -484,6 +489,7 @@ const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset
 const toolbarEvents = {
     ...fileEvents,
     toggleExpandedGrid: () => { expandedGrid.value = !expandedGrid.value; },
+    setTileSize: size => { tileSizePref.value = size; },
     setViewMode: mode => {
         // Close any open context menu first
         window.dispatchEvent(new MouseEvent('click'));
@@ -497,6 +503,7 @@ const toolbarContext = {
     dataset,
     get viewMode() { return viewMode.value; },
     get expandedGrid() { return expandedGrid.value; },
+    get tileSize() { return tileSize.value; },
     selectAll,
     emit: (event, ...args) => toolbarEvents[event]?.(...args)
 };

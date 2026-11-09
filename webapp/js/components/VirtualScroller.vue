@@ -82,6 +82,9 @@ watch(() => props.items.length, async () => {
   virtualizer.value.measure();
 });
 
+// Another item size (the same count): the rows are placed again at the new size before they are drawn
+watch(() => props.itemSize, () => virtualizer.value.measure());
+
 // For parents: scroll to a row, and the element that scrolls (e.g. an IntersectionObserver root)
 defineExpose({
   scrollToIndex: (index) => virtualizer.value.scrollToIndex(index, { align: 'start' }),
