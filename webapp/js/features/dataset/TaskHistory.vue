@@ -194,6 +194,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import { escapeHtml } from '@/libs/sanitize';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { countOf } from '@/libs/format';
+import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY, visibilityName } from '@/libs/visibility';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Window from '@/components/HubWindow.vue';
@@ -305,7 +306,7 @@ export default {
                 destPath: 'photogrammetry_output',
                 createNewDataset: false,
                 newDatasetName: '',
-                newDatasetVisibility: 'PRIVATE'
+                newDatasetVisibility: DEFAULT_VISIBILITY
             },
             optionsError: '',
             folderPathError: '',
@@ -314,11 +315,7 @@ export default {
             nodeStatus: null,
             availableOdmOptions: [],
             customOptions: [],
-            visibilityOptions: [
-                { label: 'Private', value: 'PRIVATE' },
-                { label: 'Unlisted', value: 'UNLISTED' },
-                { label: 'Public', value: 'PUBLIC' }
-            ],
+            visibilityOptions: VISIBILITY_OPTIONS,
 
             logDialogOpen: false,
             logTask: null,
@@ -557,7 +554,7 @@ export default {
                 destPath: 'photogrammetry_output',
                 createNewDataset: false,
                 newDatasetName: '',
-                newDatasetVisibility: 'PRIVATE'
+                newDatasetVisibility: DEFAULT_VISIBILITY
             };
             this.photogrammetryDialogOpen = true;
 
@@ -688,7 +685,8 @@ export default {
                 params.destPath = this.photogrammetryForm.destPath.trim();
             } else {
                 params.newDatasetName = this.photogrammetryForm.newDatasetName;
-                params.newDatasetVisibility = this.photogrammetryForm.newDatasetVisibility;
+                // The task parameters carry the name of the visibility
+                params.newDatasetVisibility = visibilityName(this.photogrammetryForm.newDatasetVisibility);
             }
             return params;
         },

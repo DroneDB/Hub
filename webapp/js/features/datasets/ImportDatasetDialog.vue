@@ -164,7 +164,7 @@ import ProgressBar from 'primevue/progressbar';
 import { bytesToSize } from '@/libs/utils';
 import { slugFromName } from '@/libs/api/registryUtils';
 import reg from '@/libs/api/sharedRegistry';
-import { Visibility } from 'ddb';
+import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { IMPORT_SOURCES, getImportSource, splitRegistryLink } from './importSources';
 import { formatDurationSeconds } from '@/libs/format';
@@ -217,12 +217,8 @@ export default {
             name: '',
             slug: '',
             slugEdited: false,
-            visibility: Visibility.PRIVATE,
-            visibilityOptions: [
-                { value: Visibility.PRIVATE, label: 'Private' },
-                { value: Visibility.UNLISTED, label: 'Unlisted' },
-                { value: Visibility.PUBLIC, label: 'Public' }
-            ],
+            visibility: DEFAULT_VISIBILITY,
+            visibilityOptions: VISIBILITY_OPTIONS,
 
             submitting: false,
             importing: false,

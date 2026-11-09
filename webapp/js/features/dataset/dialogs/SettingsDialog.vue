@@ -122,6 +122,7 @@ import InputText from 'primevue/inputtext';
 import ddb from 'ddb';
 import { sanitizeHtml } from '@/libs/sanitize';
 import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
+import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
 
 export default {
     components: {
@@ -153,12 +154,8 @@ export default {
             thumbnailUploading: false,
             thumbnailRemoving: false,
             Licenses,
-            Visibilities: {
-                [ddb.Visibility.PUBLIC]: { label: "Public" },
-                [ddb.Visibility.UNLISTED]: { label: "Unlisted" },
-                [ddb.Visibility.PRIVATE]: { label: "Private" }
-            },
-            visibility: ddb.Visibility.PRIVATE
+            visibilityOptions: VISIBILITY_OPTIONS,
+            visibility: DEFAULT_VISIBILITY
         }
     },
     computed: {
@@ -183,12 +180,6 @@ export default {
         safeDescription: function () {
             return sanitizeHtml(this.description);
         },
-        visibilityOptions: function () {
-            return Object.entries(this.Visibilities).map(([k, v]) => ({
-                value: parseInt(k),
-                label: v.label
-            }));
-        },
         licenseOptions: function () {
             return Object.entries(this.Licenses).map(([k, v]) => ({
                 value: k,
@@ -203,7 +194,7 @@ export default {
 
             this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
             this.license = this.properties?.meta?.license?.data ?? 'proprietary';
-            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
+            this.visibility = this.properties?.meta?.visibility?.data ?? DEFAULT_VISIBILITY;
             this.tagline = this.properties?.meta?.tagline?.data ?? '';
 
             // Load existing dataset thumbnail preview

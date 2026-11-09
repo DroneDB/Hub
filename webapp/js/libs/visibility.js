@@ -24,5 +24,34 @@ export function visibilityLook(visibility) {
     return LOOKS[/** @type {number} */ (visibility)] ?? LOOKS[Visibility.PRIVATE];
 }
 
+/**
+ * The visibilities a form offers, from the most closed to the most open, each as a select option. The one list
+ * of every form that picks a visibility (upload, new dataset, import, settings, photogrammetry).
+ * @type {ReadonlyArray<Readonly<{ value: number, label: string }>>}
+ */
+export const VISIBILITY_OPTIONS = Object.freeze(
+    [Visibility.PRIVATE, Visibility.UNLISTED, Visibility.PUBLIC]
+        .map(value => Object.freeze({ value, label: LOOKS[value].label })));
+
+/** What a new dataset starts as: private (D-009). */
+export const DEFAULT_VISIBILITY = Visibility.PRIVATE;
+
+/** The names the task parameters carry, by visibility. @type {Readonly<Record<number, string>>} */
+const NAMES = Object.freeze({
+    [Visibility.PRIVATE]: 'PRIVATE',
+    [Visibility.UNLISTED]: 'UNLISTED',
+    [Visibility.PUBLIC]: 'PUBLIC'
+});
+
+/**
+ * The name of a visibility as the task parameters carry it ('PRIVATE', 'UNLISTED', 'PUBLIC'); an unknown or missing
+ * one is the default.
+ * @param {unknown} visibility
+ * @returns {string}
+ */
+export function visibilityName(visibility) {
+    return NAMES[/** @type {number} */ (visibility)] ?? NAMES[DEFAULT_VISIBILITY];
+}
+
 /** @param {unknown} visibility */
 export const visibilityLabel = visibility => visibilityLook(visibility).label;

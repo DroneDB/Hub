@@ -63,9 +63,33 @@ export function useUploadQueue(opts) {
         retryFailed: () => scheduler.retryFailed(),
         /** @param {string} id @param {{ path?: string, overwrite?: boolean }} changes */
         requeue: (id, changes) => scheduler.requeue(id, changes),
-        cancel() {
+        /**
+         * The one way the Hub cancels an upload (FR-XC-27). `confirm()` asks the user first: when it answers
+         * false nothing happens. The queue then stops (requests in flight are aborted, queued and retrying files
+         * are dropped), and `cleanup()` undoes what the upload left on the server: /upload rolls its share batch
+         * back (ShareApi.rollback), the dataset page passes none, because the files already sent stay (D-045).
+         * The stop is synchronous when there is no `confirm`. A failing cleanup does not throw: the queue is
+         * stopped either way, and the caller gets the error to tell the user.
+         * @param {object} [steps]
+         * @param {() => boolean | Promise<boolean>} [steps.confirm]
+         * @param {() => unknown} [steps.cleanup]
+         * @returns {Promise<{ cancelled: boolean, cleanupError: unknown }>}
+         */
+        async cancel({ confirm, cleanup } = {}) {
+            if (confirm && !(await confirm())) return { cancelled: false, cleanupError: null };
+
             scheduler.cancelAll();
             emitter.emit(UPLOAD_ACTIVITY_EVENT, { active: false });
+
+            let cleanupError = null;
+            if (cleanup) {
+                try {
+                    await cleanup();
+                } catch (e) {
+                    cleanupError = e;
+                }
+            }
+            return { cancelled: true, cleanupError };
         },
         rows: filter => (state.value?.items ?? []).filter(filter ?? (() => true)).map(item => ({ ...item }))
     };

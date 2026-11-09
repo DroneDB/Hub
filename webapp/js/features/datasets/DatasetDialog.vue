@@ -81,7 +81,7 @@ import PrimeMessage from 'primevue/message';
 import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '@/libs/api/registryUtils';
 import { getOpenAfterCreatePreference, saveOpenAfterCreatePreference } from '@/libs/storageUtils';
-import { Visibility } from 'ddb';
+import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
 import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
 import { slugProblem, slugDescription } from '@/libs/slug';
 import { latinNameProblem } from '@/libs/nameRules';
@@ -118,7 +118,7 @@ export default {
             ds: {
                 slug: null,
                 name: null,
-                visibility: Visibility.PRIVATE,
+                visibility: DEFAULT_VISIBILITY,
                 tagline: ''
             },
             title: null,
@@ -129,11 +129,7 @@ export default {
             // What the checkbox started from: the preference is stored only when the user changed it,
             // so a value that changed elsewhere since the dialog opened is not overwritten
             openAfterCreateAtOpen: openAfterCreate,
-            visibilityOptions: [
-                { value: Visibility.PRIVATE, label: 'Private' },
-                { value: Visibility.UNLISTED, label: 'Unlisted' },
-                { value: Visibility.PUBLIC, label: 'Public' }
-            ]
+            visibilityOptions: VISIBILITY_OPTIONS
         };
     },
     computed: {
@@ -171,14 +167,14 @@ export default {
 
             this.ds.slug = this.model.slug;
             this.ds.name = this.model.name;
-            this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : Visibility.PRIVATE;
+            this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : DEFAULT_VISIBILITY;
             this.ds.tagline = this.model.tagline || '';
         } else {
             this.title = 'Create dataset';
 
             this.ds.slug = null;
             this.ds.name = null;
-            this.ds.visibility = Visibility.PRIVATE;
+            this.ds.visibility = DEFAULT_VISIBILITY;
             this.ds.tagline = '';
         }
     }, methods: {
