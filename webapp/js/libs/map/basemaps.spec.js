@@ -154,6 +154,10 @@ describe('customBasemapTestUrl', () => {
         expect(customBasemapTestUrl({ ...XYZ })).toBe('https://tiles.example.com/0/0/0.png');
     });
 
+    it('is the 1x tile of an XYZ source with a 2x source: {r} is left out (FR-MAP-29)', () => {
+        expect(customBasemapTestUrl({ ...XYZ, url: 'https://tiles.example.com/{z}/{x}/{y}{r}.png' })).toBe('https://tiles.example.com/0/0/0.png');
+    });
+
     it('is a GetMap of a WMS source at its tile size, with its TIME', () => {
         const url = customBasemapTestUrl({ ...WMS, tileSize: 512, defaultTime: '2026-03-12T00:00:00Z' });
         expect(url).toBe('https://maps.example.org/wms?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=ortho&STYLES='

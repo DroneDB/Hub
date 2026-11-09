@@ -92,6 +92,20 @@ describe('scene up', () => {
 });
 
 describe('renderer', () => {
+    it('applies the ratio again when the screen changes, with the cap of the quality in force (FR-XC-32)', () => {
+        let onChange;
+        const stop = vi.fn();
+        vi.stubGlobal('matchMedia', () => ({ addEventListener: (type, fn) => { onChange = fn; }, removeEventListener: stop }));
+        vi.stubGlobal('devicePixelRatio', 1);
+        makeStage();
+        stage.applyQuality({ maxSh: 1, lodScale: 0.75, lodSplatScale: 0.5, pixelRatio: 1.5 });
+        vi.stubGlobal('devicePixelRatio', 2);
+        onChange();
+        expect(stage.renderer.setPixelRatio).toHaveBeenLastCalledWith(1.5);
+        stage.dispose();
+        expect(stop).toHaveBeenCalled();
+    });
+
     it('draws at the pixel ratio of the screen up to the cap', () => {
         vi.stubGlobal('devicePixelRatio', 1.5);
         expect(makeStage().renderer.setPixelRatio).toHaveBeenCalledWith(1.5);

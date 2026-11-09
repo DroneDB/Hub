@@ -1231,7 +1231,9 @@ describe('the navigation strategy each loader picks for the scene it builds', ()
                 this.view = { camera: new THREE.PerspectiveCamera() };
                 this.scene = new THREE.Scene();
                 this.domElement = { style: {} };
+                this.renderer = { setPixelRatio() {} };
             }
+            notifyChange() {}
         }
         class COPCSource {
             addEventListener() {}

@@ -14,6 +14,7 @@ import { isLocalVector } from '@/libs/openItemDefaults';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
 import { isFiniteBox, vectorStyle } from './sceneUtils';
+import { appliedPixelRatio } from '@/libs/pixelRatio';
 
 // Screen-space error target (px) of DroneDB-built model tiles. Obj2Tiles >= 1.8 writes a
 // geometricError from the mesh edge length: at 6 close-ups match the finest LOD while the
@@ -116,7 +117,8 @@ async function loadLocalVector(scene, entry, dataset) {
         style: {
             stroke: { color: ANALYSIS_COLOR, lineWidth: 2 },
             fill: { color: ANALYSIS_COLOR, opacity: 0.25 },
-            point: { color: '#ffeb3b', pointSize: 8 }
+            // 8 CSS px: Giro3D sizes the points in the pixels of the drawing buffer (FR-XC-32)
+            point: { color: '#ffeb3b', pointSize: 8 * appliedPixelRatio() }
         }
     });
     await scene.instance.add(collection);
@@ -199,7 +201,7 @@ async function loadPointCloud(scene, entry, dataset) {
     await scene.instance.add(entity);
     scene.colorizePointCloud(entity);
     // Automatic sizing can collapse to sub-pixel for sparse or wide clouds
-    entity.pointSize = 2;
+    scene.setPointSize(entity, 2);
     scene.registerLayer(name(entry), 'fa-solid fa-braille', () => entity.visible, v => { entity.visible = v; });
 
     const box = entity.getBoundingBox();

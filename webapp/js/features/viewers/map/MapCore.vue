@@ -160,6 +160,7 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import { onColorSchemeChange } from '@/libs/colorScheme';
+import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 
 // Pointer over one of these: no feature tooltip
 const MAP_CONTROLS = '.ol-map-display-buttons, .ol-map-buttons, .ol-measure-control, .ol-selection, .ol-zoom, .ol-settings';
@@ -344,6 +345,8 @@ export default {
     beforeUnmount: function () {
         if (this.stopColorScheme) this.stopColorScheme();
         this.stopColorScheme = null;
+        if (this.stopPixelRatio) this.stopPixelRatio();
+        this.stopPixelRatio = null;
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
         if (this.viewZoomCap) this.viewZoomCap.dispose();
@@ -419,8 +422,11 @@ export default {
             this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [this.createBasemapLayer(), ...this.fileLayers.layers, this.measureControls.getLayer()],
-                view: new View({ center: [0, 0], zoom: 2 })
+                view: new View({ center: [0, 0], zoom: 2 }),
+                // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042): OpenLayers would draw at the device ratio, uncapped
+                pixelRatio: appliedPixelRatio()
             });
+            this.stopPixelRatio = watchPixelRatio(() => this.map.setPixelRatio(appliedPixelRatio()));
 
             this.setupTooltipOverlay();
             this.map.addOverlay(this.tooltipOverlay);

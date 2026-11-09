@@ -26,7 +26,7 @@
  */
 import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 import { tokenHex } from '@/libs/colorScheme';
-import { appliedPixelRatio, MAX_PIXEL_RATIO } from '@/libs/pixelRatio';
+import { appliedPixelRatio, watchPixelRatio, MAX_PIXEL_RATIO } from '@/libs/pixelRatio';
 import { deviceMemoryGb, isMobile, reportsDeviceMemory } from '@/libs/responsive';
 import { pagedSplatBudget } from './splatMemory';
 
@@ -101,6 +101,8 @@ export function createSplatStage({
     // The cap on the pixel ratio: the quality preset moves it (up to MAX_PIXEL_RATIO)
     let pixelCap = MAX_PIXEL_RATIO;
     renderer.setPixelRatio(appliedPixelRatio(pixelCap));
+    // A screen with another ratio (the window moves, the browser zooms): the canvas follows on the next frame (fitCanvas)
+    const stopPixelRatio = watchPixelRatio(() => renderer.setPixelRatio(appliedPixelRatio(pixelCap)));
     renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
 
     const scene = new THREE.Scene();
@@ -273,6 +275,7 @@ export function createSplatStage({
     function dispose() {
         if (disposed) return;
         disposed = true;
+        stopPixelRatio();
         renderer.setAnimationLoop(null);
         canvas.removeEventListener('webglcontextlost', lost);
         canvas.removeEventListener('webglcontextrestored', restored);

@@ -32,6 +32,7 @@ vi.mock('ol', async () => {
             this.setTarget = vi.fn();
             this.dispose = vi.fn();
             this.updateSize = vi.fn();
+            this.setPixelRatio = vi.fn();
             this.getView = () => this.view;
             this.getTargetElement = () => ({ style: {} });
             this.hit = null;
@@ -93,6 +94,32 @@ const pointAt = (...ofSlugs) => {
     const members = pinSource().getFeatures().filter(f => ofSlugs.includes(f.get('slug')));
     map().hit = { get: () => members };
 };
+
+describe('DatasetLocationsMap canvas ratio (FR-XC-32)', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s', async (dpr, applied) => {
+        vi.stubGlobal('devicePixelRatio', dpr);
+        render();
+        await flushPromises();
+        expect(map().options.pixelRatio).toBe(applied);
+    });
+
+    it('applies the ratio again when the screen changes, and stops with the page', async () => {
+        let onChange;
+        const stop = vi.fn();
+        vi.stubGlobal('matchMedia', () => ({ addEventListener: (type, fn) => { onChange = fn; }, removeEventListener: stop }));
+        vi.stubGlobal('devicePixelRatio', 1);
+        render();
+        await flushPromises();
+        vi.stubGlobal('devicePixelRatio', 2);
+        onChange();
+        expect(map().setPixelRatio).toHaveBeenCalledWith(2);
+        wrapper.unmount();
+        wrapper = null;
+        expect(stop).toHaveBeenCalled();
+    });
+});
 
 describe('DatasetLocationsMap pins', () => {
     it('creates the map with the basemap as layer 0 and a pin for each dataset with a location', async () => {

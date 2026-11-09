@@ -284,3 +284,36 @@ describe('Clear, and a new shape', () => {
         expect(tool.activeKind).toBeNull();
     });
 });
+
+describe('label size and line width follow the canvas (FR-VWR-37)', () => {
+    const height = px => Object.defineProperty(domElement, 'clientHeight', { configurable: true, value: px });
+
+    it('on a canvas 2104 CSS px high every kind gets fontSize 18 and lineWidth 3', async () => {
+        height(2104);
+        const drawing = tool.measure('distance');
+        expect(created[0]).toMatchObject({ fontSize: 18, lineWidth: 3 });
+        tool.cancel();
+        await drawing;
+        tool.measure('area');
+        expect(created[1]).toMatchObject({ fontSize: 18, lineWidth: 3 });
+        tool.measure('point');
+        expect(created[2]).toMatchObject({ fontSize: 18, lineWidth: 3 });
+    });
+
+    it('on a canvas 1080 px high the label is 12 px (it was 12 px before), the line 3', () => {
+        height(1080);
+        tool.measure('distance');
+        expect(created[0]).toMatchObject({ fontSize: 12, lineWidth: 3 });
+    });
+
+    it('a shape drawn earlier takes the size of the view when the next one starts', async () => {
+        height(1080);
+        const first = tool.measure('distance');
+        click(); click();
+        rightClick();
+        await first;
+        height(1440);
+        tool.measure('distance');
+        expect(tool.shapes[0]).toMatchObject({ fontSize: 16, lineWidth: 3 });
+    });
+});

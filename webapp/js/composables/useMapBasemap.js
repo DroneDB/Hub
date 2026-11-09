@@ -23,12 +23,27 @@ import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { EPSG } from '@/libs/constants';
 import { onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
+import { watchPixelRatio } from '@/libs/pixelRatio';
 
-/** Tile layer of a custom WMS/XYZ configuration. @param {any} config */
-function customLayer(config) {
+/** Whether the screen takes 2x tiles (FR-XC-32: above 1, as libs/map/olHybridXYZ.js decides for the DroneDB tiles). */
+const wantsRetina = () => (globalThis.devicePixelRatio || 1) > 1;
+
+/**
+ * Tile layer of a custom WMS/XYZ configuration. A custom XYZ URL with `{r}` has a 2x source: `{r}` becomes `@2x` (and the
+ * tiles are 512 px, tilePixelRatio 2) on a screen above ratio 1, and nothing at 1x; a URL without it stays at 1x.
+ * @param {any} config
+ * @param {boolean} retina
+ */
+function customLayer(config, retina) {
     const attributions = config.attribution ? [config.attribution] : [];
     if (config.sourceType !== 'wms') {
-        return new TileLayer({ source: new XYZ({ url: config.url, attributions }) });
+        const has2x = config.url.includes('{r}');
+        const source = new XYZ({
+            url: has2x ? config.url.replaceAll('{r}', retina ? '@2x' : '') : config.url,
+            attributions,
+            ...(has2x && retina ? { tilePixelRatio: 2 } : {})
+        });
+        return new TileLayer({ source });
     }
     const params = { LAYERS: config.layerName, TILED: true, STYLES: '' };
     if (config.defaultTime) params.TIME = config.defaultTime;
@@ -56,18 +71,24 @@ export function useMapBasemap(map) {
     // shows too, unless the map draws a basemap of its own
     watch(preferredBasemap, name => { if (!ownBasemap) selectedBasemap.value = name; }, { flush: 'sync' });
     const customBasemapConfig = ref(getCustomBasemapConfig());
+    // The tiles the basemap was last made with (1x or 2x)
+    let retinaDrawn = wantsRetina();
 
     /** Tile layer of the current selection. */
     function createBasemapLayer() {
         const config = customBasemapConfig.value;
-        if (selectedBasemap.value === 'custom' && config) return customLayer(config);
+        const retina = retinaDrawn = wantsRetina();
+        if (selectedBasemap.value === 'custom' && config) return customLayer(config, retina);
         // A custom selection without a usable configuration (cleared, or invalid) or an unknown name: the default
         const chosen = Basemaps[selectedBasemap.value];
         const basemap = chosen?.url ? chosen : Basemaps[PREF_DEFAULTS[PREF.BASEMAP]];
+        // 512 px tiles in 256 px slots on a screen above ratio 1, for a basemap that has them (FR-MAP-29)
+        const twice = retina && !!basemap.url2x;
         return new TileLayer({
             source: new XYZ({
-                url: basemap.url,
+                url: twice ? basemap.url2x : basemap.url,
                 attributions: basemap.attributions,
+                ...(twice ? { tilePixelRatio: 2 } : {}),
                 ...(basemap.maxZoom != null ? { maxZoom: basemap.maxZoom } : {})
             })
         });
@@ -100,6 +121,10 @@ export function useMapBasemap(map) {
 
     // Applies the selection however it changed: the dialog, the Preferences page, another tab, the account
     watch(selectedBasemap, updateBasemap, { flush: 'sync' });
+    // The window moves to another screen, or the browser zoom changes: the basemap takes the tiles of the new ratio
+    onScopeDispose(watchPixelRatio(() => {
+        if (wantsRetina() !== retinaDrawn) updateBasemap();
+    }));
     onScopeDispose(onPrefChange(key => {
         if (key !== PREF.CUSTOM_BASEMAP) return;
         customBasemapConfig.value = getCustomBasemapConfig();

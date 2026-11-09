@@ -14,6 +14,7 @@
  */
 import { measureFormatters, measureColor } from './sceneUtils';
 import { isRightClick, RIGHT_BUTTON } from '@/libs/mouse';
+import { measureLabelPx, MEASURE_LINE_PX } from '@/libs/measureScale';
 
 /** The least points a shape is kept with: the shape being drawn with fewer is dropped. */
 const MIN_POINTS = { point: 1, distance: 2, area: 3 };
@@ -65,6 +66,14 @@ export class MeasureTool {
         this.onKey = e => this.handleKey(e);
     }
 
+    /**
+     * How a shape looks: the label size and the line width in CSS px follow the height of the canvas, so the values are
+     * readable on a 4K screen as on a 1080 one (FR-VWR-37).
+     */
+    look() {
+        return { fontSize: measureLabelPx(this.scene.instance?.domElement?.clientHeight), lineWidth: MEASURE_LINE_PX };
+    }
+
     /** The kind being drawn ('point' | 'distance' | 'area'), or null. */
     get activeKind() {
         return this.abort ? this.kind : null;
@@ -76,6 +85,9 @@ export class MeasureTool {
         if (!scene.instance || !Object.hasOwn(MIN_POINTS, kind)) return;
         if (!this.drawTool) this.drawTool = new scene.libs.DrawTool({ instance: scene.instance });
         if (this.abort) this.abort.abort();
+        // The shapes already drawn take the size of the view as it is now
+        const look = this.look();
+        this.shapes.forEach(s => { s.fontSize = look.fontSize; s.lineWidth = look.lineWidth; });
         const abort = this.abort = new AbortController();
         const run = ++this.run;
         this.kind = kind;
@@ -88,7 +100,7 @@ export class MeasureTool {
         // lifetime: paired (removed when this drawing ends, below)
         window.addEventListener('keydown', this.onKey);
 
-        const options = { signal, color: measureColor(), endCondition: e => this.endCondition(e), onPointCreated: (shape, index) => { this.placed = index + 1; } };
+        const options = { signal, color: measureColor(), ...this.look(), endCondition: e => this.endCondition(e), onPointCreated: (shape, index) => { this.placed = index + 1; } };
         let shape = null;
         try {
             if (kind === 'point') {

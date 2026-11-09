@@ -187,6 +187,31 @@ const SAVED_POSITION = { center: [123, 456], zoom: 7, rotation: 0 };
 afterEach(() => reported.splice(0));
 
 
+describe('the canvas ratio of the map (FR-XC-32, D-042)', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s', async (dpr, applied) => {
+        vi.stubGlobal('devicePixelRatio', dpr);
+        await mountMap([MAIN]);
+        expect(wrapper.vm.map.getPixelRatio()).toBe(applied);
+    });
+
+    it('applies the ratio again when the window moves to another screen, and stops with the map', async () => {
+        let onChange;
+        const stop = vi.fn();
+        vi.stubGlobal('matchMedia', () => ({ addEventListener: (type, fn) => { onChange = fn; }, removeEventListener: stop }));
+        vi.stubGlobal('devicePixelRatio', 1);
+        await mountMap([MAIN]);
+        expect(wrapper.vm.map.getPixelRatio()).toBe(1);
+        vi.stubGlobal('devicePixelRatio', 2);
+        onChange();
+        expect(wrapper.vm.map.getPixelRatio()).toBe(2);
+        wrapper.unmount();
+        wrapper = null;
+        expect(stop).toHaveBeenCalled();
+    });
+});
+
 describe('the position of the map in a view', () => {
     it('opens on the base file, not on the first file of the draw order', async () => {
         // MAIN is the base and the top layer; the files are bottom first, so ADDED comes first

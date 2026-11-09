@@ -17,6 +17,7 @@
 import { watch } from 'vue';
 import { fitDistance, canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 import { tokenHex } from '@/libs/colorScheme';
+import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 
 // The vertical field of view of the camera, in degrees
 const FOV = 35;
@@ -90,7 +91,9 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     if (colourManaged) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.setClearColor(scene.fog.color);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    // min(devicePixelRatio, 2): the canvas follows it on the next frame (fitCanvas); a screen with another ratio moves it again (FR-XC-32)
+    renderer.setPixelRatio(appliedPixelRatio());
+    const stopPixelRatio = watchPixelRatio(() => renderer.setPixelRatio(appliedPixelRatio()));
 
     // MeshLab-style shading for models without a texture
     const material = new THREE.MeshPhongMaterial({ color: colour(0xaaaaaa), specular: colour(0x444444), shininess: settings.shininess });
@@ -197,6 +200,7 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     function dispose() {
         running = false;
         stopWatching();
+        stopPixelRatio();
         cancelAnimationFrame(frame);
         controls.dispose?.();
         material.dispose();

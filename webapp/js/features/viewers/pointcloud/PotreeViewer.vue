@@ -79,6 +79,7 @@ import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { labelPotreeControls } from '@/libs/potree/potreeControls';
+import { attachPotreeScale } from '@/libs/potree/potreeScale';
 import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 
@@ -106,6 +107,8 @@ const toolsViewer = shallowRef(null);
 // Owns the viewer and everything it creates (released on leave)
 let session = new PotreeSession();
 let viewer = null;
+// Stops following the ratio of the screen (potreeScale)
+let stopScale = () => {};
 
 // The measures follow the gesture rule of every measuring tool (D-027): click adds a point; double click, Enter or
 // right click ends it; Escape cancels it (libs/potree/measureGestures). The toolbar shows the kind being drawn; a
@@ -173,7 +176,12 @@ async function addPointCloud(ddbEntry) {
                 return;
             }
             viewer.scene.addPointCloud(e.pointcloud);
-            e.pointcloud.material.size = 1;
+            // Sizes in CSS px (the vendored renderer draws them in buffer pixels): an adaptive size of 1 closes the surface at
+            // any screen resolution, and no point is smaller than 2 px (FR-VWR-36). The Appearance menu changes them in CSS px
+            const material = e.pointcloud.material;
+            material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+            material.size = 1;
+            material.minSize = 2;
             resolve();
         });
     });
@@ -182,10 +190,13 @@ async function addPointCloud(ddbEntry) {
 
 async function loadViewer() {
     // A previous viewer of this component is released completely first
+    stopScale();
     session.dispose();
     session = new PotreeSession();
     toolsViewer.value = null;
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
+    // The canvas, the points and the labels are drawn at the applied ratio of the screen (FR-XC-32)
+    stopScale = attachPotreeScale(viewer, session);
     // At once: a measure that the Potree menu starts while the cloud still loads is followed too. A measure that is
     // dropped leaves without a step of the history; before the measurements are attached there is no history yet
     const potree = viewer;
@@ -245,6 +256,8 @@ onMounted(async () => {
 // the jQuery UI sidebar, window.viewer
 onBeforeUnmount(() => {
     toolsViewer.value = null;
+    stopScale();
+    stopScale = () => {};
     session.dispose();
     viewer = gestures = null;
 });

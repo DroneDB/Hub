@@ -75,7 +75,7 @@ function stubPotree() {
         })
     });
     viewer = Object.assign(new Dispatcher(), {
-        scene, measuringTool, renderer: { domElement: canvas },
+        scene, measuringTool, renderer: { domElement: canvas, setPixelRatio: vi.fn() },
         inputHandler: { drag: null, startDragging: vi.fn() },
         volumeTool: { startInsertion: vi.fn() },
         setTopView: vi.fn(), setFrontView: vi.fn(), setLeftView: vi.fn(), setRightView: vi.fn(),
@@ -83,6 +83,7 @@ function stubPotree() {
         loadGUI: cb => cb(), lengthUnit: 'm', lengthUnitDisplay: {}
     });
     globalThis.Potree = {
+        PointSizeType: { FIXED: 0, ATTENUATED: 1, ADAPTIVE: 2 }, TextSprite: class {},
         Viewer: function Viewer() { return viewer; },
         loadPointCloud: (_url, _name, cb) => cb({ type: 'pointcloud_loaded', pointcloud: Object.assign(cloud, { material }) })
     };
@@ -112,6 +113,32 @@ afterEach(() => {
     delete globalThis.Potree;
     delete globalThis.THREE;
     delete globalThis.$;
+});
+
+describe('PotreeViewer on a HiDPI screen (FR-VWR-33, FR-VWR-36)', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('draws at the applied ratio: min(devicePixelRatio, 2), and the labels of Potree at the same one', async () => {
+        vi.stubGlobal('devicePixelRatio', 3);
+        await mountViewer();
+        expect(viewer.renderer.setPixelRatio).toHaveBeenCalledWith(2);
+        expect(globalThis.Potree.TextSprite.resolutionScale).toBe(2);
+    });
+
+    it('at ratio 1 the canvas is the CSS size', async () => {
+        vi.stubGlobal('devicePixelRatio', 1);
+        await mountViewer();
+        expect(viewer.renderer.setPixelRatio).toHaveBeenCalledWith(1);
+        expect(globalThis.Potree.TextSprite.resolutionScale).toBe(1);
+    });
+
+    it('shows the point cloud with adaptive points of 1 CSS px, never less than 2 px (the size of a point follows the screen)', async () => {
+        await mountViewer();
+        const material = viewer.scene.pointclouds[0].material;
+        expect(material.pointSizeType).toBe(2);
+        expect(material.size).toBe(1);
+        expect(material.minSize).toBe(2);
+    });
 });
 
 describe('PotreeViewer tool panel', () => {

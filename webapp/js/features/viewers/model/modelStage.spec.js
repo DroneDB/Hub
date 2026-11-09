@@ -246,6 +246,32 @@ describe('render loop', () => {
         expect(stage.renderer.setSize).toHaveBeenCalledTimes(1);
     });
 
+    it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s (FR-VWR-34)', (dpr, applied) => {
+        vi.stubGlobal('devicePixelRatio', dpr);
+        makeStage();
+        expect(stage.renderer.setPixelRatio).toHaveBeenCalledWith(applied);
+        stage.start();
+        expect(canvas.width).toBe(800 * applied);
+        expect(canvas.height).toBe(400 * applied);
+    });
+
+    it('follows a screen with another ratio: the canvas is sized again on the next frame, and not after dispose', () => {
+        let onChange;
+        const stop = vi.fn();
+        vi.stubGlobal('matchMedia', () => ({ addEventListener: (type, fn) => { onChange = fn; }, removeEventListener: stop }));
+        vi.stubGlobal('devicePixelRatio', 1);
+        makeStage();
+        stage.start();
+        expect(canvas.width).toBe(800);
+        vi.stubGlobal('devicePixelRatio', 2);
+        onChange();
+        expect(stage.renderer.setPixelRatio).toHaveBeenLastCalledWith(2);
+        runFrame();
+        expect(canvas.width).toBe(1600);
+        stage.dispose();
+        expect(stop).toHaveBeenCalled();
+    });
+
     it('asks for one frame at a time, and starting twice does not double the loop', () => {
         makeStage();
         stage.start();

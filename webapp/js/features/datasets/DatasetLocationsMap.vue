@@ -78,6 +78,7 @@ import { Vector as VectorSource, Cluster } from 'ol/source';
 import { fromExtent } from 'ol/geom/Polygon';
 import { createEmpty, extend as extendExtent, isEmpty as isEmptyExtent } from 'ol/extent';
 import Button from 'primevue/button';
+import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import EmptyState from '@/components/EmptyState.vue';
 import { useMapBasemap } from '@/composables/useMapBasemap';
 import { useListenerBag } from '@/composables/useEventListener';
@@ -138,6 +139,7 @@ const popup = shallowRef(null);
 const hovered = shallowRef(null);
 let overlay = null;
 let resizeObserver = null;
+let stopPixelRatio = () => {};
 // True until the user moves the map: the view then follows the pins
 let followPins = true;
 
@@ -255,8 +257,11 @@ onMounted(() => {
         target: mapEl.value,
         // The basemap must be layer 0 (useMapBasemap replaces it)
         layers: [createBasemapLayer(), pinLayer, boxLayer, labelLayer],
-        view: new View({ center: [0, 0], zoom: 2 })
+        view: new View({ center: [0, 0], zoom: 2 }),
+        // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042)
+        pixelRatio: appliedPixelRatio()
     });
+    stopPixelRatio = watchPixelRatio(() => map.value?.setPixelRatio(appliedPixelRatio()));
     overlay = new Overlay({
         element: popupEl.value,
         positioning: 'bottom-center',
@@ -282,6 +287,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     resizeObserver?.disconnect();
+    stopPixelRatio();
+    stopPixelRatio = () => {};
     listeners.dispose();
     if (map.value) {
         map.value.removeOverlay(overlay);

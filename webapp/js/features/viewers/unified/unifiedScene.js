@@ -15,6 +15,7 @@ import {
 import { navigateByKey } from './navKeys';
 import { alignContentUpAxis } from './contentOrientation';
 import { deviceMemoryGb } from '@/libs/responsive';
+import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
 
@@ -75,6 +76,60 @@ export class UnifiedScene {
         this.keyDispose = null;
         // The cancels of the afterFirstRender listeners still waiting (dispose removes them)
         this.firstRenderCancels = new Set();
+        // Point clouds with the size of their points in CSS px (Giro3D draws in the pixels of the buffer: setPointSize)
+        this.pointSizes = new Map();
+        this.stopPixelRatio = null;
+    }
+
+    // ---- Pixel ratio (FR-XC-32, D-042) ------------------------------------------------
+
+    /**
+     * Makes the canvas the CSS size x the applied ratio, and keeps it so when the screen's ratio changes. The point
+     * clouds with eye-dome lighting render through targets of their own, which Giro3D sizes in CSS px: they get the
+     * size of the drawing buffer. The size of the points stays in CSS px.
+     */
+    applyPixelRatio() {
+        const instance = this.instance;
+        if (!instance) return;
+        instance.renderer.setPixelRatio(appliedPixelRatio());
+        this.sizeEdlTargets(instance);
+        this.pointSizes.forEach((css, entity) => { entity.pointSize = css * appliedPixelRatio(); });
+        instance.notifyChange();
+        this.stopPixelRatio ??= watchPixelRatio(() => this.applyPixelRatio());
+    }
+
+    /**
+     * Giro3D's render pipeline (eye-dome lighting) makes its targets the size it was given: the CSS size of the canvas.
+     * It is given the size of the drawing buffer instead, for the pass that renders the scene, so the cloud is drawn at
+     * the applied ratio too (the width and height of the engine, which picking reads in CSS px, are put back after).
+     */
+    sizeEdlTargets(instance) {
+        const engine = instance.engine;
+        if (!engine || engine.drawsAtBufferSize || typeof engine.renderUsingCustomPipeline !== 'function') return;
+        const render = engine.renderUsingCustomPipeline;
+        const size = new this.libs.THREE.Vector2();
+        engine.renderUsingCustomPipeline = function (...args) {
+            const { width, height } = engine;
+            engine.renderer.getDrawingBufferSize(size);
+            engine.width = size.x;
+            engine.height = size.y;
+            try {
+                return render.apply(engine, args);
+            } finally {
+                engine.width = width;
+                engine.height = height;
+            }
+        };
+        engine.drawsAtBufferSize = true;
+    }
+
+    /**
+     * The size of the points of a point cloud, in CSS px (Giro3D takes the size in the pixels of the drawing buffer).
+     * @param {any} entity @param {number} cssPx
+     */
+    setPointSize(entity, cssPx) {
+        this.pointSizes.set(entity, cssPx);
+        entity.pointSize = cssPx * appliedPixelRatio();
     }
 
     // ---- Instance --------------------------------------------------------------------
@@ -86,6 +141,7 @@ export class UnifiedScene {
     setupInstance(crs, { nav = 'free' } = {}) {
         const instance = new this.libs.Instance({ target: this.container, crs, backgroundColor: tokenHex('--ddb-viewer-bg') });
         this.instance = instance;
+        this.applyPixelRatio();
         instance.view.camera.up.set(0, 0, 1);
         this.sceneUp = instance.view.camera.up.clone();
         this.addLights({ fill: true });
@@ -101,6 +157,7 @@ export class UnifiedScene {
         const { Instance, Globe, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
         const instance = new Instance({ target: this.container, crs: CoordinateSystem.epsg4978, backgroundColor: tokenHex('--ddb-viewer-space-bg') });
         this.instance = instance;
+        this.applyPixelRatio();
         this.mercatorScale = 1;
         instance.view.camera.up.set(0, 0, 1);
         this.sceneUp = instance.view.camera.up.clone();
@@ -595,6 +652,9 @@ export class UnifiedScene {
     /** Releases everything: Giro3D disposes its renderer, scene, entities and canvas. */
     dispose() {
         this.tweener.stop();
+        if (this.stopPixelRatio) this.stopPixelRatio();
+        this.stopPixelRatio = null;
+        this.pointSizes.clear();
         [...this.firstRenderCancels].forEach(cancel => cancel());
         if (this.dblClickDispose) this.dblClickDispose();
         if (this.keyDispose) this.keyDispose();

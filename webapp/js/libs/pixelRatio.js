@@ -11,3 +11,34 @@ export function appliedPixelRatio(presetCap = MAX_PIXEL_RATIO, devicePixelRatio 
     const cap = presetCap > 0 ? presetCap : MAX_PIXEL_RATIO;
     return Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO, cap);
 }
+
+/**
+ * Calls `onChange(devicePixelRatio)` whenever the screen's ratio changes (the window moves to another screen, the
+ * browser zoom changes): every canvas renderer applies its ratio again (FR-XC-32). The `resolution` media query
+ * matches one ratio, so it is made again for each new one. Returns the function that stops watching.
+ * @param {(devicePixelRatio: number) => void} onChange
+ * @param {Pick<Window, 'matchMedia'> & { devicePixelRatio?: number }} [win]
+ * @returns {() => void}
+ */
+export function watchPixelRatio(onChange, win = globalThis.window) {
+    if (typeof win?.matchMedia !== 'function') return () => {};
+    let query = null;
+    let stopped = false;
+    const handler = () => {
+        if (stopped) return;
+        arm();
+        onChange(win.devicePixelRatio || 1);
+    };
+    function arm() {
+        query?.removeEventListener?.('change', handler);
+        query = win.matchMedia(`(resolution: ${win.devicePixelRatio || 1}dppx)`);
+        // lifetime: paired (removed by the function this returns, and each time the query is made again)
+        query.addEventListener?.('change', handler);
+    }
+    arm();
+    return () => {
+        stopped = true;
+        query?.removeEventListener?.('change', handler);
+        query = null;
+    };
+}

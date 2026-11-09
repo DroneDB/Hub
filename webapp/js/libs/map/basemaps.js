@@ -1,15 +1,19 @@
 import { getPref, setPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
+// `url2x` is the source of 512 px tiles (the map draws them in 256 px slots, tilePixelRatio 2) that a screen with a
+// devicePixelRatio above 1 uses (FR-XC-32, FR-MAP-29); a basemap with no 2x source (OpenStreetMap) has none and stays at 1x
 const Basemaps = {
     'satellite': {
         label: "Satellite",
         url: "https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}",
+        url2x: "https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}&scale=2",
         attributions: ["&copy; Google Maps"],
         maxZoom: 21
     },
     'hybrid': {
         label: "Hybrid",
         url: "https://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}",
+        url2x: "https://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}&scale=2",
         attributions: ["&copy; Google Maps"],
         maxZoom: 21
     },
@@ -111,12 +115,13 @@ function buildCustomBasemapConfig({ sourceType, url, layerName = '', tileSize, w
 
 /**
  * The URL of one tile of a custom source, loaded to check the source before it is saved: the
- * first XYZ tile, or a WMS GetMap of one quarter of the world at the tile size.
+ * first XYZ tile (its 1x tile when the URL has the `{r}` of a 2x source, FR-MAP-29), or a WMS GetMap
+ * of one quarter of the world at the tile size.
  * @param {{ sourceType: 'wms'|'xyz', url: string, layerName: string, tileSize?: number, defaultTime?: string }} config
  */
 function customBasemapTestUrl(config) {
     if (config.sourceType !== 'wms') {
-        return config.url.replace('{z}', '0').replace('{x}', '0').replace('{y}', '0');
+        return config.url.replace('{z}', '0').replace('{x}', '0').replace('{y}', '0').replaceAll('{r}', '');
     }
     const separator = config.url.includes('?') ? '&' : '?';
     const size = config.tileSize || CUSTOM_TILE_SIZES[0];
