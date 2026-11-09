@@ -22,6 +22,7 @@ import { CONFIRM_RESCAN, CONFIRM_REBUILD, deleteFilesConfirmation } from '@/libs
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { formatAlignResult } from '@/libs/dataset/alignResult';
+import { skippedSentence } from '@/libs/tasks/extractSummary';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import { useConfirmReplace } from '@/composables/useConfirmReplace';
@@ -420,7 +421,11 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             file, dataset,
             onClose: async (action, result) => {
                 if (action !== 'extracted' || !result) return;
-                notify.success(`Archive extracted to ${result.destPath || 'root folder'}`, { summary: 'Extract Completed', life: 'normal' });
+                // The entries the extraction skipped are named with their reason (FR-PRC-30)
+                const skipped = skippedSentence(result.summary);
+                const where = `Archive extracted to ${result.destPath || 'root folder'}`;
+                if (skipped) notify.warn(`${where}. ${skipped}`, { summary: 'Extract Completed', life: 'long' });
+                else notify.success(where, { summary: 'Extract Completed', life: 'normal' });
                 await listing.reload(result.destPath);
                 if (result.deletedArchive && result.archivePath) listing.removed([result.archivePath]);
             }

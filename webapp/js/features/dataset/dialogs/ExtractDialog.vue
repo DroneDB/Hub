@@ -70,6 +70,7 @@ import DialogHost from '@/components/DialogHost.vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useDialogs } from '@/composables/useDialogs';
 import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
+import { extractSummary } from '@/libs/tasks/extractSummary';
 import ddb from 'ddb';
 
 const { pathutils } = ddb;
@@ -237,7 +238,7 @@ export default {
                 // file listing can be refreshed when the dialog closes. The task lists
                 // name it by the label the tool gives it (archive → folder, FR-PRC-22):
                 // no `path` is sent only for that.
-                await this.runHeavyTask(this.dataset, 'archive-extract', {
+                const task = await this.runHeavyTask(this.dataset, 'archive-extract', {
                     params: {
                         sourcePath,
                         destPath: this.destPath || '',
@@ -252,7 +253,9 @@ export default {
                 this.$emit('close', 'extracted', {
                     destPath: this.destPath || '',
                     deletedArchive: this.deleteArchive,
-                    archivePath: sourcePath
+                    archivePath: sourcePath,
+                    // What the extraction did not extract, named with the reason (FR-PRC-30)
+                    summary: extractSummary(task && task.logTail)
                 });
             } catch (e) {
                 // A failed task shows its own reason in the status; a refusal of the submit has no task

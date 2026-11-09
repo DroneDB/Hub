@@ -70,6 +70,40 @@ describe('ExtractDialog submit', () => {
         expect(w.text()).toContain("A file or folder named 'a.txt' already exists in this folder");
         expect(w.findComponent(WindowStub).props('busy')).toBe(false);
     });
+
+    // FR-PRC-30: the skipped entries are read from the log of the task and handed to the page that shows the toast
+    it('closes with the entries the extraction skipped, named with their reason', async () => {
+        runHeavyTask.mockResolvedValue({
+            taskId: 't1',
+            logTail: ['[10:00:02] Skipped: vectors/tool.exe (file type not allowed)\nExtraction complete: 8 extracted, 1 skipped']
+        });
+        const { w } = open();
+        await flushPromises();
+
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+
+        const [action, result] = w.emitted('close')[0];
+        expect(action).toBe('extracted');
+        expect(result.destPath).toBe('archives');
+        expect(result.summary).toEqual({
+            extracted: 8,
+            skipped: 1,
+            entries: [{ path: 'vectors/tool.exe', reason: 'file type not allowed' }],
+            more: 0
+        });
+    });
+
+    it('closes with an empty summary when the task has no log', async () => {
+        runHeavyTask.mockResolvedValue({ taskId: 't1' });
+        const { w } = open();
+        await flushPromises();
+
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+
+        expect(w.emitted('close')[0][1].summary.skipped).toBe(0);
+    });
 });
 
 describe('ExtractDialog task status', () => {
