@@ -96,6 +96,41 @@ describe('duplicate tracking', () => {
 });
 
 describe('terminal state', () => {
+    it('reports the error message of a failed task while it polls, not its exception type', async () => {
+        const message = 'The file is damaged or not a valid GeoTIFF';
+        const seen = [];
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'build', state: 'Failed', errorType: 'DdbException', error: message }]),
+            getTask: vi.fn(async () => ({ error: message, artifact: null })),
+        });
+        const host = makeHost();
+
+        const result = host.trackHeavyTask(dataset, 't1', { notify: false, onProgress: e => seen.push(e.error) });
+        result.catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).rejects.toThrow(message);
+        expect(seen[0]).toBe(message);
+        host.$unmount();
+    });
+
+    it('falls back to the exception type of a task without a message', async () => {
+        const seen = [];
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'build', state: 'Failed', errorType: 'DdbException', error: null }]),
+            getTask: vi.fn(async () => ({ error: 'DdbException', artifact: null })),
+        });
+        const host = makeHost();
+
+        const result = host.trackHeavyTask(dataset, 't1', { notify: false, onProgress: e => seen.push(e.error) });
+        result.catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).rejects.toThrow('DdbException');
+        expect(seen[0]).toBe('DdbException');
+        host.$unmount();
+    });
+
     it('stops polling and releases the monitor when the task succeeds', async () => {
         const dataset = makeDataset({
             getTasks: vi.fn(async () => [{ taskId: 't1', toolId: 'build', state: 'Succeeded' }]),

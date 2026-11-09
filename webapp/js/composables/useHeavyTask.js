@@ -117,7 +117,9 @@ export function useHeavyTask() {
                         phase: summary.phaseMessage,
                         logTail,
                         logCursor,
-                        error: summary.errorType || null,
+                        // Why it failed: the server's message, or only the exception type of a task that
+                        // failed before the server kept messages
+                        error: summary.error || summary.errorType || null,
                         artifact: null, // not in the summary; fetched on the terminal state
                         createdAt: summary.createdAt,
                         startedAt: summary.startedAt,

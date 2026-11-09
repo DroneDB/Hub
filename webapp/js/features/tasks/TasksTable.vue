@@ -62,13 +62,14 @@
                         <Tag severity="warn" icon="fa-solid fa-hourglass-half" :value="stateTag(slotProps.data).label" />
                         <small v-if="stateTag(slotProps.data).files.length" class="missing-files">{{ stateTag(slotProps.data).files.join(', ') }}</small>
                     </div>
+                    <div v-else-if="progressKind(slotProps.data) === 'failed'" class="task-failed">
+                        <Tag severity="danger" icon="fa-solid fa-triangle-exclamation" value="Failed" />
+                        <small class="error-text" :title="slotProps.data.errorType || undefined">{{ failureText(slotProps.data) }}</small>
+                    </div>
                     <template v-else-if="progressKind(slotProps.data) === 'bar'">
                         <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
                                      :show-value="true" style="height: 1rem;" />
                         <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
-                        <small v-if="slotProps.data.state === 'Failed'" class="error-text" :title="slotProps.data.errorType">
-                            <i class="fa-solid fa-triangle-exclamation" /> {{ slotProps.data.errorType || 'Failed' }}
-                        </small>
                     </template>
                     <div v-else class="muted">-</div>
                 </template>
@@ -185,27 +186,37 @@ export default {
 
     methods: {
         /**
-         * What the Progress column renders for a row: 'waiting', 'bar' or 'none'.
+         * What the Progress column renders for a row: 'waiting', 'failed', 'bar' or 'none'.
          * A build that succeeded without building, its entry waiting for files, shows
-         * what it waits for. Otherwise only Processing, Succeeded (100%) and Failed
-         * (100% + error text) render a bar. Queued states (Created/Enqueued/Scheduled/
-         * Reused/Awaiting) and Deleted (reached by the Cancel button) show a muted placeholder.
+         * what it waits for. A failed task shows a red Failed tag and why it failed (the
+         * task's error), never a bar. Only Processing and Succeeded (100%) render a bar.
+         * Queued states (Created/Enqueued/Scheduled/Reused/Awaiting) and Deleted (reached
+         * by the Cancel button) show a muted placeholder.
          */
         progressKind(task) {
             if (isWaitingForFiles(task)) return 'waiting';
-            if (task.state === 'Processing' || task.state === 'Succeeded' || task.state === 'Failed') return 'bar';
+            if (task.state === 'Failed') return 'failed';
+            if (task.state === 'Processing' || task.state === 'Succeeded') return 'bar';
             return 'none';
         },
 
-        /** Bar fill: reported percent while Processing, full for ended tasks. */
-        progressValue(task) {
-            if (task.state === 'Processing') return task.progressPercent || 0;
-            return 100; // Succeeded / Failed
+        /**
+         * Why a failed task failed: the server's message (scrubbed of server paths). A task that
+         * failed before the server recorded messages has only its exception type.
+         */
+        failureText(task) {
+            return task.error || task.errorType || 'The task failed';
         },
 
-        /** Ended tasks show a full determinate bar; Processing shows one only with a real percent. */
+        /** Bar fill: reported percent while Processing, full once it succeeded. */
+        progressValue(task) {
+            if (task.state === 'Processing') return task.progressPercent || 0;
+            return 100; // Succeeded
+        },
+
+        /** A succeeded task shows a full determinate bar; Processing shows one only with a real percent. */
         barMode(task) {
-            const ended = task.state === 'Succeeded' || task.state === 'Failed';
+            const ended = task.state === 'Succeeded';
             const percent = task.progressPercent;
             const determinate = ended || (task.state === 'Processing' && percent != null && percent > 0);
             return determinate ? 'determinate' : 'indeterminate';
@@ -271,6 +282,19 @@ export default {
 
 .error-text {
     color: var(--ddb-danger);
+}
+
+.task-failed {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ddb-spacing-xs);
+    min-width: 0;
+}
+
+.task-failed .error-text {
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 
 .waiting-for-files {

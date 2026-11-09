@@ -22,10 +22,9 @@ describe('progress rendering rules', () => {
         });
     });
 
-    it('Failed renders a determinate 100% bar (with error text shown separately in the cell)', () => {
-        expect(render({ state: 'Failed', progressPercent: 37, errorType: 'JobAbortedException' })).toEqual({
-            kind: 'bar', value: 100, mode: 'determinate'
-        });
+    it('Failed renders no bar: a Failed tag and the error instead (TasksTable.failed.spec)', () => {
+        expect(progressKind({ state: 'Failed', progressPercent: 37, errorType: 'JobAbortedException' })).toBe('failed');
+        expect(progressKind({ state: 'Failed', progressPercent: 100, error: 'The file is damaged' })).toBe('failed');
     });
 
     it('Processing without a real percent renders indeterminate', () => {
