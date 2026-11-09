@@ -3,7 +3,7 @@
  * clicked one, with prev/next and an Information panel that follows the photo; a video opens the
  * video lightbox with the dataset (for its Download); other entries are not supported.
  */
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import DatasetLightbox from './DatasetLightbox.vue';
@@ -38,8 +38,13 @@ function mountLightbox() {
     return w;
 }
 const q = sel => document.querySelector(sel);
-// The viewers are lazy components: their chunks arrive after a few ticks
-const shown = sel => vi.waitFor(() => expect(q(sel)).not.toBeNull());
+// The viewers are lazy components. Their first import transforms the SFCs and their dependencies,
+// which can take seconds when the whole suite runs in parallel: load them once, up front, with a
+// generous hook timeout, so that the tests only wait for the (then cached) async component to render.
+beforeAll(async () => {
+    await Promise.all([import('./PhotoLightbox.vue'), import('./VideoLightbox.vue')]);
+}, 60000);
+const shown = sel => vi.waitFor(() => expect(q(sel)).not.toBeNull(), { timeout: 5000, interval: 10 });
 
 afterEach(() => {
     mounted.splice(0).forEach(w => w.unmount());
