@@ -353,6 +353,29 @@ describe('HubHeader accessible names', () => {
         expect(wrapper.find('[aria-label="Download"]').attributes('title')).toBe('Download');
     });
 
+    it('offers no Download, Share or Settings on a dataset that did not load (FR-ACC-18)', async () => {
+        await render();
+        const { useDatasetSessionStore } = await import('@/stores/datasetSession');
+        const session = useDatasetSessionStore(wrapper.vm.$pinia);
+        session.activeTab = 'explorer';
+        session.setSelectedFiles([{ path: 'ddb://acme/site/a.tif' }]);
+        session.setUnavailable(true);
+        await flushPromises();
+        expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(false);
+        expect(wrapper.find('[aria-label="Download"]').exists()).toBe(false);
+        expect(wrapper.find('[aria-label="Share"]').exists()).toBe(false);
+        session.setUnavailable(false);
+        await flushPromises();
+        expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(true);
+        expect(wrapper.find('[aria-label="Download"]').exists()).toBe(true);
+    });
+
+    it('is the banner landmark, with its actions in the Main navigation (FR-NAV-02)', async () => {
+        await render();
+        expect(wrapper.element.tagName).toBe('HEADER');
+        expect(wrapper.find('nav[aria-label="Main"]').exists()).toBe(true);
+    });
+
     it('says what the number of the storage row is', async () => {
         await render();
         const storageRow = () => wrapper.vm.userMenuItems.find(i => i.icon === 'fa-regular fa-hard-drive');

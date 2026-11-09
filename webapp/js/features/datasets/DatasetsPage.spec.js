@@ -444,10 +444,91 @@ describe('DatasetsPage create actions', () => {
         expect(wrapper.text()).not.toContain('create a new dataset');
     });
 
-    it('keeps offering them in an empty organization of an older Registry that sends no permissions', async () => {
+    it('offers none in an empty organization of an older Registry that sends no permissions (FR-ACC-02)', async () => {
         await renderEmpty(null);
-        expect(wrapper.vm.canCreateDataset).toBe(true);
-        expect(createActions()).toEqual(['Import Dataset', 'Create Dataset']);
+        expect(wrapper.vm.canCreateDataset).toBe(false);
+        expect(createActions()).toEqual([]);
+    });
+
+    it('offers none before the organization loaded', () => {
+        expect(DatasetsPage.computed.canCreateDataset.call({ orgInfo: null, datasets: [] })).toBe(false);
+        expect(DatasetsPage.computed.canCreateDataset.call({ orgInfo: null, datasets: [{ permissions: { canWrite: true } }] })).toBe(false);
+    });
+});
+
+// FR-ACC-02, FR-ACC-16, D-048: an organization that did not load shows its page state, not a broken page
+describe('DatasetsPage page states (FR-XC-13)', () => {
+    let wrapper;
+    let push;
+    beforeEach(() => {
+        globalThis.HubOptions = {};
+        _resetPrefListenersForTests();
+        localStorage.clear();
+    });
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        reg.isLoggedIn = () => true;
+        _resetPrefListenersForTests();
+    });
+
+    async function renderRefused(status) {
+        const { ApiError } = await import('@/libs/ddb/apiError');
+        const { RouterLinkStub } = await import('@vue/test-utils');
+        const datasetsPage = vi.fn(() => Promise.resolve({ items: [], total: 0 }));
+        reg.Organization = vi.fn(() => ({ info: () => Promise.reject(new ApiError('refused', status)), datasetsPage }));
+        push = vi.fn(() => Promise.resolve());
+        wrapper = mount(DatasetsPage, {
+            global: {
+                plugins: [PrimeVue],
+                mocks: { $route: { params: { org: 'admin' } }, $router: { push }, $notify: { success: vi.fn(), error: vi.fn() } },
+                stubs: {
+                    RouterLink: RouterLinkStub, DatasetDialog: true, ImportDatasetDialog: true, OrganizationDialog: true,
+                    OrganizationMembersDialog: true, MessageDialog: true, DialogHost: true, Paginator: true, DatasetLocationsMap: true
+                }
+            }
+        });
+        await flushPromises();
+        return { datasetsPage };
+    }
+    const shownActions = () => wrapper.findAll('button').map(b => b.attributes('title') || b.text())
+        .filter(t => /Import|Create|Members/.test(t));
+
+    it('a 403 shows "You do not have access to this organization", with no header, table, Create or Import', async () => {
+        const { datasetsPage } = await renderRefused(403);
+        expect(wrapper.find('h1').text()).toBe('You do not have access to this organization');
+        expect(wrapper.findAll('h1')).toHaveLength(1);
+        expect(wrapper.text()).toContain('"admin" is private.');
+        expect(wrapper.find('.org-header').exists()).toBe(false);
+        expect(wrapper.find('.ds-table').exists()).toBe(false);
+        expect(shownActions()).toEqual([]);
+        expect(wrapper.vm.canCreateDataset).toBe(false);
+        expect(datasetsPage).not.toHaveBeenCalled();
+        expect(wrapper.text()).toContain('Sign in as another user');
+    });
+
+    it('a 404 shows "Organization not found" naming the slug, and does not redirect (FR-ACC-16)', async () => {
+        await renderRefused(404);
+        expect(wrapper.find('h1').text()).toBe('Organization not found');
+        expect(wrapper.text()).toContain('"admin" does not exist.');
+        expect(wrapper.findAllComponents({ name: 'RouterLinkStub' }).map(l => l.props('to'))).toContainEqual({ name: 'Organizations' });
+        expect(push).not.toHaveBeenCalled();
+        expect(shownActions()).toEqual([]);
+    });
+
+    it('a 401 to a visitor without a session shows the sign-in state (D-048)', async () => {
+        reg.isLoggedIn = () => false;
+        await renderRefused(401);
+        expect(wrapper.find('h1').text()).toBe('Sign in to open this organization');
+        const signIn = wrapper.findAllComponents({ name: 'RouterLinkStub' }).find(l => l.text().includes('Sign in'));
+        expect(signIn.props('to')).toMatchObject({ name: 'Login' });
+        expect(push).not.toHaveBeenCalled();
+    });
+
+    it('another failure keeps the page with its message', async () => {
+        await renderRefused(500);
+        expect(wrapper.find('.resource-state').exists()).toBe(false);
+        expect(wrapper.vm.error).toBe('refused');
     });
 });
 

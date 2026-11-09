@@ -1,5 +1,5 @@
 <template>
-    <ViewerShell id="panorama" v-model:error="error" dark :loading="loading" loading-text="Loading viewer...">
+    <ViewerShell id="panorama" v-model:error="error" dark :loading="loading" :load-error="loadError" loading-text="Loading viewer...">
         <div ref="container" class="viewer" />
     </ViewerShell>
 </template>
@@ -21,7 +21,7 @@ import { useResizeObserver } from '@/composables/useEventListener';
 
 defineOptions({ name: 'PanoramaViewer' });
 
-const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({
+const { entry, dataset, loading, error, loadError, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA], typeLabel: 'a panorama', title: 'Panorama'
 });
 const container = ref(null);

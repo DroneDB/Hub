@@ -31,6 +31,8 @@
                 </DataTable>
             </div>
         </div>
+        <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table -->
+        <ResourceState v-else-if="loadKind" :kind="loadKind" resource="organization" :name="$route.params.org" />
         <div v-else class="ds-content">
             <!-- Organization header -->
             <div class="org-header">
@@ -49,7 +51,7 @@
                                         <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                             {{ orgInfo.owner }}
                                         </Tag>
-                                        <VisibilityTag rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
+                                        <VisibilityTag v-if="orgInfo" rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
                                         <Tag rounded severity="info" icon="fa-solid fa-database">
                                             {{ totalDatasets }}
                                         </Tag>
@@ -210,6 +212,7 @@
 
 <script>
 import EmptyState from '@/components/EmptyState.vue';
+import ResourceState from '@/components/ResourceState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
 import Message from '@/components/HubMessage.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
@@ -246,7 +249,7 @@ import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { visibilityLabel } from '@/libs/visibility';
 import { formatDateTime } from '@/libs/format';
-import { isUnauthorized } from '@/libs/ddb/apiError';
+import { isUnauthorized, loadErrorKind } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
 import { hasOpenOverlay } from '@/composables/useOverlay';
 
@@ -260,6 +263,7 @@ export default {
     name: 'DatasetsPage',
     components: {
         EmptyState,
+        ResourceState,
         Message,
         ViewSelect,
         ListToolbar,
@@ -296,6 +300,8 @@ export default {
             Visibility,
             skeletonRows: new Array(10).fill({}),
             error: "",
+            // The organization did not load: not there, not for this user, or sign in (ResourceState)
+            loadError: null,
             // The page shown (the server searches, sorts and pages)
             datasets: [],
             totalDatasets: 0,
@@ -361,20 +367,24 @@ export default {
         memberManagementEnabled: function () {
             return reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         },
-        // Check if user can create datasets in this organization
-        // User can create if: dataset creation is not disabled AND at least one dataset has canWrite permission
-        // OR if there are no datasets yet (server will validate permission)
+        // The page state of an organization that did not load (loadErrorKind), or null
+        loadKind: function () {
+            return loadErrorKind(this.loadError);
+        },
+        // Check if user can create datasets in this organization: only in an organization that loaded and
+        // says the user may write (an older Registry without permissions: a dataset the user may write)
         canCreateDataset: function () {
             if (HubOptions.disableDatasetCreation) return false;
             // An anonymous visitor (a Public organization opens without signing in) creates nothing: the Registry
             // sends them no permissions, which the fallback below would read as an older Registry
             if (!reg.isLoggedIn()) return false;
+            // Nothing is offered before the organization loaded, nor when it did not (FR-ACC-02)
+            if (!this.orgInfo) return false;
             // The organization says what the user may do: write creates, read only (a Public organization of
-            // another user, D-003) does not. Without permissions for a signed-in user (an older Registry) the
-            // rules below decide
-            const orgPermissions = this.orgInfo?.permissions;
+            // another user, D-003) does not. Without permissions for a signed-in user (an older Registry) a
+            // dataset the user may write decides
+            const orgPermissions = this.orgInfo.permissions;
             if (orgPermissions) return orgPermissions.canWrite === true;
-            if (this.datasets.length === 0) return true;
             return this.datasets.some(ds => ds.permissions && ds.permissions.canWrite);
         },
         // Show Actions column only if at least one dataset has actions available
@@ -484,13 +494,10 @@ export default {
 
             await this.loadPage();
         } catch (e) {
-            if (isUnauthorized(e)) {
-                // reg.onUnauthorized sends the user to Login
-            } else if (e.status === 404) {
-                this.$router.push({ name: "Organizations" }).catch(() => { });
-            } else {
-                this.error = e.message;
-            }
+            // Not there, not for this user, or sign in: the page state says so (with a session, a 401
+            // has already sent the user to Login); any other failure is the message
+            if (loadErrorKind(e)) this.loadError = e;
+            else this.error = e.message;
         }
         this.loading = false;
     },

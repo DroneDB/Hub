@@ -19,13 +19,15 @@ vi.mock('@/composables/useViewerEntry', async () => {
     const refusedEntry = message => {
         const loading = ref(true);
         const error = ref('');
+        const loadError = shallowRef(null);
         const entryLoaded = Promise.resolve().then(() => {
+            loadError.value = new Error(message);
             error.value = message;
             loading.value = false;
             return false;
         });
         return {
-            entry: shallowRef(null), dataset: shallowRef(null), canWrite: ref(false), loading, error, entryLoaded
+            entry: shallowRef(null), dataset: shallowRef(null), canWrite: ref(false), loading, error, loadError, entryLoaded
         };
     };
     return {
@@ -38,6 +40,7 @@ vi.mock('@/composables/useViewerEntry', async () => {
             canWrite: ref(source.canWrite),
             loading: ref(true),
             error: ref(''),
+            loadError: shallowRef(null),
             entryLoaded: Promise.resolve(true)
         })
     };
@@ -158,6 +161,33 @@ describe('MarkdownViewer', () => {
         expect(wrapper.find('.error').text()).toBe('cog.tif cannot be opened as markdown');
         expect(wrapper.find('.md-container').exists()).toBe(false);
         expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
+    });
+
+    it('shows the error of a file of another type in the shell, with the way back and no spinner (FR-VWR-05)', async () => {
+        source.refused = 'cog.tif cannot be opened as markdown';
+        globalThis.HubOptions = {};
+        const { createRouter, createMemoryHistory } = await import('vue-router');
+        const page = { render: () => null };
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: [
+                { path: '/r/:org/:ds', name: 'ViewDataset', component: page },
+                { path: '/r/:org/:ds/view/:encodedPath/markdown', name: 'Markdown', component: page }
+            ]
+        });
+        await router.push('/r/acme/site/view/Y29nLnRpZg==/markdown');
+        const errorHandler = vi.fn();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        wrapper = mount(MarkdownViewer, { attachTo: document.body, global: { plugins: [PrimeVue, router], config: { errorHandler } } });
+        await flushPromises();
+        expect(errorHandler).not.toHaveBeenCalled();
+        expect(consoleError).not.toHaveBeenCalled();
+        consoleError.mockRestore();
+        expect(wrapper.text()).toContain('cog.tif cannot be opened as markdown');
+        expect(wrapper.find('.viewer-failed a').attributes('href')).toBe('/r/acme/site');
+        expect(wrapper.find('.viewer-loading').exists()).toBe(false);
+        expect(wrapper.find('.viewer-name').text()).toBe('cog.tif');
+        expect(wrapper.find('.md-container').exists()).toBe(false);
     });
 
     describe('editing', () => {

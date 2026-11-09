@@ -1,5 +1,5 @@
 <template>
-    <ViewerShell id="splat" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
+    <ViewerShell id="splat" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading" :load-error="loadError"
                  settings-title="View settings" settings-id="splat-settings">
         <template #loading>
             <LoadingSpinner label="Loading Gaussian Splat..." />
@@ -132,7 +132,7 @@ import { useSplatScene } from './useSplatScene';
 
 defineOptions({ name: 'SplatViewer' });
 
-const { entry, dataset, ddbURI, canWrite, loading, error, entryLoaded } = useViewerEntry({
+const { entry, dataset, ddbURI, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.GAUSSIAN_SPLAT], typeLabel: 'a Gaussian Splat', title: 'Gaussian Splat'
 });
 const notify = useNotify();

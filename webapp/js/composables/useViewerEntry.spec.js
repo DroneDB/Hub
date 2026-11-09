@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import ddb from 'ddb';
-import { ApiError } from '@/libs/ddb/apiError';
+import { ApiError, loadErrorKind, LoadErrorKind } from '@/libs/ddb/apiError';
 import { b64encode } from '@/libs/base64';
 
 const route = { params: {} };
@@ -40,19 +40,43 @@ describe('useViewerEntry from the route', () => {
         expect(v.loading.value).toBe(false);
     });
 
-    it('reports a route without a file as an invalid uri', async () => {
+    it('reports a route without a file as a link that is not valid', async () => {
         route.params = { org: 'o', ds: 'd' };
         const v = useViewerEntry({ title: 'Map' });
         expect(await v.entryLoaded).toBe(false);
-        expect(v.error.value).toBe('Invalid uri');
+        expect(v.error.value).toBe('This link is not valid: the file path in the address cannot be read.');
+        expect(loadErrorKind(v.loadError.value)).toBe(LoadErrorKind.INVALID_LINK);
     });
 
-    it('reports a file that is not in the dataset as an error', async () => {
+    it('reports a file path that cannot be decoded as a link that is not valid, without a request (FR-VWR-23)', async () => {
+        route.params = { org: 'o', ds: 'd', encodedPath: '%%%garbage' };
+        const v = useViewerEntry({ title: 'Map' });
+        expect(await v.entryLoaded).toBe(false);
+        expect(v.error.value).toBe('This link is not valid: the file path in the address cannot be read.');
+        expect(loadErrorKind(v.loadError.value)).toBe(LoadErrorKind.INVALID_LINK);
+        expect(dataset.listOne).not.toHaveBeenCalled();
+    });
+
+    it('reports a file that is not in the dataset as an error, of the not found state', async () => {
         dataset.listOne.mockRejectedValue(new Error('Cannot find: f/a.tif.'));
         const v = useViewerEntry({ title: 'Map' });
         expect(await v.entryLoaded).toBe(false);
         expect(v.error.value).toBe('Cannot find: f/a.tif.');
+        expect(loadErrorKind(v.loadError.value)).toBe(LoadErrorKind.NOT_FOUND);
         expect(v.entry.value).toBeNull();
+    });
+
+    it.each([[401, 'sign-in'], [403, 'no-access'], [404, 'not-found']])('keeps the error of a %i for its page state', async (status, kind) => {
+        dataset.listOne.mockRejectedValue(new ApiError('refused', status));
+        const v = useViewerEntry({ title: 'Map' });
+        expect(await v.entryLoaded).toBe(false);
+        expect(loadErrorKind(v.loadError.value)).toBe(kind);
+    });
+
+    it('has no load error for a file that loaded', async () => {
+        const v = useViewerEntry({ title: 'Map' });
+        expect(await v.entryLoaded).toBe(true);
+        expect(v.loadError.value).toBeNull();
     });
 
     it('rejects a file of another type', async () => {

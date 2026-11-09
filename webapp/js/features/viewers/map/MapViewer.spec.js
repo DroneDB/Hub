@@ -186,12 +186,12 @@ describe('MapViewer on a file', () => {
         expect(window.location.search).toBe('?keep=1');
     });
 
-    it('shows the error of a file that is not there, with a link back to the dataset and the title of the route', async () => {
+    it('shows the not found state of a file that is not there, with a link back to the dataset and the title of the state', async () => {
         await open(fileUrl('f/a.tif'), { dataset: fakeDataset({ missing: ['f/a.tif'] }) });
         expect(map().exists()).toBe(false);
-        expect(wrapper.text()).toContain('Cannot find: f/a.tif.');
-        const back = wrapper.find('a');
-        expect(back.text()).toContain('Back to the dataset');
+        expect(wrapper.find('h1').text()).toBe('File not found');
+        expect(wrapper.text()).toContain('"f/a.tif" does not exist.');
+        const back = wrapper.findAll('.resource-state a').find(a => a.text().includes('Back to the dataset'));
         expect(back.attributes('href')).toBe('/r/acme/site');
         expect(titles()).not.toContain('Map - undefined');
         expect(titles().every(t => !t.endsWith('- Map'))).toBe(true);

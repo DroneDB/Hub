@@ -1,7 +1,9 @@
 <template>
     <div id="browser" class="cui app">
         <Message v-model="error" />
-        <Panel split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%" storage-key="dataset" mobile-collapsed>
+        <!-- The dataset is not there, not for this user, or needs a sign-in: the page state in place of the panels -->
+        <ResourceState v-if="loadKind" :kind="loadKind" resource="dataset" :name="params.ds" />
+        <Panel v-else split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%" storage-key="dataset" mobile-collapsed>
             <template #first>
                 <div class="sidebar">
                     <FileBrowser v-show="!isMobile" ref="fileBrowser" v-bind="treeProps" v-on="treeEvents" />
@@ -54,7 +56,7 @@
  * its dialog, on the dialog registry), useDatasetClipboard, useOpenItem and
  * useDatasetShortcuts; the toolbar is libs/dataset/explorerTools; the lightbox is a component.
  */
-import { ref, reactive, computed, watch, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, shallowRef, reactive, computed, watch, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
@@ -65,7 +67,7 @@ import { lazyComponent } from '@/libs/lazyComponent';
 import { Features } from '@/libs/features';
 import { PREF } from '@/libs/preferences';
 import { permissionsOf } from '@/libs/datasetPermissions';
-import { isUnauthorized } from '@/libs/ddb/apiError';
+import { loadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import BuildManager from '@/libs/build/buildManager';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError } from '@/libs/datasetDownloads';
@@ -89,6 +91,7 @@ import { useViewActions } from '@/composables/useViewActions';
 import { useEventListener } from '@/composables/useEventListener';
 import { listViews } from '@/libs/views/viewStore';
 import Message from '@/components/HubMessage.vue';
+import ResourceState from '@/components/ResourceState.vue';
 import Panel from '@/features/dataset/HubPanel.vue';
 import TabSwitcher from '@/features/dataset/TabSwitcher.vue';
 import Loader from '@/components/HubLoader.vue';
@@ -119,6 +122,11 @@ const { watchBuildEvents, handleBuildStarted, handleBuildError } = useBuildEvent
 
 const error = ref('');
 const busy = ref(false);
+// The dataset did not load (not found, no access, sign in): ResourceState replaces the panels
+const loadError = shallowRef(null);
+const loadKind = computed(() => loadErrorKind(loadError.value));
+// A dataset opened after one that did not load starts with the toolbar's actions
+session.setUnavailable(false);
 const isMobile = detectMobile();
 const mainTabs = [
     ...(isMobile ? [{ label: 'Browser', icon: 'fa-solid fa-sitemap', key: 'filebrowser' }] : []),
@@ -296,8 +304,16 @@ async function rootNodes() {
             expanded: true, entry: e, isExpandable: ddb.entry.isDirectory(e)
         }));
     } catch (e) {
-        // Left while loading; a 401 is reg.onUnauthorized's (sign in, then come back)
-        if (!isAbort(e) && !isUnauthorized(e)) actions.showError(e, 'Dataset');
+        // Left while loading
+        if (isAbort(e)) return [];
+        // Not there, not for this user, or sign in (with a session, a 401 has already sent the user
+        // to Login): the page state, and the header offers nothing on the dataset
+        if (loadErrorKind(e)) {
+            loadError.value = e;
+            session.setUnavailable(true);
+        } else {
+            actions.showError(e, 'Dataset');
+        }
         return [];
     }
 }
@@ -410,6 +426,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     document.getElementById('app').classList.remove('fullpage');
     BuildManager.unregisterDataset(dataset);
+    session.setUnavailable(false);
 });
 </script>
 

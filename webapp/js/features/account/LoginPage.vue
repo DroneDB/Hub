@@ -5,7 +5,7 @@
                 <ProgressSpinner class="login-spinner" />
             </div>
             <div v-else>
-                <h2>Welcome Back</h2>
+                <h1>Welcome Back</h1>
                 <p>Sign in with your credentials</p>
                 <Card>
                     <template #content>

@@ -11,7 +11,9 @@
  *
  * Returns refs, so they are reactive in templates and Options-API code alike: `entry`,
  * `dataset`, `ddbURI`, `canRead`, `canWrite`, `canDelete`, `loading`, `error` (the view's
- * one error, shown by ViewerShell) and `entryLoaded`, a promise of whether the entry
+ * one error, shown by ViewerShell), `loadError` (the error the entry did not load with, for
+ * ViewerShell's `load-error`: a missing file or dataset, no access, sign in, a link whose path
+ * cannot be read give its page state) and `entryLoaded`, a promise of whether the entry
  * loaded and has an accepted type.
  *
  * A viewer whose file is not named by the route (a saved view names it in its data) passes
@@ -27,7 +29,7 @@ import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { b64decode } from '@/libs/base64';
 import { setTitle } from '@/libs/utils';
-import { ApiError, isNotFound } from '@/libs/ddb/apiError';
+import { ApiError, InvalidLinkError, isNotFound } from '@/libs/ddb/apiError';
 import { permissionsOf, NO_PERMISSIONS } from '@/libs/datasetPermissions';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 
@@ -50,13 +52,20 @@ export function useViewerEntry({ types, typeLabel = 'this view', title, path: pa
     const canDelete = ref(false);
     const loading = ref(true);
     const error = ref('');
+    /** @type {import('vue').ShallowRef<unknown>} */
+    const loadError = shallowRef(null);
 
     /** The dataset path of the file, or null when the caller has none to load. */
     async function filePath() {
         if (pathOption === undefined) {
             const { encodedPath } = route.params;
-            if (!encodedPath) throw new Error('Invalid uri');
-            return b64decode(String(encodedPath));
+            try {
+                if (!encodedPath) throw new Error('no path');
+                return b64decode(String(encodedPath));
+            } catch {
+                // A link cut short or edited by hand
+                throw new InvalidLinkError('This link is not valid: the file path in the address cannot be read.');
+            }
         }
         return (await (typeof pathOption === 'function' ? pathOption() : unref(pathOption))) || null;
     }
@@ -75,7 +84,14 @@ export function useViewerEntry({ types, typeLabel = 'this view', title, path: pa
         try {
             e = await ds.listOne(path);
         } catch (listError) {
-            if (!allowMissing || !isMissing(listError)) throw listError;
+            if (allowMissing && isMissing(listError)) {
+                // The viewer opens without it
+            } else if (!(listError instanceof ApiError)) {
+                // An empty listing: the file is not there (its page state, not found)
+                throw new ApiError(listError.message, 404);
+            } else {
+                throw listError;
+            }
         }
         if (e && types && !types.includes(e.type)) throw new Error(`${e.path} cannot be opened as ${typeLabel}`);
 
@@ -99,9 +115,10 @@ export function useViewerEntry({ types, typeLabel = 'this view', title, path: pa
     }
 
     const entryLoaded = load().catch(e => {
+        loadError.value = e;
         error.value = e.message;
         return false;
     }).finally(() => { loading.value = false; });
 
-    return { entry, dataset, ddbURI, canRead, canWrite, canDelete, loading, error, entryLoaded };
+    return { entry, dataset, ddbURI, canRead, canWrite, canDelete, loading, error, loadError, entryLoaded };
 }

@@ -14,10 +14,11 @@
 
 <script setup>
 /**
- * ViewBar - the bar above the map of the map viewer: the name of the view (the saved name, or
+ * ViewBar - the content of the view bar of the map viewer (ViewerShell's bar, after the way back
+ * to the dataset): the name of the view (the saved name, or
  * the name of the base file of a new view; always text), the mark of unsaved changes and, for a
  * user who can save, Save (a new or a saved view) and Save as new (a saved view). A reader sees
- * the name only. The viewer leaves the bar out of a map in Viewer only.
+ * the name only. ViewerShell has no bar in Viewer only.
  *
  * It is one line at any width: a long name ends with an ellipsis (the full name is its title).
  */
@@ -43,9 +44,6 @@ const emit = defineEmits(['save', 'saveAsNew']);
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
-    padding: 0.4rem 0.75rem;
-    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
-    background: var(--ddb-bg);
 }
 
 .view-icon {
@@ -78,7 +76,6 @@ const emit = defineEmits(['save', 'saveAsNew']);
 @media (max-width: 575.98px) {
     .view-bar {
         gap: 0.35rem;
-        padding: 0.35rem 0.5rem;
     }
 
     .view-dirty {

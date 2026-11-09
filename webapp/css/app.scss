@@ -262,8 +262,9 @@ div.loading {
     flex-direction: column;
     height: 100%;
 
-    // Content area fills remaining space below header
-    > :last-child {
+    // Content area (<main>, App.vue) fills remaining space below header, and the page fills it
+    > :last-child,
+    > main > * {
         flex: 1;
         overflow: hidden;
         min-height: 0;
@@ -274,7 +275,7 @@ div.loading {
     // .page-scroll on it. The page keeps its own padding; border-box keeps that padding inside
     // the height it is given. Written under #app, after the rule above, so it outranks the
     // content area's overflow: hidden.
-    > .page-scroll {
+    > main > .page-scroll {
         height: 100%;
         overflow-y: auto;
         box-sizing: border-box;
