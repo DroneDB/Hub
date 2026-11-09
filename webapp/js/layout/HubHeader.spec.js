@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 import { reactive } from 'vue';
@@ -60,7 +60,7 @@ async function render(info = AVAILABLE) {
         global: {
             plugins: [PrimeVue, createPinia()],
             mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: { push: vi.fn() } },
-            stubs: { UpdateNotesDialog: { props: ['info'], template: '<div class="notes-stub">{{ info.latestVersion }}</div>' }, Menu: true, ShareEmbed: true }
+            stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: { props: ['info'], template: '<div class="notes-stub">{{ info.latestVersion }}</div>' }, Menu: true, ShareEmbed: true }
         }
     });
     await flushPromises();
@@ -129,7 +129,7 @@ describe('HubHeader update indicator', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: { push: vi.fn() } },
-                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();
@@ -172,7 +172,7 @@ describe('HubHeader user menu: Preferences', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: {}, fullPath: '/r' }, $router: { push } },
-                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             },
             attachTo: document.body
         });
@@ -274,7 +274,7 @@ describe('HubHeader: a link to the Preferences window', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: route, $router: { push, replace } },
-                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             },
             attachTo: document.body
         });
@@ -491,7 +491,7 @@ describe('HubHeader back-to-organization look-up', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: { org: 'acme', ds: 'site' }, query: {} }, $router: { push, replace } },
-                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();
@@ -547,7 +547,7 @@ describe('HubHeader logout', () => {
             global: {
                 plugins: [PrimeVue, createPinia()],
                 mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: router },
-                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             }
         });
         await flushPromises();
@@ -612,5 +612,86 @@ describe('HubHeader logout', () => {
         await flushPromises();
         expect(router.currentRoute.value.path).toBe('/r/acme');
         expect(h.auth.logout).not.toHaveBeenCalled();
+    });
+});
+
+// FR-NAV-06, FR-ACC-03, FR-ACC-08: home, Sign In and My Datasets
+describe('HubHeader: home and the session', () => {
+    let push;
+
+    async function mountOn(route, { loggedIn = true } = {}) {
+        h.auth.isLoggedIn = loggedIn;
+        h.auth.isAdmin = false;
+        h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(AVAILABLE));
+        push = vi.fn(() => Promise.resolve());
+        window.history.replaceState({}, '', route.fullPath ?? route.path);
+        wrapper = mount(HubHeader, {
+            global: {
+                plugins: [PrimeVue, createPinia()],
+                mocks: { $route: reactive({ params: {}, query: {}, ...route }), $router: { push, replace: vi.fn() } },
+                stubs: { RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+            }
+        });
+        await flushPromises();
+    }
+    const signIn = () => wrapper.find('button[aria-label="Sign In"]');
+    const logo = () => wrapper.findComponent(RouterLinkStub);
+
+    let isLoggedIn;
+    beforeEach(() => {
+        isLoggedIn = h.reg.isLoggedIn;
+        h.auth.sync = vi.fn();
+    });
+    afterEach(() => {
+        h.reg.isLoggedIn = isLoggedIn;
+        h.auth.username = 'admin';
+        delete h.auth.sync;
+    });
+
+    it('the logo is a link to home, the same for a visitor and a signed-in user', async () => {
+        await mountOn({ path: '/r/x', name: 'Datasets' }, { loggedIn: false });
+        expect(logo().classes()).toContain('logo');
+        expect(logo().props('to')).toEqual({ name: 'Organizations' });
+        wrapper.unmount();
+        await mountOn({ path: '/r/x', name: 'Datasets' });
+        expect(logo().props('to')).toEqual({ name: 'Organizations' });
+    });
+
+    it('the logo goes to the datasets of a one-organization install', async () => {
+        globalThis.HubOptions = { singleOrganization: 'acme' };
+        await mountOn({ path: '/r', name: 'Organizations' });
+        expect(logo().props('to')).toEqual({ name: 'Datasets', params: { org: 'acme' } });
+    });
+
+    it('offers no Sign In on the Login page, which would lose the page to come back to', async () => {
+        await mountOn({ path: '/login', fullPath: '/login?redirect=/r/survey-team', name: 'Login', query: { redirect: '/r/survey-team' } }, { loggedIn: false });
+        expect(signIn().exists()).toBe(false);
+        // Nor the user menu: nobody is signed in
+        expect(wrapper.find('button[aria-controls="user_menu"]').exists()).toBe(false);
+        // Should it be asked all the same, it keeps the page to come back to
+        wrapper.vm.login();
+        expect(push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/survey-team' } });
+    });
+
+    it('signs in from another page, coming back to it', async () => {
+        await mountOn({ path: '/r/x', name: 'Datasets' }, { loggedIn: false });
+        await signIn().trigger('click');
+        expect(push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/x' } });
+    });
+
+    it('My Datasets with a session that has gone: the header catches up and Login opens, without an error or a notice', async () => {
+        await mountOn({ path: '/account', name: 'Account' });
+        h.reg.isLoggedIn = () => false;
+        h.auth.username = '';
+        expect(() => wrapper.vm.myDatasets()).not.toThrow();
+        expect(h.auth.sync).toHaveBeenCalledOnce();
+        // It may have ended by a sign-out in another tab: nothing says it expired (FR-ACC-08)
+        expect(push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/account' } });
+    });
+
+    it('My Datasets with a session: the datasets of the user', async () => {
+        await mountOn({ path: '/account', name: 'Account' });
+        wrapper.vm.myDatasets();
+        expect(push).toHaveBeenCalledWith({ name: 'Datasets', params: { org: 'admin' } });
     });
 });

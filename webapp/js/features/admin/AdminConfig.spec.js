@@ -18,6 +18,8 @@ vi.mock('vue-router', async importOriginal => ({
 }));
 
 const { ref } = await import('vue');
+const { ApiError } = await import('@/libs/ddb/apiError');
+const { deniedLocation } = await import('@/libs/authRoutes');
 const { default: Select } = await import('primevue/select');
 const { default: AdminConfig } = await import('./AdminConfig.vue');
 
@@ -136,6 +138,28 @@ describe('AdminConfig', () => {
     it('says that it does not change the server, and how to use what it copies (D-005)', async () => {
         await show();
         expect(wrapper.text()).toContain('This page does not change the server. Merge the copied keys into appsettings.json, then restart the Registry. Do not replace the file with them.');
+    });
+
+    // FR-ACC-15: the server refuses the admin rights the client believed in
+    it('goes home with the notice of the guard when the server refuses it (403), and stays refused', async () => {
+        const push = vi.fn(() => Promise.resolve());
+        h.sys.config = vi.fn(() => Promise.reject(new ApiError('Forbidden', 403)));
+        const error = vi.spyOn(console, 'error').mockImplementation(() => { });
+        wrapper = mount(AdminConfig, {
+            attachTo: document.body,
+            global: {
+                plugins: [PrimeVue],
+                stubs: { UsageAndContactCard: true, EmailTemplatesCard: true },
+                mocks: { $notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, $router: { push } }
+            }
+        });
+        await flushPromises();
+        error.mockRestore();
+        expect(push).toHaveBeenCalledOnce();
+        expect(push).toHaveBeenCalledWith(deniedLocation('AdminConfig'));
+        expect(push).toHaveBeenCalledWith({ name: 'Organizations', query: { notice: 'denied:AdminConfig' } });
+        // Nothing of the configuration is shown
+        expect(wrapper.find('.config-field').exists()).toBe(false);
     });
 
     describe('edits', () => {

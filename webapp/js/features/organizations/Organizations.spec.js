@@ -91,13 +91,13 @@ describe('handleUnauthorized', () => {
         };
     };
 
-    it('ends the session and signs in again, coming back afterwards', async () => {
+    it('ends the session and signs in again, told why (FR-ACC-09), coming back afterwards', async () => {
         const { handleUnauthorized } = await import('@/libs/authRoutes');
         const r = router('/r');
         const auth = { isLoggedIn: true, logout: vi.fn() };
         handleUnauthorized(r, auth);
         expect(auth.logout).toHaveBeenCalledOnce();
-        expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r' } });
+        expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r', notice: 'expired' } });
     });
 
     it('comes back to the address as it is now, not to the one the route was opened at', async () => {
@@ -107,7 +107,7 @@ describe('handleUnauthorized', () => {
         // A map adds its layers without a navigation: the route keeps the address it opened at
         replaceQueryKeys({ layer: ['a'] });
         handleUnauthorized(r, { isLoggedIn: true, logout: vi.fn() });
-        expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/o/d/view/abc/map?t=1&layer=a' } });
+        expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/o/d/view/abc/map?t=1&layer=a', notice: 'expired' } });
     });
 
     it('leaves a visitor without a session on the page, which shows the sign-in state (D-048)', async () => {

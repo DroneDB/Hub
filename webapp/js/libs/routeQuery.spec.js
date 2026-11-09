@@ -64,6 +64,16 @@ describe('replaceQueryKeys', () => {
         replaceQueryKeys({ q: 'a b&c' });
         expect(address()).toBe('/r/o/d/view/abc/map?q=a%20b%26c');
     });
+
+    it('leaves an entry with no state without one, for the router made after it to fill in', () => {
+        window.history.replaceState(null, '', '/p?a=1#h');
+        replaceQueryKeys({ b: '2' });
+        expect(address()).toBe('/p?a=1&b=2#h');
+        expect(window.history.state).toBeNull();
+        replaceHash('x');
+        expect(address()).toBe('/p?a=1&b=2#x');
+        expect(window.history.state).toBeNull();
+    });
 });
 
 describe('applyQueryUpdates', () => {

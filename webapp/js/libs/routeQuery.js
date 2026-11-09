@@ -57,11 +57,15 @@ export function applyQueryUpdates(search, updates) {
  * written too, with the rest of its state: a later navigation or back then starts from this
  * address, not the old one (with no state, the router writes back the address of its last
  * navigation when it next pushes).
+ * An entry with no state stays without one (the address is written before the router is made,
+ * main.js): the router fills in its state (`position` among it) only when it finds none, and
+ * without `position` it cannot tell how far a back or forward went.
  * @param {string} url  path, query and hash
  */
 function replaceAddress(url) {
     if (url === currentPath()) return;
-    window.history.replaceState({ ...window.history.state, current: url }, '', url);
+    const state = window.history.state;
+    window.history.replaceState(state ? { ...state, current: url } : null, '', url);
 }
 
 /**

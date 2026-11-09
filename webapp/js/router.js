@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { setTitle } from '@/libs/utils';
 import { useAuthStore } from '@/stores/auth';
-import { guard } from '@/libs/authRoutes';
+import { guard, handleNotice } from '@/libs/authRoutes';
 import { navigationTitle } from '@/libs/routeTitle';
 
 // Lazy-loaded route components
@@ -67,6 +67,11 @@ export function createAppRouter(embed = false) {
         const title = navigationTitle(to, from);
         if (title) setTitle(title);
         return guard(to, useAuthStore());
+    });
+
+    // The one-shot notices (why the app brought the user here): shown once, then removed
+    router.afterEach((to, from, failure) => {
+        if (!failure) handleNotice(to, router);
     });
 
     return router;

@@ -54,6 +54,7 @@ import Button from 'primevue/button';
 import Select from 'primevue/select';
 import reg from '@/libs/api/sharedRegistry';
 import { isForbidden } from '@/libs/ddb/apiError';
+import { deniedLocation } from '@/libs/authRoutes';
 import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
@@ -163,8 +164,9 @@ export default {
                 this.total = (res && res.total) || 0;
             } catch (e) {
                 console.error('Failed to load tasks:', e);
+                // The server refuses the admin rights the client believed in: home, saying why
                 if (isForbidden(e)) {
-                    this.$router.push({ name: 'Organizations' }).catch(() => { });
+                    this.$router.push(deniedLocation('AdminTasks')).catch(() => { });
                     return;
                 }
                 this.items = [];

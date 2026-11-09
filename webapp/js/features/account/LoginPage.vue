@@ -7,6 +7,8 @@
             <div v-else>
                 <h1>Welcome Back</h1>
                 <p>Sign in with your credentials</p>
+                <!-- Why the app brought the user here (the one-shot notice of FR-XC-13) -->
+                <Message v-if="noticeText" severity="info" :closable="false" class="login-notice">{{ noticeText }}</Message>
                 <Card>
                     <template #content>
                         <div class="login-form">
@@ -45,7 +47,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { xAuthAvailable, getXAuthToken } from '@/libs/api/xauth';
 import { mapStores } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
-import { isAppPath } from '@/libs/authRoutes';
+import { EXPIRED_TEXT, NOTICE_QUERY, Notice, homeLocation, isAppPath, withoutNotice } from '@/libs/authRoutes';
 
 export default {
     name: 'LoginPage',
@@ -66,6 +68,11 @@ export default {
         ...mapStores(useAuthStore),
         showRegistrationLink: function() {
             return HubOptions.showRegistrationLink !== false;
+        },
+        // The router's query keeps the notice that the shared handler removed from the address:
+        // shown on this visit of the page, not after a reload
+        noticeText: function () {
+            return this.$route.query[NOTICE_QUERY] === Notice.EXPIRED ? EXPIRED_TEXT : '';
         }
     },
     beforeMount: function () {
@@ -87,10 +94,11 @@ export default {
         }
     },
     methods: {
-        // Back to the page that asked for a sign-in (router guard, expired session), else home
+        // Back to the page that asked for a sign-in (router guard, expired session), else home;
+        // a notice is not carried there
         redirectAfterLogin: function () {
             const redirect = this.$route.query.redirect;
-            this.$router.replace(isAppPath(redirect) ? redirect : { name: "Organizations" });
+            this.$router.replace(isAppPath(redirect) ? withoutNotice(redirect) : homeLocation());
         },
         login: async function (e) {
             if (e && e.preventDefault) e.preventDefault();
@@ -142,6 +150,10 @@ export default {
 
     .login-error {
         margin-top: 1rem;
+    }
+
+    .login-notice {
+        margin-bottom: 1rem;
     }
 }
 </style>
