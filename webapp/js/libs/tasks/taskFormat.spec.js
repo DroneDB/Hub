@@ -97,3 +97,13 @@ describe('taskFormat, cancelled and node-queued tasks', () => {
     });
 });
 
+
+describe('nodeLoad (FR-PRC-35)', () => {
+    it('splits the queue count of a node into the tasks it runs and the ones that wait', () => {
+        expect(f.nodeLoad({ taskQueueCount: 1, maxParallelTasks: 1 })).toEqual({ running: 1, waiting: 0 });
+        expect(f.nodeLoad({ taskQueueCount: 4, maxParallelTasks: 2 })).toEqual({ running: 2, waiting: 2 });
+        expect(f.nodeLoad({ taskQueueCount: 0, maxParallelTasks: 2 })).toEqual({ running: 0, waiting: 0 });
+        expect(f.nodeLoad({ taskQueueCount: 3 })).toEqual({ running: 3, waiting: 0 });
+        expect(f.nodeLoadText({ taskQueueCount: 3, maxParallelTasks: 2 })).toBe('2 running, 1 waiting, max 2 parallel');
+    });
+});

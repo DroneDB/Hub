@@ -73,9 +73,8 @@
                     <div v-if="nodeStatus" class="mb-3">
                         <PrimeMessage :severity="nodeStatus.reachable ? 'success' : 'error'" :closable="false">
                             <template v-if="nodeStatus.reachable">
-                                Node reachable - {{ nodeStatus.taskQueueCount }} task(s) queued,
-                                max {{ nodeStatus.maxParallelTasks }} parallel.<span v-if="nodeStatus.engine">
-                                    Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
+                                Node reachable - {{ nodeLoadText(nodeStatus) }}.<span v-if="nodeStatus.engine">
+                                    Engine: {{ [nodeStatus.engine, nodeStatus.engineVersion].filter(Boolean).join(' ') }}.</span>
                             </template>
                             <template v-else>
                                 Node unreachable: {{ nodeStatus.errorMessage }}
@@ -196,7 +195,8 @@ import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import { useTaskActions } from '@/composables/useTaskActions';
-import { matchesStateFilter } from '@/libs/tasks/taskFormat';
+import { matchesStateFilter, nodeLoadText } from '@/libs/tasks/taskFormat';
+import { foldBuildChildren } from '@/libs/tasks/taskGroups';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -307,7 +307,7 @@ export default {
             toolTitle: task => formatting.toolTitle(task.toolId, vm.tools),
             datasetName: () => `${props.dataset.org}/${props.dataset.ds}`
         });
-        return { trackHeavyTask, dialogs, confirm, taskActions, wideScreen: useMediaMatch(WIDE_MEDIA_QUERY), ...formatting };
+        return { trackHeavyTask, dialogs, confirm, taskActions, nodeLoadText, wideScreen: useMediaMatch(WIDE_MEDIA_QUERY), ...formatting };
     },
     data() {
         return {
@@ -535,6 +535,8 @@ export default {
             // A task queued on a processing node is Enqueued, as the Registry filters it (FR-PRC-37)
             if (this.selectedState) filtered = filtered.filter(t => matchesStateFilter(t, this.selectedState));
             if (this.selectedTool) filtered = filtered.filter(t => t.toolId === this.selectedTool);
+            // The builds a task started are listed under it with a count, unless the list is the one of the builds (FR-PRC-26)
+            if (this.selectedTool !== 'build') filtered = foldBuildChildren(filtered, state => this.isActive(state));
             this.filteredTasks = filtered;
 
             if (resetPage) {
@@ -625,8 +627,9 @@ export default {
         },
 
         // Queries the server for the selected node's availability and queue stats.
-        // Returns the status object (also stored in this.nodeStatus).
-        async checkNode() {
+        // Returns the status object (also stored in this.nodeStatus). { silent }: no toast (the submit).
+        // The toast is the answer of the click on Check Node: a check that the submit makes first (silent) shows none
+        async checkNode({ silent = false } = {}) {
             const nodeId = this.photogrammetryForm.nodeId
                 || (this.photogrammetryNodes[0] && this.photogrammetryNodes[0].value);
             if (!nodeId) {
@@ -638,15 +641,17 @@ export default {
             try {
                 const status = await this.dataset.registry.sys.processingNodeStatus(nodeId);
                 this.nodeStatus = status;
-                if (status.reachable) {
-                    this.$notify.success(`${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`, { summary: 'Node reachable' });
-                } else {
-                    this.$notify.error(status.errorMessage || 'The node did not respond.', { summary: 'Node unreachable' });
+                if (!silent) {
+                    if (status.reachable) {
+                        this.$notify.success(`${nodeLoadText(status)}.`, { summary: 'Node reachable' });
+                    } else {
+                        this.$notify.error(status.errorMessage || 'The node did not respond.', { summary: 'Node unreachable' });
+                    }
                 }
                 return status;
             } catch (e) {
                 this.nodeStatus = { reachable: false, errorMessage: e.message };
-                this.$notify.error(e.message, { summary: 'Check failed' });
+                if (!silent) this.$notify.error(e.message, { summary: 'Check failed' });
                 return this.nodeStatus;
             } finally {
                 this.checkingNode = false;
@@ -751,7 +756,7 @@ export default {
 
             // #6: pre-flight node check. We never hard-block on a full queue, but we
             // do ask for confirmation when the node appears unreachable.
-            const status = await this.checkNode();
+            const status = await this.checkNode({ silent: true });
             if (status && !status.reachable && !await this.confirm({
                 title: 'Processing node unreachable',
                 message: `The selected processing node did not respond${status.errorMessage ? ` (${escapeHtml(status.errorMessage)})` : ''}.<br/>Do you want to start the task anyway?`,

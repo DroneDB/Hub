@@ -6,16 +6,19 @@
  * for dangerous options.
  *
  * Props:
- *   option - Option object with name, type, domain, help, defaultValue, value
+ *   option - Option object with name, type, domain, help, defaultValue, baseValue, value
+ *            (baseValue: the value of the profile, else the node's default; defaultValue: the node's)
+ *
+ * Emits: update:value (the user entered a value), reset (the user asked for the base value back)
  */
 <template>
     <div class="odm-option-row">
         <div class="odm-option-label">
             <span :id="labelId" class="odm-option-name">{{ option.name }}</span>
             <span v-if="domainLabel" class="odm-option-domain">({{ domainLabel }})</span>
-            <i v-if="interpolatedHelp" v-tooltip.bottom="interpolatedHelp"
+            <i v-if="helpText" v-tooltip.bottom="helpText"
                class="fa-solid fa-circle-info odm-option-help" aria-hidden="true" />
-            <span v-if="interpolatedHelp" :id="helpId" class="visually-hidden">{{ interpolatedHelp }}</span>
+            <span v-if="helpText" :id="helpId" class="visually-hidden">{{ helpText }}</span>
         </div>
 
         <div class="odm-option-control">
@@ -71,7 +74,7 @@ export default {
         option: { type: Object, required: true }
     },
 
-    emits: ['update:value'],
+    emits: ['update:value', 'reset'],
 
     setup() {
         return { labelId: useId() };
@@ -86,7 +89,7 @@ export default {
     computed: {
         // The option name labels the control, its help describes it (the tooltip is mouse-only)
         helpId() {
-            return this.interpolatedHelp ? this.labelId + '-help' : undefined;
+            return this.helpText ? this.labelId + '-help' : undefined;
         },
         isEnum() {
             return this.option.type === 'enum' && Array.isArray(this.option.domain);
@@ -99,21 +102,16 @@ export default {
             if (this.isEnum) return null;
             return typeof this.option.domain === 'string' ? this.option.domain : null;
         },
-        interpolatedHelp() {
-            let h = this.option.help || '';
-            if (!h) return '';
-            const choices = Array.isArray(this.option.domain)
-                ? this.option.domain.join(', ')
-                : (this.option.domain || '');
-            const def = this.option.defaultValue ?? '';
-            // NodeODX help uses Python printf-style %(choices)s / %(default)s;
-            // also support {choices} / {default} for robustness.
-            h = h.replace(/%\(choices\)s/g, choices).replace(/\{choices\}/g, choices);
-            h = h.replace(/%\(default\)s/g, def).replace(/\{default\}/g, def);
-            return h;
+        // The Registry writes the choices and the default into the help (FR-DEV-10): it is shown as it is
+        helpText() {
+            return this.option.help || '';
+        },
+        // The value the row has without a customization: the one of the profile, else the node's default (FR-PRC-33)
+        baseValue() {
+            return this.option.baseValue !== undefined ? this.option.baseValue : (this.option.defaultValue ?? '');
         },
         hasChanged() {
-            return this.localValue !== '' && this.localValue !== this.option.defaultValue;
+            return this.localValue !== '' && String(this.localValue) !== String(this.baseValue);
         },
         showWarning() {
             return !!warnings[this.option.name] && this.localValue !== '';
@@ -137,8 +135,10 @@ export default {
             this.localValue = value;
             this.$emit('update:value', value);
         },
+        // Back to the base value: the customization goes away (the editor removes it), it is not a value of the user
         resetToDefault() {
-            this.onInput('');
+            this.localValue = this.baseValue;
+            this.$emit('reset');
         }
     }
 };

@@ -571,3 +571,38 @@ describe('MergeMultispectralDialog cancel', () => {
     });
 
 });
+
+// FR-PRC-18: the list is rebuilt by a move, and the browser drops the focus of a node that moves
+describe('MergeMultispectralDialog moving a band with the arrows', () => {
+    const arrow = (w, index, direction) => w.findAll('.band-item')[index].findAll('.band-move button')[direction === 'up' ? 0 : 1];
+
+    it('keeps the focus on the arrow of the moved band and says its new position', async () => {
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        const dataset = { validateMergeMultispectral: vi.fn().mockResolvedValue(validation(true)), previewMergeMultispectral: vi.fn().mockResolvedValue(null) };
+        const dialog = mount(MergeMultispectralDialog, {
+            attachTo: host,
+            props: { files: BANDS.map(path => ({ label: path, entry: { path } })), dataset },
+            global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /><slot name="footer" /></div>' } } }
+        });
+        await flushPromises();
+
+        arrow(dialog, 2, 'up').element.focus();
+        await arrow(dialog, 2, 'up').trigger('click');
+        await flushPromises();
+
+        // The third band is second now, and its "up" arrow has the focus
+        expect(dialog.findAll('.band-item')[1].find('.band-name').attributes('title')).toBe('IMG_0001_3.tif');
+        expect(document.activeElement).toBe(arrow(dialog, 1, 'up').element);
+        expect(dialog.find('[data-testid="band-move-announcement"]').text()).toBe('IMG_0001_3.tif moved to position 2');
+
+        // At the top the arrow is disabled: the focus goes to the other arrow
+        await arrow(dialog, 1, 'up').trigger('click');
+        await flushPromises();
+        expect(dialog.findAll('.band-item')[0].find('.band-name').attributes('title')).toBe('IMG_0001_3.tif');
+        expect(document.activeElement).toBe(arrow(dialog, 0, 'down').element);
+        expect(dialog.find('[data-testid="band-move-announcement"]').text()).toBe('IMG_0001_3.tif moved to position 1');
+        dialog.unmount();
+        host.remove();
+    });
+});

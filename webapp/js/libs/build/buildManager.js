@@ -133,6 +133,8 @@ class BuildManager {
                 filePath: path,
                 previousState: before?.state ?? null,
                 newState: after?.state ?? null,
+                // The task that started the build (a photogrammetry run), to report builds that end together once
+                parentJobId: after?.parentJobId ?? null,
                 buildInfo: after ? { path, currentState: after.state } : null,
             });
         }

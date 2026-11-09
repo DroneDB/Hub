@@ -128,14 +128,60 @@ describe('OdxOptionRow', () => {
         expect(row.findComponent({ name: 'Checkbox' }).props('modelValue')).toBe(true);
     });
 
-    it('emits the value the user enters, and an empty one on Reset', async () => {
-        const row = mountRow({ name: 'dem-resolution', type: 'float', value: '5', defaultValue: '5' });
+    it('emits the value the user enters, and a reset (no value) on Reset', async () => {
+        const row = mountRow({ name: 'dem-resolution', type: 'float', value: '5', defaultValue: '5', baseValue: '5' });
         row.findComponent({ name: 'InputText' }).vm.$emit('update:modelValue', '2');
         await flushPromises();
         expect(row.emitted('update:value')).toEqual([['2']]);
 
         await row.find('.odm-reset-btn').trigger('click');
-        expect(row.emitted('update:value')).toEqual([['2'], ['']]);
+        expect(row.emitted('update:value')).toEqual([['2']]);
+        expect(row.emitted('reset')).toHaveLength(1);
+        expect(row.findComponent({ name: 'InputText' }).props('modelValue')).toBe('5');
+    });
+
+    it('offers Reset only for a value other than the one of the profile, and shows the help as it is', () => {
+        // The profile sets dsm; the node's default is false: the profile's value is not a change
+        const row = mountRow({ name: 'dsm', type: 'bool', value: true, defaultValue: false, baseValue: true, help: 'Build a DSM. Default: false' });
+
+        expect(row.find('.odm-reset-btn').exists()).toBe(false);
+        expect(row.find('.visually-hidden').text()).toBe('Build a DSM. Default: false');
+    });
+});
+
+describe('OdxOptionsEditor - Reset (FR-PRC-33)', () => {
+    it('Reset of a changed option leaves the customizations, and the submit sends nothing of it', async () => {
+        const { custom } = mountEditor();
+        await flushPromises();
+        rowOf('dem-resolution').vm.$emit('update:value', '2');
+        await flushPromises();
+        expect(custom.value).toEqual([{ name: 'dem-resolution', value: '2' }]);
+
+        await rowOf('dem-resolution').find('.odm-reset-btn').trigger('click');
+        await flushPromises();
+
+        expect(custom.value).toEqual([]);
+        expect(wrapper.find('.odm-toolbar-right').text()).toBe('0 changed');
+        const params = TaskHistory.methods._buildSubmitParams.call({
+            photogrammetryForm: { preset: 'default', createNewDataset: false, destPath: 'results', folder: '', nodeId: '', name: '' },
+            customOptions: custom.value, optionsError: '', destPathError: '',
+            selectedPreset: TaskHistory.computed.selectedPreset.call({ photogrammetryForm: { preset: 'default' } })
+        });
+        expect(JSON.stringify(params.options ?? [])).not.toContain('dem-resolution');
+    });
+
+    it('Reset of an option the profile sets goes back to the value of the profile', async () => {
+        const { custom } = mountEditor();
+        await flushPromises();
+        rowOf('dsm').vm.$emit('update:value', false);
+        await flushPromises();
+        expect(custom.value).toEqual([{ name: 'dsm', value: false }]);
+
+        await rowOf('dsm').find('.odm-reset-btn').trigger('click');
+        await flushPromises();
+
+        expect(custom.value).toEqual([]);
+        expect(rowOf('dsm').props('option').value).toBe(true);
     });
 });
 

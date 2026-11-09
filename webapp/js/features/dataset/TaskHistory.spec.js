@@ -268,3 +268,74 @@ describe('photogrammetry profile', () => {
         expect(build('fast', [{ name: 'dsm', value: true }]).profile).toBe('Fast Orthophoto, customized');
     });
 });
+
+// FR-PRC-35: Check Node says what the node runs and what waits; the submit's own check adds no toast
+describe('Check Node', () => {
+    const status = { reachable: true, taskQueueCount: 1, maxParallelTasks: 1, engine: 'odx', engineVersion: '3.8.4' };
+    function vmWith(info) {
+        return {
+            photogrammetryForm: { nodeId: 'local' }, photogrammetryNodes: [], nodeStatus: null, checkingNode: false,
+            dataset: { registry: { sys: { processingNodeStatus: vi.fn(() => Promise.resolve(info)) } } },
+            $notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() }
+        };
+    }
+
+    it('says "1 running, 0 waiting" for one task on a node that runs one', async () => {
+        const vm = vmWith(status);
+
+        await TaskHistory.methods.checkNode.call(vm);
+
+        expect(vm.$notify.success).toHaveBeenCalledOnce();
+        expect(vm.$notify.success).toHaveBeenCalledWith('1 running, 0 waiting, max 1 parallel.', { summary: 'Node reachable' });
+        expect(vm.nodeStatus).toEqual(status);
+    });
+
+    it('shows no toast for the check the submit makes first', async () => {
+        const vm = vmWith(status);
+
+        const result = await TaskHistory.methods.checkNode.call(vm, { silent: true });
+
+        expect(result).toEqual(status);
+        expect(vm.$notify.success).not.toHaveBeenCalled();
+        expect(vm.$notify.error).not.toHaveBeenCalled();
+    });
+
+    it('a submit shows one toast: Photogrammetry started', async () => {
+        const vm = {
+            ...vmWith(status),
+            _pendingParams: { folder: '' }, submitting: false, photogrammetryDialogOpen: true,
+            photogrammetryDisabledMsg: 'off', loadTasks: vi.fn(() => Promise.resolve()),
+            trackHeavyTask: vi.fn(() => Promise.resolve()),
+            dataset: { submitTask: vi.fn(() => Promise.resolve({ taskId: 't1' })) }
+        };
+
+        await TaskHistory.methods._doSubmit.call(vm);
+
+        expect(vm.$notify.info).toHaveBeenCalledOnce();
+        expect(vm.$notify.info).toHaveBeenCalledWith('The task is now queued on the processing node.', { summary: 'Photogrammetry started' });
+        expect(vm.$notify.success).not.toHaveBeenCalled();
+    });
+});
+
+// FR-PRC-26: the builds of a photogrammetry run are folded under it
+describe('applyFilters - the builds of a task', () => {
+    const pg = { taskId: 'pg', toolId: 'photogrammetry', state: 'Succeeded' };
+    const builds = Array.from({ length: 9 }, (_, i) => ({ taskId: `b${i}`, toolId: 'build', state: 'Succeeded', parentJobId: 'pg' }));
+
+    it('lists the run with the count of its 9 builds, not 10 rows', () => {
+        const vm = fakeVm([pg, ...builds]);
+
+        applyFilters.call(vm);
+
+        expect(vm.filteredTasks.map(t => t.taskId)).toEqual(['pg']);
+        expect(vm.filteredTasks[0].childBuilds).toEqual({ total: 9, active: 0 });
+    });
+
+    it('lists the builds themselves when the tool filter is Build', () => {
+        const vm = fakeVm([pg, ...builds], { selectedTool: 'build' });
+
+        applyFilters.call(vm);
+
+        expect(vm.filteredTasks).toHaveLength(9);
+    });
+});

@@ -194,3 +194,25 @@ export function toolTitle(toolId, tools) {
     const tool = tools.find(t => t.id === toolId);
     return tool && tool.title ? tool.title : (toolId || 'Task');
 }
+
+/**
+ * What a NodeODX node is doing, from its status (FR-PRC-35): its queue count includes the tasks it runs, and it runs at
+ * most maxParallelTasks of them at once, so the rest waits. A node that does not say its limit runs all of them.
+ * @param {{ taskQueueCount?: number, maxParallelTasks?: number }} status
+ * @returns {{ running: number, waiting: number }}
+ */
+export function nodeLoad(status) {
+    const count = Math.max(0, status?.taskQueueCount ?? 0);
+    const limit = status?.maxParallelTasks ?? 0;
+    const running = limit > 0 ? Math.min(count, limit) : count;
+    return { running, waiting: count - running };
+}
+
+/**
+ * The status of a reachable node in words: "1 running, 0 waiting, max 1 parallel".
+ * @param {{ taskQueueCount?: number, maxParallelTasks?: number }} status
+ */
+export function nodeLoadText(status) {
+    const { running, waiting } = nodeLoad(status);
+    return `${running} running, ${waiting} waiting, max ${status?.maxParallelTasks ?? 0} parallel`;
+}

@@ -46,6 +46,8 @@
                         <small v-if="taskTarget(slotProps.data)" class="path-details">{{ targetText(slotProps.data) }}</small>
                         <!-- On a phone the card has the room for the whole target -->
                         <small v-if="taskTarget(slotProps.data)" class="path-full">{{ fullTargetText(slotProps.data) }}</small>
+                        <!-- The builds this task started: one line with their count (FR-PRC-26) -->
+                        <small v-if="slotProps.data.childBuilds" class="child-builds">{{ childBuildsText(slotProps.data.childBuilds) }}</small>
                     </div>
                 </template>
             </Column>
@@ -79,9 +81,19 @@
                          :title="stateTag(slotProps.data).title">
                         <Tag severity="info" icon="fa-regular fa-clock" :value="stateTag(slotProps.data).label" />
                     </div>
+                    <!-- A task that waits its turn says so with the label of its state, and what it waits behind (FR-PRC-42) -->
+                    <div v-else-if="progressKind(slotProps.data) === 'queued'" class="task-queued"
+                         :title="stateTag(slotProps.data).title">
+                        <Tag severity="info" icon="fa-regular fa-clock" :value="stateTag(slotProps.data).label" />
+                        <small v-if="slotProps.data.phaseMessage" class="muted queued-reason">{{ slotProps.data.phaseMessage }}</small>
+                    </div>
                     <div v-else-if="progressKind(slotProps.data) === 'bar'" class="task-progress">
-                        <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
-                                     :show-value="true" style="height: 1rem;" />
+                        <!-- The percent is text of its own: the bar's own label is clipped at 1-9 % (FR-PRC-39) -->
+                        <div class="task-bar">
+                            <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
+                                         :show-value="false" style="height: 1rem;" />
+                            <span v-if="barMode(slotProps.data) === 'determinate'" class="task-percent">{{ progressValue(slotProps.data) }}%</span>
+                        </div>
                         <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
                     </div>
                     <div v-else class="muted">-</div>
@@ -142,6 +154,8 @@ import EmptyState from '@/components/EmptyState.vue';
 import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
 import { useStackedLayout } from '@/composables/useStackedLayout';
 import { isWaitingForFiles, isWaitingForNode, isCancelled } from '@/libs/tasks/taskFormat';
+import { childBuildsText } from '@/libs/tasks/taskGroups';
+import { isActiveState } from '@/libs/tasks/taskStates';
 import { offersAction } from '@/composables/useTaskActions';
 
 /**
@@ -189,7 +203,7 @@ export default {
     setup() {
         // Secondary columns leave a narrow table; below `sm` every row is a stacked card with all of them (D-026),
         // and the hidden header's sortable cells leave the tab order
-        return { ...useTaskFormatting(), stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout() };
+        return { ...useTaskFormatting(), childBuildsText, stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout() };
     },
     data() {
         return {
@@ -219,9 +233,9 @@ export default {
          * what it waits for. A failed task shows a red Failed tag and why it failed (the
          * task's error), never a bar. A task a user cancelled says so, with the percent it
          * had reached (FR-PRC-20). A task a processing node keeps queued says so (FR-PRC-37).
-         * Only Processing and Succeeded (100%) render a bar. Queued states
-         * (Created/Enqueued/Scheduled/Reused/Awaiting) and a Deleted task nobody cancelled
-         * show a muted placeholder.
+         * Only Processing and Succeeded (100%) render a bar. A task that has not started (Created, Enqueued, Scheduled,
+         * Reused, Awaiting) shows its state's label, 'queued' (FR-PRC-42); a Deleted task nobody cancelled shows a muted
+         * placeholder.
          */
         progressKind(task) {
             if (isWaitingForFiles(task)) return 'waiting';
@@ -229,6 +243,7 @@ export default {
             if (isCancelled(task)) return 'cancelled';
             if (isWaitingForNode(task)) return 'node';
             if (task.state === 'Processing' || task.state === 'Succeeded') return 'bar';
+            if (isActiveState(task.state)) return 'queued';
             return 'none';
         },
 
@@ -386,6 +401,31 @@ export default {
     .tasks-table :deep(.col-created) { width: 11rem; }
     .tasks-table :deep(.col-dataset),
     .tasks-table :deep(.col-owner) { width: 14rem; }
+}
+
+.task-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--ddb-spacing-xs);
+}
+
+.task-bar :deep(.p-progressbar) {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Its own text, so that 5 % is whole whatever the width of the bar */
+.task-percent {
+    flex: none;
+    min-width: 2.5rem;
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+}
+
+.child-builds {
+    display: block;
+    color: var(--ddb-text-muted);
 }
 
 .task-cancelled,

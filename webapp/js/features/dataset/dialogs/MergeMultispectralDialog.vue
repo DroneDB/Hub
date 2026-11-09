@@ -26,13 +26,15 @@
                             <span class="band-move">
                                 <Button icon="fa-solid fa-arrow-up" text rounded size="small" severity="secondary"
                                         :aria-label="`Move ${item.label} up`" :disabled="submitting || index === 0"
-                                        @click="moveBand(index, index - 1)" />
+                                        @click="moveBand(index, index - 1, 'up')" />
                                 <Button icon="fa-solid fa-arrow-down" text rounded size="small" severity="secondary"
                                         :aria-label="`Move ${item.label} down`" :disabled="submitting || index === orderedFiles.length - 1"
-                                        @click="moveBand(index, index + 1)" />
+                                        @click="moveBand(index, index + 1, 'down')" />
                             </span>
                         </li>
                     </ol>
+                    <!-- The new position of the band a button moved, said to a screen reader (FR-PRC-18) -->
+                    <span class="visually-hidden" role="status" aria-live="polite" data-testid="band-move-announcement">{{ moveAnnouncement }}</span>
                 </div>
 
                 <!-- Column 2: Validation info -->
@@ -184,6 +186,7 @@ export default {
     data() {
         return {
             orderedFiles: [...this.files],
+            moveAnnouncement: '',
             dragIndex: null,
             dragOverIndex: null,
             validating: false,
@@ -415,12 +418,22 @@ export default {
             this.dragIndex = null;
             if (from !== null) this.moveBand(from, index);
         },
-        // Band order is the merge order: drag and the arrow buttons both end here
-        moveBand(from, to) {
+        // Band order is the merge order: drag and the arrow buttons both end here. A move by a button (`direction`) keeps
+        // the focus on the arrow of the same direction of the moved band, or on the other one when that is the end of the
+        // list (the list is rebuilt: the browser drops the focus of a node that moves), and says the new position
+        async moveBand(from, to, direction) {
             if (from === to || to < 0 || to >= this.orderedFiles.length) return;
             const item = this.orderedFiles.splice(from, 1)[0];
             this.orderedFiles.splice(to, 0, item);
             this.validate();
+            if (!direction) return;
+            this.moveAnnouncement = `${item.label} moved to position ${to + 1}`;
+            await this.$nextTick();
+            const buttons = this.$refs.bandList?.children[to]?.querySelectorAll('.band-move button');
+            if (!buttons) return;
+            const [up, down] = buttons;
+            const wanted = direction === 'up' ? up : down;
+            (wanted.disabled ? (direction === 'up' ? down : up) : wanted).focus();
         },
         onDragEnd() {
             this.dragOverIndex = null;

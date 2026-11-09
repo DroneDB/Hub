@@ -65,7 +65,7 @@
                             </div>
                             <div class="odm-option-subgroup-content">
                                 <OdxOptionRow v-for="opt in getOptions(group, subgroup)" :key="opt.name"
-                                              :option="opt" @update:value="(val) => onOptionChange(opt.name, val)" />
+                                              :option="opt" @update:value="(val) => onOptionChange(opt.name, val)" @reset="onOptionReset(opt.name)" />
                             </div>
                         </div>
                     </div>
@@ -82,7 +82,7 @@
                     <div v-show="!collapsedGroups['ungrouped']" class="odm-option-group-content">
                         <div class="odm-option-subgroup-content">
                             <OdxOptionRow v-for="opt in ungroupedOptions" :key="opt.name" :option="opt"
-                                          @update:value="(val) => onOptionChange(opt.name, val)" />
+                                          @update:value="(val) => onOptionChange(opt.name, val)" @reset="onOptionReset(opt.name)" />
                         </div>
                     </div>
                 </div>
@@ -92,7 +92,7 @@
             <template v-else>
                 <div class="odm-flat-list">
                     <OdxOptionRow v-for="opt in filteredOptions" :key="opt.name" :option="opt"
-                                  @update:value="(val) => onOptionChange(opt.name, val)" />
+                                  @update:value="(val) => onOptionChange(opt.name, val)" @reset="onOptionReset(opt.name)" />
                 </div>
             </template>
         </div>
@@ -314,30 +314,14 @@ export default {
                 const merged = { ...opt };
                 // Set defaultValue from node's default value
                 merged.defaultValue = merged.value !== undefined ? merged.value : '';
-                // Apply preset override
+                // Apply preset override; the value of the profile (else the node's) is where Reset goes back to
                 const presetOpt = this.presetOptions.find(p => p.name === opt.name);
-                if (presetOpt) {
-                    merged.value = presetOpt.value;
-                } else {
-                    merged.value = merged.defaultValue;
-                }
+                merged.baseValue = presetOpt ? presetOpt.value : merged.defaultValue;
+                merged.value = merged.baseValue;
                 // Apply user customization
                 const userOpt = this.modelValue.find(p => p.name === opt.name);
                 if (userOpt) {
                     merged.value = userOpt.value;
-                }
-                // Interpolate help text (NodeODX uses Python printf-style
-                // %(choices)s / %(default)s; also support {choices} / {default})
-                if (typeof merged.help === 'string') {
-                    const choices = Array.isArray(merged.domain)
-                        ? merged.domain.join(', ')
-                        : (merged.domain || '');
-                    const def = merged.defaultValue ?? '';
-                    merged.help = merged.help
-                        .replace(/%\(choices\)s/g, choices)
-                        .replace(/\{choices\}/g, choices)
-                        .replace(/%\(default\)s/g, def)
-                        .replace(/\{default\}/g, def);
                 }
                 return merged;
             });
@@ -522,6 +506,11 @@ export default {
         isCustomization(name, value) {
             if (value === '' || value === undefined || value === null) return false;
             return String(value) !== String(this.effectiveValue(name));
+        },
+        // Reset: the option leaves the customizations, and the profile's (else the node's) value is the one it has (FR-PRC-33)
+        onOptionReset(name) {
+            if (this.modelValue.some(o => o.name === name))
+                this.$emit('update:modelValue', this.modelValue.filter(o => o.name !== name));
         },
         onOptionChange(name, value) {
             let customizations = [...this.modelValue];
