@@ -68,7 +68,7 @@ import { usePreference } from '@/composables/usePreference';
 import { usePotreeMeasurements } from '@/composables/usePotreeMeasurements';
 import { useTimerGroup } from '@/composables/useTimers';
 import { loadResources } from '@/libs/lazy';
-import { isMobile } from '@/libs/responsive';
+import { isMobile, deviceMemoryGb } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
@@ -188,7 +188,7 @@ async function loadViewer() {
     viewer.toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
     viewer.setEDLEnabled(false);
     viewer.setFOV(60);
-    viewer.setPointBudget(pointBudgetFor(navigator.deviceMemory, isMobile()));
+    viewer.setPointBudget(pointBudgetFor(deviceMemoryGb(), isMobile()));
     // High-quality splats on desktop, standard on phones
     viewer.useHQ = !isMobile();
     applyUnits();

@@ -65,6 +65,7 @@ import { loadGiro3dLibs } from './giro3dLibs';
 import { UnifiedScene } from './unifiedScene';
 import { LOADERS, viewableEntry } from './loaders';
 import { MeasureTool } from './measureTool';
+import { NAV_GESTURES, showNavHintOnce } from './navKeys';
 
 defineOptions({ name: 'UnifiedViewer' });
 
@@ -99,13 +100,9 @@ const measureUnit = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_
 watch(measureUnit, () => { if (measureTool) measureTool.relabel(); });
 
 // What the navigation does (the help of the toolbar of ViewerShell, which also takes Home, H and 0)
-const GESTURES = [
-    { input: 'Left drag', action: 'Rotate' },
-    { input: 'Right drag or Ctrl + left drag', action: 'Pan' },
-    { input: 'Wheel or pinch', action: 'Zoom' },
-    { input: 'Shift + wheel', action: 'Field of view' },
-    { input: 'Double click', action: 'Focus on the point' }
-];
+const GESTURES = NAV_GESTURES;
+// The hint that points to the keys and to that help is shown once on this device
+const navHintSeen = usePreference(PREF.UNIFIED_NAV_HINT, false);
 
 // The shapes of the 3D viewer: a height is the splat viewer's
 const MEASURE_KINDS = ['point', 'distance', 'area'];
@@ -142,6 +139,7 @@ async function load() {
         measureTool = new MeasureTool(scene, count => { measureCount.value = count; });
         await LOADERS[viewable.type](scene, viewable, dataset.value);
         ready.value = true;
+        showNavHintOnce(notify, navHintSeen);
     } catch (e) {
         // A loader can fail after the instance exists (an empty tileset): no render loop left behind
         dispose();

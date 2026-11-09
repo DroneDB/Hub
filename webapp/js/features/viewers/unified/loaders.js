@@ -21,6 +21,11 @@ import { isFiniteBox, vectorStyle } from './sceneUtils';
 // detail). Older tilesets carry inflated errors and still load their finest LOD here.
 const MODEL_TILES_ERROR_TARGET = 6;
 
+// How long the loading indicator waits for the first frame of a 3D Tiles archive (FR-VWR-20):
+// framed to fit the view its root tile is in the frustum at once, so a longer wait means the tiles
+// are slow; the viewer opens, they go on streaming, and what needs them runs when they come
+const TILES3D_FIRST_RENDER_MS = 5000;
+
 const name = entry => ddb.pathutils.basename(entry.path);
 
 /** A tileset streamed coarse-to-fine: the coarse tiles stay up while finer ones load (no holes). */
@@ -132,7 +137,7 @@ async function loadModel(scene, entry, dataset) {
     if (!box || !isFiniteBox(box)) throw new Error(`The 3D model '${name(entry)}' is not available in the 3D viewer.\n\nIts 3D Tiles output is empty or invalid and needs to be rebuilt.`);
     scene.registerLayer(name(entry), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
     scene.frameBox(box);
-    await scene.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
+    await scene.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000, () => tileset.progress);
     scene.uprightTileset(tileset, box);
 }
 
@@ -154,15 +159,22 @@ async function loadTiles3D(scene, entry, dataset) {
     scene.registerLayer(name(entry), 'fa-solid fa-cubes', () => tileset.visible, v => { tileset.visible = v; });
     if (georeferenced) scene.frameGlobe(tileset, box);
     else scene.frameBox(box);
-    await scene.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
+    // The progress row shows the tiles that arrived while the scene waits
+    const hasGeometry = () => tileset.tiles.group.children.length > 0;
+    const rendered = await scene.waitForFirstRender(hasGeometry, TILES3D_FIRST_RENDER_MS, () => tileset.progress);
 
-    // Grounding measures the streamed geometry: only now. The re-frame yields to the user
-    if (georeferenced) {
-        box = scene.groundGlobeTileset(tileset, box);
-        if (!scene.userInteracted) scene.frameGlobe(tileset, box);
-    } else {
-        scene.uprightTileset(tileset, box);
-    }
+    // Grounding measures the streamed geometry: once it is there, now or (past the wait of the
+    // loading indicator) on its first frame. The re-frame yields to the user
+    const settle = () => {
+        if (georeferenced) {
+            box = scene.groundGlobeTileset(tileset, box);
+            if (!scene.userInteracted) scene.frameGlobe(tileset, box);
+        } else {
+            scene.uprightTileset(tileset, box);
+        }
+    };
+    if (rendered) settle();
+    else scene.afterFirstRender(hasGeometry, settle);
 }
 
 /**

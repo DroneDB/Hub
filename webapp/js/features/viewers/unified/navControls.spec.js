@@ -69,10 +69,12 @@ describe('wheelNotches', () => {
 
 // ---- scene distance limits ----
 
-describe('applySceneMetrics', () => {
+describe('applySceneMetrics (FR-XC-18)', () => {
     it('derives min/max distance from the framed scene size', () => {
         const c = {};
         applySceneMetrics(c, 200);
+        expect(c.minDistance).toBeCloseTo(4);
+        expect(c.maxDistance).toBeCloseTo(4000);
         expect(c.minDistance).toBeCloseTo(200 * NAV.minDistanceFactor);
         expect(c.maxDistance).toBeCloseTo(200 * NAV.maxDistanceFactor);
     });
@@ -80,17 +82,91 @@ describe('applySceneMetrics', () => {
     it('falls back to unit size when the scene size is unknown', () => {
         const c = {};
         applySceneMetrics(c, 0);
-        expect(c.minDistance).toBeCloseTo(NAV.minDistanceFactor);
+        expect(c.minDistance).toBeCloseTo(0.02);
+        expect(c.maxDistance).toBeCloseTo(20);
     });
 
     it('lets globe scenes keep a far looser distance ceiling', () => {
         const c = {};
-        applySceneMetrics(c, 300, NAV.globeMaxDistanceFactor);
-        expect(c.minDistance).toBeCloseTo(300 * NAV.minDistanceFactor);
+        applySceneMetrics(c, 300, { globe: true });
+        expect(c.minDistance).toBeCloseTo(6);
         // Zooming out to continent scale must stay possible, so the ceiling is orders of
         // magnitude above the flat-scene one.
-        expect(c.maxDistance).toBeCloseTo(300 * NAV.globeMaxDistanceFactor);
+        expect(c.maxDistance).toBeCloseTo(600000);
         expect(c.maxDistance).toBeGreaterThan(300 * NAV.maxDistanceFactor * 10);
+    });
+
+    it('sets the near plane to a hundredth of the framing distance and a far plane bounded by the cap (FR-VWR-09)', () => {
+        const c = {};
+        const view = {};
+        // A framing 8 units from a 20-unit scene: a hundredth of it (0.08) is under a quarter of minDistance (0.1)
+        const metrics = applySceneMetrics(c, 20, { view, distance: 8 });
+        expect(view.minNearPlane).toBeCloseTo(0.08, 10);
+        expect(c.minDistance).toBeCloseTo(0.4, 10);
+        // The cap is 20 scene sizes; the far plane twice the cap and the size
+        expect(c.maxDistance).toBeCloseTo(400);
+        expect(view.maxFarPlane).toBeCloseTo(840);
+        expect(metrics).toEqual({ minDistance: expect.closeTo(0.4), maxDistance: expect.closeTo(400), near: expect.closeTo(0.08), far: expect.closeTo(840) });
+    });
+
+    it('keeps the near plane at a quarter of minDistance at most: a camera zoomed in to the limit sees its pivot', () => {
+        const c = {};
+        const view = {};
+        // A hundredth of 50 would be 0.5, past minDistance (0.4): the near plane would clip the pivot
+        const metrics = applySceneMetrics(c, 20, { view, distance: 50 });
+        expect(view.minNearPlane).toBeCloseTo(0.1, 10);
+        expect(c.minDistance).toBeCloseTo(0.4, 10);
+        expect(metrics).toEqual({ minDistance: expect.closeTo(0.4), maxDistance: expect.closeTo(400), near: expect.closeTo(0.1), far: expect.closeTo(840) });
+        // A globe framing of 2.5 sizes: the same quarter
+        applySceneMetrics(c, 300, { view, distance: 750, globe: true });
+        expect(c.minDistance).toBeCloseTo(6, 10);
+        expect(view.minNearPlane).toBeCloseTo(1.5, 10);
+    });
+
+    it('keeps a 0.2 m scene out of the near plane, and its minimum distance four near planes away', () => {
+        const c = {};
+        const view = {};
+        applySceneMetrics(c, 0.2, { view, distance: 0.736, globe: true });
+        // A hundredth of the framing (0.00736) passes a quarter of 0.004: the 1 mm floor
+        expect(view.minNearPlane).toBe(1e-3);
+        expect(c.minDistance).toBeCloseTo(0.004, 12);
+        expect(0.736).toBeGreaterThan(view.minNearPlane * 100);
+        // Never a zero near plane, whatever the scene, and the minimum distance follows the floor
+        applySceneMetrics(c, 1e-9, { view, distance: 1e-9 });
+        expect(view.minNearPlane).toBe(1e-3);
+        expect(c.minDistance).toBeCloseTo(0.004, 12);
+    });
+
+    it('bounds the far plane of a globe by the horizon from the cap altitude, and by the size of the Earth', () => {
+        const c = {};
+        const view = {};
+        // Cap 400 m (0.2 m x 2000): the horizon 71 433 m away, twice the sum
+        applySceneMetrics(c, 0.2, { view, distance: 0.736, globe: true });
+        expect(c.maxDistance).toBeCloseTo(400);
+        expect(view.maxFarPlane).toBeCloseTo(143665.9, 0);
+        // A tileset of a city: the horizon from its cap is past the Earth
+        applySceneMetrics(c, 1e5, { view, distance: 2e5, globe: true });
+        expect(view.maxFarPlane).toBe(5.0e7);
+    });
+
+    it('caps the zoom-out at the distance where the basemap stops filling the view, when that is nearer (FR-VWR-15)', () => {
+        const c = {};
+        const view = {};
+        applySceneMetrics(c, 14000, { view, distance: 20000, fillDistance: 212504 });
+        expect(c.maxDistance).toBe(212504);
+        expect(view.maxFarPlane).toBe(2 * (212504 + 14000));
+        // A basemap that fills the view farther out than the flat cap does not raise it
+        applySceneMetrics(c, 14000, { view, distance: 20000, fillDistance: 900000 });
+        expect(c.maxDistance).toBe(280000);
+        // Nor does the cap end before the framing: Home, and room to zoom out from it
+        applySceneMetrics(c, 14000, { view, distance: 20000, fillDistance: 5000 });
+        expect(c.maxDistance).toBe(40000);
+    });
+
+    it('takes a scene with no view as the limits of the controls only', () => {
+        const c = {};
+        expect(() => applySceneMetrics(c, 10, { distance: 30 })).not.toThrow();
+        expect(c.maxDistance).toBeCloseTo(200);
     });
 });
 
@@ -402,7 +478,7 @@ describe('navigation (real ArcballControls)', () => {
         const camera = new THREE.PerspectiveCamera(50, W / H, 0.02, 20000);
         camera.up.copy(Z_UP);
         const scene = new THREE.Scene();
-        const controls = createNavControls({ ArcballControls }, camera, el, scene);
+        const controls = createNavControls({ THREE, ArcballControls }, camera, el, scene);
         camera.position.set(24, -24, 28);
         controls.target.set(0, 0, 10);
         applySceneMetrics(controls, 20);
@@ -657,25 +733,28 @@ describe('navigation (real ArcballControls)', () => {
         return e;
     }
 
-    it('zooms to the pivot on a wheel notch, and the next left-drag turns from the zoomed pose (no snap back)', () => {
+    it('zooms a notch toward the cursor, and the next left-drag turns from the zoomed pose (no snap back)', () => {
         const { el, camera, controls } = fixture();
         const pivot = navPivot(controls).clone();
         const distance = camera.position.distanceTo(pivot);
         const change = vi.fn();
         // lifetime: paired (removed below)
         controls.addEventListener('change', change);
-        // Off the middle: the zoom is to the pivot all the same (FR-XC-18; cursor zoom is not this one's)
+        // Off the middle (FR-VWR-28): the pivot moves toward the point under the cursor, the camera with it
+        const under = controls.pointUnder(W / 4, H / 4);
         const notch = wheel(el, -100);
         expect(notch.defaultPrevented).toBe(true);
         expect(change).toHaveBeenCalled();
-        expect(camera.position.distanceTo(pivot)).toBeCloseTo(distance / 1.1, 9);
-        expect(navPivot(controls).distanceTo(pivot)).toBeLessThan(1e-9);
+        const moved = navPivot(controls).clone();
+        expect(moved.distanceTo(pivot)).toBeGreaterThan(0.1);
+        expect(moved.distanceTo(under)).toBeCloseTo(pivot.distanceTo(under) / 1.1, 9);
+        expect(camera.position.distanceTo(moved)).toBeCloseTo(distance / 1.1, 9);
         const before = camera.quaternion.clone();
 
         drag(el, 120, 80);
 
         expect(camera.quaternion.angleTo(before)).toBeGreaterThan(0.1);
-        expect(camera.position.distanceTo(pivot)).toBeCloseTo(distance / 1.1, 6);
+        expect(camera.position.distanceTo(navPivot(controls))).toBeCloseTo(distance / 1.1, 6);
         controls.removeEventListener('change', change);
         controls.dispose();
     });
@@ -735,7 +814,8 @@ describe('navigation (real ArcballControls)', () => {
         el.dispatchEvent(pointer('pointerdown', W / 2, H / 2));
         window.dispatchEvent(pointer('pointermove', W / 2 + 30, H / 2 + 20));
         const turned = camera.quaternion.clone();
-        wheel(el, -100);
+        // At the middle of the view: the pivot stays
+        wheel(el, -100, { clientX: W / 2, clientY: H / 2 });
         expect(camera.position.distanceTo(pivot)).toBeCloseTo(distance / 1.1, 9);
         // The drag starts again where the pointer is: the turn it made before the notch is not
         // applied a second time on top of the zoomed pose
@@ -769,7 +849,8 @@ describe('navigation (real ArcballControls)', () => {
         const id = controls.arcball._animationId;
         expect(id).not.toBe(-1);
 
-        wheel(el, -100);
+        // At the middle of the view: the pivot stays
+        wheel(el, -100, { clientX: W / 2, clientY: H / 2 });
 
         expect(cancel).toHaveBeenCalledWith(id);
         expect(controls.arcball._animationId).toBe(-1);
@@ -850,9 +931,15 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
     }
 
     // A plain event with the wheel's fields: happy-dom's WheelEvent drops clientX
-    function wheel(el, deltaY = 100) {
+    function wheel(el, deltaY = 100, fields = {}) {
         el.dispatchEvent(Object.assign(new Event('wheel', { bubbles: true, cancelable: true }),
-            { deltaY, deltaX: 0, deltaMode: 0, clientX: W / 2, clientY: H / 2, shiftKey: false }));
+            { deltaY, deltaX: 0, deltaMode: 0, clientX: W / 2, clientY: H / 2, shiftKey: false, ...fields }));
+    }
+
+    function key(el, name, fields = {}) {
+        const e = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...fields });
+        el.dispatchEvent(e);
+        return e;
     }
 
     function pointer(type, x, y, button) {
@@ -965,6 +1052,139 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
             { deltaY: 100, deltaX: 0, deltaMode: 0, clientX: W / 2, clientY: H / 2, shiftKey: true }));
         expect(setFov).toHaveBeenCalledTimes(1);
         expect(camera.position.distanceTo(position)).toBeLessThan(1e-9);
+        scene.dispose();
+    });
+
+    // FR-VWR-28: the point under the cursor stays under the cursor, the pivot moves toward it
+    it('zooms a wheel notch toward the point under the cursor, which stays where it is on the screen (FR-VWR-28)', () => {
+        const { scene, el, camera } = sceneFixture();
+        const { controls } = scene;
+        const cursor = [150, 200];
+        const under = () => (strategy === 'free' ? controls.pointUnder(...cursor) : controls.groundPoint(...cursor));
+        // Where it is on the screen (NDC x and y; the depth changes with the distance)
+        const onScreen = point => { camera.updateMatrixWorld(); const p = point.clone().project(camera); return new THREE.Vector2(p.x, p.y); };
+        const point = under();
+        const pivot = navPivot(controls).clone();
+        const screen = onScreen(point);
+        const distance = camera.position.distanceTo(pivot);
+
+        wheel(el, -100, { clientX: cursor[0], clientY: cursor[1] });
+
+        // The pivot came toward the cursor point and the camera with it: the zoom is x1.1
+        expect(navPivot(controls).distanceTo(pivot)).toBeGreaterThan(0.1);
+        expect(navPivot(controls).distanceTo(point)).toBeLessThan(pivot.distanceTo(point));
+        expect(camera.position.distanceTo(navPivot(controls))).toBeLessThan(distance);
+        expect(onScreen(point).distanceTo(screen)).toBeLessThan(1e-6);
+        expect(under().distanceTo(point)).toBeLessThan(1e-6);
+        scene.dispose();
+    });
+
+    it('zooms to the pivot for a wheel notch at the middle of the view', () => {
+        const { scene, el } = sceneFixture();
+        const pivot = navPivot(scene.controls).clone();
+        wheel(el, -100);
+        expect(navPivot(scene.controls).distanceTo(pivot)).toBeLessThan(1e-6);
+        scene.dispose();
+    });
+
+    // FR-VWR-29: Home gives back the field of view too
+    it('flies Home with the field of view it was framed with, after Shift+wheel changed it (FR-VWR-29)', () => {
+        const { scene, el, camera, frames } = sceneFixture();
+        expect(scene.homePose.fov).toBe(50);
+        wheel(el, 100, { shiftKey: true });
+        wheel(el, 100, { shiftKey: true });
+        wheel(el, 100, { shiftKey: true });
+        expect(camera.fov).toBeGreaterThan(60);
+        const widened = camera.fov;
+
+        scene.goHome();
+        const pending = frames.length;
+        const now = performance.now();
+        frames[pending - 1](now + 300);
+        // Half way (the easing of 300 of 600 ms): between the two
+        expect(camera.fov).toBeLessThan(widened);
+        expect(camera.fov).toBeGreaterThan(50);
+        frames[pending](now + 5000);
+
+        expect(camera.fov).toBeCloseTo(50, 9);
+        // The projection follows: a camera of 50 degrees has 1 / tan(25 degrees) in its matrix
+        expect(camera.projectionMatrix.elements[5]).toBeCloseTo(1 / Math.tan(25 * Math.PI / 180), 9);
+        scene.dispose();
+    });
+
+    // FR-VWR-16: the keys of the focused canvas, through the interface of the strategy
+    it('has a name, a role and the keyboard focus on its canvas (FR-VWR-16)', () => {
+        const { scene, el } = sceneFixture();
+        expect(el.getAttribute('role')).toBe('application');
+        expect(el.getAttribute('aria-label')).toMatch(/^3D view\. Arrow keys rotate/);
+        expect(el.tabIndex).toBe(0);
+        scene.dispose();
+    });
+
+    it.each([
+        ['ArrowRight', {}, 'orbit', [Math.PI / 36, 0]],
+        ['ArrowLeft', {}, 'orbit', [-Math.PI / 36, 0]],
+        ['ArrowUp', {}, 'orbit', [0, Math.PI / 36]],
+        ['ArrowDown', {}, 'orbit', [0, -Math.PI / 36]],
+        ['ArrowRight', { shiftKey: true }, 'pan', [0.05, 0]],
+        ['ArrowDown', { shiftKey: true }, 'pan', [0, -0.05]]
+    ])('%s %j calls %s on the interface with %j, moves the camera and renders (FR-VWR-16)', (name, fields, method, args) => {
+        const { scene, el, camera } = sceneFixture();
+        const spy = vi.spyOn(scene.controls, method);
+        const before = camera.position.clone();
+        scene.instance.notifyChange.mockClear();
+
+        const e = key(el, name, fields);
+
+        expect(spy).toHaveBeenCalledTimes(1);
+        args.forEach((value, i) => expect(spy.mock.calls[0][i]).toBeCloseTo(value, 12));
+        expect(e.defaultPrevented).toBe(true);
+        expect(camera.position.distanceTo(before)).toBeGreaterThan(1e-3);
+        expect(scene.instance.notifyChange).toHaveBeenCalledWith(camera);
+        expect(scene.userInteracted).toBe(true);
+        scene.dispose();
+    });
+
+    it('zooms to the pivot with + and -, x1.1 a press, within the limits', () => {
+        const { scene, el, camera } = sceneFixture();
+        const zoomAt = vi.spyOn(scene.controls, 'zoomAt');
+        const pivot = navPivot(scene.controls).clone();
+        const distance = camera.position.distanceTo(pivot);
+
+        key(el, '+', { shiftKey: true });
+        expect(zoomAt).toHaveBeenLastCalledWith(undefined, 1.1);
+        expect(camera.position.distanceTo(navPivot(scene.controls))).toBeCloseTo(distance / 1.1, 6);
+        key(el, '-');
+        expect(zoomAt).toHaveBeenLastCalledWith(undefined, 1 / 1.1);
+        expect(camera.position.distanceTo(navPivot(scene.controls))).toBeCloseTo(distance, 6);
+        for (let i = 0; i < 400; i++) key(el, 'PageUp');
+        expect(camera.position.distanceTo(navPivot(scene.controls))).toBeCloseTo(scene.controls.minDistance, 6);
+        scene.dispose();
+    });
+
+    it('leaves the keys it does not use, and the ones with Ctrl, to the browser; and nothing moves while navigation is off', () => {
+        const { scene, el, camera } = sceneFixture();
+        const before = camera.position.clone();
+        expect(key(el, 'a').defaultPrevented).toBe(false);
+        expect(key(el, 'ArrowLeft', { ctrlKey: true }).defaultPrevented).toBe(false);
+        expect(key(el, 'Tab').defaultPrevented).toBe(false);
+        scene.setNavigationEnabled(false);
+        expect(key(el, 'ArrowLeft').defaultPrevented).toBe(false);
+        expect(camera.position.distanceTo(before)).toBe(0);
+        scene.setNavigationEnabled(true);
+        scene.dispose();
+        // The listener goes with the scene
+        expect(key(el, 'ArrowLeft').defaultPrevented).toBe(false);
+    });
+
+    it('takes the camera over from a flight: a key stops it where it is', () => {
+        const { scene, el, camera, frames } = sceneFixture();
+        scene.goHome();
+        const pending = frames.length;
+        key(el, 'ArrowRight');
+        const at = camera.position.clone();
+        frames[pending - 1]?.(performance.now() + 5000);
+        expect(camera.position.distanceTo(at)).toBe(0);
         scene.dispose();
     });
 

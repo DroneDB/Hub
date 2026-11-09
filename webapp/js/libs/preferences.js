@@ -32,6 +32,7 @@ export const PREF = Object.freeze({
     ORG_PAGE: 'org_page_prefs',
     ORG_PAGE_POSITION: 'org_page_position', // { currentPage, scrollTop } of the organisations page
     UNIFIED_VIEWER: 'unified-viewer-settings',
+    UNIFIED_NAV_HINT: 'ddb.unified.navHint', // true once the 3D viewer told the user how to move (keys, Controls help); device only
     MODEL_LIGHTING: 'model-lighting-settings',
     BUILD_NOTIFICATIONS: 'buildNotifications', // 'none' | 'all' | 'failed': which ended builds the server e-mails
     STOCKPILE_MATERIALS: 'stockpileMaterials', // { overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)

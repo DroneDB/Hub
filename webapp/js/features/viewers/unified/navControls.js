@@ -8,8 +8,9 @@
  *
  *  - left-drag rotates freely around the pivot (a trackball, with inertia);
  *  - right-drag or Ctrl+left-drag pans in the screen plane, the pivot with it;
- *  - the wheel and middle-drag zoom to the pivot (x1.1 a notch); Shift+wheel changes the field
- *    of view;
+ *  - the wheel zooms toward the point under the cursor (x1.1 a notch: the point stays under the
+ *    cursor, the pivot moves toward it), middle-drag zooms to the pivot; Shift+wheel changes the
+ *    field of view;
  *  - a double-click focuses on the clicked point: it becomes the pivot, in the middle of the
  *    view, x1.1 closer (the focus of ArcballControls, picked with Giro3D so that it lands on
  *    point clouds and map tiles too; see createDoubleClickRecenter).
@@ -41,7 +42,21 @@ const NAV = {
     // looser ceiling than a bounded flat scene.
     globeMaxDistanceFactor: 2000,
     // A double-click focus and the flight Home
-    dblClickDurationMs: 600
+    dblClickDurationMs: 600,
+    // The near plane is this fraction of the framing distance: a model that fills the view is never
+    // inside it, however small the scene is (FR-VWR-09)
+    nearFraction: 0.01,
+    // ...and never nearer than this (scene units), so that a zoom to a point cannot ask for a zero
+    minNear: 1e-3,
+    // ...and at most this fraction of the minimum distance: a camera zoomed in to the limit sees its
+    // pivot, and the geometry around it, in front of the near plane
+    nearOfMinDistance: 0.25,
+    // The distance a framing leaves to zoom out to, in framing distances (Home stays inside the cap)
+    homeRoom: 2,
+    // Where a globe's far plane ends (the Earth is 1.3e7 m across)
+    globeFarLimit: 5.0e7,
+    // The Earth's equatorial radius, for the distance to the horizon of a globe camera
+    earthRadius: 6378137
 };
 
 // Chrome reports deltaMode 0 (pixels) with ~100 units/notch; Firefox reports deltaMode 1 (lines)
@@ -73,8 +88,9 @@ const END_EVENT = { type: 'end' };
  * The free trackball (D-019): the ArcballControls of the bm3d viewer (modelStage) with their
  * defaults and hidden gizmos, behind the navigation interface. The pointer and touch are the
  * ArcballControls' own; its events reach the listeners of the strategy. The wheel is the
- * strategy's (FR-XC-18): a notch (100 px in Chrome, where ArcballControls count 125) zooms to the
- * pivot through zoomAt, Shift+wheel changes the field of view through setFov.
+ * strategy's (FR-XC-18): a notch (100 px in Chrome, where ArcballControls count 125) zooms toward
+ * the point under the cursor through zoomAt (FR-VWR-28), Shift+wheel changes the field of view
+ * through setFov.
  *
  * ArcballControls move the camera from a matrix state they take at the start of a gesture
  * (camera.matrix and the gizmos' matrix, which only a render refreshes): every move from outside
@@ -82,13 +98,14 @@ const END_EVENT = { type: 'end' };
  */
 export class FreeTrackball {
     /**
-     * @param libs - { ArcballControls } of the viewer's three.js build.
+     * @param libs - { THREE, ArcballControls } of the viewer's three.js build.
      * @param camera - the camera to control (its up is kept).
      * @param domElement - the element to listen to.
      * @param scene - the three.js scene the hidden gizmos join.
      */
     constructor(libs, camera, domElement, scene) {
         this.kind = 'free';
+        this._three = libs.THREE;
         this.camera = camera;
         const up = camera.up.clone();
         camera.up.set(0, 1, 0);
@@ -268,7 +285,29 @@ export class FreeTrackball {
     }
 
     /**
-     * A wheel notch zooms to the pivot (x scaleFactor), Shift+wheel changes the field of view
+     * The point under a screen point: where its ray meets the plane through the pivot that faces
+     * the camera, so that a zoom toward it keeps it under the pointer. Null for an element with no
+     * size or a ray that does not meet the plane.
+     */
+    pointUnder(clientX, clientY) {
+        const { camera, domElement } = this;
+        const rect = domElement.getBoundingClientRect();
+        if (!rect.width || !rect.height || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+        const THREE = this._three;
+        if (!THREE) return null;
+        const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+        // A move from outside (a flight) left the world matrix to the next render
+        camera.updateMatrixWorld();
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(ndc, camera);
+        const facing = camera.getWorldDirection(new THREE.Vector3());
+        const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(facing, this.pivot());
+        return raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    }
+
+    /**
+     * A wheel notch zooms toward the point under the cursor (x scaleFactor: the pivot moves
+     * toward it), Shift+wheel changes the field of view
      * (the tangent of its half x scaleFactor, the step of ArcballControls; a notch down widens
      * it, as the constrained orbit). Wheel up (a negative delta) zooms in.
      */
@@ -291,7 +330,7 @@ export class FreeTrackball {
             const tan = Math.tan(this.camera.fov * Math.PI / 360) * Math.pow(this.scaleFactor, notches);
             this.setFov(Math.atan(tan) * 360 / Math.PI);
         } else {
-            this.zoomAt(undefined, Math.pow(this.scaleFactor, -notches));
+            this.zoomAt(this.pointUnder(e.clientX, e.clientY) ?? undefined, Math.pow(this.scaleFactor, -notches));
         }
         this.dispatchEvent(END_EVENT);
     }
@@ -369,18 +408,60 @@ export function focusPosition(camera, controls, point) {
     return offset.multiplyScalar(wanted / distance).add(point);
 }
 
+/** Distance to the horizon of a camera `height` above a sphere of `radius`. */
+function horizonDistance(height, radius = NAV.earthRadius) {
+    return Math.sqrt(height * (2 * radius + height));
+}
+
 /**
- * Sets distance limits proportional to the framed scene so the camera can neither pass through the
- * pivot to an inverted view nor scroll out past the far plane and lose the data.
+ * The one place that sizes the camera's range to the framed scene (FR-XC-18): the distance limits
+ * of the controls (so the camera can neither pass through the pivot to an inverted view nor
+ * scroll out past the far plane and lose the data), and, with a `view`, its near and far planes.
+ * The framing methods of the scene call it and set none of these themselves.
+ *
+ *  - minDistance is a fraction of the scene size, maxDistance (the zoom cap) a multiple of it: 20
+ *    for a flat scene, 2000 for a globe (to stay zoomable out to continent scale). With
+ *    `fillDistance` (a flat scene with a basemap: the distance at which the basemap fills the
+ *    view) the cap is the nearer of the two, so the camera does not leave the map (FR-VWR-15). The
+ *    cap never ends before the framing distance, with room (NAV.homeRoom) to zoom out from Home;
+ *  - near is a fraction (1/100) of the framing distance: a small scene is never inside it
+ *    (FR-VWR-09); and at most a quarter of minDistance, which is at least four near planes, so that
+ *    a camera zoomed in (or focused) to the limit sees its pivot instead of clipping it (a framing
+ *    stands about 1.5 to 2 scene sizes away, where a hundredth would pass 0.02 scene sizes);
+ *  - far is bounded by the cap: twice the cap and the scene size in a flat scene; on a globe the
+ *    horizon at the cap altitude (twice it, at most the Earth's size), as the rest is out of sight.
  *
  * @param controls - the control to tune.
  * @param sceneSize - the greatest dimension of the framed scene, in scene units.
- * @param maxDistanceFactor - override for scenes that must stay zoomable far out (see NAV).
+ * @param options - { view: the Giro3D view whose minNearPlane / maxFarPlane are set, distance: the
+ *   distance the framing puts the camera at (the scene size x 2.5 when absent), globe: a globe
+ *   scene, fillDistance: see above, maxDistanceFactor: the cap in scene sizes (what the kind of
+ *   scene says by default) }.
+ * @returns { minDistance, maxDistance, near, far }
  */
-export function applySceneMetrics(controls, sceneSize, maxDistanceFactor = NAV.maxDistanceFactor) {
+export function applySceneMetrics(controls, sceneSize, options = {}) {
+    const { view, globe = false, fillDistance, maxDistanceFactor } = options;
     const size = sceneSize || 1;
-    controls.minDistance = size * NAV.minDistanceFactor;
-    controls.maxDistance = size * maxDistanceFactor;
+    const framing = options.distance > 0 ? options.distance : size * 2.5;
+    const factor = maxDistanceFactor ?? (globe ? NAV.globeMaxDistanceFactor : NAV.maxDistanceFactor);
+    let maxDistance = size * factor;
+    if (fillDistance > 0) maxDistance = Math.min(maxDistance, fillDistance);
+    maxDistance = Math.max(maxDistance, framing * NAV.homeRoom);
+    const sceneMin = size * NAV.minDistanceFactor;
+    const near = Math.max(Math.min(framing * NAV.nearFraction, sceneMin * NAV.nearOfMinDistance), NAV.minNear);
+    // A scene so small that the floor of the near plane passes a quarter of its minimum distance
+    const minDistance = Math.max(sceneMin, near / NAV.nearOfMinDistance);
+    const far = globe
+        ? Math.min(NAV.globeFarLimit, 2 * (maxDistance + horizonDistance(maxDistance)))
+        : 2 * (maxDistance + size);
+    controls.minDistance = minDistance;
+    controls.maxDistance = maxDistance;
+    if (view) {
+        // Giro3D clamps the planes it computes for every frame to these two bounds
+        view.minNearPlane = near;
+        view.maxFarPlane = far;
+    }
+    return { minDistance, maxDistance, near, far };
 }
 
 // Ground-plane fallback for the double-click focus, used when the click misses all geometry
@@ -435,7 +516,8 @@ export function easeInOutCubic(t) {
 // camera, on every entry load. Cancels any tween already in flight so a second dbl-click / Home
 // press before the first one finishes retargets smoothly. `onStep(e)` (optional) is told the eased
 // progress after each step, for what the tween does not move itself (the orientation of an orbit,
-// the splat viewer's field of view). Controls with setPose (a navigation strategy) get every step
+// the splat viewer's field of view); what it returns, an object of pose fields ({ fov }), goes to the
+// strategy's setPose with the step. Controls with setPose (a navigation strategy) get every step
 // through it, the last one saved (the next gesture starts from the end of the flight); other
 // controls (the splat viewer's) are updated. `onFrame(e)` (optional) runs after every step: a
 // Giro3D scene renders on demand, so it asks for the render there.
@@ -457,9 +539,10 @@ export function createCameraTweener({ onFrame } = {}) {
             const e = easeInOutCubic(t);
             camera.position.lerpVectors(startPosition, targetPosition, e);
             controls.target.lerpVectors(startTarget, targetTarget, e);
-            if (onStep) onStep(e);
+            // What onStep returns is more of the pose the step moves (the field of view: FR-VWR-29)
+            const more = onStep ? onStep(e) : undefined;
             if (typeof controls.setPose === 'function') {
-                controls.setPose({ position: camera.position, target: controls.target }, { save: t >= 1 });
+                controls.setPose({ position: camera.position, target: controls.target, ...more }, { save: t >= 1 });
             } else {
                 controls.update();
             }

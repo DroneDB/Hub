@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PotreeSession, pointBudgetFor } from './potreeSession';
+import { deviceMemoryGb } from '@/libs/responsive';
 
 // The jQuery that PotreeViewer.vue loads (public/potree), bound to the test window
 function vendoredJQuery() {
@@ -309,10 +310,33 @@ describe('PotreeSession.create', () => {
 
 describe('pointBudgetFor', () => {
     it('keeps 10 M points on desktops with 8 GB or more, less on smaller devices and phones', () => {
-        expect(pointBudgetFor(8, false)).toBe(10_000_000);
-        expect(pointBudgetFor(undefined, false)).toBe(10_000_000);
-        expect(pointBudgetFor(4, false)).toBe(4_000_000);
-        expect(pointBudgetFor(0.5, false)).toBe(1_000_000);
-        expect(pointBudgetFor(8, true)).toBe(3_000_000);
+        expect(pointBudgetFor(8, false, true)).toBe(10_000_000);
+        expect(pointBudgetFor(4, false, true)).toBe(4_000_000);
+        expect(pointBudgetFor(0.5, false, true)).toBe(1_000_000);
+        expect(pointBudgetFor(8, true, true)).toBe(3_000_000);
+        expect(pointBudgetFor(2, true, true)).toBe(2_000_000);
+    });
+
+    it('keeps 10 M points on a desktop whose browser does not report its memory (desktop Firefox, Safari)', () => {
+        // What deviceMemoryGb() gives there: its 4 GB default, which is not the memory of the desktop
+        expect(pointBudgetFor(4, false, false)).toBe(10_000_000);
+        expect(pointBudgetFor(undefined, false, false)).toBe(10_000_000);
+        // A phone that does not say stays within the phone budget
+        expect(pointBudgetFor(4, true, false)).toBe(3_000_000);
+    });
+
+    it('asks the browser whether it reported the memory when the caller does not say', () => {
+        const nav = globalThis.navigator;
+        const had = Object.getOwnPropertyDescriptor(nav, 'deviceMemory');
+        try {
+            // No navigator.deviceMemory (the test browser): a desktop keeps 10 M
+            delete nav.deviceMemory;
+            expect(pointBudgetFor(deviceMemoryGb(), false)).toBe(10_000_000);
+            Object.defineProperty(nav, 'deviceMemory', { value: 4, configurable: true });
+            expect(pointBudgetFor(deviceMemoryGb(), false)).toBe(4_000_000);
+        } finally {
+            if (had) Object.defineProperty(nav, 'deviceMemory', had);
+            else delete nav.deviceMemory;
+        }
     });
 });

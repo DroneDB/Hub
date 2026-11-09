@@ -21,6 +21,7 @@
  *   the whole viewer reachable).
  */
 import { ListenerBag } from '@/libs/listenerBag';
+import { DEFAULT_DEVICE_MEMORY_GB, reportsDeviceMemory } from '@/libs/responsive';
 
 // Nodes Potree 1.8 appends to document.body: the profile window (profile.html) and the
 // spectrum colour pickers of the sidebar
@@ -320,10 +321,17 @@ function jqueryWindowHandlers($, win) {
 
 /**
  * Points rendered at once for this device: 10 M where memory allows, fewer on devices with
- * less memory (navigator.deviceMemory, GB, capped at 8 by browsers) and on phones.
+ * less memory (deviceMemoryGb() of libs/responsive.js, GB, capped at 8 by browsers; a value that
+ * is not usable is the default of that helper) and on phones. A desktop whose browser does not
+ * report its memory (`reported` false: desktop Firefox and Safari) keeps the 10 M it always had;
+ * the 4 GB default of deviceMemoryGb() sizes the other budgets (NFR-003) and a phone's.
+ * @param {number} memoryGb deviceMemoryGb()
+ * @param {boolean} mobile isMobile()
+ * @param {boolean} [reported] whether the browser gave memoryGb (reportsDeviceMemory())
  */
-export function pointBudgetFor(deviceMemoryGb, mobile) {
-    const memory = Number.isFinite(deviceMemoryGb) && deviceMemoryGb > 0 ? deviceMemoryGb : 8;
+export function pointBudgetFor(memoryGb, mobile, reported = reportsDeviceMemory()) {
+    const known = reported && Number.isFinite(memoryGb) && memoryGb > 0;
+    const memory = known ? memoryGb : mobile ? DEFAULT_DEVICE_MEMORY_GB : 8;
     let budget = memory >= 8 ? 10_000_000 : Math.max(1_000_000, memory * 1_000_000);
     if (mobile) budget = Math.min(budget, 3_000_000);
     return budget;

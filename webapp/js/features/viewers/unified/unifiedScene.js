@@ -12,9 +12,17 @@ import {
     createNavControls, navPivot, orbitTweenStep, stopNavAnimation, focusPosition,
     applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV
 } from './navControls';
+import { navigateByKey } from './navKeys';
 import { alignContentUpAxis } from './contentOrientation';
+import { deviceMemoryGb } from '@/libs/responsive';
 import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
+
+// How often the progress row follows the tiles while the scene waits for its first frame
+const PROGRESS_POLL_MS = 250;
+
+// What a screen reader says of the canvas (FR-VWR-16); the Controls help of the toolbar lists the rest
+const CANVAS_LABEL = '3D view. Arrow keys rotate, Shift and arrow keys pan, plus and minus zoom, Home resets the view.';
 
 // Direction (east, south, up) the camera looks at a framed model from
 const THREE_QUARTER_VIEW = [1.2, -1.2, 0.9];
@@ -32,7 +40,7 @@ export class UnifiedScene {
      * @param {object} ctx
      * @param {Record<string, number>} ctx.settings  lighting (reactive, from useViewerSettings)
      * @param {Record<string, any>} ctx.view
-     * @param {{ info: Function }} ctx.notify
+     * @param {{ info: Function, error?: Function }} ctx.notify
      */
     constructor(libs, container, { settings, view, notify }) {
         this.libs = libs;
@@ -53,6 +61,8 @@ export class UnifiedScene {
         this.layerSetters = {};
         this.layerId = 0;
         this.homePose = null;
+        // Half the smaller side of the basemap of a flat scene (addBasemap): how far out it still fills the view
+        this.basemapRadius = 0;
         // The user dragged / zoomed: the loaders' late re-frames must not overwrite that pose
         this.userInteracted = false;
         // Web Mercator length correction (cos of the centre latitude); 1 in metric CRSs
@@ -62,6 +72,9 @@ export class UnifiedScene {
             onFrame: () => { if (this.instance) this.instance.notifyChange(this.instance.view.camera); }
         });
         this.dblClickDispose = null;
+        this.keyDispose = null;
+        // The cancels of the afterFirstRender listeners still waiting (dispose removes them)
+        this.firstRenderCancels = new Set();
     }
 
     // ---- Instance --------------------------------------------------------------------
@@ -76,8 +89,6 @@ export class UnifiedScene {
         instance.view.camera.up.set(0, 0, 1);
         this.sceneUp = instance.view.camera.up.clone();
         this.addLights({ fill: true });
-        // Focusable: a click on the view takes the keyboard focus
-        instance.domElement.tabIndex = 0;
         this.attachControls(nav);
     }
 
@@ -116,6 +127,7 @@ export class UnifiedScene {
         const { instance } = this;
         const camera = instance.view.camera;
         if (this.dblClickDispose) this.dblClickDispose();
+        if (this.keyDispose) this.keyDispose();
         if (this.controls) {
             try { this.controls.dispose(); } catch { /* already gone */ }
         }
@@ -133,6 +145,15 @@ export class UnifiedScene {
         });
         // A touch drag must never scroll the page
         instance.domElement.style.touchAction = 'none';
+        // Focusable (a click on the view takes the keyboard focus), named, and moved by the keys of
+        // navKeys while it has the focus (FR-VWR-16)
+        const canvas = instance.domElement;
+        canvas.tabIndex = 0;
+        canvas.setAttribute('role', 'application');
+        canvas.setAttribute('aria-label', CANVAS_LABEL);
+        const onKeyDown = event => this.onKeyDown(event);
+        canvas.addEventListener('keydown', onKeyDown);
+        this.keyDispose = () => canvas.removeEventListener('keydown', onKeyDown);
         // Navigation is disabled while a measurement is drawn; the focus is too
         this.dblClickDispose = createDoubleClickRecenter(this.libs, instance, camera, controls,
             () => !this.view.activeTool && controls.enabled, point => this.flyTo(point), () => this.sceneUp);
@@ -172,9 +193,13 @@ export class UnifiedScene {
     addBasemap(extent, elevation) {
         try {
             const { Map, ColorLayer, TiledImageSource, OSM } = this.libs;
-            const map = new Map({ extent: extent.withRelativeMargin(5) });
+            const extentWithMargin = extent.withRelativeMargin(5);
+            const map = new Map({ extent: extentWithMargin });
             this.instance.add(map);
             this.map = map;
+            // How far out the camera can go before the basemap no longer fills the view (FR-VWR-15)
+            const { x, y } = extentWithMargin.dimensions();
+            this.basemapRadius = Math.min(x, y) / 2;
             if (typeof elevation === 'number' && isFinite(elevation) && map.object3d) {
                 map.object3d.position.z = elevation;
                 map.object3d.updateMatrixWorld(true);
@@ -281,8 +306,7 @@ export class UnifiedScene {
         if (tileset.distance) tileset.distance.max = Infinity;
         const cache = tileset.tiles && tileset.tiles.lruCache;
         if (!cache) return;
-        const deviceMemGb = navigator.deviceMemory || 4;
-        const budget = Math.min(2, Math.max(0.75, deviceMemGb * 0.25)) * 1024 * 1024 * 1024;
+        const budget = Math.min(2, Math.max(0.75, deviceMemoryGb() * 0.25)) * 1024 * 1024 * 1024;
         if (!(cache.maxBytesSize >= budget)) {
             cache.maxBytesSize = budget;
             cache.minBytesSize = Math.round(budget * 0.75);
@@ -340,32 +364,98 @@ export class UnifiedScene {
         return upright;
     }
 
-    /** Resolves once `isReady()` after a frame (the data is on screen), or after the timeout. */
-    waitForFirstRender(isReady, timeoutMs = 30000) {
+    /**
+     * Resolves once `isReady()` after a frame (the data is on screen) with true, or after the
+     * timeout (the cap of the loading indicator, not of the data: it may come later) with false.
+     * With `progress` (a function giving 0..1, the tiles loaded) the progress row of the loading
+     * indicator follows it while the scene waits. A scene without an instance resolves false; an
+     * `isReady` that throws ends the wait with false.
+     * @returns {Promise<boolean>}
+     */
+    waitForFirstRender(isReady, timeoutMs = 30000, progress = null) {
         return new Promise(resolve => {
             const instance = this.instance;
-            if (!instance) { resolve(); return; }
+            if (!instance) { resolve(false); return; }
             let timer = null;
-            const finish = () => {
+            let poll = null;
+            const finish = ready => {
                 instance.removeEventListener('update-end', onUpdate);
                 clearTimeout(timer);
-                resolve();
+                clearInterval(poll);
+                resolve(ready);
             };
-            const onUpdate = () => { try { if (isReady()) finish(); } catch { finish(); } };
+            const onUpdate = () => { try { if (isReady()) finish(true); } catch { finish(false); } };
+            const report = () => {
+                try {
+                    const value = progress();
+                    if (Number.isFinite(value)) this.view.progress = Math.min(1, Math.max(0, value));
+                } catch { /* the bar stays where it was */ }
+            };
             // lifetime: paired (removed by finish)
-            timer = setTimeout(finish, timeoutMs);
+            timer = setTimeout(() => finish(false), timeoutMs);
             instance.addEventListener('update-end', onUpdate);
+            if (progress) {
+                report();
+                poll = setInterval(report, PROGRESS_POLL_MS);
+            }
             instance.notifyChange();
         });
+    }
+
+    /**
+     * Runs `action` once, after the first frame at which `isReady()` (the data is on screen): what
+     * needs the streamed geometry (the grounding of a tileset) when waitForFirstRender stopped
+     * waiting before it came (FR-VWR-20). The listener goes after its run, with the scene
+     * (dispose), or when `isReady` throws. An error of `action` is shown, not thrown into Giro3D's
+     * render loop.
+     * @returns {() => void} cancels it
+     */
+    afterFirstRender(isReady, action) {
+        const instance = this.instance;
+        if (!instance) return () => {};
+        const cancel = () => {
+            if (!this.firstRenderCancels.delete(cancel)) return;
+            try { instance.removeEventListener('update-end', onUpdate); } catch { /* the instance is gone */ }
+        };
+        const onUpdate = () => {
+            let ready;
+            try {
+                ready = isReady();
+            } catch {
+                cancel();
+                return;
+            }
+            if (!ready) return;
+            cancel();
+            try {
+                action();
+            } catch (e) {
+                if (this.notify.error) this.notify.error(e);
+                else throw e;
+            }
+        };
+        this.firstRenderCancels.add(cancel);
+        // lifetime: paired (removed by cancel: after the run, or by dispose)
+        instance.addEventListener('update-end', onUpdate);
+        instance.notifyChange();
+        return cancel;
     }
 
     // ---- Framing and navigation ------------------------------------------------------
 
     savePose(target) {
         const camera = this.instance.view.camera;
+        // The field of view too: Home gives back what Shift+wheel changed (FR-VWR-29)
         this.homePose = {
-            position: camera.position.clone(), target: target.clone(), up: camera.up.clone(), quaternion: camera.quaternion.clone()
+            position: camera.position.clone(), target: target.clone(), up: camera.up.clone(), quaternion: camera.quaternion.clone(), fov: camera.fov
         };
+    }
+
+    /** The distance at which the basemap of a flat scene still fills the view (0 without one). */
+    basemapFillDistance() {
+        if (!(this.basemapRadius > 0)) return 0;
+        const { camera } = this.instance.view;
+        return fitDistance(this.basemapRadius, camera.fov, camera.aspect, 1);
     }
 
     /** Oblique top-down view of a map extent; sets the Mercator correction. */
@@ -376,10 +466,12 @@ export class UnifiedScene {
         const dist = span * 1.2;
         const { THREE } = this.libs;
         this.mercatorScale = Math.cos(centerLat * Math.PI / 180);
-        this.instance.view.minNearPlane = Math.max(dist / 1000, 0.1);
-        applySceneMetrics(this.controls, span);
         const target = new THREE.Vector3(cx, cy, 0);
-        this.controls.setPose({ position: new THREE.Vector3(cx, cy - dist, dist), target, up: this.sceneUp }, { save: true });
+        const position = new THREE.Vector3(cx, cy - dist, dist);
+        applySceneMetrics(this.controls, span, {
+            view: this.instance.view, distance: position.distanceTo(target), fillDistance: this.basemapFillDistance()
+        });
+        this.controls.setPose({ position, target, up: this.sceneUp }, { save: true });
         this.savePose(target);
         this.instance.notifyChange();
     }
@@ -391,14 +483,14 @@ export class UnifiedScene {
         const center = box.getCenter(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         this.mercatorScale = 1;
-        this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.01);
-        // Also the far plane while a tileset streams (distance.max = Infinity): contains the model
-        this.instance.view.maxFarPlane = maxDim * 1000;
         // Far enough for the whole box to fit the screen, narrow (a phone upright) or wide
         const camera = this.instance.view.camera;
         const distance = fitDistance(size.length() / 2 || maxDim / 2, camera.fov, camera.aspect);
         const position = new THREE.Vector3(...THREE_QUARTER_VIEW).normalize().multiplyScalar(distance).add(center);
-        applySceneMetrics(this.controls, maxDim);
+        // The near plane, the far plane (also while a tileset streams: distance.max = Infinity) and the zoom cap
+        applySceneMetrics(this.controls, maxDim, {
+            view: this.instance.view, distance, fillDistance: this.basemapFillDistance()
+        });
         this.controls.setPose({ position, target: center, up: this.sceneUp }, { save: true });
         this.savePose(center);
         this.instance.notifyChange();
@@ -407,7 +499,10 @@ export class UnifiedScene {
     /**
      * Frames a georeferenced tileset from its declared bounding volume (view.goTo would use
      * the still empty object hierarchy and park the camera at the Earth's centre, where no
-     * tile ever loads), straight down with north up. The first call fixes the scene's up axis.
+     * tile ever loads), as frameBox frames a model: from the south-east above the ground (east,
+     * south and up of the tileset's own vertical), far enough for the whole box to fit the view
+     * (fitDistance). applySceneMetrics sizes the planes to that distance, so a tileset of any size
+     * is in front of the near plane. The first call fixes the scene's up axis.
      */
     frameGlobe(tileset, box) {
         const { THREE } = this.libs;
@@ -416,18 +511,19 @@ export class UnifiedScene {
         const maxDim = Math.max(size.x, size.y, size.z) || 10;
         const up = center.clone().normalize();
         const camera = this.instance.view.camera;
-        this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.5);
-        this.instance.view.maxFarPlane = Math.max(maxDim * 1000, 5.0e7);
-        const position = center.clone().add(up.clone().multiplyScalar(maxDim * 2.5));
+        const distance = fitDistance(size.length() / 2 || maxDim / 2, camera.fov, camera.aspect);
+        const north = northOf(THREE, up);
+        const east = new THREE.Vector3().crossVectors(north, up);
+        const [e, n, u] = THREE_QUARTER_VIEW;
+        const position = east.multiplyScalar(e).addScaledVector(north, n).addScaledVector(up, u).normalize()
+            .multiplyScalar(distance).add(center);
         if (!this.globeUpSet) {
             this.sceneUp = up.clone();
             this.globeUpSet = true;
         }
         // Pulling back to the continent is legitimate on a globe
-        applySceneMetrics(this.controls, maxDim, NAV.globeMaxDistanceFactor);
-        // Straight down, north up (the constrained orbit stops it at its 89° tilt, north still up:
-        // Home is that pose)
-        this.controls.setPose({ position, target: center, up: northOf(THREE, up) }, { save: true });
+        applySceneMetrics(this.controls, maxDim, { view: this.instance.view, distance, globe: true });
+        this.controls.setPose({ position, target: center, up: north }, { save: true });
         this.savePose(center);
         this.instance.notifyChange(camera);
     }
@@ -457,15 +553,39 @@ export class UnifiedScene {
      */
     goHome() {
         if (!this.instance || !this.homePose || !this.controls) return;
-        const { position, target, quaternion } = this.homePose;
+        const { position, target, quaternion, fov } = this.homePose;
         const camera = this.instance.view.camera;
         const controls = this.controls;
         stopNavAnimation(controls);
         controls.target.copy(navPivot(controls));
-        const onStep = orbitTweenStep(this.libs.THREE, camera, controls, quaternion, position.distanceTo(target));
+        const orbit = orbitTweenStep(this.libs.THREE, camera, controls, quaternion, position.distanceTo(target));
+        // The field of view goes back with the pose (setPose takes it; FR-VWR-29)
+        const fromFov = camera.fov;
+        const onStep = e => {
+            orbit(e);
+            return typeof fov === 'number' ? { fov: fromFov + (fov - fromFov) * e } : undefined;
+        };
         this.tweener.tweenTo(camera, controls, position.clone(), target.clone(), NAV.dblClickDurationMs, () => {
             this.userInteracted = false;
         }, onStep);
+    }
+
+    /**
+     * A key on the canvas (it has the focus): the arrows, Shift+arrows and +/- move the view
+     * through the strategy's interface (navKeys), as a drag or a wheel notch would: they take the
+     * camera over from a flight and count as an interaction. Nothing while navigation is off.
+     */
+    onKeyDown(event) {
+        const controls = this.controls;
+        if (!this.instance || !controls || !controls.enabled) return;
+        if (!navigateByKey(controls, event, () => {
+            // Before the move: a flight or the inertia of a drag would undo it
+            this.tweener.stop();
+            stopNavAnimation(controls);
+        })) return;
+        event.preventDefault();
+        this.userInteracted = true;
+        this.instance.notifyChange(this.instance.view.camera);
     }
 
     setNavigationEnabled(enabled) {
@@ -475,14 +595,16 @@ export class UnifiedScene {
     /** Releases everything: Giro3D disposes its renderer, scene, entities and canvas. */
     dispose() {
         this.tweener.stop();
+        [...this.firstRenderCancels].forEach(cancel => cancel());
         if (this.dblClickDispose) this.dblClickDispose();
+        if (this.keyDispose) this.keyDispose();
         if (this.controls) {
             try { this.controls.dispose(); } catch { /* already gone */ }
         }
         if (this.instance) {
             try { this.instance.dispose(); } catch { /* already gone */ }
         }
-        this.dblClickDispose = this.controls = this.instance = this.map = this.globe = this.homePose = null;
+        this.dblClickDispose = this.keyDispose = this.controls = this.instance = this.map = this.globe = this.homePose = null;
         this.lights = {};
         this.layerSetters = {};
     }
