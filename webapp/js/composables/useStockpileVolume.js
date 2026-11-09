@@ -37,7 +37,7 @@ import {
     samePricing
 } from '@/libs/stockpileMaterials';
 import { usePreference } from '@/composables/usePreference';
-import { normalizeCurrency } from '@/libs/format';
+import { formatDensity, formatVolume, normalizeCurrency } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
@@ -764,9 +764,10 @@ const definition = {
         _formatStockpileTooltip(p) {
             const parts = [];
             if (p.title) parts.push(p.title);
-            if (typeof p.netVolume === 'number') parts.push(`${p.netVolume.toFixed(1)} m³`);
+            // In the units and with the formatter of the panel, so the label reads as the panel does
+            if (typeof p.netVolume === 'number') parts.push(formatVolume(p.netVolume, p.unitSystem));
             if (p.materialName) parts.push(p.materialName);
-            if (p.materialDensity) parts.push(`${p.materialDensity} t/m³`);
+            if (p.materialDensity) parts.push(formatDensity(p.materialDensity, p.unitSystem));
             return parts.join(' - ') || 'Stockpile';
         },
 

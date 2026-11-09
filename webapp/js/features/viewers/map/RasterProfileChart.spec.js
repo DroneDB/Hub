@@ -18,7 +18,7 @@ describe('RasterProfileChart', () => {
 
     it('writes the distances in the units of the map measurements', async () => {
         const w = mount(RasterProfileChart, { props: { profile, unit: 'm' } });
-        expect(summary(w)).toContain('Length: 0.25 km');
+        expect(summary(w)).toContain('Length: 250 m');
         setPref(PREF.MEASURE_UNIT, 'imperial');
         await w.vm.$nextTick();
         expect(summary(w)).toContain('Length: 820.21 ft');

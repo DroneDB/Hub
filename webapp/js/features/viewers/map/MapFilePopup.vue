@@ -58,6 +58,7 @@ import { pointLonLat } from '@/libs/ddb/pointGeom';
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
+import { formatDateTime, UNKNOWN } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
 import { useTimeout } from '@/composables/useTimers';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
@@ -114,7 +115,8 @@ function show(file, coordinate) {
         openUrl: isVideo ? '' : dataset.downloadUrl(path, { inline: true }),
         loading: !isVideo,
         resolution: props_.width && props_.height ? `${props_.width} x ${props_.height}` : '',
-        date: props_.captureTime ? new Date(props_.captureTime).toLocaleString() : ''
+        // As every date is written; a capture time that is not known (missing or 0) is "Unknown"
+        date: formatDateTime(props_.captureTime, { placeholder: UNKNOWN, seconds: true })
     });
     copied.value = false;
 

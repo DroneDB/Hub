@@ -14,6 +14,15 @@ describe('counts', () => {
         for (const bad of [undefined, null, '12', NaN, -1]) expect(formatSplatCount(bad)).toBe('Unknown');
     });
 
+    it('writes the count with the group separator of the browser locale (FR-MAP-05)', () => {
+        Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
+        try {
+            expect(formatSplatCount(59090002)).toBe('59.090.002');
+        } finally {
+            delete navigator.language;
+        }
+    });
+
     it('names the degree of the colour detail', () => {
         expect(formatShDegree(0)).toBe('0 (flat colour)');
         expect(formatShDegree(3)).toBe('3 (full)');

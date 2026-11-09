@@ -16,6 +16,7 @@ import { createFeatureScope } from '@/composables/featureScope';
 import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/rasterPixels';
 import { rasterValueUnit } from '@/libs/map/rasterUnit';
 import { rasterLayerPath } from '@/libs/map/rasterLayers';
+import { formatNumber, lengthParts } from '@/libs/format';
 
 // The server answers an area without any value with an error of its own
 const AREA_NO_DATA_MESSAGE = 'No statistics for this area: it may hold only pixels without data.';
@@ -470,9 +471,8 @@ const definition = {
                 // first-class measurement.
                 let lengthM = 0;
                 try { lengthM = olGetLength(geom); } catch { /* noop */ }
-                const lengthLabel = lengthM >= 1000
-                    ? `${(lengthM / 1000).toFixed(2)} km`
-                    : `${lengthM.toFixed(1)} m`;
+                // As the map writes every length (libs/format.js), in the user's units
+                const lengthLabel = lengthParts(lengthM, this.currentUnitPref).text;
                 feature.set('measurementType', 'profile');
                 feature.set('createdAt', new Date().toISOString());
                 feature.set('stroke', ANALYSIS_COLOR);
@@ -842,8 +842,7 @@ const definition = {
                 : (Array.isArray(info.values) ? info.values.join(', ') : null);
             if (v == null) return '';
             const unit = info.unit || info.units || '';
-            const num = (typeof v === 'number') ? v.toLocaleString(undefined,
-                { maximumFractionDigits: 3 }) : v;
+            const num = (typeof v === 'number') ? formatNumber(v, 'value', { trim: true }) : v;
             return unit ? `${num} ${unit}` : `${num}`;
         },
 

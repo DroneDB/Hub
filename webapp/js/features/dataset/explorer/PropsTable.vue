@@ -15,8 +15,8 @@
             <Column field="displayKey" header="Property" style="width: 40%;" />
             <Column header="Value">
                 <template #body="{ data }">
-                    <div v-if="data.key === 'captureTime' && data.rawValue">
-                        {{ new Date(data.rawValue) }}
+                    <div v-if="data.key === 'captureTime'">
+                        {{ formatCaptureTime(data.rawValue) }}
                     </div>
                     <div v-else-if="data.key === 'bands' && Array.isArray(data.rawValue)">
                         {{ data.rawValue.map(b => b && b.colorInterp ? b.colorInterp : '').join(', ') }}
@@ -64,7 +64,7 @@
                                 @click="copyValue(copyableValues[data.key])" />
                     </div>
                     <div v-else-if="typeof data.rawValue === 'number'">
-                        {{ data.rawValue.toLocaleString() }}
+                        {{ formatValue(data.rawValue) }}
                     </div>
                     <!-- Object/array beyond max depth: show drill-down button -->
                     <Button v-else-if="shouldCollapse(data.rawValue)"
@@ -86,7 +86,7 @@
 
         <!-- Scalar number -->
         <div v-else-if="typeof tObj === 'number'">
-            {{ tObj.toLocaleString() }}
+            {{ formatValue(tObj) }}
         </div>
 
         <!-- Scalar string / other -->
@@ -122,6 +122,7 @@ import Button from 'primevue/button';
 import Window from '@/components/HubWindow.vue';
 import EntryTypeInfoDialog from './EntryTypeInfoDialog.vue';
 import { copyText } from '@/composables/useCopyText';
+import { formatDateTime, formatNumber, UNKNOWN } from '@/libs/format';
 
 /**
  * PropsTable - Recursive object/array-to-PrimeVue-DataTable renderer.
@@ -255,6 +256,16 @@ export default {
         beautify: beautifyKey,
 
         isUrl,
+
+        // As Modified is written (formatDateTime); a capture time that is not known (missing or 0) is "Unknown"
+        formatCaptureTime(value) {
+            return formatDateTime(value, { placeholder: UNKNOWN, seconds: true });
+        },
+
+        // A number in the browser's locale, at most 3 decimals
+        formatValue(value) {
+            return formatNumber(value, 'value', { trim: true });
+        },
 
         linkCrsCodes,
 

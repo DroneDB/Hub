@@ -5,7 +5,7 @@ import ddb from 'ddb';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { formatGroundResolution } from '@/libs/groundResolution';
-import { fixedLengthParts, formatSpeed } from '@/libs/format';
+import { fixedLengthParts, formatDateTime, formatNumber, formatSpeed, joinNumberTexts, UNKNOWN } from '@/libs/format';
 import { VIEWS_KEY } from '@/libs/views/viewStore';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
@@ -85,13 +85,12 @@ export function getFileSizeDisplay(entry) {
 }
 
 /**
- * Format modification timestamp to locale string
+ * The modification time as every date is written (formatDateTime, with seconds), or "Unknown"
  * @param {number} mtime - Unix timestamp (seconds)
  * @returns {string}
  */
 export function formatModifiedDate(mtime) {
-    if (!mtime) return '--';
-    return new Date(mtime * 1000).toLocaleString();
+    return formatDateTime(mtime ? mtime * 1000 : null, { placeholder: UNKNOWN, seconds: true });
 }
 
 /**
@@ -120,9 +119,15 @@ export function pointCoordinatesText(pointGeom) {
     return parts.join(', ');
 }
 
+// The decimals of a longitude or a latitude (about 1 mm)
+const COORDINATE_DECIMALS = 8;
+
 /**
  * Format coordinates from point_geom geometry: "EPSG:4326 lon, lat, altm", the altitude
- * in the user's units ("altft" for imperial)
+ * in the user's units ("altft" for imperial). Every part is a number of the browser's locale
+ * (libs/format.js) without group separators, joined by joinNumberTexts: a comma-decimal locale
+ * separates them with "; " ("9,1234; 45,678; 123,45m"). Lon and lat keep up to 8 decimals,
+ * the altitude has 2.
  * @param {Object} pointGeom - The point_geom object
  * @param {string} [units] - 'metric' or 'imperial'
  * @returns {string|null}
@@ -131,12 +136,14 @@ function formatCoordinates(pointGeom, units) {
     const coords = pointLonLat(pointGeom);
     if (!coords) return null;
     const crsName = pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name;
-    let text = (crsName ? crsName + ' ' : '') + coords[0] + ', ' + coords[1];
+    // No group separators: a projected coordinate would read as several numbers
+    const plain = { trim: true, grouping: false };
+    const parts = [formatNumber(coords[0], COORDINATE_DECIMALS, plain), formatNumber(coords[1], COORDINATE_DECIMALS, plain)];
     if (hasAltitude(coords)) {
-        const { value, unit } = fixedLengthParts(coords[2], units);
-        text += `, ${value}${unit}`;
+        const { value, unit } = fixedLengthParts(coords[2], units, undefined, { grouping: false });
+        parts.push(`${value}${unit}`);
     }
-    return text;
+    return (crsName ? crsName + ' ' : '') + joinNumberTexts(parts);
 }
 
 // EPSG and ESRI codes ("EPSG:32633", "ESRI:102100", the "EPSG::4326" of an OGC URN).

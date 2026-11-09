@@ -198,9 +198,9 @@ import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterPixels';
 import { rasterValueUnit } from '@/libs/map/rasterUnit';
-import { formatNumber } from '@/libs/format';
+import { formatNumber, formatNumberList } from '@/libs/format';
 
-const formatCount = n => (typeof n === 'number' ? n.toLocaleString() : '-');
+const formatCount = n => formatNumber(n, 'count');
 
 export default {
     components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect },
@@ -267,7 +267,7 @@ export default {
             const s = this.spotInfo;
             if (!s) return '';
             if (s.hasGeo && typeof s.geoX === 'number' && typeof s.geoY === 'number') {
-                return `${formatNumber(s.geoY, 6)}, ${formatNumber(s.geoX, 6)}`;
+                return formatNumberList([s.geoY, s.geoX], 6);
             }
             return `pixel ${s.x}, ${s.y}`;
         },

@@ -1,6 +1,7 @@
 /**
  * PropsTable: EPSG codes in values get an info button to epsg.io, the copy buttons copy the value
- * given for their row and the Type row explains the entry type.
+ * given for their row and the Type row explains the entry type. Dates and numbers are written with
+ * libs/format.js.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -9,6 +10,7 @@ import PrimeVue from 'primevue/config';
 vi.mock('@/composables/useCopyText', () => ({ copyText: vi.fn(() => Promise.resolve()) }));
 import { copyText } from '@/composables/useCopyText';
 import PropsTable from './PropsTable.vue';
+import { formatModifiedDate } from '@/libs/propertiesUtils';
 
 const notify = { success: vi.fn() };
 const mountTable = (props) => mount(PropsTable, {
@@ -81,5 +83,28 @@ describe('PropsTable', () => {
 
     it('reads an entry type given as a string', () => {
         expect(mountTable({ obj: { type: 'Vector' }, entryType: '14' }).find('button.type-info-btn').exists()).toBe(true);
+    });
+
+    // FR-EXP-26, FR-RAS-29: the capture time is written as Modified is, and "Unknown" when it is not known
+    it('writes the capture time as Modified is written, in local time with seconds', () => {
+        const ms = new Date(2016, 5, 23, 23, 32, 13).getTime();
+        const wrapper = mountTable({ obj: { captureTime: ms } });
+        expect(wrapper.find('tbody').text()).toContain(formatModifiedDate(ms / 1000));
+        expect(wrapper.find('tbody').text()).not.toContain('GMT');
+    });
+
+    it.each([0, null])('shows "Unknown" for a capture time of %s', value => {
+        const wrapper = mountTable({ obj: { captureTime: value } });
+        const row = wrapper.findAll('tbody tr').find(r => r.text().startsWith('Capture Time'));
+        expect(row.text()).toBe('Capture TimeUnknown');
+    });
+
+    it('writes numbers with the formatter of the browser locale', () => {
+        Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
+        try {
+            expect(mountTable({ obj: { focalLength: 1234.5678 } }).find('tbody').text()).toContain('1.234,568');
+        } finally {
+            delete navigator.language;
+        }
     });
 });

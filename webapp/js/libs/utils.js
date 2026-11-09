@@ -1,3 +1,5 @@
+import { formatBytes, formatTimeAgo } from './format';
+
 export function setTitle(title) {
     document.title = `${title} - ${HubOptions.appName || "DroneDB"}`;
 }
@@ -45,44 +47,19 @@ export function clone(obj) {
 }
 
 /**
- * Format bytes to human-readable string using binary units (1 KB = 1024 bytes).
- * This is the single source of truth for file size formatting across the app.
+ * Format bytes to human-readable string using binary units (1 KB = 1024 bytes): formatBytes of
+ * libs/format.js, the one definition.
  * @param {number} bytes - The number of bytes
- * @param {number} [decimals=2] - Number of decimal places
- * @returns {string} Formatted size string (e.g., "1.50 MB")
+ * @param {number} [decimals=2] - At most this many decimals
+ * @returns {string} Formatted size string (e.g., "1.5 MB")
  */
 export function bytesToSize(bytes, decimals = 2) {
-    if (bytes == 0) return '0 B';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return formatBytes(bytes, { decimals });
 }
 
-/**
- * Format a timestamp as a human-readable relative time string.
- * This is the single source of truth for "time ago" formatting across the app.
- * @param {number} ms - Millisecond timestamp (e.g., `Date.now()` or `new Date(str).getTime()`)
- * @returns {string} e.g. "just now", "5 minutes ago", "3 months ago", "2 years ago"
- */
-export function formatTimeAgo(ms) {
-    if (ms == null) return '';
-    const diff = Date.now() - ms;
-    const absDiff = Math.abs(diff);
-    const suffix = diff >= 0 ? 'ago' : 'from now';
-    const minutes = Math.floor(absDiff / 60000);
-    const hours = Math.floor(absDiff / 3600000);
-    const days = Math.floor(absDiff / 86400000);
-    const months = Math.floor(days / 30);
-    const years = Math.floor(days / 365);
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ${suffix}`;
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ${suffix}`;
-    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ${suffix}`;
-    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
-    return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
-}
+/** Relative time ("5 minutes ago"): formatTimeAgo of libs/format.js, the one definition. */
+export { formatTimeAgo };
+
 /**
  * The millisecond timestamp of a date the server sent (an ISO string).
  * @param {unknown} value
