@@ -7,7 +7,7 @@
  * 45 px, the paginator 56 px and a row 72 px (what the page expects before its rows are there): a page 1320 px high
  * holds (1320 - 200 - 45 - 56) / 72 = 14 rows.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
@@ -42,6 +42,12 @@ const calls = () => reg.admin.adminTasks.mock.calls.map(([query]) => ({ skip: qu
 const lastCall = () => calls().at(-1);
 const storedChoice = () => JSON.parse(localStorage.getItem(PREF.ADMIN_TASKS) ?? 'null');
 
+// Heavy mounts under a parallel run: load the PrimeVue chunks once, with a long hook timeout, and give each test
+// (set on the describe below) 30 s instead of the 5 s default
+beforeAll(async () => {
+    await Promise.all(['primevue/select', 'primevue/datatable', 'primevue/column'].map(m => import(/* @vite-ignore */ m)));
+}, 60000);
+
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     localStorage.clear();
@@ -64,7 +70,7 @@ afterEach(() => {
     window.history.replaceState(null, '', '/');
 });
 
-describe('TasksPage page size', () => {
+describe('TasksPage page size', { timeout: 30000 }, () => {
     it('asks for the rows that fit the height, and offers that size in the paginator', async () => {
         await render();
         expect(calls()).toEqual([{ skip: 0, take: 14 }]);

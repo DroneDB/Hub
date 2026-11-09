@@ -6,7 +6,7 @@
  * is 45 px, the paginator 56 px and a row 60 px (what the page expects before its rows are there): a page 1530 px
  * high holds floor((1530 - 200 - 45 - 56) / 60) = 20 rows.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
@@ -34,6 +34,12 @@ async function render() {
 const rowNames = () => wrapper.findAll('tbody tr').map(tr => tr.find('strong').text());
 const stored = () => JSON.parse(localStorage.getItem(PREF.ADMIN_USERS) ?? 'null');
 
+// Heavy mounts under a parallel run: load the PrimeVue chunks once, with a long hook timeout, and give each test
+// (set on the describe below) 30 s instead of the 5 s default
+beforeAll(async () => {
+    await Promise.all(['primevue/datatable', 'primevue/column', 'primevue/select', 'primevue/tag', 'primevue/chip'].map(m => import(/* @vite-ignore */ m)));
+}, 60000);
+
 beforeEach(() => {
     _resetPrefListenersForTests();
     localStorage.clear();
@@ -57,7 +63,7 @@ afterEach(() => {
     _resetPrefListenersForTests();
 });
 
-describe('UsersPage page size', () => {
+describe('UsersPage page size', { timeout: 30000 }, () => {
     it('shows the rows that fit the height, and offers that size in the paginator', async () => {
         await render();
         expect(wrapper.vm.pageSize).toBe(20);

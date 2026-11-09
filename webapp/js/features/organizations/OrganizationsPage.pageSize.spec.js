@@ -7,7 +7,7 @@
  * paginator is 49 px and a card 100 px (what the page expects before its cards are there): a page 1700 px high
  * holds floor((1700 - 200 - 49) / 100) = 14 cards.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
@@ -47,6 +47,12 @@ const resize = async () => {
     await flushPromises();
 };
 
+// Heavy mounts under a parallel run: load the PrimeVue chunks once, with a long hook timeout, and give each test
+// (set on the describe below) 30 s instead of the 5 s default
+beforeAll(async () => {
+    await Promise.all(['primevue/paginator', 'primevue/select', 'primevue/card'].map(m => import(/* @vite-ignore */ m)));
+}, 60000);
+
 beforeEach(() => {
     globalThis.HubOptions = {};
     _resetPrefListenersForTests();
@@ -70,7 +76,7 @@ afterEach(() => {
     _resetPrefListenersForTests();
 });
 
-describe('OrganizationsPage page size', () => {
+describe('OrganizationsPage page size', { timeout: 30000 }, () => {
     it('shows the cards that fit the height, and offers that size in the paginator', async () => {
         await render();
         expect(wrapper.vm.pageSize).toBe(14);

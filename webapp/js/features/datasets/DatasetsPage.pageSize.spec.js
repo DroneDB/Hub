@@ -7,7 +7,7 @@
  * 45 px, the paginator 56 px, a row 65 px (what the page expects before its rows are there). A page 2781 px high
  * holds floor((2781 - 200 - 45 - 56) / 65) = 38 rows.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
@@ -58,6 +58,12 @@ const calls = () => datasetsPage.mock.calls.map(([query]) => ({ skip: query.skip
 const stored = () => JSON.parse(localStorage.getItem(PREF.DATASET_TABLE) ?? 'null');
 const paginator = () => wrapper.findComponent({ name: 'Paginator' });
 
+// Heavy mounts under a parallel run: load the PrimeVue chunks once, with a long hook timeout, and give each test
+// (set on the describe below) 30 s instead of the 5 s default
+beforeAll(async () => {
+    await Promise.all(['primevue/datatable', 'primevue/column', 'primevue/paginator', 'primevue/select', 'primevue/contextmenu'].map(m => import(/* @vite-ignore */ m)));
+}, 60000);
+
 beforeEach(() => {
     globalThis.HubOptions = {};
     _resetPrefListenersForTests();
@@ -82,7 +88,7 @@ afterEach(() => {
     _resetPrefListenersForTests();
 });
 
-describe('DatasetsPage page size', () => {
+describe('DatasetsPage page size', { timeout: 30000 }, () => {
     it('asks for the rows that fit the height, and offers that size in the paginator', async () => {
         await render();
         expect(calls()).toEqual([{ skip: 0, take: 38 }]);
