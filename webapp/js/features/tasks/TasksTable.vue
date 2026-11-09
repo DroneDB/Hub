@@ -38,10 +38,10 @@
             </Column>
             <Column field="toolId" header="Tool" :sortable="!lazy">
                 <template #body="slotProps">
-                    <div :title="slotProps.data.path || ''">
+                    <div :title="taskTarget(slotProps.data)">
                         <strong>{{ toolTitle(slotProps.data.toolId, tools) }}</strong>
                         <span class="muted"> v{{ slotProps.data.version }}</span>
-                        <small class="path-details">{{ formatPath(slotProps.data.path) }}</small>
+                        <small v-if="taskTarget(slotProps.data)" class="path-details">{{ targetText(slotProps.data) }}</small>
                     </div>
                 </template>
             </Column>
@@ -65,6 +65,15 @@
                     <div v-else-if="progressKind(slotProps.data) === 'failed'" class="task-failed">
                         <Tag severity="danger" icon="fa-solid fa-triangle-exclamation" value="Failed" />
                         <small class="error-text" :title="slotProps.data.errorType || undefined">{{ failureText(slotProps.data) }}</small>
+                    </div>
+                    <div v-else-if="progressKind(slotProps.data) === 'cancelled'" class="task-cancelled"
+                         :title="stateTag(slotProps.data).title">
+                        <Tag severity="secondary" icon="fa-solid fa-ban" :value="cancelledText(slotProps.data)" />
+                        <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
+                    </div>
+                    <div v-else-if="progressKind(slotProps.data) === 'node'" class="task-queued"
+                         :title="stateTag(slotProps.data).title">
+                        <Tag severity="info" icon="fa-regular fa-clock" :value="stateTag(slotProps.data).label" />
                     </div>
                     <template v-else-if="progressKind(slotProps.data) === 'bar'">
                         <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
@@ -96,18 +105,19 @@
             <Column header="Actions" style="width: 10rem;">
                 <template #body="slotProps">
                     <div class="d-flex gap-1 flex-wrap">
-                        <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log" aria-label="View log"
-                                @click="$emit('view-log', slotProps.data)" />
+                        <Button v-if="offers(slotProps.data, 'viewLog')" size="small" severity="secondary" icon="fa-solid fa-terminal"
+                                title="View log" aria-label="View log" @click="$emit('view-log', slotProps.data)" />
                         <Button v-if="canDownloadResult(slotProps.data, tools)" size="small" icon="fa-solid fa-download"
                                 label="Result" :title="resultAvailabilityHint(slotProps.data)"
                                 :loading="slotProps.data.taskId === downloadingTaskId"
                                 :disabled="slotProps.data.taskId === downloadingTaskId"
                                 @click="$emit('download-result', slotProps.data)" />
-                        <Button v-if="isActive(slotProps.data.state)" size="small" severity="secondary"
+                        <Button v-if="offers(slotProps.data, 'cancel')" size="small" severity="secondary"
                                 icon="fa-solid fa-stop" title="Cancel" aria-label="Cancel" @click="$emit('cancel', slotProps.data)" />
-                        <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
-                                icon="fa-solid fa-rotate-right" title="Retry" aria-label="Retry" @click="$emit('retry', slotProps.data)" />
-                        <Button v-if="!isActive(slotProps.data.state)" size="small" severity="danger"
+                        <Button v-if="offers(slotProps.data, 'retry')" size="small" severity="secondary"
+                                icon="fa-solid fa-rotate-right" title="Run again from the beginning" aria-label="Retry"
+                                @click="$emit('retry', slotProps.data)" />
+                        <Button v-if="offers(slotProps.data, 'delete')" size="small" severity="danger"
                                 icon="fa-solid fa-trash" title="Delete from history" aria-label="Delete from history" @click="$emit('delete', slotProps.data)" />
                     </div>
                 </template>
@@ -126,12 +136,15 @@ import Column from 'primevue/column';
 import Skeleton from 'primevue/skeleton';
 import ProgressBar from 'primevue/progressbar';
 import { columnFrom } from '@/libs/responsiveColumns';
-import { isWaitingForFiles } from '@/libs/tasks/taskFormat';
+import { isWaitingForFiles, isWaitingForNode, isCancelled } from '@/libs/tasks/taskFormat';
+import { offersAction } from '@/composables/useTaskActions';
 
 /**
  * Presentational task table shared by the per-dataset Task History tab and the
  * admin Tasks dashboard. Contains no fetch logic: data, loading and
- * paging are driven by the parent via props/events.
+ * paging are driven by the parent via props/events. The action buttons of a row
+ * are the ones the server lists in its `actions` (D-024, FR-XC-15); the parent runs
+ * them through useTaskActions.
  */
 export default {
     name: 'TasksTable',
@@ -186,18 +199,37 @@ export default {
 
     methods: {
         /**
-         * What the Progress column renders for a row: 'waiting', 'failed', 'bar' or 'none'.
+         * What the Progress column renders for a row: 'waiting', 'failed', 'cancelled', 'node', 'bar' or 'none'.
          * A build that succeeded without building, its entry waiting for files, shows
          * what it waits for. A failed task shows a red Failed tag and why it failed (the
-         * task's error), never a bar. Only Processing and Succeeded (100%) render a bar.
-         * Queued states (Created/Enqueued/Scheduled/Reused/Awaiting) and Deleted (reached
-         * by the Cancel button) show a muted placeholder.
+         * task's error), never a bar. A task a user cancelled says so, with the percent it
+         * had reached (FR-PRC-20). A task a processing node keeps queued says so (FR-PRC-37).
+         * Only Processing and Succeeded (100%) render a bar. Queued states
+         * (Created/Enqueued/Scheduled/Reused/Awaiting) and a Deleted task nobody cancelled
+         * show a muted placeholder.
          */
         progressKind(task) {
             if (isWaitingForFiles(task)) return 'waiting';
             if (task.state === 'Failed') return 'failed';
+            if (isCancelled(task)) return 'cancelled';
+            if (isWaitingForNode(task)) return 'node';
             if (task.state === 'Processing' || task.state === 'Succeeded') return 'bar';
             return 'none';
+        },
+
+        /** "Cancelled at 42 %", or "Cancelled" for a task that had reported no progress. */
+        cancelledText(task) {
+            return task.progressPercent != null ? `Cancelled at ${task.progressPercent} %` : 'Cancelled';
+        },
+
+        /** Whether the server offers `action` on the row (D-024). */
+        offers(task, action) {
+            return offersAction(task, action);
+        },
+
+        /** The target of a row: the tool's label as it is, else the shortened path. */
+        targetText(task) {
+            return task.targetLabel || this.formatPath(task.path);
         },
 
         /**
@@ -227,7 +259,7 @@ export default {
          * zero-width spaces after slashes so line breaks only occur at "/" boundaries.
          */
         formatPath(path) {
-            if (!path) return 'Whole dataset';
+            if (!path) return '';
             const parts = path.split('/');
             if (parts.length <= 4) {
                 return parts.join('/\u200B');
@@ -295,6 +327,15 @@ export default {
 .task-failed .error-text {
     max-width: 100%;
     overflow-wrap: anywhere;
+}
+
+.task-cancelled,
+.task-queued {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ddb-spacing-xs);
+    min-width: 0;
 }
 
 .waiting-for-files {

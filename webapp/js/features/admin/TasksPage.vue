@@ -26,36 +26,28 @@
                     style="flex: 1; min-height: 18rem;"
                     empty-message="No tasks match the current filters."
                     @page="onPage" @view-log="openLog" @download-result="downloadResult"
-                    @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
+                    @cancel="taskActions.cancel" @retry="taskActions.retry" @delete="taskActions.remove" />
 
-        <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
+        <TaskLogDialog v-model:visible="logDialogOpen" :title="taskActions.logTitle(logTask)" :log-text="logText"
                        :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
-        <!-- Cancel task confirmation -->
-        <ConfirmDialog v-if="cancelDialogOpen"
-                       title="Cancel Task"
-                       :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
-                       confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
-                       @close="handleCancelDialogClose" />
-
-        <!-- Delete task confirmation -->
-        <ConfirmDialog v-if="deleteDialogOpen"
-                       v-bind="deleteDialog"
-                       @close="handleDeleteDialogClose" />
+        <DialogHost :dialogs="dialogs" />
     </div>
 </template>
 
 <script>
+import { getCurrentInstance } from 'vue';
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
+import { useTaskActions } from '@/composables/useTaskActions';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import reg from '@/libs/api/sharedRegistry';
 import { isForbidden } from '@/libs/ddb/apiError';
-import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
-import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -65,10 +57,25 @@ import { confirmDialogProps } from '@/libs/deleteConfirmation';
 export default {
     name: 'TasksPage',
 
-    components: { Button, Select, TasksTable, TaskLogDialog, ConfirmDialog },
+    components: { Button, Select, TasksTable, TaskLogDialog, DialogHost },
 
     setup() {
-        return { ...useTaskFormatting() };
+        const dialogs = useDialogs();
+        const formatting = useTaskFormatting();
+        // The same row actions as the dataset Tasks tab (FR-XC-15), on the task's own dataset
+        const vm = /** @type {any} */ (getCurrentInstance()?.proxy);
+        const taskActions = useTaskActions({
+            datasetOf: task => reg.Organization(task.orgSlug).Dataset(task.dsSlug),
+            deleteTask: task => reg.admin.adminDeleteTask(task.taskId),
+            refresh: async () => {
+                await vm.loadTasks();
+                vm.scheduleAutoRefresh();
+            },
+            confirm: useConfirm(dialogs),
+            toolTitle: task => formatting.toolTitle(task.toolId),
+            datasetName: task => `${task.orgSlug}/${task.dsSlug}`
+        });
+        return { dialogs, taskActions, ...formatting };
     },
     data() {
         return {
@@ -87,27 +94,11 @@ export default {
             logTask: null,
             logText: '',
 
-            downloadingTaskId: null,
-
-            cancelDialogOpen: false,
-            cancellingTask: null,
-
-            deleteDialogOpen: false,
-            deletingTask: null
+            downloadingTaskId: null
         };
     },
 
     computed: {
-        // The concluded task leaves the history with its results
-        deleteDialog() {
-            const task = this.deletingTask;
-            if (!task) return { message: '' };
-            return confirmDialogProps({
-                kind: 'task',
-                items: [{ name: this.toolTitle(task.toolId, this.taskTools), note: task.path ? `on ${task.path}` : '' }],
-                lost: ['the results it produced that are still available for download']
-            });
-        },
         userOptions() {
             const opts = [{ label: 'All users', value: '' }];
             this.users.forEach(u => {
@@ -122,9 +113,6 @@ export default {
         },
         hasActiveTasks() {
             return this.items.some(t => this.isActive(t.state));
-        },
-        logTaskTitle() {
-            return this.logTask ? this.toolTitle(this.logTask.toolId) : '';
         }
     },
 
@@ -200,68 +188,10 @@ export default {
             this.loadTasks();
         },
 
-        // Per-task actions reuse the existing per-dataset endpoints, which already
+        // Per-task actions (cancel, retry, delete: useTaskActions) reuse the per-dataset endpoints, which
         // authorize admins via dataset ownership.
         datasetFor(task) {
             return reg.Organization(task.orgSlug).Dataset(task.dsSlug);
-        },
-
-        cancelTask(task) {
-            this.cancellingTask = task;
-            this.cancelDialogOpen = true;
-        },
-
-        async handleCancelDialogClose(buttonId) {
-            this.cancelDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.cancellingTask) {
-                this.cancellingTask = null;
-                return;
-            }
-            const task = this.cancellingTask;
-            this.cancellingTask = null;
-            try {
-                const result = await cancelTaskOutcome(this.datasetFor(task), task.taskId);
-                if (result.outcome === 'alreadyEnded')
-                    this.$notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
-                else if (result.outcome === 'failed')
-                    this.$notify.error(result.error?.message, { summary: 'Cancel failed' });
-            } finally {
-                // The row shows the real state at once, whatever the answer (D-002)
-                await this.loadTasks();
-                this.scheduleAutoRefresh();
-            }
-        },
-
-        async retryTask(task) {
-            try {
-                await this.datasetFor(task).retryTask(task.taskId);
-                await this.loadTasks();
-                this.scheduleAutoRefresh();
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Retry failed' });
-            }
-        },
-
-        deleteTask(task) {
-            this.deletingTask = task;
-            this.deleteDialogOpen = true;
-        },
-
-        async handleDeleteDialogClose(buttonId) {
-            this.deleteDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.deletingTask) {
-                this.deletingTask = null;
-                return;
-            }
-            const task = this.deletingTask;
-            this.deletingTask = null;
-            try {
-                await reg.admin.adminDeleteTask(task.taskId);
-                await this.loadTasks();
-                this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Delete failed' });
-            }
         },
 
         async downloadResult(task) {

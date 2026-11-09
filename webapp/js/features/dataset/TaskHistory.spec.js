@@ -3,16 +3,13 @@
  * - filter changes reset back to the first page (via onFilterChange)
  * - background store refreshes (applyFilters(false)) keep the current page
  * - a shrinking list clamps onto the last valid page
- * and cancelTask (FR-PRC-10): a cancel refused for a task that has already ended is a neutral message,
- * and the row is refreshed whatever the answer
+ * (the row actions, cancel, retry and delete, are useTaskActions': useTaskActions.spec)
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import TaskHistory from './TaskHistory.vue';
-import taskMonitor from '@/libs/tasks/taskMonitor';
-import { ApiError } from '@/libs/ddb/apiError';
 
-// cancelTask refreshes the shared task store: the calls are asserted, the store is not under test
+// The tab refreshes the shared task store: the store is not under test
 vi.mock('@/libs/tasks/taskMonitor', () => ({
     default: { forceRefresh: vi.fn(() => Promise.resolve()), on: vi.fn(), off: vi.fn() },
     datasetKey: vi.fn()
@@ -120,86 +117,6 @@ describe('onFilterChange', () => {
     });
 });
 
-describe('cancelTask', () => {
-    const { cancelTask } = TaskHistory.methods;
-
-    beforeEach(() => taskMonitor.forceRefresh.mockClear());
-
-    function cancelVm(answer, read = () => Promise.resolve({ state: 'Succeeded' })) {
-        return {
-            tools: [],
-            toolTitle: id => id,
-            confirm: vi.fn(() => Promise.resolve(true)),
-            dataset: { cancelTask: vi.fn(() => answer), getTask: vi.fn(read) },
-            loadTasks: vi.fn(() => Promise.resolve()),
-            $notify: { info: vi.fn(), error: vi.fn(), success: vi.fn() }
-        };
-    }
-
-    function expectRefreshed(vm) {
-        expect(taskMonitor.forceRefresh).toHaveBeenCalledWith(vm.dataset);
-        expect(vm.loadTasks).toHaveBeenCalled();
-    }
-
-    it('shows a neutral message when the server refuses the cancel of a task that has already ended', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('The task has already ended (Succeeded)', 400)));
-        await cancelTask.call(vm, fixedTask(1, { state: 'Processing' }));
-        expect(vm.dataset.cancelTask).toHaveBeenCalledWith('t1');
-        expect(vm.dataset.getTask).toHaveBeenCalledWith('t1');
-        expect(vm.$notify.info).toHaveBeenCalledWith('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows the refusal as an error when the task is still active', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.resolve({ state: 'Processing' }));
-        await cancelTask.call(vm, fixedTask(2, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows an error when the task cannot be read again after a 400', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.reject(new ApiError('Not found', 404)));
-        await cancelTask.call(vm, fixedTask(6, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('shows an error on another status, without reading the task again', async () => {
-        const vm = cancelVm(Promise.reject(new ApiError('Server error', 500)));
-        await cancelTask.call(vm, fixedTask(7, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('Server error', { summary: 'Cancel failed' });
-        expect(vm.dataset.getTask).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('says nothing more when the task was cancelled', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        await cancelTask.call(vm, fixedTask(3, { state: 'Processing' }));
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('says nothing when the server deleted nothing, the refreshed row showing how the task ended', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: false }));
-        await cancelTask.call(vm, fixedTask(4, { state: 'Processing' }));
-        expect(vm.$notify.info).not.toHaveBeenCalled();
-        expect(vm.$notify.error).not.toHaveBeenCalled();
-        expectRefreshed(vm);
-    });
-
-    it('does nothing when the cancel is not confirmed', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: true }));
-        vm.confirm = vi.fn(() => Promise.resolve(false));
-        await cancelTask.call(vm, fixedTask(5, { state: 'Processing' }));
-        expect(vm.dataset.cancelTask).not.toHaveBeenCalled();
-        expect(vm.loadTasks).not.toHaveBeenCalled();
-    });
-});
-
 // FR-ACC-01: GET /sys/processingNodes needs a signed-in user; its 401 would send an anonymous
 // visitor of a shared dataset to Login, and only a user who can write is offered the nodes
 describe('processing nodes', () => {
@@ -251,25 +168,6 @@ describe('processing nodes', () => {
     });
 });
 
-describe('deleteTask', () => {
-    const { deleteTask } = TaskHistory.methods;
-
-    it('asks with the shared delete wording: the task by its tool and path, Delete / Cancel', async () => {
-        const vm = {
-            tools: [],
-            toolTitle: () => 'Build <3D>',
-            confirm: vi.fn(() => Promise.resolve(false)),
-            dataset: { deleteTask: vi.fn() }
-        };
-        await deleteTask.call(vm, fixedTask(1, { state: 'Succeeded', path: 'a.tif' }));
-        const question = vm.confirm.mock.calls[0][0];
-        expect(question).toMatchObject({ title: 'Delete task “Build <3D>”', confirmText: 'Delete', cancelText: 'Cancel', danger: true });
-        expect(question.message).toContain('<strong>Build &lt;3D&gt;</strong> on a.tif');
-        expect(question.message).toContain('results it produced');
-        expect(vm.dataset.deleteTask).not.toHaveBeenCalled();
-    });
-});
-
 describe('showClearDialog', () => {
     const { showClearDialog } = TaskHistory.methods;
 
@@ -289,6 +187,8 @@ describe('photogrammetry new dataset name', () => {
     const build = newDatasetName => {
         const vm = {
             optionsError: '',
+            selectedPreset: { label: 'Custom (JSON array)' },
+            customOptions: [],
             photogrammetryForm: { preset: 'custom', optionsText: '', createNewDataset: true, newDatasetName, newDatasetVisibility: 0 }
         };
         return { params: TaskHistory.methods._buildSubmitParams.call(vm), error: vm.optionsError };
@@ -303,5 +203,22 @@ describe('photogrammetry new dataset name', () => {
     it('accepts what the server accepts, one character too', () => {
         expect(build('a').params).toMatchObject({ createNewDataset: true, newDatasetName: 'a' });
         expect(build('survey-2026').error).toBe('');
+    });
+});
+
+// FR-PRC-22: the profile names the run in the task lists (the label the server gives the task)
+describe('photogrammetry profile', () => {
+    const build = (preset, customOptions = []) => TaskHistory.methods._buildSubmitParams.call({
+        optionsError: '', destPathError: '', customOptions,
+        selectedPreset: { label: 'Fast Orthophoto', options: [{ name: 'fast-orthophoto', value: true }] },
+        photogrammetryForm: { preset, optionsText: '', createNewDataset: false, destPath: 'out' }
+    });
+
+    it('sends the profile of the options', () => {
+        expect(build('fast').profile).toBe('Fast Orthophoto');
+    });
+
+    it('says when the options of the profile were changed', () => {
+        expect(build('fast', [{ name: 'dsm', value: true }]).profile).toBe('Fast Orthophoto, customized');
     });
 });
