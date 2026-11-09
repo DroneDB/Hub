@@ -13,6 +13,7 @@ import {
     applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV
 } from './navControls';
 import { alignContentUpAxis } from './contentOrientation';
+import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
 
 // Direction (east, south, up) the camera looks at a framed model from
@@ -70,7 +71,7 @@ export class UnifiedScene {
      * navigation strategy of the scene the loader builds: 'constrained' (a geo scene) or 'free'.
      */
     setupInstance(crs, { nav = 'free' } = {}) {
-        const instance = new this.libs.Instance({ target: this.container, crs, backgroundColor: 0x1a1a2e });
+        const instance = new this.libs.Instance({ target: this.container, crs, backgroundColor: tokenHex('--ddb-viewer-bg') });
         this.instance = instance;
         instance.view.camera.up.set(0, 0, 1);
         this.sceneUp = instance.view.camera.up.clone();
@@ -87,14 +88,14 @@ export class UnifiedScene {
      */
     setupGlobe({ nav = 'constrained' } = {}) {
         const { Instance, Globe, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
-        const instance = new Instance({ target: this.container, crs: CoordinateSystem.epsg4978, backgroundColor: 0x0b1021 });
+        const instance = new Instance({ target: this.container, crs: CoordinateSystem.epsg4978, backgroundColor: tokenHex('--ddb-viewer-space-bg') });
         this.instance = instance;
         this.mercatorScale = 1;
         instance.view.camera.up.set(0, 0, 1);
         this.sceneUp = instance.view.camera.up.clone();
         this.addLights({ fill: false });
         try {
-            const globe = new Globe({ backgroundColor: 0x0b1021 });
+            const globe = new Globe({ backgroundColor: tokenHex('--ddb-viewer-space-bg') });
             instance.add(globe);
             this.map = this.globe = globe;
             globe.addLayer(new ColorLayer({ name: 'osm', source: new TiledImageSource({ source: new OSM() }) }));

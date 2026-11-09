@@ -63,7 +63,7 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
     max-height: 82%;
     overflow-y: auto;
     padding: 0.35rem var(--splat-rail-padding);
-    background: rgba(0, 0, 0, 0.35);
+    background: rgba(var(--ddb-shade-rgb), 0.35);
     border-radius: 0 var(--ddb-radius-sm) var(--ddb-radius-sm) 0;
     user-select: none;
 }
@@ -78,23 +78,23 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
     @include overlay-button(
         $size: var(--splat-rail-button),
         $radius: var(--ddb-radius-sm),
-        $background: rgba(0, 0, 0, 0.5),
-        $hover-background: rgba(0, 0, 0, 0.75),
+        $background: rgba(var(--ddb-shade-rgb), 0.5),
+        $hover-background: rgba(var(--ddb-shade-rgb), 0.75),
         $active-background: rgba(var(--ddb-primary-rgb), 0.85),
-        $border: 1px solid rgba(255, 255, 255, 0.2),
+        $border: 1px solid rgba(var(--ddb-glass-rgb), 0.2),
         $active-border-color: var(--ddb-primary-300),
         $font-size: 0.85rem
     );
 }
 .rail-btn.dirty {
-    border-color: rgba(240, 180, 60, 0.9);
+    border-color: rgba(var(--ddb-viewer-accent-rgb), 0.9);
 }
 
 
 .camera-rail .rail-sep {
     width: 70%;
     height: 1px;
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(var(--ddb-glass-rgb), 0.25);
     margin: 0.1rem 0;
 }
 </style>

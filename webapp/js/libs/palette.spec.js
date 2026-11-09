@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PRIMARY, primaryRgba, ANALYSIS_YELLOW, hexRgba } from './palette';
+import { PRIMARY, primaryRgba, ANALYSIS_YELLOW, hexRgba, FOCUS_RING } from './palette';
 
 const WEBAPP = path.resolve(__dirname, '../..');
 const variables = fs.readFileSync(path.join(WEBAPP, 'css/_variables.scss'), 'utf8');
@@ -44,6 +44,34 @@ describe('the brand blue', () => {
     it('gives canvas colours with an alpha', () => {
         expect(primaryRgba(0.25)).toBe('rgba(0, 112, 224, 0.25)');
         expect(primaryRgba(0.5, 700)).toBe('rgba(0, 74, 149, 0.5)');
+    });
+});
+
+// FR-XC-21: one focus-ring token set; the stylesheets keep a copy of it, in both themes
+describe('the focus ring', () => {
+    /** The declarations of the light (:root) or the dark (:root.app-dark) block. @param {boolean} dark */
+    const block = dark => {
+        const start = variables.indexOf(dark ? ':root.app-dark {' : ':root {');
+        return variables.slice(start, variables.indexOf('\n}', start));
+    };
+
+    it('is held equal by --ddb-focus-ring-width and -offset', () => {
+        expect(block(false)).toMatch(new RegExp(`--ddb-focus-ring-width:\\s*${FOCUS_RING.width};`));
+        expect(block(false)).toMatch(new RegExp(`--ddb-focus-ring-offset:\\s*${FOCUS_RING.offset};`));
+    });
+
+    it.each([['light', false], ['dark', true]])('is held equal by --ddb-focus-ring-color and -halo in the %s theme', (scheme, dark) => {
+        const { color, halo } = FOCUS_RING[scheme];
+        expect(block(dark)).toMatch(new RegExp(`--ddb-focus-ring-color:\\s*${color};`, 'i'));
+        expect(block(dark)).toMatch(new RegExp(`--ddb-focus-ring-halo:\\s*${halo};`, 'i'));
+    });
+
+    it('is the dark ring on the surfaces that are dark in both themes', () => {
+        expect(block(false)).toMatch(new RegExp(`--ddb-focus-ring-on-dark:\\s*${FOCUS_RING.dark.color};`, 'i'));
+    });
+
+    it('cannot be changed at run time', () => {
+        expect(Object.isFrozen(FOCUS_RING) && Object.isFrozen(FOCUS_RING.light) && Object.isFrozen(FOCUS_RING.dark)).toBe(true);
     });
 });
 

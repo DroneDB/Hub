@@ -391,7 +391,7 @@ export default {
 }
 
 .btn-icon:hover {
-    background-color: rgba(0, 0, 0, 0.06);
+    background-color: rgba(var(--ddb-ink-rgb), 0.06);
 }
 
 .btn-delete,
@@ -401,7 +401,7 @@ export default {
 
 .btn-delete:hover,
 .btn-delete-group:hover {
-    background-color: rgba(220, 53, 69, 0.1);
+    background-color: rgba(var(--ddb-danger-rgb), 0.1);
 }
 
 /* Footer */

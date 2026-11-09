@@ -501,7 +501,7 @@ export default {
     align-items: center;
     justify-content: center;
     font-size: var(--ddb-font-size-sm);
-    color: white;
+    color: var(--ddb-text-on-color);
     z-index: 10;
 }
 
@@ -522,7 +522,7 @@ export default {
 
 .build-badge.pending {
     background-color: var(--ddb-warning);
-    color: var(--ddb-text);
+    color: var(--ddb-text-on-warning);
 }
 
 .build-badge i.icon {

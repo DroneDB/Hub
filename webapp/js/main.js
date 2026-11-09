@@ -36,6 +36,7 @@ import { usePreferencesStore } from '@/stores/preferences';
 import reg from '@/libs/api/sharedRegistry';
 import { loadFeaturesAndBranding } from '@/libs/hubBranding';
 import { queryParams, inIframe } from '@/libs/utils';
+import { startColorScheme } from '@/libs/colorScheme';
 import {
     checkAndHandleUpdate,
     consumePendingUpdateNotice
@@ -51,6 +52,10 @@ window.addEventListener('load', function () {
 
     // Hide header if ?embed=1 is in URL
     const embed = !!params.embed || inIframe();
+
+    // The scheme the inline script of index.html applied, kept in step with the Appearance
+    // preference and the system from now on (an embedded view follows the system). For the page's life
+    startColorScheme({ embedded: embed });
 
     const router = createAppRouter(embed);
 

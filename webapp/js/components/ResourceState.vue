@@ -223,8 +223,9 @@ watch(heading, value => setTitle(value), { immediate: true });
     background: var(--ddb-primary-hover);
 }
 
+/* The Hub's ring: the --ddb-focus-ring-* set */
 .resource-state-action:focus-visible {
-    outline: 2px solid var(--ddb-primary);
-    outline-offset: 2px;
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+    outline-offset: var(--ddb-focus-ring-offset);
 }
 </style>

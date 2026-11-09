@@ -74,7 +74,8 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { xml } from '@codemirror/lang-xml';
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
+import { syntaxHighlighting, bracketMatching } from '@codemirror/language';
+import { codeEditorTheme, codeHighlightStyle } from '@/libs/codeEditorTheme';
 
 export default {
     components: {
@@ -211,7 +212,9 @@ export default {
                 highlightActiveLineGutter(),
                 history(),
                 bracketMatching(),
-                syntaxHighlighting(defaultHighlightStyle),
+                // The colours are the Hub's tokens: the editor reads in both themes
+                syntaxHighlighting(codeHighlightStyle),
+                codeEditorTheme,
                 keymap.of([...defaultKeymap, ...historyKeymap]),
                 EditorView.updateListener.of((update) => {
                     if (update.docChanged) {

@@ -36,6 +36,9 @@ export const PREF = Object.freeze({
     BUILD_NOTIFICATIONS: 'buildNotifications', // 'none' | 'all' | 'failed': which ended builds the server e-mails
     STOCKPILE_MATERIALS: 'stockpileMaterials', // { overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
+    // 'system' | 'light' | 'dark': the colour scheme (libs/colorScheme.js); device only (D-044). The
+    // inline script of public/index.html reads it too, before the app mounts
+    APPEARANCE: 'ddb.appearance',
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
     HUB_UPDATE_ATTEMPTED: 'hubUpdateAttempted', // sessionStorage
     CLIPBOARD: 'ddb:hub:clipboard' // sessionStorage
@@ -209,23 +212,35 @@ export const PREF_DEFAULTS = frozen({
 });
 
 /**
+ * What each device-only preference with a fixed set of choices is while nothing is stored (the
+ * account preferences have theirs in PREF_DEFAULTS).
+ */
+export const DEVICE_PREF_DEFAULTS = frozen({
+    // The system's scheme, until the user picks one (D-044)
+    [PREF.APPEARANCE]: 'system'
+});
+
+/**
  * The values a preference with a fixed set of choices accepts. A stored value outside the set (a
  * hand-edited store, an account written by a newer Hub) is not one of them: `prefChoice` reads it
  * as the default instead of letting a view act on a value it does not know.
  */
 export const PREF_CHOICES = frozen({
     [PREF.SPLAT_NAV_MODE]: frozen(['fly', 'earth']),
-    [PREF.SPLAT_QUALITY]: frozen(['auto', 'low', 'medium', 'high'])
+    [PREF.SPLAT_QUALITY]: frozen(['auto', 'low', 'medium', 'high']),
+    [PREF.APPEARANCE]: frozen(['system', 'light', 'dark'])
 });
 
 /**
- * `value` when it is one of the choices of the preference, else the preference's default.
+ * `value` when it is one of the choices of the preference, else the preference's default (PREF_DEFAULTS,
+ * or DEVICE_PREF_DEFAULTS for a device-only preference).
  * @param {keyof typeof PREF_CHOICES} key
  * @param {unknown} value
  * @returns {string}
  */
 export function prefChoice(key, value) {
-    return PREF_CHOICES[key].includes(/** @type {never} */ (value)) ? /** @type {string} */ (value) : PREF_DEFAULTS[key];
+    if (PREF_CHOICES[key].includes(/** @type {never} */ (value))) return /** @type {string} */ (value);
+    return Object.hasOwn(PREF_DEFAULTS, key) ? PREF_DEFAULTS[/** @type {keyof typeof PREF_DEFAULTS} */ (key)] : DEVICE_PREF_DEFAULTS[key];
 }
 
 /**

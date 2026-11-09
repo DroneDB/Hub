@@ -7,18 +7,19 @@
  */
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 import { isMobile } from '@/libs/responsive';
-import { primaryRgba } from '@/libs/palette';
+import { colorToken, tokenRgba } from '@/libs/colorScheme';
 
 /**
- * File-layer colours (one place; the measurement accent lives in CSS --ddb-measure-color).
+ * File-layer colours: the --ddb-map-* tokens of css/_variables.scss, read when a style is made
+ * (FR-XC-21; the map redraws with createFileLayerStyles() when the colour scheme changes).
  * Shots, clusters and the flight path are the brand blue at shade 300: a light blue that stands
  * out on dark satellite imagery with the same weight as the sky blue these markers had before
  * (the darker shades sink into vegetation and roofs). A selected shot is orange.
  */
 export const FILE_COLORS = {
-    shot: primaryRgba(1, 300),
-    shotSelected: 'rgba(255, 158, 103, 1)',
-    halo: 'rgba(252, 252, 255, 1)'
+    get shot() { return colorToken('--ddb-map-shot'); },
+    get shotSelected() { return colorToken('--ddb-map-shot-selected'); },
+    get halo() { return colorToken('--ddb-map-halo'); }
 };
 
 /**
@@ -95,7 +96,7 @@ export function createFileLayerStyles() {
         direction: arrow,
         pano: feats => anySelected(feats) ? styles.panoSelected : styles.panoDeselected,
 
-        invisible: new Style({ fill: new Fill({ color: 'rgba(0, 0, 0, 0)' }) }),
+        invisible: new Style({ fill: new Fill({ color: tokenRgba('--ddb-shade-rgb', 0) }) }),
         startFlag: iconStyle('/images/start-flag.svg', [0.05, 1]),
         finishFlag: iconStyle('/images/finish-flag.svg', [0.05, 1]),
         flightPath: new Style({ stroke: new Stroke({ color: FILE_COLORS.shot, width: 4 }) }),

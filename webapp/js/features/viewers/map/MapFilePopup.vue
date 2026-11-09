@@ -262,7 +262,7 @@ defineExpose({ show, close, closeUnlessIn });
 
 <style scoped>
 .image-popup {
-    background: white;
+    background: var(--ddb-bg-surface);
     border-radius: var(--ddb-radius-md);
     box-shadow: var(--ddb-shadow-md);
     min-width: min(16.25rem, calc(100vw - 2rem));
@@ -378,7 +378,7 @@ defineExpose({ show, close, closeUnlessIn });
 }
 
 .image-popup-copy .icon.check {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 
 .image-popup-video-info {

@@ -162,7 +162,7 @@ export default {
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(var(--ddb-ink-rgb), 0.03);
 }
 
 .formula-card h4 {
@@ -175,7 +175,7 @@ export default {
 
 .formula-id {
     font-weight: 700;
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 
 .formula-name {
@@ -188,7 +188,7 @@ export default {
 }
 
 .line code {
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(var(--ddb-ink-rgb), 0.08);
     padding: 0.05rem 0.3rem;
     border-radius: 0.2rem;
     font-size: 0.85rem;

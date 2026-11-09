@@ -4,6 +4,7 @@ import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
 import { Vector as VectorLayer } from 'ol/layer';
 import { controlButton, controlGroup } from './controlButton';
+import { tokenRgba } from '@/libs/colorScheme';
 
 /**
  * Unified selection control that groups rectangle and polygon selection
@@ -50,22 +51,8 @@ class SelectionControl extends Control {
         this.onDeactivated = options.onDeactivated || (() => {});
         this.onClearSelection = options.onClearSelection || (() => {});
 
-        // Shared dashed drawing style
-        this.drawingStyle = new Style({
-            fill: new Fill({
-                color: 'rgba(255, 255, 255, 0.2)'
-            }),
-            stroke: new Stroke({
-                color: 'rgba(255, 255, 255, 0.9)',
-                lineDash: [10, 10],
-                width: 2
-            }),
-            image: new CircleStyle({
-                radius: 5,
-                fill: new Fill({ color: 'rgba(255, 255, 255, 0.9)' }),
-                stroke: new Stroke({ color: 'rgba(0, 0, 0, 0.5)', width: 1.5 })
-            })
-        });
+        // Shared dashed drawing style, from the colour tokens
+        this.restyle();
 
         // lifetime: element (the control's own buttons)
         btnRectangle.addEventListener('click', () => {
@@ -206,6 +193,23 @@ class SelectionControl extends Control {
         });
 
         map.addInteraction(this.draw);
+    }
+
+    /**
+     * The dashed drawing style, from the colour tokens (the map draws over imagery, so its values are
+     * the same in both themes); made again when the colour scheme changes.
+     */
+    restyle() {
+        this.drawingStyle = new Style({
+            fill: new Fill({ color: tokenRgba('--ddb-glass-rgb', 0.2) }),
+            stroke: new Stroke({ color: tokenRgba('--ddb-glass-rgb', 0.9), lineDash: [10, 10], width: 2 }),
+            image: new CircleStyle({
+                radius: 5,
+                fill: new Fill({ color: tokenRgba('--ddb-glass-rgb', 0.9) }),
+                stroke: new Stroke({ color: tokenRgba('--ddb-shade-rgb', 0.5), width: 1.5 })
+            })
+        });
+        this.selectionLayer?.setStyle(this.drawingStyle);
     }
 
     /**

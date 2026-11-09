@@ -669,10 +669,13 @@ export default {
         white-space: nowrap;
     }
 
+    /* The focus ring of a card lies outside it: the box keeps the ring's reach clear above and beside
+       the cards, so it does not clip the ring of the first one (FR-ORG-07) */
     .org-cards-area {
         flex: 1;
         overflow-y: auto;
         min-height: 0;
+        padding: var(--ddb-focus-ring-reach) var(--ddb-focus-ring-reach) 0;
     }
 
     .org-map-area {
@@ -713,8 +716,10 @@ export default {
             outline: none;
         }
 
+        /* The ring of the Hub (the --ddb-focus-ring-* set) around the whole card */
         &:has(.org-name:focus-visible) {
-            outline: 2px solid var(--ddb-primary);
+            outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+            outline-offset: var(--ddb-focus-ring-offset);
             border-radius: var(--ddb-radius-sm);
         }
 

@@ -59,6 +59,30 @@
 //    (size / 16) + 'rem' in JS data. The division by 16
 //    maps the pixel size the callers pass to rem.
 //
+// 10. The focus ring (--ddb-focus-ring-width, -offset): 2px,
+//    a hairline that does not grow with the font size. Its
+//    values are FOCUS_RING of js/libs/palette.js.
+//
+// ── COLOURS: TWO THEMES ────────────────────────────────────
+//
+// Every colour has a light value (:root) and a dark value
+// (:root.app-dark, the class libs/colorScheme.js and the
+// inline script of public/index.html put on <html>). A colour
+// that is the same in both themes (the brand scale, the map,
+// the viewers and the panels over them, which are always
+// dark) is listed in the dark block's comment. Use a token,
+// never a colour of its own: the dark theme cannot reach it.
+//
+// WARNING TEXT: --ddb-warning is a fill (a bar, a badge, a
+// border), too light for text on the page. Text (and an icon
+// beside text) in a warning colour uses --ddb-warning-text,
+// on --ddb-warning-bg where it needs a tint. Both pass 4.5:1
+// in both themes (js/specs/colorTokens.spec.js).
+//
+// FOCUS: the keyboard focus ring is the --ddb-focus-ring-*
+// set: the focus-ring mixin of app.scss draws it. Use the
+// set, never an outline colour or offset of its own.
+//
 // RADIUS SCALE:
 //   sm = 0.25rem (rounded-1), md = 0.5rem (rounded-3)
 //
@@ -73,6 +97,9 @@
 // ============================================================
 
 :root {
+    // Native controls, scroll bars and form fields of the browser follow the theme
+    color-scheme: light;
+
     // ── Brand ──────────────────────────────────────────────
     // The DroneDB blue, shade 50 to 950: a copy of PRIMARY in js/libs/palette.js (the source
     // PrimeVue builds its tokens from), held equal to it by libs/palette.spec.js. Every blue of
@@ -98,6 +125,7 @@
     --ddb-text-muted: #767676; // 4.5:1 on white
     --ddb-text-on-dark: #fefefe;
     --ddb-text-on-color: #fff;
+    --ddb-text-on-warning: #1A1A2E; // on the --ddb-warning fill, in both themes
 
     // ── Backgrounds ────────────────────────────────────────
     --ddb-bg: #fefefe;
@@ -146,8 +174,10 @@
     // ── Status ─────────────────────────────────────────────
     --ddb-success: #20a96b;
     --ddb-success-rgb: 32, 169, 107;
-    --ddb-danger: #dc3545;
-    --ddb-danger-rgb: 220, 53, 69;
+    // --ddb-success is a fill (3:1 on white): text in the success colour uses this, 5:1 on the page
+    --ddb-success-text: #15803d;
+    --ddb-danger: #d32f3f; // 4.9:1 on the page (#dc3545 was 4.49:1), and white text on it 4.9:1
+    --ddb-danger-rgb: 211, 47, 63;
     --ddb-warning: #ffc107;
     --ddb-warning-rgb: 255, 193, 7;
     --ddb-warning-text: #856404;
@@ -164,12 +194,48 @@
     --ddb-link: var(--ddb-primary);
     --ddb-link-hover: var(--ddb-primary-hover);
     --ddb-link-on-tint: var(--ddb-primary-700); // links inside an info message: 7.7:1 on its tint
+
+    // ── Focus ring ─────────────────────────────────────────
+    // FOCUS_RING of js/libs/palette.js, held equal by libs/palette.spec.js. The ring: 8.7:1 on
+    // white. The halo: the second ring, between a control and the ring, where what lies around is
+    // not known (the map). On-dark: the ring on the surfaces that are dark in both themes (the
+    // map panels and the viewers). Reach: the room the ring takes outside a control; a scroll box
+    // that clips its content keeps that much padding, so the ring of its first item shows whole.
+    --ddb-focus-ring-width: 2px;
+    --ddb-focus-ring-offset: 2px;
+    --ddb-focus-ring-color: #004a95;
+    --ddb-focus-ring-halo: #ffffff;
+    --ddb-focus-ring-on-dark: #4d9cf0;
+    --ddb-focus-ring-reach: calc(var(--ddb-focus-ring-width) + var(--ddb-focus-ring-offset));
+
+    // ── Code (the text editor's syntax colours, js/libs/codeEditorTheme.js) ──
+    // CodeMirror's default colours, the ones under 4.5:1 on white darkened
+    --ddb-code-meta: #404740;
+    --ddb-code-keyword: #770088;
+    --ddb-code-atom: #221199;
+    --ddb-code-literal: #116644;
+    --ddb-code-string: #aa1111;
+    --ddb-code-escape: #c2410c;
+    --ddb-code-property: #0000cc;
+    --ddb-code-variable: #3300aa;
+    --ddb-code-type: #047857;
+    --ddb-code-comment: #994400;
+    --ddb-code-selection: var(--ddb-primary-100);
+    --ddb-code-active-line: rgba(var(--ddb-primary-rgb), 0.06);
+
     --ddb-console-bg: #1e1e1e;
     --ddb-console-text: #d4d4d4;
     --ddb-map-control-active: #7bc67e;
 
     // ── Measure / Annotation colors ────────────────────────
-    --ddb-measure-color: #ffcc33;
+    --ddb-measure-color: #ffcc33; // MEASURE_COLOR of libs/map/mapUtils.js, the default a measurement stores
+
+    // ── Map canvas ─────────────────────────────────────────
+    // What OpenLayers draws, read through colorToken (libs/colorScheme.js) and drawn again when
+    // the scheme changes. The map's imagery is the same in both themes, and so are these.
+    --ddb-map-shot: #4d9cf0; // shade 300 of the brand blue: shots, clusters, the flight path, splats
+    --ddb-map-shot-selected: #ff9e67;
+    --ddb-map-halo: #fcfcff; // the ring and the count of a marker, the ring of a hovered point
 
     // ── Tooltip ────────────────────────────────────────────
     --ddb-tooltip-bg: rgba(0, 0, 0, 0.85);
@@ -178,6 +244,17 @@
 
     // ── Overlay ────────────────────────────────────────────
     --ddb-overlay-bg: rgba(0, 0, 0, 0.65);
+
+    // ── Tints ──────────────────────────────────────────────
+    // Triplets for see-through tints, rgba(var(--ddb-...-rgb), alpha). Glass lightens a surface
+    // that is dark in both themes (the viewers, the map overlays and panels); shade darkens and
+    // shadows anything; ink tints the page and its dialogs: dark in the light theme, light in
+    // the dark one.
+    --ddb-glass-rgb: 255, 255, 255;
+    --ddb-shade-rgb: 0, 0, 0;
+    --ddb-ink-rgb: 0, 0, 0;
+    // The white paper of a document preview (an e-mail), in both themes
+    --ddb-paper: #ffffff;
 
     // ── Viewer (dark backgrounds for 3D/panorama/potree) ──
     --ddb-viewer-bg: #1a1a2e;
@@ -195,11 +272,108 @@
     --ddb-viewer-btn-disabled-bg: #333;
     --ddb-viewer-btn-disabled-color: #666;
     --ddb-viewer-btn-active-bg: #666;
-    --ddb-viewer-btn-primary: var(--ddb-primary);
-    --ddb-viewer-btn-primary-hover: var(--ddb-primary-hover);
+    --ddb-viewer-btn-primary: var(--ddb-primary-500); // the viewers are dark in both themes: the light theme's blue
+    --ddb-viewer-btn-primary-hover: var(--ddb-primary-600);
     --ddb-viewer-btn-danger: #e74c3c;
     --ddb-viewer-btn-danger-hover: #c0392b;
     --ddb-viewer-select-bg: #555;
     --ddb-viewer-select-border: #777;
     --ddb-viewer-label-color: #555;
+    // The splat viewer's accent (pins, the camera being edited) and the text on it
+    --ddb-viewer-accent: #f2a51a;
+    --ddb-viewer-accent-rgb: 242, 165, 26;
+    --ddb-viewer-accent-text: #000000;
+    // The canvas of the panorama viewer, under the sphere while it loads, and the space around
+    // the globe of the 3D viewer
+    --ddb-viewer-canvas-bg: #030a03;
+    --ddb-viewer-space-bg: #0b1021;
+}
+
+// ── Dark theme ─────────────────────────────────────────────
+// The dark value of every colour above that changes with the theme. The surfaces are the zinc
+// greys of the PrimeVue dark scheme (zinc 950 the page, 900 a card or a dialog), so the Hub's own
+// panels and PrimeVue's match. Text on the page passes 4.5:1, borders of fields 3:1, and the
+// pairs that js/specs/colorTokens.spec.js names are checked there.
+//
+// The same in both themes, so not repeated here: the brand scale (--ddb-primary-50 to 950,
+// --ddb-primary-rgb), --ddb-text-on-dark, the console, the map (--ddb-map-*, --ddb-measure-*,
+// the tooltips and the overlay over it), the viewers (--ddb-viewer-*), the glass and shade
+// tints, the paper of a preview (--ddb-paper) and the ring of
+// the dark surfaces (--ddb-focus-ring-on-dark). The tokens written as another token (--ddb-link:
+// var(--ddb-primary)) follow the token they name.
+:root.app-dark {
+    color-scheme: dark;
+
+    // ── Brand ──────────────────────────────────────────────
+    // Shade 400 is PrimeVue's dark primary: 5.3:1 on the page, and dark text on it 5.3:1
+    --ddb-primary: var(--ddb-primary-400);
+    --ddb-primary-hover: var(--ddb-primary-300);
+
+    // ── Text ───────────────────────────────────────────────
+    --ddb-text: #f4f4f5;
+    --ddb-text-secondary: #d4d4d8;
+    --ddb-text-muted: #a1a1aa; // 7.8:1 on the page, 5.8:1 on --ddb-bg-hover
+    // Text on a fill of the theme (--ddb-primary, --ddb-success, --ddb-danger): the fills are
+    // light in the dark theme. On the surfaces that are dark in both themes use --ddb-text-on-dark.
+    --ddb-text-on-color: #09090b;
+
+    // ── Backgrounds ────────────────────────────────────────
+    --ddb-bg: #09090b;
+    --ddb-bg-light: #18181b;
+    --ddb-bg-subtle: #1f1f23;
+    --ddb-bg-hover: #27272a;
+    --ddb-bg-surface: #18181b;
+
+    // ── Borders ────────────────────────────────────────────
+    --ddb-border: #3f3f46;
+    --ddb-border-light: rgba(255, 255, 255, 0.15);
+    --ddb-border-medium: #52525b;
+    --ddb-border-separator: #3f3f46;
+
+    // ── Shadows ────────────────────────────────────────────
+    --ddb-shadow-sm: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.5);
+    --ddb-shadow-md: 0 0.25rem 1rem rgba(0, 0, 0, 0.5);
+
+    // ── Status ─────────────────────────────────────────────
+    --ddb-success: #20a96b; // the light value: 6.6:1 on the page, and dark text on it
+    --ddb-success-rgb: 32, 169, 107;
+    --ddb-success-text: #4ade80;
+    --ddb-danger: #ef4444; // 5.3:1 on the page, and dark text on it
+    --ddb-danger-rgb: 239, 68, 68;
+    --ddb-warning: #facc15;
+    --ddb-warning-rgb: 250, 204, 21;
+    --ddb-warning-text: #fde047;
+    --ddb-warning-bg: #422006;
+
+    // ── Tints ──────────────────────────────────────────────
+    --ddb-ink-rgb: 255, 255, 255;
+
+    // ── Status Backgrounds (dark tints) ────────────────────
+    --ddb-success-bg: #052e16;
+    --ddb-danger-bg: #450a0a;
+    --ddb-info-bg: var(--ddb-primary-950);
+    // The highlight of PrimeVue's dark scheme: shade 400 at 16% and, focused, 24%
+    --ddb-selected-bg: color-mix(in srgb, var(--ddb-primary-400) 16%, transparent);
+    --ddb-selected-active-bg: color-mix(in srgb, var(--ddb-primary-400) 24%, transparent);
+
+    // ── Link ───────────────────────────────────────────────
+    --ddb-link-on-tint: var(--ddb-primary-200); // 9.2:1 on the info tint
+
+    // ── Code ───────────────────────────────────────────────
+    --ddb-code-meta: #a1a1aa;
+    --ddb-code-keyword: #d8b4fe;
+    --ddb-code-atom: #93b4ff;
+    --ddb-code-literal: #86efac;
+    --ddb-code-string: #fca5a5;
+    --ddb-code-escape: #fdba74;
+    --ddb-code-property: #93c5fd;
+    --ddb-code-variable: #c4b5fd;
+    --ddb-code-type: #5eead4;
+    --ddb-code-comment: #fcd34d;
+    --ddb-code-selection: color-mix(in srgb, var(--ddb-primary-400) 35%, transparent);
+    --ddb-code-active-line: rgba(var(--ddb-glass-rgb), 0.05);
+
+    // ── Focus ring ─────────────────────────────────────────
+    --ddb-focus-ring-color: #4d9cf0;
+    --ddb-focus-ring-halo: #09090b;
 }

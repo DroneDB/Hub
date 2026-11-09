@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    PREF, ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF_DEFAULTS, PREF_CHOICES, RENAMED_PREFS, prefChoice, onPrefChange, applyAccountValue, setPref, removePref, getPref,
+    PREF, ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF_DEFAULTS, DEVICE_PREF_DEFAULTS, PREF_CHOICES, RENAMED_PREFS, prefChoice, onPrefChange, applyAccountValue, setPref, removePref, getPref,
     _resetPrefListenersForTests
 } from './preferences';
 
@@ -160,7 +160,7 @@ describe('catalog', () => {
     it('ACCOUNT_SECTIONS keys are PREF values, and the device-only keys are not mapped', () => {
         const known = new Set(Object.values(PREF));
         for (const key of Object.keys(ACCOUNT_SECTIONS)) expect(known.has(key)).toBe(true);
-        for (const local of [PREF.PANEL_SIZES, PREF.ORG_PAGE_POSITION, PREF.HUB_UPDATE_NOTICE, PREF.CLIPBOARD, PREF.HUB_UPDATE_ATTEMPTED, PREF.SPLAT_VIEW_SETTINGS]) {
+        for (const local of [PREF.PANEL_SIZES, PREF.ORG_PAGE_POSITION, PREF.HUB_UPDATE_NOTICE, PREF.CLIPBOARD, PREF.HUB_UPDATE_ATTEMPTED, PREF.SPLAT_VIEW_SETTINGS, PREF.APPEARANCE]) {
             expect(ACCOUNT_SECTIONS).not.toHaveProperty(local);
         }
     });
@@ -190,7 +190,17 @@ describe('catalog', () => {
     });
 
     it('every preference with choices has its default among them', () => {
-        for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key]);
+        for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key] ?? DEVICE_PREF_DEFAULTS[key]);
+    });
+
+    // D-044: the choice is stored per device, not with the account; System until the user picks one
+    it('the appearance is a device preference, System, Light or Dark, System by default', () => {
+        expect(ACCOUNT_SECTIONS).not.toHaveProperty(PREF.APPEARANCE);
+        expect(PREF_CHOICES[PREF.APPEARANCE]).toEqual(['system', 'light', 'dark']);
+        expect(DEVICE_PREF_DEFAULTS[PREF.APPEARANCE]).toBe('system');
+        expect(prefChoice(PREF.APPEARANCE, 'dark')).toBe('dark');
+        expect(prefChoice(PREF.APPEARANCE, 'sepia')).toBe('system');
+        expect(prefChoice(PREF.APPEARANCE, null)).toBe('system');
     });
 
     it('the organisation list defaults to name ascending, as a list', () => {

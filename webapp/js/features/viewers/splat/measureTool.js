@@ -21,7 +21,7 @@
  * length the user knows, `measure('pin')` the place of a pin. The points are returned and nothing
  * is kept.
  */
-import { MEASURE_COLOR } from '@/features/viewers/unified/sceneUtils';
+import { measureColor } from '@/features/viewers/unified/sceneUtils';
 import { MEASURE_KINDS, sceneLabels, shapeLabels } from './measureMath';
 import { newId } from './sceneData';
 
@@ -199,7 +199,7 @@ export class SplatMeasureTool {
         if (path.length > 1) {
             const geometry = new THREE.BufferGeometry().setFromPoints(path.map(p => new THREE.Vector3(...p)));
             // Over the splats, which are transparent and sorted by Spark: depth testing would hide it
-            const material = new THREE.LineBasicMaterial({ color: MEASURE_COLOR, depthTest: false, transparent: true });
+            const material = new THREE.LineBasicMaterial({ color: measureColor(), depthTest: false, transparent: true });
             const line = kind === 'area' && points.length > 2 ? new THREE.LineLoop(geometry, material) : new THREE.Line(geometry, material);
             line.renderOrder = 10;
             group.add(line);

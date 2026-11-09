@@ -52,7 +52,7 @@ const html = computed(() => renderMarkdown(props.pin.text, { allowImages: false 
     overflow-y: auto;
     padding: 0.6rem 0.75rem;
     background: var(--ddb-overlay-bg);
-    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25);
     border-radius: var(--ddb-border-radius, 4px);
     color: var(--ddb-text-on-dark);
     text-align: left;
@@ -83,7 +83,7 @@ h3 {
 }
 
 .card-action:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(var(--ddb-glass-rgb), 0.15);
 }
 
 .pin-image {
@@ -106,7 +106,7 @@ h3 {
 
 .pin-text :deep(a),
 .pin-link {
-    color: var(--ddb-primary-200, #9cc4ff);
+    color: var(--ddb-primary-200);
 }
 
 .pin-coordinates {

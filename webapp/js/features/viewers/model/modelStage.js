@@ -15,10 +15,12 @@
  */
 import { watch } from 'vue';
 import { fitDistance, canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
+import { tokenHex } from '@/libs/colorScheme';
 
 // Room around the unit sphere the model is scaled to (the mesh is not strictly inside it)
 const FIT_MARGIN = 1.25;
-const BACKGROUND = 0x1a1a2e;
+// The viewers are dark in both themes: --ddb-viewer-bg has one value
+const BACKGROUND = () => tokenHex('--ddb-viewer-bg');
 // From r165 three.js has only lights in physical units (a light of intensity 1 is 1/PI as bright as
 // one of the earlier releases, which scaled the light by PI)
 const PHYSICAL_LIGHTS_REVISION = 165;
@@ -68,8 +70,8 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     let fittedDistance = camera.position.length();
 
     const scene = new THREE.Scene();
-    scene.background = colour(BACKGROUND);
-    scene.fog = new THREE.Fog(colour(BACKGROUND), 2000, 3500);
+    scene.background = colour(BACKGROUND());
+    scene.fog = new THREE.Fog(colour(BACKGROUND()), 2000, 3500);
 
     const lights = {
         ambient: new THREE.AmbientLight(0xffffff, settings.ambientIntensity * lightScale),

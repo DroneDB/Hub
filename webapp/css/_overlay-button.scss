@@ -27,6 +27,8 @@
     background: $background;
     color: var(--ddb-text-on-dark);
     font-size: $font-size;
+    // Dark in both themes: the keyboard focus ring of the dark surfaces
+    --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
     cursor: pointer;
     transition: background $transition-time ease, border-color $transition-time ease;
 
@@ -55,7 +57,8 @@
         $radius: 4px,
         $background: transparent,
         $hover-background: rgba(255, 255, 255, 0.15),
-        $active-background: var(--ddb-primary),
+        // The viewers are dark in both themes: the blue that takes white text in both
+        $active-background: var(--ddb-viewer-btn-primary),
         $font-size: var(--ddb-font-size-base),
         $transition-time: 0.2s
     );

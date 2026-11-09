@@ -121,7 +121,7 @@ defineExpose({ open, supports });
 .lightbox-toolbar-extra {
     position: fixed;
     right: 90px;
-    background: rgba(35, 35, 35, .65);
+    background: var(--ddb-overlay-bg);
     top: 0;
     height: 45px;
     width: 45px;
@@ -146,8 +146,8 @@ defineExpose({ open, supports });
 }
 
 .lightbox-open-fullsize:hover {
-    color: var(--ddb-text-on-color);
-    background-color: rgba(255, 255, 255, 0.15);
+    color: var(--ddb-text-on-dark);
+    background-color: rgba(var(--ddb-glass-rgb), 0.15);
 }
 
 .lightbox-info-overlay {

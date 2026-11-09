@@ -19,6 +19,7 @@ import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPr
 import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
 import { showPointPopup } from '@/libs/map/pointPopup';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { colorToken, tokenRgba } from '@/libs/colorScheme';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 // Cursor shown over a measurement while the eraser tool is active. We use
@@ -554,7 +555,9 @@ class MeasureControls extends Control {
      */
     createFeatureStyle(feature) {
         // Default colors
-        const defaultStroke = MEASURE_COLOR;
+        // The canvas reads the token (--ddb-measure-color, equal to MEASURE_COLOR, the default a
+        // measurement stores); the halo of a hovered point is the markers' halo
+        const defaultStroke = colorToken('--ddb-measure-color', MEASURE_COLOR);
         const defaultStrokeWidth = 2;
 
         // Read GeoJSON style properties from feature
@@ -603,7 +606,7 @@ class MeasureControls extends Control {
                 fill: new Fill({
                     color: strokeColor,
                 }),
-                stroke: hovered ? new Stroke({ color: '#ffffff', width: 2 }) : null,
+                stroke: hovered ? new Stroke({ color: colorToken('--ddb-map-halo'), width: 2 }) : null,
             }),
         });
         // A stockpile or a profile is an analysis overlay: a dark halo under its line
@@ -707,8 +710,8 @@ class MeasureControls extends Control {
             style: new Style({
                 image: new CircleStyle({
                     radius: 6,
-                    fill: new Fill({ color: MEASURE_COLOR }),
-                    stroke: new Stroke({ color: '#fff', width: 2 })
+                    fill: new Fill({ color: colorToken('--ddb-measure-color', MEASURE_COLOR) }),
+                    stroke: new Stroke({ color: colorToken('--ddb-map-halo'), width: 2 })
                 })
             })
         });
@@ -1104,6 +1107,11 @@ class MeasureControls extends Control {
         if (this.selectedTool) this.onSelect(this.selectedTool);
     }
 
+    /** Draws the measurements again with the colour tokens (the colour scheme changed). */
+    restyle() {
+        this.vector?.changed();
+    }
+
     getLayer() {
         return this.vector;
     }
@@ -1228,20 +1236,20 @@ class MeasureControls extends Control {
                 type: type,
                 style: new Style({
                     fill: new Fill({
-                        color: 'rgba(255, 255, 255, 0.4)',
+                        color: tokenRgba('--ddb-glass-rgb', 0.4),
                     }),
                     stroke: new Stroke({
-                        color: 'rgba(255, 204, 51, 0.7)',
+                        color: tokenRgba('--ddb-measure-color', 0.7),
                         lineDash: [10, 10],
                         width: 2,
                     }),
                     image: new CircleStyle({
                         radius: 5,
                         stroke: new Stroke({
-                            color: 'rgba(0, 0, 0, 0.9)',
+                            color: tokenRgba('--ddb-shade-rgb', 0.9),
                         }),
                         fill: new Fill({
-                            color: 'rgba(255, 255, 255, 0.4)',
+                            color: tokenRgba('--ddb-glass-rgb', 0.4),
                         }),
                     })
                 })

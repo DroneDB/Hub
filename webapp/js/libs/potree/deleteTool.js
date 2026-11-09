@@ -4,8 +4,10 @@
  * any Potree tool starting ends it. Its button sits in Potree's own toolbar.
  */
 import { measureAt } from '@/libs/potree/measureLabels';
+import { tokenRgba } from '@/libs/colorScheme';
 
-const ACTIVE_BG = 'rgba(231, 76, 60, 0.5)';
+// The danger red of the viewers' buttons, see-through
+const ACTIVE_BG = () => tokenRgba('--ddb-viewer-btn-danger', 0.5);
 
 export class PotreeDeleteTool {
     /**
@@ -55,7 +57,7 @@ export class PotreeDeleteTool {
         this.active = active;
         this.viewer.renderer.domElement.style.cursor = active ? 'crosshair' : '';
         if (this.icon) {
-            this.icon.css('background-color', active ? ACTIVE_BG : '');
+            this.icon.css('background-color', active ? ACTIVE_BG() : '');
             this.icon.css('border-radius', 'var(--ddb-radius-sm)');
         }
         this.onChange(active);

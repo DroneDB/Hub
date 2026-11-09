@@ -167,6 +167,15 @@ export class FileLayers {
         this.shotLayer.changed();
     }
 
+    /** Makes the styles again from the colour tokens (the colour scheme changed), and draws with them. */
+    restyle() {
+        this.styles = createFileLayerStyles();
+        this.extentLayer.setStyle(this.styles.invisible);
+        this.shotLayer.setStyle(this.styles.forCluster);
+        this.pathFeatures.getFeatures().forEach(path => path.setStyle(this.styles.flightPath));
+        this.splats.restyle();
+    }
+
     setFlightPathVisible(on) {
         this.pathLayer.setVisible(on);
         this.flagLayer.setVisible(on);

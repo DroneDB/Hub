@@ -5,6 +5,7 @@
 import { PRIMARY, primaryRgba } from '@/libs/palette';
 import { areaParts, lengthParts } from '@/libs/format';
 import { getPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { colorToken } from '@/libs/colorScheme';
 
 /**
  * [minLon, minLat, maxLon, maxLat] of a GeoJSON Feature or geometry (DroneDB footprints are
@@ -68,8 +69,8 @@ export function canvasNeedsResize(canvas, pixelRatio) {
 /** Low to high elevation colours (blue, cyan, green, yellow, red). */
 export const ELEVATION_RAMP = [0x2c7bb6, 0x00a6ca, 0x00ccbc, 0x90eb9d, 0xffff8c, 0xf9d057, 0xf29e2e, 0xe76818, 0xd7191c];
 
-/** The colour of the shapes drawn by the measurement tools of the 3D viewers. */
-export const MEASURE_COLOR = '#f2a51a';
+/** The colour of the shapes drawn by the measurement tools of the 3D viewers: the viewers' accent token, read when one is drawn. */
+export const measureColor = () => colorToken('--ddb-viewer-accent');
 
 /**
  * The units of the measurement labels below the scales of the map (libs/format.js), largest

@@ -24,6 +24,22 @@ export const PRIMARY = Object.freeze({
 });
 
 /**
+ * The keyboard focus ring of the Hub, in the light and the dark theme (FR-XC-21): the one set the
+ * PrimeVue preset (theme.js), the focus-ring mixin of css/app.scss and css/ol-controls.css draw
+ * with. css/_variables.scss keeps a copy (--ddb-focus-ring-*) that a spec holds equal to it.
+ *
+ * `color` is the ring: 3:1 or more against the page of its theme. `halo` is the second ring that
+ * fills the gap between a control and the ring where the colours around are not known (the map
+ * and its imagery): the pair is 3:1 or more against each other, so one of them always shows.
+ */
+export const FOCUS_RING = Object.freeze({
+    width: '2px',
+    offset: '2px',
+    light: Object.freeze({ color: PRIMARY[700], halo: '#ffffff' }),
+    dark: Object.freeze({ color: PRIMARY[300], halo: '#09090b' })
+});
+
+/**
  * The yellow of the map analysis overlays (the raster area, the profile line, the stockpiles) and
  * of the stockpile panel's accent and the panels' warnings: the Hub has no orange, its warnings
  * are yellow. css/_analysis-panel.scss keeps a copy that a spec holds equal to it.

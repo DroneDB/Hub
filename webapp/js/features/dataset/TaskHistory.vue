@@ -979,7 +979,7 @@ export default {
 }
 
 .duration.running {
-    color: var(--ddb-warning);
+    color: var(--ddb-warning-text);
 }
 
 </style>

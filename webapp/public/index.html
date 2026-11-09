@@ -41,7 +41,32 @@
             display: flex;
             height: 100%;
         }
+
+        /* The page of the dark theme before the stylesheets load (--ddb-bg of the dark theme) */
+        html.app-dark {
+            background: #09090b;
+            color-scheme: dark;
+        }
     </style>
+    <script>
+        // The colour scheme, before anything is drawn (FR-XC-21, D-044): the rule of
+        // js/libs/colorScheme.js (resolveScheme), which keeps it in step once the app runs. The
+        // Appearance preference of this device (ddb.appearance: system, light or dark), System
+        // when there is none; an embedded view always follows the system.
+        (function () {
+            var appearance = null;
+            try { appearance = window.localStorage.getItem('ddb.appearance'); } catch (e) { /* no storage */ }
+            var embedded = /[?&]embed=[^&]/.test(window.location.search);
+            try { embedded = embedded || window.self !== window.top; } catch (e) { embedded = true; }
+            if (embedded || (appearance !== 'light' && appearance !== 'dark')) {
+                appearance = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            if (appearance === 'dark') {
+                document.documentElement.classList.add('app-dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+        })();
+    </script>
     <script>
         // HubOptions is populated at runtime by hubBranding.js after /sys/features
         // resolves. We seed it with safe defaults here so legacy components reading

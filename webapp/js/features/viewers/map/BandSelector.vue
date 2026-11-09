@@ -1,8 +1,9 @@
 <template>
     <div class="band-selector" role="group">
         <div v-for="ch in channels" :key="ch.id" class="band-channel">
-            <label :for="uid + ch.id" class="channel-label" :style="{ color: ch.color }">{{ ch.label }}</label>
-            <select :id="uid + ch.id" v-model="selected[ch.id]" class="channel-select" @change="emitChange">
+            <label :for="uid + ch.id" class="channel-label" :class="`channel-label--${ch.id}`">{{ ch.label }}</label>
+            <!-- The one field of the panels (css/_analysis-panel.scss), with the Hub's focus ring -->
+            <select :id="uid + ch.id" v-model="selected[ch.id]" class="panel-select" @change="emitChange">
                 <option v-for="b in bands" :key="b.index" :value="b.index">
                     {{ b.index }} - {{ b.name }}
                 </option>
@@ -37,9 +38,9 @@ export default {
     data() {
         return {
             channels: [
-                { id: 'r', label: 'R', color: '#ff6b6b' },
-                { id: 'g', label: 'G', color: '#69db7c' },
-                { id: 'b', label: 'B', color: '#74c0fc' }
+                { id: 'r', label: 'R' },
+                { id: 'g', label: 'G' },
+                { id: 'b', label: 'B' }
             ],
             selected: { r: 1, g: 2, b: 3 }
         };
@@ -100,23 +101,7 @@ export default {
     text-align: center;
 }
 
-.channel-select {
-    width: 100%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: var(--panel-text);
-    border-radius: 0.25rem;
-    padding: 0.2rem 0.15rem;
-    font-size: 0.7rem;
-}
-
-.channel-select:focus {
-    outline: none;
-    border-color: rgba(76, 175, 80, 0.6);
-}
-
-.channel-select option {
-    background: var(--panel-option-bg);
-    color: var(--panel-text);
-}
+.channel-label--r { color: var(--panel-channel-r); }
+.channel-label--g { color: var(--panel-channel-g); }
+.channel-label--b { color: var(--panel-channel-b); }
 </style>

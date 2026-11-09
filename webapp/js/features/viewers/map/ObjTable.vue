@@ -128,7 +128,7 @@ ul {
 }
 
 .bool-true {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
     font-weight: bold;
 }
 

@@ -455,7 +455,7 @@ export default {
     right: var(--ddb-spacing-sm);
     padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
     border-radius: var(--ddb-radius-sm);
-    color: white;
+    color: var(--ddb-text-on-color);
     font-weight: bold;
     display: flex;
     gap: var(--ddb-spacing-sm);
@@ -474,7 +474,7 @@ export default {
 
 .build-status.pending {
     background-color: var(--ddb-warning);
-    color: var(--ddb-text);
+    color: var(--ddb-text-on-warning);
 }
 
 .build-explanation-section {

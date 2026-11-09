@@ -119,7 +119,7 @@ export default {
 /* The status icons: the class names are the colours the template asks for */
 .file-icon .grey { color: var(--ddb-text-muted); }
 .file-icon .blue { color: var(--ddb-primary); }
-.file-icon .green { color: var(--ddb-success); }
+.file-icon .green { color: var(--ddb-success-text); }
 .file-icon .red { color: var(--ddb-danger); }
 
 .file-info {
@@ -249,7 +249,7 @@ export default {
 }
 
 .done-label {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
     font-size: 0.75rem;
     font-weight: 500;
 }

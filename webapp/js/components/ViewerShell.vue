@@ -14,7 +14,8 @@
         <ResourceState v-if="loadKind" :kind="loadKind" :resource="stateResource" :name="stateName" :message="stateMessage"
                        :back-to="datasetLocation" back-label="Back to the dataset" />
         <template v-else>
-            <Message v-model="error" no-dismiss />
+            <!-- A viewer that cannot open is an error, not a warning -->
+            <Message v-model="error" severity="error" no-dismiss />
             <!-- Any other failure to load: the message above, and the way back -->
             <div v-if="loadError && datasetLocation" class="viewer-failed">
                 <!-- Embedded: the dataset opens in a new tab, not in the frame (ResourceState does the same) -->
@@ -207,7 +208,7 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
     height: 2.25rem;
     border-radius: 50%;
     background: var(--ddb-overlay-bg);
-    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25);
     color: var(--ddb-text-on-dark);
     font-size: var(--ddb-font-size-base);
     cursor: pointer;
@@ -226,8 +227,8 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
 }
 
 .btn-settings:hover {
-    background: rgba(0, 0, 0, 0.85);
-    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(var(--ddb-shade-rgb), 0.85);
+    border-color: rgba(var(--ddb-glass-rgb), 0.5);
 }
 
 .viewer-settings {

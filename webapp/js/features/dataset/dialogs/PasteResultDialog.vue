@@ -118,6 +118,6 @@ export default {
     padding-left: 1.25rem;
 }
 
-.green { color: var(--ddb-success); }
+.green { color: var(--ddb-success-text); }
 .red { color: var(--ddb-danger); }
 </style>

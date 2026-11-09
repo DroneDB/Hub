@@ -66,10 +66,10 @@ function press(code, ev) {
     @include overlay-button(
         $size: 2.6rem,
         $radius: var(--ddb-radius-sm),
-        $background: rgba(0, 0, 0, 0.4),
-        $hover-background: rgba(0, 0, 0, 0.6),
+        $background: rgba(var(--ddb-shade-rgb), 0.4),
+        $hover-background: rgba(var(--ddb-shade-rgb), 0.6),
         $active-background: rgba(var(--ddb-primary-rgb), 0.85),
-        $border: 1px solid rgba(255, 255, 255, 0.25),
+        $border: 1px solid rgba(var(--ddb-glass-rgb), 0.25),
         $active-border-color: var(--ddb-primary-300),
         $font-size: 1rem
     );
@@ -92,7 +92,7 @@ function press(code, ev) {
 .nav-controls.touch .nav-key {
     width: 3.4rem;
     height: 3.4rem;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(var(--ddb-shade-rgb), 0.5);
     font-size: 1.2rem;
 }
 </style>

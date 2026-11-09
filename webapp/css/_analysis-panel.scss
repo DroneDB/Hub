@@ -29,10 +29,19 @@
     --panel-thermal: #ff9800;
     --panel-thermal-strong: #ff7043;
     --panel-thermal-soft: #ffab91;
+    --panel-thermal-strong-rgb: 255, 112, 67; // --panel-thermal-strong as a triplet
+    // A value out of range, the fill under a profile
+    --panel-danger-rgb: 255, 82, 82;
+    // The labels of the red, green and blue channels of a band mapping
+    --panel-channel-r: #ff6b6b;
+    --panel-channel-g: #69db7c;
+    --panel-channel-b: #74c0fc;
     // Primary button: the accent unless a panel picks a stronger one
     --panel-primary: var(--panel-accent);
     --panel-primary-hover: var(--panel-accent);
     --panel-primary-text: #fff;
+    // The panels are dark in both themes: the focus ring of the dark surfaces
+    --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
 
     position: absolute;
     top: 0.5rem;
@@ -137,6 +146,8 @@
         font-size: 0.75rem;
     }
 
+    // The one field of the panels: a select, an input and the colormap list
+    // (ColormapDropdown.vue) share its look, and the keyboard focus ring of the Hub
     .panel-select,
     .panel-input,
     .panel-range {
@@ -166,7 +177,6 @@
 
     .panel-select:focus,
     .panel-input:focus {
-        outline: none;
         border-color: rgba(var(--panel-accent-rgb), 0.6);
     }
 
@@ -238,8 +248,8 @@
         }
 
         &:focus-visible {
-            outline: 2px solid var(--panel-accent);
-            outline-offset: 1px;
+            outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+            outline-offset: var(--ddb-focus-ring-offset);
         }
 
         // The tool the map is in (drawing, inspecting)

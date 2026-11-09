@@ -208,14 +208,14 @@ export default {
 }
 
 .contour-gen-spinner {
-    background: rgba(255, 255, 255, 0.96);
+    background: color-mix(in srgb, var(--ddb-bg-surface) 96%, transparent);
     border-radius: 8px;
     padding: 2rem 3rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 1rem;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 4px 24px rgba(var(--ddb-shade-rgb), 0.25);
     color: var(--ddb-text-secondary);
     font-size: 0.95rem;
     font-weight: 500;

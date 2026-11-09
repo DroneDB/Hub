@@ -25,11 +25,13 @@
  * renderer's, followed by the canvas on the next frame.
  */
 import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
+import { tokenHex } from '@/libs/colorScheme';
 
 // Splat rendering is limited by fill rate: a phone at a ratio of 3 or more draws 2.25 times the
 // pixels of a ratio of 2 for a sharpness no one sees on soft splats
 export const MAX_PIXEL_RATIO = 2;
-const BACKGROUND = 0x1a1a2e;
+// The viewers are dark in both themes: --ddb-viewer-bg has one value
+const BACKGROUND = () => tokenHex('--ddb-viewer-bg');
 
 // How many splats of the level of detail Spark keeps up to date for picking, while a measurement
 // or a pin is being placed. Picking a paged .rad is best against that set: it is the detail of the
@@ -97,7 +99,7 @@ export function createSplatStage({
     renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(BACKGROUND);
+    scene.background = new THREE.Color(BACKGROUND());
     const camera = new THREE.PerspectiveCamera(60, (canvas.clientWidth || 1) / (canvas.clientHeight || 1), 0.1, 1000);
     camera.position.set(0, 0, 4);
     // OrbitControls reads camera.up once, in its constructor: it has to be final by then

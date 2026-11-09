@@ -328,7 +328,7 @@ onBeforeUnmount(() => {
     padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
     border-radius: var(--ddb-radius-md);
     background: var(--p-content-background);
-    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0.125rem 0.5rem rgba(var(--ddb-shade-rgb), 0.25);
     font-size: var(--ddb-font-size-sm);
     pointer-events: none;
 }
@@ -355,7 +355,7 @@ onBeforeUnmount(() => {
     overflow-y: auto;
     border-radius: var(--ddb-radius-md);
     background: var(--p-content-background);
-    box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0.125rem 0.5rem rgba(var(--ddb-shade-rgb), 0.25);
     font-size: var(--ddb-font-size-sm);
 }
 
@@ -386,7 +386,7 @@ onBeforeUnmount(() => {
     border-radius: var(--ddb-radius-md);
     background: var(--p-content-background);
     color: var(--p-text-color);
-    box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.3);
+    box-shadow: 0 0.25rem 1rem rgba(var(--ddb-shade-rgb), 0.3);
 }
 
 .dlm-popup::after {
