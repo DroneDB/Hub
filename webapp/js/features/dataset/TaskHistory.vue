@@ -144,7 +144,7 @@
                     <label for="task-history-new-dataset-name" class="d-block mb-1"><strong>New dataset name</strong></label>
                     <InputText id="task-history-new-dataset-name" v-model="photogrammetryForm.newDatasetName" class="w-100"
                                placeholder="photogrammetry-results" />
-                    <small class="muted">Kebab-case slug, max 128 chars.</small>
+                    <small class="muted">A slug: {{ slugRuleText }}</small>
                 </div>
                 <div class="mb-3">
                     <label id="task-history-visibility-label" for="task-history-visibility" class="d-block mb-1"><strong>Visibility</strong></label>
@@ -205,6 +205,7 @@ import OdxOptionsEditor from '@/features/dataset/OdxOptionsEditor.vue';
 import FolderPicker from '@/components/FolderPicker.vue';
 import Paginator from 'primevue/paginator';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
+import { slugProblem, slugDescription } from '@/libs/slug';
 
 // Curated processing profiles based on standard OpenDroneMap presets.
 const ODM_PRESETS = [
@@ -364,6 +365,11 @@ export default {
             });
             return opts;
         },
+        // The slug rule of the Registry, as the new dataset name field shows it
+        slugRuleText() {
+            return slugDescription();
+        },
+
         selectedPreset() {
             return ODM_PRESETS.find(p => p.id === this.photogrammetryForm.preset) || ODM_PRESETS[0];
         },
@@ -663,10 +669,10 @@ export default {
                     this.optionsError = 'A new dataset name is required.';
                     return null;
                 }
-                // Basic kebab-case validation: the same check as PhotogrammetryTool on the server, until FR-PRC-03
-                // moves both to the published slug rule (SlugRules, libs/slug.js)
-                if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(this.photogrammetryForm.newDatasetName)) {
-                    this.optionsError = 'Dataset name must be kebab-case (lowercase letters, digits, hyphens).';
+                // The slug rule of the Registry (FR-XC-12, libs/slug.js), the text the Registry answers with
+                const slugError = slugProblem(this.photogrammetryForm.newDatasetName, 'Dataset');
+                if (slugError) {
+                    this.optionsError = slugError;
                     return null;
                 }
             }

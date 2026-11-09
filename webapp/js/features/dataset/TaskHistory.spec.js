@@ -302,7 +302,7 @@ describe('showClearDialog', () => {
 });
 
 describe('photogrammetry new dataset name', () => {
-    // The server's PhotogrammetryTool check (kebab-case) until FR-PRC-03 moves both to the published slug rule
+    // The slug rule of the Registry (SlugRules, FR-XC-12, libs/slug.js): FR-PRC-03 replaced the local kebab-case check
     const build = newDatasetName => {
         const vm = {
             optionsError: '',
@@ -310,15 +310,18 @@ describe('photogrammetry new dataset name', () => {
         };
         return { params: TaskHistory.methods._buildSubmitParams.call(vm), error: vm.optionsError };
     };
+    const RULE = "Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'";
 
-    it('refuses what the server refuses, with its kebab-case rule', () => {
-        for (const name of ['survey_2026', 'survey-']) {
-            expect(build(name)).toEqual({ params: null, error: 'Dataset name must be kebab-case (lowercase letters, digits, hyphens).' });
+    it('refuses what the Registry refuses, with its rule', () => {
+        for (const name of ['a', 'a--b', 'Survey 2026', '-survey']) {
+            expect(build(name)).toEqual({ params: null, error: RULE });
         }
     });
 
-    it('accepts what the server accepts, one character too', () => {
-        expect(build('a').params).toMatchObject({ createNewDataset: true, newDatasetName: 'a' });
-        expect(build('survey-2026').error).toBe('');
+    it('accepts what the Registry accepts: an underscore, a trailing dash, two characters', () => {
+        for (const name of ['survey_2026', 'survey-', 'ab', 'survey-2026']) {
+            expect(build(name).params).toMatchObject({ createNewDataset: true, newDatasetName: name });
+            expect(build(name).error).toBe('');
+        }
     });
 });

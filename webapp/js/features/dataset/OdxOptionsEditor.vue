@@ -396,6 +396,15 @@ export default {
         }
     },
 
+    watch: {
+        // A new profile replaces the profile options: what the user changed by hand stays, unless the new profile
+        // sets the same value
+        presetOptions() {
+            const kept = this.modelValue.filter(o => this.isCustomization(o.name, o.value));
+            if (kept.length !== this.modelValue.length) this.$emit('update:modelValue', kept);
+        }
+    },
+
     methods: {
         toggleGroup(groupId) {
             this.collapsedGroups[groupId] = !this.collapsedGroups[groupId];
@@ -469,13 +478,25 @@ export default {
             });
         },
 
+        // The value the options have without a customization: the one of the profile, or the node's default
+        effectiveValue(name) {
+            const preset = this.presetOptions.find(p => p.name === name);
+            if (preset) return preset.value;
+            const option = this.availableOptions.find(o => o.name === name);
+            return option && option.value !== undefined ? option.value : '';
+        },
+        // A customization is a value the user set by hand that differs from the effective one (FR-PRC-07)
+        isCustomization(name, value) {
+            if (value === '' || value === undefined || value === null) return false;
+            return String(value) !== String(this.effectiveValue(name));
+        },
         onOptionChange(name, value) {
             let customizations = [...this.modelValue];
             const idx = customizations.findIndex(o => o.name === name);
-
-            if (value === '' || value === undefined || value === null) {
-                // Reset: remove from customizations
-                if (idx >= 0) customizations.splice(idx, 1);
+            if (!this.isCustomization(name, value)) {
+                // Reset, or the value of the profile: nothing to customize
+                if (idx < 0) return;
+                customizations.splice(idx, 1);
             } else {
                 if (idx >= 0) {
                     customizations[idx] = { name, value };
@@ -483,7 +504,6 @@ export default {
                     customizations.push({ name, value });
                 }
             }
-
             this.$emit('update:modelValue', customizations);
         }
     }

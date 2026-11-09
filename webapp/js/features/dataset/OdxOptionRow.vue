@@ -20,18 +20,20 @@
 
         <div class="odm-option-control">
             <!-- Boolean: checkbox -->
-            <Checkbox v-if="option.type === 'bool'" v-model="localValue" :binary="true" :aria-labelledby="labelId" :aria-describedby="helpId" />
+            <Checkbox v-if="option.type === 'bool'" :model-value="localValue" :binary="true" :aria-labelledby="labelId" :aria-describedby="helpId"
+                      @update:model-value="onInput" />
 
             <!-- Enum: select dropdown -->
-            <Select v-else-if="isEnum" v-model="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" :options="enumChoices"
-                    option-label="label" option-value="value" class="w-100" />
+            <Select v-else-if="isEnum" :model-value="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" :options="enumChoices"
+                    option-label="label" option-value="value" class="w-100" @update:model-value="onInput" />
 
             <!-- JSON: textarea with file import -->
-            <Textarea v-else-if="option.type === 'json'" v-model="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" rows="2"
-                      placeholder="Paste JSON..." class="w-100" />
+            <Textarea v-else-if="option.type === 'json'" :model-value="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" rows="2"
+                      placeholder="Paste JSON..." class="w-100" @update:model-value="onInput" />
 
             <!-- String, int, float: text input -->
-            <InputText v-else v-model="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" :placeholder="option.defaultValue ?? ''" class="w-100" />
+            <InputText v-else :model-value="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" :placeholder="option.defaultValue ?? ''" class="w-100"
+                       @update:model-value="onInput" />
         </div>
 
         <div class="odm-option-actions">
@@ -122,17 +124,21 @@ export default {
     },
 
     watch: {
-        localValue(val) {
-            this.$emit('update:value', val);
-        },
+        // The profile or the editor changed the value: the control follows, and nothing is emitted (FR-PRC-07): only
+        // what the user does is a customization, a value that a profile sets is not
         'option.value'(val) {
             this.localValue = val !== undefined ? val : '';
         }
     },
 
     methods: {
+        // The user changed the control
+        onInput(value) {
+            this.localValue = value;
+            this.$emit('update:value', value);
+        },
         resetToDefault() {
-            this.localValue = '';
+            this.onInput('');
         }
     }
 };
