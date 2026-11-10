@@ -171,10 +171,10 @@ test('dragging a file onto a folder moves it', async () => {
 test('the header downloads the selected file', async () => {
     const name = path.basename(FILES.raster);
     await page.click(`#explorer >> text=${name}`);
-    await page.click(`button[title="Download ${name}"]`);
+    // One file goes straight to the browser (a confirmation is asked only for a ZIP of several items or a large size)
     const [download] = await Promise.all([
         page.waitForEvent('download', { timeout: 30000 }),
-        page.click('.p-dialog button:has-text("Download")')
+        page.click('header button[title="Download"]') // with a selection the header action is "Download" ("Download entire dataset" with none)
     ]);
     assert.equal(download.suggestedFilename(), name);
     await download.cancel();
@@ -202,12 +202,12 @@ test('dialogs: Escape closes, Enter confirms', async () => {
 
 test('dataset page: the file grid works from the keyboard', async () => {
     const tile = page.locator('#explorer [role="option"]', { hasText: 'smoke-folder' });
-    await tile.focus();
-    await page.keyboard.press('Space');
+    // The list holds the focus and names its active tile (FR-EXP-09): Home makes the first one (the folder) active and selected
+    await page.locator('#explorer[data-file-list]').focus();
+    await page.keyboard.press('Home');
     assert.equal(await tile.getAttribute('aria-selected'), 'true');
     await page.keyboard.press('Escape');
     assert.equal(await tile.getAttribute('aria-selected'), 'false');
-    await tile.focus();
     await page.keyboard.press('Enter');
     await page.waitForSelector('#explorer-container [aria-current="location"]:has-text("smoke-folder")', { timeout: 10000 });
     await page.click('#explorer-container button[aria-label="Root folder"]');
@@ -367,10 +367,16 @@ test('map viewer: a file with another georaster added opens split, saved as a vi
         assert.deepEqual((await page.locator('.split-label-text').allInnerTexts()).sort(), [raster, dem].sort());
         // Both are layers of the view; the split toggle is on
         // (the panel's "Layers (n)" header shows on phones only)
+        const split = page.locator('button[aria-label="Compare georasters side by side"]');
+        assert.equal(await split.getAttribute('aria-pressed'), 'true');
+        // The layer panel is the layers' list when the split is off (the split overlay names them while it is on)
+        await split.click();
         const rows = page.locator('.raster-opacity-panel .raster-opacity-row');
         await rows.nth(1).waitFor({ timeout: 10000 });
         assert.equal(await rows.count(), 2);
-        assert.equal(await page.locator('button[aria-label="Compare georasters side by side"]').getAttribute('aria-pressed'), 'true');
+        await split.click();
+        await page.waitForSelector('.split-overlay', { timeout: 10000 });
+        assert.equal(await split.getAttribute('aria-pressed'), 'true');
         // `add` is read once: the address names the file, not the view
         assert.equal(new URL(page.url()).searchParams.has('add'), false);
         await page.click('.view-bar button:has-text("Save")');
@@ -453,10 +459,10 @@ test('dataset page: a photo opens in the lightbox', async () => {
     // Still in sub/ (previous test)
     await page.click('text=Files');
     await page.dblclick(`#explorer >> text=${path.basename(FILES.photo)}`);
-    await page.waitForSelector('.lightbox-info-overlay', { timeout: 15000 });
-    assert.match(await page.locator('.lightbox-info-name').textContent(), /DJI_0018/);
+    await page.waitForSelector('.photo-lightbox-overlay', { timeout: 15000 });
+    assert.match(await page.locator('.photo-lightbox-name').textContent(), /DJI_0018/);
     await page.keyboard.press('Escape');
-    await page.waitForSelector('.lightbox-info-overlay', { state: 'detached', timeout: 10000 });
+    await page.waitForSelector('.photo-lightbox-overlay', { state: 'detached', timeout: 10000 });
 });
 
 test('point cloud viewer renders a canvas', async () => {

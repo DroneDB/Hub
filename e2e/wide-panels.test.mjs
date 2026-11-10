@@ -60,9 +60,11 @@ for (const viewport of VIEWPORTS) {
 
     test(`${at}: the tree has the width of its token and the detail panel is wide (FR-EXP-40)`, async () => {
         const page = await newPage(viewport);
-        await page.goto(`${URL_}/r/${DATASET}/images`);
+        // A folder has no URL of its own: open the dataset and enter images/ when its photos are not at the root
+        await page.goto(`${URL_}/r/${DATASET}`);
         await appReady(page);
         await page.waitForSelector('.sidebar', { timeout: 30000 });
+        if (!(await page.locator('#explorer :text("DJI_0020.JPG")').count())) await page.locator('#explorer :text-is("images")').first().dblclick();
         await page.locator('#explorer [data-path$="DJI_0020.JPG"], #explorer :text("DJI_0020.JPG")').first().click();
         await page.waitForSelector('.detail-side', { timeout: 30000 });
         const tree = await widthOf(page, '.sidebar');
@@ -100,9 +102,19 @@ for (const viewport of VIEWPORTS) {
         await appReady(page);
         await page.click('[role="tab"]:has-text("Tasks")');
         const logButton = page.locator('button[aria-label*="log" i]').first();
+        await logButton.waitFor({ timeout: 10000 }).catch(() => {}); // the task list loads after the tab opens
         if (!(await logButton.count())) return t.skip('no task with a log in the dataset');
         await logButton.click();
         await page.waitForSelector('#task-log .task-log');
+        // The window grows into its size (a scale transition): measure when its width has stopped changing
+        await page.evaluate(async () => {
+            const log = document.querySelector('#task-log .task-log');
+            let before = -1;
+            for (let i = 0; i < 40 && log.getBoundingClientRect().width !== before; i++) {
+                before = log.getBoundingClientRect().width;
+                await new Promise(r => setTimeout(r, 150));
+            }
+        });
         // Fill the log, so that the box has the height it is allowed (a short log is a short box), then count what it holds
         await page.evaluate(() => {
             document.querySelector('#task-log .task-log').textContent = Array.from({ length: 300 }, (_, i) => `line ${i}`).join('\n');
@@ -127,8 +139,10 @@ for (const viewport of VIEWPORTS) {
 
     test(`${at}: the analysis panel is 400 px wide or more at 4K, the chart text is 12 px, the Expand window is wide (FR-RAS-35)`, async (t) => {
         const page = await newPage(viewport);
-        await page.goto(`${URL_}/r/${DATASET}/map/${RASTER}`);
+        await page.goto(`${URL_}/r/${DATASET}/view/${Buffer.from(RASTER, 'utf8').toString('base64')}/map`);
         await appReady(page);
+        await page.waitForSelector('.ol-viewport canvas', { timeout: 60000 });
+        await page.click('[data-testid="raster-analysis-toolbar-btn"]'); // the panel opens from the toolbar, not on load
         await page.waitForSelector('.analysis-panel', { timeout: 60000 });
         const panel = await widthOf(page, '.analysis-panel');
         if (viewport.width >= 3840) assert.ok(panel >= 400, `the panel is ${panel} px wide`);

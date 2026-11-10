@@ -52,8 +52,13 @@ async function newPage(viewport, { signedIn = true } = {}) {
 
 /** What the width checks read: horizontal scroll, the widest text lines and the size of a selector's box */
 const measure = (page, selector) => page.evaluate(sel => {
-    const box = sel ? document.querySelector(sel)?.getBoundingClientRect() : null;
+    const el = sel ? document.querySelector(sel) : null;
+    const box = el?.getBoundingClientRect();
+    // A box that scrolls itself spans the screen (its scroll bar is at the edge); its content is what the side padding leaves
+    const style = el && getComputedStyle(el);
+    const content = box && style ? box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) : null;
     return {
+        content,
         hScroll: document.documentElement.scrollWidth > innerWidth + 1,
         box: box && { left: box.left, right: box.right, width: box.width, top: box.top },
         windowHeight: innerHeight
@@ -74,7 +79,7 @@ for (const viewport of VIEWPORTS) {
             await page.waitForSelector(selector, { timeout: 30000 });
             const m = await measure(page, selector);
             assert.equal(m.hScroll, false, `${route} scrolls horizontally`);
-            assert.ok(m.box.width <= ROW_MAX_PX, `${route}: ${selector} is ${m.box.width} px wide`);
+            assert.ok(m.content <= ROW_MAX_PX, `${route}: ${selector} is ${m.content} px wide`);
         }
     });
 

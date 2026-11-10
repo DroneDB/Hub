@@ -105,6 +105,8 @@ after(async () => {
 test('FR-MAP-12 at 390x844: a map with two layers has no panel over it on load, and a rail of at most 6 buttons', async () => {
     const page = await newPage(PHONE, { touch: true });
     await openMap(page, ORTHO, `?add=${Buffer.from(ORTHO_2).toString('base64url')}`);
+    // Two layers open side by side, and the split overlay takes the place of the layer panel: switch the split off
+    await page.locator('button[aria-label="Compare georasters side by side"]').click();
     await page.waitForSelector('.raster-opacity-panel', { timeout: 20000 });
     // The size class of the map, not of the window
     assert.match(await page.locator('.map-container').getAttribute('class'), /\bis-compact\b/);

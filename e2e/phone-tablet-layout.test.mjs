@@ -104,6 +104,18 @@ const overlappingControls = (page, scope) => page.evaluate(selector => {
     return overlaps;
 }, scope);
 
+/** A window grows into its size (a scale transition): the width of `locator` once it has stopped changing */
+async function settledWidth(locator) {
+    return locator.evaluate(async el => {
+        let width = -1;
+        for (let i = 0; i < 40 && el.getBoundingClientRect().width !== width; i++) {
+            width = el.getBoundingClientRect().width;
+            await new Promise(r => setTimeout(r, 150));
+        }
+        return Math.round(width);
+    });
+}
+
 const inViewport = (page, locator) => locator.evaluate(el => {
     const r = el.getBoundingClientRect();
     return r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
@@ -137,22 +149,38 @@ for (const viewport of VIEWPORTS) {
 
         await openFiles(page);
         assert.equal(await scrollsHorizontally(page), false, 'the dataset page scrolls sideways');
-        assert.deepEqual(await overlappingControls(page, '.hub-toolbar'), []);
+        // The toolbar shows every tool until its width is measured (one frame), then moves what does not fit into More
+        let overlaps = await overlappingControls(page, '.hub-toolbar');
+        for (let i = 0; i < 20 && overlaps.length; i++) {
+            await page.waitForTimeout(100);
+            overlaps = await overlappingControls(page, '.hub-toolbar');
+        }
+        assert.deepEqual(overlaps, []);
         assert.deepEqual(errors, []);
     });
 
     test(`FR-EXP-17 at ${at}: selecting the orthophoto shows every value fully, and Open is inside the window`, async () => {
         const { page } = await newPage(viewport, { touch: true });
         await openFiles(page);
+        // A dataset with one file opens with it selected: on a tablet its details drawer covers the toolbar (Escape closes it)
+        if (await page.locator('#dataset-detail-side').isVisible()) await page.keyboard.press('Escape');
         await page.locator('.hub-toolbar button[aria-label="List"]').click();
         await page.waitForSelector('#table-view', { timeout: 15000 });
         await page.click(`#table-view tr:has-text("${RASTER}")`);
-        await page.waitForSelector('.detail-panel .props-datatable, .detail-side', { timeout: 15000 });
+        // The details are the Properties tab on a phone and a drawer on a tablet (the Details button reopens it)
+        const properties = page.getByRole('tab', { name: 'Properties' });
+        if (await properties.count()) await properties.click();
+        else if (!(await page.locator('.detail-panel .props-datatable').isVisible())) await page.getByRole('button', { name: 'Details' }).click();
+        await page.waitForSelector('.detail-panel .props-datatable', { state: 'visible', timeout: 15000 });
         const clipped = await page.evaluate(() => [...document.querySelectorAll('.detail-panel .props-datatable td')]
             .filter(td => td.scrollWidth > td.clientWidth + 1).map(td => td.textContent.trim().slice(0, 40)));
         assert.deepEqual(clipped, [], 'a value cell clips its text');
         const open = page.locator('.detail-panel button').filter({ hasText: /^\s*Open/ }).first();
+        // The panel scrolls inside the window (on a phone it is taller than the room above the bottom navigation): Open is
+        // reached by scrolling it, and then it is in the window and nothing covers it
+        await open.scrollIntoViewIfNeeded();
         assert.ok(await inViewport(page, open), 'the Open button is outside the window');
+        assert.ok(await open.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)); }), 'the Open button is covered');
         assert.equal(await scrollsHorizontally(page), false);
     });
 }
@@ -160,6 +188,7 @@ for (const viewport of VIEWPORTS) {
 test('FR-EXP-29 at 390x844: five tabs with a label each, no splitter handle at the left edge', async () => {
     const { page } = await newPage({ width: 390, height: 844 }, { touch: true });
     await openDataset(page);
+    await page.getByRole('tab', { name: 'Browser' }).waitFor({ state: 'visible', timeout: 20000 }); // the page builds its tabs after the dataset loads
     for (const name of ['Browser', 'Files', 'Properties', 'Map', 'Tasks']) {
         const tab = page.getByRole('tab', { name });
         assert.ok(await tab.isVisible(), `the ${name} tab is not visible`);
@@ -200,7 +229,7 @@ test('FR-ORG-19: the Create dataset dialog keeps its width while a name is typed
     await page.click('button:has-text("Create Dataset")');
     const dialog = page.locator('#datasetDialog');
     await dialog.waitFor({ state: 'visible', timeout: 10000 });
-    const width = async () => Math.round((await dialog.boundingBox()).width);
+    const width = () => settledWidth(dialog);
     const before = await width();
     await dialog.locator('#dataset-dialog-dataset-name').fill('Bulk dataset 24');
     await page.waitForTimeout(200);
@@ -242,7 +271,7 @@ test('FR-SHR-06: the Share dialog names the file and keeps its width between sha
     const dialog = page.locator('#share-embed');
     await dialog.waitFor({ state: 'visible', timeout: 10000 });
     assert.equal((await dialog.locator('.p-dialog-title').textContent()).trim(), `Share ${RASTER}`);
-    const width = async () => Math.round((await dialog.boundingBox()).width);
+    const width = () => settledWidth(dialog);
     const linkWidth = await width();
     await dialog.locator('#share-mode').click();
     await page.getByRole('option', { name: /Tiles|OGC/ }).first().click();
