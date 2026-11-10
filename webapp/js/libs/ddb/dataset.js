@@ -108,6 +108,24 @@ export default class Dataset {
         return url;
     }
 
+    /**
+     * The thumbnail of a file drawn with visualisation parameters (thumb-ex): a formula with a colormap and a rescale in its unit.
+     * The one use is the thermal image viewer (FR-RAS-15): an R-JPEG drawn from the temperatures of its raw thermal data,
+     * `formula` a thermal one (CELSIUS, KELVIN, FAHRENHEIT, D-022), over the rescale or else the minimum to the maximum.
+     * @param {string} path
+     * @param {number} [size]  the long side, in pixels
+     * @param {{ formula?: string, colormap?: string, rescale?: string, nodata?: number|string|null }} [vizParams]
+     */
+    thumbExUrl(path, size, vizParams = {}) {
+        let url = `${this.baseApi}/thumb-ex?path=${encodeURIComponent(path)}`;
+        if (size) url += `&size=${size}`;
+        if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;
+        if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
+        if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        url += rasterOptionsQuery(vizParams);
+        return url;
+    }
+
     datasetThumbUrl(size) {
         let url = `${this.baseApi}/thumb`;
         if (size) url += `?size=${size}`;

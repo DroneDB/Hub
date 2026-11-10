@@ -458,3 +458,20 @@ describe('Dataset raster value calls', () => {
     });
 });
 
+
+// U-603 (FR-RAS-15): the thermal viewer draws an R-JPEG through thumb-ex, with a thermal formula and a colormap
+describe('Dataset.thumbExUrl', () => {
+    const ds = new Dataset({ remote: 'h', secure: true }, 'my_org', 'my_ds');
+    const base = '/orgs/my_org/ds/my_ds';
+
+    it('names the path, the size, the formula and the colormap, in the encoded form', () => {
+        expect(ds.thumbExUrl('H20T/DJI_0001_R.JPG', 1024, { formula: 'KELVIN', colormap: 'ironbow' }))
+            .toBe(`${base}/thumb-ex?path=H20T%2FDJI_0001_R.JPG&size=1024&formula=KELVIN&colormap=ironbow`);
+    });
+
+    it('adds the rescale and the NoData value only when there are, and leaves the size out without one', () => {
+        expect(ds.thumbExUrl('a & b.jpg', undefined, { rescale: '-5,36', nodata: 0 }))
+            .toBe(`${base}/thumb-ex?path=a%20%26%20b.jpg&rescale=-5%2C36&nodata=0`);
+        expect(ds.thumbExUrl('r.jpg', 512)).toBe(`${base}/thumb-ex?path=r.jpg&size=512`);
+    });
+});

@@ -35,12 +35,36 @@
                     </button>
                 </div>
             </div>
+            <div v-if="thermalAvailable" class="photo-lightbox-thermal" role="group" aria-label="Thermal image">
+                <label class="photo-lightbox-thermal-field" :for="thermalUnitId">
+                    <span>Unit</span>
+                    <select :id="thermalUnitId" v-model="thermalFormula" class="photo-lightbox-select" data-testid="thermal-unit">
+                        <option v-for="option in THERMAL_UNIT_OPTIONS" :key="option.formula" :value="option.formula">{{ option.label }}</option>
+                    </select>
+                </label>
+                <div class="photo-lightbox-thermal-field">
+                    <span :id="thermalPaletteLabelId">Palette</span>
+                    <ColormapDropdown v-model="thermalPalette" :colormaps="palettes" :aria-labelledby="thermalPaletteLabelId" />
+                </div>
+                <span class="photo-lightbox-thermal-range" data-testid="thermal-range">Range {{ thermalRangeText }}</span>
+                <span class="photo-lightbox-thermal-readout" data-testid="thermal-readout">
+                    <template v-if="thermalHover">
+                        <span class="photo-lightbox-thermal-value">{{ thermalHover.text || 'No value' }}</span>
+                        <span class="photo-lightbox-thermal-pixel">at {{ thermalHover.x }}, {{ thermalHover.y }}</span>
+                    </template>
+                    <template v-else>Move the pointer over the picture to read its temperature</template>
+                </span>
+            </div>
+            <div v-else-if="thermalNotice" class="photo-lightbox-thermal" role="note" data-testid="thermal-notice">
+                <i class="fa-solid fa-circle-info" aria-hidden="true" />
+                <span>{{ thermalNotice }}</span>
+            </div>
             <div class="photo-lightbox-body">
                 <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/no-static-element-interactions -- a click on the empty space closes it; Escape and the Close button are the keyboard way; zoom has buttons and keys -->
                 <div ref="stage" class="photo-lightbox-stage" role="presentation" :class="{ zoomed: isZoomed, dragging }"
                      @wheel.prevent="zoom.onWheel" @dblclick="zoom.onDoubleClick" @pointerdown="onStagePointerDown"
-                     @pointermove="zoom.onPointerMove" @pointerup="zoom.onPointerUp" @pointercancel="zoom.onPointerUp"
-                     @click="onStageClick">
+                     @pointermove="onStagePointerMove" @pointerleave="onStagePointerLeave" @pointerup="zoom.onPointerUp"
+                     @pointercancel="zoom.onPointerUp" @click="onStageClick">
                     <img v-if="src" ref="img" :key="path" :src="src" :alt="name" class="photo-lightbox-image"
                          :width="photoWidth || undefined" :height="photoHeight || undefined" draggable="false"
                          :style="{ transform }" @load="onLoad" @error="onImageError">
@@ -61,6 +85,9 @@
                         <i class="fa-solid fa-chevron-right" aria-hidden="true" />
                     </button>
                 </template>
+                <div v-if="thermalLegend" class="photo-lightbox-legend">
+                    <RasterLegend :rows="thermalLegend.rows" :styles="thermalLegend.styles" />
+                </div>
                 <div v-if="caption" class="photo-lightbox-caption">
                     <span v-if="caption.coords" class="photo-lightbox-coords">
                         <i class="fa-solid fa-location-dot me-1" aria-hidden="true" />{{ caption.coords }}
@@ -97,13 +124,20 @@
  * the capped size, and the largest step once zoomed. A file or larger thumbnail that does not
  * load falls back to the preview.
  *
+ * A radiometric picture (a thermal camera's R-JPEG, FR-RAS-15) has a thermal mode: the temperature under the pointer (a pixel
+ * of its raw thermal grid, whatever the size of the bitmap on show), its range, the Unit (°C, K, °F, answered by ddb, D-022)
+ * and a palette (thumb-ex with a colormap, with its legend); the Information panel lists its thermal fields. A thermal picture
+ * without temperatures (no calibration: a DJI R-JPEG, whose raw values need DJI's own conversion) is shown as shot, with a
+ * notice that says so.
+ *
  *   <PhotoLightbox :dataset="dataset" :photos="[{ path, entry }]" v-model:index="i" @close="..." />
  */
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, useId } from 'vue';
 import ddb from 'ddb';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import { useOverlay, vFocusTrap } from '@/composables/useOverlay';
 import { useEventListener } from '@/composables/useEventListener';
+import { useThermalImage } from '@/composables/useThermalImage';
 import { usePanZoom, MAX_SCALE } from '@/composables/usePanZoom';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
@@ -111,6 +145,10 @@ import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import { buildAllProperties, pointCoordinatesText } from '@/libs/propertiesUtils';
 import { fixedLengthParts } from '@/libs/format';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
+import { gridPixelAt, thermalPalettes, thermalFields } from '@/libs/thermalImage';
+import { THERMAL_UNIT_OPTIONS } from '@/libs/map/rasterUnit';
+import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
+import RasterLegend from '@/features/viewers/map/RasterLegend.vue';
 
 const props = defineProps({
     visible: { type: Boolean, default: true },
@@ -138,6 +176,11 @@ const fullFailed = ref(false);
 const stageSize = ref({ w: 0, h: 0 });
 const pixelRatio = ref(1);
 const units = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
+// The palette did not load (the thermal rendering is not there): the picture as shot stays
+const paletteFailed = ref(false);
+const thermalUnitId = useId();
+const thermalPaletteLabelId = useId();
+const palettes = thermalPalettes();
 
 useOverlay({
     active: () => props.visible,
@@ -160,6 +203,18 @@ const photoWidth = computed(() => Number(entry.value?.properties?.width) || 0);
 const photoHeight = computed(() => Number(entry.value?.properties?.height) || 0);
 const longSide = computed(() => Math.max(photoWidth.value, photoHeight.value));
 
+// The thermal mode of a radiometric picture (FR-RAS-15)
+const thermal = useThermalImage({ dataset: props.dataset, path: () => path.value, entry: () => entry.value });
+const {
+    formula: thermalFormula, palette: thermalPalette, activePalette: thermalActivePalette, info: thermalInfo,
+    hover: thermalHover, available: thermalAvailable, notice: thermalNotice, rangeText: thermalRangeText,
+    legendStyle: thermalLegendStyle
+} = thermal;
+// The legend of the palette on show, in the shape RasterLegend takes
+const thermalLegend = computed(() => (thermalLegendStyle.value
+    ? { rows: [{ path: path.value, name: name.value, visible: true }], styles: { [path.value]: thermalLegendStyle.value } }
+    : null));
+
 const fullUrl = computed(() => (path.value ? props.dataset.downloadUrl(path.value, { inline: true }) : ''));
 const decodable = computed(() => BROWSER_FORMATS.has(ddb.pathutils.extname(path.value).slice(1).toLowerCase()));
 // The stage in device pixels, in the steps of FR-XC-32, capped at the photo's long side
@@ -172,13 +227,29 @@ const previewIsFull = computed(() => longSide.value > 0 && previewSize.value >= 
 const fullSrc = computed(() => (decodable.value
     ? fullUrl.value
     : props.dataset.thumbUrl(path.value, thumbnailRequestSize(Number.POSITIVE_INFINITY, 1, longSide.value))));
+// The thermal rendering of the picture (thumb-ex): its temperatures in the unit and the palette chosen, in the steps of
+// FR-XC-32 like the preview; zoomed, the largest step (the file itself has no palette)
+const usesPalette = computed(() => !!thermalActivePalette.value && !paletteFailed.value);
+const paletteSize = computed(() => (fullWanted.value
+    ? thumbnailRequestSize(Number.POSITIVE_INFINITY, 1, longSide.value)
+    : previewSize.value));
+const paletteSrc = computed(() => (path.value
+    ? props.dataset.thumbExUrl(path.value, paletteSize.value, { formula: thermalFormula.value, colormap: thermalActivePalette.value })
+    : ''));
 const src = computed(() => {
     if (!path.value) return '';
+    if (usesPalette.value) return paletteSrc.value;
     if ((fullWanted.value || previewIsFull.value) && !fullFailed.value) return fullSrc.value;
     return previewUrl.value;
 });
 
-const properties = computed(() => (photo.value ? buildAllProperties(photo.value, units.value) : null));
+// The properties of the photo and, for a radiometric picture, its thermal fields: the sensor, the range, the emissivity and the
+// distance it was set to
+const properties = computed(() => {
+    const all = photo.value ? buildAllProperties(photo.value, units.value) : null;
+    const fields = all && thermalAvailable.value ? thermalFields(entry.value, thermalInfo.value, units.value) : null;
+    return fields ? { ...all, thermal: fields } : all;
+});
 
 // The place of the photo over the picture: latitude and longitude, the altitude in the user's units
 const caption = computed(() => {
@@ -206,6 +277,11 @@ function onLoad() {
 }
 
 function onImageError() {
+    // The thermal rendering did not load: the picture as shot
+    if (usesPalette.value) {
+        paletteFailed.value = true;
+        return;
+    }
     // The file did not load (a format or a size the browser refuses): the preview instead
     if (!fullFailed.value && src.value !== previewUrl.value) {
         fullFailed.value = true;
@@ -218,6 +294,19 @@ function onImageError() {
 function go(step) {
     const n = props.photos.length;
     if (n > 1) emit('update:index', (props.index + step + n) % n);
+}
+
+// The temperature under the pointer: the pixel of the raw thermal grid at the pointer, from the box the picture is drawn in
+// (zoom included), so it holds at any size of the bitmap on show (FR-XC-32)
+function onStagePointerMove(e) {
+    zoom.onPointerMove(e);
+    if (!thermalAvailable.value || dragging.value || !img.value) return;
+    const grid = { width: Number(thermalInfo.value?.width), height: Number(thermalInfo.value?.height) };
+    thermal.pointerAt(gridPixelAt({ x: e.clientX, y: e.clientY }, img.value.getBoundingClientRect(), grid));
+}
+
+function onStagePointerLeave() {
+    thermal.pointerAt(null);
 }
 
 // The empty space around the photo closes it: a click pressed and released there, at the fit. Not a
@@ -258,10 +347,12 @@ function onKeydown(e) {
 }
 
 watch(isZoomed, z => { if (z) fullWanted.value = true; });
+watch([thermalPalette, thermalFormula], () => { paletteFailed.value = false; });
 
 // Another photo: back to the fit, with its preview
 watch(path, () => {
     zoom.reset();
+    paletteFailed.value = false;
     fullWanted.value = false;
     fullFailed.value = false;
     loading.value = true;
@@ -356,6 +447,62 @@ useEventListener(window, 'resize', measure);
 .photo-lightbox-zoom {
     min-width: 4.2em;
     font-variant-numeric: tabular-nums;
+}
+
+.photo-lightbox-thermal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 6px 16px;
+    background: rgba(var(--ddb-shade-rgb), 0.4);
+    font-size: 0.85rem;
+}
+
+.photo-lightbox-thermal-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.photo-lightbox-select {
+    color: var(--ddb-text);
+    background: var(--ddb-bg-surface);
+    border: 1px solid var(--ddb-border, rgba(var(--ddb-glass-rgb), 0.2));
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+
+.photo-lightbox-thermal-range,
+.photo-lightbox-thermal-readout {
+    font-variant-numeric: tabular-nums;
+}
+
+.photo-lightbox-thermal-readout {
+    margin-left: auto;
+}
+
+.photo-lightbox-thermal-value {
+    font-weight: 600;
+    margin-right: 6px;
+}
+
+.photo-lightbox-thermal-pixel {
+    opacity: 0.8;
+}
+
+.photo-lightbox-legend {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1;
+}
+
+/* The legend of the map is placed by the map's own reserves: here it flows in its box */
+.photo-lightbox-legend :deep(.raster-legend) {
+    position: static;
+    max-width: none;
 }
 
 .photo-lightbox-body {
