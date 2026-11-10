@@ -420,3 +420,19 @@ describe('StockpileVolumePanel Find all piles', () => {
         expect(wrapper.find('[data-testid="stockpile-piles-empty"]').exists()).toBe(false);
     });
 });
+
+// FR-RAS-23: the action grid is the footer of the panel
+describe('StockpileVolumePanel footer', () => {
+    it('has Click map, Draw and Clear in the footer, not in the body that scrolls', () => {
+        render();
+        const footer = wrapper.get('[data-testid="panel-actions"]');
+        expect(footer.findAll('button').map(b => b.text())).toEqual(['Click map', 'Draw', 'Clear']);
+        expect(wrapper.get('.panel-body').find('[data-testid="stockpile-click-btn"]').exists()).toBe(false);
+    });
+
+    it('keeps the label "Elevation model" on its selector', () => {
+        render({ targetCandidates: [{ path: 'a/dsm.tif', label: 'dsm.tif' }, { path: 'a/dtm.tif', label: 'dtm.tif' }], targetPath: 'a/dsm.tif' });
+        expect(wrapper.find('.analysis-target label').text()).toBe('Elevation model');
+    });
+});
+

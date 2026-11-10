@@ -75,6 +75,11 @@ describe('contourLevelsWarning', () => {
         expect(contourLevelsWarning(50, 'count')).toBe('');
     });
 
+    it('names the value range of a raster that is not an elevation model (FR-RAS-25)', () => {
+        expect(contourLevelsWarning(51, 'count', 'value')).toBe('About 51 contour levels. A large raster can take several minutes, and the result is limited in size. Use fewer levels, or limit the value range, to make it faster.');
+        expect(contourLevelsWarning(51, 'interval', 'value')).toBe('About 51 contour levels (the range divided by the interval). A large raster can take several minutes, and the result is limited in size. Use a larger interval, or limit the value range, to make it faster.');
+    });
+
     it('says nothing for 50 or fewer, or for an estimate that cannot be made', () => {
         expect(contourLevelsWarning(50)).toBe('');
         expect(contourLevelsWarning(6)).toBe('');
@@ -92,6 +97,11 @@ describe('contourTruncation', () => {
 
     it('says it without a cap when the server gave none', () => {
         expect(contourTruncation({ truncated: true }).message).toContain('truncated at the most lines the server returns');
+    });
+
+    it('names the value range of a raster that is not an elevation model (FR-RAS-25)', () => {
+        expect(contourTruncation({ truncated: true, featureCap: 100000 }, 'value').message).toBe('The contour lines are truncated at 100,000 lines: the rest of the raster has none. Use a larger interval, or limit the value range, and generate again.');
+        expect(contourTruncation({ truncated: true, featureCap: 100000 }).message).toContain('limit the elevation range');
     });
 
     it('says nothing of a complete result, or of a server that does not say', () => {

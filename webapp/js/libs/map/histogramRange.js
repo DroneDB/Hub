@@ -2,16 +2,16 @@
 /**
  * The range of an index histogram that is worth showing. A few outliers (an NDVI of -191 where
  * the ground has no signal) put almost every value in one or two bars and the range handles on
- * top of each other. The range shown keeps the values the index can have (its formula's range)
- * and those near the bulk of the data (within one 2%-98% spread of the 2nd and 98th
- * percentiles). The server bins that range itself and counts the values outside its edges
- * (`below`, `above`); a server that bins from min to max is trimmed here to the same range.
+ * top of each other. The server bins the range worth showing itself (the values the index can have,
+ * near the bulk of the data, D-041) and counts the values outside its edges (`below`, `above`); the
+ * Hub computes no range of its own from the percentiles. A server that bins from min to max is
+ * trimmed here to the values the index can have (its formula's range).
  */
 
 /**
  * @typedef {{ counts: number[], edges: number[], below?: number, above?: number }} Histogram
  *   `edges` has one more item than `counts`; `below` and `above` count the values outside the edges
- * @typedef {{ min?: number, max?: number, percentiles?: { p2?: number, p98?: number } }} BandStats
+ * @typedef {{ min?: number, max?: number }} BandStats
  * @typedef {{ histogram: Histogram, domain: [number, number], bars: boolean, trimmed: boolean }} ShownHistogram
  *   `domain` is the range the handles move in; `bars` is false when the histogram has too few
  *   bins inside it to show a shape (then `histogram` has no counts and its edges are the domain);
@@ -22,24 +22,6 @@
 export const MIN_SHOWN_BINS = 16;
 
 const isNum = v => typeof v === 'number' && isFinite(v);
-
-/**
- * The 2nd and 98th percentiles of the statistics, inside the formula's range when it has one;
- * null without percentiles.
- * @param {BandStats|null|undefined} stats
- * @param {number[]|null|undefined} [validRange]  the formula's [min, max]
- * @returns {[number, number]|null}
- */
-export function percentileRange(stats, validRange) {
-    const p = stats && stats.percentiles;
-    if (!p || !isNum(p.p2) || !isNum(p.p98)) return null;
-    let [lo, hi] = [p.p2, p.p98];
-    if (validRange && isNum(validRange[0]) && isNum(validRange[1])) {
-        lo = Math.min(Math.max(lo, validRange[0]), validRange[1]);
-        hi = Math.min(Math.max(hi, validRange[0]), validRange[1]);
-    }
-    return [lo, hi];
-}
 
 /**
  * The part of a histogram to show (see the module's comment).
@@ -64,12 +46,6 @@ export function shownHistogram(histogram, stats, validRange) {
     if (validRange && isNum(validRange[0]) && isNum(validRange[1])) {
         lo = Math.max(lo, validRange[0]);
         hi = Math.min(hi, validRange[1]);
-    }
-    const p = percentileRange(stats);
-    if (p && p[1] > p[0]) {
-        const spread = p[1] - p[0];
-        lo = Math.max(lo, p[0] - spread);
-        hi = Math.min(hi, p[1] + spread);
     }
     if (!(hi > lo) || (lo <= first && hi >= last)) return { ...full, domain: [first, last], trimmed: outside };
 

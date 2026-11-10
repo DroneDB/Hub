@@ -103,6 +103,15 @@ describe('useContourLines as a task', () => {
         expect(showAlert.mock.calls[0][1]).toContain('truncated at 100,000 lines');
     });
 
+    it('names the value range in the truncation of a raster that is not an elevation model (FR-RAS-25)', async () => {
+        const { contours, showAlert } = setup({ result: resultOf({ truncated: true, featureCount: 100000 }) });
+        contours.openContourDialog({ valueMin: 145, valueMax: 402, bandCount: 2, dataType: 'UInt16', isThermal: false, unit: '' });
+
+        await contours.generateContourLines({ interval: 1 });
+
+        expect(showAlert.mock.calls[0][1]).toBe('The contour lines are truncated at 100,000 lines: the rest of the raster has none. Use a larger interval, or limit the value range, and generate again.');
+    });
+
     it('exposes the live entry of the task of the request while it runs', async () => {
         const { contours } = setup();
         let release;

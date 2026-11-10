@@ -21,6 +21,7 @@
  */
 import { buildContourFeature, colorForElevation } from '@/libs/map/contourStorage';
 import { CONTOUR_TOOL_ID, contourTaskParams, contourTruncation } from '@/libs/map/contourTask';
+import { isElevationRaster } from '@/libs/map/rasterUnit';
 import { createFeatureScope } from '@/composables/featureScope';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { formatNumber } from '@/libs/format';
@@ -57,7 +58,9 @@ const definition = {
             // Cached raster min/max for the dialog hint (populated lazily).
             contourRasterMin: null,
             contourRasterMax: null,
-            contourUnit: ''
+            contourUnit: '',
+            // The raster is an elevation model (FR-RAS-25): the dialog says elevation or value
+            contourElevation: true
         };
     },
     computed: {
@@ -80,6 +83,7 @@ const definition = {
                     this.contourRasterMax = rasterInfoLike.valueMax;
                 }
                 if (rasterInfoLike.unit) this.contourUnit = rasterInfoLike.unit;
+                this.contourElevation = isElevationRaster(rasterInfoLike);
             }
             this.contourError = null;
             // A task of an earlier request has nothing to say to a new one
@@ -164,7 +168,7 @@ const definition = {
                     this.showFlash(`Generated ${formatNumber(n, 0)} contour line${n === 1 ? '' : 's'}.`, 'positive');
                 }
                 // The lines stop at the cap of the server (FR-RAS-11): a message the user acknowledges
-                const cut = contourTruncation(result);
+                const cut = contourTruncation(result, this.contourElevation ? 'elevation' : 'value');
                 if (cut.truncated && typeof this.showAlert === 'function') this.showAlert(cut.title, cut.message);
             } catch (e) {
                 // A task that failed or was cancelled is shown by its status in the dialog (FR-XC-06); anything else

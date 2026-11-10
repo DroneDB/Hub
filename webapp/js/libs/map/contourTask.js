@@ -78,29 +78,31 @@ function finite(value) {
  * the interval; a target count is the number of levels asked for.
  * @param {number|null} levels  estimateContourLevels
  * @param {'interval'|'count'} [mode]  how the dialog spaces the levels
+ * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model (FR-RAS-25)
  * @returns {string}
  */
-export function contourLevelsWarning(levels, mode = 'interval') {
+export function contourLevelsWarning(levels, mode = 'interval', noun = 'elevation') {
     if (levels === null || levels <= CONTOUR_LEVEL_WARNING) return '';
     const shown = formatNumber(levels, 0);
     if (mode === 'count') {
-        return `About ${shown} contour levels. A large raster can take several minutes, and the result is limited in size. Use fewer levels, or limit the elevation range, to make it faster.`;
+        return `About ${shown} contour levels. A large raster can take several minutes, and the result is limited in size. Use fewer levels, or limit the ${noun} range, to make it faster.`;
     }
-    return `About ${shown} contour levels (the range divided by the interval). A large raster can take several minutes, and the result is limited in size. Use a larger interval, or limit the elevation range, to make it faster.`;
+    return `About ${shown} contour levels (the range divided by the interval). A large raster can take several minutes, and the result is limited in size. Use a larger interval, or limit the ${noun} range, to make it faster.`;
 }
 
 /**
  * What a result says about being cut at the cap of the server: `truncated` and `featureCap` (ddb 2.3). Empty when the result
  * is complete or comes from a server that does not say.
  * @param {{ truncated?: boolean, featureCap?: number }|null|undefined} result
+ * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model (FR-RAS-25)
  * @returns {{ truncated: boolean, title: string, message: string }}
  */
-export function contourTruncation(result) {
+export function contourTruncation(result, noun = 'elevation') {
     if (!result || result.truncated !== true) return { truncated: false, title: '', message: '' };
     const cap = typeof result.featureCap === 'number' ? formatNumber(result.featureCap, 0) : '';
     return {
         truncated: true,
         title: 'Contours truncated',
-        message: `The contour lines are truncated at ${cap ? `${cap} lines` : 'the most lines the server returns'}: the rest of the raster has none. Use a larger interval, or limit the elevation range, and generate again.`
+        message: `The contour lines are truncated at ${cap ? `${cap} lines` : 'the most lines the server returns'}: the rest of the raster has none. Use a larger interval, or limit the ${noun} range, and generate again.`
     };
 }

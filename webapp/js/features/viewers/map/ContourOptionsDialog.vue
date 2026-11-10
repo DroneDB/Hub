@@ -5,7 +5,7 @@
             @update:visible="$emit('update:visible', $event)" @close="$emit('cancel')" @confirm="onGenerate">
         <div class="contour-dialog-body">
             <p class="dialog-help">
-                Generate contour lines from this elevation raster. They will be added to the
+                Generate contour lines from this {{ elevation ? 'elevation raster' : 'raster' }}. They will be added to the
                 measurements layer; click <b>Save</b> on the measurement toolbar to persist them.
                 Generating again replaces the unsaved contours.
             </p>
@@ -50,7 +50,7 @@
 
             <!-- Base offset -->
             <div class="form-row">
-                <label for="contour-options-dialog-base-elevation" class="form-label">Base elevation</label>
+                <label for="contour-options-dialog-base-elevation" class="form-label">Base {{ noun }}</label>
                 <InputNumber v-model="baseOffset" input-id="contour-options-dialog-base-elevation"
                              :max-fraction-digits="3"
                              show-buttons button-layout="horizontal" :step="1"
@@ -60,14 +60,14 @@
             <!-- Min/max clipping -->
             <div class="form-row two-cols">
                 <div>
-                    <label for="contour-options-dialog-min-elevation" class="form-label">Min elevation</label>
+                    <label for="contour-options-dialog-min-elevation" class="form-label">Min {{ noun }}</label>
                     <InputNumber v-model="minElev" input-id="contour-options-dialog-min-elevation"
                                  :max-fraction-digits="3"
                                  :placeholder="rasterMin != null ? String(rasterMin) : ''"
                                  class="form-input" />
                 </div>
                 <div>
-                    <label for="contour-options-dialog-max-elevation" class="form-label">Max elevation</label>
+                    <label for="contour-options-dialog-max-elevation" class="form-label">Max {{ noun }}</label>
                     <InputNumber v-model="maxElev" input-id="contour-options-dialog-max-elevation"
                                  :max-fraction-digits="3"
                                  :placeholder="rasterMax != null ? String(rasterMax) : ''"
@@ -142,7 +142,9 @@ export default {
         // The live entry of the task of the latest request (useHeavyTask)
         task: { type: Object, default: null },
         // Why the latest request has no task: it was refused, or its result could not be read
-        error: { type: String, default: '' }
+        error: { type: String, default: '' },
+        // The raster is an elevation model (isElevationRaster): any other raster (a thermal mosaic) has values, not elevations (FR-RAS-25)
+        elevation: { type: Boolean, default: true }
     },
     emits: ['update:visible', 'generate', 'cancel'],
     setup(props) {
@@ -164,6 +166,10 @@ export default {
         };
     },
     computed: {
+        // What the values of the raster are called
+        noun() {
+            return this.elevation ? 'elevation' : 'value';
+        },
         // The levels the request draws (interval mode: the range of the raster over the interval)
         levels() {
             return estimateContourLevels({
@@ -174,7 +180,7 @@ export default {
         },
         // A fixed interval and a target count alike ask above 50 levels (a count asks for its own number)
         levelsWarning() {
-            return contourLevelsWarning(this.levels, this.mode === 'count' ? 'count' : 'interval');
+            return contourLevelsWarning(this.levels, this.mode === 'count' ? 'count' : 'interval', this.noun);
         },
         rangeHint() {
             if (this.mode !== 'count') return null;
@@ -192,7 +198,7 @@ export default {
             }
             if (this.minElev != null && this.maxElev != null
                 && Number(this.minElev) >= Number(this.maxElev)) {
-                return 'Min elevation must be less than max elevation.';
+                return `Min ${this.noun} must be less than max ${this.noun}.`;
             }
             if (this.simplifyTolerance != null && this.simplifyTolerance < 0) {
                 return 'Simplification tolerance must be >= 0.';

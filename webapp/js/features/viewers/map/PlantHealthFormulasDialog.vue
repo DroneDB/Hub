@@ -18,8 +18,8 @@
                 <p v-if="entry.expression" class="line">
                     <b>Formula:</b> <code>{{ entry.expression }}</code>
                 </p>
-                <p class="line"><b>Bands required:</b> {{ entry.bands }}</p>
-                <p class="line"><b>When to use:</b> {{ entry.when }}</p>
+                <p v-if="entry.bands" class="line"><b>Bands required:</b> {{ entry.bands }}</p>
+                <p v-if="entry.when" class="line"><b>When to use:</b> {{ entry.when }}</p>
                 <p v-if="entry.disabled" class="line unavailable">
                     <i class="fas fa-ban" />
                     Not available on this raster: {{ entry.disabledReason }}
@@ -37,71 +37,112 @@
 <script>
 import Window from '@/components/HubWindow.vue';
 
-// Curated copy for the most common multispectral indices. Anything not listed
-// here falls back to the descriptions provided by the backend.
-// `bands` mirrors the requiredBands field in the DDB C++ formula struct.
+// Curated copy for the formulas of ddb (DDBGetRasterMetadata lists 18). It holds what the list cannot: what an index
+// measures and when to use it, each text its own. Anything not listed here shows the help of the list as what it
+// measures and has no "when to use". The bands come from the list (`requiredBands`, ddb 2.3); `bands` here is the last
+// resort for a host whose list has no requiredBands (ddb 2.2), whose enabled formulas give no "Requires bands" reason.
 const FORMULA_INFO = {
+    VARI: {
+        bands: 'Red, Green, Blue',
+        measures: 'the fraction of green vegetation in ordinary RGB photos, with less sensitivity to the atmosphere.',
+        when: 'RGB cameras: a quick check of crop cover when the camera has no NIR band.'
+    },
+    EXG: {
+        bands: 'Red, Green, Blue',
+        measures: 'the greenness of foliage against soil and residue.',
+        when: 'separating plants from soil in RGB orthophotos, to count plants or map weeds.'
+    },
+    GLI: {
+        bands: 'Red, Green, Blue',
+        measures: 'green leaf cover using only the RGB bands, from -1 to 1.',
+        when: 'comparing the green cover of fields photographed with a standard RGB camera (no NIR).'
+    },
+    vNDVI: {
+        bands: 'Red, Green, Blue',
+        measures: 'an approximation of NDVI computed from the RGB bands.',
+        when: 'RGB-only flights where you still want an NDVI-like picture of plant vigor.'
+    },
     NDVI: {
-        measures: 'overall vegetation vigor and biomass density.',
         bands: 'Red, NIR',
+        measures: 'overall vegetation vigor and biomass density.',
         when: 'general crop health monitoring; the most common starting point.'
     },
-    NDRE: {
-        measures: 'nitrogen content and chlorophyll in mid-to-late season crops.',
-        bands: 'Red Edge, NIR',
-        when: 'mature canopies where NDVI saturates; nitrogen management.'
-    },
     NDWI: {
-        measures: 'leaf and canopy water content.',
         bands: 'Green, NIR',
+        measures: 'leaf and canopy water content.',
         when: 'irrigation checks and drought stress detection.'
     },
     GNDVI: {
-        measures: 'chlorophyll concentration; more sensitive than NDVI in dense canopies.',
         bands: 'Green, NIR',
+        measures: 'chlorophyll concentration; more sensitive than NDVI in dense canopies.',
         when: 'late-stage crop monitoring and chlorophyll variability.'
     },
-    ENDVI: {
-        measures: 'plant health using the blue band, reducing soil noise.',
-        bands: 'Green, Blue, NIR',
-        when: 'sensors that lack a true NIR band but have NDVI-like requirements.'
+    SAVI: {
+        bands: 'Red, NIR',
+        measures: 'vegetation with a soil-adjustment factor (L = 0.5).',
+        when: 'sparse cover or early growth stages where soil dominates the signal; reflectance rasters only.'
     },
     EVI: {
-        measures: 'vegetation while correcting for atmosphere and soil background.',
         bands: 'Red, Blue, NIR',
-        when: 'forested areas or dense canopies where NDVI saturates.'
+        measures: 'vegetation while correcting for atmosphere and soil background.',
+        when: 'forested areas or dense canopies where NDVI saturates; reflectance rasters only.'
     },
-    EVI2: {
-        measures: 'EVI without the blue band; lighter and more robust.',
+    NDRE: {
+        bands: 'NIR, Red edge',
+        measures: 'nitrogen content and chlorophyll in mid-to-late season crops.',
+        when: 'mature canopies where NDVI saturates; nitrogen management.'
+    },
+    NDYI: {
+        bands: 'Green, Blue',
+        measures: 'yellowness: the yellow of flowers, and of stressed or ripening leaves.',
+        when: 'flowering crops such as canola, and spotting yellowing.'
+    },
+    MPRI: {
+        bands: 'Red, Green',
+        measures: 'a modified photochemical reflectance index from the green and red bands, a proxy of plant pigment change.',
+        when: 'spotting early stress changes of the canopy with a green and a red band.'
+    },
+    OSAVI: {
         bands: 'Red, NIR',
-        when: 'sensors without a blue band; quick canopy assessment.'
+        measures: 'vegetation with a fixed soil-adjustment factor of 0.16.',
+        when: 'young crops and orchards with bare soil between the plants; reflectance rasters only.'
     },
-    SAVI: {
-        measures: 'vegetation with a soil-adjustment factor (L).',
-        bands: 'Red, NIR',
-        when: 'sparse cover or early growth stages where soil dominates the signal.'
+    GRVI: {
+        bands: 'Green, NIR',
+        measures: 'the ratio of NIR to green, a measure of green biomass with no fixed range.',
+        when: 'comparing biomass between dates or plots with the same sensor.'
     },
-    MSAVI2: {
-        measures: 'a self-adjusting variant of SAVI.',
-        bands: 'Red, NIR',
-        when: 'very sparse vegetation; emerging crops on bare soil.'
+    ENDVI: {
+        bands: 'Green, Blue, NIR',
+        measures: 'plant health using the blue band, reducing soil noise.',
+        when: 'cameras that record blue, green and NIR (a modified RGB camera, for example).'
     },
-    MCARI2: {
-        measures: 'chlorophyll content with reduced soil and LAI bias.',
-        bands: 'Red, Red Edge, NIR',
-        when: 'precision agriculture focused on chlorophyll status.'
+    ARVI: {
+        bands: 'Red, Blue, NIR',
+        measures: 'vegetation with a correction for the atmosphere, using the blue band.',
+        when: 'flights through haze or smoke, where the atmosphere changes NDVI.'
     },
-    GLI: {
-        measures: 'green leaf cover using only RGB bands.',
-        bands: 'Red, Green, Blue',
-        when: 'standard RGB cameras (no NIR).'
+    CELSIUS: {
+        bands: 'Thermal',
+        measures: 'the temperature in degrees Celsius, as the thermal band gives it.',
+        when: 'thermal rasters: hot spots, water stress and heat loss.'
     },
-    BAI: {
-        measures: 'burned area / fire-affected vegetation.',
-        bands: 'Red, NIR',
-        when: 'post-fire damage assessment and burn severity mapping.'
+    KELVIN: {
+        bands: 'Thermal',
+        measures: 'the same temperature in kelvin (K).',
+        when: 'a model or a report that needs absolute temperatures.'
     }
 };
+
+// The names of the band symbols of a "Requires bands: RGN" reason, for a server whose list has no `requiredBands`
+const SYMBOL_NAMES = { R: 'Red', G: 'Green', B: 'Blue', N: 'NIR', e: 'Red edge', T: 'Thermal' };
+function bandsOfReason(reason) {
+    const prefix = 'Requires bands: ';
+    if (!reason || !reason.startsWith(prefix)) return '';
+    const names = [];
+    for (const [token] of reason.slice(prefix.length).matchAll(/Re|[RGBNT]/g)) names.push(SYMBOL_NAMES[token === 'Re' ? 'e' : token]);
+    return names.join(', ');
+}
 
 export default {
     name: 'PlantHealthFormulasDialog',
@@ -115,32 +156,24 @@ export default {
         entries() {
             return (this.formulas || []).map(f => {
                 const id = f.id || f.name || '';
-                const curated = FORMULA_INFO[String(id).toUpperCase()] || null;
+                const curated = FORMULA_INFO[id] || null;
                 const help = (f.help && String(f.help).trim()) || '';
                 return {
                     id,
                     name: f.name || id,
                     expression: f.expr || '',
-                    bands: this._formatBands(f, curated),
+                    // The bands the formula reads: the structured list of ddb, else its reason, else the curated bands
+                    bands: Array.isArray(f.requiredBands)
+                        ? f.requiredBands.join(', ')
+                        : bandsOfReason(f.disabledReason) || (curated && curated.bands) || '',
                     measures: curated ? curated.measures : (help || 'See product documentation for details.'),
-                    when: curated ? curated.when : (help || 'Use when this index is part of your standard workflow.'),
+                    // Only the curated text says when: the help is not repeated
+                    when: curated ? curated.when : '',
                     disabled: !!f.disabled,
                     disabledReason: f.disabledReason || ''
                 };
             });
         }
-    },
-    methods: {
-        _formatBands(f, curated) {
-            // 1. Use curated band info if available (most reliable source)
-            if (curated && curated.bands) return curated.bands;
-            // 2. Extract from disabledReason: DDB emits "Requires bands: Red, NIR"
-            if (f.disabledReason && f.disabledReason.startsWith('Requires bands: ')) {
-                return f.disabledReason.slice('Requires bands: '.length);
-            }
-            // 3. Fall back gracefully
-            return 'see formula expression above';
-        },
     }
 };
 </script>

@@ -51,4 +51,51 @@ describe('ContourOptionsDialog', () => {
             w.unmount();
         });
     }
+
+    // FR-RAS-25: a thermal mosaic is not an elevation model
+    describe('wording', () => {
+        const labels = () => [...document.querySelectorAll('.contour-dialog-body label.form-label')].map(l => l.textContent.trim());
+        const help = () => document.querySelector('.dialog-help').textContent.replace(/\s+/g, ' ').trim();
+        const open = async props => {
+            const w = mount(ContourOptionsDialog, {
+                props: { visible: true, unit: 'm', ...props },
+                attachTo: document.body,
+                global: { plugins: [PrimeVue], stubs: { transition: false } }
+            });
+            await flushPromises();
+            return w;
+        };
+
+        it('speaks of elevations for an elevation raster', async () => {
+            const w = await open({ elevation: true });
+            expect(help()).toContain('Generate contour lines from this elevation raster.');
+            expect(labels()).toEqual(expect.arrayContaining(['Base elevation', 'Min elevation', 'Max elevation']));
+            w.unmount();
+        });
+
+        it('speaks of values and of the raster for any other raster', async () => {
+            const w = await open({ elevation: false, unit: '' });
+            expect(help()).toContain('Generate contour lines from this raster.');
+            expect(help()).not.toContain('elevation');
+            expect(labels()).toEqual(expect.arrayContaining(['Interval (units)', 'Base value', 'Min value', 'Max value']));
+            expect(labels().join(' ')).not.toContain('elevation');
+            w.unmount();
+        });
+
+        it('says the same of the range that is wrong', async () => {
+            const w = await open({ elevation: false });
+            w.vm.minElev = 5;
+            w.vm.maxElev = 2;
+            await flushPromises();
+            expect(document.querySelector('.form-error').textContent).toContain('Min value must be less than max value.');
+            w.unmount();
+        });
+
+        it('asks for a narrower value range, not elevation range, before many levels (with the task of FR-RAS-11)', async () => {
+            const w = await open({ elevation: false, rasterMin: 145, rasterMax: 402 });
+            const warning = document.querySelector('[data-testid="contour-levels-warning"]').textContent.replace(/\s+/g, ' ').trim();
+            expect(warning).toBe('About 257 contour levels (the range divided by the interval). A large raster can take several minutes, and the result is limited in size. Use a larger interval, or limit the value range, to make it faster.');
+            w.unmount();
+        });
+    });
 });

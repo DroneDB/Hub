@@ -70,4 +70,9 @@ describe('AnalysisTargetSelect names (FR-RAS-12)', () => {
         expect(options.map(o => o.attributes('title'))).toEqual([A.label, B.label]);
         expect(wrapper.find('select').element.value).toBe(B.path);
     });
+
+    it('takes the label of the tool: "Raster" for Raster Analysis, which takes any raster (FR-RAS-25)', () => {
+        render({ label: 'Raster' });
+        expect(wrapper.find('label').text()).toBe('Raster');
+    });
 });

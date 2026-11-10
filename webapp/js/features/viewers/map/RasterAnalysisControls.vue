@@ -2,7 +2,7 @@
     <AnalysisPanel v-if="visible" variant="raster" class="raster-panel"
                    :icon="panelIconClass" :title="panelTitle" @close="close">
         <div v-if="rasterInfo" class="panel-body">
-            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath"
+            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath" label="Raster"
                                   @update:model-value="path => $emit('selectTarget', path)" />
 
             <!-- No-calibration warning (thermal only) -->
@@ -120,8 +120,14 @@
                                     :is-thermal="isThermal"
                                     @active-sample="onProfileHover" />
             </div>
-            <!-- Actions: two rows so each button has room for a short label -->
-            <div class="section actions-grid">
+        </div>
+
+        <div v-else class="panel-body loading">
+            <LoadingSpinner inline label="Loading raster info..." />
+        </div>
+        <!-- Actions: two rows so each button has room for a short label; the foot of the panel, always in view (FR-RAS-23) -->
+        <template v-if="rasterInfo" #actions>
+            <div class="actions-grid">
                 <button class="panel-btn action-btn"
                         :class="{ 'is-active': drawingProfile }"
                         :disabled="profileLoading"
@@ -160,7 +166,7 @@
                     <span class="action-label">{{ drawingArea ? 'Stop' : 'Area' }}</span>
                 </button>
                 <button v-if="!isThermal && !loadError" class="panel-btn action-btn"
-                        title="Generate contour lines from this elevation raster"
+                        :title="isElevation ? 'Generate contour lines from this elevation raster' : 'Generate contour lines from the values of this raster'"
                         data-testid="raster-contours-btn"
                         @click="onGenerateContoursClick">
                     <i class="fas fa-layer-group" />
@@ -183,11 +189,7 @@
             <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16) -->
             <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox"
                                 :info="rasterInfo" :read-estimate="false" />
-        </div>
-
-        <div v-else class="panel-body loading">
-            <LoadingSpinner inline label="Loading raster info..." />
-        </div>
+        </template>
     </AnalysisPanel>
 </template>
 
@@ -203,7 +205,7 @@ import RasterProfileChart from './RasterProfileChart.vue';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterAreaStats';
 import { nodataNumber } from '@/libs/ddb/dataset';
-import { rasterValueParts } from '@/libs/map/rasterUnit';
+import { rasterValueParts, isElevationRaster } from '@/libs/map/rasterUnit';
 import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { formatNumber, formatNumberList } from '@/libs/format';
 
@@ -259,6 +261,10 @@ export default {
     computed: {
         isThermal() {
             return !!(this.rasterInfo && this.rasterInfo.isThermal);
+        },
+        // An elevation model has elevations; any other raster has values (FR-RAS-25)
+        isElevation() {
+            return isElevationRaster(this.rasterInfo);
         },
         panelTitle() {
             return this.isThermal ? 'Thermal' : 'Raster Analysis';

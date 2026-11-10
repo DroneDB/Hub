@@ -57,6 +57,11 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     max-height: calc(100% - 1rem);
     overflow-y: auto;
+    // A field the keyboard focuses scrolls clear of the sticky footer (.panel-actions) and its fade, not under it
+    // (FR-RAS-23): about their height, rows of 2.6rem buttons with 0.4rem gaps, 0.9rem of padding and the 1.25rem fade;
+    // two rows here, a panel with another number of rows says so
+    --panel-actions-reserve: 7.75rem;
+    scroll-padding-bottom: var(--panel-actions-reserve);
 
     .panel-header {
         display: flex;
@@ -208,6 +213,34 @@
         margin-top: 0.5rem;
     }
 
+    // The foot of the panel (AnalysisPanel's #actions slot, FR-RAS-23): the action grid stays at the bottom of the visible
+    // panel while the body above it scrolls, on the solid panel colour so that the body does not show through. While more
+    // of the body is hidden under it (.has-more), the body fades out above it, a cue that the panel scrolls. The one
+    // footer of the three analysis panels
+    .panel-actions {
+        position: sticky;
+        bottom: 0;
+        z-index: 1;
+        padding: 0.4rem 0.75rem 0.5rem;
+        background: var(--panel-bg-solid);
+        border-top: 1px solid var(--panel-line);
+
+        .actions-grid {
+            margin-top: 0;
+        }
+
+        &.has-more::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 100%;
+            height: 1.25rem;
+            background: linear-gradient(to top, var(--panel-bg-solid), transparent);
+            pointer-events: none;
+        }
+    }
+
     .action-btn {
         display: flex;
         flex-direction: column;
@@ -277,6 +310,9 @@
     --panel-accent: #4caf50;
     --panel-accent-rgb: 76, 175, 80;
     --panel-primary-hover: #388e3c;
+    // One row of actions and the export control under it (RasterExportButton, FR-RAS-16): its label, a row of two buttons
+    // and its note of up to three lines, about 8rem
+    --panel-actions-reserve: 12.75rem;
 }
 
 .analysis-panel--raster {
@@ -284,6 +320,7 @@
     --panel-accent-rgb: 77, 156, 240; // shade 300 as a triplet
     --panel-primary: var(--ddb-primary); // white text on the button: 4.8:1
     --panel-primary-hover: var(--ddb-primary-hover);
+    --panel-actions-reserve: 18.75rem; // three rows of actions and the export control (about 8rem, as in Plant Health)
 }
 
 .analysis-panel--stockpile {
@@ -292,6 +329,7 @@
     --panel-primary: #ffc107; // dark text on the button: 10.7:1
     --panel-primary-hover: #ffb300;
     --panel-primary-text: #1a1a1a;
+    --panel-actions-reserve: 4.75rem; // one row of actions
 }
 
 // Bottom sheet on phones (the Hub's phone breakpoint): it floats over the bottom of the map, between
@@ -310,6 +348,10 @@
 
         .panel-body {
             padding: 0.5rem;
+        }
+
+        .panel-actions {
+            padding: 0.4rem 0.5rem 0.5rem;
         }
 
         // The header buttons are 2rem, as the map buttons are, which sets the height of the folded sheet

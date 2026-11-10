@@ -233,3 +233,102 @@ describe('usePlantHealth restorePlantHealthFromHash', () => {
         expect(ph.plantHealthVisible.value).toBe(false);
     });
 });
+
+// FR-RAS-19: a formula the raster cannot compute (the server refuses its tiles) is told to the panel
+describe('usePlantHealth formula tile errors', () => {
+    const setup = () => {
+        const a = layerFor('a.tif');
+        const group = shallowRef(new LayerGroup({ layers: [a] }));
+        const ph = effectScope().run(() => usePlantHealth({ dataset: () => null, rasterLayer: group, entry: () => null }));
+        ph.plantHealthFilePath.value = 'a.tif';
+        return { ph, source: a.getSource() };
+    };
+
+    it('flags the failed tiles of the formula of the open panel, and a tile that loads clears the flag', () => {
+        const { ph, source } = setup();
+        ph.vizParamsByPath.value = { 'a.tif': { formula: 'VARI' } };
+        ph.refreshRasterLayers();
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+
+        source.dispatchEvent({ type: 'tileloaderror' });
+        expect(ph.plantHealthFormulaError.value).toBe(true);
+
+        source.dispatchEvent({ type: 'tileloadend' });
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+    });
+
+    it('does not flag the failed tiles of a style without a formula, or of another layer than the panel shows', () => {
+        const { ph, source } = setup();
+        ph.vizParamsByPath.value = { 'a.tif': { colormap: 'viridis', rescale: '0,1' } };
+        ph.refreshRasterLayers();
+        source.dispatchEvent({ type: 'tileloaderror' });
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+
+        ph.vizParamsByPath.value = { 'a.tif': { formula: 'VARI' } };
+        ph.refreshRasterLayers();
+        ph.plantHealthFilePath.value = 'b.tif';
+        source.dispatchEvent({ type: 'tileloaderror' });
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+    });
+
+    it('does not flag a network error after tiles of the formula loaded: the formula is not refused', () => {
+        const { ph, source } = setup();
+        ph.vizParamsByPath.value = { 'a.tif': { formula: 'NDVI' } };
+        ph.refreshRasterLayers();
+        const tile = { key: source.getKey() };
+        source.dispatchEvent({ type: 'tileloadend', tile });
+        source.dispatchEvent({ type: 'tileloadend', tile });
+        // A timeout, a 5xx or a lost connection on the next tiles
+        source.dispatchEvent({ type: 'tileloaderror', tile });
+        source.dispatchEvent({ type: 'tileloaderror', tile });
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+    });
+
+    it('does not flag the failed tiles while the browser is offline', () => {
+        const { ph, source } = setup();
+        ph.vizParamsByPath.value = { 'a.tif': { formula: 'VARI' } };
+        ph.refreshRasterLayers();
+        const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+        try {
+            source.dispatchEvent({ type: 'tileloaderror', tile: { key: source.getKey() } });
+            expect(ph.plantHealthFormulaError.value).toBe(false);
+        } finally {
+            online.mockRestore();
+        }
+    });
+
+    it('counts the tiles per style: the loaded tiles of the former style and its late errors do not decide', () => {
+        const { ph, source } = setup();
+        ph.vizParamsByPath.value = { 'a.tif': { formula: 'NDVI' } };
+        ph.refreshRasterLayers();
+        const ndvi = { key: source.getKey() };
+        source.dispatchEvent({ type: 'tileloadend', tile: ndvi });
+
+        ph.handleVizParamsChanged({ formula: 'VARI' });
+        const vari = { key: source.getKey() };
+        expect(vari.key).not.toBe(ndvi.key);
+        // A tile of NDVI that was still loading ends after the change: it is not a tile of VARI
+        source.dispatchEvent({ type: 'tileloadend', tile: ndvi });
+        source.dispatchEvent({ type: 'tileloaderror', tile: vari });
+        expect(ph.plantHealthFormulaError.value).toBe(true);
+        // A late error of NDVI does not decide either
+        ph.handleVizParamsChanged({ formula: 'NDVI' });
+        source.dispatchEvent({ type: 'tileloaderror', tile: vari });
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+    });
+
+    it('clears the flag when the panel changes the style, and when it closes', () => {
+        const { ph, source } = setup();
+        ph.vizParamsByPath.value = { 'a.tif': { formula: 'VARI' } };
+        ph.refreshRasterLayers();
+        source.dispatchEvent({ type: 'tileloaderror' });
+        expect(ph.plantHealthFormulaError.value).toBe(true);
+        ph.handleVizParamsChanged({ formula: 'EXG' });
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+
+        source.dispatchEvent({ type: 'tileloaderror' });
+        expect(ph.plantHealthFormulaError.value).toBe(true);
+        ph.closePlantHealth();
+        expect(ph.plantHealthFormulaError.value).toBe(false);
+    });
+});

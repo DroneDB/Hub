@@ -463,6 +463,40 @@ describe('the default style of a raster', () => {
     });
 });
 
+// FR-RAS-27: the colour legend of the styled rasters, derived from the style of the layers
+describe('the colour legend', () => {
+    const legend = () => wrapper.find('[data-testid="raster-legend"]');
+
+    it('shows the colours and the range of a DEM that opens as a ramp, in metres', async () => {
+        await mountMap([file(MAIN), file(ADDED)], { standalone: false });
+        await settle();
+        expect(legend().exists()).toBe(true);
+        expect(wrapper.find('[data-testid="raster-legend-min"]').text()).toBe('-6.30 m');
+        expect(wrapper.find('[data-testid="raster-legend-max"]').text()).toBe('216.00 m');
+    });
+
+    it('is in the map, which defines the reserves it keeps to', async () => {
+        await mountMap([file(MAIN)], { standalone: false });
+        await settle();
+        expect(legend().element.parentElement.classList.contains('map-container')).toBe(true);
+    });
+
+    it('shows for a view that records the style of its layer, and for none that records no style', async () => {
+        await mountView([MAIN], { state: { view: SAVED_POSITION, layers: [{ path: MAIN.path, hash: MAIN.hash, opacity: 1, visible: true, vizParams: { colormap: 'ironbow', rescale: '10,40' } }] } });
+        await settle();
+        expect(wrapper.find('[data-testid="raster-legend-min"]').exists()).toBe(true);
+    });
+
+    it('is not shown while the layer is hidden', async () => {
+        await mountMap([file(MAIN)], { standalone: false });
+        await settle();
+        expect(legend().exists()).toBe(true);
+        wrapper.vm.rasterLayerList = wrapper.vm.rasterLayerList.map(r => ({ ...r, visible: false }));
+        await settle();
+        expect(legend().exists()).toBe(false);
+    });
+});
+
 describe('the rows of the layer panel', () => {
     it('on the dataset tab, a lone raster has the one opacity control and no panel', async () => {
         await mountMap([file(MAIN)], { standalone: false });

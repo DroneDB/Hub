@@ -82,29 +82,6 @@
                 </div>
             </div>
 
-            <div class="section actions-grid">
-                <button class="panel-btn action-btn" :class="{ active: mode === 'click', 'is-active': mode === 'click' }"
-                        :disabled="loading" :aria-pressed="mode === 'click'"
-                        data-testid="stockpile-click-btn" title="Click on the map to detect a pile at that point"
-                        @click="$emit('clickOnMap')">
-                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'" />
-                    <span class="action-label">{{ mode === 'click' ? 'Click map…' : 'Click map' }}</span>
-                </button>
-                <button class="panel-btn action-btn" :class="{ active: mode === 'draw', 'is-active': mode === 'draw' }"
-                        :disabled="loading" :aria-pressed="mode === 'draw'"
-                        data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
-                        @click="$emit('drawPolygon')">
-                    <i class="fa-solid fa-draw-polygon" />
-                    <span class="action-label">{{ mode === 'draw' ? 'Drawing…' : 'Draw' }}</span>
-                </button>
-                <button class="panel-btn action-btn" :disabled="!canClear"
-                        data-testid="stockpile-clear-btn" title="Clear the overlay, exit any active mode and reset the panel"
-                        @click="$emit('clearOverlay')">
-                    <i class="fa-solid fa-eraser" />
-                    <span class="action-label">Clear</span>
-                </button>
-            </div>
-
             <!-- Every pile of the raster at once (FR-MAP-25): the list adopts the chosen one as the draft pile -->
             <div class="section find-all">
                 <button type="button" class="panel-btn find-all-btn" :disabled="loading || pilesLoading"
@@ -229,6 +206,31 @@
                 </div>
             </div>
         </div>
+        <!-- The actions stay in view at the foot of the panel, whatever the length of what is above (FR-RAS-23) -->
+        <template #actions>
+            <div class="actions-grid">
+                <button class="panel-btn action-btn" :class="{ active: mode === 'click', 'is-active': mode === 'click' }"
+                        :disabled="loading" :aria-pressed="mode === 'click'"
+                        data-testid="stockpile-click-btn" title="Click on the map to detect a pile at that point"
+                        @click="$emit('clickOnMap')">
+                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'" />
+                    <span class="action-label">{{ mode === 'click' ? 'Click map…' : 'Click map' }}</span>
+                </button>
+                <button class="panel-btn action-btn" :class="{ active: mode === 'draw', 'is-active': mode === 'draw' }"
+                        :disabled="loading" :aria-pressed="mode === 'draw'"
+                        data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
+                        @click="$emit('drawPolygon')">
+                    <i class="fa-solid fa-draw-polygon" />
+                    <span class="action-label">{{ mode === 'draw' ? 'Drawing…' : 'Draw' }}</span>
+                </button>
+                <button class="panel-btn action-btn" :disabled="!canClear"
+                        data-testid="stockpile-clear-btn" title="Clear the overlay, exit any active mode and reset the panel"
+                        @click="$emit('clearOverlay')">
+                    <i class="fa-solid fa-eraser" />
+                    <span class="action-label">Clear</span>
+                </button>
+            </div>
+        </template>
         <StockpileBaseMethodsDialog v-model:visible="showBaseMethodsInfo" />
     </AnalysisPanel>
 </template>

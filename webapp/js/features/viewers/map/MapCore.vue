@@ -37,8 +37,11 @@
                                 @move="(index, to) => handleRasterLayerReorder({ fromIndex: index, toIndex: to })"
                                 @remove="index => $emit('removeLayer', rasterLayerList[index].path)"
                                 @repick="index => $emit('repick', rasterLayerList[index].path)" />
+            <!-- The colours of the styled rasters, from the style of the layers (not in the split, whose layers share the map) -->
+            <RasterLegend v-if="!splitMode" :rows="rasterLayerList" :styles="vizParamsByPath" :units="rasterUnits" :dataset="dataset" />
             <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :file-path="plantHealthFilePath"
-                              :initial-params="plantHealthInitialParams" :visible-bbox="visibleBbox" @close="closePlantHealth"
+                              :initial-params="plantHealthInitialParams" :visible-bbox="visibleBbox"
+                              :formula-error="plantHealthFormulaError" @close="closePlantHealth"
                               @viz-params-changed="handleVizParamsChanged" />
             <RasterAnalysisControls :visible="rasterPanelVisible" :dataset="dataset" :file-path="rasterFilePath"
                                     :target-candidates="analysisCandidates" :target-path="analysisTargetPath"
@@ -54,7 +57,7 @@
                                     @open-contour-dialog="openContourDialog" @select-target="selectAnalysisTarget" />
             <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
                                   :raster-min="contourRasterMin" :raster-max="contourRasterMax" :initial-options="contourLastOptions"
-                                  :dataset="dataset" :task="contourTask" :error="contourError || ''"
+                                  :dataset="dataset" :task="contourTask" :error="contourError || ''" :elevation="contourElevation"
                                   @generate="generateContourLines" @cancel="closeContourDialog" />
             <StockpileVolumePanel v-model:sensitivity="stockpileSensitivity"
                                   v-model:radius="stockpileRadius" v-model:material="stockpileMaterial"
@@ -157,6 +160,7 @@ import MapFilePopup from './MapFilePopup.vue';
 import OpacityControl from './OpacityControl.vue';
 import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
 import RasterSplitOverlay from './RasterSplitOverlay.vue';
+import RasterLegend from './RasterLegend.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
 import ContourOptionsDialog from './ContourOptionsDialog.vue';
@@ -189,7 +193,7 @@ const MAP_CONTROLS = '.ol-map-display-buttons, .ol-map-buttons, .ol-measure-cont
 export default {
     name: 'MapCore',
     components: {
-        DialogHost, MapToolbar, MapFilePopup, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel,
+        DialogHost, MapToolbar, MapFilePopup, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, RasterLegend, PlantHealthPanel,
         RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog,
         MeasurementListDialog, MeasurementGroupDialog, MapLinkPanel
     },

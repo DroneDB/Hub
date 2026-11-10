@@ -3,7 +3,7 @@
         <button :id="inputId" ref="trigger" class="colormap-trigger" type="button"
                 aria-haspopup="listbox" :aria-expanded="open" :aria-controls="menuId"
                 :aria-labelledby="ariaLabelledby" @click="toggleOpen" @keydown="onTriggerKey">
-            <span v-if="selectedItem" class="colormap-preview" :style="gradientStyle(selectedItem.colors)" />
+            <span v-if="selectedItem" class="colormap-preview" :style="gradientStyle(selectedItem)" />
             <span class="colormap-label">{{ selectedItem ? selectedItem.name : 'Select...' }}</span>
             <i class="fas fa-chevron-down colormap-arrow" aria-hidden="true" />
         </button>
@@ -16,7 +16,7 @@
                 :class="{ selected: cm.id === modelValue, active: idx === active }"
                 :aria-selected="cm.id === modelValue"
                 @click="select(cm)" @mousemove="active = idx">
-                <span class="colormap-preview" :style="gradientStyle(cm.colors)" />
+                <span class="colormap-preview" :style="gradientStyle(cm)" />
                 <span class="colormap-label">{{ cm.name }}</span>
             </li>
         </ul>
@@ -34,6 +34,7 @@
  */
 import { computed, nextTick, ref, useId } from 'vue';
 import { useEventListener } from '@/composables/useEventListener';
+import { colormapGradient } from '@/libs/map/colormaps';
 
 const props = defineProps({
     /** ID of the selected colormap */
@@ -60,9 +61,10 @@ const selectedItem = computed(() => items.value[selectedIndex.value] || null);
 
 const optionId = idx => (idx >= 0 ? `${menuId}-${idx}` : undefined);
 
-function gradientStyle(colors) {
-    if (!colors || colors.length === 0) return {};
-    return { background: `linear-gradient(to right, ${colors.join(', ')})` };
+// The swatch of a colormap: the gradient of the map legend, hard stops for a discrete one
+function gradientStyle(cm) {
+    const background = colormapGradient(cm.colors, cm.discrete);
+    return background ? { background } : {};
 }
 
 async function show() {

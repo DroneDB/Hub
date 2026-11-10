@@ -71,3 +71,20 @@ export function colorAt(id, t) {
     const [r, g, bl] = a.map((v, i) => Math.round(v + (b[i] - v) * f));
     return `rgb(${r},${g},${bl})`;
 }
+
+/**
+ * The CSS background of a colour bar for the colours of a colormap, left to right: a smooth gradient, or for a discrete
+ * colormap (`discrete`) one block per colour with hard stops, as the server paints it. The one gradient of the colormap
+ * picker and of the map legend (FR-RAS-27); '' without colours.
+ * @param {string[]|null|undefined} colors
+ * @param {boolean} [discrete]
+ * @returns {string}
+ */
+export function colormapGradient(colors, discrete = false) {
+    if (!colors || colors.length === 0) return '';
+    if (colors.length === 1) return `linear-gradient(to right, ${colors[0]}, ${colors[0]})`;
+    if (!discrete) return `linear-gradient(to right, ${colors.join(', ')})`;
+    const n = colors.length;
+    const stops = colors.map((c, i) => `${c} ${+(i * 100 / n).toFixed(4)}%, ${c} ${+((i + 1) * 100 / n).toFixed(4)}%`);
+    return `linear-gradient(to right, ${stops.join(', ')})`;
+}

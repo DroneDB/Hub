@@ -2,18 +2,18 @@
     <AnalysisPanel v-if="visible" variant="plant-health" class="plant-health-panel"
                    icon="fas fa-leaf" title="Plant Health" @close="close">
         <div v-if="rasterInfo" class="panel-body">
-            <!-- Sensor Info -->
+            <!-- Sensor Info: the name of its profile (the id as the title) -->
             <div v-if="rasterInfo.detectedSensor" class="section">
                 <span class="section-label">Sensor</span>
-                <span class="sensor-badge">{{ rasterInfo.detectedSensor }}</span>
+                <span class="sensor-badge" :title="rasterInfo.detectedSensor" data-testid="plant-health-sensor">{{ sensorLabel }}</span>
             </div>
 
-            <!-- Preset Selection -->
-            <div v-if="rasterInfo.presets && rasterInfo.presets.length > 0" class="section">
+            <!-- Preset Selection: the presets of the sensor, built from the bands the raster has (FR-RAS-18) -->
+            <div v-if="presetList.length > 0" class="section">
                 <label for="plant-health-panel-preset" class="section-label">Preset</label>
                 <select id="plant-health-panel-preset" v-model="selectedPreset" class="panel-select" @change="onPresetChange">
                     <option value="">Custom...</option>
-                    <option v-for="p in rasterInfo.presets" :key="p.id" :value="p.id">{{ p.name }}</option>
+                    <option v-for="p in presetList" :key="p.id" :value="p.id" :title="p.description">{{ p.name }}</option>
                 </select>
             </div>
 
@@ -28,14 +28,21 @@
                         <i class="fas fa-info-circle" />
                     </button>
                 </label>
-                <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
+                <!-- The id first, so that the closed select reads "NDVI – ..." even when the name is cut (FR-RAS-32) -->
+                <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" data-testid="plant-health-formula"
+                        :aria-describedby="disabledCount ? 'plant-health-panel-formula-hint' : undefined" @change="onFormulaChange">
                     <option value="">None (bands only)</option>
-                    <option v-for="f in availableFormulas" :key="f.id" :value="f.id"
+                    <option v-for="f in shownFormulas" :key="f.id" :value="f.id"
                             :disabled="f.disabled"
                             :title="f.disabled ? f.disabledReason : f.help">
-                        {{ f.name }}{{ f.disabled ? ' ✗' : '' }}
+                        {{ f.id }} – {{ f.name }}{{ f.disabled ? ' ✗' : '' }}
                     </option>
                 </select>
+                <!-- A disabled option cannot take the focus: the reason of every one is in the guide, and a select reads this hint (FR-XC-22) -->
+                <p v-if="disabledCount" id="plant-health-panel-formula-hint" class="formula-hint" data-testid="plant-health-formula-hint">
+                    ✗ {{ disabledCount === 1 ? '1 formula is' : `${disabledCount} formulas are` }} not available for this raster: it lacks
+                    the bands. The guide (<i class="fas fa-info-circle" />) lists the bands each one needs.
+                </p>
             </div>
 
             <!-- Band Mapping (when no formula) -->
@@ -46,6 +53,14 @@
                     aria-labelledby="plant-health-panel-bands-label"
                     :bands="rasterInfo.bands"
                     @update:model-value="debouncedApply" />
+            </div>
+
+            <!-- The raster has not the bands the formula needs (FR-RAS-19) -->
+            <div v-if="formulaRefused" class="section" role="alert" data-testid="plant-health-formula-error">
+                <div class="single-band-info">
+                    <i class="fas fa-exclamation-triangle" />
+                    <span>This formula cannot be computed for this image.</span>
+                </div>
             </div>
 
             <!-- Single band info message -->
@@ -108,8 +123,14 @@
                 </div>
             </div>
 
-            <!-- Reset / Toggle / Copy Link / Export -->
-            <div class="section actions-grid">
+        </div>
+
+        <div v-else class="panel-body loading">
+            <LoadingSpinner inline label="Loading raster info..." />
+        </div>
+        <!-- Reset / Toggle / Copy Link / Export: the foot of the panel, always in view (FR-RAS-23) -->
+        <template v-if="rasterInfo" #actions>
+            <div class="actions-grid">
                 <button class="panel-btn action-btn" title="Reset visualization parameters to defaults"
                         @click="reset">
                     <i class="fas fa-rotate-left" />
@@ -131,14 +152,10 @@
 
             <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16, FR-PRC-15) -->
             <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox" />
-        </div>
-
-        <div v-else class="panel-body loading">
-            <LoadingSpinner inline label="Loading raster info..." />
-        </div>
+        </template>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
-                                   :formulas="availableFormulas" />
+                                   :formulas="shownFormulas" />
     </AnalysisPanel>
 </template>
 
@@ -176,7 +193,9 @@ export default {
         filePath: { type: String, default: null },
         initialParams: { type: Object, default: null },
         // The visible extent of the map in WGS 84 (minLon, minLat, maxLon, maxLat), for 'Export visible extent' (FR-RAS-16)
-        visibleBbox: { type: Array, default: null }
+        visibleBbox: { type: Array, default: null },
+        // The tiles of the formula chosen failed to load: the raster cannot compute it (FR-RAS-19)
+        formulaError: { type: Boolean, default: false }
     },
 
     emits: ['close', 'vizParamsChanged'],
@@ -220,6 +239,43 @@ export default {
             if (stats['1']) return stats['1'];
             return stats;
         },
+        // The name of the sensor profile; the id written as a name for a server that does not send one (FR-RAS-18)
+        sensorLabel() {
+            const info = this.rasterInfo;
+            if (!info || !info.detectedSensor) return '';
+            if (info.detectedSensorName) return info.detectedSensorName;
+            return String(info.detectedSensor).replace(/[-_]+/g, ' ').replace(/^./, c => c.toUpperCase());
+        },
+        // The presets of the sensor, as the server builds them from the bands of the raster
+        presetList() {
+            const info = this.rasterInfo;
+            const list = info && (Array.isArray(info.availablePresets) ? info.availablePresets : info.presets);
+            return Array.isArray(list) ? list : [];
+        },
+        // The formulas offered, by the structured category of ddb (FR-RAS-32, FR-XC-24): the thermal formulas when the
+        // raster can compute one, the reflectance ones (rgb, multispectral) when it can compute one, so a raster of both
+        // kinds (MicaSense Altum, Landsat with its thermal band) lists both; a raster that can compute none lists the
+        // reflectance ones, disabled with their reason (FR-RAS-19). The one chosen shows whatever it is
+        shownFormulas() {
+            const all = this.availableFormulas;
+            if (!all.some(f => f.category)) return all;
+            const isThermal = f => f.category === 'thermal';
+            const thermal = all.some(f => isThermal(f) && !f.disabled);
+            const reflectance = all.some(f => !isThermal(f) && !f.disabled);
+            const shown = f => (isThermal(f) ? thermal : reflectance || !thermal);
+            return all.filter(f => shown(f) || f.id === this.selectedFormula);
+        },
+        // The chosen formula cannot be computed for this raster (FR-RAS-19): its metadata says so (disabled), and only a
+        // formula the metadata does not list falls back to the tiles of the layer (formulaError: none of its tiles
+        // loaded). A formula the metadata enables is never refused for failed tiles (a timeout, a 5xx, a lost session)
+        formulaRefused() {
+            if (!this.selectedFormula) return false;
+            const f = this.availableFormulas.find(x => x.id === this.selectedFormula);
+            return f ? !!f.disabled : this.formulaError;
+        },
+        disabledCount() {
+            return this.shownFormulas.filter(f => f.disabled).length;
+        },
         // The [min, max] the selected formula can give (NDVI: -1 to 1), null when it has none
         formulaRange() {
             const f = this.availableFormulas.find(x => x.id === this.selectedFormula);
@@ -233,16 +289,28 @@ export default {
         histogramData() {
             return this.shownHistogram ? this.shownHistogram.histogram : null;
         },
+        // Why the histogram shows only part of the values. Values are outliers only when they are outside the range the index
+        // can have (NDVI: -1 to 1); an index inside its own range gets no note (FR-RAS-34). The numbers have the precision of
+        // the values of an index (FR-XC-08)
         histogramNote() {
             const shown = this.shownHistogram;
             if (!shown || !shown.trimmed) return '';
-            const [lo, hi] = shown.domain.map(v => this.formatNum(v));
             const s = this.firstBandStats;
-            // Values outside the histogram shown: say where they go
-            const outliers = `Outliers: the values go from ${this.formatNum(s.min)} to ${this.formatNum(s.max)}`;
+            const range = this.formulaRange;
+            const [lo, hi] = shown.domain.map(v => this.formatNum(v));
+            const outside = !!range && (s.min < range[0] || s.max > range[1]);
+            if (range && !outside) return '';
+            const span = `the values go from ${this.formatNum(s.min)} to ${this.formatNum(s.max)}`;
+            if (outside) {
+                // Values outside the histogram shown: say where they go
+                return shown.bars
+                    ? `Outliers: ${span}. The histogram shows ${lo} to ${hi}.`
+                    : `Outliers: ${span}, so the histogram cannot be drawn between ${lo} and ${hi}. Drag the handles to set the range.`;
+            }
+            // An index with no range of its own: no value can be called an outlier
             return shown.bars
-                ? `${outliers}. The histogram shows ${lo} to ${hi}.`
-                : `${outliers}, so the histogram cannot be drawn between ${lo} and ${hi}. Drag the handles to set the range.`;
+                ? `The histogram shows the central part, ${lo} to ${hi}; ${span}.`
+                : `The histogram cannot be drawn between ${lo} and ${hi}; ${span}. Drag the handles to set the range.`;
         },
         // The "min,max" of ddb's default stretch of the selected index (D-041), '' until it is read or without one
         indexRescale() {
@@ -341,7 +409,15 @@ export default {
             }
         },
 
-        onPresetChange() {
+        async onPresetChange() {
+            const preset = this.presetList.find(p => p.id === this.selectedPreset);
+            if (preset && preset.type === 'index' && preset.formula) {
+                // An index preset is its formula and colormap
+                this.selectedFormula = preset.formula;
+                if (preset.colormap) this.selectedColormap = preset.colormap;
+                await this.onFormulaChange();
+                return;
+            }
             if (this.selectedPreset) {
                 this.selectedFormula = '';
                 this.customBands = '';
@@ -497,8 +573,9 @@ export default {
             await copyLinkWithNotice(window.location.href, this.$notify, 'Plant Health');
         },
 
+        // A value of the index, with the decimals of the table of FR-XC-08
         formatNum(val) {
-            return formatNumber(val, 3);
+            return formatNumber(val, 'value');
         }
     }
 };
@@ -510,6 +587,13 @@ export default {
 
 .histogram-note {
     margin: 1.1rem 0 0;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--panel-text-soft);
+}
+
+.formula-hint {
+    margin: 0.25rem 0 0;
     font-size: 0.7rem;
     line-height: 1.3;
     color: var(--panel-text-soft);

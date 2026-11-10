@@ -1,6 +1,6 @@
 <template>
     <div v-if="candidates.length > 1" class="section analysis-target">
-        <label :for="selectId" class="section-label">Elevation model</label>
+        <label :for="selectId" class="section-label">{{ label }}</label>
         <select :id="selectId" ref="select" class="panel-select" data-testid="analysis-target-select" @change="onChange">
             <option v-for="(c, i) in candidates" :key="c.path" :value="c.path" :title="c.label" :selected="c.path === modelValue">{{ labels[i] }}</option>
         </select>
@@ -9,7 +9,7 @@
 
 <script setup>
 /**
- * The "Elevation model" selector of the Stockpile Volume and Raster Analysis panels: the
+ * The selector of the raster the Stockpile Volume ("Elevation model") and Raster Analysis ("Raster") panels work on: the
  * rasters of the map that the tools accept. It asks for the raster picked (update:modelValue)
  * and the parent decides: it may refuse (unsaved measurements the user keeps), so the
  * select always goes back to the value the parent holds. Hidden with fewer than two
@@ -22,7 +22,9 @@ const props = defineProps({
     /** The rasters to choose from: { path, label } */
     candidates: { type: Array, default: () => [] },
     /** Path of the raster the tools work on now */
-    modelValue: { type: String, default: null }
+    modelValue: { type: String, default: null },
+    /** What the rasters are called: the stockpile tool takes elevation models, Raster Analysis any raster (FR-RAS-25) */
+    label: { type: String, default: 'Elevation model' }
 });
 const emit = defineEmits(['update:modelValue']);
 

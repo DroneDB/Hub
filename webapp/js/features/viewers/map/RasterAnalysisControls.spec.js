@@ -132,7 +132,9 @@ describe('RasterAnalysisControls elevation model', () => {
 
     it('shows the selector with two rasters to work on, and the current one', async () => {
         await render({ filePath: 'odm_dem/dsm.tif', targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
-        expect(wrapper.text()).toContain('Elevation model');
+        // Any raster can be analysed, so the label is neutral (FR-RAS-25); only the stockpile tool takes elevation models
+        expect(wrapper.find('.analysis-target label').text()).toBe('Raster');
+        expect(wrapper.text()).not.toContain('Elevation model');
         expect(select().findAll('option').map(o => o.text())).toEqual(['dtm.tif', 'dsm.tif']);
         expect(select().element.value).toBe('odm_dem/dsm.tif');
     });
@@ -407,3 +409,44 @@ describe('RasterAnalysisControls export', () => {
         expect(dataset.registry.fetchRaw).not.toHaveBeenCalled();
     });
 });
+
+// FR-RAS-25: a raster that is not an elevation model has values and no elevations
+describe('RasterAnalysisControls Contours button wording', () => {
+    const contours = () => byId('raster-contours-btn');
+
+    it('speaks of an elevation raster for an elevation model', async () => {
+        await render();
+        expect(contours().attributes('title')).toBe('Generate contour lines from this elevation raster');
+    });
+
+    it('speaks of the values of the raster for any other one', async () => {
+        await render({}, RAW_INFO);
+        expect(contours().attributes('title')).toBe('Generate contour lines from the values of this raster');
+    });
+
+    it('passes the raster info on, which says whether it is an elevation model', async () => {
+        await render({}, RAW_INFO);
+        await contours().trigger('click');
+        expect(wrapper.emitted('openContourDialog')[0][0]).toMatchObject({ bandCount: 2, dataType: 'UInt16' });
+    });
+});
+
+// FR-RAS-23: the action grid is the footer of the panel, not part of the body that scrolls
+describe('RasterAnalysisControls footer', () => {
+    it('has its actions in the footer of the panel', async () => {
+        await render();
+        const footer = wrapper.get('[data-testid="panel-actions"]');
+        expect(footer.findAll('button').map(b => b.text()).filter(Boolean)).toEqual(['Profile', 'Inspect', 'Area', 'Contours', 'Reset', 'Original', 'Export', 'Visible extent']);
+        expect(footer.find('[data-testid="raster-export"]').exists()).toBe(true);
+        expect(wrapper.get('.panel-body').find('[data-testid="raster-area-stats-btn"]').exists()).toBe(false);
+    });
+
+    it('has no footer while the raster info is loading', () => {
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset: { getRasterValueInfo: () => new Promise(() => {}) }, filePath: 'odm_dem/dsm.tif' },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        expect(wrapper.find('[data-testid="panel-actions"]').exists()).toBe(false);
+    });
+});
+
