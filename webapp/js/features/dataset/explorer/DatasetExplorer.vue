@@ -365,7 +365,8 @@ export default {
             }
             const thumb = (this.$refs.thumbs || []).find(t => t.file === file);
             if (thumb) {
-                this.$refs.explorer.scrollTo(0, thumb.$el.offsetTop - this.$el.offsetTop - 12);
+                // The tile element by its ref (EntryThumbnail's $el is a text node in a development build)
+                this.$refs.explorer.scrollTo(0, thumb.$refs.tile.offsetTop - this.$el.offsetTop - 12);
             }
         },
 

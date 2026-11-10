@@ -1,7 +1,7 @@
 <template>
     <!-- Not a tab stop, and its keys are the list's: the list holds the focus and names its active tile (useListNavigation, FR-EXP-09) -->
     <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/interactive-supports-focus -- the listbox is the focusable element (aria-activedescendant) -->
-    <div class="thumbnail" :class="{ selected: file.selected, active, cut }" :title="titleText"
+    <div ref="tile" class="thumbnail" :class="{ selected: file.selected, active, cut }" :title="titleText"
          role="option" :aria-selected="!!file.selected"
          :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
         <!-- A second cue of the selection besides the tint and the outline (FR-EXP-10) -->
@@ -200,7 +200,10 @@ export default {
     mounted: async function () {
         if (!this.lazyLoad) await this.loadThumbnail();
         else if (this.thumbnailLoader) {
-            this.thumbnailLoader.visibility.observe(this.$el, visible => {
+            // The tile by its ref, not this.$el: the comments before it make the root a fragment in a development
+            // build, where $el is a text node an IntersectionObserver refuses
+            this.observedTile = this.$refs.tile;
+            this.thumbnailLoader.visibility.observe(this.observedTile, visible => {
                 this.inView = visible;
                 if (visible) {
                     if (this.stale) this.refreshSize();
@@ -214,7 +217,7 @@ export default {
         }
     },
     beforeUnmount() {
-        this.thumbnailLoader?.visibility.unobserve(this.$el);
+        if (this.observedTile) this.thumbnailLoader?.visibility.unobserve(this.observedTile);
         this.cancelImageRequest();
         if (this.loadTimeout) clearTimeout(this.loadTimeout);
     },

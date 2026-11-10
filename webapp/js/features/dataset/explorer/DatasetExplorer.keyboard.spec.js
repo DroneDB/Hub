@@ -160,3 +160,18 @@ describe('DatasetExplorer selected tiles', () => {
         expect(tiles[0].attributes('aria-selected')).toBe('false');
     });
 });
+
+describe('DatasetExplorer scroll to a file', () => {
+    it('scrolls the list to the tile element (EntryThumbnail\'s $el is a text node in a development build)', async () => {
+        const files = items(6);
+        mountGrid(files);
+        await flushPromises();
+        const scrollTo = vi.fn();
+        list().element.scrollTo = scrollTo;
+        const tile = w.findAll('[role="option"]')[4].element;
+        Object.defineProperty(tile, 'offsetTop', { value: 300 });
+        w.vm.scrollTo(files[4]);
+        // jsdom has no layout: the container's offsetTop is 0
+        expect(scrollTo).toHaveBeenCalledExactlyOnceWith(0, 300 - 12);
+    });
+});

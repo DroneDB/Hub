@@ -1,7 +1,7 @@
 <template>
     <!-- The map's keyboard shortcuts (Ctrl to select, H to reset, Esc) apply while the pointer or the focus is on it -->
     <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- tracks pointer/focus only, no action -->
-    <div id="map" role="region" aria-label="Map" @mouseover="pointerInside = true" @mouseleave="pointerInside = false"
+    <div id="map" ref="map-root" role="region" aria-label="Map" @mouseover="pointerInside = true" @mouseleave="pointerInside = false"
          @focusin="focusInside = true" @focusout="focusInside = false">
         <DialogHost :dialogs="dialogs" />
         <!-- Focusable from code (tabindex -1): a focus in the photo popup comes back here when it closes -->
@@ -833,7 +833,8 @@ export default {
             if (isFullScreenCurrently()) {
                 exitFullScreen();
             } else {
-                requestFullScreen(this.$el);
+                // The root by its ref: the comments before it make $el a text node in a development build
+                requestFullScreen(this.$refs['map-root']);
                 this.later(() => this.updateSize(), 500);
             }
         },

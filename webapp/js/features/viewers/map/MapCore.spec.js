@@ -225,6 +225,18 @@ describe('the canvas ratio of the map (FR-XC-32, D-042)', () => {
     });
 });
 
+describe('full screen', () => {
+    afterEach(() => { delete Element.prototype.requestFullscreen; });
+
+    it('makes the map element full screen, not $el (a text node before the comments of the template in a development build)', async () => {
+        const asked = [];
+        Element.prototype.requestFullscreen = function () { asked.push(this); return Promise.resolve(); };
+        await mountMap([MAIN]);
+        wrapper.vm.toggleFullscreen();
+        expect(asked).toEqual([wrapper.find('#map').element]);
+    });
+});
+
 describe('the position of the map in a view', () => {
     it('opens on the base file, not on the first file of the draw order', async () => {
         // MAIN is the base and the top layer; the files are bottom first, so ADDED comes first

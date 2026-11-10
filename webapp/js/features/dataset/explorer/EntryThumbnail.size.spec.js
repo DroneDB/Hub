@@ -86,7 +86,8 @@ describe('EntryThumbnail size in the Explorer queue (FR-EXP-43)', () => {
         return {
             queue: createThumbnailQueue({ concurrency: 1 }),
             visibility: { observe: (el, cb) => seen.set(el, cb), unobserve: el => seen.delete(el) },
-            show: async (w, visible = true) => { seen.get(w.vm.$el)(visible); await flushPromises(); }
+            // The tile element is what is observed (not $el, a text node before the comments of its template)
+            show: async (w, visible = true) => { seen.get(w.find('.thumbnail').element)(visible); await flushPromises(); }
         };
     }
     const mountLazy = (thumbnailLoader, name = 'a.jpg') => mount(EntryThumbnail, {
