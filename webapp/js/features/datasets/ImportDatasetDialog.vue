@@ -14,10 +14,12 @@
                 <template v-if="sourceType === 'registry' && selectedSource">
                     <div class="mb-3">
                         <label for="import-dataset-dialog-registry-url" class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
-                        <InputText id="import-dataset-dialog-registry-url" v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
-                                   :disabled="verifying" @input="onRemoteUrlChange" @paste="onRemoteUrlPaste" @change="applyRegistryLink"
+                        <InputText id="import-dataset-dialog-registry-url" v-model="params.url" :placeholder="registryPlaceholder" class="w-100"
+                                   :disabled="verifying" :aria-describedby="registryHint ? 'import-dataset-dialog-registry-hint' : undefined"
+                                   @input="onRemoteUrlChange" @paste="onRemoteUrlPaste" @change="applyRegistryLink"
                                    @keyup.enter="applyRegistryLink(); canVerify && verify()" />
-                        <small class="text-muted">The address of the registry, or paste the link of a dataset (https://hub.dronedb.app/r/odm/brighton-beach) to fill in every field.</small>
+                        <small v-if="registryHint" id="import-dataset-dialog-registry-hint" class="d-block text-danger" role="status">{{ registryHint }}</small>
+                        <small class="text-muted">The address of the registry, or paste the link of a dataset ({{ exampleLink }}) to fill in every field.</small>
                     </div>
                     <!-- Most registries are public: the credentials stay folded until they are needed. They open when a
                          Verify fails, and stay open while they hold a value: nothing is sent that the user cannot see -->
@@ -157,6 +159,8 @@
         </div>
         <!-- Outside the scrolling content: Import is in view after Verify (FR-UPL-08) -->
         <template #footer>
+            <!-- The refusal of the Import, next to the button that was pressed (FR-UPL-19) -->
+            <span v-if="importError && !importing" id="import-dataset-dialog-import-error" class="import-error flex-grow-1 align-self-center text-danger text-start" role="alert">{{ importError }}</span>
             <Button v-if="!importing" severity="secondary" label="Close" data-cancel @click="emitClose('close')" />
             <Button v-if="!importing" severity="primary" icon="fa-solid fa-download" :disabled="!canImport" data-confirm
                     :loading="submitting" label="Import" @click="startImport" />
@@ -177,9 +181,11 @@ import { bytesToSize } from '@/libs/utils';
 import reg from '@/libs/api/sharedRegistry';
 import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
 import { useHeavyTask } from '@/composables/useHeavyTask';
-import { IMPORT_SOURCES, getImportSource, splitRegistryLink } from './importSources';
+import { IMPORT_SOURCES, getImportSource, splitRegistryLink, needsRegistryAddress, REGISTRY_ADDRESS_HINT } from './importSources';
 import { formatDurationSeconds } from '@/libs/format';
-import { slugProblem, suggestSlug, uniqueSlug } from '@/libs/slug';
+import { createEtaEstimator } from '@/libs/etaWindow';
+import { DEFAULT_REGISTRY } from '@/libs/ddb/constants';
+import { slugProblem, suggestSlug, uniqueNameAndSlug } from '@/libs/slug';
 
 /**
  * ImportDatasetDialog - Import a remote dataset (another Registry instance or a downloadable
@@ -218,6 +224,8 @@ export default {
             showCredentials: false,
             verifyResult: null,
             verifyError: null,
+            // Why the Import was refused (the Registry's answer to the create), shown next to the Import button
+            importError: null,
 
             // Remote browse state (registry source only)
             browsingOrgs: false,
@@ -240,7 +248,9 @@ export default {
             progressPercent: 0,
             phase: null,
             logTail: [],
-            etaText: ''
+            etaText: '',
+            // A name and a slug that Verify suggests are being set: the name watcher leaves the slug alone
+            suggesting: false
         };
     },
 
@@ -255,14 +265,32 @@ export default {
         credentialsOpen() {
             return this.showCredentials || this.hasCredentials;
         },
+        registryPlaceholder() {
+            return `https://${DEFAULT_REGISTRY}`;
+        },
+        exampleLink() {
+            return `https://${DEFAULT_REGISTRY}/r/odm/brighton-beach`;
+        },
+        // What the Registry URL field holds as a link: the registry, the organization and the dataset it names, or null.
+        // Verify, Browse and the hints read it, so that a link that is typed (no change event yet) counts as it does once
+        // it is applied (FR-UPL-20, FR-UPL-18)
+        parsedLink() {
+            return this.sourceType === 'registry' ? splitRegistryLink(this.params.url) : null;
+        },
+        // The field holds a '/' but no registry could be read from it (FR-UPL-18)
+        registryHint() {
+            return this.sourceType === 'registry' && needsRegistryAddress(this.params.url) ? REGISTRY_ADDRESS_HINT : '';
+        },
         canBrowseOrgs() {
             return !!(this.params.url || '').trim();
         },
         canBrowseDatasets() {
-            return !!(this.params.url || '').trim() && !!(this.params.organization || '').trim();
+            return !!(this.params.url || '').trim()
+                && (!!(this.params.organization || '').trim() || !!this.parsedLink?.organization);
         },
         canVerify() {
             if (!this.selectedSource) return false;
+            if (this.parsedLink?.organization && this.parsedLink.dataset) return true;
             return this.selectedSource.fields
                 .filter(f => f.required)
                 .every(f => (this.params[f.name] || '').trim().length > 0);
@@ -301,7 +329,9 @@ export default {
 
     watch: {
         name(val) {
-            if (!this.slugEdited) this.slug = uniqueSlug(suggestSlug(val), this.forbiddenSlugs);
+            // The name that Verify suggests comes with its slug (the remote slug, the same number): not made again from it
+            if (this.suggesting) return;
+            if (!this.slugEdited) this.slug = uniqueNameAndSlug(val, suggestSlug(val), this.forbiddenSlugs).slug;
         }
     },
 
@@ -331,10 +361,16 @@ export default {
             const next = {};
             (this.selectedSource ? this.selectedSource.fields : []).forEach(f => { next[f.name] = ''; });
             this.params = next;
-            this.verifyResult = null;
-            this.verifyError = null;
+            this.resetVerify();
+            this.importError = null;
             this.slugEdited = false;
             this._resetBrowseState();
+        },
+
+        // The verify state is about the values that were verified: when they change it goes with them (FR-UPL-17)
+        resetVerify() {
+            this.verifyError = null;
+            this.verifyResult = null;
         },
 
         // Resets all browse-related state (called on source change and URL edits).
@@ -350,7 +386,8 @@ export default {
             this._resetBrowseState();
             this.params.organization = '';
             this.params.dataset = '';
-            this.verifyResult = null;
+            this.resetVerify();
+            this.importError = null;
         },
 
         // A link of a dataset (a page, the API or a ddb tag) in the URL field: the field keeps the address
@@ -361,8 +398,7 @@ export default {
             const link = splitRegistryLink(this.params.url);
             if (!link) return false;
             this._resetBrowseState();
-            this.verifyResult = null;
-            this.verifyError = null;
+            this.resetVerify();
             this.params.url = link.url;
             this.params.organization = link.organization;
             this.params.dataset = link.dataset;
@@ -384,7 +420,7 @@ export default {
             this.remoteDatasets = null;
             this.browseDatasetsError = null;
             this.params.dataset = '';
-            this.verifyResult = null;
+            this.resetVerify();
         },
 
         async browseOrgs() {
@@ -395,7 +431,7 @@ export default {
             this.remoteDatasets = null;
             this.params.organization = '';
             this.params.dataset = '';
-            this.verifyResult = null;
+            this.resetVerify();
             try {
                 const res = await this.org.browseImport(this.sourceType, this.params, 'organizations');
                 this.remoteOrgs = (res.items || [])
@@ -419,7 +455,7 @@ export default {
             this.browseDatasetsError = null;
             this.remoteDatasets = null;
             this.params.dataset = '';
-            this.verifyResult = null;
+            this.resetVerify();
             try {
                 const res = await this.org.browseImport(this.sourceType, this.params, 'datasets');
                 this.remoteDatasets = (res.items || [])
@@ -440,15 +476,21 @@ export default {
         async verify() {
             this.applyRegistryLink();
             this.verifying = true;
-            this.verifyError = null;
-            this.verifyResult = null;
+            this.resetVerify();
+            this.importError = null;
             try {
                 const res = await this.org.verifyImport(this.sourceType, this.params);
                 this.verifyResult = res;
                 if (res.reachable) {
-                    this.name = res.suggestedName || this.name || '';
+                    // The remote display name and slug; a second import of the same dataset gets 'Name (2)' and 'slug-2'
+                    // (FR-UPL-14)
+                    const suggestedName = res.suggestedName || this.name || '';
+                    const next = uniqueNameAndSlug(suggestedName, res.suggestedSlug || suggestSlug(suggestedName), this.forbiddenSlugs);
+                    this.suggesting = true;
+                    this.name = next.name;
                     this.slugEdited = false;
-                    this.slug = uniqueSlug(res.suggestedSlug || suggestSlug(this.name), this.forbiddenSlugs);
+                    this.slug = next.slug;
+                    this.$nextTick(() => { this.suggesting = false; });
                     this.showNextStep();
                 } else {
                     this.verifyError = res.note || 'The source is not reachable.';
@@ -475,6 +517,7 @@ export default {
         async startImport() {
             if (!this.canImport) return;
             this.submitting = true;
+            this.importError = null;
             let result;
             try {
                 result = await this.org.createImport({
@@ -486,13 +529,18 @@ export default {
                 });
             } catch (e) {
                 this.submitting = false;
-                this.verifyError = e.message || 'Could not start the import.';
+                // The refusal is about the Import, not about the source: 'Source reachable' goes, the reason shows next to
+                // the button (FR-UPL-19, FR-UPL-17)
+                this.resetVerify();
+                this.importError = e.message || 'Could not start the import.';
                 return;
             }
 
             this.submitting = false;
             this.importing = true;
             this.importStartTime = Date.now();
+            this._eta = createEtaEstimator();
+            this._eta.add(this.importStartTime, 0);
             this.taskId = result.taskId;
 
             // Tell the parent the dataset now exists so it can show it in the list.
@@ -524,14 +572,14 @@ export default {
             this.phase = entry.phase;
             this.logTail = entry.logTail || [];
 
+            // The time left from the speed of the last 30 seconds (FR-UPL-21), not the average since the start
             const p = entry.percent || 0;
-            if (p > 1 && p < 100) {
-                const elapsed = (Date.now() - this.importStartTime) / 1000;
-                const total = elapsed / (p / 100);
-                this.etaText = formatDurationSeconds(Math.round(Math.max(0, total - elapsed)));
-            } else if (p >= 100) {
-                this.etaText = '';
+            if (!this._eta) {
+                this._eta = createEtaEstimator();
+                this._eta.add(this.importStartTime || Date.now(), 0);
             }
+            const seconds = this._eta.add(Date.now(), p);
+            this.etaText = p >= 100 || seconds == null ? '' : formatDurationSeconds(Math.round(Math.max(0, seconds)));
         },
 
         onWindowClose() {

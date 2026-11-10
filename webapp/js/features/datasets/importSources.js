@@ -1,3 +1,5 @@
+import { DEFAULT_REGISTRY } from '@/libs/ddb/constants';
+
 /**
  * importSources - Static metadata describing the available import sources and the
  * parameter fields each one needs. Field names MUST match the backend source params
@@ -11,7 +13,7 @@ export const IMPORT_SOURCES = [
         icon: 'fa-solid fa-server',
         description: 'Import a dataset from another DroneDB Registry or Hub instance.',
         fields: [
-            { name: 'url', label: 'Registry URL', type: 'text', placeholder: 'https://hub.dronedb.app', required: true },
+            { name: 'url', label: 'Registry URL', type: 'text', placeholder: `https://${DEFAULT_REGISTRY}`, required: true },
             { name: 'organization', label: 'Organization', type: 'text', placeholder: 'organization slug', required: true },
             { name: 'dataset', label: 'Dataset', type: 'text', placeholder: 'dataset slug', required: true },
             { name: 'username', label: 'Username', type: 'text', placeholder: 'optional (for private datasets)', required: false },
@@ -39,6 +41,26 @@ export function getImportSource(type) {
 // A host as typed without a scheme: a name with a dot or a port, or localhost.
 const hostRe = /^(localhost|[^\s/:]+\.[^\s/:]+|[^\s/:]+:\d+)(:\d+)?$/i;
 
+// An organization or a dataset slug as typed: letters, digits, '-' and '_'.
+const slugLikeRe = /^[a-z0-9_-]+$/i;
+
+/**
+ * The hint that a text with a '/' in the Registry URL field is not understood (FR-UPL-18): the text has no scheme, holds a
+ * '/', does not start with a host (example.org/registry is the address of a registry served below a prefix), and
+ * `splitRegistryLink` found no registry in it. The example comes from the default registry, as the ddb command line
+ * takes it.
+ * @param {string|null|undefined} text
+ * @returns {boolean}
+ */
+export function needsRegistryAddress(text) {
+    const raw = (text || '').trim().replace(/\/+$/, '');
+    return !!raw && !/^[a-z][a-z0-9+.-]*:\/\//i.test(raw) && raw.includes('/') && !hostRe.test(raw.split('/')[0]) &&
+        !splitRegistryLink(raw);
+}
+
+/** What the field says when {@link needsRegistryAddress} holds. */
+export const REGISTRY_ADDRESS_HINT = `Add the registry address, e.g. ${DEFAULT_REGISTRY}/admin/brighton-beach`;
+
 /**
  * Splits what a user pastes in the Registry URL field into the address of the Registry and the
  * organization and the dataset it names. Understands:
@@ -46,6 +68,7 @@ const hostRe = /^(localhost|[^\s/:]+\.[^\s/:]+|[^\s/:]+:\d+)(:\d+)?$/i;
  *   - the link of an organization page: https://hub.dronedb.app/r/odm (no dataset)
  *   - an API link: https://hub.dronedb.app/orgs/odm/ds/brighton-beach[/...]
  *   - a ddb tag, with or without a scheme: hub.dronedb.app/odm/brighton-beach
+ *   - a ddb tag without a host: odm/brighton-beach is a dataset of the default registry (DEFAULT_REGISTRY)
  * A path before /r/ or /orgs/ is kept (a Registry served below a prefix); a link without a scheme
  * is https. Returns null for any other text, the bare address of a Registry included.
  */
@@ -53,7 +76,13 @@ export function splitRegistryLink(text) {
     let raw = (text || '').trim();
     if (!raw) return null;
     if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
-        if (!hostRe.test(raw.split('/')[0])) return null;
+        if (!hostRe.test(raw.split('/')[0])) {
+            // Like the ddb command line, 'org/dataset' is a dataset of the default registry (FR-UPL-18)
+            const tag = raw.split('/');
+            if (tag.length === 2 && tag.every(part => slugLikeRe.test(part)))
+                return { url: `https://${DEFAULT_REGISTRY}`, organization: tag[0], dataset: tag[1] };
+            return null;
+        }
         raw = `https://${raw}`;
     }
 

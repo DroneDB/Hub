@@ -60,6 +60,7 @@ import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { useUploadsStore } from '@/stores/uploads';
 import { useAuthStore } from '@/stores/auth';
 import { countOf, formatNumber } from '@/libs/format';
+import { cancelUploadQuestion } from '@/libs/upload/cancelQuestion';
 
 defineOptions({ name: 'UploadIndicator' });
 
@@ -91,16 +92,7 @@ function togglePause(u) {
 
 // FR-UPL-16: the question says what stays
 async function cancel(u) {
-    const sent = u.done;
-    const ok = await confirm({
-        title: 'Cancel upload',
-        message: sent > 0
-            ? `Stop the upload? The ${countOf(sent, 'file')} already sent ${sent === 1 ? 'stays' : 'stay'} in the dataset.`
-            : 'Stop the upload? No file has been added to the dataset yet.',
-        confirmText: 'Stop upload',
-        cancelText: 'Keep uploading',
-        danger: true
-    });
+    const ok = await confirm(cancelUploadQuestion({ sent: u.done, discardsBatch: false }));
     if (ok) await uploads.cancel(u.org, u.ds);
 }
 </script>

@@ -13,6 +13,8 @@ import { createUploadScheduler } from '@/libs/upload/uploadScheduler';
 import { negotiatedProtocol, uploadConcurrency, MULTIPLEXED_STREAMS } from '@/libs/upload/protocolLimits';
 import { useResilientUpload } from '@/composables/useResilientUpload';
 import { UPLOAD_ACTIVITY_EVENT } from '@/libs/upload/uploadEvents';
+import { splatLodWarning } from '@/libs/upload/splatLodFolder';
+import { notify } from '@/libs/notify';
 
 let nextItemId = 0;
 
@@ -54,9 +56,15 @@ export function useUploadQueue(opts) {
         /**
          * @param {Array<{file: File, path: string, overwrite?: boolean, fileId?: string}>} files  `path` is the dataset
          *   path (the name it gets: Keep both changes it); `overwrite` replaces a file that has it (Replace);
-         *   `fileId` resumes the stored chunked upload that has it (at its `path`)
+         *   `fileId` resumes the stored chunked upload that has it (at its `path`). A selection that holds a
+         *   `lod-meta.json` (a SOG level-of-detail splat folder, not supported) gets a warning, and is queued all the same
          */
         add(files) {
+            // The one step before the queue that the dataset upload and /upload share (FR-UPL-09): a splat folder that
+            // DroneDB does not read gets its warning here, whichever page the files come from. The files are still queued
+            const lodWarning = splatLodWarning(files);
+            if (lodWarning) notify.warn(lodWarning, { summary: 'Splat folder not supported', life: 'long' });
+
             scheduler.add(files.map(({ file, path, overwrite, fileId }) => ({
                 id: `u${++nextItemId}`,
                 file,

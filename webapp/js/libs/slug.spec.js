@@ -6,7 +6,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import reg from '@/libs/api/sharedRegistry';
 import vectors from './__vectors__/input-rules.json';
 import { FALLBACK_INPUT_RULES } from './nameRules';
-import { isValidSlug, slugProblem, slugDescription, slugFromName, suggestSlug, uniqueSlug } from './slug';
+import { isValidSlug, slugProblem, slugDescription, slugFromName, suggestSlug, uniqueSlug, uniqueNameAndSlug } from './slug';
 
 const serve = features => { reg.features.values = features; };
 afterEach(() => reg.features.clear());
@@ -120,6 +120,35 @@ describe('uniqueSlug', () => {
         // "a…a-bb" cut to 126 characters ends with '-': it is dropped before the suffix
         const base = 'a'.repeat(125) + '-bb';
         expect(uniqueSlug(base, [base])).toBe('a'.repeat(125) + '-2');
+    });
+});
+
+describe('uniqueNameAndSlug (FR-UPL-14)', () => {
+    it('keeps the name and the slug when the slug is free', () => {
+        expect(uniqueNameAndSlug('Aukerman', 'aukerman', ['other'])).toEqual({ name: 'Aukerman', slug: 'aukerman' });
+    });
+
+    it('a second import suggests "Aukerman (2)" and "aukerman-2", a third "Aukerman (3)"', () => {
+        expect(uniqueNameAndSlug('Aukerman', 'aukerman', ['aukerman'])).toEqual({ name: 'Aukerman (2)', slug: 'aukerman-2' });
+        expect(uniqueNameAndSlug('Aukerman', 'aukerman', ['aukerman', 'aukerman-2'])).toEqual({ name: 'Aukerman (3)', slug: 'aukerman-3' });
+        // the slug is the remote slug, the name the remote display name: they need not look alike
+        expect(uniqueNameAndSlug('Brighton Beach', 'brighton-b', ['brighton-b'])).toEqual({ name: 'Brighton Beach (2)', slug: 'brighton-b-2' });
+    });
+
+    it('does not add a number to a base that already ends in one and is free', () => {
+        expect(uniqueNameAndSlug('Site 2', 'site-2', [])).toEqual({ name: 'Site 2', slug: 'site-2' });
+    });
+
+    it('cuts a long name so that name and suffix stay within 256 characters', () => {
+        const long = 'n'.repeat(256);
+        const { name, slug } = uniqueNameAndSlug(long, 'n', ['n']);
+        expect(slug).toBe('n-2');
+        expect(name).toBe('n'.repeat(252) + ' (2)');
+        expect(name).toHaveLength(256);
+    });
+
+    it('gives no slug for no base', () => {
+        expect(uniqueNameAndSlug('Name', '', ['x'])).toEqual({ name: 'Name', slug: '' });
     });
 });
 

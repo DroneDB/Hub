@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitRegistryLink } from './importSources';
+import { splitRegistryLink, needsRegistryAddress, REGISTRY_ADDRESS_HINT } from './importSources';
 
 describe('splitRegistryLink', () => {
     it('splits the link of a dataset page into the registry, the organization and the dataset', () => {
@@ -50,9 +50,46 @@ describe('splitRegistryLink', () => {
         expect(splitRegistryLink('hub.dronedb.app')).toBeNull();
         expect(splitRegistryLink('https://hub.dronedb.app/r')).toBeNull();
         expect(splitRegistryLink('https://hub.dronedb.app/registry')).toBeNull();
-        expect(splitRegistryLink('odm/brighton-beach')).toBeNull();
+        expect(splitRegistryLink('a/b/c')).toBeNull();
+        expect(splitRegistryLink('odm')).toBeNull();
         expect(splitRegistryLink('ftp://hub.dronedb.app/r/odm/x')).toBeNull();
         expect(splitRegistryLink('')).toBeNull();
         expect(splitRegistryLink(null)).toBeNull();
+    });
+});
+
+describe('splitRegistryLink, a ddb tag without a host (FR-UPL-18)', () => {
+    it('takes "org/dataset" for a dataset of the default registry, like the ddb command line', () => {
+        expect(splitRegistryLink('admin/brighton-beach')).toEqual({
+            url: 'https://hub.dronedb.app', organization: 'admin', dataset: 'brighton-beach'
+        });
+        expect(splitRegistryLink(' odm/aukerman_2 ')).toEqual({
+            url: 'https://hub.dronedb.app', organization: 'odm', dataset: 'aukerman_2'
+        });
+    });
+
+    it('does not take a host or text with three parts or odd characters for a tag', () => {
+        expect(splitRegistryLink('a/b/c')).toBeNull();
+        expect(splitRegistryLink('odm/brighton beach')).toBeNull();
+        expect(splitRegistryLink('odm/')).toBeNull();
+    });
+});
+
+describe('needsRegistryAddress', () => {
+    it('holds for a text with a "/" and no registry in it, and says what to add', () => {
+        expect(needsRegistryAddress('a/b/c')).toBe(true);
+        expect(needsRegistryAddress('odm/brighton beach')).toBe(true);
+        expect(REGISTRY_ADDRESS_HINT).toBe('Add the registry address, e.g. hub.dronedb.app/admin/brighton-beach');
+    });
+
+    it('does not hold for a link, an address, a tag or an empty field', () => {
+        for (const text of ['admin/brighton-beach', 'hub.dronedb.app/odm/x', 'https://hub.dronedb.app/', 'https://hub.dronedb.app',
+            'https://example.org/registry', 'hub.dronedb.app', '', '  ', null])
+            expect(needsRegistryAddress(text), String(text)).toBe(false);
+    });
+
+    it('does not hold for the address of a registry without a scheme, below a prefix or not', () => {
+        for (const text of ['example.org/registry', 'hub.dronedb.app/odm', 'localhost:5000/registry/', 'example.org:8080/a/b/c'])
+            expect(needsRegistryAddress(text), text).toBe(false);
     });
 });

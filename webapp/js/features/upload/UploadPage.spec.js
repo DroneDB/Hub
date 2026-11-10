@@ -62,7 +62,10 @@ beforeEach(() => {
     mocks.reg.share.commit.mockResolvedValue({ url: '/r/alice/brighton', tag: { organizationSlug: 'alice', datasetSlug: 'brighton' } });
 });
 
-afterEach(() => wrapper?.unmount());
+afterEach(() => {
+    wrapper?.unmount();
+    document.body.innerHTML = '';
+});
 
 async function started(files = [file('DJI_0025.JPG')]) {
     mountPage();
@@ -219,13 +222,24 @@ describe('UploadPage init', () => {
     });
 });
 
-describe('UploadPage cancel (FR-UPL-01)', () => {
+// The question of Cancel (FR-UPL-16) is a dialog of the page: its buttons are in the document
+const question = () => document.querySelector('#confirmDialog');
+async function answer(button) {
+    question().querySelector(button).click();
+    await flushPromises();
+}
+async function clickCancel() {
+    await wrapper.find('button[class*="p-button-danger"]').trigger('click');
+    await flushPromises();
+}
+
+describe('UploadPage cancel (FR-UPL-01, FR-UPL-16)', () => {
     it('rolls the batch back with its token, then says "Upload cancelled" and shows the form again', async () => {
         await started();
         expect(wrapper.find('form').exists()).toBe(false);
 
-        await wrapper.find('button[class*="p-button-danger"]').trigger('click');
-        await flushPromises();
+        await clickCancel();
+        await answer('[data-confirm]');
 
         expect(mocks.reg.share.rollback).toHaveBeenCalledTimes(1);
         expect(mocks.reg.share.rollback).toHaveBeenCalledWith('tok-1');
@@ -239,12 +253,66 @@ describe('UploadPage cancel (FR-UPL-01)', () => {
         mocks.reg.share.rollback.mockRejectedValue(new ApiError('Server Error', 500));
         await started();
 
-        await wrapper.find('button[class*="p-button-danger"]').trigger('click');
-        await flushPromises();
+        await clickCancel();
+        await answer('[data-confirm]');
 
         expect(mocks.notify.info).not.toHaveBeenCalled();
         expect(mocks.notify.warn).toHaveBeenCalledWith(expect.stringContaining('24 hours'), { summary: 'Upload cancelled' });
         expect(wrapper.find('form').exists()).toBe(true);
+    });
+
+    it('asks before it cancels, and says that nothing is kept: the dataset and the files already sent are deleted', async () => {
+        await started([file('a.txt'), file('b.txt'), file('c.txt')]);
+        wrapper.vm.queue.state.value = { ...wrapper.vm.queue.state.value, counts: { ...wrapper.vm.queue.state.value.counts, done: 2 } };
+
+        await clickCancel();
+
+        expect(question().textContent).toContain('Stop the upload? The dataset and the 2 files already sent are deleted.');
+        // Nothing happened yet
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+        expect(wrapper.vm.uploadToken).toBe('tok-1');
+    });
+
+    it('"Keep uploading" leaves the batch and its upload as they are', async () => {
+        await started();
+
+        await clickCancel();
+        await answer('[data-cancel]');
+
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+        expect(mocks.notify.info).not.toHaveBeenCalled();
+        expect(wrapper.vm.uploadToken).toBe('tok-1');
+        expect(wrapper.vm.cancelling).toBe(false);
+        expect(question()).toBeNull();
+        // It can be asked again
+        await clickCancel();
+        expect(question()).not.toBeNull();
+    });
+
+    it('does not roll back a batch that began its commit while the question was open', async () => {
+        await started();
+
+        await clickCancel();
+        wrapper.vm.committing = true;
+        await answer('[data-confirm]');
+
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+        expect(wrapper.vm.uploadToken).toBe('tok-1');
+        // The answer says that the Stop came too late
+        expect(mocks.notify.info).toHaveBeenCalledWith('The upload had finished; nothing was cancelled');
+        expect(mocks.notify.info).not.toHaveBeenCalledWith('Upload cancelled');
+    });
+
+    it('says that nothing was cancelled when the commit ended while the question was open', async () => {
+        await started();
+
+        await clickCancel();
+        wrapper.vm.committed = true;
+        await answer('[data-confirm]');
+
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+        expect(mocks.notify.info).toHaveBeenCalledTimes(1);
+        expect(mocks.notify.info).toHaveBeenCalledWith('The upload had finished; nothing was cancelled');
     });
 
     it('rolls the batch back when the page is left while an upload runs', async () => {
@@ -300,6 +368,52 @@ describe('UploadPage cancel (FR-UPL-01)', () => {
 
         expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
         wrapper = null;
+    });
+});
+
+describe('UploadPage progress (FR-UPL-16)', () => {
+    const view = () => wrapper.findComponent({ name: 'UploadQueueView' });
+
+    it('lists every file of the batch with its status, in the "All" filter', async () => {
+        await started([file('a.txt', 10), file('sub/b.txt', 20, { fullPath: 'sub/b.txt' }), file('c.txt', 30)]);
+
+        expect(view().props('filter')).toBe('all');
+        expect(view().props('rows').map(r => [r.name, r.status])).toEqual([
+            ['a.txt', 'uploading'], ['sub/b.txt', 'uploading'], ['c.txt', 'uploading']
+        ]);
+    });
+
+    it('shows "x of y files" and a whole-number percentage of the bytes sent', async () => {
+        await started([file('a.txt', 10), file('b.txt', 10), file('c.txt', 10)]);
+        const state = wrapper.vm.queue.state.value;
+        wrapper.vm.queue.state.value = { ...state, bytesSent: 12.3456, totalBytes: 30, counts: { ...state.counts, done: 1 } };
+        await flushPromises();
+
+        const footer = view().text();
+        expect(footer).toContain('1 of 3 files');
+        expect(footer).toContain('41%');
+        expect(footer).not.toMatch(/\d\.\d+%/);
+    });
+
+    it('says "1 of 1 file" for a single file', async () => {
+        await started([file('only.txt', 10)]);
+        const state = wrapper.vm.queue.state.value;
+        wrapper.vm.queue.state.value = { ...state, counts: { ...state.counts, done: 0 } };
+        await flushPromises();
+
+        expect(view().text()).toContain('0 of 1 file');
+    });
+
+    it('opens the Errors filter when a file failed, and Retry failed goes back to all', async () => {
+        await started();
+
+        await wrapper.vm.onIdle({ items: [{ status: 'error', name: 'a.jpg', errorMessage: 'boom' }] });
+        await flushPromises();
+        expect(view().props('filter')).toBe('error');
+
+        wrapper.vm.retryFailed();
+        await flushPromises();
+        expect(view().props('filter')).toBe('all');
     });
 });
 

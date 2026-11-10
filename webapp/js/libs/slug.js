@@ -11,7 +11,7 @@
  * taken slug within the limits (`SlugSuffix.Candidate`).
  */
 
-import { inputRule, matchesRule, hasLatinLetterOrDigit } from '@/libs/nameRules';
+import { inputRule, matchesRule, hasLatinLetterOrDigit, displayNameLimits } from '@/libs/nameRules';
 
 /** The slug rule (pattern, minLength, maxLength, description, message). */
 export function slugRule() {
@@ -128,6 +128,28 @@ export function uniqueSlug(base, taken) {
         const candidate = (cut || '0') + suffix;
         if (!used.has(candidate)) return candidate;
     }
+}
+
+/**
+ * The first free slug and the name that goes with it (FR-UPL-14): when `uniqueSlug` adds the suffix `-<n>`, the name
+ * gets ' (<n>)' at its end, with the same n, so that a second import of a dataset has a different name too ('Aukerman'
+ * and 'aukerman' become 'Aukerman (2)' and 'aukerman-2'). The name is cut to make room for the suffix within the
+ * name limit.
+ * @param {string|null|undefined} name  the suggested name
+ * @param {string|null|undefined} baseSlug  the slug that goes with it
+ * @param {Iterable<string>} taken  the slugs that exist
+ * @returns {{ name: string, slug: string }}
+ */
+export function uniqueNameAndSlug(name, baseSlug, taken) {
+    const slug = uniqueSlug(baseSlug, taken);
+    const text = name ?? '';
+    if (!slug || slug === baseSlug) return { name: text, slug };
+
+    const n = /-(\d+)$/.exec(slug)?.[1];
+    if (!n || !text.trim()) return { name: text, slug };
+
+    const suffix = ` (${n})`;
+    return { name: text.trim().slice(0, Math.max(0, displayNameLimits().max - suffix.length)).trimEnd() + suffix, slug };
 }
 
 /** The length limits of a slug. */

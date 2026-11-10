@@ -15,6 +15,12 @@ const row = file => mount(FileUploadRow, {
 });
 
 describe('FileUploadRow', () => {
+    it('shows the progress of a file as a whole-number percentage (FR-UPL-16)', () => {
+        expect(row({ status: 'uploading', progress: 41.6 }).find('.progress-text').text()).toBe('42%');
+        expect(row({ status: 'uploading', progress: 0.2 }).find('.progress-text').text()).toBe('0%');
+        expect(row({ status: 'uploading', progress: 100 }).find('.progress-text').text()).toBe('100%');
+    });
+
     it('shows the whole reason, not a cut one, and names it for a screen reader', () => {
         const wrapper = row({ errorMessage: REASON });
 

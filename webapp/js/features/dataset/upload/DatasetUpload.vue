@@ -34,133 +34,87 @@
 
         <!-- Upload progress view -->
         <template v-else>
-            <div class="upload-header">
-                <div class="upload-filters">
-                    <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" text
-                            :severity="activeFilter === 'all' ? 'secondary' : 'secondary'" @click="activeFilter = 'all'">
-                        <i class="fa-solid fa-file" />
-                        <span class="filter-label">All</span>
-                        <span class="filter-count">{{ counts.total }}</span>
-                    </Button>
-                    <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" text
-                            :severity="activeFilter === 'uploading' ? undefined : 'secondary'" @click="activeFilter = 'uploading'">
-                        <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading + counts.processing > 0 }" />
-                        <span class="filter-label">In Progress</span>
-                        <span class="filter-count">{{ counts.uploading + counts.processing + counts.pending }}</span>
-                    </Button>
-                    <Button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" text
-                            :severity="activeFilter === 'done' ? 'success' : 'secondary'" @click="activeFilter = 'done'">
-                        <i class="fa-solid fa-check" />
-                        <span class="filter-label">Done</span>
-                        <span class="filter-count">{{ counts.done }}</span>
-                    </Button>
-                    <Button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" text
-                            :severity="activeFilter === 'error' ? 'danger' : 'secondary'" @click="activeFilter = 'error'">
-                        <i class="fa-solid fa-xmark" />
-                        <span class="filter-label">Errors</span>
-                        <span class="filter-count">{{ counts.error }}</span>
-                    </Button>
-                </div>
-            </div>
-
-            <div class="upload-body">
-                <p v-if="checkingNames" class="checking-names">
-                    <i class="fa-solid fa-circle-notch fa-spin" /> Looking for files with the same names in the destination...
-                </p>
-                <VirtualScroller
-                    v-slot="{ item }"
-                    class="file-list-scroller"
-                    :items="filteredFiles"
-                    :item-size="48"
-                >
-                    <FileUploadRow :file="item" @retry="retryFile" />
-                </VirtualScroller>
-            </div>
-
-            <div class="upload-footer">
-                <div v-if="uploading" class="total-progress-container">
-                    <div class="progress-info">
-                        <span>{{ humanBytesSent }} / {{ humanTotalBytes }}</span>
-                        <span>{{ totalProgress.toFixed(1) }}%</span>
-                    </div>
-                    <div class="progress-speed-info">
-                        <span><i class="fa-solid fa-gauge" /> {{ currentSpeedFormatted }}</span>
-                        <span v-if="paused"><i class="fa-solid fa-circle-pause" /> Paused</span>
-                        <span v-else-if="allSent && counts.processing > 0"><i class="fa-solid fa-gears" /> Processing on server...</span>
-                        <span v-else><i class="fa-regular fa-clock" /> {{ etaFormatted }}</span>
-                    </div>
-                    <div class="total-progress-bar">
-                        <div class="progress-fill" :style="{ width: totalProgress + '%' }" />
-                    </div>
-                </div>
-
-                <!-- Upload summary stats (shown when done) -->
-                <div v-if="done" class="upload-summary">
-                    <div class="summary-stats">
-                        <div class="summary-stat">
-                            <i class="fa-regular fa-clock" />
-                            <span class="stat-label">Duration:</span>
-                            <span class="stat-value">{{ uploadDuration }}</span>
-                        </div>
-                        <div class="summary-stat">
-                            <i class="fa-solid fa-database" />
-                            <span class="stat-label">Transferred:</span>
-                            <span class="stat-value">{{ humanTransferred }}</span>
-                        </div>
-                        <div class="summary-stat">
-                            <i class="fa-solid fa-gauge" />
-                            <span class="stat-label">Average speed:</span>
-                            <span class="stat-value">{{ averageSpeed }}</span>
-                        </div>
-                    </div>
-                    <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
-                        <template v-if="counts.error === 0">
-                            <i class="fa-solid fa-circle-check" /> {{ counts.done === 1 ? countOf(1, 'file') : `All ${countOf(counts.done, 'file')}` }} uploaded successfully!
-                        </template>
-                        <template v-else>
-                            <i class="fa-solid fa-triangle-exclamation" /> {{ counts.done }} succeeded, {{ counts.error }} failed
-                        </template>
-                    </div>
-                    <p v-if="counts.error > 0 && retryableCount === 0" class="no-retry-reason">
-                        <i class="fa-solid fa-circle-info" />
-                        {{ counts.error === 1 ? 'The failed file was refused' : 'The failed files were refused' }}:
-                        sending {{ counts.error === 1 ? 'it' : 'them' }} again would fail the same way. The reason is on each file.
+            <UploadQueueView v-model:filter="activeFilter" :snapshot="snapshot" :rows="filteredFiles" @retry="retryFile">
+                <template #before-list>
+                    <p v-if="checkingNames" class="checking-names">
+                        <i class="fa-solid fa-circle-notch fa-spin" /> Looking for files with the same names in the destination...
                     </p>
-                    <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
-                        <i class="fa-solid fa-stethoscope" /> Uploads slower than expected? Test the connection
-                    </router-link>
-                </div>
+                </template>
+                <template #footer>
+                    <!-- Upload summary stats (shown when done) -->
+                    <div v-if="done" class="upload-summary">
+                        <div class="summary-stats">
+                            <div class="summary-stat">
+                                <i class="fa-regular fa-clock" />
+                                <span class="stat-label">Duration:</span>
+                                <span class="stat-value">{{ uploadDuration }}</span>
+                            </div>
+                            <div class="summary-stat">
+                                <i class="fa-solid fa-database" />
+                                <span class="stat-label">Transferred:</span>
+                                <span class="stat-value">{{ humanTransferred }}</span>
+                            </div>
+                            <div class="summary-stat">
+                                <i class="fa-solid fa-gauge" />
+                                <span class="stat-label">Average speed:</span>
+                                <span class="stat-value">{{ averageSpeed }}</span>
+                            </div>
+                        </div>
+                        <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
+                            <template v-if="counts.error === 0">
+                                <i class="fa-solid fa-circle-check" /> {{ counts.done === 1 ? countOf(1, 'file') : `All ${countOf(counts.done, 'file')}` }} uploaded successfully!
+                            </template>
+                            <template v-else>
+                                <i class="fa-solid fa-triangle-exclamation" /> {{ counts.done }} succeeded, {{ counts.error }} failed
+                            </template>
+                        </div>
+                        <p v-if="counts.error > 0 && retryableCount === 0" class="no-retry-reason">
+                            <i class="fa-solid fa-circle-info" />
+                            {{ counts.error === 1 ? 'The failed file was refused' : 'The failed files were refused' }}:
+                            sending {{ counts.error === 1 ? 'it' : 'them' }} again would fail the same way. The reason is on each file.
+                        </p>
+                        <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
+                            <i class="fa-solid fa-stethoscope" /> Uploads slower than expected? Test the connection
+                        </router-link>
+                    </div>
 
-                <div class="upload-actions">
-                    <Button v-if="uploading" severity="danger" icon="fa-regular fa-circle-stop" label="Cancel Upload" :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : 'The files already sent stay in the dataset'"
-                            @click="handleCancel" />
-                    <Button v-if="uploading" severity="secondary" :icon="paused ? 'fa-solid fa-play' : 'fa-solid fa-pause'"
-                            :label="paused ? 'Resume' : 'Pause'" @click="togglePause" />
-                    <!-- The upload goes on while the user uses the rest of the Hub; the header shows it -->
-                    <Button v-if="uploading" severity="secondary" icon="fa-solid fa-angles-down" label="Continue in background"
-                            title="The upload goes on; the header shows its progress" @click="runInBackground" />
+                    <div class="upload-actions">
+                        <Button v-if="uploading" severity="danger" icon="fa-regular fa-circle-stop" label="Cancel Upload" :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : 'The files already sent stay in the dataset'"
+                                @click="handleCancel" />
+                        <Button v-if="uploading" severity="secondary" :icon="paused ? 'fa-solid fa-play' : 'fa-solid fa-pause'"
+                                :label="paused ? 'Resume' : 'Pause'" @click="togglePause" />
+                        <!-- The upload goes on while the user uses the rest of the Hub; the header shows it -->
+                        <Button v-if="uploading" severity="secondary" icon="fa-solid fa-angles-down" label="Continue in background"
+                                title="The upload goes on; the header shows its progress" @click="runInBackground" />
 
-                    <template v-if="done">
-                        <Button v-if="retryableCount > 0" icon="fa-solid fa-rotate-right"
-                                :label="'Retry Failed (' + retryableCount + ')'" @click="retryAllFailed" />
-                        <Button severity="secondary" icon="fa-solid fa-check" label="Close" @click="finishUpload" />
-                    </template>
-                </div>
-            </div>
+                        <template v-if="done">
+                            <Button v-if="retryableCount > 0" icon="fa-solid fa-rotate-right"
+                                    :label="'Retry Failed (' + retryableCount + ')'" @click="retryAllFailed" />
+                            <Button severity="secondary" icon="fa-solid fa-check" label="Close" @click="finishUpload" />
+                        </template>
+                    </div>
+                </template>
+            </UploadQueueView>
         </template><!-- end upload progress view -->
 
         <!-- Names that exist in the destination: asked before the files are queued (and again after a 409) -->
         <PasteConflictDialog v-if="conflictPrompt" verb="upload" keep-both :items="conflictPrompt.items"
                              @resolve="conflictPrompt.resolve" />
+
+        <!-- The question before Cancel (FR-UPL-16) -->
+        <DialogHost :dialogs="dialogs" />
     </div>
 </template>
 
 <script>
-import FileUploadRow from './FileUploadRow.vue';
+import UploadQueueView from './UploadQueueView.vue';
 import PasteConflictDialog from '@/features/dataset/dialogs/PasteConflictDialog.vue';
-import VirtualScroller from '@/components/VirtualScroller.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import Button from 'primevue/button';
 import { bytesToSize } from '@/libs/utils';
+import { useConfirm } from '@/composables/useConfirm';
+import { useDialogs } from '@/composables/useDialogs';
+import { cancelUploadQuestion } from '@/libs/upload/cancelQuestion';
 import { freeName, namesClash } from '@/libs/nameRules';
 import { orderCompanionsFirst } from '@/libs/uploadOrder';
 import { useUploadsStore } from '@/stores/uploads';
@@ -197,9 +151,9 @@ const joinPath = (folder, name) => (folder ? `${folder}/${name}` : name);
  */
 export default {
     components: {
-        FileUploadRow,
+        UploadQueueView,
         PasteConflictDialog,
-        VirtualScroller,
+        DialogHost,
         Button
     },
     props: {
@@ -209,6 +163,10 @@ export default {
         filesToUpload: { type: Array, default: null }
     },
     emits: ['close', 'upload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
+    setup() {
+        const dialogs = useDialogs();
+        return { dialogs, confirm: useConfirm(dialogs) };
+    },
     data: function () {
         return {
             error: null,
@@ -244,17 +202,10 @@ export default {
         paused() {
             return this.snapshot?.paused === true;
         },
-        // Every byte is sent: what is left is the server adding the files
-        allSent() {
-            return this.snapshot != null && this.snapshot.bytesSent >= this.snapshot.totalBytes;
-        },
         filteredFiles() {
             const filter = this.activeFilter;
             return this.queue.rows(f => filter === 'all' ||
                 (filter === 'uploading' ? ['uploading', 'processing', 'pending'].includes(f.status) : f.status === filter));
-        },
-        humanTotalBytes() {
-            return bytesToSize(this.snapshot?.totalBytes ?? 0);
         },
         // What was added to the dataset: the files that are done, not what was sent and refused
         humanTransferred() {
@@ -265,13 +216,6 @@ export default {
             if (!this.counts.error) return 0;
             return (this.snapshot?.items ?? []).filter(i => i.status === 'error' && i.canRetry).length;
         },
-        humanBytesSent() {
-            return bytesToSize(this.snapshot?.bytesSent ?? 0);
-        },
-        totalProgress() {
-            const total = this.snapshot?.totalBytes ?? 0;
-            return total === 0 ? 0 : (this.snapshot.bytesSent / total) * 100.0;
-        },
         uploadDuration() {
             const start = this.snapshot?.startedAt;
             if (!start) return '0s';
@@ -281,15 +225,6 @@ export default {
             const s = this.snapshot;
             if (!s?.startedAt || !s.endedAt || s.endedAt <= s.startedAt) return '0 B/s';
             return bytesToSize((s.bytesSent / (s.endedAt - s.startedAt)) * 1000) + '/s';
-        },
-        currentSpeedFormatted() {
-            const speed = this.snapshot?.speed ?? 0;
-            return speed <= 0 ? '0 B/s' : bytesToSize(speed) + '/s';
-        },
-        etaFormatted() {
-            const eta = this.snapshot?.eta;
-            if (eta == null) return 'Calculating...';
-            return eta < 1 ? '< 1s' : formatDurationSeconds(eta);
         }
     },
     watch: {
@@ -345,8 +280,8 @@ export default {
         useUploadsStore().detach(this.organization, this.dataset);
     },
     methods: {
-        bytesToSize,
         countOf,
+        bytesToSize,
         storedPercent,
 
         async loadOpenUploads() {
@@ -558,9 +493,18 @@ export default {
             this.queue.retryFailed();
         },
 
-        // Stops the queue and removes the chunks the server stores; the files already sent stay (D-045)
+        // Asks first (FR-UPL-16), then stops the queue and removes the chunks the server stores; the files already sent stay (D-045)
         async handleCancel() {
-            await useUploadsStore().cancel(this.organization, this.dataset);
+            let declined = false;
+            await useUploadsStore().cancel(this.organization, this.dataset, {
+                confirm: async () => {
+                    const ok = await this.confirm(cancelUploadQuestion({ sent: this.counts.done, discardsBatch: false }));
+                    declined = !ok;
+                    return ok;
+                }
+            });
+            // "Keep uploading": the upload goes on, and so does the dialog
+            if (declined) return;
             this.$emit('update:closable', true);
             this.$emit('close');
         },
@@ -630,126 +574,6 @@ export default {
     max-height: 80vh;
 }
 
-/* Header */
-.upload-header {
-    flex-shrink: 0;
-    padding: var(--ddb-spacing-md) 0;
-    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
-}
-
-.upload-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ddb-spacing-xs);
-}
-
-.filter-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--ddb-spacing-xs);
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    background: var(--ddb-bg-surface);
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    font-size: var(--ddb-font-size-base);
-    transition: all 0.2s;
-}
-
-.filter-btn:hover {
-    background-color: var(--ddb-bg-hover);
-}
-
-.filter-btn .filter-count {
-    background-color: var(--ddb-border-separator);
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs);
-    border-radius: var(--ddb-radius-md);
-    font-size: var(--ddb-font-size-base);
-    font-weight: 600;
-    min-width: 1.25rem;
-    text-align: center;
-}
-
-/* All filter */
-.filter-btn.filter-all {
-    color: var(--ddb-text-secondary);
-}
-.filter-btn.filter-all.active {
-    background-color: var(--ddb-text-secondary);
-    color: var(--ddb-text-on-color);
-    border-color: var(--ddb-text-secondary);
-}
-.filter-btn.filter-all.active .filter-count {
-    background-color: rgba(var(--ddb-glass-rgb), 0.3);
-    color: var(--ddb-text-on-color);
-}
-
-/* Uploading filter */
-.filter-btn.filter-uploading {
-    color: var(--ddb-primary);
-    border-color: rgba(var(--ddb-primary-rgb), 0.3);
-}
-.filter-btn.filter-uploading .filter-count {
-    background-color: rgba(var(--ddb-primary-rgb), 0.1);
-    color: var(--ddb-primary);
-}
-.filter-btn.filter-uploading.active {
-    background-color: var(--ddb-primary);
-    color: var(--ddb-text-on-color);
-    border-color: var(--ddb-primary);
-}
-.filter-btn.filter-uploading.active .filter-count {
-    background-color: rgba(var(--ddb-glass-rgb), 0.3);
-    color: var(--ddb-text-on-color);
-}
-
-/* Done filter */
-.filter-btn.filter-done {
-    color: var(--ddb-success-text);
-    border-color: rgba(var(--ddb-success-rgb), 0.3);
-}
-.filter-btn.filter-done .filter-count {
-    background-color: rgba(var(--ddb-success-rgb), 0.1);
-    color: var(--ddb-success-text);
-}
-.filter-btn.filter-done.active {
-    background-color: var(--ddb-success);
-    color: var(--ddb-text-on-color);
-    border-color: var(--ddb-success);
-}
-.filter-btn.filter-done.active .filter-count {
-    background-color: rgba(var(--ddb-glass-rgb), 0.3);
-    color: var(--ddb-text-on-color);
-}
-
-/* Error filter */
-.filter-btn.filter-error {
-    color: var(--ddb-danger);
-    border-color: rgba(var(--ddb-danger-rgb), 0.3);
-}
-.filter-btn.filter-error .filter-count {
-    background-color: rgba(var(--ddb-danger-rgb), 0.1);
-    color: var(--ddb-danger);
-}
-.filter-btn.filter-error.has-errors {
-    border-color: var(--ddb-danger);
-}
-.filter-btn.filter-error.active {
-    background-color: var(--ddb-danger);
-    color: var(--ddb-text-on-color);
-    border-color: var(--ddb-danger);
-}
-.filter-btn.filter-error.active .filter-count {
-    background-color: rgba(var(--ddb-glass-rgb), 0.3);
-    color: var(--ddb-text-on-color);
-}
-
-/* Body */
-.upload-body {
-    flex: 0 0 22rem; /* Fixed height - doesn't change when filtering */
-    overflow-y: auto;
-}
-
 .checking-names {
     margin: var(--ddb-spacing-md);
     color: var(--ddb-text-secondary);
@@ -759,55 +583,6 @@ export default {
     margin: var(--ddb-spacing-sm) 0 0 0;
     font-size: var(--ddb-font-size-sm);
     color: var(--ddb-text-secondary);
-}
-
-.file-list-scroller {
-    height: 100%;
-    overflow-y: auto;
-}
-
-/* Footer */
-.upload-footer {
-    flex-shrink: 0;
-    padding: var(--ddb-spacing-md) var(--ddb-spacing-lg);
-    border-top: var(--ddb-border-width) solid var(--ddb-border);
-}
-
-.total-progress-container {
-    margin-bottom: 0.75rem;
-}
-
-.progress-info {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--ddb-font-size-base);
-    color: var(--ddb-text-secondary);
-    margin-bottom: 0.25rem;
-}
-
-.progress-speed-info {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--ddb-font-size-base);
-    color: var(--ddb-text-secondary);
-    margin-bottom: 0.25rem;
-}
-
-.progress-speed-info i {
-    margin-right: 0.25rem;
-}
-
-.total-progress-bar {
-    height: 0.5rem;
-    background-color: var(--ddb-border-separator);
-    border-radius: 0.25rem;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background-color: var(--ddb-success);
-    transition: width 0.3s ease;
 }
 
 .upload-actions {

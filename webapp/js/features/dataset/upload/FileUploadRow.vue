@@ -14,7 +14,7 @@
         <div class="file-progress">
             <div v-if="file.status === 'uploading'" class="progress-bar-container">
                 <div class="progress-bar" :style="{ width: file.progress + '%' }" />
-                <span class="progress-text">{{ file.progress.toFixed(0) }}%</span>
+                <span class="progress-text">{{ percentText }}</span>
             </div>
             <div v-else-if="file.status === 'processing'" class="progress-bar-container processing"
                  title="Every byte is sent: the server is adding the file to the dataset">
@@ -43,6 +43,7 @@
 
 <script>
 import { bytesToSize } from '@/libs/utils';
+import { formatNumber, PRECISION } from '@/libs/format';
 import Button from 'primevue/button';
 
 export default {
@@ -65,6 +66,10 @@ export default {
     computed: {
         humanSize() {
             return bytesToSize(this.file.size);
+        },
+        // A whole number, by the one number formatter (FR-UPL-16, FR-XC-08)
+        percentText() {
+            return `${formatNumber(this.file.progress, PRECISION.count)}%`;
         },
         statusClass() {
             return `status-${this.file.status}`;

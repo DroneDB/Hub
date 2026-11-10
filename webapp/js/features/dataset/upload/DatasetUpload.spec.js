@@ -371,10 +371,35 @@ describe('DatasetUpload', () => {
 
             await button('Cancel Upload').trigger('click');
             await flush();
+            // It asks first, and says that the files already sent stay (D-045)
+            expect(document.querySelector('#confirmDialog').textContent).toContain('Stop the upload? No file has been added to the dataset yet.');
+            expect(server.deleted).toEqual([]);
+            document.querySelector('#confirmDialog [data-confirm]').click();
+            await flush();
 
             expect(server.deleted).toEqual(['stored-id-0001']);
             expect(wrapper.emitted('close')).toHaveLength(1);
             expect((await store()).active).toBe(false);
+        });
+
+        it('"Keep uploading" in the question of Cancel leaves the upload and the dialog as they are', async () => {
+            server.hold = true;
+            mountUpload({ filesToUpload: [new File(['a'], 'a.txt')] });
+            await flush();
+
+            await button('Cancel Upload').trigger('click');
+            await flush();
+            document.querySelector('#confirmDialog [data-cancel]').click();
+            await flush();
+
+            expect(document.querySelector('#confirmDialog')).toBeNull();
+            expect(wrapper.emitted('close')).toBeUndefined();
+            expect(server.deleted).toEqual([]);
+            const uploads = await store();
+            expect(uploads.active).toBe(true);
+            expect(button('Cancel Upload')).toBeTruthy();
+            server.held.forEach(release => release());
+            await flush();
         });
     });
 

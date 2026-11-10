@@ -52,34 +52,23 @@
                     :disabled="!canUpload" :loading="starting" />
         </form>
 
-        <div v-if="batchOpen" class="container">
-            <div class="uploading">
-                <LoadingSpinner v-if="totalBytes === 0" />
+        <!-- The files of the batch (FR-UPL-16): the filter bar, every file with its status, the total, and Cancel, which asks -->
+        <div v-if="batchOpen" class="upload-batch">
+            <LoadingSpinner v-if="!snapshot" />
 
-                <Card v-if="totalBytes > 0">
-                    <template #content>
-                        <LoadingSpinner v-if="uploading && Object.keys(fileUploadStatus).length === 0" />
-                        <template v-if="!inIframe">
-                            <div v-for="f in Object.keys(fileUploadStatus)" :key="f" class="progress-indicator">
-                                <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :show-value="false" style="height: 0.75rem; margin-bottom: 0.25rem;" />
-                                <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
-                            </div>
-                        </template>
-                        <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
-                            <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
-                        </div>
-                        <ProgressBar :value="parseFloat(totalProgress)" style="height: 0.5rem; margin-top: 0.5rem;" :show-value="false" />
-                    </template>
-                </Card>
-
-                <div class="actions">
-                    <Button v-if="hasFailed && !committing" severity="secondary" size="large" icon="fa-solid fa-rotate-right"
-                            label="Retry failed" @click="retryFailed" />
-                    <Button v-if="!committing" severity="danger" size="large" icon="fa-solid fa-circle-stop" label="Cancel"
-                            :disabled="cancelling" @click="handleCancel" />
-                </div>
-            </div>
+            <UploadQueueView v-else v-model:filter="activeFilter" :snapshot="snapshot" :rows="filteredFiles" @retry="retryFile">
+                <template #footer>
+                    <div class="actions">
+                        <Button v-if="hasFailed && !committing" severity="secondary" icon="fa-solid fa-rotate-right"
+                                label="Retry failed" @click="retryFailed" />
+                        <Button v-if="!committing" severity="danger" icon="fa-solid fa-circle-stop" label="Cancel"
+                                :disabled="cancelling" @click="handleCancel" />
+                    </div>
+                </template>
+            </UploadQueueView>
         </div>
+
+        <DialogHost :dialogs="dialogs" />
     </div>
 </template>
 
@@ -87,12 +76,14 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/HubMessage.vue';
 import Button from 'primevue/button';
-import Card from 'primevue/card';
 import InputText from 'primevue/inputtext';
-import ProgressBar from 'primevue/progressbar';
 import Select from 'primevue/select';
+import DialogHost from '@/components/DialogHost.vue';
+import UploadQueueView from '@/features/dataset/upload/UploadQueueView.vue';
 import { bytesToSize } from '@/libs/utils';
-import { inIframe } from '@/libs/utils';
+import { useConfirm } from '@/composables/useConfirm';
+import { useDialogs } from '@/composables/useDialogs';
+import { cancelUploadQuestion } from '@/libs/upload/cancelQuestion';
 import reg from '@/libs/api/sharedRegistry';
 import { notify } from '@/libs/notify';
 import { useUploadQueue } from '@/composables/useUploadQueue';
@@ -125,11 +116,15 @@ const pathOf = file => file.fullPath || file.webkitRelativePath || file.name;
  */
 export default {
     name: 'UploadPage',
-    components: { LoadingSpinner, Message, Button, Card, InputText, ProgressBar, Select },
+    components: { LoadingSpinner, Message, Button, InputText, Select, DialogHost, UploadQueueView },
+    setup() {
+        const dialogs = useDialogs();
+        return { dialogs, confirm: useConfirm(dialogs) };
+    },
     data: function () {
         return {
             error: "",
-            inIframe: inIframe(),
+            activeFilter: 'all',
             uploadToken: null,
             // Reactive property holding a raw queue: a new queue (after Cancel) re-renders
             queue: markRaw(this.createQueue()),
@@ -148,6 +143,8 @@ export default {
             starting: false,
             committing: false,
             cancelling: false,
+            // The question before Cancel is open
+            asking: false,
 
             NO_WRITABLE_ORG,
             DATASET_NAME_MAX_LENGTH
@@ -170,37 +167,21 @@ export default {
         snapshot() {
             return this.queue.state.value;
         },
-        uploading() {
-            return this.snapshot != null && !this.snapshot.done;
-        },
         hasFailed() {
             return this.snapshot != null && this.snapshot.done && this.snapshot.counts.error > 0;
         },
         filesCount() {
             return this.snapshot?.counts.total ?? 0;
         },
+        // The files that are added to the batch: what Cancel would delete
         uploadedFiles() {
             return this.snapshot?.counts.done ?? 0;
         },
-        totalBytes() {
-            return this.snapshot?.totalBytes ?? 0;
-        },
-        totalBytesSent() {
-            return this.snapshot?.bytesSent ?? 0;
-        },
-        // Progress of the files being sent right now, by name
-        fileUploadStatus() {
-            const status = {};
-            for (const row of this.queue.rows(r => r.status === 'uploading' || r.status === 'processing'))
-                status[row.name] = row.progress;
-            return status;
-        },
-        humanRemainingBytes: function () {
-            return bytesToSize(this.totalBytes - this.totalBytesSent);
-        },
-        totalProgress: function () {
-            if (this.totalBytes === 0) return 0;
-            return (this.totalBytesSent / this.totalBytes * 100.0).toFixed(2);
+        // The files of the filter, all of them (a long list scrolls inside the view)
+        filteredFiles() {
+            const filter = this.activeFilter;
+            return this.queue.rows(f => filter === 'all' ||
+                (filter === 'uploading' ? ['uploading', 'processing', 'pending'].includes(f.status) : f.status === filter));
         }
     },
     async mounted() {
@@ -352,6 +333,7 @@ export default {
             if (this._isUnmounted || this.committing || this.cancelling || !this.uploadToken) return;
             const failed = snapshot.items.filter(i => i.status === 'error');
             if (failed.length > 0) {
+                this.activeFilter = 'error';
                 this.error = failed.length === 1
                     ? `Failed to upload ${failed[0].name}: ${failed[0].errorMessage}`
                     : `Failed to upload ${failed.length} files (first: ${failed[0].name}: ${failed[0].errorMessage})`;
@@ -391,19 +373,40 @@ export default {
 
         retryFailed() {
             this.error = '';
+            this.activeFilter = 'all';
             this.queue.retryFailed();
         },
 
-        // Cancel discards the batch: the Registry removes its files and the dataset it created (FR-UPL-01)
+        retryFile(file) {
+            this.queue.retry(file.id);
+        },
+
+        // Cancel asks first (FR-UPL-16: nothing is kept), then discards the batch: the Registry removes its files and the dataset
+        // it created (FR-UPL-01)
         async handleCancel() {
             const token = this.uploadToken;
-            if (this.cancelling) return;
-            this.cancelling = true;
+            if (this.cancelling || this.asking) return;
+            this.asking = true;
             try {
                 // The rollback goes before the token is dropped
-                const { cleanupError } = await this.queue.cancel({
+                const { cancelled, cleanupError } = await this.queue.cancel({
+                    confirm: async () => {
+                        const ok = await this.confirm(cancelUploadQuestion({ sent: this.uploadedFiles, discardsBatch: true }));
+                        if (!ok) return false;
+                        // The upload went on while the question was open: a commit that began is not undone, and the
+                        // answer says so
+                        if (this.committing || this.committed) {
+                            notify.info('The upload had finished; nothing was cancelled');
+                            return false;
+                        }
+                        // From here the batch is being discarded: nothing commits it
+                        this.cancelling = true;
+                        return true;
+                    },
                     cleanup: token ? () => reg.share.rollback(token) : undefined
                 });
+                if (!cancelled) return;
+                this.activeFilter = 'all';
                 this.queue = markRaw(this.createQueue());
                 this.uploadToken = null;
                 this.shareRequests = null;
@@ -415,6 +418,7 @@ export default {
                     notify.info('Upload cancelled');
                 }
             } finally {
+                this.asking = false;
                 this.cancelling = false;
             }
         }
@@ -423,7 +427,6 @@ export default {
 </script>
 
 <style scoped>
-.container,
 .error-msg {
     margin: 1rem;
 }
@@ -489,25 +492,19 @@ export default {
     margin: 0;
 }
 
-.uploading {
-    width: 100%;
-    text-align: center;
-
-    .circle.notch {
-        margin-bottom: var(--ddb-spacing-md);
-        height: 1.25rem;
-        width: 1.25rem;
-    }
-
-    .progress-indicator {
-        margin-bottom: 2.25rem;
-    }
+/* The files of the batch: the one view of the dataset upload (UploadQueueView), a column of its own on the page */
+.upload-batch {
+    display: flex;
+    flex-direction: column;
+    width: min(50rem, 100% - 2rem);
+    max-height: 80vh;
+    margin: var(--ddb-spacing-lg) auto;
+    text-align: left;
 
     .actions {
         display: flex;
-        justify-content: center;
+        justify-content: flex-end;
         gap: var(--ddb-spacing-md);
-        margin-top: var(--ddb-spacing-lg);
     }
 }
 </style>

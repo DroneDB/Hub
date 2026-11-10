@@ -2,8 +2,9 @@
  * useUploadQueue.cancel({ confirm, cleanup }) (FR-XC-27): the one way the Hub cancels an upload. /upload passes the
  * rollback of its share batch as the cleanup; the dataset page passes none, because the files already sent stay (D-045).
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { useUploadQueue } from './useUploadQueue';
+import { notify } from '@/libs/notify';
 
 const flush = () => new Promise(r => setTimeout(r, 0));
 
@@ -150,5 +151,36 @@ describe('useUploadQueue activity signal', () => {
         expect(announced).toEqual([true, false]);
         expect(heard).toEqual([]);
         expect(quiet).toEqual([true, false]);
+    });
+});
+
+describe('useUploadQueue.add, a splat level-of-detail folder (FR-UPL-09)', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const queueOf = () => useUploadQueue({ send: vi.fn(() => new Promise(() => {})) });
+
+    it('warns that the folder is not supported and says to bundle it into a .sog file, and still queues the files', () => {
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        const queue = queueOf();
+
+        queue.add([
+            { file: { size: 10 }, path: 'hotel-oldmill/lod-meta.json' },
+            { file: { size: 20 }, path: 'hotel-oldmill/2_8/means_l.webp' }
+        ]);
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+            'lod-meta.json is in the folder hotel-oldmill: a SOG level-of-detail folder is not supported as a splat, '
+            + 'and its textures are stored as ordinary files. Bundle it into one .sog file first, then upload that file.',
+            expect.objectContaining({ summary: 'Splat folder not supported' }));
+        expect(queue.state.value.counts.total).toBe(2);
+    });
+
+    it('says nothing about an ordinary selection', () => {
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+
+        queueOf().add([{ file: { size: 10 }, path: 'a.jpg' }, { file: { size: 10 }, path: 'site/meta.json' }]);
+
+        expect(warn).not.toHaveBeenCalled();
     });
 });
