@@ -38,11 +38,11 @@
                                 @remove="index => $emit('removeLayer', rasterLayerList[index].path)"
                                 @repick="index => $emit('repick', rasterLayerList[index].path)" />
             <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :file-path="plantHealthFilePath"
-                              :initial-params="plantHealthInitialParams" @close="closePlantHealth"
+                              :initial-params="plantHealthInitialParams" :visible-bbox="visibleBbox" @close="closePlantHealth"
                               @viz-params-changed="handleVizParamsChanged" />
             <RasterAnalysisControls :visible="rasterPanelVisible" :dataset="dataset" :file-path="rasterFilePath"
                                     :target-candidates="analysisCandidates" :target-path="analysisTargetPath"
-                                    :initial-params="rasterInitialParams" :spot-info="rasterSpotInfo" :area-stats="rasterAreaStats"
+                                    :initial-params="rasterInitialParams" :visible-bbox="visibleBbox" :spot-info="rasterSpotInfo" :area-stats="rasterAreaStats"
                                     :profile="rasterProfile" :profile-loading="rasterProfileLoading" :profile-error="rasterProfileError"
                                     :drawing-profile="rasterProfileDrawing" :inspect-active="rasterInspectActive"
                                     :area-stats-loading="rasterAreaStatsLoading" :area-stats-error="rasterAreaStatsError"
@@ -140,6 +140,7 @@ import { createControlZones, moveToZone } from '@/libs/map/controlZones';
 import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fileLayers';
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
 import { ViewZoomCap } from '@/libs/map/rasterLayers';
+import { visibleBbox } from '@/libs/map/rasterExport';
 import { getVectorColor, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
 
 import { useListenerBag } from '@/composables/useEventListener';
@@ -308,7 +309,9 @@ export default {
             initialExtent: null,
             vectorLayerColors: {},
             mapSettingsDialogOpen: false,
-            linkPanelOpen: false
+            linkPanelOpen: false,
+            // The visible extent in WGS 84, for 'Export visible extent' of the raster panels (FR-RAS-16)
+            visibleBbox: null
         };
     },
     computed: {
@@ -478,7 +481,10 @@ export default {
                 this.map.on('pointermove', e => this.onPointerMove(e)),
                 this.map.on('click', e => this.onMapClick(e)),
                 this.map.on('dblclick', e => this.onMapDoubleClick(e)),
-                this.map.on('moveend', () => this.loadSplatFootprints()),
+                this.map.on('moveend', () => {
+                    this.loadSplatFootprints();
+                    this.updateVisibleBbox();
+                }),
                 this.map.on('contextmenu', e => {
                     this.selectAt(e.pixel);
                     e.stopPropagation();
@@ -553,6 +559,12 @@ export default {
         mainFileExtent: function () {
             const geom = this.baseEntry && this.baseEntry.polygon_geom;
             return geom ? mercatorExtent(geom) : null;
+        },
+
+        // The window the map shows, as the WGS 84 box of the export of the visible extent (D-023)
+        updateVisibleBbox: function () {
+            const size = this.map && this.map.getSize();
+            this.visibleBbox = size ? visibleBbox(this.map.getView().calculateExtent(size)) : null;
         },
 
         // The footprints of the georeferenced splats in view (the points of the others stay)

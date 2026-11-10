@@ -127,19 +127,10 @@
                     <i class="fas fa-link" />
                     <span class="action-label">Copy Link</span>
                 </button>
-                <button v-if="!isExportTooLarge"
-                        class="panel-btn action-btn"
-                        :disabled="exporting"
-                        title="Export the current view as a GeoTIFF file"
-                        @click="exportGeoTiff">
-                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'" />
-                    <span class="action-label">Export</span>
-                </button>
-                <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
-                    <i class="fas fa-download" />
-                    <span class="action-label">Export</span>
-                </span>
             </div>
+
+            <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16, FR-PRC-15) -->
+            <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox" />
         </div>
 
         <div v-else class="panel-body loading">
@@ -160,13 +151,7 @@ import { colormap, INDEX_COLORMAPS } from '@/libs/map/colormaps';
 import BandSelector from '@/features/viewers/map/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import RescaleFields from './RescaleFields.vue';
-import reg from '@/libs/api/sharedRegistry';
-import { Features } from '@/libs/features';
-import { isExportTooLarge as computeIsExportTooLarge } from '@/libs/exportSize';
-import { bytesToSize } from '@/libs/utils';
-import { useHeavyTask } from '@/composables/useHeavyTask';
-import { downloadBlob } from '@/libs/download';
-import { pathutils } from 'ddb';
+import RasterExportButton from './RasterExportButton.vue';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
 import { encodeVizParamsHash } from '@/libs/map/vizParamsHash';
 import { formatNumber, parseNumber } from '@/libs/format';
@@ -184,19 +169,20 @@ import { replaceHash } from '@/libs/routeQuery';
  * rescaling, and copy-link functionality.
  */
 export default {
-    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner, RescaleFields },
+    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner, RescaleFields, RasterExportButton },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
         filePath: { type: String, default: null },
-        initialParams: { type: Object, default: null }
+        initialParams: { type: Object, default: null },
+        // The visible extent of the map in WGS 84 (minLon, minLat, maxLon, maxLat), for 'Export visible extent' (FR-RAS-16)
+        visibleBbox: { type: Array, default: null }
     },
 
     emits: ['close', 'vizParamsChanged'],
 
     setup() {
-        const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask, applyLater: useTimerGroup() };
+        return { applyLater: useTimerGroup() };
     },
     data() {
         return {
@@ -214,7 +200,6 @@ export default {
             availableFormulas: [],
             // Ids, or { id, name } from the raster metadata
             availableColormaps: INDEX_COLORMAPS,
-            exporting: false,
             originalView: false,
             showFormulasInfo: false
         };
@@ -227,18 +212,6 @@ export default {
                 const id = typeof cm === 'string' ? cm : cm.id;
                 return { ...colormap(id), ...(cm.name ? { name: cm.name } : {}) };
             });
-        },
-        maxExportSizeBytes() {
-            return reg.features.value(Features.MAX_EXPORT_SIZE_BYTES);
-        },
-        isExportTooLarge() {
-            return computeIsExportTooLarge(this.rasterInfo, this.maxExportSizeBytes);
-        },
-        exportLimitTooltip() {
-            const limit = this.maxExportSizeBytes;
-            return limit
-                ? `Export disabled: estimated output exceeds the configured limit (${bytesToSize(limit)})`
-                : 'Export disabled';
         },
         firstBandStats() {
             if (!this.metadata || !this.metadata.statistics) return {};
@@ -515,32 +488,6 @@ export default {
         onRescaleManualChange() {
             this.selectedStretch = 'custom';
             this.debouncedApply();
-        },
-
-        async exportGeoTiff() {
-            if (!this.filePath || !this.dataset) return;
-            // The export takes the style of the layer, without the kind of stretch that only the panel keeps
-            const params = { path: this.filePath, ...this.vizParams() };
-            delete params.stretch;
-
-            try {
-                this.exporting = true;
-                // Submit a raster-export heavy task and wait for it to complete.
-                const result = await this.runHeavyTask(this.dataset, 'raster-export', {
-                    path: this.filePath,
-                    params,
-                    notify: false
-                });
-
-                // Download the produced GeoTIFF
-                const blob = await this.dataset.taskResult(result.taskId);
-                downloadBlob(blob, `${pathutils.stem(this.filePath) || 'export'}_export.tif`);
-            } catch (e) {
-                console.error('Export error:', e);
-                this.$notify.error(e, { summary: 'Export Failed' });
-            } finally {
-                this.exporting = false;
-            }
         },
 
         async copyLink() {

@@ -7,9 +7,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null } } }));
+// A server that exports a window (libddb 2.3, rasterExportWindow of /sys/features)
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null, get: name => name === 'rasterExportWindow' } } }));
 
 const { default: RasterAnalysisControls } = await import('./RasterAnalysisControls.vue');
+const { ESTIMATE_DELAY_MS } = await import('@/composables/useRasterExport');
 
 const STATS = {
     min: 196.96, max: 197.71, mean: 197.2133, median: 197.19, stddev: 0.1692,
@@ -352,5 +354,56 @@ describe('RasterAnalysisControls value format', () => {
         expect(byId('raster-spot-value').text()).toContain('29.1 °C');
         expect(wrapper.find('.temp-range').text()).toContain('12.8 °C');
         expect(wrapper.find('.temp-range').text()).toContain('35.3 °C');
+    });
+});
+
+// FR-RAS-16: the export of Raster Analysis is the one export control (a task), not a direct download; one over the limit is a
+// button that can be focused with its reason as visible text
+describe('RasterAnalysisControls export', () => {
+    it('refuses an export over the limit with a focusable button and the reason as text, from the value info of the Registry', async () => {
+        await render({}, { ...DSM_INFO, estimatedExportBytes: 9985798963, exportLimitBytes: 1073741824 });
+        const button = byId('raster-export-whole');
+        expect(button.element.tagName).toBe('BUTTON');
+        expect(button.attributes('disabled')).toBeUndefined();
+        expect(button.attributes('aria-disabled')).toBe('true');
+        const reason = byId('raster-export-whole-reason');
+        expect(reason.text()).toContain('Too large to export: about 9.3 GB > 1 GB limit');
+        expect(button.attributes('aria-describedby').split(' ')).toContain(reason.attributes('id'));
+        // The visible extent stays available to export it in parts (the map says the extent), once the estimate of the
+        // window (read with the window) is within the limit; until then it waits and says why
+        wrapper.props().dataset.getRasterValueInfo.mockImplementation(async (_path, options = {}) => (options.bbox
+            ? { estimatedExportBytes: 200 * 1024 * 1024, exportLimitBytes: 1073741824 }
+            : { ...DSM_INFO, estimatedExportBytes: 9985798963, exportLimitBytes: 1073741824 }));
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        try {
+            await wrapper.setProps({ visibleBbox: [15, 45, 15.5, 45.5] });
+            expect(byId('raster-export-extent').attributes('aria-disabled')).toBe('true');
+            expect(byId('raster-export-extent-reason').text()).toBe('Checking size…');
+            await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
+        } finally {
+            vi.useRealTimers();
+        }
+        await flushPromises();
+        expect(wrapper.props().dataset.getRasterValueInfo).toHaveBeenCalledWith('odm_dem/dsm.tif', { nodata: undefined, bbox: [15, 45, 15.5, 45.5] });
+        expect(byId('raster-export-extent').attributes('aria-disabled')).toBeUndefined();
+    });
+
+    it('offers the export of the whole raster when it is within the limit', async () => {
+        await render({}, { ...DSM_INFO, estimatedExportBytes: 1000, exportLimitBytes: 1073741824 });
+        expect(byId('raster-export-whole').attributes('aria-disabled')).toBeUndefined();
+        expect(byId('raster-export-whole-reason').exists()).toBe(false);
+    });
+
+    it('has no direct download of the export any more', async () => {
+        const dataset = { getRasterValueInfo: vi.fn(async () => ({ ...DSM_INFO })), exportUrl: vi.fn(), registry: { fetchRaw: vi.fn() } };
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset, filePath: 'odm_dem/dsm.tif' },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        await flushPromises();
+        await byId('raster-export-whole').trigger('click');
+        await flushPromises();
+        expect(dataset.exportUrl).not.toHaveBeenCalled();
+        expect(dataset.registry.fetchRaw).not.toHaveBeenCalled();
     });
 });

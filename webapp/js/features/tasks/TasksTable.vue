@@ -116,6 +116,8 @@
                         {{ taskDuration(slotProps.data) }}
                     </div>
                     <div v-else class="muted">-</div>
+                    <small v-if="taskWaiting(slotProps.data)" class="muted task-waiting" title="Time in the queue before it started"
+                           data-testid="task-waiting">waited {{ taskWaiting(slotProps.data) }}</small>
                 </template>
             </Column>
             <Column header="Actions" style="width: 10rem;" v-bind="stackedColumn()">

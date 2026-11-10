@@ -157,6 +157,17 @@ export function taskDuration(task) {
     return ms < 0 ? '' : formatDuration(ms);
 }
 
+/**
+ * How long a task waited in the queue before it started (startedAt - createdAt), shown next to its duration (FR-PRC-15);
+ * '' for a task that has not started, one that started at once (under a second) and a task a processing node still holds.
+ * @param {{ startedAt?: string | null, createdAt?: string | null, state?: string, waitingForNode?: boolean }} task
+ */
+export function taskWaiting(task) {
+    if (!task?.startedAt || !task.createdAt || isWaitingForNode(task)) return '';
+    const ms = new Date(task.startedAt).getTime() - new Date(task.createdAt).getTime();
+    return Number.isFinite(ms) && ms >= 1000 ? formatDuration(ms) : '';
+}
+
 /** Synthetic download name; the extension comes from the tool catalog. @param {any} task @param {TaskTool[]} tools */
 export function resultFileName(task, tools) {
     const tool = tools.find(t => t.id === task.toolId);

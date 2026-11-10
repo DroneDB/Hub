@@ -178,19 +178,11 @@
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                     <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
-                <button v-if="!isExportTooLarge"
-                        class="panel-btn action-btn"
-                        :disabled="exporting"
-                        title="Export the current view as a GeoTIFF file"
-                        @click="exportGeoTiff">
-                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'" />
-                    <span class="action-label">Export</span>
-                </button>
-                <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
-                    <i class="fas fa-download" />
-                    <span class="action-label">Export</span>
-                </span>
             </div>
+
+            <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16) -->
+            <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox"
+                                :info="rasterInfo" :read-estimate="false" />
         </div>
 
         <div v-else class="panel-body loading">
@@ -205,13 +197,9 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import RescaleFields from './RescaleFields.vue';
+import RasterExportButton from './RasterExportButton.vue';
 import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
-import reg from '@/libs/api/sharedRegistry';
-import { Features } from '@/libs/features';
-import { isExportTooLarge as computeIsExportTooLarge } from '@/libs/exportSize';
-import { bytesToSize } from '@/libs/utils';
 import RasterProfileChart from './RasterProfileChart.vue';
-import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterAreaStats';
 import { nodataNumber } from '@/libs/ddb/dataset';
@@ -222,7 +210,7 @@ import { formatNumber, formatNumberList } from '@/libs/format';
 const formatCount = n => formatNumber(n, 'count');
 
 export default {
-    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect, RescaleFields },
+    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect, RescaleFields, RasterExportButton },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -232,6 +220,8 @@ export default {
         targetCandidates: { type: Array, default: () => [] },
         targetPath: { type: String, default: null },
         initialParams: { type: Object, default: null },
+        // The visible extent of the map in WGS 84 (minLon, minLat, maxLon, maxLat), for 'Export visible extent' (FR-RAS-16)
+        visibleBbox: { type: Array, default: null },
         spotInfo: { type: Object, default: null },
         areaStats: { type: Object, default: null },
         areaStatsLoading: { type: Boolean, default: false },
@@ -263,7 +253,6 @@ export default {
             // The NoData value typed in the panel ('' keeps the one of the file)
             nodata: '',
             unitLabel: '',
-            exporting: false,
             originalView: false
         };
     },
@@ -343,18 +332,6 @@ export default {
                 return this.selectedFormula === 'KELVIN' ? 'K' : '°C';
             }
             return this.unitLabel || '';
-        },
-        maxExportSizeBytes() {
-            return reg.features.value(Features.MAX_EXPORT_SIZE_BYTES);
-        },
-        isExportTooLarge() {
-            return computeIsExportTooLarge(this.rasterInfo, this.maxExportSizeBytes);
-        },
-        exportLimitTooltip() {
-            const limit = this.maxExportSizeBytes;
-            return limit
-                ? `Export disabled: estimated output exceeds the configured limit (${bytesToSize(limit)})`
-                : 'Export disabled';
         }
     },
 
@@ -531,23 +508,6 @@ export default {
 
         onProfileHover(sample) {
             this.$emit('profileHover', sample);
-        },
-
-        async exportGeoTiff() {
-            if (!this.filePath || !this.dataset) return;
-            const url = this.dataset.exportUrl(this.filePath, this.vizParams());
-            try {
-                this.exporting = true;
-                const resp = await this.dataset.registry.fetchRaw(url, { cache: 'no-store' });
-                if (!resp.ok) throw new Error(`Export failed (HTTP ${resp.status})`);
-                const blob = await resp.blob();
-                downloadBlob(blob, filenameFromDisposition(resp.headers.get('content-disposition'), 'raster_export.tif'));
-            } catch (e) {
-                console.error('Export error:', e);
-                this.$notify.error(e, { summary: 'Export Failed' });
-            } finally {
-                this.exporting = false;
-            }
         },
 
         // A value of the raster in its unit: the one format of the Hub (FR-RAS-28). A Kelvin raster is shown as the value plus

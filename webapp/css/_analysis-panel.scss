@@ -271,18 +271,6 @@
             background: var(--panel-primary-hover);
         }
     }
-
-    .export-limit-hint {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        padding: 4px 8px;
-        font-size: 0.85rem;
-        color: var(--panel-muted);
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
 }
 
 .analysis-panel--plant-health {

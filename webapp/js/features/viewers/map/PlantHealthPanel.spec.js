@@ -6,15 +6,24 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null } } }));
-vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask: vi.fn() }) }));
+// The server features: no export limit of its own (the value info says it), a server that exports a window (libddb 2.3)
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null, get: name => name === 'rasterExportWindow' } } }));
+const heavy = vi.hoisted(() => ({ runHeavyTask: vi.fn(), tasks: null }));
+vi.mock('@/composables/useHeavyTask', async () => {
+    const { ref } = await import('vue');
+    heavy.tasks = ref({});
+    return { useHeavyTask: () => ({ runHeavyTask: heavy.runHeavyTask, heavyTasks: heavy.tasks }) };
+});
+vi.mock('@/libs/download', () => ({ downloadBlob: vi.fn() }));
 const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 // The clipboard: copyLinkWithNotice (useCopyText) copies through it
 vi.mock('clipboard-copy', () => ({ default: copyText }));
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock('@/libs/notify', () => ({ notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
 const { default: PlantHealthPanel } = await import('./PlantHealthPanel.vue');
 const { default: HistogramChart } = await import('./HistogramChart.vue');
+const { ESTIMATE_DELAY_MS } = await import('@/composables/useRasterExport');
 
 // `bins` equal bins from `min` to `max`, the counts given by `count(binCenter)`
 function histogram(min, max, bins, count) {
@@ -244,5 +253,77 @@ describe('PlantHealthPanel close (FR-RAS-01)', () => {
         expect(vm.reset).not.toHaveBeenCalled();
         expect(vm.$emit).toHaveBeenCalledWith('close');
         expect(vm.$emit).not.toHaveBeenCalledWith('vizParamsChanged', expect.anything());
+    });
+});
+
+// FR-RAS-16, FR-PRC-15, FR-RAS-26: the export of Plant Health is the one export control, with the state of its task
+describe('PlantHealthPanel export', () => {
+    const exportWhole = () => wrapper.find('[data-testid="raster-export-whole"]');
+    const exportStatus = () => wrapper.find('[data-testid="heavy-task-status"]');
+
+    it('submits the raster-export task with the style of the layer and shows Queued…, then Exporting n %', async () => {
+        heavy.tasks.value = {};
+        heavy.runHeavyTask.mockReset();
+        heavy.runHeavyTask.mockImplementation((_dataset, _tool, options) => new Promise(() => {
+            heavy.tasks.value = { t1: { taskId: 't1', toolId: 'raster-export', state: 'Enqueued', percent: 0 } };
+            options.onSubmitted({ taskId: 't1' });
+        }));
+        await renderWith(CLEAN_STATS);
+        expect(exportWhole().attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+
+        await exportWhole().trigger('click');
+        await flushPromises();
+        const [, toolId, options] = heavy.runHeavyTask.mock.calls[0];
+        expect(toolId).toBe('raster-export');
+        expect(options.params).toMatchObject({ path: 'odm_orthophoto/odm_orthophoto.tif', formula: 'NDVI', fileName: 'odm_orthophoto_export.tif' });
+        expect(options.params).not.toHaveProperty('stretch');
+        expect(exportStatus().text()).toContain('Queued…');
+
+        heavy.tasks.value = { t1: { taskId: 't1', toolId: 'raster-export', state: 'Processing', phase: 'rendering', percent: 37 } };
+        await flushPromises();
+        expect(exportStatus().text()).toContain('Exporting');
+        expect(exportStatus().text()).toContain('37%');
+        expect(wrapper.find('[data-testid="heavy-task-cancel"]').exists()).toBe(true);
+    });
+
+    it('passes the visible extent of the map to the control', async () => {
+        await renderWith(CLEAN_STATS);
+        dataset.taskResult = vi.fn(async () => new Blob(['tif']));
+        await wrapper.setProps({ visibleBbox: [15, 45, 15.5, 45.5] });
+        heavy.runHeavyTask.mockReset();
+        heavy.runHeavyTask.mockResolvedValue({ taskId: 't1' });
+        await wrapper.find('[data-testid="raster-export-extent"]').trigger('click');
+        await flushPromises();
+        expect(heavy.runHeavyTask.mock.calls[0][2].params).toMatchObject({ bbox: [15, 45, 15.5, 45.5], fileName: 'odm_orthophoto_extent_export.tif' });
+    });
+
+    // FR-RAS-16, FR-XC-22: in Plant Health too, an export refused for its size is a focusable button with its reason as
+    // visible text. Plant Health reads the info of its bands, so the control reads the estimate of the raster itself
+    it('refuses an export over the limit with a focusable button and the reason as visible text', async () => {
+        heavy.runHeavyTask.mockReset();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        try {
+            await renderWith(CLEAN_STATS);
+            dataset.getRasterValueInfo.mockImplementation(async (path, options = {}) => (options.formula
+                ? { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', stretch: STRETCH.CLEAN }
+                : { bandCount: 5, dataType: 'UInt16', isThermal: false, unit: '', estimatedExportBytes: 9985798963, exportLimitBytes: 1073741824 }));
+            await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
+            await flushPromises();
+        } finally {
+            vi.useRealTimers();
+        }
+
+        const button = exportWhole();
+        expect(button.element.tagName).toBe('BUTTON');
+        expect(button.attributes('disabled')).toBeUndefined();
+        expect(button.attributes('tabindex')).toBeUndefined();
+        expect(button.attributes('aria-disabled')).toBe('true');
+        const reason = wrapper.find('[data-testid="raster-export-whole-reason"]');
+        expect(reason.text()).toBe('Too large to export: about 9.3 GB > 1 GB limit. Use Visible extent to export it in parts.');
+        expect(button.attributes('aria-describedby').split(' ')).toContain(reason.attributes('id'));
+
+        await button.trigger('click');
+        await flushPromises();
+        expect(heavy.runHeavyTask).not.toHaveBeenCalled();
     });
 });

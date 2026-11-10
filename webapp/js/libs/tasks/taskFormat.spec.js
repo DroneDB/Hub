@@ -24,6 +24,15 @@ describe('taskFormat', () => {
         expect(f.taskDuration({ createdAt: '2026-10-20T10:00:00Z' })).toBe('');
     });
 
+    // FR-PRC-15: the time a task waited in the queue, next to its duration
+    it('measures the wait in the queue: startedAt less createdAt', () => {
+        expect(f.taskWaiting({ createdAt: '2026-10-20T10:00:00Z', startedAt: '2026-10-20T10:01:05Z' })).toBe('1m 5s');
+        expect(f.taskWaiting({ createdAt: '2026-10-20T10:00:00Z', startedAt: '2026-10-20T10:00:00.400Z' })).toBe('');
+        expect(f.taskWaiting({ createdAt: '2026-10-20T10:00:00Z' })).toBe('');
+        expect(f.taskWaiting({ createdAt: '2026-10-20T10:00:00Z', startedAt: '2026-10-20T10:05:00Z', waitingForNode: true, state: 'Processing' })).toBe('');
+        expect(f.taskWaiting({ startedAt: '2026-10-20T10:05:00Z' })).toBe('');
+    });
+
     it('offers a result only while the artifact is retained', () => {
         const task = { state: 'Succeeded', toolId: 'build', taskId: 't1', artifactExpiresAt: '2026-10-21T00:00:00Z' };
         expect(f.canDownloadResult(task, tools, Date.parse('2026-10-20T00:00:00Z'))).toBe(true);

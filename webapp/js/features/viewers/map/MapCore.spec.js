@@ -394,6 +394,35 @@ describe('the state of a view', () => {
     });
 });
 
+// FR-RAS-16: the raster panels export the visible extent; the map says it as the WGS 84 window of the export task
+describe('the visible extent for the raster panels (FR-RAS-16)', () => {
+    it('is the window the map shows, in degrees, after each move, and reaches both panels', async () => {
+        await mountMap([file(MAIN)]);
+        const map = wrapper.vm.map;
+        map.setSize([800, 600]);
+        map.getView().setCenter([1670100, 5645700]);
+        map.getView().setResolution(1);
+        await moved();
+
+        // 800 x 600 pixels of 1 m around (1670100, 5645700): x 1669700..1670500, y 5645400..5646000; the longitude and
+        // latitude of those corners (x / 6378137 rad; 2 atan(e^(y / 6378137)) - 90 degrees), by hand
+        expect(wrapper.vm.visibleBbox).toEqual([14.99917, 45.151477, 15.006357, 45.155278]);
+        expect(wrapper.findComponent({ name: 'RasterAnalysisControls' }).vm.$attrs['visible-bbox']).toEqual([14.99917, 45.151477, 15.006357, 45.155278]);
+        expect(wrapper.findComponent({ name: 'PlantHealthPanel' }).vm.$attrs['visible-bbox']).toEqual([14.99917, 45.151477, 15.006357, 45.155278]);
+
+        map.getView().setCenter([1671100, 5645700]);
+        await moved();
+        expect(wrapper.vm.visibleBbox[0]).toBeCloseTo(14.99917 + 1000 / 111319.49, 4);
+    });
+
+    it('is unknown while the map has no size', async () => {
+        await mountMap([file(MAIN)]);
+        wrapper.vm.map.setSize(undefined);
+        await moved();
+        expect(wrapper.vm.visibleBbox).toBeNull();
+    });
+});
+
 // FR-RAS-01: a DEM opens as a colour ramp over its range, not as the grey of the tiles; an orthophoto keeps its colours
 describe('the default style of a raster', () => {
     it('seeds a single-band georaster with the default of its value info, and leaves the orthophoto alone', async () => {

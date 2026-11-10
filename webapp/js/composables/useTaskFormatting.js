@@ -35,6 +35,7 @@ export function useTaskFormatting() {
         getRelativeTime: fmt.taskTimeAgo,
         runningTime: task => fmt.runningTime(task, now.value),
         taskDuration: fmt.taskDuration,
+        taskWaiting: fmt.taskWaiting,
         resultFileName: task => fmt.resultFileName(task, taskTools.value),
         canDownloadResult: (task, list = []) => fmt.canDownloadResult(task, tools(list), now.value),
         artifactExpiresAt: fmt.artifactExpiresAt,
