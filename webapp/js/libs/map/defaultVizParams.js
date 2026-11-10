@@ -5,9 +5,11 @@
  * raster carries it (`stretch`, one {min, max} per band, one for an index, none for a Byte raster of several bands); the
  * Hub computes none. A panel never changes the default (FR-RAS-17).
  *
- * The colour map is ironbow for thermal, rdylgn for a vegetation index and viridis for any other single band.
+ * The colour map is ironbow for thermal, rdylgn for a vegetation index and viridis for any other single band. A thermal
+ * raster opens in the unit of its band (D-022): a Kelvin raster in K, with the formula of that unit (ddb converts from the
+ * band unit, so the formula of the band's own unit changes no value) and the rescale of ddb, which is in the band unit.
  */
-import { rasterValueUnit } from '@/libs/map/rasterUnit';
+import { rasterValueUnit, thermalBandUnit, thermalFormulaOfUnit } from '@/libs/map/rasterUnit';
 
 /**
  * @typedef {{ isThermal?: boolean, calibration?: unknown, unit?: string, bandCount?: number, dataType?: string,
@@ -17,7 +19,6 @@ import { rasterValueUnit } from '@/libs/map/rasterUnit';
  *   rescale is "min,max", or '' for the server's own stretch; unit is what the panel's Unit field starts with
  */
 
-export const THERMAL_FORMULA = 'CELSIUS';
 export const THERMAL_COLORMAP = 'ironbow';
 export const INDEX_COLORMAP = 'rdylgn';
 export const GENERIC_COLORMAP = 'viridis';
@@ -59,14 +60,16 @@ export function defaultRescale(info) {
  */
 export function defaultVizParams(info, { index = false } = {}) {
     const thermal = !!(info && info.isThermal);
+    // The unit of a thermal raster: its band's; none for the raw counts of a sensor, which are no temperatures
+    const bandUnit = thermalBandUnit(info);
     /** @type {DefaultVizParams} */
     const params = {
         colormap: thermal ? THERMAL_COLORMAP : (index ? INDEX_COLORMAP : GENERIC_COLORMAP),
         rescale: defaultRescale(info),
-        unit: thermal ? '°C' : rasterValueUnit(info)
+        unit: thermal ? bandUnit : rasterValueUnit(info)
     };
-    // Only a calibrated thermal raster has a unit to convert to; a formula on another raster would change its values
-    if (thermal && info && info.calibration) params.formula = THERMAL_FORMULA;
+    // Only a thermal raster whose unit is known has a unit to convert to; a formula on another raster would change its values
+    if (bandUnit) params.formula = thermalFormulaOfUnit(bandUnit);
     return params;
 }
 

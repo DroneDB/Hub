@@ -64,11 +64,12 @@ describe('RasterAnalysisControls area statistics', () => {
         expect(statRows().some(r => r.startsWith('No data'))).toBe(false);
     });
 
-    it('shows the spread of a thermal area without the Kelvin offset', async () => {
+    // D-022: ddb answers in the unit of the selected formula, the panel adds nothing to the numbers
+    it('shows the values of a thermal area as the server sends them, in the unit of the selected formula', async () => {
         await render();
         wrapper.vm.rasterInfo = { valueMin: 20, valueMax: 40, isThermal: true, calibration: {} };
         wrapper.vm.selectedFormula = 'KELVIN';
-        await wrapper.setProps({ areaStats: { ...STATS, min: 20, stddev: 1.25, isThermal: true } });
+        await wrapper.setProps({ areaStats: { ...STATS, min: 293.15, stddev: 1.25, isThermal: true } });
         expect(statRows()).toContain('Min: 293.2 K');
         expect(statRows()).toContain('Std dev: 1.3 K');
     });
@@ -450,3 +451,206 @@ describe('RasterAnalysisControls footer', () => {
     });
 });
 
+// The thermal units (FR-RAS-03, FR-RAS-06, D-022, AC-011): the panel shows the values of ddb in the unit of its Unit select,
+// which starts at the unit of the band. As libddb's raster value info answers a Float32 GeoTIFF in K, one in degrees Celsius,
+// and the raw counts of a sensor.
+describe('RasterAnalysisControls thermal units', () => {
+    const KELVIN = { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '',
+        valueMin: 280.1, valueMax: 308.4, stretch: [{ min: 280.1, max: 308.4 }] };
+    const CELSIUS = { ...KELVIN, unit: 'Celsius', valueMin: 6.95, valueMax: 35.25, stretch: [{ min: 6.95, max: 35.25 }] };
+    const RAW_COUNTS = { isThermal: true, isDirectValue: false, bandCount: 1, dataType: 'UInt16', unit: '°C', sensorId: 'flir',
+        valueMin: 14000, valueMax: 16000, stretch: [{ min: 14000, max: 16000 }] };
+    // What ddb answers for the value info of the Kelvin raster in each unit
+    const KELVIN_IN = {
+        CELSIUS: { ...KELVIN, unit: '°C', valueMin: 6.95, valueMax: 35.25, stretch: [{ min: 6.95, max: 35.25 }] },
+        FAHRENHEIT: { ...KELVIN, unit: '°F', valueMin: 44.51, valueMax: 95.45, stretch: [{ min: 44.51, max: 95.45 }] },
+        KELVIN
+    };
+
+    // The info by the formula that was asked: the file's own without one
+    async function mountThermal(info, inUnit = {}, props = {}) {
+        const getRasterValueInfo = vi.fn(async (path, options = {}) => ({ ...(options.formula && inUnit[options.formula] ? inUnit[options.formula] : info) }));
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset: { getRasterValueInfo }, filePath: 'hatcreek/clip.tif', ...props },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        await flushPromises();
+        return { getRasterValueInfo };
+    }
+    const select = () => wrapper.find('#raster-analysis-controls-unit');
+    const last = () => wrapper.emitted('vizParamsChanged').at(-1)[0];
+    const range = () => wrapper.findAll('.temp-range span').map(span => span.text()).join(' ');
+    // The Rescale range of the two fields (U-401 RescaleFields) as the panel's machine value "min,max"
+    const rescaleShown = () => `${wrapper.find('#raster-analysis-controls-rescale-min').element.value},${wrapper.find('#raster-analysis-controls-rescale-max').element.value}`;
+    // The user types a range and leaves the field (the commit the panel applies)
+    const typeRescale = async (min, max) => {
+        await wrapper.find('#raster-analysis-controls-rescale-min').setValue(min);
+        await wrapper.find('#raster-analysis-controls-rescale-max').setValue(max);
+        await wrapper.find('#raster-analysis-controls-rescale-max').trigger('change');
+    };
+    const rescaleLabel = () => wrapper.find('#raster-analysis-controls-rescale-label').text();
+    const chooseUnit = async formula => { await select().setValue(formula); await flushPromises(); };
+
+    it('opens a Kelvin raster in K, with the formula of the band and no 273.15 added', async () => {
+        await mountThermal(KELVIN, KELVIN_IN);
+        expect(select().element.value).toBe('KELVIN');
+        expect(range()).toBe('280.1 K - 308.4 K');
+        expect(last()).toEqual({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280.1,308.4' });
+        expect(wrapper.vm.formatValue(284.6)).toBe('284.6 K');
+        expect(wrapper.vm.formatSpread(1.25)).toBe('1.3 K');
+    });
+
+    it('shows the values in °C once the user selects it: ddb converts, the panel only formats', async () => {
+        const { getRasterValueInfo } = await mountThermal(KELVIN, KELVIN_IN);
+        await chooseUnit('CELSIUS');
+        // The value info is asked again in the unit
+        expect(getRasterValueInfo).toHaveBeenLastCalledWith('hatcreek/clip.tif', { nodata: undefined, formula: 'CELSIUS' });
+        expect(range()).toBe('7.0 °C - 35.3 °C');
+        expect(wrapper.vm.formatValue(11.5)).toBe('11.5 °C');
+    });
+
+    it('the Unit select offers °C, K and °F, and °F sends the Fahrenheit formula', async () => {
+        const { getRasterValueInfo } = await mountThermal(KELVIN, KELVIN_IN);
+        expect(select().findAll('option').map(o => `${o.element.value} ${o.text()}`)).toEqual([
+            'CELSIUS Celsius (°C)', 'KELVIN Kelvin (K)', 'FAHRENHEIT Fahrenheit (°F)'
+        ]);
+        await chooseUnit('FAHRENHEIT');
+        expect(getRasterValueInfo).toHaveBeenLastCalledWith('hatcreek/clip.tif', { nodata: undefined, formula: 'FAHRENHEIT' });
+        expect(last().formula).toBe('FAHRENHEIT');
+        expect(range()).toBe('44.5 °F - 95.5 °F');
+    });
+
+    // D-022: a rescale keeps its temperatures when the unit changes: it goes with the unit it was written in
+    it('sends the rescale with the unit it was written in after the unit changed', async () => {
+        await mountThermal(KELVIN, KELVIN_IN);
+        expect(rescaleLabel()).toBe('Rescale (K)');
+        await chooseUnit('CELSIUS');
+        expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '280.1,308.4', rescaleUnit: 'K' });
+        expect(rescaleLabel()).toBe('Rescale (K)');
+
+        // A rescale typed now is in °C: it needs no unit of its own
+        await typeRescale('10', '30');
+        await new Promise(resolve => setTimeout(resolve, 350));
+        expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '10,30' });
+        expect(rescaleLabel()).toBe('Rescale (°C)');
+    });
+
+    it('Reset goes back to the unit of the band and to its stretch', async () => {
+        await mountThermal(KELVIN, KELVIN_IN);
+        await chooseUnit('FAHRENHEIT');
+        await typeRescale('50', '90');
+        await wrapper.find('button[title="Reset all visualization parameters to their defaults"]').trigger('click');
+        await flushPromises();
+        expect(select().element.value).toBe('KELVIN');
+        expect(rescaleShown()).toBe('280.1,308.4');
+        expect(range()).toBe('280.1 K - 308.4 K');
+        expect(last()).toEqual({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280.1,308.4' });
+    });
+
+    it('opens with the unit and the rescale of the layer, with the unit the rescale was written in', async () => {
+        const { getRasterValueInfo } = await mountThermal(KELVIN, KELVIN_IN,
+            { initialParams: { formula: 'FAHRENHEIT', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' } });
+        expect(select().element.value).toBe('FAHRENHEIT');
+        expect(getRasterValueInfo).toHaveBeenLastCalledWith('hatcreek/clip.tif', { nodata: undefined, formula: 'FAHRENHEIT' });
+        expect(last()).toEqual({ formula: 'FAHRENHEIT', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' });
+    });
+
+    it('a vegetation index of Plant Health on the same file is no unit', async () => {
+        await mountThermal(KELVIN, KELVIN_IN, { initialParams: { formula: 'NDVI', colormap: 'rdylgn', rescale: '0,1' } });
+        expect(select().element.value).toBe('KELVIN');
+    });
+
+    // FR-RAS-06
+    it('says that the values of a raster in degrees Celsius are in the file, with its Unit select and no notice', async () => {
+        await mountThermal(CELSIUS);
+        expect(wrapper.find('[data-testid="raster-thermal-notice"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="raster-thermal-file-unit"]').text()).toBe('Values in °C from the file.');
+        expect(select().exists()).toBe(true);
+        expect(select().element.value).toBe('CELSIUS');
+        expect(last().formula).toBe('CELSIUS');
+        expect(range()).toBe('7.0 °C - 35.3 °C');
+    });
+
+    it('has the notice only for the raw counts of a sensor, and then no Unit select and no formula', async () => {
+        await mountThermal(RAW_COUNTS);
+        expect(wrapper.find('[data-testid="raster-thermal-notice"]').text()).toContain('No thermal calibration data: Showing raw values.');
+        expect(wrapper.find('[data-testid="raster-thermal-file-unit"]').exists()).toBe(false);
+        expect(select().exists()).toBe(false);
+        expect(last()).toEqual({ colormap: 'ironbow', rescale: '14000,16000' });
+        expect(range()).toMatch(/^14[,.\s\u00a0\u202f]?000 - 16[,.\s\u00a0\u202f]?000$/);
+    });
+
+    it('a calibrated raster has its Unit select, no notice and no "from the file" text', async () => {
+        await mountThermal({ ...RAW_COUNTS, calibration: { planckB: 1501 }, unit: '', valueMin: 12.76, valueMax: 35.27 });
+        expect(wrapper.find('[data-testid="raster-thermal-notice"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="raster-thermal-file-unit"]').exists()).toBe(false);
+        expect(select().element.value).toBe('CELSIUS');
+    });
+
+    // The numbers are labelled with the unit the server says they are in: a server that did not apply the formula answers
+    // the Kelvin raster in K to a request in °C, and a value read before the unit changed is in the unit it was read in
+    it('labels each value with the unit of the answer, not with the unit selected', async () => {
+        await mountThermal(KELVIN, { CELSIUS: KELVIN });
+        await chooseUnit('CELSIUS');
+        expect(select().element.value).toBe('CELSIUS');
+        expect(range()).toBe('280.1 K - 308.4 K');
+
+        await wrapper.setProps({
+            areaStats: { ...STATS, min: 293.15, max: 295.4, mean: 294.0, median: 294.1, stddev: 1.25, unit: 'K', isThermal: true },
+            spotInfo: { value: 284.6, unit: 'K', x: 4, y: 5, hasGeo: false },
+            profile: { unit: 'K', samples: [{ distance: 0, value: 284.6 }] }
+        });
+        expect(statRows()).toContain('Min: 293.2 K');
+        expect(statRows()).toContain('Std dev: 1.3 K');
+        expect(byId('raster-spot-value').text()).toContain('284.6 K');
+        expect(wrapper.findComponent({ name: 'RasterProfileChart' }).props('unit')).toBe('K');
+
+        // An answer without a unit is in the unit selected
+        await wrapper.setProps({ spotInfo: { value: 11.5, x: 4, y: 5, hasGeo: false }, profile: { samples: [] } });
+        expect(byId('raster-spot-value').text()).toContain('11.5 °C');
+        expect(wrapper.findComponent({ name: 'RasterProfileChart' }).props('unit')).toBe('°C');
+    });
+
+    it('labels no raw count of a sensor with a temperature unit, whatever the answer says', async () => {
+        await mountThermal(RAW_COUNTS);
+        await wrapper.setProps({ areaStats: { ...STATS, min: 14000, unit: '°C', isThermal: true } });
+        expect(statRows().find(row => row.startsWith('Min'))).toMatch(/^Min: 14[,.\s\u00a0\u202f]?000$/);
+    });
+
+    // F5: the value info in the new unit fails: the panel says so and goes back to the unit it shows, with no unhandled error
+    it('goes back to the unit it shows when the value info in the selected unit fails', async () => {
+        const failure = new Error('Unknown formula: FAHRENHEIT');
+        const getRasterValueInfo = vi.fn(async (path, options = {}) => {
+            if (options.formula === 'FAHRENHEIT') throw failure;
+            return { ...(options.formula ? KELVIN_IN[options.formula] : KELVIN) };
+        });
+        const notifyError = vi.fn();
+        const errorHandler = vi.fn();
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        try {
+            wrapper = mount(RasterAnalysisControls, {
+                props: { visible: true, dataset: { getRasterValueInfo }, filePath: 'hatcreek/clip.tif' },
+                global: {
+                    stubs: { RasterProfileChart: true, ColormapDropdown: true },
+                    mocks: { $notify: { error: notifyError } },
+                    config: { errorHandler }
+                }
+            });
+            await flushPromises();
+            await chooseUnit('CELSIUS');
+            const emitted = wrapper.emitted('vizParamsChanged').length;
+
+            await chooseUnit('FAHRENHEIT');
+            expect(getRasterValueInfo).toHaveBeenLastCalledWith('hatcreek/clip.tif', { nodata: undefined, formula: 'FAHRENHEIT' });
+            expect(notifyError).toHaveBeenCalledWith(failure, { summary: 'Unit' });
+            expect(errorHandler).not.toHaveBeenCalled();
+            expect(select().element.value).toBe('CELSIUS');
+            expect(range()).toBe('7.0 °C - 35.3 °C');
+            // The style of the layer is not changed to a unit the panel does not show
+            expect(wrapper.emitted('vizParamsChanged').length).toBe(emitted);
+            expect(last().formula).toBe('CELSIUS');
+        } finally {
+            consoleError.mockRestore();
+        }
+    });
+});

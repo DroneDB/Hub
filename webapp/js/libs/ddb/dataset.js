@@ -33,6 +33,17 @@ export function rasterOptionsQuery(options = {}) {
 }
 
 /**
+ * The query part of the unit of the rescale (D-022): a rescale of a thermal formula written in another unit than the formula's
+ * (the user changed the Unit after setting it) is sent with the unit it was written in, and ddb converts it.
+ * @param {{ formula?: string, rescale?: string, rescaleUnit?: string }} [vizParams]
+ */
+export function rescaleUnitQuery(vizParams = {}) {
+    return vizParams && vizParams.formula && vizParams.rescale && vizParams.rescaleUnit
+        ? `&rescaleUnit=${encodeURIComponent(vizParams.rescaleUnit)}`
+        : '';
+}
+
+/**
  * The query part of the options the raster value calls (info, point, area) share: the NoData value, and the formula of
  * the values (D-022).
  * @param {{ nodata?: number|string|null, formula?: string }} [options]
@@ -128,6 +139,7 @@ export default class Dataset {
         if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
         if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
         if (vizParams.stretch) url += `&stretch=${encodeURIComponent(vizParams.stretch)}`;
+        url += rescaleUnitQuery(vizParams);
         url += rasterOptionsQuery(vizParams);
         return url;
     }
@@ -295,6 +307,9 @@ export default class Dataset {
      * @param {number} [options.maxElev] Drop contours above this elevation
      * @param {number} [options.simplifyTolerance=0] Simplification tolerance in raster CRS units
      * @param {number} [options.bandIndex=1] 1-based raster band index
+     * @param {{ nodata?: number|string|null, formula?: string }} [valueOptions] the options of the values of the layer
+     *        (layerValueOptions): its NoData value, and its thermal formula, which gives the levels, the limits and the labels
+     *        in the unit of the layer (D-022)
      */
     async generateContours(path, {
         interval = null,
@@ -304,7 +319,8 @@ export default class Dataset {
         maxElev = null,
         simplifyTolerance = 0,
         bandIndex = 1,
-    } = {}) {
+    } = {}, valueOptions = {}) {
+        /** @type {Record<string, any>} */
         const body = {
             path,
             interval,
@@ -315,6 +331,9 @@ export default class Dataset {
             simplifyTolerance,
             bandIndex,
         };
+        const nodata = nodataNumber(valueOptions && valueOptions.nodata);
+        if (nodata !== null) body.nodata = nodata;
+        if (valueOptions && valueOptions.formula) body.formula = valueOptions.formula;
         return this.registry.postRequest(`${this.baseApi}/contours`, body);
     }
 
@@ -326,6 +345,7 @@ export default class Dataset {
         if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
         if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
         if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        url += rescaleUnitQuery(vizParams);
         url += rasterOptionsQuery({ nodata: vizParams.nodata });
         return url;
     }

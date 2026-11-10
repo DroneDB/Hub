@@ -64,6 +64,69 @@ export function rasterUnitSymbol(unit) {
     return UNIT_SYMBOLS.get(text.toLowerCase()) ?? text;
 }
 
+/**
+ * The thermal formulas of ddb (D-022): each gives the values of a thermal raster in its unit, converted from the unit of
+ * the band; the Hub sends the one of the unit the user picks and only formats the answer. The order is that of the Unit select.
+ */
+export const THERMAL_UNIT_OPTIONS = Object.freeze([
+    { formula: 'CELSIUS', unit: '°C', label: 'Celsius (°C)' },
+    { formula: 'KELVIN', unit: 'K', label: 'Kelvin (K)' },
+    { formula: 'FAHRENHEIT', unit: '°F', label: 'Fahrenheit (°F)' }
+]);
+
+/**
+ * The thermal formula that gives the values in a unit ("K", "kelvin", "Celsius", "°F"...); '' for a unit that is not a
+ * temperature unit.
+ * @param {string|null|undefined} unit
+ * @returns {string}
+ */
+export function thermalFormulaOfUnit(unit) {
+    const symbol = rasterUnitSymbol(unit);
+    return THERMAL_UNIT_OPTIONS.find(o => o.unit === symbol)?.formula ?? '';
+}
+
+/**
+ * The symbol of the unit a thermal formula gives ('°C', 'K', '°F'); '' for any other formula.
+ * @param {string|null|undefined} formula
+ * @returns {string}
+ */
+export function thermalUnitOfFormula(formula) {
+    return THERMAL_UNIT_OPTIONS.find(o => o.formula === formula)?.unit ?? '';
+}
+
+/**
+ * The options the value calls of a layer (value info, point, area, profile, contours) read its raster with: the NoData value
+ * of its style (FR-RAS-31) and, when it is styled with a thermal formula, that formula, so that ddb answers in the unit the
+ * layer shows (D-022). A formula that is not a thermal one (a vegetation index of Plant Health on the same file) is no option
+ * of a value.
+ * @param {{ nodata?: number|string|null, formula?: string }|null|undefined} vizParams the style of the layer
+ * @returns {{ nodata?: number|string, formula?: string }}
+ */
+export function layerValueOptions(vizParams) {
+    /** @type {{ nodata?: number|string, formula?: string }} */
+    const options = {
+        nodata: vizParams && vizParams.nodata !== undefined && vizParams.nodata !== null && vizParams.nodata !== ''
+            ? vizParams.nodata : undefined
+    };
+    if (vizParams && vizParams.formula && thermalUnitOfFormula(vizParams.formula)) options.formula = vizParams.formula;
+    return options;
+}
+
+/**
+ * The unit the values of a thermal raster are in, as the file says it (the band's unit): '°C', 'K' or '°F'. '' for a
+ * raster that is not thermal and for one whose values are raw counts of a sensor (no calibration, not direct values: they
+ * are no temperatures, FR-RAS-06). A calibrated raster without a unit is in degrees Celsius.
+ * @param {{ isThermal?: boolean, isDirectValue?: boolean, calibration?: unknown, unit?: string }|null|undefined} info
+ * @returns {string}
+ */
+export function thermalBandUnit(info) {
+    if (!info || !info.isThermal) return '';
+    if (info.isDirectValue === false && !info.calibration) return '';
+    const symbol = rasterUnitSymbol(info.unit);
+    if (THERMAL_UNIT_OPTIONS.some(o => o.unit === symbol)) return symbol;
+    return info.calibration ? '°C' : '';
+}
+
 /** The number rounded as Intl rounds it (293.15 is 293.2 at one decimal; toFixed says 293.1), in a form Number() reads */
 const roundedText = (/** @type {number} */ value, /** @type {number} */ places) =>
     new Intl.NumberFormat('en-US', { useGrouping: false, minimumFractionDigits: places, maximumFractionDigits: places }).format(value);

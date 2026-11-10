@@ -11,7 +11,7 @@
  *  - this.dataset (Dataset instance exposing submitTask, getTask and taskResult)
  *  - this.rasterFilePath (shared with useRasterAnalysis / useStockpileVolume)
  *  - this.vizParamsByPath (optional; the styles of the layers, shared with useRasterAnalysis): the contours are read with
- *    the NoData value of the layer (FR-RAS-31)
+ *    the NoData value and the thermal formula of the layer, so their levels and labels are in the unit it shows (D-022)
  *  - this.measureControls (the OL measurements controller, same one used by
  *    useStockpileVolume) for importFromGeoJSON and source access.
  *
@@ -21,7 +21,7 @@
  */
 import { buildContourFeature, colorForElevation } from '@/libs/map/contourStorage';
 import { CONTOUR_TOOL_ID, contourTaskParams, contourTruncation } from '@/libs/map/contourTask';
-import { isElevationRaster } from '@/libs/map/rasterUnit';
+import { isElevationRaster, layerValueOptions } from '@/libs/map/rasterUnit';
 import { createFeatureScope } from '@/composables/featureScope';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { formatNumber } from '@/libs/format';
@@ -96,11 +96,12 @@ const definition = {
         },
 
         /**
-         * The options of the values the layer is read with (the NoData value it is styled with, FR-RAS-31).
+         * The options of the values the layer is read with: the NoData value it is styled with (FR-RAS-31) and its thermal
+         * formula, so the levels and labels are in the unit it shows (D-022; never a Plant Health index formula).
          */
         _contourValueOptions() {
             const style = this.vizParamsByPath && this.rasterFilePath ? this.vizParamsByPath[this.rasterFilePath] : null;
-            return style && style.nodata !== undefined && style.nodata !== '' ? { nodata: style.nodata } : {};
+            return layerValueOptions(style);
         },
 
         /**

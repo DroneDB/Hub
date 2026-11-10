@@ -377,3 +377,58 @@ describe('useRasterAnalysis profile', () => {
         expect(dataset.getRasterProfile).toHaveBeenCalledWith(PATH, { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, 32, { nodata: 0 });
     });
 });
+
+// D-022: ddb converts the values to the unit of the layer's thermal formula; the panel asks in it, and again when it changes
+describe('useRasterAnalysis thermal units', () => {
+    const KELVIN_LAYER = { [PATH]: { formula: 'KELVIN', colormap: 'ironbow', rescale: '280,310' } };
+
+    it('sends the thermal formula of the layer with a point, an area and a profile', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { formula: 'FAHRENHEIT', colormap: 'ironbow', nodata: 0 } } });
+        await raster.queryRasterPointAt([505, 255]);
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        expect(dataset.getRasterAreaStatsOfWindow.mock.calls[0][2]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+        await raster.queryRasterProfile([[0, 0], [1, 1]], 8);
+        expect(dataset.getRasterProfile.mock.calls[0][3]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+        await raster.queryRasterPoint(3, 4);
+        expect(dataset.getRasterPointValue.mock.calls[0][3]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+    });
+
+    it('does not send a vegetation index as the unit of a value', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { formula: 'NDVI', colormap: 'rdylgn' } } });
+        await raster.queryRasterPointAt([505, 255]);
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: undefined });
+    });
+
+    it('reads the spot value, the area and the profile again in the new unit when the unit changes', async () => {
+        const { raster, dataset, map } = setup({ vizParams: KELVIN_LAYER });
+        await raster.queryRasterPointAt([505, 255]);
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        raster.rasterAreaStats.value = { min: 284.6 };
+        await raster.queryRasterProfile([[0, 0], [1, 1]], 8);
+        dataset.getRasterPointValueAt.mockClear();
+        dataset.getRasterAreaStatsOfWindow.mockClear();
+        dataset.getRasterProfile.mockClear();
+        dataset.getRasterPointValueAt.mockResolvedValueOnce({ value: 11.5, unit: '°C', lon: 0.0045, lat: 0.0023 });
+        dataset.getRasterAreaStatsOfWindow.mockResolvedValueOnce({ min: 11.45, unit: '°C' });
+
+        raster.handleRasterVizParamsChanged({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' });
+
+        await vi.waitFor(() => expect(raster.rasterSpotInfo.value.value).toBe(11.5));
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: undefined, formula: 'CELSIUS' });
+        await vi.waitFor(() => expect(raster.rasterAreaStats.value).toEqual({ min: 11.45, unit: '°C' }));
+        expect(dataset.getRasterAreaStatsOfWindow.mock.calls[0][2]).toEqual({ nodata: undefined, formula: 'CELSIUS' });
+        expect(dataset.getRasterProfile).toHaveBeenCalledTimes(1);
+        expect(dataset.getRasterProfile.mock.calls[0][3]).toEqual({ nodata: undefined, formula: 'CELSIUS' });
+        expect(map).toBeDefined();
+    });
+
+    it('reads nothing again when another part of the style changes', async () => {
+        const { raster, dataset } = setup({ vizParams: KELVIN_LAYER });
+        await raster.queryRasterPointAt([505, 255]);
+        dataset.getRasterPointValueAt.mockClear();
+        raster.handleRasterVizParamsChanged({ formula: 'KELVIN', colormap: 'magma', rescale: '280,310' });
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(dataset.getRasterPointValueAt).not.toHaveBeenCalled();
+    });
+});

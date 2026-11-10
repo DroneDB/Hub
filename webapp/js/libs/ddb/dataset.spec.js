@@ -422,12 +422,39 @@ describe('Dataset raster value calls', () => {
         expect(post.mock.calls[1][1]).not.toHaveProperty('nodata');
     });
 
+    // D-022: the contours of a thermal layer are in its unit (levels, limits, labels), and they skip its NoData value
+    it('contours send the NoData value and the thermal formula of the layer in the body', async () => {
+        const { ds, post } = datasetGetting();
+        await ds.generateContours('t.tif', { interval: 5 }, { nodata: '0', formula: 'KELVIN' });
+        expect(post).toHaveBeenLastCalledWith(`${base}/contours`, {
+            path: 't.tif', interval: 5, count: null, baseOffset: 0, minElev: null, maxElev: null, simplifyTolerance: 0, bandIndex: 1,
+            nodata: 0, formula: 'KELVIN'
+        });
+        await ds.generateContours('dsm.tif', { count: 10 });
+        expect(post.mock.calls[1][1]).not.toHaveProperty('formula');
+        expect(post.mock.calls[1][1]).not.toHaveProperty('nodata');
+        expect(post.mock.calls[1][1]).toMatchObject({ path: 'dsm.tif', count: 10 });
+    });
+
     it('the tiles and the export of a layer with a NoData value carry it', () => {
         const { ds } = datasetGetting();
         expect(ds.tileExUrl('t.tif', 1, 2, 3, { colormap: 'ironbow', nodata: 0 })).toBe(
             `${base}/tiles-ex/1/2/3.webp?path=t.tif&colormap=ironbow&nodata=0`);
         expect(ds.tileExUrl('t.tif', 1, 2, 3, { colormap: 'ironbow' })).not.toContain('nodata');
         expect(ds.exportUrl('t.tif', { rescale: '0,1', nodata: 65535 })).toContain('&nodata=65535');
+    });
+
+    // D-022: a rescale written in another unit than the formula's goes with its unit
+    it('the tiles and the export of a thermal layer carry the unit its rescale was written in', () => {
+        const { ds } = datasetGetting();
+        const style = { formula: 'CELSIUS', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' };
+        expect(ds.tileExUrl('t.tif', 1, 2, 3, style)).toBe(
+            `${base}/tiles-ex/1/2/3.webp?path=t.tif&formula=CELSIUS&colormap=ironbow&rescale=280%2C310&rescaleUnit=K`);
+        expect(ds.exportUrl('t.tif', style)).toContain('&rescale=280%2C310&rescaleUnit=K');
+        expect(ds.tileExUrl('t.tif', 1, 2, 3, { ...style, rescaleUnit: undefined })).not.toContain('rescaleUnit');
+        // Without a rescale or a formula it has no meaning
+        expect(ds.tileExUrl('t.tif', 1, 2, 3, { formula: 'CELSIUS', rescaleUnit: '°F' })).not.toContain('rescaleUnit');
+        expect(ds.tileExUrl('t.tif', 1, 2, 3, { rescale: '0,1', rescaleUnit: '°F' })).not.toContain('rescaleUnit');
     });
 });
 

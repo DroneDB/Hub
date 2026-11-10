@@ -50,6 +50,14 @@ describe('legendUnit', () => {
         expect(legendUnit({}, '')).toBe('');
         expect(legendUnit({}, null)).toBe('');
     });
+
+    // D-022: a rescale kept across a change of the unit is in the unit it was written in
+    it('is the unit of the rescale of a thermal layer when it was written in another temperature unit', () => {
+        expect(legendUnit({ formula: 'FAHRENHEIT' }, null)).toBe('°F');
+        expect(legendUnit({ formula: 'CELSIUS', rescaleUnit: 'K' }, null)).toBe('K');
+        expect(legendUnit({ formula: 'NDVI', rescaleUnit: 'K' }, null)).toBe('');
+        expect(legendUnit({ formula: 'KELVIN', rescaleUnit: 'm' }, null)).toBe('K');
+    });
 });
 
 describe('legendEntry', () => {
@@ -71,5 +79,12 @@ describe('legendEntry', () => {
         const [ndvi] = legendLayers([{ path: 'o.tif', name: 'o.tif' }], { 'o.tif': { formula: 'NDVI', colormap: 'rdylgn', rescale: '-0.25,0.9' } });
         const index = legendEntry(ndvi, null);
         expect([index.minText, index.maxText]).toEqual(['-0.25', '0.9']);
+    });
+
+    it('writes the range of a °C layer whose rescale was kept in K in K', () => {
+        const [kept] = legendLayers([ROW], { 'hat-creek/thermal.tif': { formula: 'CELSIUS', colormap: 'ironbow', rescale: '280.1,308.4', rescaleUnit: 'K' } });
+        expect(kept.rescaleUnit).toBe('K');
+        const entry = legendEntry(kept, null);
+        expect([entry.minText, entry.maxText]).toEqual(['280.1 K', '308.4 K']);
     });
 });

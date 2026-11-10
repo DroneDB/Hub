@@ -23,6 +23,14 @@ describe('vizParamsHash', () => {
         }
     });
 
+    // D-022: a rescale of a thermal layer keeps the unit it was written in
+    it('keeps the unit of the rescale of a thermal layer', () => {
+        const thermal = { formula: 'CELSIUS', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' };
+        expect(encodeVizParamsHash('t.tif', thermal))
+            .toBe('path=t.tif&formula=CELSIUS&colormap=ironbow&rescale=280%2C310&rescaleUnit=K');
+        expect(decodeVizParamsHash(encodeVizParamsHash('t.tif', thermal))).toEqual({ path: 't.tif', vizParams: thermal });
+    });
+
     it('leaves out empty values and keeps a NoData value of zero', () => {
         expect(encodeVizParamsHash('a.tif', { formula: '', rescale: undefined, nodata: 0 })).toBe('path=a.tif&nodata=0');
         expect(decodeVizParamsHash('path=a.tif&nodata=0').vizParams).toEqual({ nodata: 0 });

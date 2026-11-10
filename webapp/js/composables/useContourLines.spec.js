@@ -1,7 +1,8 @@
 /**
  * Every contour request of the Hub runs as the task raster-contours (FR-RAS-11, NFR-001): the progress and the Cancel come
  * from the task, the lines are its artifact, the layer's NoData value goes with the request, and a result the server cut at
- * its cap says so. A refusal or a failure shows in the dialog, not in a modal alert.
+ * its cap says so. A refusal or a failure shows in the dialog, not in a modal alert. A thermal layer gets its levels, its
+ * limits and its labels in the unit it shows: its formula goes with the request (D-022), never a Plant Health index formula.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { effectScope, ref, shallowRef } from 'vue';
@@ -207,5 +208,32 @@ describe('useContourLines as a task', () => {
         contours.openContourDialog();
 
         expect(contours.contourTask.value).toBeNull();
+    });
+
+    it('reads the contours of a thermal layer with its formula and its NoData value (D-022)', async () => {
+        // What the Registry answers for the contours of a Kelvin raster with the CELSIUS formula
+        const celsius = resultOf({ unit: '°C', interval: 5, min: 15, max: 30, rasterMin: 10.85, rasterMax: 30.65 });
+        const { contours } = setup({
+            result: celsius,
+            vizParams: { [PATH]: { formula: 'CELSIUS', colormap: 'ironbow', rescale: '10,30', nodata: 0 } }
+        });
+
+        await contours.generateContourLines({ interval: 5 });
+
+        expect(runHeavyTask.mock.calls[0][2].params).toMatchObject({ interval: 5, nodata: 0, formula: 'CELSIUS' });
+        // The hints of the dialog are in the unit of the answer
+        expect(contours.contourUnit.value).toBe('°C');
+        expect(contours.contourRasterMin.value).toBe(10.85);
+    });
+
+    it('sends no formula for a layer styled with an index, nor for a layer without style', async () => {
+        const index = setup({ vizParams: { [PATH]: { formula: 'NDVI', colormap: 'rdylgn' } } });
+        await index.contours.generateContourLines({ interval: 5 });
+        expect(runHeavyTask.mock.calls[0][2].params).not.toHaveProperty('formula');
+        expect(runHeavyTask.mock.calls[0][2].params).not.toHaveProperty('nodata');
+
+        const plain = setup();
+        await plain.contours.generateContourLines({ count: 10 });
+        expect(runHeavyTask.mock.calls[1][2].params).not.toHaveProperty('formula');
     });
 });

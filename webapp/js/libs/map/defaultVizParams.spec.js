@@ -18,7 +18,25 @@ describe('defaultVizParams', () => {
         expect(defaultVizParams(info)).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '12.76,35.27', unit: '°C' });
     });
 
-    it('has no formula for a thermal raster without a calibration', () => {
+    // D-022: the default unit is the band unit
+    it('opens a Kelvin raster in K, with the formula of the unit of its band', () => {
+        const info = { isThermal: true, isDirectValue: true, unit: 'K', stretch: [{ min: 280.1, max: 308.4 }] };
+        expect(defaultVizParams(info)).toEqual({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280.1,308.4', unit: 'K' });
+    });
+
+    it('opens a raster in degrees Celsius or Fahrenheit in that unit', () => {
+        expect(defaultVizParams({ isThermal: true, isDirectValue: true, unit: 'Celsius', stretch: [{ min: 1, max: 2 }] }))
+            .toMatchObject({ formula: 'CELSIUS', unit: '°C' });
+        expect(defaultVizParams({ isThermal: true, isDirectValue: true, unit: 'degF', stretch: [{ min: 1, max: 2 }] }))
+            .toMatchObject({ formula: 'FAHRENHEIT', unit: '°F' });
+    });
+
+    it('has no formula and no unit for a thermal raster of raw counts, which are no temperatures', () => {
+        const raw = defaultVizParams({ isThermal: true, isDirectValue: false, unit: '°C', stretch: [{ min: 14000, max: 16000 }] });
+        expect(raw).toEqual({ colormap: 'ironbow', rescale: '14000,16000', unit: '' });
+    });
+
+    it('has no formula for a thermal raster whose unit is not known', () => {
         expect(defaultVizParams({ isThermal: true, stretch: [{ min: 1, max: 2 }] }).formula).toBeUndefined();
     });
 

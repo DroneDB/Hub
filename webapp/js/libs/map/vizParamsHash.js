@@ -8,11 +8,11 @@
  */
 
 /** The text keys of a style, in the order they are written */
-const TEXT_KEYS = ['preset', 'formula', 'bands', 'colormap', 'rescale', 'stretch'];
+const TEXT_KEYS = ['preset', 'formula', 'bands', 'colormap', 'rescale', 'rescaleUnit', 'stretch'];
 
 /**
- * @typedef {{ preset?: string, formula?: string, bands?: string, colormap?: string, rescale?: string, stretch?: string,
- *             nodata?: number }} VizParams
+ * @typedef {{ preset?: string, formula?: string, bands?: string, colormap?: string, rescale?: string, rescaleUnit?: string,
+ *             stretch?: string, nodata?: number }} VizParams
  */
 
 /**

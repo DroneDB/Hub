@@ -3,7 +3,10 @@
  * unit for raw values.
  */
 import { describe, it, expect } from 'vitest';
-import { isElevationRaster, rasterValueUnit, rasterValueParts, rasterUnitSymbol } from './rasterUnit';
+import {
+    isElevationRaster, rasterValueUnit, rasterValueParts, rasterUnitSymbol, thermalBandUnit, thermalFormulaOfUnit, thermalUnitOfFormula,
+    THERMAL_UNIT_OPTIONS, layerValueOptions
+} from './rasterUnit';
 
 // As libddb's raster value info answers them
 const DSM = { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '' };
@@ -82,5 +85,57 @@ describe('rasterUnitSymbol', () => {
         expect(['Fahrenheit', 'F', '°F'].map(rasterUnitSymbol)).toEqual(['°F', '°F', '°F']);
         expect(rasterUnitSymbol('m')).toBe('m');
         expect(rasterUnitSymbol(undefined)).toBe('');
+    });
+});
+
+// The thermal units (D-022): the unit of the band, and the formula of ddb that gives the values in a unit
+describe('thermal units', () => {
+    it('names the formula of a unit, as the files and libddb write it', () => {
+        expect(thermalFormulaOfUnit('K')).toBe('KELVIN');
+        expect(thermalFormulaOfUnit('kelvin')).toBe('KELVIN');
+        expect(thermalFormulaOfUnit('Celsius')).toBe('CELSIUS');
+        expect(thermalFormulaOfUnit('°C')).toBe('CELSIUS');
+        expect(thermalFormulaOfUnit('degF')).toBe('FAHRENHEIT');
+        expect(thermalFormulaOfUnit('m')).toBe('');
+        expect(thermalFormulaOfUnit('')).toBe('');
+        expect(thermalFormulaOfUnit(undefined)).toBe('');
+    });
+
+    it('names the unit of a formula, and none for an index', () => {
+        expect(thermalUnitOfFormula('CELSIUS')).toBe('°C');
+        expect(thermalUnitOfFormula('KELVIN')).toBe('K');
+        expect(thermalUnitOfFormula('FAHRENHEIT')).toBe('°F');
+        expect(thermalUnitOfFormula('NDVI')).toBe('');
+        expect(thermalUnitOfFormula(undefined)).toBe('');
+        expect(THERMAL_UNIT_OPTIONS.map(o => o.formula)).toEqual(['CELSIUS', 'KELVIN', 'FAHRENHEIT']);
+    });
+
+    it('is the unit of the band for a thermal raster whose values are temperatures', () => {
+        expect(thermalBandUnit({ isThermal: true, isDirectValue: true, unit: 'K' })).toBe('K');
+        expect(thermalBandUnit({ isThermal: true, unit: 'K' })).toBe('K');
+        expect(thermalBandUnit({ isThermal: true, isDirectValue: true, unit: 'Celsius' })).toBe('°C');
+        expect(thermalBandUnit({ isThermal: true, calibration: {}, unit: '' })).toBe('°C');
+    });
+
+    it('is none for raw counts, for a raster that is not thermal and for a unit that is not a temperature', () => {
+        expect(thermalBandUnit({ isThermal: true, isDirectValue: false, unit: '°C' })).toBe('');
+        expect(thermalBandUnit({ isThermal: false, unit: 'K' })).toBe('');
+        expect(thermalBandUnit({ isThermal: true, isDirectValue: true, unit: 'dN' })).toBe('');
+        expect(thermalBandUnit(null)).toBe('');
+    });
+});
+
+// D-022, FR-RAS-31: the value calls of a layer (value info, point, area, profile, contours) read it as it is styled
+describe('layerValueOptions', () => {
+    it('has the NoData value and the thermal formula of the style of the layer', () => {
+        expect(layerValueOptions({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280,310', nodata: 0 }))
+            .toEqual({ nodata: 0, formula: 'KELVIN' });
+        expect(layerValueOptions({ formula: 'FAHRENHEIT' })).toEqual({ nodata: undefined, formula: 'FAHRENHEIT' });
+    });
+
+    it('has no formula for an index or for a layer without style, and no NoData value when none was typed', () => {
+        expect(layerValueOptions({ formula: 'NDVI', nodata: '' })).toEqual({ nodata: undefined });
+        expect(layerValueOptions(null)).toEqual({ nodata: undefined });
+        expect(layerValueOptions(undefined)).toEqual({ nodata: undefined });
     });
 });

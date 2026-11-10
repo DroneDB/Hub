@@ -5,10 +5,16 @@
             <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath" label="Raster"
                                   @update:model-value="path => $emit('selectTarget', path)" />
 
-            <!-- No-calibration warning (thermal only) -->
-            <div v-if="isThermal && (loadError || !rasterInfo.calibration)" class="section">
-                <div class="no-calibration-info">
+            <!-- Raw counts of a sensor (no calibration, not temperatures): the notice. A raster whose values are temperatures
+                 says the unit they are in (FR-RAS-06) -->
+            <div v-if="isThermal && !thermalUnit" class="section">
+                <div class="no-calibration-info" data-testid="raster-thermal-notice">
                     <i class="fas fa-info-circle" />&nbsp;No thermal calibration data: Showing raw values.
+                </div>
+            </div>
+            <div v-else-if="isThermal && !rasterInfo.calibration" class="section">
+                <div class="thermal-file-unit" data-testid="raster-thermal-file-unit">
+                    <i class="fas fa-info-circle" />&nbsp;Values in {{ thermalUnit }} from the file.
                 </div>
             </div>
 
@@ -16,9 +22,9 @@
             <div v-if="!loadError" class="section">
                 <span class="section-label">{{ rangeLabel }}</span>
                 <div class="temp-range" :class="{ 'thermal': isThermal }">
-                    <span>{{ formatValue(rasterInfo.valueMin) }}</span>
+                    <span>{{ formatValue(rasterInfo.valueMin, rasterInfo.unit) }}</span>
                     <span>-</span>
-                    <span>{{ formatValue(rasterInfo.valueMax) }}</span>
+                    <span>{{ formatValue(rasterInfo.valueMax, rasterInfo.unit) }}</span>
                 </div>
             </div>
 
@@ -28,12 +34,11 @@
                 <span class="sensor-badge" :class="{ thermal: isThermal }">{{ rasterInfo.sensorId }}</span>
             </div>
 
-            <!-- Unit (thermal: °C/K toggle; generic: free text with autodetected default) -->
-            <div v-if="isThermal && rasterInfo.calibration" class="section">
+            <!-- Unit (thermal: °C, K or °F, converted by ddb from the unit of the band; generic: free text with autodetected default) -->
+            <div v-if="isThermal && thermalUnit" class="section">
                 <label for="raster-analysis-controls-unit" class="section-label">Unit</label>
                 <select id="raster-analysis-controls-unit" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
-                    <option value="CELSIUS">Celsius (°C)</option>
-                    <option value="KELVIN">Kelvin (K)</option>
+                    <option v-for="option in thermalUnitOptions" :key="option.formula" :value="option.formula">{{ option.label }}</option>
                 </select>
             </div>
             <div v-else-if="!isThermal" class="section">
@@ -53,7 +58,7 @@
 
             <!-- Rescale -->
             <div class="section">
-                <span id="raster-analysis-controls-rescale-label" class="section-label">Rescale</span>
+                <span id="raster-analysis-controls-rescale-label" class="section-label">{{ rescaleLabel }}</span>
                 <!-- Min and Max, numbers in the user's locale; a bad range shows its error here and the map keeps the last valid one (FR-RAS-10) -->
                 <RescaleFields v-model="rescale" id-prefix="raster-analysis-controls-rescale" @commit="onRescaleChange" />
             </div>
@@ -77,7 +82,7 @@
             <div v-if="spotInfo" class="section" data-testid="raster-spot-value">
                 <span class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</span>
                 <div class="spot-info">
-                    <span class="spot-temp" :class="{ thermal: isThermal }">{{ formatValue(spotInfo.value) }}</span>
+                    <span class="spot-temp" :class="{ thermal: isThermal }">{{ formatValue(spotInfo.value, spotInfo.unit) }}</span>
                     <span class="spot-coords">{{ spotPlace }}</span>
                 </div>
             </div>
@@ -116,7 +121,7 @@
                 </div>
                 <RasterProfileChart v-if="profile"
                                     :profile="profile"
-                                    :unit="displayUnit"
+                                    :unit="valueUnit(profile.unit)"
                                     :is-thermal="isThermal"
                                     @active-sample="onProfileHover" />
             </div>
@@ -205,7 +210,7 @@ import RasterProfileChart from './RasterProfileChart.vue';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterAreaStats';
 import { nodataNumber } from '@/libs/ddb/dataset';
-import { rasterValueParts, isElevationRaster } from '@/libs/map/rasterUnit';
+import { rasterValueParts, isElevationRaster, THERMAL_UNIT_OPTIONS, thermalBandUnit, thermalFormulaOfUnit, thermalUnitOfFormula } from '@/libs/map/rasterUnit';
 import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { formatNumber, formatNumberList } from '@/libs/format';
 
@@ -247,11 +252,18 @@ export default {
         return { applyLater: useTimerGroup() };
     },    data() {
         return {
+            // The value info the panel shows: the range in the selected unit (D-022)
             rasterInfo: null,
+            // The value info of the file as it is: in the unit of its band, the one of the defaults
+            bandInfo: null,
             loadError: false,
-            selectedFormula: 'CELSIUS',
+            // The thermal formula of the Unit select; '' for a raster whose values are no temperatures
+            selectedFormula: '',
             selectedColormap: 'ironbow',
             rescale: '',
+            // The unit the rescale was written in (D-022): the unit of the band for the default one, the unit selected when the
+            // user typed it. Changing the unit keeps the temperatures of the rescale: it is sent with this unit
+            rescaleUnit: '',
             // The NoData value typed in the panel ('' keeps the one of the file)
             nodata: '',
             unitLabel: '',
@@ -297,11 +309,11 @@ export default {
             const s = this.areaStats;
             if (!s) return [];
             const rows = [
-                { label: 'Min', value: this.formatValue(s.min) },
-                { label: 'Max', value: this.formatValue(s.max) },
-                { label: 'Mean', value: this.formatValue(s.mean) },
-                { label: 'Median', value: this.formatValue(s.median) },
-                { label: 'Std dev', value: this.formatSpread(s.stddev) },
+                { label: 'Min', value: this.formatValue(s.min, s.unit) },
+                { label: 'Max', value: this.formatValue(s.max, s.unit) },
+                { label: 'Mean', value: this.formatValue(s.mean, s.unit) },
+                { label: 'Median', value: this.formatValue(s.median, s.unit) },
+                { label: 'Std dev', value: this.formatSpread(s.stddev, s.unit) },
                 { label: 'Pixels', value: formatCount(s.pixelCount) }
             ];
             const noData = noDataPixelCount(s);
@@ -333,11 +345,21 @@ export default {
         activePath() {
             return this.visible ? this.filePath : null;
         },
+        // The unit of the band of a thermal raster ('°C', 'K', '°F'); '' for raw counts, which are no temperatures
+        thermalUnit() {
+            return thermalBandUnit(this.bandInfo || this.rasterInfo);
+        },
+        thermalUnitOptions() {
+            return THERMAL_UNIT_OPTIONS;
+        },
+        // The unit the numbers of the panel are in: the one of the selected formula, which ddb converts the values to
         displayUnit() {
-            if (this.isThermal) {
-                return this.selectedFormula === 'KELVIN' ? 'K' : '°C';
-            }
+            if (this.isThermal) return thermalUnitOfFormula(this.selectedFormula);
             return this.unitLabel || '';
+        },
+        // The rescale has the unit it was written in when that is a temperature unit
+        rescaleLabel() {
+            return this.isThermal && this.thermalUnit && this.rescale && this.rescaleUnit ? `Rescale (${this.rescaleUnit})` : 'Rescale';
         }
     },
 
@@ -365,57 +387,110 @@ export default {
             const path = this.filePath;
             this.loadError = false;
             try {
-                const info = await this.dataset.getRasterValueInfo(path, { nodata: this.nodataValue ?? undefined });
+                const info = await this.readInfo('');
                 // The panel closed or moved to another raster while the info was read
                 if (!this.visible || path !== this.filePath) return;
+                this.bandInfo = info;
                 this.rasterInfo = info;
                 this.useDefaults();
-                this.applyInitialParams();
+                await this.applyInitialParams();
             } catch (e) {
                 console.error('Failed to load raster info:', e);
                 if (!this.visible || path !== this.filePath) return;
                 // Fallback so colormap/rescale controls still work
-                this.rasterInfo = { valueMin: 0, valueMax: 65535, isThermal: false, isDirectValue: true, sensorId: '', unit: '' };
+                this.bandInfo = { valueMin: 0, valueMax: 65535, isThermal: false, isDirectValue: true, sensorId: '', unit: '' };
+                this.rasterInfo = this.bandInfo;
                 this.loadError = true;
                 this.useDefaults();
-                this.applyInitialParams();
+                await this.applyInitialParams();
             }
+        },
+
+        // The value info of the file with the NoData value of the panel; with a thermal formula, ddb gives the range and the unit
+        // in the unit of the formula (D-022), without one in the unit of the band
+        readInfo(formula) {
+            const options = { nodata: this.nodataValue ?? undefined };
+            if (formula) options.formula = formula;
+            return this.dataset.getRasterValueInfo(this.filePath, options);
+        },
+
+        // The info the panel shows, in the unit of the Unit select: the info of the file for the unit of the band, else ddb's
+        // answer for the formula. A later change of the unit wins over an answer that comes late. Rejects when ddb cannot
+        // answer: the panel keeps showing the unit it showed (_shownFormula)
+        async showSelectedUnit() {
+            const formula = this.selectedFormula;
+            if (!this.isThermal || !formula || formula === thermalFormulaOfUnit(this.thermalUnit)) {
+                this.rasterInfo = this.bandInfo;
+                this._shownFormula = formula;
+                return;
+            }
+            const path = this.filePath;
+            const info = await this.readInfo(formula);
+            if (path !== this.filePath || formula !== this.selectedFormula) return;
+            this.rasterInfo = info;
+            this._shownFormula = formula;
         },
 
         // The panel's fields at the default style of the raster (FR-RAS-24): the one function the map seeds a layer with.
         // Without value info there is no range to stretch to: the tiles keep the server's own stretch (no rescale), not
         // the range of the fallback info
         useDefaults() {
-            const defaults = defaultVizParams(this.rasterInfo);
-            this.selectedFormula = defaults.formula || 'CELSIUS';
+            const defaults = defaultVizParams(this.bandInfo);
+            this.selectedFormula = defaults.formula || '';
             this.selectedColormap = defaults.colormap;
             this.rescale = this.loadError ? '' : defaults.rescale;
             this.unitLabel = defaults.unit;
+            // The stretch of ddb is in the unit of the band
+            this.rescaleUnit = this.thermalUnit;
+            this.rasterInfo = this.bandInfo;
+            this._shownFormula = this.selectedFormula;
         },
 
         // The style the layer has (URL hash, the panel's cache) over the defaults; a layer without one is styled with them,
         // unless the user chose its original view
-        applyInitialParams() {
+        async applyInitialParams() {
             const initial = this.initialParams;
             if (initial && !this._initialParamsApplied) {
                 this._initialParamsApplied = true;
-                if (initial.formula) this.selectedFormula = initial.formula;
+                // Only a thermal formula of a raster whose values are temperatures is a unit; an index of Plant Health on the same
+                // file is not
+                if (initial.formula && this.thermalUnit && thermalUnitOfFormula(initial.formula)) this.selectedFormula = initial.formula;
                 if (initial.colormap) this.selectedColormap = initial.colormap;
-                if (initial.rescale !== undefined) this.rescale = initial.rescale;
+                if (initial.rescale !== undefined) {
+                    this.rescale = initial.rescale;
+                    // A rescale of the layer was written in the unit it says, else in the unit of its formula
+                    this.rescaleUnit = initial.rescaleUnit || thermalUnitOfFormula(initial.formula) || this.thermalUnit;
+                }
                 if (initial.nodata !== undefined && initial.nodata !== null) {
                     this.nodata = String(initial.nodata);
                 }
+                await this.showSelectedUnit();
                 this.apply();
             } else if (!this.originalView) {
                 this.apply();
             }
         },
 
-        onFormulaChange() {
+        // The unit changed: ddb gives the range in it, and the style carries the formula (the rescale keeps its temperatures).
+        // When ddb cannot give the range in it, the Unit select goes back to the unit the panel shows and the style is kept
+        async onFormulaChange() {
+            const previous = this._shownFormula;
+            const formula = this.selectedFormula;
+            try {
+                await this.showSelectedUnit();
+            } catch (e) {
+                console.error('Failed to read the raster info in the selected unit:', e);
+                this.$notify.error(e, { summary: 'Unit' });
+                // Unless the user picked another unit meanwhile
+                if (previous !== undefined && this.selectedFormula === formula) this.selectedFormula = previous;
+                return;
+            }
             this.apply();
         },
 
+        // A rescale the user types is in the unit the panel shows
         onRescaleChange() {
+            this.rescaleUnit = this.displayUnit;
             this.debouncedApply();
         },
 
@@ -423,9 +498,10 @@ export default {
         async onNodataChange() {
             if (this.nodataError || !this.filePath || !this.dataset) return;
             try {
-                this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath,
-                    { nodata: this.nodataValue ?? undefined });
-                this.rescale = defaultVizParams(this.rasterInfo).rescale;
+                this.bandInfo = await this.readInfo('');
+                this.rescale = defaultVizParams(this.bandInfo).rescale;
+                this.rescaleUnit = this.thermalUnit;
+                await this.showSelectedUnit();
             } catch (e) {
                 console.error('Failed to reload the raster info with the NoData value:', e);
                 this.$notify.error(e, { summary: 'NoData value' });
@@ -435,12 +511,19 @@ export default {
         },
 
         // The style of the panel: what the layer and the export carry. The formula is the thermal unit, so only a thermal
-        // raster has one (FR-RAS-24)
+        // raster whose values are temperatures has one (FR-RAS-24, D-022)
         vizParams() {
             const params = {};
-            if (this.isThermal && this.rasterInfo && this.rasterInfo.calibration) params.formula = this.selectedFormula;
+            const thermalFormula = this.isThermal && this.thermalUnit ? this.selectedFormula : '';
+            if (thermalFormula) params.formula = thermalFormula;
             params.colormap = this.selectedColormap;
-            if (this.rescale) params.rescale = this.rescale;
+            if (this.rescale) {
+                params.rescale = this.rescale;
+                // The rescale written in another unit than the formula's keeps its temperatures: ddb converts it (D-022)
+                if (thermalFormula && this.rescaleUnit && this.rescaleUnit !== thermalUnitOfFormula(thermalFormula)) {
+                    params.rescaleUnit = this.rescaleUnit;
+                }
+            }
             // Sent with the vizParams of the layer (FR-RAS-31): tiles, the numbers and the export read the same pixels
             if (this.nodataValue !== null) params.nodata = this.nodataValue;
             return params;
@@ -465,7 +548,7 @@ export default {
             if (hadNodata && this.filePath && this.dataset) {
                 // The range of the values is that of the file's own NoData value again
                 try {
-                    this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath);
+                    this.bandInfo = await this.readInfo('');
                     this.loadError = false;
                 } catch (e) {
                     console.error('Failed to reload the raster info after Reset:', e);
@@ -516,18 +599,25 @@ export default {
             this.$emit('profileHover', sample);
         },
 
-        // A value of the raster in its unit: the one format of the Hub (FR-RAS-28). A Kelvin raster is shown as the value plus
-        // 273.15 for now: the server will answer in the unit asked (D-022)
-        formatValue(val) {
-            if (typeof val !== 'number') return val === undefined || val === null ? '-' : val;
-            const shown = this.isThermal && this.selectedFormula === 'KELVIN' ? val + 273.15 : val;
-            return rasterValueParts(shown, this.displayUnit).text;
+        // The unit of numbers the server answered with `unit` (D-022): the temperatures of a thermal raster are in the unit ddb
+        // says it gave them in, which is the one of the selected formula unless the answer was read in another (a value read
+        // before the unit changed, a server that did not apply the formula); the unit of the panel only when the answer has
+        // none. The raw counts of a sensor have no unit, and the values of any other raster have the unit of the panel
+        valueUnit(unit) {
+            if (this.isThermal && this.thermalUnit && unit) return unit;
+            return this.displayUnit;
         },
 
-        // A spread of values (a standard deviation): in the raster's unit, without the offset
-        // that turns Celsius into Kelvin
-        formatSpread(val) {
-            return typeof val === 'number' ? rasterValueParts(val, this.displayUnit).text : '-';
+        // A value of the raster in its unit: the one format of the Hub (FR-RAS-28). It does not convert: ddb answers in the unit
+        // of the selected formula (D-022), so a Kelvin raster reads 284.6 K, and 11.5 °C once the user picks °C
+        formatValue(val, unit) {
+            if (typeof val !== 'number') return val === undefined || val === null ? '-' : val;
+            return rasterValueParts(val, this.valueUnit(unit)).text;
+        },
+
+        // A spread of values (a standard deviation): in the unit of the values
+        formatSpread(val, unit) {
+            return typeof val === 'number' ? rasterValueParts(val, this.valueUnit(unit)).text : '-';
         }
     }
 };
@@ -613,5 +703,10 @@ export default {
 
 .no-calibration-info i {
     margin-right: 0.2rem;
+}
+
+.thermal-file-unit {
+    font-size: 0.75rem;
+    color: var(--panel-text-faint);
 }
 </style>

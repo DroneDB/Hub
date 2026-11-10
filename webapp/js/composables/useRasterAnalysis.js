@@ -14,7 +14,7 @@ import { PRIMARY } from '@/libs/palette';
 import { analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
-import { rasterValueUnit, rasterValueParts } from '@/libs/map/rasterUnit';
+import { rasterValueUnit, rasterValueParts, thermalUnitOfFormula, layerValueOptions } from '@/libs/map/rasterUnit';
 import { rasterLayerPath } from '@/libs/map/rasterLayers';
 import { lengthParts } from '@/libs/format';
 import { measurementTooltipHtml } from '@/libs/map/olMeasurementConverter';
@@ -141,6 +141,9 @@ const definition = {
         handleRasterVizParamsChanged(params) {
             const path = this.rasterFilePath;
             if (path) {
+                // The unit changed: the values that are shown were read in the other one (D-022)
+                const before = this.vizParamsByPath && this.vizParamsByPath[path];
+                const unitChanged = thermalUnitOfFormula(before && before.formula) !== thermalUnitOfFormula(params && params.formula);
                 if (params && Object.keys(params).length) {
                     this.vizParamsByPath = { ...this.vizParamsByPath, [path]: { ...params } };
                 } else if (this.vizParamsByPath && this.vizParamsByPath[path]) {
@@ -148,8 +151,30 @@ const definition = {
                     delete next[path];
                     this.vizParamsByPath = next;
                 }
+                if (unitChanged && before) this._rereadRasterValues();
             }
             this.refreshRasterLayers();
+        },
+
+        /**
+         * Reads again what the panel shows (the spot value, the area statistics, the profile) in the unit of the layer: ddb
+         * converts the values, the Hub does not (D-022). A reading that is no longer there is not asked.
+         */
+        _rereadRasterValues() {
+            const spot = this.rasterSpotInfo;
+            if (spot && this.dataset) {
+                const path = this.rasterFilePath;
+                const options = this._rasterValueOptions();
+                const read = typeof spot.lon === 'number' && typeof spot.lat === 'number'
+                    ? this.dataset.getRasterPointValueAt(path, spot.lon, spot.lat, options)
+                    : this.dataset.getRasterPointValue(path, spot.x, spot.y, options);
+                read.then(result => { if (path === this.rasterFilePath && this.rasterSpotInfo === spot) this.rasterSpotInfo = result; })
+                    .catch(e => console.warn('[RasterAnalysis] the spot value could not be read again:', e));
+            }
+            if (this.rasterAreaStats && this._rasterAreaBbox) this.queryRasterArea(this._rasterAreaBbox);
+            if (this.rasterProfile && this._rasterProfileQuery) {
+                this.queryRasterProfile(this._rasterProfileQuery.line, this._rasterProfileQuery.samples);
+            }
         },
 
         /**
@@ -163,6 +188,16 @@ const definition = {
         },
 
         /**
+         * The options the value calls read the file with: the NoData value of the layer and, when the layer is styled with a
+         * thermal formula, that formula, so that ddb answers in the unit the panel shows (D-022). A formula that is not a
+         * thermal one (a vegetation index of Plant Health on the same file) is no option of a value.
+         * @returns {{ nodata?: number|string, formula?: string }}
+         */
+        _rasterValueOptions() {
+            return layerValueOptions(this.vizParamsByPath && this.rasterFilePath ? this.vizParamsByPath[this.rasterFilePath] : null);
+        },
+
+        /**
          * The value of the raster at a map coordinate of the view (D-021): the server finds the pixel of the file under
          * it; the panel shows the answer as the spot value. Errors reach the caller.
          * @param {number[]} mapCoord  [x, y] in the projection of the map view
@@ -172,7 +207,7 @@ const definition = {
             if (!this.rasterFilePath || !this.dataset) return null;
             const [lon, lat] = transform(mapCoord, this.map.getView().getProjection(), EPSG.WGS84);
             const result = await this.dataset.getRasterPointValueAt(this.rasterFilePath, lon, lat,
-                { nodata: this._rasterNodata() });
+                this._rasterValueOptions());
             this.rasterSpotInfo = result;
             return result;
         },
@@ -184,7 +219,7 @@ const definition = {
          */
         async queryRasterPoint(x, y) {
             if (!this.rasterFilePath || !this.dataset) return null;
-            const result = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y, { nodata: this._rasterNodata() });
+            const result = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y, this._rasterValueOptions());
             this.rasterSpotInfo = result;
             return result;
         },
@@ -200,8 +235,10 @@ const definition = {
             this.rasterAreaStatsLoading = true;
             this.rasterAreaStatsError = null;
             this.rasterAreaStats = null;
+            // Kept to read it again when the unit changes
+            this._rasterAreaBbox = bbox;
             try {
-                const stats = await this.dataset.getRasterAreaStatsOfWindow(path, bbox, { nodata: this._rasterNodata() });
+                const stats = await this.dataset.getRasterAreaStatsOfWindow(path, bbox, this._rasterValueOptions());
                 if (path === this.rasterFilePath) this.rasterAreaStats = stats;
             } catch (e) {
                 if (path !== this.rasterFilePath) return;
@@ -327,8 +364,9 @@ const definition = {
             this.rasterProfileLoading = true;
             this.rasterProfileError = null;
             try {
+                this._rasterProfileQuery = { line: lineGeoJson, samples };
                 this.rasterProfile = await this.dataset.getRasterProfile(
-                    this.rasterFilePath, lineGeoJson, samples, { nodata: this._rasterNodata() });
+                    this.rasterFilePath, lineGeoJson, samples, this._rasterValueOptions());
             } catch (e) {
                 console.error('Failed to query raster profile:', e);
                 this.rasterProfileError = (e && e.message) ? e.message : 'Failed to compute profile';
