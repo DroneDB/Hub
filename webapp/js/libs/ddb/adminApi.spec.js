@@ -23,3 +23,25 @@ describe('AdminApi.adminTasks', () => {
         expect(getRequest).toHaveBeenCalledWith('/sys/tasks?skip=0&take=10');
     });
 });
+
+describe('AdminApi.updateUser (FR-ADM-07)', () => {
+    const put = () => {
+        const putRequest = vi.fn(() => Promise.resolve(true));
+        return { admin: new AdminApi(/** @type {any} */ ({ putRequest })), putRequest };
+    };
+
+    it('leaves the e-mail out of the body when it is undefined, so the Registry keeps it', async () => {
+        const { admin, putRequest } = put();
+        await admin.updateUser('bob', undefined, ['editor']);
+        expect(putRequest).toHaveBeenCalledWith('/users/bob', { roles: ['editor'] });
+        expect(Object.keys(putRequest.mock.calls[0][1])).toEqual(['roles']);
+    });
+
+    it('sends an e-mail that is given, an empty one too (it removes the address)', async () => {
+        const { admin, putRequest } = put();
+        await admin.updateUser('bob', 'bob@example.com', ['editor']);
+        await admin.updateUser('bob', '', []);
+        expect(putRequest).toHaveBeenNthCalledWith(1, '/users/bob', { roles: ['editor'], email: 'bob@example.com' });
+        expect(putRequest).toHaveBeenNthCalledWith(2, '/users/bob', { roles: [], email: '' });
+    });
+});

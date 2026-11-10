@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The input rules the Registry owns (FR-XC-12, D-014), as `GET /sys/features` publishes them in
- * `inputRules`: e-mail, entry names, the "already exists" message and its case rule (D-040), the
+ * `inputRules`: user and role names (D-007, D-015), e-mail, entry names, the "already exists" message and its case rule (D-040), the
  * cron words that switch a job off and the Latin letter rule of organization and dataset names
  * (D-035). Slugs are in libs/slug.js, which reads the same rules. Every Hub form checks its input
  * here, and shows the published description or message at the field (AC-036).
@@ -18,9 +18,9 @@ import { Features } from '@/libs/features';
  * @typedef {{ pattern: string, minLength: number|null, maxLength: number|null, description: string, message: string|null }} PatternRule
  * @typedef {{ pattern: string, reservedNames: string[], rootReservedNames: string[], description: string }} EntryNameRule
  * @typedef {{ message: string, caseInsensitive: boolean }} NameClashRule
- * @typedef {{ disableWords: string[], description: string }} CronRule
+ * @typedef {{ disableWords: string[], minFields: number, maxFields: number, macros: string[], description: string }} CronRule
  * @typedef {{ pattern: string, normalization: string, description: string, message: string, messageWithoutSlug: string }} LatinNameRule
- * @typedef {{ slug: PatternRule, email: PatternRule, entryName: EntryNameRule, nameClash: NameClashRule, cron: CronRule, latinName: LatinNameRule }} InputRules
+ * @typedef {{ slug: PatternRule, name: PatternRule, email: PatternRule, entryName: EntryNameRule, nameClash: NameClashRule, cron: CronRule, latinName: LatinNameRule }} InputRules
  */
 
 /** The rules as the Registry publishes them (Registry.Web.UnitTest golden sys-features.json). */
@@ -30,6 +30,13 @@ export const FALLBACK_INPUT_RULES = /** @type {Readonly<InputRules>} */ (Object.
         minLength: 2,
         maxLength: 128,
         description: "it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'",
+        message: null
+    }),
+    name: Object.freeze({
+        pattern: '^[a-z0-9]{1,127}$',
+        minLength: 1,
+        maxLength: 127,
+        description: '1 to 127 characters: lowercase letters (a–z) and digits (0–9)',
         message: null
     }),
     email: Object.freeze({
@@ -51,7 +58,10 @@ export const FALLBACK_INPUT_RULES = /** @type {Readonly<InputRules>} */ (Object.
     }),
     cron: Object.freeze({
         disableWords: Object.freeze(['disabled', 'off', 'none']),
-        description: "leave it empty for the default schedule; 'disabled', 'off' or 'none' (any case) turns the job off"
+        minFields: 5,
+        maxFields: 6,
+        macros: Object.freeze(['@yearly', '@annually', '@monthly', '@weekly', '@daily', '@midnight', '@hourly', '@every_minute', '@every_second']),
+        description: "leave it empty for the default schedule; 'disabled', 'off' or 'none' (any case) turns the job off; a macro such as '@daily' is a schedule; any other value has 5 or 6 fields separated by spaces"
     }),
     latinName: Object.freeze({
         pattern: '[A-Za-z0-9]',
@@ -116,6 +126,53 @@ export function rulePattern(pattern) {
 export function matchesRule(pattern, value) {
     const re = rulePattern(pattern);
     return re ? re.test(value) : true;
+}
+
+// ---- User and role names (D-007, D-015) -----------------------------------------------------
+
+/** The user and role name rule as a form shows it (helper text). */
+export function nameDescription() {
+    return inputRule('name').description;
+}
+
+/**
+ * Whether `value` follows the user and role name rule: the published pattern, as written (the form
+ * trims what the user typed first, the server does not). The case is never changed.
+ * @param {string|null|undefined} value
+ */
+export function isName(value) {
+    return typeof value === 'string' && matchesRule(inputRule('name').pattern, value);
+}
+
+/**
+ * The refusal of a name, in the words of the Registry's own 400 (`NameRules.InvalidMessage`), so the
+ * form shows the same rule text before submit as the server after it (AC-036).
+ * @param {string} kind  "User name", "Role name"
+ */
+export function invalidNameMessage(kind) {
+    return `${kind} is invalid: use ${nameDescription()}`;
+}
+
+/**
+ * What is wrong with the user name of a new user, or null. Required; the rule of the Registry
+ * (lowercase letters and digits). A user an external provider signs in has the wider Identity set,
+ * and is never created here (D-015).
+ * @param {string|null|undefined} value
+ * @returns {string|null}
+ */
+export function userNameProblem(value) {
+    if (typeof value !== 'string' || value.trim() === '') return 'Enter a username.';
+    return isName(value.trim()) ? null : invalidNameMessage('User name');
+}
+
+/**
+ * What is wrong with the name of a new role, or null: the user name rule (D-007).
+ * @param {string|null|undefined} value
+ * @returns {string|null}
+ */
+export function roleNameProblem(value) {
+    if (typeof value !== 'string' || value.trim() === '') return 'Enter a role name.';
+    return isName(value.trim()) ? null : invalidNameMessage('Role name');
 }
 
 // ---- E-mail ---------------------------------------------------------------------------------
@@ -224,9 +281,29 @@ export function cronDescription() {
     return inputRule('cron').description;
 }
 
+/**
+ * The fields of a cron expression: the fewest and the most (5 or 6; a leading seconds field is
+ * accepted).
+ * @returns {{ min: number, max: number }}
+ */
+export function cronFieldCount() {
+    const rule = inputRule('cron');
+    return { min: rule.minFields, max: rule.maxFields };
+}
+
 /** The words that switch a scheduled job off. */
 export function cronDisableWords() {
     return [...inputRule('cron').disableWords];
+}
+
+/**
+ * Whether a cron value is one of the macros (the whole value, in any case, spaces around it ignored).
+ * @param {string|null|undefined} value
+ */
+export function isCronMacro(value) {
+    if (typeof value !== 'string') return false;
+    const word = value.trim().toLowerCase();
+    return inputRule('cron').macros.some(m => m.toLowerCase() === word);
 }
 
 /**

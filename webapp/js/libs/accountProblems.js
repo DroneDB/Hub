@@ -24,15 +24,6 @@ export function usernameProblem(value) {
 }
 
 /**
- * The user name of an account an admin creates: required.
- * @param {string|null|undefined} value
- * @returns {string|null}
- */
-export function newUserNameProblem(value) {
-    return blank(value) ? 'Enter a username.' : null;
-}
-
-/**
  * The password of a sign-in: required. It is never trimmed or checked against the policy: it
  * is whatever the account has.
  * @param {string|null|undefined} value

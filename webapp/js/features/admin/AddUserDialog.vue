@@ -12,7 +12,9 @@
                         <InputText id="add-user-dialog-username" name="username" placeholder="" class="w-100" autocomplete="off"
                                    :readonly="busy" :invalid="!!errorOf($form, 'username')"
                                    :aria-invalid="errorOf($form, 'username') ? 'true' : undefined"
-                                   :aria-describedby="errorOf($form, 'username') ? 'add-user-dialog-username-error' : undefined" />
+                                   :aria-describedby="errorOf($form, 'username') ? 'add-user-dialog-username-error add-user-dialog-username-help' : 'add-user-dialog-username-help'" />
+                        <!-- The rule of the Registry, before any input (FR-ADM-02) -->
+                        <small id="add-user-dialog-username-help" class="field-help">Use {{ nameRule }}</small>
                         <FieldError id="add-user-dialog-username-error" :message="errorOf($form, 'username')" />
                     </div>
                     <div class="mb-3">
@@ -48,10 +50,10 @@ import FieldError from '@/components/FieldError.vue';
 import NewPasswordFields from '@/components/NewPasswordFields.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { emailProblem } from '@/libs/nameRules';
+import { emailProblem, nameDescription, userNameProblem } from '@/libs/nameRules';
 import { pickableRoles } from '@/libs/roles';
 import { createResolver } from '@/libs/forms/resolver';
-import { newUserNameProblem, newPasswordProblem, confirmPasswordProblem } from '@/libs/accountProblems';
+import { newPasswordProblem, confirmPasswordProblem } from '@/libs/accountProblems';
 import { useHubForm } from '@/composables/useHubForm';
 
 export default {
@@ -70,7 +72,8 @@ export default {
     setup() {
         const policy = reg.features?.value?.(Features.PASSWORD_POLICY) ?? null;
         const resolver = createResolver({
-            username: newUserNameProblem,
+            // The rule of the Registry (lowercase letters and digits), in its words, as the user types
+            username: userNameProblem,
             // The server's rule text, at the field; the e-mail is optional
             email: v => emailProblem(v),
             newPassword: v => newPasswordProblem(v, { policy }),
@@ -82,7 +85,7 @@ export default {
             aliases: { userName: 'username', password: 'newPassword' },
             dependents: { newPassword: ['confirmPassword'] }
         });
-        return { ...form, resolver, passwordPolicy: policy };
+        return { ...form, resolver, passwordPolicy: policy, nameRule: nameDescription() };
     },
     data: function () {
         return {
@@ -106,6 +109,12 @@ export default {
 </script>
 
 <style scoped>
+.field-help {
+    display: block;
+    margin-top: var(--ddb-spacing-xs);
+    color: var(--ddb-text-secondary);
+}
+
 .dialog {
     min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;

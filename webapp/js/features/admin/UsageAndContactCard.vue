@@ -23,16 +23,25 @@
         <div class="card-field">
             <label for="usage-contact-email">Security and release news from DroneDB</label>
             <InputText id="usage-contact-email" v-model="email" type="email" autocomplete="email"
-                       placeholder="Email address (optional)" :disabled="inputsDisabled" />
+                       placeholder="Email address (optional)" :disabled="inputsDisabled"
+                       :invalid="!!emailError" :aria-invalid="emailError ? 'true' : undefined"
+                       :aria-describedby="emailError ? 'usage-contact-email-error' : undefined" />
+            <FieldError id="usage-contact-email-error" :message="emailError" />
             <div class="consent">
                 <Checkbox v-model="consent" input-id="usage-contact-consent" :binary="true"
-                          :disabled="inputsDisabled || !hasEmail" />
+                          :disabled="inputsDisabled || !hasEmail" :invalid="!!consentError"
+                          :aria-invalid="consentError ? 'true' : undefined"
+                          :aria-describedby="consentHelp ? 'usage-contact-consent-help' : undefined" />
                 <label for="usage-contact-consent">{{ CONSENT_TEXT }}</label>
             </div>
+            <!-- Without the consent the address is not saved: the helper says so, and a refused Save shows it as the error -->
+            <small v-if="consentHelp" id="usage-contact-consent-help" :class="{ 'consent-error': !!consentError }"
+                   :role="consentError ? 'alert' : undefined">{{ consentHelp }}</small>
         </div>
 
         <div class="card-actions">
-            <Button label="Save" icon="fa-solid fa-floppy-disk" :disabled="!canSave" :loading="saving" @click="save" />
+            <ActionButton label="Save" show-label icon="fa-solid fa-floppy-disk" :disabled="saveDisabled"
+                          :disabled-reason="saveReason" :loading="saving" @click="save" />
         </div>
     </section>
 </template>
@@ -42,12 +51,20 @@
  * UsageAndContactCard - the admin's optional statement of how this deployment is used and
  * an e-mail for security and release news, saved on the server with the update-check settings.
  * The e-mail needs the box ticked: the server refuses an address without consent.
+ *
+ * Save is available when the form differs from the saved values (the same dirty state the
+ * Configuration page asks about before it is left); with no change it is disabled and says why.
+ * A Save checks the e-mail (the one `emailProblem` of the Add User and Edit User windows) and the
+ * consent first: it shows the error at the field and saves nothing (FR-ADM-21, D-046).
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
+import ActionButton from '@/components/ActionButton.vue';
+import FieldError from '@/components/FieldError.vue';
+import { emailProblem } from '@/libs/nameRules';
 import { useNotify } from '@/composables/useNotify';
 import { useUpdateCheck, updateLinks } from '@/composables/useUpdateCheck';
 
@@ -80,7 +97,6 @@ const hasEmail = computed(() => email.value.trim() !== '');
 // when the check is off
 const inputsDisabled = computed(() =>
     !updateCheckEnabled.value || loading.value || !updateInfo.value || !!error.value || saving.value);
-const canSave = computed(() => !inputsDisabled.value && (!hasEmail.value || consent.value));
 const links = computed(() => updateLinks(updateInfo.value));
 // The form differs from the saved values (the Configuration page asks before it is left then)
 const dirty = computed(() => {
@@ -89,6 +105,23 @@ const dirty = computed(() => {
     return declaration.value !== (info.useDeclaration || NOT_STATED)
         || email.value.trim() !== (info.contactEmail || '')
         || consent.value !== !!info.contactEmail;
+});
+
+const CONSENT_HELP = 'Tick the box to save an e-mail address';
+// A Save was refused: the errors show (the e-mail one shows while the admin types)
+const refused = ref(false);
+const emailError = computed(() => emailProblem(email.value));
+const consentMissing = computed(() => hasEmail.value && !consent.value);
+const consentHelp = computed(() => (consentMissing.value ? CONSENT_HELP : ''));
+const consentError = computed(() => (refused.value && consentMissing.value ? CONSENT_HELP : ''));
+const saveDisabled = computed(() => inputsDisabled.value || !dirty.value);
+// Why Save is disabled: nothing to send, or the form is not ready for a change
+const saveReason = computed(() => {
+    if (saving.value) return '';
+    if (!updateCheckEnabled.value) return 'The update check is turned off on this server';
+    if (error.value) return 'The saved settings could not be loaded';
+    if (loading.value || !updateInfo.value) return 'The saved settings are loading';
+    return dirty.value ? '' : 'No changes to save';
 });
 
 // The saved values fill the form (also after a save: the server's answer replaces them)
@@ -108,7 +141,14 @@ watch(() => email.value.trim(), address => {
 load({ ignoreGate: true, force: true });
 
 async function save() {
-    if (!canSave.value) return;
+    if (saveDisabled.value) return;
+    // The validators first: a refused Save sends nothing, shows the error at its field and puts the focus there
+    refused.value = true;
+    if (emailError.value || consentMissing.value) {
+        await nextTick();
+        document.getElementById(emailError.value ? 'usage-contact-email' : 'usage-contact-consent')?.focus();
+        return;
+    }
     saving.value = true;
     try {
         await saveSettings({
@@ -116,6 +156,7 @@ async function save() {
             contactEmail: hasEmail.value ? email.value.trim() : null,
             contactConsent: hasEmail.value && consent.value
         });
+        refused.value = false;
         notify.success('Usage and contact saved');
     } catch (e) {
         notify.error(e);
@@ -164,6 +205,10 @@ h2 {
 
 .card-field small {
     color: var(--ddb-text-secondary);
+}
+
+.card-field small.consent-error {
+    color: var(--ddb-danger);
 }
 
 .consent {

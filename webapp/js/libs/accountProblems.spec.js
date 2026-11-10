@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-    usernameProblem, newUserNameProblem, loginPasswordProblem, currentPasswordProblem, newPasswordProblem, confirmPasswordProblem
+    usernameProblem, loginPasswordProblem, currentPasswordProblem, newPasswordProblem, confirmPasswordProblem
 } from './accountProblems';
 
 const policy = { minLength: 8, requireDigit: true, requireUppercase: true, requireLowercase: true, requireNonAlphanumeric: false };
@@ -11,8 +11,6 @@ describe('sign-in validators (FR-ACC-05)', () => {
         expect(usernameProblem('   ')).toBe('Enter your username.');
         expect(usernameProblem(undefined)).toBe('Enter your username.');
         expect(usernameProblem('admin')).toBeNull();
-        expect(newUserNameProblem(' ')).toBe('Enter a username.');
-        expect(newUserNameProblem('bob')).toBeNull();
     });
 
     it('require a password, which is not trimmed or checked against the policy', () => {

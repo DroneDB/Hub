@@ -8,7 +8,8 @@ import reg from '@/libs/api/sharedRegistry';
 import vectors from './__vectors__/input-rules.json';
 import {
     FALLBACK_INPUT_RULES, inputRule, isEmail, emailProblem, emailDescription, isEntryName, nameClashMessage, namesClash,
-    freeName, isCronDisableWord, cronDisableWords, hasLatinLetterOrDigit, latinNameProblem
+    freeName, isCronDisableWord, isCronMacro, cronDisableWords, cronFieldCount, hasLatinLetterOrDigit, latinNameProblem,
+    isName, nameDescription, userNameProblem, roleNameProblem, invalidNameMessage
 } from './nameRules';
 
 const serve = features => { reg.features.values = features; };
@@ -24,6 +25,12 @@ describe.each([
     it('e-mail: the pre-check answers as the vectors say', () => {
         setup();
         expect(vectors.email.map(v => [v.value, isEmail(v.value)])).toEqual(vectors.email.map(v => [v.value, v.precheck]));
+    });
+
+    it('user and role names (D-007): the pattern answers as the Registry does', () => {
+        setup();
+        expect(vectors.name.accept.filter(n => !isName(n))).toEqual([]);
+        expect(vectors.name.reject.filter(n => isName(n))).toEqual([]);
     });
 
     it('entry names at the dataset root', () => {
@@ -76,6 +83,42 @@ describe('reading the rules', () => {
     });
 });
 
+describe('user and role names (FR-ADM-01, FR-ADM-02)', () => {
+    const RULE = '1 to 127 characters: lowercase letters (a–z) and digits (0–9)';
+
+    it('say the rule at the field in the words of the Registry 400, before submit', () => {
+        expect(nameDescription()).toBe(RULE);
+        expect(invalidNameMessage('User name')).toBe(`User name is invalid: use ${RULE}`);
+        for (const name of ['t-admin-user', 'TADMIN', 'bad name!', 'a.b']) {
+            expect(userNameProblem(name)).toBe(`User name is invalid: use ${RULE}`);
+        }
+        for (const name of ['a/b', 'Bad Role!', 'a-b']) {
+            expect(roleNameProblem(name)).toBe(`Role name is invalid: use ${RULE}`);
+        }
+    });
+
+    it('require a name, and trim the spaces around it as the forms do', () => {
+        expect(userNameProblem('')).toBe('Enter a username.');
+        expect(userNameProblem('   ')).toBe('Enter a username.');
+        expect(userNameProblem(undefined)).toBe('Enter a username.');
+        expect(roleNameProblem(' ')).toBe('Enter a role name.');
+        expect(userNameProblem(' bob ')).toBeNull();
+        expect(roleNameProblem('editor2')).toBeNull();
+    });
+
+    it('stop at 127 characters', () => {
+        expect(userNameProblem('a'.repeat(127))).toBeNull();
+        expect(userNameProblem('a'.repeat(128))).toBe(`User name is invalid: use ${RULE}`);
+    });
+
+    it('follow the rule the server publishes, with the built-in text for a field it leaves out', () => {
+        serve({ inputRules: { name: { pattern: '^[a-z]{1,5}$', description: 'up to 5 letters' } } });
+        expect(userNameProblem('abc')).toBeNull();
+        expect(userNameProblem('abc1')).toBe('User name is invalid: use up to 5 letters');
+        expect(isName('abcdef')).toBe(false);
+    });
+});
+
 describe('the rule texts', () => {
     it('e-mail: blank is fine in an optional field, another value gets the published message', () => {
         expect(emailProblem('')).toBeNull();
@@ -94,10 +137,26 @@ describe('the rule texts', () => {
         expect(namesClash('Readme.MD', 'README.md')).toBe(false);
     });
 
+    it('cron: the fields of an expression, from the rule (an older Registry: 5 or 6)', () => {
+        expect(cronFieldCount()).toEqual({ min: 5, max: 6 });
+        serve({ inputRules: { cron: { disableWords: ['off'] } } });
+        expect(cronFieldCount()).toEqual({ min: 5, max: 6 });
+        serve({ inputRules: { cron: { minFields: 5, maxFields: 7 } } });
+        expect(cronFieldCount()).toEqual({ min: 5, max: 7 });
+    });
+
     it('cron: the words that switch a job off, in any case', () => {
         expect(cronDisableWords()).toEqual(['disabled', 'off', 'none']);
         expect(['off', ' NONE ', 'Disabled'].map(isCronDisableWord)).toEqual([true, true, true]);
         expect(['', '0 0 * * *', 'never'].map(isCronDisableWord)).toEqual([false, false, false]);
+    });
+
+    it('cron: the macros that are a whole value, in any case (an older Registry: the nine of Hangfire)', () => {
+        expect(['@daily', ' @HOURLY ', '@every_second', '@yearly', '@annually', '@monthly', '@weekly', '@midnight', '@every_minute'].map(isCronMacro)).toEqual(Array(9).fill(true));
+        expect(['', '@reboot', '@daily extra', 'daily', '0 0 * * *', null, undefined].map(isCronMacro)).toEqual(Array(7).fill(false));
+        serve({ inputRules: { cron: { macros: ['@soon'] } } });
+        expect(isCronMacro('@SOON')).toBe(true);
+        expect(isCronMacro('@daily')).toBe(false);
     });
 
     it('Latin letter: the message with a slug field, the one without, and a slug that holds a letter', () => {

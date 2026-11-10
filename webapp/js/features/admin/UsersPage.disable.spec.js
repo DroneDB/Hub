@@ -122,34 +122,33 @@ describe('UsersPage Disable and Enable', () => {
 
 describe('Edit User and the role that blocks sign-in', () => {
     const bob = () => ({ userName: 'bob', email: '', roles: ['editor', 'deactivated'] });
+    const WindowStub = {
+        emits: ['confirm', 'close'],
+        template: '<div><slot /><button type="button" data-confirm @click="$emit(\'confirm\')">Update User</button></div>'
+    };
     async function edit() {
         wrapper = mount(EditUserDialog, {
             props: { user: bob(), availableRoles: ['admin', 'deactivated', 'editor'] },
-            global: { plugins: [PrimeVue], mocks: { $notify: notify }, stubs: { Window: { template: '<div><slot /></div>' } } }
+            global: { plugins: [PrimeVue], mocks: { $notify: notify }, stubs: { Window: WindowStub } }
         });
         await flushPromises();
     }
+    const update = async () => {
+        await wrapper.find('[data-confirm]').trigger('click');
+        await flushPromises();
+    };
 
     it('does not offer deactivated, and does not send it: the server keeps it', async () => {
         await edit();
         expect(wrapper.vm.roleOptions.map(o => o.value)).toEqual(['admin', 'editor']);
-        expect(wrapper.vm.editUser.roles).toEqual(['editor']);
-        await wrapper.vm.confirmUpdate();
-        expect(reg.admin.updateUser).toHaveBeenCalledWith('bob', '', ['editor']);
+        await update();
+        expect(reg.admin.updateUser).toHaveBeenCalledWith('bob', undefined, ['editor']);
     });
 
     it('sends it back to an older Registry, whose update replaces every role', async () => {
         h.features = {};
         await edit();
-        await wrapper.vm.confirmUpdate();
-        expect(reg.admin.updateUser).toHaveBeenCalledWith('bob', '', ['editor', 'deactivated']);
-    });
-
-    it('shows the server\'s e-mail rule at the field and sends nothing for an invalid address', async () => {
-        await edit();
-        await wrapper.find('#edit-user-dialog-email').setValue('not an email');
-        expect(wrapper.text()).toContain('The e-mail address is not valid: enter one address, such as name@example.com');
-        await wrapper.vm.confirmUpdate();
-        expect(reg.admin.updateUser).not.toHaveBeenCalled();
+        await update();
+        expect(reg.admin.updateUser).toHaveBeenCalledWith('bob', undefined, ['editor', 'deactivated']);
     });
 });

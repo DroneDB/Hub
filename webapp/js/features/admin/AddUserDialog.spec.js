@@ -50,6 +50,29 @@ describe('AddUserDialog', () => {
         expect(wrapper.findAll('.password-requirements li').map(i => i.text())).toEqual(['At least 6 characters', 'At least one digit (0-9)']);
     });
 
+    // FR-ADM-02: the rule is stated before any input, and checked while the user types
+    it('states the user name rule of the Registry before any input', async () => {
+        await render();
+        const help = wrapper.find('#add-user-dialog-username-help');
+        expect(help.text()).toBe('Use 1 to 127 characters: lowercase letters (a–z) and digits (0–9)');
+        expect(wrapper.find('input[name="username"]').attributes('aria-describedby')).toContain('add-user-dialog-username-help');
+        expect(wrapper.find('#add-user-dialog-username-error').exists()).toBe(false);
+    });
+
+    it.each(['t-admin-user', 'TADMIN', 'bad name!'])('shows the rule at the field for "%s" and Add User sends no request', async name => {
+        await render();
+        await type('username', name);
+        const message = 'User name is invalid: use 1 to 127 characters: lowercase letters (a–z) and digits (0–9)';
+        expect(wrapper.find('#add-user-dialog-username-error').text()).toBe(message);
+        expect(wrapper.find('input[name="username"]').element.value).toBe(name);
+        await type('newPassword', 'abc123');
+        await type('confirmPassword', 'abc123');
+        await confirm();
+        expect(addUser).not.toHaveBeenCalled();
+        expect(wrapper.find('#add-user-dialog-username-error').text()).toBe(message);
+        expect(notify.error).not.toHaveBeenCalled();
+    });
+
     it('keeps Add User enabled and shows the errors of an empty submit at the fields', async () => {
         await render();
         expect(wrapper.find('[data-confirm]').attributes('disabled')).toBeUndefined();

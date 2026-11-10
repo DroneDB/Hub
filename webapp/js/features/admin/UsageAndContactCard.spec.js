@@ -34,6 +34,10 @@ const INFO = {
 };
 
 let wrapper;
+const w_declare = async value => {
+    await wrapper.findComponent(Select).vm.$emit('update:modelValue', value);
+    await flushPromises();
+};
 async function show(info = {}) {
     h.sys.updateInfo = vi.fn(() => Promise.resolve({ ...INFO, ...info }));
     wrapper = mount(UsageAndContactCard, { attachTo: document.body, global: { plugins: [PrimeVue] } });
@@ -41,6 +45,11 @@ async function show(info = {}) {
     return wrapper;
 }
 const saveButton = () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Save'));
+// A disabled Save is aria-disabled, not disabled: it stays focusable and says why (FR-XC-22)
+const saveDisabled = () => saveButton().getAttribute('aria-disabled') === 'true';
+const saveReason = () => document.getElementById(saveButton().getAttribute('aria-describedby'))?.textContent ?? null;
+const emailError = () => document.getElementById('usage-contact-email-error')?.textContent ?? null;
+const consentHelp = () => document.getElementById('usage-contact-consent-help')?.textContent ?? null;
 const emailInput = () => document.getElementById('usage-contact-email');
 const consentBox = () => document.getElementById('usage-contact-consent');
 const licenceLink = () => [...document.querySelectorAll('a')].find(a => a.textContent.includes('Get a licence'));
@@ -78,7 +87,7 @@ describe('UsageAndContactCard', () => {
     it('saves a declaration without an address', async () => {
         const w = await show();
         await w.findComponent(Select).vm.$emit('update:modelValue', 'personal');
-        expect(saveButton().disabled).toBe(false);
+        expect(saveDisabled()).toBe(false);
         saveButton().click();
         await flushPromises();
         expect(h.sys.saveUpdateCheckSettings).toHaveBeenCalledWith({ useDeclaration: 'personal', contactEmail: null, contactConsent: false });
@@ -93,16 +102,27 @@ describe('UsageAndContactCard', () => {
         expect(h.sys.saveUpdateCheckSettings).toHaveBeenCalledWith(expect.objectContaining({ useDeclaration: null }));
     });
 
-    it('cannot save an address until the consent box is ticked', async () => {
+    it('saves an address only with the consent box ticked: a Save without it shows the error and sends nothing', async () => {
         await show();
         expect(consentBox().disabled).toBe(true);
+        expect(consentHelp()).toBeNull();
         await typeEmail('it@acme.test');
         expect(consentBox().disabled).toBe(false);
-        expect(saveButton().disabled).toBe(true);
+        // Save stays available (D-046); the helper says what is missing
+        expect(saveDisabled()).toBe(false);
+        expect(consentHelp()).toBe('Tick the box to save an e-mail address');
+        expect(consentBox().getAttribute('aria-invalid')).toBeNull();
+
+        saveButton().click();
+        await flushPromises();
+        expect(h.sys.saveUpdateCheckSettings).not.toHaveBeenCalled();
+        expect(document.getElementById('usage-contact-consent-help').classList.contains('consent-error')).toBe(true);
+        expect(consentBox().getAttribute('aria-invalid')).toBe('true');
+        expect(document.activeElement).toBe(consentBox());
 
         consentBox().click();
         await flushPromises();
-        expect(saveButton().disabled).toBe(false);
+        expect(consentHelp()).toBeNull();
         saveButton().click();
         await flushPromises();
         expect(h.sys.saveUpdateCheckSettings).toHaveBeenCalledWith({ useDeclaration: null, contactEmail: 'it@acme.test', contactConsent: true });
@@ -117,7 +137,7 @@ describe('UsageAndContactCard', () => {
 
         await typeEmail('ops@acme.test');
         expect(consentBox().checked).toBe(false);
-        expect(saveButton().disabled).toBe(true);
+        expect(consentHelp()).toBe('Tick the box to save an e-mail address');
 
         consentBox().click();
         await flushPromises();
@@ -134,14 +154,17 @@ describe('UsageAndContactCard', () => {
 
         expect(wrapper.findComponent(Select).props('disabled')).toBe(true);
         expect(emailInput().disabled).toBe(true);
-        expect(saveButton().disabled).toBe(true);
+        expect(saveDisabled()).toBe(true);
+        expect(saveReason()).toBe('The saved settings are loading');
 
         answer({ ...INFO, useDeclaration: 'personal', contactEmail: 'it@acme.test' });
         await flushPromises();
         expect(wrapper.findComponent(Select).props('disabled')).toBe(false);
         expect(emailInput().disabled).toBe(false);
         expect(emailInput().value).toBe('it@acme.test');
-        expect(saveButton().disabled).toBe(false);
+        // Nothing changed yet: still no Save
+        expect(saveDisabled()).toBe(true);
+        expect(saveReason()).toBe('No changes to save');
     });
 
     it('cannot save when the saved values could not be loaded', async () => {
@@ -151,7 +174,8 @@ describe('UsageAndContactCard', () => {
 
         expect(wrapper.text()).toContain('could not be loaded');
         expect(emailInput().disabled).toBe(true);
-        expect(saveButton().disabled).toBe(true);
+        expect(saveDisabled()).toBe(true);
+        expect(saveReason()).toBe('The saved settings could not be loaded');
     });
 
     it('sends no address and no consent once the address is cleared', async () => {
@@ -172,7 +196,7 @@ describe('UsageAndContactCard', () => {
         saveButton().click();
         await flushPromises();
         expect(h.notify.error).toHaveBeenCalledWith(expect.objectContaining({ message: 'refused' }));
-        expect(saveButton().disabled).toBe(false);
+        expect(saveDisabled()).toBe(false);
     });
 
     it('exposes whether the form differs from the saved values (the page asks before it is left)', async () => {
@@ -204,6 +228,51 @@ describe('UsageAndContactCard', () => {
         expect(wrapper.vm.dirty).toBe(false);
     });
 
+    // FR-ADM-21
+    it('disables Save with the reason "No changes to save" while the form equals the saved values, and keeps the button focusable', async () => {
+        await show({ useDeclaration: 'nonprofit', contactEmail: 'it@acme.test' });
+        expect(saveDisabled()).toBe(true);
+        expect(saveReason()).toBe('No changes to save');
+        expect(saveButton().disabled).toBe(false);
+        expect(saveButton().title).toBe('Save: No changes to save');
+        saveButton().click();
+        await flushPromises();
+        expect(h.sys.saveUpdateCheckSettings).not.toHaveBeenCalled();
+
+        await w_declare('personal');
+        expect(saveDisabled()).toBe(false);
+        expect(saveButton().getAttribute('aria-describedby')).toBeNull();
+    });
+
+    it('a Save with an e-mail that is not an address saves nothing and shows the rule at the field', async () => {
+        await show();
+        await typeEmail('not an email');
+        consentBox().click();
+        await flushPromises();
+        expect(emailError()).toBe('The e-mail address is not valid: enter one address, such as name@example.com');
+        expect(emailInput().getAttribute('aria-invalid')).toBe('true');
+        expect(emailInput().getAttribute('aria-describedby')).toBe('usage-contact-email-error');
+        // Save is available: the card is dirty
+        expect(saveDisabled()).toBe(false);
+
+        saveButton().click();
+        await flushPromises();
+        expect(h.sys.saveUpdateCheckSettings).not.toHaveBeenCalled();
+        expect(h.notify.success).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(emailInput());
+
+        await typeEmail('it@acme.test');
+        expect(emailError()).toBeNull();
+        expect(emailInput().getAttribute('aria-invalid')).toBeNull();
+    });
+
+    it('shows no rule for an empty address (it is optional)', async () => {
+        await show({ contactEmail: 'it@acme.test' });
+        await typeEmail('');
+        expect(emailError()).toBeNull();
+        expect(consentHelp()).toBeNull();
+    });
+
     it('links to the licence request unless the deployment is licensed', async () => {
         await show();
         expect(licenceLink().getAttribute('href')).toBe(INFO.licenseRequestUrl);
@@ -219,7 +288,8 @@ describe('UsageAndContactCard', () => {
         const w = await show();
         expect(w.text()).toContain('update check is turned off');
         expect(emailInput().disabled).toBe(true);
-        expect(saveButton().disabled).toBe(true);
+        expect(saveDisabled()).toBe(true);
+        expect(saveReason()).toBe('The update check is turned off on this server');
         expect(licenceLink()).toBeDefined();
         expect(h.sys.updateInfo).toHaveBeenCalledTimes(1);
     });

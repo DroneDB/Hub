@@ -42,8 +42,8 @@ const CONFIG = {
 
 let wrapper;
 let notify;
-async function show(stubs = { UsageAndContactCard: true, EmailTemplatesCard: true }) {
-    h.sys.config = vi.fn(() => Promise.resolve(structuredClone(CONFIG)));
+async function show(stubs = { UsageAndContactCard: true, EmailTemplatesCard: true }, config = CONFIG) {
+    h.sys.config = vi.fn(() => Promise.resolve(structuredClone(config)));
     notify = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     wrapper = mount(AdminConfig, {
         attachTo: document.body,
@@ -249,6 +249,149 @@ describe('AdminConfig', () => {
             cardDirty.value = true;
             await flushPromises();
             expect(unload()).toBe(true);
+        });
+    });
+    // FR-ADM-06, FR-ADM-13: each cron, timespan and JSON value is checked while the admin types
+    describe('validation of cron, timespan and JSON values', () => {
+        const VALIDATED = {
+            sections: [{
+                name: 'Checks', title: 'Checks', description: 'Fields with a rule', isActive: false,
+                fields: [
+                    { ...field('ThumbnailsCacheExpiration', 'timespan', '00:30:00') },
+                    { ...field('RecoverCron', 'cron', null, '* * * * *') },
+                    { ...field('SomeCron', 'cron', null, null) },
+                    { ...field('Favicon', 'json', null, null) },
+                    field('Name', 'text', 'x')
+                ]
+            }]
+        };
+        const input = key => fieldOf(key).querySelector('input, textarea');
+        const type = async (key, value) => {
+            const el = input(key);
+            el.value = value;
+            el.dispatchEvent(new Event('input'));
+            await flushPromises();
+        };
+        const errorOf = key => fieldOf(key).querySelector('.field-error')?.textContent ?? null;
+        const copy = async () => {
+            [...document.querySelectorAll('button')].find(b => b.textContent.includes('Copy AppSettings JSON')).click();
+            await flushPromises();
+        };
+
+        it('shows the rule next to an invalid timespan, cron and JSON value, and marks the field', async () => {
+            await show(undefined, VALIDATED);
+            await type('ThumbnailsCacheExpiration', 'not-a-time');
+            await type('RecoverCron', 'every day please');
+            await type('Favicon', '{ not json');
+
+            expect(errorOf('ThumbnailsCacheExpiration')).toBe('Not a valid time span: use days (such as 2) or [days.]hh:mm[:ss] with hours up to 23 (such as 00:30:00 for 30 minutes).');
+            expect(errorOf('RecoverCron')).toBe('Not a valid cron expression: use 5 or 6 fields separated by spaces (such as 0 0 * * *), a macro such as @daily, or disabled, off, none to turn the job off.');
+            expect(errorOf('Favicon')).toMatch(/^Not valid JSON/);
+            expect(errorOf('Name')).toBeNull();
+            const timespan = input('ThumbnailsCacheExpiration');
+            expect(timespan.getAttribute('aria-invalid')).toBe('true');
+            expect(timespan.getAttribute('aria-describedby')).toContain(`${timespan.id}-error`);
+            expect(document.getElementById(`${timespan.id}-error`).textContent).toBe(errorOf('ThumbnailsCacheExpiration'));
+        });
+
+        it('clears the error as soon as the value is valid, and accepts blank, off, none and 0 0 * * *', async () => {
+            await show(undefined, VALIDATED);
+            await type('RecoverCron', 'every day please');
+            expect(errorOf('RecoverCron')).not.toBeNull();
+            for (const value of ['off', 'NONE', '0 0 * * *', '@daily', '@Every_Minute', '']) {
+                await type('RecoverCron', value);
+                expect(errorOf('RecoverCron'), value).toBeNull();
+            }
+            await type('ThumbnailsCacheExpiration', '1.02:03:04');
+            expect(errorOf('ThumbnailsCacheExpiration')).toBeNull();
+            expect(input('RecoverCron').getAttribute('aria-invalid')).toBeNull();
+        });
+
+        it('keeps both Copy buttons enabled; a Copy with invalid values copies nothing and shows the number of invalid fields', async () => {
+            await show(undefined, VALIDATED);
+            await type('ThumbnailsCacheExpiration', 'not-a-time');
+            await type('RecoverCron', 'every day please');
+            await type('Favicon', '{ not json');
+            const copyButtons = [...document.querySelectorAll('button')].filter(b => b.textContent.includes('Copy AppSettings JSON'));
+            expect(copyButtons).toHaveLength(2);
+            expect(copyButtons.map(b => b.disabled)).toEqual([false, false]);
+
+            await copy();
+
+            expect(h.copyText).not.toHaveBeenCalled();
+            const summary = document.querySelector('.invalid-summary');
+            expect(summary.textContent).toContain('Nothing was copied: 3 fields have an invalid value (ThumbnailsCacheExpiration, RecoverCron, Favicon)');
+            expect(summary.getAttribute('role')).toBe('alert');
+            expect(document.activeElement).toBe(input('ThumbnailsCacheExpiration'));
+            expect(notify.success).not.toHaveBeenCalled();
+            expect(document.querySelector('.section-header').textContent).toContain('3 invalid');
+        });
+
+        it('copies once the invalid values are fixed, and the summary goes', async () => {
+            await show(undefined, VALIDATED);
+            await type('RecoverCron', 'every day please');
+            await copy();
+            expect(document.querySelector('.invalid-summary').textContent).toContain('1 field has an invalid value');
+            expect(h.copyText).not.toHaveBeenCalled();
+
+            await type('RecoverCron', '0 3 * * *');
+            expect(document.querySelector('.invalid-summary')).toBeNull();
+            await copy();
+            expect(h.copyText).toHaveBeenCalledTimes(1);
+            expect(JSON.parse(h.copyText.mock.calls[0][0]).AppSettings).toMatchObject({ RecoverCron: '0 3 * * *' });
+        });
+
+        it('valid values copy; an unedited cron is left out (it is the default of its job)', async () => {
+            await show(undefined, VALIDATED);
+            await type('ThumbnailsCacheExpiration', '01:00:00');
+            await copy();
+            const copied = JSON.parse(h.copyText.mock.calls[0][0]).AppSettings;
+            expect(copied.ThumbnailsCacheExpiration).toBe('01:00:00');
+            expect(copied).not.toHaveProperty('RecoverCron');
+            expect(copied).not.toHaveProperty('SomeCron');
+        });
+
+        it('an unedited value of the server is never judged: only an edited field blocks a Copy', async () => {
+            // The server runs with these values (its own parser accepted them), whatever the page thinks of them
+            const unedited = {
+                sections: [{
+                    name: 'Checks', title: 'Checks', description: 'Fields with a rule', isActive: false,
+                    fields: [
+                        field('Macro', 'cron', '@daily', '0 0 * * *'),
+                        field('Odd', 'cron', 'what the server runs', null),
+                        field('Name', 'text', 'x')
+                    ]
+                }]
+            };
+            await show(undefined, unedited);
+            expect(errorOf('Odd')).toBeNull();
+            expect(input('Odd').getAttribute('aria-invalid')).toBeNull();
+
+            await copy();
+            expect(document.querySelector('.invalid-summary')).toBeNull();
+            expect(h.copyText).toHaveBeenCalledTimes(1);
+
+            // Once edited the same field is judged, and the other unedited one still is not
+            await type('Odd', 'what the admin typed');
+            expect(errorOf('Odd')).not.toBeNull();
+            await copy();
+            expect(h.copyText).toHaveBeenCalledTimes(1);
+            expect(document.querySelector('.invalid-summary').textContent).toContain('1 field has an invalid value (Odd)');
+            expect(errorOf('Macro')).toBeNull();
+        });
+
+        it('an empty cron shows the effective default as its placeholder, an empty one without a default says Not set', async () => {
+            await show(undefined, VALIDATED);
+            expect(input('RecoverCron').placeholder).toBe('Default: * * * * *');
+            expect(input('SomeCron').placeholder).toBe('Not set');
+            expect(input('ThumbnailsCacheExpiration').placeholder).toBe('Default: 00:30:00');
+        });
+
+        it('the cron hint names the words that switch a job off; the timespan hint says the format .NET reads', async () => {
+            await show(undefined, VALIDATED);
+            expect(fieldOf('RecoverCron').querySelector('.cron-hint').textContent).toContain('disabled, off, none (any case) turns the job off');
+            expect(fieldOf('ThumbnailsCacheExpiration').querySelector('.timespan-hint').textContent)
+                .toContain('Days, or [days.]hh:mm[:ss]');
         });
     });
 });

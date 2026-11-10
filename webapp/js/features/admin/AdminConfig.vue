@@ -17,6 +17,12 @@
             This page does not change the server. Merge the copied keys into appsettings.json, then restart the Registry. Do not replace the file with them.
         </PrimeMessage>
 
+        <!-- A Copy with an invalid value copies nothing: the page says how many fields it refuses and which (FR-ADM-06) -->
+        <PrimeMessage v-if="copyBlocked && invalidFields.length" severity="error" role="alert" :closable="false" class="config-notice invalid-summary">
+            Nothing was copied: {{ invalidFields.length === 1 ? '1 field has an invalid value' : `${invalidFields.length} fields have an invalid value` }}
+            ({{ invalidFields.map(f => f.name).join(', ') }}). Fix {{ invalidFields.length === 1 ? 'it' : 'them' }} and copy again.
+        </PrimeMessage>
+
         <LoadingSpinner v-if="loading" size="lg" label="Loading configuration..." />
 
         <div v-else class="config-scroll-container page-scroll-column">
@@ -35,6 +41,7 @@
                             {{ section.title }}
                             <Tag v-if="isSectionActive(sIdx)" :id="`config-section-state-${sIdx}`" value="Custom" severity="info" size="small" class="ms-2" />
                             <Tag v-else :id="`config-section-state-${sIdx}`" value="Default" severity="secondary" size="small" class="ms-2" />
+                            <Tag v-if="invalidCount(sIdx)" :value="`${invalidCount(sIdx)} invalid`" severity="danger" size="small" class="ms-2" />
                         </span>
                     </template>
                     <!-- A section in its default state is as legible and editable as a custom one: the tag says
@@ -123,23 +130,31 @@
                                 <div v-else-if="field.fieldType === 'timespan'" class="timespan-input-wrapper">
                                     <InputText :id="`field-${sIdx}-${fIdx}`"
                                                :model-value="getFieldValue(sIdx, fIdx, field)"
-                                               placeholder="dd:hh:mm:ss"
+                                               :placeholder="fieldPlaceholder(field)"
+                                               :invalid="!!problemOf(sIdx, fIdx)"
+                                               :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
+                                               :aria-describedby="describedBy(sIdx, fIdx)"
                                                :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
                                                @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                    <small class="timespan-hint">Format: dd:hh:mm:ss (e.g. 00:30:00 = 30 min)</small>
+                                    <small :id="`field-${sIdx}-${fIdx}-hint`" class="timespan-hint">{{ fieldHint(field) }}</small>
+                                    <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
                                 </div>
 
                                 <!-- cron -->
                                 <div v-else-if="field.fieldType === 'cron'" class="cron-input-wrapper">
                                     <InputText :id="`field-${sIdx}-${fIdx}`"
                                                :model-value="getFieldValue(sIdx, fIdx, field)"
-                                               placeholder="0 * * * *"
+                                               :placeholder="fieldPlaceholder(field)"
+                                               :invalid="!!problemOf(sIdx, fIdx)"
+                                               :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
+                                               :aria-describedby="describedBy(sIdx, fIdx)"
                                                :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
                                                @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                    <small class="cron-hint">
-                                        Cron expression. Validate at
+                                    <small :id="`field-${sIdx}-${fIdx}-hint`" class="cron-hint">
+                                        {{ fieldHint(field) }} Check it at
                                         <a href="https://crontab.guru" target="_blank" rel="noopener">crontab.guru</a>
                                     </small>
+                                    <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
                                 </div>
 
                                 <!-- array -->
@@ -149,14 +164,19 @@
                                        @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
 
                                 <!-- json (fallback) -->
-                                <Textarea v-else
-                                          :id="`field-${sIdx}-${fIdx}`"
-                                          :model-value="getFieldValue(sIdx, fIdx, field)"
-                                          :rows="3"
-                                          :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                          @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                <template v-else>
+                                    <Textarea :id="`field-${sIdx}-${fIdx}`"
+                                              :model-value="getFieldValue(sIdx, fIdx, field)"
+                                              :rows="3"
+                                              :invalid="!!problemOf(sIdx, fIdx)"
+                                              :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
+                                              :aria-describedby="describedBy(sIdx, fIdx)"
+                                              :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                              @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                    <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
+                                </template>
 
-                                <small class="field-description">{{ field.description }}</small>
+                                <small :id="`field-${sIdx}-${fIdx}-description`" class="field-description">{{ field.description }}</small>
                             </div>
                         </div>
 
@@ -182,6 +202,7 @@
 <script>
 import { getCurrentInstance } from 'vue';
 import DialogHost from '@/components/DialogHost.vue';
+import FieldError from '@/components/FieldError.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import EmailTemplatesCard from '@/features/admin/EmailTemplatesCard.vue';
 import UsageAndContactCard from '@/features/admin/UsageAndContactCard.vue';
@@ -204,6 +225,7 @@ import { copyText } from '@/composables/useCopyText';
 import { isForbidden } from '@/libs/ddb/apiError';
 import { deniedLocation } from '@/libs/authRoutes';
 import { settingPath, setSettingAt } from '@/libs/appSettingsJson';
+import { VALIDATED_TYPES, fieldProblem, fieldPlaceholder, fieldHint } from '@/libs/configValidators';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
@@ -215,7 +237,7 @@ export default {
     name: 'AdminConfig',
 
     components: {
-        DialogHost, LoadingSpinner, UsageAndContactCard, EmailTemplatesCard,
+        DialogHost, FieldError, LoadingSpinner, UsageAndContactCard, EmailTemplatesCard,
         Accordion, AccordionTab, Button, InputText, InputNumber,
         ToggleSwitch, Select, Password, Chips, Textarea, Tag, PrimeMessage
     },
@@ -242,7 +264,9 @@ export default {
             // Map<"sIdx-fIdx", newValue>
             modifiedFields: {},
             // Set of section indices that became active due to editing
-            modifiedSections: {}
+            modifiedSections: {},
+            // A Copy was refused for invalid values: the summary shows until they are fixed
+            copyBlocked: false
         };
     },
 
@@ -250,6 +274,32 @@ export default {
         // The fields edited on this page (not yet merged into appsettings.json)
         editCount() {
             return Object.keys(this.modifiedFields).length;
+        },
+
+        // The edited fields whose value the page refuses, by the validator of their type, while the admin types.
+        // An unedited field keeps the value the server runs with, which the server's own parser accepted (or the
+        // Registry would not run), so the page does not judge it: it never blocks a Copy. A Copy writes nothing
+        // while there is one (FR-ADM-06)
+        invalidFields() {
+            const list = [];
+            this.sections.forEach((section, sIdx) => section.fields.forEach((field, fIdx) => {
+                if (this.isInfoField(field) || field.sensitive || !VALIDATED_TYPES.includes(field.fieldType)) return;
+                if (!(`${sIdx}-${fIdx}` in this.modifiedFields)) return;
+                const message = fieldProblem(field, this.getFieldValue(sIdx, fIdx, field));
+                if (message) list.push({ sIdx, fIdx, id: `field-${sIdx}-${fIdx}`, name: field.displayName, message });
+            }));
+            return list;
+        },
+
+        problems() {
+            return Object.fromEntries(this.invalidFields.map(f => [`${f.sIdx}-${f.fIdx}`, f.message]));
+        }
+    },
+
+    watch: {
+        // Once every value is fine the summary of the refused Copy has nothing to say
+        invalidFields(list) {
+            if (!list.length) this.copyBlocked = false;
         }
     },
 
@@ -284,6 +334,26 @@ export default {
 
         isSectionActive(sIdx) {
             return this.sections[sIdx]?.isActive || !!this.modifiedSections[sIdx];
+        },
+
+        // The rule to show next to a field whose value is invalid, or ''
+        problemOf(sIdx, fIdx) {
+            return this.problems[sIdx + '-' + fIdx] || '';
+        },
+
+        // The field names the error when it has one, else its hint, and its description
+        describedBy(sIdx, fIdx) {
+            const id = `field-${sIdx}-${fIdx}`;
+            const hint = fieldHint(this.sections[sIdx].fields[fIdx]);
+            return [this.problemOf(sIdx, fIdx) ? `${id}-error` : '', hint ? `${id}-hint` : '', `${id}-description`]
+                .filter(Boolean).join(' ');
+        },
+
+        fieldPlaceholder,
+        fieldHint,
+
+        invalidCount(sIdx) {
+            return this.invalidFields.filter(f => f.sIdx === sIdx).length;
         },
 
         isFieldModified(sIdx, fIdx) {
@@ -339,6 +409,8 @@ export default {
         // ---- input styling ----
 
         fieldInputClass(sIdx, fIdx) {
+            // The red of an invalid field wins over the mark of a modified one
+            if (this.problemOf(sIdx, fIdx)) return '';
             if (this.isFieldModified(sIdx, fIdx)) return 'p-field-modified';
             return '';
         },
@@ -422,9 +494,9 @@ export default {
                             break;
                     }
 
-                    // Skip null/empty values that match defaults
+                    // Skip null/empty values that match defaults; an unedited empty cron is the default of its job
                     if (value === null || value === '') {
-                        if (!field.sensitive && field.defaultValue === rawValue) continue;
+                        if (!field.sensitive && (field.defaultValue === rawValue || (field.fieldType === 'cron' && !isModified))) continue;
                     }
 
                     setSettingAt(obj, settingPath(section.name, field.key), value);
@@ -435,6 +507,13 @@ export default {
         },
 
         copyToClipboard() {
+            // Both Copy buttons stay enabled; with an invalid value nothing is copied, and the page says how many (D-046)
+            if (this.invalidFields.length) {
+                this.copyBlocked = true;
+                document.getElementById(this.invalidFields[0].id)?.focus();
+                return;
+            }
+            this.copyBlocked = false;
             copyText(this.generateAppSettingsJson()).then(() => {
                 this.$notify.success('AppSettings JSON copied to clipboard.', { summary: 'Copied' });
             }).catch(() => {
@@ -581,12 +660,19 @@ export default {
     color: var(--ddb-text-secondary);
 }
 
-.number-input-wrapper,
-.timespan-input-wrapper,
-.cron-input-wrapper {
+.number-input-wrapper {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+/* The input, its hint and its error, one under the other */
+.timespan-input-wrapper,
+.cron-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
 }
 
 .input-unit {

@@ -90,12 +90,18 @@ export default class AdminApi {
         return this.registry.postRequest(`/sys/tasks/${encodeURIComponent(id)}/delete`, {});
     }
 
-    // User update method (email and roles)
+    /**
+     * Updates a user (admin only): the roles and, when given, the e-mail address. An `undefined` e-mail is left out of the
+     * request, and the Registry keeps the address as it is (also when it manages the profile itself); an empty one removes it.
+     * @param {string} userName
+     * @param {string|undefined} email
+     * @param {string[]} roles
+     */
     async updateUser(userName, email, roles) {
-        return await this.registry.putRequest(`/users/${encodeURIComponent(userName)}`, {
-            email: email,
-            roles: roles
-        });
+        /** @type {{ email?: string, roles: string[] }} */
+        const body = { roles };
+        if (email !== undefined) body.email = email;
+        return await this.registry.putRequest(`/users/${encodeURIComponent(userName)}`, body);
     }
 
     /**
