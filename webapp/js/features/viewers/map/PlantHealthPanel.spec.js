@@ -422,6 +422,17 @@ describe('PlantHealthPanel presets', () => {
         expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({ preset: 'false-color-ir' });
     });
 
+    // FR-RAS-26: a band preset has no formula, so ddb exports the bands scaled to 8 bits, and the label says so; an index is the styled image
+    it('names the export after the style: scaled bands for a band preset, a styled image for an index', async () => {
+        await renderWith(CLEAN_STATS, { info: INFO, algorithms: [{ id: 'NDWI', name: 'NDWI', range: [-1, 1] }], pick: '' });
+        const label = () => wrapper.find('[data-testid="raster-export-whole"]').attributes('aria-label');
+        await preset().setValue('false-color-ir');
+        expect(label()).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
+        await preset().setValue('ndwi');
+        await flushPromises();
+        expect(label()).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+    });
+
     it('takes an index preset as its formula and colormap', async () => {
         const algorithms = [{ id: 'NDWI', name: 'NDWI', range: [-1, 1] }];
         await renderWith(CLEAN_STATS, { info: INFO, algorithms, pick: '' });

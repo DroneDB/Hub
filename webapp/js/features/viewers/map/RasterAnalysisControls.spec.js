@@ -391,6 +391,19 @@ describe('RasterAnalysisControls export', () => {
         expect(byId('raster-export-extent').attributes('aria-disabled')).toBeUndefined();
     });
 
+    // FR-RAS-26: ddb writes an RGBA image only for a formula (the thermal unit); a DEM with a colormap gets its band scaled to 8 bits
+    it('names the file of the export after the style: scaled bands for an elevation raster, a styled image for a thermal unit', async () => {
+        await render();
+        expect(byId('raster-export-whole').attributes('aria-label')).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
+        expect(byId('raster-export-note').text()).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file): the bands scaled to 8 bits, not the values.');
+        wrapper.unmount();
+
+        await render({}, { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '',
+            valueMin: 280.1, valueMax: 308.4, stretch: [{ min: 280.1, max: 308.4 }] });
+        expect(byId('raster-export-whole').attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+        expect(byId('raster-export-whole').attributes('title')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+    });
+
     it('offers the export of the whole raster when it is within the limit', async () => {
         await render({}, { ...DSM_INFO, estimatedExportBytes: 1000, exportLimitBytes: 1073741824 });
         expect(byId('raster-export-whole').attributes('aria-disabled')).toBeUndefined();

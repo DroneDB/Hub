@@ -5,7 +5,7 @@
             <div class="export-choice">
                 <button type="button" class="panel-btn action-btn" :class="{ 'is-disabled': wholeDisabled }"
                         :aria-disabled="wholeDisabled ? 'true' : undefined" :aria-describedby="wholeDescription"
-                        :title="wholeDisabled ? `${EXPORT_LABEL}: ${wholeNote}` : EXPORT_LABEL" :aria-label="EXPORT_LABEL"
+                        :title="wholeDisabled ? `${wholeLabel}: ${wholeNote}` : wholeLabel" :aria-label="wholeLabel"
                         data-testid="raster-export-whole" @click="onWhole">
                     <i :class="exporter.running.value && !exporter.refusedExtent.value ? 'fas fa-spinner fa-spin' : 'fas fa-download'" aria-hidden="true" />
                     <span class="action-label">Export</span>
@@ -28,7 +28,7 @@
         <p v-if="exporter.extentReason.value" :id="extentReasonId" class="export-reason" data-testid="raster-export-extent-reason">
             {{ exporter.extentReason.value }}{{ exporter.extentOverLimit.value ? '. Zoom in to export less.' : '' }}
         </p>
-        <p :id="noteId" class="export-note" data-testid="raster-export-note">{{ EXPORT_LABEL }}: the picture of the style, not the values.</p>
+        <p :id="noteId" class="export-note" data-testid="raster-export-note">{{ note }}</p>
         <HeavyTaskStatus :task="exporter.task.value" :error="exporter.error.value" label="Export" :phases="EXPORT_PHASES" cancellable
                          :cancelling="exporter.cancelling.value" @cancel="exporter.cancel" />
         <DialogHost :dialogs="dialogs" />
@@ -44,15 +44,15 @@
  * stays a button that can be focused, with the reason as visible text (FR-XC-22: 'Too large to export: about 9.3 GB >
  * 1 GB limit'); the size and the limit are those of the Registry (value info). 'Visible extent' is disabled the same way on
  * a server whose libddb exports no window ('Needs a newer server (libddb 2.3)') and while the estimate of a new extent is
- * read ('Checking size…'). The label says what the file is
- * (FR-RAS-26: a styled RGBA picture, not the values).
+ * read ('Checking size…'). The label says what the file is and follows the style (FR-RAS-26): a styled RGBA picture
+ * when there is a formula, the bands scaled to 8 bits otherwise (the rule of ddb), never the values.
  */
 import { computed, useId } from 'vue';
 import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useRasterExport } from '@/composables/useRasterExport';
-import { EXPORT_LABEL, EXPORT_EXTENT_LABEL, EXPORT_PHASES } from '@/libs/map/rasterExport';
+import { exportLabel, exportNote, EXPORT_EXTENT_LABEL, EXPORT_PHASES } from '@/libs/map/rasterExport';
 
 defineOptions({ name: 'RasterExportButton' });
 
@@ -81,6 +81,10 @@ const labelId = useId();
 const wholeReasonId = useId();
 const extentReasonId = useId();
 const noteId = useId();
+
+// What the file is follows the style: ddb writes RGBA only for a formula
+const wholeLabel = computed(() => exportLabel(props.vizParams));
+const note = computed(() => exportNote(props.vizParams));
 
 const wholeDisabled = computed(() => !props.dataset || !props.filePath || exporter.running.value || !!exporter.wholeReason.value);
 const extentDisabled = computed(() => !props.dataset || !props.filePath || exporter.running.value || !!exporter.extentReason.value);

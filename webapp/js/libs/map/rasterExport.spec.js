@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-    EXPORT_LABEL, EXPORT_EXTENT_LABEL, EXPORT_PHASES, exportRefusal, visibleBbox, exportFileName, exportTaskParams, exportSubmitMessage
+    EXPORT_STYLED_LABEL, EXPORT_BANDS_LABEL, exportsStyledImage, exportLabel, exportNote, EXPORT_EXTENT_LABEL, EXPORT_PHASES, exportRefusal, visibleBbox, exportFileName, exportTaskParams, exportSubmitMessage
 } from './rasterExport';
 
 const GIB = 1073741824;
@@ -86,9 +86,27 @@ describe('exportSubmitMessage', () => {
 
 describe('the words of the control', () => {
     it('say what the file is, and what the second export is', () => {
-        expect(EXPORT_LABEL).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+        expect(EXPORT_STYLED_LABEL).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+        expect(EXPORT_BANDS_LABEL).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
         expect(EXPORT_EXTENT_LABEL).toBe('Export visible extent');
         // Every phase of the tool is an export for the status
         expect(Object.values(EXPORT_PHASES)).toEqual(['Exporting', 'Exporting', 'Exporting', 'Exporting']);
+    });
+});
+
+describe('the label follows the style (FR-RAS-26, the rule of ddb: only a formula makes the RGBA image)', () => {
+    it('is the styled image for a formula, with or without a colormap', () => {
+        expect(exportsStyledImage({ formula: 'NDVI', colormap: 'rdylgn' })).toBe(true);
+        expect(exportsStyledImage({ formula: 'CELSIUS' })).toBe(true);
+        expect(exportLabel({ formula: 'NDVI' })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+        expect(exportNote({ formula: 'NDVI' })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
+    });
+
+    it('is the scaled bands without a formula, a colormap or a rescale alone included (ddb does not apply them)', () => {
+        for (const style of [undefined, null, {}, { colormap: 'ironbow' }, { colormap: 'ironbow', rescale: '10,40' }, { preset: 'rgb' }, { bands: '1,2,3' }, { formula: '' }, { formula: null }]) {
+            expect(exportsStyledImage(style)).toBe(false);
+            expect(exportLabel(style)).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
+        }
+        expect(exportNote({ colormap: 'ironbow' })).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file): the bands scaled to 8 bits, not the values.');
     });
 });

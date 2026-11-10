@@ -8,8 +8,38 @@ import { transformExtent } from 'ol/proj';
 import { pathutils } from 'ddb';
 import { formatBytes } from '@/libs/format';
 
-/** What the export gives (FR-RAS-26): a picture of the style, in the CRS of the file, not its values. */
-export const EXPORT_LABEL = 'Export styled image (RGBA GeoTIFF, in the CRS of the file)';
+/** What the export gives with a formula (FR-RAS-26): a picture of the style, in the CRS of the file, not its values. */
+export const EXPORT_STYLED_LABEL = 'Export styled image (RGBA GeoTIFF, in the CRS of the file)';
+
+/** What the export gives without a formula (FR-RAS-26): the bands scaled to 8 bits, in the CRS of the file, not its values. */
+export const EXPORT_BANDS_LABEL = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
+
+/**
+ * Whether the export is the RGBA picture of a style (FR-RAS-26). The rule is that of ddb (raster_export.cpp, exportRaster):
+ * only a formula makes the RGBA rendering; without one it writes the bands scaled to 8 bits (a DEM: one grey band) and a
+ * colormap alone is not applied.
+ * @param {Record<string, any> | null | undefined} vizParams  the style of the layer
+ * @returns {boolean}
+ */
+export function exportsStyledImage(vizParams) {
+    return typeof vizParams?.formula === 'string' && vizParams.formula.length > 0;
+}
+
+/**
+ * The label of the export for a style (the button, its tooltip and its aria-label).
+ * @param {Record<string, any> | null | undefined} vizParams
+ */
+export function exportLabel(vizParams) {
+    return exportsStyledImage(vizParams) ? EXPORT_STYLED_LABEL : EXPORT_BANDS_LABEL;
+}
+
+/**
+ * The note under the export: the label and what the file is.
+ * @param {Record<string, any> | null | undefined} vizParams
+ */
+export function exportNote(vizParams) {
+    return `${exportLabel(vizParams)}: ${exportsStyledImage(vizParams) ? 'the picture of the style' : 'the bands scaled to 8 bits'}, not the values.`;
+}
 
 /** The second export: what the map shows now, at the resolution of the raster (D-023). */
 export const EXPORT_EXTENT_LABEL = 'Export visible extent';

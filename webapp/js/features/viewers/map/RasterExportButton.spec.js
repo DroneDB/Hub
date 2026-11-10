@@ -79,12 +79,24 @@ function controlledRun() {
 }
 
 describe('RasterExportButton the export of the whole raster', () => {
-    it('says what the file is: a styled image in the CRS of the file, not the values (FR-RAS-26)', () => {
+    it('says what the file is: the scaled bands without a formula, a styled image with one, in the CRS of the file, not the values (FR-RAS-26)', async () => {
+        // The default style of the tests has a colormap and no formula: ddb scales the bands to 8 bits and applies no colormap
         mountControl();
-        expect(whole().attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
-        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(
-            'Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
+        const bands = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
+        expect(whole().attributes('aria-label')).toBe(bands);
+        expect(whole().attributes('title')).toBe(bands);
+        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${bands}: the bands scaled to 8 bits, not the values.`);
         expect(extent().attributes('aria-label')).toBe('Export visible extent');
+
+        // A formula makes the RGBA image; the label follows the style as it changes
+        const styled = 'Export styled image (RGBA GeoTIFF, in the CRS of the file)';
+        await wrapper.setProps({ vizParams: { formula: 'CELSIUS', colormap: 'ironbow' } });
+        expect(whole().attributes('aria-label')).toBe(styled);
+        expect(whole().attributes('title')).toBe(styled);
+        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
+
+        await wrapper.setProps({ vizParams: { colormap: 'ironbow' } });
+        expect(whole().attributes('aria-label')).toBe(bands);
     });
 
     it('submits the raster-export task with the style (not the stretch of the panel) and the file name, without a toast of its own', async () => {
