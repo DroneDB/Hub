@@ -79,8 +79,8 @@ function controlledRun() {
 }
 
 describe('RasterExportButton the export of the whole raster', () => {
-    it('says what the file is: the scaled bands without a formula, a styled image with one, in the CRS of the file, not the values (FR-RAS-26)', async () => {
-        // The default style of the tests has a colormap and no formula: ddb scales the bands to 8 bits and applies no colormap
+    it('says what the file is: the scaled bands without a formula, a styled image with one or with a colormap on one band, in the CRS of the file, not the values (FR-RAS-26)', async () => {
+        // The default style of the tests has a colormap and no formula, on a raster not known to have one band: ddb scales the bands to 8 bits and applies no colormap
         mountControl();
         const bands = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
         expect(whole().attributes('aria-label')).toBe(bands);
@@ -96,6 +96,13 @@ describe('RasterExportButton the export of the whole raster', () => {
         expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
 
         await wrapper.setProps({ vizParams: { colormap: 'ironbow' } });
+        expect(whole().attributes('aria-label')).toBe(bands);
+
+        // A colormap on a raster of one data band is the styled image too (ddb 2.3.1), several bands of it are not
+        await wrapper.setProps({ singleBand: true });
+        expect(whole().attributes('aria-label')).toBe(styled);
+        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
+        await wrapper.setProps({ vizParams: { colormap: 'ironbow', bands: '1,2' } });
         expect(whole().attributes('aria-label')).toBe(bands);
     });
 

@@ -8,37 +8,58 @@ import { transformExtent } from 'ol/proj';
 import { pathutils } from 'ddb';
 import { formatBytes } from '@/libs/format';
 
-/** What the export gives with a formula (FR-RAS-26): a picture of the style, in the CRS of the file, not its values. */
+/** What the export gives with a formula, or a colormap on one band (FR-RAS-26): a picture of the style, in the CRS of the file, not its values. */
 export const EXPORT_STYLED_LABEL = 'Export styled image (RGBA GeoTIFF, in the CRS of the file)';
 
 /** What the export gives without a formula (FR-RAS-26): the bands scaled to 8 bits, in the CRS of the file, not its values. */
 export const EXPORT_BANDS_LABEL = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
 
 /**
- * Whether the export is the RGBA picture of a style (FR-RAS-26). The rule is that of ddb (raster_export.cpp, exportRaster):
- * only a formula makes the RGBA rendering; without one it writes the bands scaled to 8 bits (a DEM: one grey band) and a
- * colormap alone is not applied.
+ * How many distinct bands a style exports when it names them: the bands of the style ("2", "4,4,4"), none when it names no
+ * band (a preset maps three bands, and the default is the first three bands of a raster of several).
+ * @param {Record<string, any> | null | undefined} vizParams
+ * @returns {number}
+ */
+function namedBandCount(vizParams) {
+    if (typeof vizParams?.bands !== 'string') return 0;
+    const bands = vizParams.bands.split(',').map(band => band.trim()).filter(Boolean);
+    return new Set(bands).size;
+}
+
+/**
+ * Whether the export is the RGBA picture of a style (FR-RAS-26). The rule is that of ddb (raster_export.cpp, exportRaster;
+ * since DroneDB 2.3.1): a formula makes the RGBA picture, and so does a colormap when the export is exactly one band, as the
+ * bands of the style name it, or as the raster has it (`singleBand`: a raster of one data band, a DEM; the panel of Raster
+ * Analysis is for such a raster). Several bands, or a preset, are written as bands scaled to 8 bits and the colormap is not
+ * applied to them.
  * @param {Record<string, any> | null | undefined} vizParams  the style of the layer
+ * @param {{ singleBand?: boolean }} [options]  singleBand: the raster has one data band
  * @returns {boolean}
  */
-export function exportsStyledImage(vizParams) {
-    return typeof vizParams?.formula === 'string' && vizParams.formula.length > 0;
+export function exportsStyledImage(vizParams, { singleBand = false } = {}) {
+    if (typeof vizParams?.formula === 'string' && vizParams.formula.length > 0) return true;
+    if (typeof vizParams?.colormap !== 'string' || vizParams.colormap.length === 0) return false;
+    if (typeof vizParams?.preset === 'string' && vizParams.preset.length > 0) return false;
+    const named = namedBandCount(vizParams);
+    return named > 0 ? named === 1 : singleBand;
 }
 
 /**
  * The label of the export for a style (the button, its tooltip and its aria-label).
  * @param {Record<string, any> | null | undefined} vizParams
+ * @param {{ singleBand?: boolean }} [options]  as exportsStyledImage
  */
-export function exportLabel(vizParams) {
-    return exportsStyledImage(vizParams) ? EXPORT_STYLED_LABEL : EXPORT_BANDS_LABEL;
+export function exportLabel(vizParams, options) {
+    return exportsStyledImage(vizParams, options) ? EXPORT_STYLED_LABEL : EXPORT_BANDS_LABEL;
 }
 
 /**
  * The note under the export: the label and what the file is.
  * @param {Record<string, any> | null | undefined} vizParams
+ * @param {{ singleBand?: boolean }} [options]  as exportsStyledImage
  */
-export function exportNote(vizParams) {
-    return `${exportLabel(vizParams)}: ${exportsStyledImage(vizParams) ? 'the picture of the style' : 'the bands scaled to 8 bits'}, not the values.`;
+export function exportNote(vizParams, options) {
+    return `${exportLabel(vizParams, options)}: ${exportsStyledImage(vizParams, options) ? 'the picture of the style' : 'the bands scaled to 8 bits'}, not the values.`;
 }
 
 /** The second export: what the map shows now, at the resolution of the raster (D-023). */

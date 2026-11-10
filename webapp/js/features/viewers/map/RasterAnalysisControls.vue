@@ -191,9 +191,10 @@
                 </button>
             </div>
 
-            <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16) -->
+            <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16). This panel is for a
+                 raster of one data band, so its colormap makes the styled image (FR-RAS-26) -->
             <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox"
-                                :info="rasterInfo" :read-estimate="false" />
+                                :info="rasterInfo" :read-estimate="false" single-band />
         </template>
     </AnalysisPanel>
 </template>

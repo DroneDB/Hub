@@ -45,7 +45,8 @@
  * 1 GB limit'); the size and the limit are those of the Registry (value info). 'Visible extent' is disabled the same way on
  * a server whose libddb exports no window ('Needs a newer server (libddb 2.3)') and while the estimate of a new extent is
  * read ('Checking size…'). The label says what the file is and follows the style (FR-RAS-26): a styled RGBA picture
- * when there is a formula, the bands scaled to 8 bits otherwise (the rule of ddb), never the values.
+ * when there is a formula, or a colormap on one band (libddb 2.3.1), the bands scaled to 8 bits otherwise (the rule of ddb), never
+ * the values.
  */
 import { computed, useId } from 'vue';
 import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
@@ -65,6 +66,8 @@ const props = defineProps({
     vizParams: { type: Object, default: () => ({}) },
     /** The visible extent of the map in WGS 84 (minLon, minLat, maxLon, maxLat), null while it is not known */
     bbox: { type: Array, default: null },
+    /** The raster has one data band (a DEM): a colormap on it makes the styled image, as ddb 2.3.1 exports it */
+    singleBand: { type: Boolean, default: false },
     /** The value info the panel already has: its estimate and limit are used instead of reading them again */
     info: { type: Object, default: null },
     /** Read the value info of the raster when `info` has no estimate (false for a panel whose info is the value info) */
@@ -82,9 +85,9 @@ const wholeReasonId = useId();
 const extentReasonId = useId();
 const noteId = useId();
 
-// What the file is follows the style: ddb writes RGBA only for a formula
-const wholeLabel = computed(() => exportLabel(props.vizParams));
-const note = computed(() => exportNote(props.vizParams));
+// What the file is follows the style: ddb writes RGBA for a formula, and for a colormap on one band
+const wholeLabel = computed(() => exportLabel(props.vizParams, { singleBand: props.singleBand }));
+const note = computed(() => exportNote(props.vizParams, { singleBand: props.singleBand }));
 
 const wholeDisabled = computed(() => !props.dataset || !props.filePath || exporter.running.value || !!exporter.wholeReason.value);
 const extentDisabled = computed(() => !props.dataset || !props.filePath || exporter.running.value || !!exporter.extentReason.value);

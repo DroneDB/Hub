@@ -94,7 +94,7 @@ describe('the words of the control', () => {
     });
 });
 
-describe('the label follows the style (FR-RAS-26, the rule of ddb: only a formula makes the RGBA image)', () => {
+describe('the label follows the style (FR-RAS-26, the rule of ddb 2.3.1: a formula, or a colormap on exactly one band, makes the RGBA image)', () => {
     it('is the styled image for a formula, with or without a colormap', () => {
         expect(exportsStyledImage({ formula: 'NDVI', colormap: 'rdylgn' })).toBe(true);
         expect(exportsStyledImage({ formula: 'CELSIUS' })).toBe(true);
@@ -102,11 +102,33 @@ describe('the label follows the style (FR-RAS-26, the rule of ddb: only a formul
         expect(exportNote({ formula: 'NDVI' })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
     });
 
-    it('is the scaled bands without a formula, a colormap or a rescale alone included (ddb does not apply them)', () => {
-        for (const style of [undefined, null, {}, { colormap: 'ironbow' }, { colormap: 'ironbow', rescale: '10,40' }, { preset: 'rgb' }, { bands: '1,2,3' }, { formula: '' }, { formula: null }]) {
+    it('is the styled image for a colormap on a raster of one data band, formula or not', () => {
+        expect(exportsStyledImage({ colormap: 'viridis' }, { singleBand: true })).toBe(true);
+        expect(exportsStyledImage({ colormap: 'viridis', rescale: '0,50' }, { singleBand: true })).toBe(true);
+        expect(exportLabel({ colormap: 'viridis' }, { singleBand: true })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
+        expect(exportNote({ colormap: 'viridis' }, { singleBand: true })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
+    });
+
+    it('is the styled image for a colormap on one band the style names, the same band three times included', () => {
+        expect(exportsStyledImage({ colormap: 'viridis', bands: '2' })).toBe(true);
+        expect(exportsStyledImage({ colormap: 'viridis', bands: '4,4,4' })).toBe(true);
+        expect(exportsStyledImage({ colormap: 'viridis', bands: ' 3 ' })).toBe(true);
+    });
+
+    it('is the scaled bands for a colormap on several bands, a preset or a raster that is not known to have one band', () => {
+        expect(exportsStyledImage({ colormap: 'viridis', bands: '1,2' })).toBe(false);
+        expect(exportsStyledImage({ colormap: 'viridis', bands: '3,2,1' }, { singleBand: true })).toBe(false);
+        expect(exportsStyledImage({ colormap: 'viridis', preset: 'rgb' }, { singleBand: true })).toBe(false);
+        expect(exportsStyledImage({ colormap: 'viridis' })).toBe(false);
+        expect(exportsStyledImage({ colormap: 'viridis' }, { singleBand: false })).toBe(false);
+    });
+
+    it('is the scaled bands without a formula or a colormap, whatever the raster (the bands are scaled, no colour is applied)', () => {
+        for (const style of [undefined, null, {}, { rescale: '10,40' }, { preset: 'rgb' }, { bands: '1,2,3' }, { bands: '1' }, { formula: '' }, { formula: null }, { colormap: '' }]) {
+            expect(exportsStyledImage(style, { singleBand: true })).toBe(false);
             expect(exportsStyledImage(style)).toBe(false);
             expect(exportLabel(style)).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
         }
-        expect(exportNote({ colormap: 'ironbow' })).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file): the bands scaled to 8 bits, not the values.');
+        expect(exportNote({ colormap: 'ironbow', bands: '1,2' })).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file): the bands scaled to 8 bits, not the values.');
     });
 });
