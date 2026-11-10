@@ -109,10 +109,12 @@
                                         title="Disable User" aria-label="Disable User" icon="fa-solid fa-user-slash"
                                         @click.stop="disableUser(slotProps.data)" />
                             </template>
-                            <Button severity="danger" size="small" :loading="slotProps.data.deleting"
-                                    :disabled="slotProps.data.deleting || slotProps.data.editing || slotProps.data.userName === 'admin'"
-                                    title="Delete User" aria-label="Delete User"
-                                    icon="fa-solid fa-trash" @click.stop="handleDelete(slotProps.data)" />
+                            <!-- Off while it is busy or the user cannot be deleted; the reason of the rule is what the button says -->
+                            <ActionButton severity="danger" size="small" :loading="slotProps.data.deleting" label="Delete User"
+                                          icon="fa-solid fa-trash"
+                                          :disabled="slotProps.data.deleting || slotProps.data.editing || !!userDeleteBlockReason(slotProps.data)"
+                                          :disabled-reason="userDeleteBlockReason(slotProps.data) ?? ''"
+                                          @click.stop="handleDelete(slotProps.data)" />
                         </div>
                     </template>
                 </Column>
@@ -234,6 +236,7 @@ import OrganizationsDialog from './OrganizationsDialog.vue';
 import RoleManagementDialog from './RoleManagementDialog.vue';
 import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
 import Button from 'primevue/button';
+import ActionButton from '@/components/ActionButton.vue';
 import PrimeMessage from 'primevue/message';
 import Chip from 'primevue/chip';
 import Tag from 'primevue/tag';
@@ -246,6 +249,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
 import { formatDateTime, UNKNOWN } from '@/libs/format';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
+import { userDeleteBlockReason } from '@/libs/deleteBlockReason';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
 import { useStackedLayout } from '@/composables/useStackedLayout';
@@ -281,6 +285,7 @@ export default {
         RoleManagementDialog,
         OrganizationManagementDialog,
         Button,
+        ActionButton,
         PrimeMessage,
         Chip,
         Tag,
@@ -304,7 +309,7 @@ export default {
             initial: getAdminPageSize(PREF.ADMIN_USERS)
         });
         // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order (D-026)
-        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), ...sizing, table, page };
+        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), userDeleteBlockReason, ...sizing, table, page };
     },
     data: function () {
         return {
@@ -492,6 +497,7 @@ export default {
         },
 
         async handleDelete(user) {
+            if (userDeleteBlockReason(user)) return;
             this.userToDelete = user;
             this.deleteSuccessor = null;
             this.deleteConflictResolution = 'Rename';

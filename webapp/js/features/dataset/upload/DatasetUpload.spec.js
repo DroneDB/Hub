@@ -30,6 +30,8 @@ vi.mock('@/libs/notify', () => ({
 }));
 vi.mock('@/libs/upload/uploadRequests', () => ({
     createUploadRequests: () => ({
+        // Each add is a new batch (the open uploads it starts with: FR-XC-10)
+        newBatch: () => {},
         send: async (job, hooks) => {
             sent.push(...job.items.map(i => ({ path: i.path, overwrite: i.overwrite, ...(i.fileId ? { fileId: i.fileId } : {}) })));
             // A held request ends when the test says, or when it is aborted (pause, cancel)

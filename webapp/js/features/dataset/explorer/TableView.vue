@@ -105,6 +105,7 @@ import { getCurrentInstance, nextTick, useId } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
 import { useListNavigation } from '@/composables/useListNavigation';
+import { useCutMarks } from '@/composables/useCutMarks';
 import { columnFrom } from '@/libs/responsiveColumns';
 
 // The preview of a row is a 48 px box that `object-fit: cover` fills along the long side of a 16:9 photo:
@@ -134,7 +135,7 @@ export default {
         importing: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
-    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         // One tab stop: the table holds the focus and names its active row (aria-activedescendant), FR-EXP-09
@@ -151,7 +152,8 @@ export default {
             // Ranges follow the rows as sorted on screen
             selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path),
             nav,
-            columnFrom
+            columnFrom,
+            ...useCutMarks(() => props.dataset)
         };
     },
     data: function () {
@@ -280,6 +282,8 @@ export default {
             const classes = [];
             if (data.selected) classes.push('row-selected');
             if (this.activePath === data.path) classes.push('row-active');
+            // Cut (Ctrl+X) and not pasted yet: dimmed (FR-EXP-16)
+            if (this.isCut(data)) classes.push('row-cut');
             if (data.entry && this.dropTargetPath === data.entry.path) classes.push('drop-target');
             return classes.join(' ');
         },
@@ -560,6 +564,10 @@ export default {
         &:hover {
             background-color: var(--ddb-selected-active-bg) !important;
         }
+    }
+
+    tr.row-cut {
+        opacity: 0.5;
     }
 
     tr.drop-target > td {

@@ -50,8 +50,9 @@ function sameFiles(a, b) {
  * @param {() => any} [ctx.savedData]  the data of the saved view the state belongs to, null for a new view
  * @param {{ open: (component: any, props: any) => Promise<any> }} ctx.dialogs
  * @param {boolean} [ctx.embed]
+ * @param {(path: string) => void} [ctx.onAdded]  called with the path of a layer that add() put in the view (the map says where it is)
  */
-export function useViewLayers({ dataset, state, setState, baseEntry, savedData = () => null, dialogs, embed = false }) {
+export function useViewLayers({ dataset, state, setState, baseEntry, savedData = () => null, dialogs, embed = false, onAdded = () => {} }) {
     const notify = useNotify();
 
     /** @type {import('vue').ShallowRef<import('@/libs/map/georasterLayers').ResolvedLayers>} */
@@ -172,7 +173,9 @@ export function useViewLayers({ dataset, state, setState, baseEntry, savedData =
     async function add() {
         if (!canAdd.value || !state.value) return false;
         const file = await pickFile('Add layer', layerPaths.value[0] ?? basePath.value);
-        return !!file && apply(s => addLayer(s, file));
+        const added = !!file && apply(s => addLayer(s, file));
+        if (added && file) onAdded(file.path);
+        return added;
     }
 
     /**

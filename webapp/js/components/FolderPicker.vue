@@ -24,7 +24,11 @@
                         <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
-                        <span class="file-name" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ data.label }}</span>
+                        <!-- A click on a row chooses it: the disabled name is a button that cannot be pressed (a table row
+                             cannot nest in its cell) -->
+                        <DisabledReason :reason="disabledReason(data)" role="button">
+                            <span class="file-name" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ data.label }}</span>
+                        </DisabledReason>
                     </template>
                 </Column>
                 <Column style="width: 7.5rem;" v-bind="columnFrom('sm')">
@@ -95,6 +99,7 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
 import SortHeader from '@/components/SortHeader.vue';
+import DisabledReason from '@/components/DisabledReason.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import PrimeMessage from 'primevue/message';
@@ -122,6 +127,8 @@ const { pathutils, entry } = ddb;
  *   accept      - Optional (entry) => boolean; files it rejects cannot be selected. Folders are
  *                 never filtered by it, so they stay navigable.
  *   exclude     - Dataset-relative paths that cannot be selected (default: none).
+ *   excludeReason, rejectReason - what the disabled rows say: why an excluded path, and why a file that `accept`
+ *                 rejects, cannot be selected. A disabled row stays focusable and gives it (DisabledReason).
  *
  * Emits:
  *   close - Emitted on confirm with { path, entry } or on cancel with null.
@@ -133,7 +140,7 @@ const { pathutils, entry } = ddb;
 export default {
     components: {
         LoadingSpinner,
-        Window, Button, InputText, PathBreadcrumb, SortHeader, DataTable, Column, PrimeMessage, ConfirmDialog
+        Window, Button, InputText, PathBreadcrumb, SortHeader, DisabledReason, DataTable, Column, PrimeMessage, ConfirmDialog
     },
 
     props: {
@@ -161,6 +168,15 @@ export default {
         exclude: {
             type: Array,
             default: () => []
+        },
+        // What a disabled row says (FR-XC-22): why a path of `exclude` cannot be selected, and why `accept` rejects a file
+        excludeReason: {
+            type: String,
+            default: 'Already chosen'
+        },
+        rejectReason: {
+            type: String,
+            default: 'Not available here'
         }
     },
 
@@ -374,6 +390,16 @@ export default {
             if (this.mode === 'folder') return entry.isDirectory(file.entry);
             if (this.mode === 'file') return !entry.isDirectory(file.entry);
             return false;
+        },
+
+        // Why a row cannot be selected, in words (FR-MAP-22, FR-XC-22); '' when it can
+        disabledReason: function (file) {
+            if (!file || this.canSelect(file)) return '';
+            if (this.excludedPaths.has(this.normalizePath(file.entry.path))) return this.excludeReason;
+            if (!this.isEntryAllowed(file.entry)) return this.rejectReason;
+            return entry.isDirectory(file.entry)
+                ? 'Open the folder to choose a file inside it'
+                : 'Only folders can be chosen here';
         },
 
         rowClass: function (data) {

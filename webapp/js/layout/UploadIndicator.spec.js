@@ -13,6 +13,7 @@ import { nextTick } from 'vue';
 const h = vi.hoisted(() => ({ held: [], deleted: [], listeners: {}, auth: null, session: true }));
 vi.mock('@/libs/upload/uploadRequests', () => ({
     createUploadRequests: () => ({
+        newBatch: () => {},
         send: (job, hooks) => new Promise((resolve, reject) => {
             hooks.signal.addEventListener('abort', () => reject(Object.assign(new Error('Upload aborted'), { name: 'AbortError' })));
             h.held.push({ job, hooks, resolve });

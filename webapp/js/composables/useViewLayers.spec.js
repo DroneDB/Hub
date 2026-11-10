@@ -22,7 +22,7 @@ function viewOf(base, paths) {
 }
 
 let scope;
-function open(initial, { baseEntry = null, saved = null, embed = false } = {}) {
+function open(initial, { baseEntry = null, saved = null, embed = false, onAdded = undefined } = {}) {
     const state = shallowRef(initial);
     const baseRef = shallowRef(baseEntry);
     const savedRef = shallowRef(saved);
@@ -31,7 +31,7 @@ function open(initial, { baseEntry = null, saved = null, embed = false } = {}) {
     let layers;
     scope = effectScope();
     scope.run(() => {
-        layers = useViewLayers({ dataset, state, setState, baseEntry: baseRef, savedData: () => savedRef.value, dialogs, embed });
+        layers = useViewLayers({ dataset, state, setState, baseEntry: baseRef, savedData: () => savedRef.value, dialogs, embed, onAdded });
     });
     return { layers, state, setState, dialogs, baseRef, savedRef };
 }
@@ -259,6 +259,19 @@ describe('useViewLayers add', () => {
         expect(setState).toHaveBeenCalledTimes(1);
         expect(state.value.layers.map(l => l.path)).toEqual(['h/c.tif', 'f/a.tif', 'g/b.tif']);
         expect(state.value.layers[0].hash).toBe('h-h/c.tif');
+    });
+
+    it('tells the map the path of the layer it added (FR-MAP-08), and nothing for a cancelled or refused pick', async () => {
+        const onAdded = vi.fn();
+        const { layers, dialogs } = open(viewOf('f/a.tif', ['f/a.tif']), { onAdded });
+        await settled(layers);
+        dialogs.open.mockResolvedValueOnce(null);
+        await layers.add();
+        expect(onAdded).not.toHaveBeenCalled();
+        dialogs.open.mockResolvedValueOnce({ path: 'g/b.tif' });
+        await layers.add();
+        expect(onAdded).toHaveBeenCalledTimes(1);
+        expect(onAdded).toHaveBeenCalledWith('g/b.tif');
     });
 
     it('keeps split off when it is off, and on with equal bands when it is on', async () => {

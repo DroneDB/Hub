@@ -12,6 +12,7 @@ import ddb from 'ddb';
 import { ScaleLine } from 'ol/control';
 import { b64encode } from '@/libs/base64';
 import { PREF, setPref } from '@/libs/preferences';
+import { notify } from '@/libs/notify';
 
 const T = ddb.entry.type;
 const POLYGON = { type: 'Polygon', coordinates: [[[10, 45], [10.01, 45], [10.01, 45.01], [10, 45.01], [10, 45]]] };
@@ -44,7 +45,7 @@ const LayerPanel = defineComponent({
         layers: { type: Array, default: () => [] }, removable: Boolean, removablePaths: { type: Array, default: null },
         canRepick: Boolean, canAdd: Boolean, addDisabled: Boolean, addTitle: { type: String, default: '' }, changedPaths: { type: Array, default: () => [] }
     },
-    emits: ['remove', 'repick', 'add', 'reorder', 'toggle-visible', 'plant-health', 'update:layers'],
+    emits: ['remove', 'repick', 'add', 'reorder', 'toggle-visible', 'plant-health', 'update:layers', 'zoom-to'],
     setup() { return () => h('div', { 'data-stub': 'layers' }); }
 });
 const Opacity = defineComponent({
@@ -773,5 +774,53 @@ describe('the size class of the map (FR-MAP-12, FR-SHR-05)', () => {
         sized(1280, 800);
         await mountMap([]);
         for (const name of ['is-narrow', 'is-short', 'is-compact']) expect(classes()).not.toContain(name);
+    });
+});
+
+
+describe('Zoom to layer (FR-MAP-08, FR-XC-23)', () => {
+    it('fits the map to the extent of the layer of a row, which the panel asks for with zoom-to', async () => {
+        await mountView([MAIN, ADDED], { base: MAIN });
+        expect(near(center(), mainCenter)).toBe(true);
+
+        layerPanel().vm.$emit('zoom-to', 'ortho.tif');
+        await moved();
+
+        expect(near(center(), farCenter)).toBe(true);
+    });
+
+    it('does nothing for a path that is no layer of the map', async () => {
+        await mountView([MAIN], { base: MAIN });
+        expect(wrapper.vm.zoomToLayer('nothing.tif')).toBe(false);
+        expect(near(center(), mainCenter)).toBe(true);
+    });
+
+    it('says where a layer added outside the part of the map in view is, with a "Zoom to layer" action that fits it', async () => {
+        await mountView([MAIN, ADDED], { base: MAIN });
+        wrapper.vm.map.setSize([800, 600]);
+        const info = vi.spyOn(notify, 'info').mockImplementation(() => {});
+
+        wrapper.vm.announceAddedLayer('ortho.tif');
+
+        expect(info).toHaveBeenCalledTimes(1);
+        const [text, options] = info.mock.calls[0];
+        expect(text).toBe('ortho.tif is outside the part of the map you are looking at.');
+        expect(options.summary).toBe('Layer added');
+        expect(options.action.label).toBe('Zoom to layer');
+        options.action.run();
+        await moved();
+        expect(near(center(), farCenter)).toBe(true);
+        info.mockRestore();
+    });
+
+    it('says nothing for a layer that is in view', async () => {
+        await mountView([MAIN, THIRD], { base: MAIN });
+        wrapper.vm.map.setSize([800, 600]);
+        const info = vi.spyOn(notify, 'info').mockImplementation(() => {});
+
+        wrapper.vm.announceAddedLayer('dtm.tif');
+
+        expect(info).not.toHaveBeenCalled();
+        info.mockRestore();
     });
 });

@@ -5,7 +5,7 @@
     <main id="main" ref="main" tabindex="-1">
         <RouterView :key="contentKey" name="content" />
     </main>
-    <Toast position="bottom-left" />
+    <NotifyToasts />
     <HubUpdateNoticeDialog v-if="updateNotice"
                            :notice="updateNotice"
                            :hub-version="versions.hubVersion"
@@ -17,12 +17,13 @@
 <script setup>
 /**
  * Root component: the skip link, the header and content route views (the page in the one
- * <main> landmark), the one toast host and the one-shot "Hub was updated" notice.
+ * <main> landmark), the toast hosts and the one-shot "Hub was updated" notice.
  */
-import { computed, ref } from 'vue';
+import { computed, onScopeDispose, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import Toast from 'primevue/toast';
+import NotifyToasts from '@/components/NotifyToasts.vue';
 import HubUpdateNoticeDialog from '@/components/HubUpdateNoticeDialog.vue';
+import { setToastGroupResolver, VIEWER_GROUP } from '@/libs/notify';
 
 const props = defineProps({
     // { from, to, at } when the previous page load reloaded for an update
@@ -32,6 +33,11 @@ const props = defineProps({
 });
 
 const route = useRoute();
+
+// A viewer route has its own corner for the toasts, off the viewer's controls (FR-XC-09)
+setToastGroupResolver(() => (route.meta.viewer ? VIEWER_GROUP : undefined));
+onScopeDispose(() => setToastGroupResolver(null));
+
 const updateNotice = ref(props.notice);
 const main = ref(null);
 

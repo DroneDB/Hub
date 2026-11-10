@@ -7,7 +7,12 @@
  *
  * A chunked upload's id (`fileId`) is made from the file, not drawn at random (FR-UPL-04, §7.1): the SHA-256 (hex)
  * of the dataset, the destination path, the size and the last-modified time. The same file picked again after a
- * reload therefore has the same id, and `GET .../obj/chunk/{fileId}` tells which chunks the server still has. An item
+ * reload therefore has the same id, and `GET .../obj/chunk/{fileId}` tells which chunks the server still has. That
+ * status is asked only for an upload the server holds (FR-XC-10: a new file's id is unknown, and a 404 per file would
+ * log a console error): the caller's open uploads (`GET .../obj/chunk`) are listed once per batch, shared by the files
+ * of the batch (`newBatch`, which takes the list that the resume offer already read), and an id that the list holds,
+ * or that these requests have sent chunks for, has its status read; any other file sends every chunk. A list that
+ * cannot be read asks each file's status, as before. An item
  * that resumes a stored upload (`item.fileId`, set from the list of open uploads, valid for its path) keeps the id
  * that upload has: Keep both renamed it, so the path alone would not give it back. The chunks carry the file's
  * own name and last-modified time, which the server keeps to match a file selected again.
@@ -110,6 +115,32 @@ export function createUploadRequests(deps) {
         return item.fileId;
     }
 
+    // The ids of the caller's open uploads, for the batch (see the top): a Set, null when the list could not be read
+    /** @type {Promise<Set<string>|null>|null} */
+    let openUploads = null;
+    // The ids that these requests have stored chunks for (a retry, a resume after pause, a Replace after the commit)
+    const sentTo = new Set();
+
+    /**
+     * A new batch of files: the list of open uploads is read again for it, or is the one given (the caller's open
+     * uploads as `GET .../obj/chunk` returned them, which the resume offer has just read).
+     * @param {Array<{ fileId: string }>} [listed]
+     */
+    function newBatch(listed) {
+        openUploads = Array.isArray(listed) ? Promise.resolve(idsOf(listed)) : null;
+    }
+
+    function openUploadIds() {
+        if (!openUploads) {
+            const listing = getJson(`${deps.baseUrl}/obj/chunk`)
+                .then(res => (res.status === 200 && Array.isArray(res.body) ? idsOf(res.body) : null));
+            // A request that could not start (the session ended) is not the batch's answer
+            listing.catch(() => { if (openUploads === listing) openUploads = null; });
+            openUploads = listing;
+        }
+        return openUploads;
+    }
+
     async function send(job, hooks) {
         if (job.kind === 'chunked') return [await sendChunked(job.items[0], hooks)];
         if (job.kind === 'bundle') return sendBundle(job.items, hooks);
@@ -176,9 +207,11 @@ export function createUploadRequests(deps) {
         const fileId = fileIdOf(item);
         const totalChunks = Math.max(1, Math.ceil(item.size / chunkBytes));
 
-        // Resuming: only the chunks the server does not have yet
-        const status = await getJson(`${deps.baseUrl}/obj/chunk/${fileId}`);
-        let missing = status.status === 200 && status.body?.missing
+        // Resuming: only the chunks the server does not have yet. A file the server holds no upload of sends them all
+        const listed = await openUploadIds();
+        const held = listed === null || listed.has(fileId) || sentTo.has(fileId);
+        const status = held ? await getJson(`${deps.baseUrl}/obj/chunk/${fileId}`) : null;
+        let missing = status?.status === 200 && status.body?.missing
             ? status.body.missing
             : Array.from({ length: totalChunks }, (_, i) => i);
         let stored = (totalChunks - missing.length) * chunkBytes;
@@ -210,6 +243,7 @@ export function createUploadRequests(deps) {
                 onProgress: loaded => hooks.onProgress(item.id, Math.min(item.size, base + Math.min(loaded, end - start)))
             });
             if (res.status !== 200) return failure(item, res);
+            sentTo.add(fileId);
             stored += end - start;
         }
 
@@ -248,7 +282,12 @@ export function createUploadRequests(deps) {
         return items.map(item => ({ id: item.id, ok: false, status: 0, error: 'Upload aborted', noRetry: true }));
     }
 
-    return { send };
+    return { send, newBatch };
+}
+
+/** The upload ids of a list of open uploads. @param {Array<{ fileId?: string }>} list */
+function idsOf(list) {
+    return new Set(list.map(u => u?.fileId).filter(id => typeof id === 'string' && id));
 }
 
 function ok(item, entry) {

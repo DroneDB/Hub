@@ -360,3 +360,20 @@ describe('RasterLayerOpacityPanel layer names (FR-RAS-12)', () => {
         expect(names()).toEqual(['dsm.tif']);
     });
 });
+
+describe('RasterLayerOpacityPanel zoom to layer (FR-MAP-08)', () => {
+    const zooms = () => wrapper.findAll('button[title="Zoom to layer"]');
+
+    it('has a Zoom to layer button for each drawn row, named by the layer, and emits the path of its row', async () => {
+        render();
+        expect(zooms().map(b => b.attributes('aria-label'))).toEqual(['Zoom to layer: b.tif', 'Zoom to layer: a.tif']);
+        await zooms()[1].trigger('click');
+        expect(wrapper.emitted('zoom-to')).toEqual([['a.tif']]);
+    });
+
+    it('has none on a placeholder row, which has no layer to fit', () => {
+        render({ layers: [missing('gone.tif'), row('a.tif')] });
+        expect(zooms()).toHaveLength(1);
+        expect(wrapper.find('button[aria-label="Zoom to layer: gone.tif"]').exists()).toBe(false);
+    });
+});

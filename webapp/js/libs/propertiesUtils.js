@@ -266,9 +266,9 @@ export function buildAllProperties(file, units = 'metric') {
         props['metadata'] = meta;
     }
 
-    // Extended properties (exclude meta and permissions)
+    // Extended properties (exclude meta, and what the Registry adds to the dataset's own entry: permissions, whether it has a cover)
     if (entry.properties) {
-        const excluded = ['meta', 'permissions'];
+        const excluded = ['meta', 'permissions', 'hasThumbnail'];
         for (const key in entry.properties) {
             if (!excluded.includes(key)) {
                 props[key] = entry.properties[key];

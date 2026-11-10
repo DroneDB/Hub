@@ -25,6 +25,7 @@
  * replace it, asks first.
  */
 import { ref, shallowRef } from 'vue';
+import { isListed } from '@/libs/optionalFile';
 import { camerasPathFor, parseCamerasFile, serializeCamerasFile, viewFromRig, cameraFromRig } from './cameraPresets';
 import { editableList } from './editableList';
 import { newId } from './sceneData';
@@ -80,6 +81,11 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
         path = camerasPathFor(entry.value.path);
         let text;
         try {
+            // Most splats have no sidecar: it is asked for only when the folder lists it (no 404 in the console, FR-XC-10)
+            if (!(await isListed(dataset.value, path))) {
+                cameras.value = [];
+                return;
+            }
             text = await dataset.value.getFileContents(path);
         } catch (e) {
             if (isNotFound(e)) cameras.value = [];

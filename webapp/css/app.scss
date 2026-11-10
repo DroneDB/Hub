@@ -89,6 +89,14 @@ body {
     color: var(--ddb-link-on-tint);
 }
 
+// Toasts (NotifyToasts): the pages' toasts are top right and the viewers' top centre, below the 56 px header, where
+// the user looks after a click on a button of the page (FR-NAV-09). PrimeVue puts the container 20px from the top
+// of the window with an inline style: !important is the only way past it.
+.p-toast.p-toast-top-right,
+.p-toast.p-toast-top-center {
+    top: calc(56px + var(--ddb-spacing-sm)) !important;
+}
+
 // Headings: the page title (h1) is the one the Datasets and Organizations pages always used;
 // h2 to h4 step down from it. Phones (below the md breakpoint) take one step smaller titles.
 h1, h2, h3, h4, h5, h6 {
@@ -481,13 +489,15 @@ body:fullscreen {
         font-size: inherit;
     }
 
-    // Toasts (App.vue shows them bottom-left): PrimeVue gives the container a fixed 25rem and puts
+    // Toasts (NotifyToasts shows them top right): PrimeVue gives the container a fixed 25rem and puts
     // it 20px from its corner with inline styles, wider than a phone. Here it spans the screen
     // less a small margin; !important is the only way past the inline position.
-    .p-toast.p-toast-bottom-left {
+    .p-toast.p-toast-top-right,
+    .p-toast.p-toast-top-center {
         width: calc(100vw - 2 * var(--ddb-spacing-sm));
         left: var(--ddb-spacing-sm) !important;
-        bottom: var(--ddb-spacing-sm) !important;
+        right: auto !important;
+        transform: none !important;
     }
 }
 

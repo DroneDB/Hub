@@ -252,3 +252,18 @@ describe('raw metadata rows', () => {
         expect(visibleMeta(undefined)).toEqual({});
     });
 });
+
+describe('buildAllProperties of the dataset entry', () => {
+    it('shows neither the permissions nor the cover flag that the Registry adds to the dataset entry (FR-EXP-28)', () => {
+        const file = {
+            entry: {
+                path: 'ddb://h/o/d', type: ddb.entry.type.DRONEDB, size: 5, mtime: 1,
+                properties: { entries: 6, meta: {}, permissions: { canRead: true }, hasThumbnail: false }
+            }
+        };
+        const props = buildAllProperties(file);
+        expect(props.entries).toBe(6);
+        expect(props).not.toHaveProperty('permissions');
+        expect(props).not.toHaveProperty('hasThumbnail');
+    });
+});

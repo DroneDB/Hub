@@ -135,6 +135,8 @@ describe('pickGeoraster', () => {
         const [component, props] = dialogs.open.mock.calls[0];
         expect(component).toBe(FolderPicker);
         expect(props).toMatchObject({ dataset: ds, mode: 'file', title: 'Add raster', initialPath: 'f/sub', exclude: ['f/sub/a.tif'] });
+        // What the disabled rows say (FR-MAP-22)
+        expect(props).toMatchObject({ excludeReason: 'Already on the map', rejectReason: 'Not a map layer' });
         expect(props.accept).toBe(isGeoraster);
         expect(props.accept(raster('x.tif'))).toBe(true);
         expect(props.accept({ path: 'n.txt', type: entry.type.GENERIC })).toBe(false);

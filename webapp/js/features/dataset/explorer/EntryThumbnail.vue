@@ -1,7 +1,7 @@
 <template>
     <!-- Not a tab stop, and its keys are the list's: the list holds the focus and names its active tile (useListNavigation, FR-EXP-09) -->
     <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/interactive-supports-focus -- the listbox is the focusable element (aria-activedescendant) -->
-    <div class="thumbnail" :class="{ selected: file.selected, active }" :title="titleText"
+    <div class="thumbnail" :class="{ selected: file.selected, active, cut }" :title="titleText"
          role="option" :aria-selected="!!file.selected"
          :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
         <!-- A second cue of the selection besides the tint and the outline (FR-EXP-10) -->
@@ -76,6 +76,11 @@ export default {
         },
         // The tile the keyboard is on (the list's aria-activedescendant)
         active: {
+            type: Boolean,
+            default: false
+        },
+        // The file was cut and waits for a paste: the tile is dimmed (FR-EXP-16)
+        cut: {
             type: Boolean,
             default: false
         }
@@ -467,6 +472,11 @@ export default {
 /* Selected (FR-EXP-10): the primary tint, a 2px primary outline (3:1 or more against the page and
    against the hover grey) and a check badge; it is declared after :hover, so a selected tile keeps its tint
    under the pointer and never reads as hovered */
+/* Cut (Ctrl+X) and not pasted yet: dimmed, as a file manager does (FR-EXP-16) */
+.thumbnail.cut {
+    opacity: 0.5;
+}
+
 .thumbnail.selected {
     background: var(--ddb-selected-bg);
     outline: 2px solid var(--ddb-primary);

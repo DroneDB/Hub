@@ -8,7 +8,7 @@
         </template>
         <div v-if="shown" class="viewer-layout">
             <div class="viewer-map-area">
-                <MapCore :files="layers.files.value" :view="state" :changed-paths="layers.changedPaths.value" :dataset="dataset"
+                <MapCore ref="mapCore" :files="layers.files.value" :view="state" :changed-paths="layers.changedPaths.value" :dataset="dataset"
                          standalone :can-write="canWrite" :can-delete="!!canDelete"
                          can-add-layers :add-layer-disabled="layers.atLimit.value" :add-layer-title="layers.addTitle.value"
                          :link-target="linkTarget" :share-note="shareNote" :can-save="canWrite && !embed"
@@ -52,7 +52,12 @@ const {
     dataset, loading, error, loadError, canWrite, canDelete, state, setState, saved, dirty, shareNote, name, pageTitle, identity,
     baseEntry, busy, pickOnLoad, linkTarget, save, saveAsNew
 } = useSavedView({ route, router: useRouter(), dialogs, embed, hashOf });
-const layers = useViewLayers({ dataset, state, setState, baseEntry, savedData: () => saved.value?.data ?? null, dialogs, embed });
+const mapCore = ref(null);
+// A layer added where the map is not looking is told, with the way there (FR-MAP-08)
+const layers = useViewLayers({
+    dataset, state, setState, baseEntry, savedData: () => saved.value?.data ?? null, dialogs, embed,
+    onAdded: path => mapCore.value?.announceAddedLayer?.(path)
+});
 hashOf.value = layers.hashOf;
 
 // The page moves to another route of its own view (a save, another base file): the parent must

@@ -38,12 +38,14 @@
                                         </td>
                                         <td v-bind="stackedCell('Description', 'sm')">{{ org.description || '-' }}</td>
                                         <td class="cell-actions">
-                                            <Button severity="danger"
-                                                    size="small" :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
-                                                    :loading="deleting === org.slug"
-                                                    icon="fa-solid fa-trash"
-                                                    label="Delete" title="Delete Organization"
-                                                    @click="confirmDeleteOrganization(org)" />
+                                            <ActionButton severity="danger" size="small" label="Delete Organization"
+                                                          :disabled="!!organizationDeleteBlockReason(org) || deleting === org.slug"
+                                                          :disabled-reason="organizationDeleteBlockReason(org) ?? ''"
+                                                          :loading="deleting === org.slug"
+                                                          @click="confirmDeleteOrganization(org)">
+                                                <i class="fa-solid fa-trash" aria-hidden="true" />
+                                                <span class="p-button-label">Delete</span>
+                                            </ActionButton>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -102,6 +104,7 @@ import Window from '@/components/HubWindow.vue';
 import Message from '@/components/HubMessage.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
+import ActionButton from '@/components/ActionButton.vue';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
@@ -116,16 +119,17 @@ import SearchField from '@/components/SearchField.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import { countOf } from '@/libs/format';
 import { confirmDialogProps, namedItem } from '@/libs/deleteConfirmation';
+import { organizationDeleteBlockReason } from '@/libs/deleteBlockReason';
 
 export default {
     components: {
         LoadingSpinner,
-        Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
+        Window, Message, ConfirmDialog, Button, ActionButton, PrimeMessage, InputText,
         SearchField, EmptyState, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
     },
     emits: ['close'],
     setup() {
-        return { stackedFrom, stackedCell, breakAfterHyphens };
+        return { stackedFrom, stackedCell, breakAfterHyphens, organizationDeleteBlockReason };
     },
 
     data: function () {
@@ -210,8 +214,9 @@ export default {
 
 
         confirmDeleteOrganization: function(org) {
-            if (org.slug.toLowerCase() === 'public') {
-                this.error = "The Public organization cannot be deleted.";
+            const blocked = organizationDeleteBlockReason(org);
+            if (blocked) {
+                this.error = `${blocked}.`;
                 return;
             }
             this.orgToDelete = org;

@@ -105,6 +105,9 @@ export function pickGeoraster(dialogs, dataset, { title, near = '', exclude = []
         title,
         initialPath: pathutils.getParentFolder(near) || '',
         accept: isGeoraster,
-        exclude
+        exclude,
+        // What the disabled rows say (FR-MAP-22)
+        excludeReason: 'Already on the map',
+        rejectReason: 'Not a map layer'
     });
 }

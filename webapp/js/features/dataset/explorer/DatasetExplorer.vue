@@ -31,7 +31,7 @@
                          @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                          @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                          @dragleave="itemDragLeave($event, f)">
-                        <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset"
+                        <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset" :cut="isCut(f)"
                                    :size="thumbnailSize" @clicked="handleSelection" @open="handleOpen" />
                     </div>
                 </div>
@@ -41,7 +41,7 @@
                      @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                      @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                      @dragleave="itemDragLeave($event, f)">
-                    <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset"
+                    <Thumbnail :id="nav.idOf(idx)" ref="thumbs" :file="f" :data-idx="idx" :active="nav.active.value === idx" :lazy-load="true" :dataset="dataset" :cut="isCut(f)"
                                :size="thumbnailSize" @clicked="handleSelection" @open="handleOpen" />
                 </div>
             </template>
@@ -82,6 +82,7 @@ import { getCurrentInstance, nextTick, useId } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
 import { useListNavigation } from '@/composables/useListNavigation';
+import { useCutMarks } from '@/composables/useCutMarks';
 
 export default {
     name: 'DatasetExplorer',
@@ -110,7 +111,7 @@ export default {
         // The size of the thumbnails: 's' (128 px), 'm' (192) or 'l' (256), FR-EXP-43
         tileSize: { type: String, default: 's' }
     },
-    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         // One tab stop: the list holds the focus and names its active tile (aria-activedescendant), FR-EXP-09
@@ -125,7 +126,9 @@ export default {
         return {
             ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
             selection: useFileSelection(() => props.files, f => f.path),
-            nav
+            nav,
+            // Cut items are dimmed until they are pasted (FR-EXP-16)
+            ...useCutMarks(() => props.dataset)
         };
     },
     data: function () {

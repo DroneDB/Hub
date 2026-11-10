@@ -72,6 +72,30 @@ describe('loading the sidecar', () => {
         expect(orientation.upAxis.value).toBe('-y');
     });
 
+    it('does not ask for a sidecar that the folder does not list (no 404 in the console, FR-XC-10)', async () => {
+        dataset.list = vi.fn().mockResolvedValue([{ path: 'scenes/site.spz' }, { path: 'scenes/other_cameras.json' }]);
+        const cams = make();
+        await cams.load();
+        expect(dataset.list).toHaveBeenCalledWith('scenes');
+        expect(dataset.getFileContents).not.toHaveBeenCalled();
+        expect(cams.cameras.value).toEqual([]);
+        expect(cams.unreadable.value).toBe(false);
+    });
+
+    it('reads the sidecar that the folder lists, and still reads it when the listing fails', async () => {
+        dataset.list = vi.fn().mockResolvedValue([{ path: 'scenes/site_cameras.json' }]);
+        let cams = make();
+        await cams.load();
+        expect(dataset.getFileContents).toHaveBeenCalledWith('scenes/site_cameras.json');
+        expect(cams.cameras.value.map(c => c.name)).toEqual(['Front']);
+
+        dataset.getFileContents.mockClear();
+        dataset.list = vi.fn().mockRejectedValue(new Error('offline'));
+        cams = make();
+        await cams.load();
+        expect(dataset.getFileContents).toHaveBeenCalledWith('scenes/site_cameras.json');
+    });
+
     it.each([
         ['a server error', new ApiError('Server Error', 500)],
         ['a timeout', new ApiError('Request timed out after 30s', 0)],

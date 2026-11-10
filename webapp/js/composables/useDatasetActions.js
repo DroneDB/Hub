@@ -26,6 +26,7 @@ import { skippedSentence } from '@/libs/tasks/extractSummary';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import { useConfirmReplace, existingItem, replaceConflictPath, conflictIsFolder } from '@/composables/useConfirmReplace';
+import { namesClash } from '@/libs/nameRules';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { MASK_BORDERS_TOOL, maskedOutputPath } from '@/libs/dataset/maskBorders';
 import Alert from '@/components/HubAlert.vue';
@@ -168,9 +169,12 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     /**
      * Moves or renames an item on the server and in the views. A pure move never triggers a
-     * build (builds are by hash); a rename does when it makes the file buildable.
+     * build (builds are by hash); a rename does when it makes the file buildable. A drag move offers Undo in its
+     * toast (FR-EXP-16, FR-XC-23): the item goes back to the path it came from; a move that replaced an entry
+     * (`undoable: false`) offers none, as the entry it replaced cannot come back.
+     * Resolves to the item at its new path, or null when the move failed.
      */
-    async function moveItem(file, newPath, { action = 'rename', silent = false } = {}) {
+    async function moveItem(file, newPath, { action = 'rename', silent = false, undoable = true } = {}) {
         try {
             const oldPath = file.entry.path;
             const updated = await dataset.moveObj(oldPath, newPath);
@@ -186,9 +190,63 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             if (action === 'rename' && !isBuildableType(file.entry.type) && isBuildableType(item.entry.type)) {
                 BuildManager.onFilesAdded(dataset, [item.entry]);
             }
-            if (!silent) notify.success(action === 'move' ? 'File moved successfully' : 'File renamed successfully', { summary: action === 'move' ? 'Moved' : 'Renamed' });
+            if (!silent) {
+                if (action === 'move' && undoable) {
+                    notify.success('File moved successfully', { summary: 'Moved', action: { label: 'Undo', run: () => undoMove(item, oldPath) } });
+                } else if (action === 'move') {
+                    notify.success('File moved successfully', { summary: 'Moved' });
+                } else if (action === 'undo') {
+                    notify.success('The move was undone', { summary: 'Moved' });
+                } else {
+                    notify.success('File renamed successfully', { summary: 'Renamed' });
+                }
+            }
+            return item;
         } catch (e) {
-            showError(e, action === 'move' ? 'Move file' : 'Rename file');
+            showError(e, action === 'rename' ? 'Rename file' : action === 'undo' ? 'Undo move' : 'Move file');
+            return null;
+        }
+    }
+
+    /**
+     * The Undo of a drag move: the item at its new path goes back to the path it came from, when that path is still
+     * free (the server's listing of its folder). An entry that came there meanwhile would be replaced: the Undo is
+     * refused and nothing moves.
+     */
+    function undoMove(item, oldPath) {
+        return withBusy(async () => {
+            let taken;
+            try {
+                taken = await pathTaken(oldPath);
+            } catch (e) {
+                showError(e, 'Undo move');
+                return null;
+            }
+            if (taken) {
+                notify.warn(`Cannot undo: ${oldPath} exists again`, { summary: 'Undo move' });
+                return null;
+            }
+            return moveItem(item, oldPath, { action: 'undo' });
+        });
+    }
+
+    /** Whether the dataset has an entry at `path` (any letter case, D-040), from the server's listing of its folder. */
+    async function pathTaken(path) {
+        const entries = await dataset.list(pathutils.getParentFolder(path) || undefined);
+        return (entries || []).some(e => namesClash(e?.path, path));
+    }
+
+    /**
+     * Whether a move to `path` replaces an entry: the listing knows when the path is in the folder on show, else the
+     * server's listing of its folder says (a failed read: yes, so that no Undo is offered that could not undo).
+     */
+    async function moveReplaces(path) {
+        if (listing.inView(path)) return !!existingItem(path, listing.files.value);
+        try {
+            return await pathTaken(path);
+        } catch (e) {
+            console.warn(`Cannot read the folder of ${path}:`, e);
+            return true;
         }
     }
 
@@ -254,7 +312,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         } else if (ddb.entry.isDirectory(source.entry) && (destPath + '/').startsWith(source.entry.path + '/')) {
             notify.warn('Cannot move a folder onto itself or one of its descendants', { summary: 'Move' });
         } else {
-            await withBusy(() => moveItem(source, destPath, { action: 'move' }));
+            // A move onto an entry of the same kind and name replaces it (the Registry's move): no Undo then
+            await withBusy(async () => moveItem(source, destPath, { action: 'move', undoable: !(await moveReplaces(destPath)) }));
         }
     }
 

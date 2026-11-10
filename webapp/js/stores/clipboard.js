@@ -49,6 +49,17 @@ export const useClipboardStore = defineStore('clipboard', () => {
     const isEmpty = computed(() => !mode.value || items.value.length === 0);
     const isCut = computed(() => mode.value === 'cut');
     const count = computed(() => items.value.length);
+    // The paths that a paste will move, while the clipboard holds a cut: the explorers dim them (FR-EXP-16)
+    const cutPaths = computed(() => new Set(isCut.value && !isEmpty.value ? items.value.map(it => it.path) : []));
+
+    /**
+     * Whether `path` of a dataset was cut and is not pasted yet.
+     * @param {string} orgSlug @param {string} dsSlug @param {string} path
+     */
+    function isCutAt(orgSlug, dsSlug, path) {
+        const src = source.value;
+        return !!src && src.orgSlug === orgSlug && src.dsSlug === dsSlug && cutPaths.value.has(path);
+    }
 
     function clear() {
         mode.value = null;
@@ -99,5 +110,5 @@ export const useClipboardStore = defineStore('clipboard', () => {
     // lifetime: app (the store lives as long as the page)
     emitter.on('deleteEntries', removePaths);
 
-    return { mode, source, items, capturedAt, isEmpty, isCut, count, clear, copy, cut, removePaths };
+    return { mode, source, items, capturedAt, isEmpty, isCut, count, cutPaths, isCutAt, clear, copy, cut, removePaths };
 });

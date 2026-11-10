@@ -123,6 +123,7 @@ import ddb from 'ddb';
 import { sanitizeHtml } from '@/libs/sanitize';
 import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
 import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
+import { datasetThumbnailUrl } from '@/libs/optionalFile';
 
 export default {
     components: {
@@ -197,8 +198,10 @@ export default {
             this.visibility = this.properties?.meta?.visibility?.data ?? DEFAULT_VISIBILITY;
             this.tagline = this.properties?.meta?.tagline?.data ?? '';
 
-            // Load existing dataset thumbnail preview
-            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
+            // The existing dataset thumbnail, asked for only when the dataset has one (its entry says so): a request for
+            // a cover that is not there logs a 404 in the console (FR-XC-10, FR-EXP-28)
+            const thumbnail = datasetThumbnailUrl(this.dataset, this.properties, 256);
+            this.thumbnailPreview = thumbnail && thumbnail + '&t=' + Date.now();
             this.thumbnailError = false;
 
         } catch (e) {

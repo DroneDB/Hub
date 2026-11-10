@@ -29,6 +29,7 @@ import { isUnauthorized } from '@/libs/ddb/apiError';
 
 import { createAppRouter } from './router';
 import { handleUnauthorized, markStaleSession } from '@/libs/authRoutes';
+import { startImportNotices } from '@/libs/tasks/importNotices';
 import { createPinia } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -129,6 +130,10 @@ window.addEventListener('load', function () {
         // The server rejected the session or a private page needs one: one place
         // decides - end the session and sign in, then come back here
         reg.onUnauthorized(() => handleUnauthorized(router, useAuthStore(pinia)));
+        // A sign-out in another tab: this one says so and offers Sign in (FR-ACC-19)
+        useAuthStore(pinia).bindRouter(router);
+        // An import that runs in the background says when it ends, on any page (FR-UPL-11)
+        startImportNotices(dataset => router.push({ name: 'ViewDataset', params: { org: dataset.org, ds: dataset.ds } }));
         app.use(ToastService);
 
         // The one toast host (root template) and the notifier every component uses

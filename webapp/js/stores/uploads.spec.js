@@ -8,12 +8,14 @@ import { createPinia, setActivePinia } from 'pinia';
 
 const h = vi.hoisted(() => ({
     held: [], deleted: [], deleteFails: null, open: [], listFails: false, toasts: [], activity: [], invalidated: 0, listeners: {},
-    user: 'alice', refused: [], deps: []
+    user: 'alice', refused: [], deps: [], batches: []
 }));
 vi.mock('@/libs/upload/uploadRequests', () => ({
     createUploadRequests: deps => {
         h.deps.push(deps);
         return {
+            // The open uploads each batch starts with (undefined: the batch lists them itself)
+            newBatch: listed => h.batches.push({ datasetId: deps.datasetId, listed }),
             // Every request waits until the test answers it (or it is aborted); like the real layer, it asks
             // `canSend` before it starts
             send: (job, hooks) => new Promise((resolve, reject) => {
@@ -70,7 +72,7 @@ let uploads;
 beforeEach(() => {
     Object.assign(h, {
         held: [], deleted: [], deleteFails: null, open: [], listFails: false, toasts: [], activity: [], invalidated: 0, listeners: {},
-        user: 'alice', refused: [], deps: []
+        user: 'alice', refused: [], deps: [], batches: []
     });
     setActivePinia(createPinia());
     uploads = useUploadsStore();
@@ -363,6 +365,39 @@ describe('open uploads (the resume offer)', () => {
 
         expect(await uploads.listOpen('o', 'd')).toEqual([]);
         warn.mockRestore();
+    });
+
+    // FR-XC-10: the batch asks the chunk status only of the uploads that this list holds, and does not list them again
+    it('hands the list that the offer read to the next batch of the dataset, once; a later batch lists by itself', async () => {
+        h.open = [open('a'), open('b')];
+        await uploads.listOpen('o', 'd');
+
+        uploads.add('o', 'd', files('new.tif'));
+        uploads.add('o', 'd', files('later.tif'));
+
+        expect(h.batches).toEqual([
+            { datasetId: 'o/d', listed: [open('a'), open('b')] },
+            { datasetId: 'o/d', listed: undefined }
+        ]);
+    });
+
+    it('does not hand a list read in an ended session, nor one that could not be read', async () => {
+        h.open = [open('a')];
+        // The dialog keeps the session it was opened in (it hears the sign-out from then on)
+        uploads.session();
+        await uploads.listOpen('o', 'd');
+        h.user = null;
+        for (const cb of [...(h.listeners.logout ?? [])]) cb();
+        h.user = 'bob';
+        uploads.add('o', 'd', files('x.tif'));
+
+        h.listFails = true;
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        await uploads.listOpen('o', 'd');
+        warn.mockRestore();
+        uploads.add('o', 'd', files('y.tif'));
+
+        expect(h.batches.map(b => b.listed)).toEqual([undefined, undefined]);
     });
 
     it('discards one: its chunks are deleted, an unknown one is already gone, another failure is raised', async () => {

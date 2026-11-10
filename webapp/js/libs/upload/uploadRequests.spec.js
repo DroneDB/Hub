@@ -11,7 +11,11 @@ const item = (id, extra = {}) => ({ id, name: id, path: id, size: 10, file: new 
 const hooks = () => ({ signal: undefined, onProgress: vi.fn(), onUploaded: vi.fn() });
 const fieldNames = form => [...form.keys()];
 
-function requests(transport, getJson = vi.fn(async () => ({ status: 404, body: null })), extra = {}) {
+const LIST_URL = 'http://hub/orgs/o/ds/d/obj/chunk';
+// The server: the caller has no open upload (the list is empty), and the status of an upload it does not know is a 404
+const noOpenUploads = () => vi.fn(async url => (url === LIST_URL ? { status: 200, body: [] } : { status: 404, body: null }));
+
+function requests(transport, getJson = noOpenUploads(), extra = {}) {
     return createUploadRequests({
         baseUrl: 'http://hub/orgs/o/ds/d', authToken: () => 't', destination: i => i.path,
         transport, getJson, sleep: () => Promise.resolve(), ...extra
@@ -95,9 +99,10 @@ describe('uploadRequests conflicts', () => {
                 ? { status: 201, body: { path: 'big' }, uploaded: true }
                 : { status: 409, body: CLASH, uploaded: true };
         });
-        const getJson = vi.fn(async () => (stored
-            ? { status: 200, body: { missing: [] } }
-            : { status: 404, body: null }));
+        const getJson = vi.fn(async url => {
+            if (url === LIST_URL) return { status: 200, body: [] };
+            return stored ? { status: 200, body: { missing: [] } } : { status: 404, body: null };
+        });
         const big = item('big');
         const r = requests(transport, getJson, { chunkBytes: 4 });
 
@@ -163,7 +168,7 @@ describe('uploadRequests chunk file id (FR-UPL-04, §7.1)', () => {
             calls.push({ url, body });
             return url.endsWith('/commit') ? { status: 201, body: { path: 'x' }, uploaded: true } : { status: 200, body: {}, uploaded: true };
         });
-        const getJson = vi.fn(async () => ({ status: 404, body: null }));
+        const getJson = noOpenUploads();
         const r = requests(transport, getJson, { datasetId: 'o/d', chunkBytes: 10 });
         return { r, calls, getJson };
     }
@@ -178,8 +183,7 @@ describe('uploadRequests chunk file id (FR-UPL-04, §7.1)', () => {
         const expected = '067e1f8df03556fe4190e13ec1e3964dcfe96fcb27d84d293694ee63bf016c7e';
         expect(first.calls[0].body.get('fileId')).toBe(expected);
         expect(second.calls[0].body.get('fileId')).toBe(expected);
-        // The state of the upload and its commit are asked for by that id
-        expect(first.getJson).toHaveBeenCalledWith(`http://hub/orgs/o/ds/d/obj/chunk/${expected}`);
+        // The commit is asked for by that id (a new file has no state to ask for: FR-XC-10)
         expect(first.calls.at(-1).url).toBe(`http://hub/orgs/o/ds/d/obj/chunk/${expected}/commit`);
     });
 
@@ -250,21 +254,21 @@ describe('uploadRequests and the session', () => {
         await r.send({ kind: 'single', items: [item('a')] }, hooks());
         expect(onUnauthorized).toHaveBeenCalledTimes(1);
         await r.send({ kind: 'chunked', items: [item('big')] }, hooks());
-        // The status read, then the first chunk
-        expect(onUnauthorized).toHaveBeenCalledTimes(3);
+        // The list of open uploads, the status read (the list could not be read), then the first chunk
+        expect(onUnauthorized).toHaveBeenCalledTimes(4);
     });
 
     it('asks canSend before each request: once it says no, nothing more is sent and the job ends as aborted', async () => {
         let allowed = 2;
         const canSend = vi.fn(() => allowed-- > 0);
         const transport = vi.fn(async () => ({ status: 200, body: {}, uploaded: true }));
-        const getJson = vi.fn(async () => ({ status: 404, body: null }));
+        const getJson = noOpenUploads();
 
         const sending = requests(transport, getJson, { chunkBytes: 4, canSend })
             .send({ kind: 'chunked', items: [item('big')] }, hooks());
 
         await expect(sending).rejects.toMatchObject({ name: 'AbortError' });
-        // The status read and the first chunk; the second chunk is not sent
+        // The list of open uploads and the first chunk; the second chunk is not sent
         expect(getJson).toHaveBeenCalledTimes(1);
         expect(transport).toHaveBeenCalledTimes(1);
         expect(canSend).toHaveBeenCalledTimes(3);
@@ -276,5 +280,99 @@ describe('uploadRequests and the session', () => {
         await expect(requests(transport, undefined, { canSend: () => false }).send({ kind: 'single', items: [item('a')] }, hooks()))
             .rejects.toMatchObject({ name: 'AbortError' });
         expect(transport).not.toHaveBeenCalled();
+    });
+});
+
+// FR-XC-10: the status of a chunked upload is asked only for an upload that the server holds; a new file's id is
+// unknown to it, and a 404 per file would log a console error
+describe('uploadRequests and the open uploads (FR-XC-10)', () => {
+    const STORED = 'stored-upload-id';
+    const STATUS_URL = `${LIST_URL}/${STORED}`;
+
+    function server(open = [{ fileId: STORED, path: 'big' }]) {
+        const transport = vi.fn(async ({ url }) => (url.endsWith('/commit')
+            ? { status: 201, body: { path: 'big' }, uploaded: true }
+            : { status: 200, body: {}, uploaded: true }));
+        const getJson = vi.fn(async url => {
+            if (url === LIST_URL) return { status: 200, body: open };
+            if (url === STATUS_URL) return { status: 200, body: { missing: [2] } };
+            return { status: 404, body: null };
+        });
+        return { transport, getJson };
+    }
+    const chunkIndexes = transport => transport.mock.calls.map(c => c[0]).filter(o => !o.url.endsWith('/commit'))
+        .map(o => o.body.get('chunkIndex'));
+
+    it('a new file asks no status: the open uploads are listed, and every chunk is sent', async () => {
+        const { transport, getJson } = server();
+
+        const [result] = await requests(transport, getJson, { chunkBytes: 4 })
+            .send({ kind: 'chunked', items: [item('new')] }, hooks());
+
+        expect(result).toMatchObject({ ok: true });
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL]);
+        expect(chunkIndexes(transport)).toEqual(['0', '1', '2']);
+    });
+
+    it('a file whose upload the list holds asks its status and sends only the missing chunks', async () => {
+        const { transport, getJson } = server();
+        const resumed = item('big', { fileId: STORED, fileIdFor: 'big' });
+
+        await requests(transport, getJson, { chunkBytes: 4 }).send({ kind: 'chunked', items: [resumed] }, hooks());
+
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL, STATUS_URL]);
+        expect(chunkIndexes(transport)).toEqual(['2']);
+    });
+
+    it('lists once for the files of a batch, and again for the next batch', async () => {
+        const { transport, getJson } = server();
+        const r = requests(transport, getJson, { chunkBytes: 4 });
+
+        await Promise.all([
+            r.send({ kind: 'chunked', items: [item('a')] }, hooks()),
+            r.send({ kind: 'chunked', items: [item('b')] }, hooks())
+        ]);
+        await r.send({ kind: 'chunked', items: [item('c')] }, hooks());
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL]);
+
+        r.newBatch();
+        await r.send({ kind: 'chunked', items: [item('d')] }, hooks());
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL, LIST_URL]);
+    });
+
+    it('a batch given the list that the resume offer read lists nothing, and asks the status of the uploads it holds', async () => {
+        const { transport, getJson } = server();
+        const r = requests(transport, getJson, { chunkBytes: 4 });
+
+        r.newBatch([{ fileId: STORED, path: 'big' }]);
+        await r.send({ kind: 'chunked', items: [item('new')] }, hooks());
+        await r.send({ kind: 'chunked', items: [item('big', { fileId: STORED, fileIdFor: 'big' })] }, hooks());
+
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([STATUS_URL]);
+    });
+
+    it('a file that these requests have sent chunks for asks its status when it is sent again (a retry)', async () => {
+        const { getJson } = server([]);
+        const transport = vi.fn()
+            .mockResolvedValueOnce({ status: 200, body: {}, uploaded: true })
+            .mockResolvedValueOnce({ status: 503, body: null, uploaded: true })
+            .mockResolvedValue({ status: 200, body: {}, uploaded: true });
+        const r = requests(transport, getJson, { chunkBytes: 4 });
+        const big = item('big');
+
+        const [failed] = await r.send({ kind: 'chunked', items: [big] }, hooks());
+        expect(failed).toMatchObject({ ok: false, status: 503 });
+        await r.send({ kind: 'chunked', items: [big] }, hooks());
+
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL, `${LIST_URL}/${big.fileId}`]);
+    });
+
+    it('a list that cannot be read asks each file its status, as before', async () => {
+        const getJson = vi.fn(async () => ({ status: 0, body: null }));
+        const { transport } = server();
+
+        await requests(transport, getJson, { chunkBytes: 4 }).send({ kind: 'chunked', items: [item('new')] }, hooks());
+
+        expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL, expect.stringMatching(/\/obj\/chunk\/[0-9a-f]{64}$/)]);
     });
 });

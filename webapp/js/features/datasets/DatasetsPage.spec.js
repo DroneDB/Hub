@@ -652,21 +652,33 @@ describe('DatasetsPage keyboard (ORG-01)', () => {
     });
 });
 
-describe('DatasetsPage, an import that failed (FR-UPL-12)', () => {
+describe('DatasetsPage, an import that failed (FR-UPL-12, FR-UPL-11)', () => {
     const { handleImportClose } = DatasetsPage.methods;
 
-    it('shows the reason from the task error, and drops the placeholder row of the dataset the rollback deletes', () => {
-        const reason = 'The file is not a ZIP, TAR, 7z or RAR archive';
+    it('drops the placeholder row of the dataset the rollback deletes; the toast with the reason is the app\'s (importNotices)', () => {
         const vm = {
             importDialogOpen: true,
             datasets: [{ slug: 'imp', isTemporary: true }, { slug: 'other' }],
             reloadDatasets: vi.fn(),
             $notify: { error: vi.fn(), success: vi.fn(), info: vi.fn() }
         };
-        handleImportClose.call(vm, 'done', { slug: 'imp', success: false, error: reason });
-        expect(vm.$notify.error).toHaveBeenCalledWith(reason, { summary: 'Import failed', life: 'long' });
+        handleImportClose.call(vm, 'done', { slug: 'imp', success: false, error: 'The file is not a ZIP, TAR, 7z or RAR archive' });
         expect(vm.datasets.map(d => d.slug)).toEqual(['other']);
         expect(vm.importDialogOpen).toBe(false);
+        // One toast for an import that ends: libs/tasks/importNotices says it, so the page does not say it twice
+        expect(vm.$notify.error).not.toHaveBeenCalled();
         expect(vm.$notify.success).not.toHaveBeenCalled();
+    });
+
+    it('keeps the import tracked when the dialog is closed with Run in background, and says it continues', () => {
+        const vm = {
+            importDialogOpen: true,
+            datasets: [],
+            reloadDatasets: vi.fn(),
+            $notify: { error: vi.fn(), success: vi.fn(), info: vi.fn() }
+        };
+        handleImportClose.call(vm, 'background', { slug: 'imp' });
+        expect(vm.importDialogOpen).toBe(false);
+        expect(vm.$notify.info).toHaveBeenCalledWith('Import of "imp" continues in the background', expect.objectContaining({ summary: 'Import running' }));
     });
 });

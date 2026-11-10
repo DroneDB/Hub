@@ -701,15 +701,12 @@ export default {
             this.importDialogOpen = false;
 
             if (action === 'done') {
-                const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === slug);
+                // The toast that says how it ended is the app's, one for every way an import ends (libs/tasks/importNotices,
+                // FR-UPL-11): here only the list follows
                 if (payload.success) {
                     this.reloadDatasets();
-                    this.$notify.success(`Dataset "${slug}" imported successfully`, { summary: 'Import complete', life: 'normal' });
                 } else {
-                    if (index !== -1) {
-                        this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === slug));
-                    }
-                    this.$notify.error((payload && payload.error) || `Import of "${slug}" failed`, { summary: 'Import failed', life: 'long' });
+                    this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === slug));
                 }
             } else if (action === 'background') {
                 this.$notify.info(`Import of "${slug}" continues in the background`, { summary: 'Import running', life: 'normal' });

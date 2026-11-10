@@ -67,6 +67,7 @@ const keyOf = (/** @type {string} */ org, /** @type {string} */ ds) => `${org}/$
  * @property {boolean} dropped  the session ended: the queue is stopped and no longer the store's
  * @property {number} session  the session it was made in
  * @property {string|null} owner  the user it was made for
+ * @property {{ newBatch: (listed?: Array<{ fileId: string }>) => void }} requests  its request layer (uploadRequests)
  */
 
 export const useUploadsStore = defineStore('uploads', () => {
@@ -76,6 +77,10 @@ export const useUploadsStore = defineStore('uploads', () => {
     /** @type {Map<string, Set<Listener>>} */
     const subscribers = new Map();
     const sending = new Set();
+    // The open uploads that `listOpen` read last, per dataset, with the session it read them in: the next `add` of
+    // that dataset hands them to its batch, which then lists nothing itself (FR-XC-10)
+    /** @type {Map<string, { session: number, open: Array<{ fileId: string }> }>} */
+    const listed = new Map();
     let announced = false;
     // The session the queues belong to: every end of a session starts the next one
     let session = 0;
@@ -243,7 +248,8 @@ export const useUploadsStore = defineStore('uploads', () => {
         const signedIn = reg.isLoggedIn();
         /** @type {UploadEntry} */
         const e = {
-            key: keyOf(org, ds), org, ds, queue: /** @type {any} */ (null), attached: 0, fresh: [], timer: null, settledAt: null,
+            key: keyOf(org, ds), org, ds, queue: /** @type {any} */ (null), requests: /** @type {any} */ (null),
+            attached: 0, fresh: [], timer: null, settledAt: null,
             dropped: !signedIn, session, owner: signedIn ? reg.getUsername() : null
         };
         const requests = createUploadRequests({
@@ -255,6 +261,7 @@ export const useUploadsStore = defineStore('uploads', () => {
             canSend: () => maySend(e),
             onUnauthorized: () => sessionRefused(e)
         });
+        e.requests = requests;
         e.queue = useUploadQueue({
             send: requests.send,
             announceActivity: false,
@@ -316,6 +323,10 @@ export const useUploadsStore = defineStore('uploads', () => {
         const e = entryFor(org, ds);
         if (e.dropped) return false;
         e.settledAt = null;
+        // A new batch: it shares one list of the open uploads, the one the resume offer has just read if any
+        const offer = listed.get(e.key);
+        listed.delete(e.key);
+        e.requests.newBatch(offer?.session === session ? offer.open : undefined);
         e.queue.add(files);
         return true;
     }
@@ -411,6 +422,7 @@ export const useUploadsStore = defineStore('uploads', () => {
         const list = entries.value;
         for (const e of list) stop(e);
         subscribers.clear();
+        listed.clear();
         sending.clear();
         if (list.length > 0) setEntries([]);
         announceActivity();
@@ -434,12 +446,16 @@ export const useUploadsStore = defineStore('uploads', () => {
 
     /**
      * The open chunked uploads of the caller in the dataset that no queue holds: what the dialog offers to resume.
-     * A listing that fails offers nothing (the upload itself does not depend on it).
+     * A listing that fails offers nothing (the upload itself does not depend on it). The whole list is kept for the
+     * next `add` of the dataset: its batch asks the chunk status only of the uploads it holds (FR-XC-10).
      * @param {string} org @param {string} ds
      */
     async function listOpen(org, ds) {
+        const since = session;
+        listed.delete(keyOf(org, ds));
         try {
             const open = (await reg.Organization(org).Dataset(ds).listChunkUploads()) ?? [];
+            listed.set(keyOf(org, ds), { session: since, open });
             const queued = new Set((find(org, ds)?.queue.state.value?.items ?? []).map(item => item.fileId).filter(Boolean));
             return open.filter(u => !queued.has(u.fileId));
         } catch (e) {

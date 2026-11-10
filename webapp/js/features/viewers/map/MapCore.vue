@@ -30,6 +30,7 @@
                                      @toggle-visible="toggleRasterLayerVisible"
                                      @remove="path => $emit('removeLayer', path)"
                                      @repick="path => $emit('repick', path)"
+                                     @zoom-to="zoomToLayer"
                                      @add="$emit('addLayer')" />
             <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" :removable="layersEditable && !!view"
                                 @update:positions="onSplitPositionsChange"
@@ -118,7 +119,7 @@
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import { ScaleLine } from 'ol/control';
-import { isEmpty as isEmptyExtent, extend as extendExtent, getWidth as extentWidth, getHeight as extentHeight } from 'ol/extent';
+import { isEmpty as isEmptyExtent, extend as extendExtent, getWidth as extentWidth, getHeight as extentHeight, intersects as extentsIntersect } from 'ol/extent';
 import { inject, provide, shallowRef } from 'vue';
 
 import ddb from 'ddb';
@@ -161,7 +162,12 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import { onColorSchemeChange } from '@/libs/colorScheme';
+import { notify } from '@/libs/notify';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
+
+// A layer added to a view is looked for this often, this long apart, until the map has drawn it
+const ADDED_LAYER_WAIT_TRIES = 20;
+const ADDED_LAYER_WAIT_MS = 150;
 
 /** The options to fit the view to the extent of the files: the whole extent in the map; an extent with no size (one point) stops at a small scale */
 function fileFitOptions(extent) {
@@ -707,6 +713,38 @@ export default {
                 this.map.getView().setCenter([0, 0]);
                 this.map.getView().setZoom(2);
             }
+        },
+
+        // The extent (EPSG:3857) of the raster layer of `path`; null while it is not drawn yet (or has no size to fit)
+        layerExtent: function (path) {
+            const extent = this.rasterLayerList.find(r => r.path === path)?.olLayer?.getExtent();
+            return extent && !isEmptyExtent(extent) ? extent : null;
+        },
+
+        // "Zoom to layer": the map fits the extent of one raster layer (FR-MAP-08)
+        zoomToLayer: function (path) {
+            const extent = this.layerExtent(path);
+            if (!this.map || !extent) return false;
+            this.map.getView().fit(extent, fileFitOptions(extent));
+            return true;
+        },
+
+        // A layer was added to the view (the parent calls it with the path). A layer that lands where the map is not
+        // looking would show nothing happened: the toast says where it is, with "Zoom to layer" (FR-MAP-08, FR-XC-23).
+        // The layer is drawn a moment after the add: it is asked for until it is there
+        announceAddedLayer: function (path, attempt = 0) {
+            const extent = this.layerExtent(path);
+            if (!extent) {
+                if (attempt < ADDED_LAYER_WAIT_TRIES) this.later(() => this.announceAddedLayer(path, attempt + 1), ADDED_LAYER_WAIT_MS);
+                return;
+            }
+            const size = this.map?.getSize();
+            if (!size || extentsIntersect(extent, this.map.getView().calculateExtent(size))) return;
+            const name = this.rasterLayerList.find(r => r.path === path)?.name ?? path;
+            notify.info(`${name} is outside the part of the map you are looking at.`, {
+                summary: 'Layer added',
+                action: { label: 'Zoom to layer', run: () => this.zoomToLayer(path) }
+            });
         },
 
         resetToInitialView: function () {

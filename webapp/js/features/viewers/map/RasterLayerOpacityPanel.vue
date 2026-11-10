@@ -49,6 +49,11 @@
                         title="Pick another raster" aria-label="Pick another raster" @click.stop="$emit('repick', layer.path)">
                     <i class="fa-solid fa-arrows-rotate" />
                 </button>
+                <!-- Where the layer is: the map fits its extent (FR-MAP-08) -->
+                <button v-if="!layer.placeholder" class="row-btn zoom-btn" type="button" title="Zoom to layer"
+                        :aria-label="'Zoom to layer: ' + layer.name" @click.stop="$emit('zoom-to', layer.path)">
+                    <i class="fa-solid fa-location-crosshairs" />
+                </button>
                 <button v-if="layers.length > 1 && isRemovable(layer)" class="row-btn" type="button" title="Remove layer" :aria-label="'Remove layer: ' + layer.name"
                         @click.stop="$emit('remove', layer.path)">
                     <i class="fa-solid fa-xmark" />
@@ -134,7 +139,7 @@ export default {
             default: () => []
         }
     },
-    emits: ['update:layers', 'reorder', 'plant-health', 'remove', 'repick', 'toggle-visible', 'add'],
+    emits: ['update:layers', 'reorder', 'plant-health', 'remove', 'repick', 'toggle-visible', 'add', 'zoom-to'],
     setup() {
         // The size class of the map (MapCore provides it); a panel mounted without one is on a map that is not narrow
         return { CHANGED_TEXT, mapSize: inject('mapSize', null) };

@@ -6,6 +6,7 @@
 import { pathutils } from 'ddb';
 import { downloadText } from '@/libs/download';
 import { isNotFound } from '@/libs/ddb/apiError';
+import { isListed } from '@/libs/optionalFile';
 import { VIEW, ownerOf, sectionOf, parse, write, MeasurementFileError } from '@/libs/map/measurementFormat';
 
 /** Whether a path is a measurements file (`<name>_measurements.geojson` or `measurements.geojson`). */
@@ -79,11 +80,16 @@ export class MeasurementStorage {
      * missing file and for a folder that is not there either): the first save makes it. An empty file
      * (a 200 with no body) is a new file too. Any other failure (a network error, 401, 403, 5xx) is
      * not a missing file: the read throws, so a save does not replace what it could not read.
+     * With `onlyIfListed` (the first read of a view, which has no file in most datasets) the file is asked for only
+     * when the listing of its folder holds it, so the browser logs no 404 (FR-XC-10). A save reads without it: what it
+     * merges into must be the file as the server holds it now.
+     * @param {{ onlyIfListed?: boolean }} [options]
      * @returns {Promise<Object|null>} null when there is no file (or it is empty)
      * @throws {MeasurementFileError} when the file cannot be read or used: it is not touched, and a save
      *   stops there instead of replacing it with the view's measurements alone
      */
-    async _read() {
+    async _read({ onlyIfListed = false } = {}) {
+        if (onlyIfListed && !(await isListed(this.dataset, this.measurementPath))) return null;
         let content;
         try {
             content = await this.dataset.getFileContents(this.measurementPath);
@@ -153,7 +159,7 @@ export class MeasurementStorage {
      * @throws {MeasurementFileError} when the file cannot be read or used
      */
     async load() {
-        const document = await this._read();
+        const document = await this._read({ onlyIfListed: true });
         if (!document) return null;
         const features = document.features.filter(f => this._owns(f));
         if (!features.length) return null;

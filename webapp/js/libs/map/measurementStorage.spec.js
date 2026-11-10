@@ -67,6 +67,34 @@ describe('MeasurementStorage.load', () => {
     });
 });
 
+describe('MeasurementStorage.load of a file that is not listed (FR-XC-10)', () => {
+    it('does not ask for the file when the listing of its folder does not hold it', async () => {
+        const { dataset, storage } = storageWith([cloud('distance', 'd3')], POINT_CLOUD);
+        dataset.list = vi.fn().mockResolvedValue([{ path: 'cloud.laz' }]);
+        expect(await storage.load()).toBeNull();
+        expect(dataset.list).toHaveBeenCalledWith(null);
+        expect(dataset.getFileContents).not.toHaveBeenCalled();
+    });
+
+    it('reads the file that the listing holds, and the file of a listing that failed', async () => {
+        const listed = storageWith([cloud('distance', 'd3')], POINT_CLOUD);
+        listed.dataset.list = vi.fn().mockResolvedValue([{ path: 'cloud_measurements.geojson' }]);
+        expect(ids(await listed.storage.load())).toEqual(['d3']);
+
+        const failed = storageWith([cloud('distance', 'd3')], POINT_CLOUD);
+        failed.dataset.list = vi.fn().mockRejectedValue(new Error('offline'));
+        expect(ids(await failed.storage.load())).toEqual(['d3']);
+    });
+
+    it('reads the file as the server holds it when it saves, whatever a listing says', async () => {
+        const { dataset, storage } = storageWith([cloud('distance', 'd3')], POINT_CLOUD);
+        dataset.list = vi.fn().mockResolvedValue([]);
+        await storage.save({ type: 'FeatureCollection', features: [] }).catch(() => {});
+        expect(dataset.list).not.toHaveBeenCalled();
+        expect(dataset.getFileContents).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('MeasurementStorage.save', () => {
     it('writes the stockpiles, contours and profiles of the 2D map once (they are on the map and in the file)', async () => {
         const mine = () => [feature('length', 'l1'), feature('stockpile', 's1'), feature('contour', 'c1'), feature('profile', 'r1')];
