@@ -8,7 +8,7 @@
         </template>
         <div v-if="shown" class="viewer-layout">
             <div class="viewer-map-area">
-                <MapCore ref="mapCore" :files="layers.files.value" :view="state" :changed-paths="layers.changedPaths.value" :dataset="dataset"
+                <MapCore ref="mapCore" :files="layers.files.value" :view="state" :changed-paths="layers.changedPaths.value" :saved-layers="savedLayers" :dataset="dataset"
                          standalone :can-write="canWrite" :can-delete="!!canDelete"
                          can-add-layers :add-layer-disabled="layers.atLimit.value" :add-layer-title="layers.addTitle.value"
                          :link-target="linkTarget" :share-note="shareNote" :can-save="canWrite && !embed"
@@ -79,6 +79,9 @@ watch([pageTitle, () => route.fullPath], () => { if (pageTitle.value) setTitle(p
  * @param {object} next
  */
 const onMapUpdate = next => setState(JSON.parse(JSON.stringify(next)));
+
+// The layers of the saved view: the map keeps the style it records for them, none included (FR-RAS-01)
+const savedLayers = computed(() => (saved.value ? saved.value.data.layers.map(l => l.path) : []));
 
 // "Compare to...": the picker opens once, as soon as the map shows
 function pickOnMount() {

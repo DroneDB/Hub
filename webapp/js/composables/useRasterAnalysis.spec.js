@@ -331,6 +331,17 @@ describe('useRasterAnalysis queryRasterPointAt', () => {
         expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: 0 });
     });
 
+    // FR-RAS-28: the tooltip writes a value as the panel does
+    it('Inspect writes the value in the one format of a raster value, "29.1 °C"', async () => {
+        const { map, raster, dataset } = setup();
+        dataset.getRasterPointValueAt.mockResolvedValueOnce({ value: 29.06, unit: 'Celsius', isThermal: true, lon: 0, lat: 0 });
+        raster.toggleRasterInspect();
+        drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(new Point([505, 255]))));
+        await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1));
+        const tooltip = () => map.getOverlays().getArray().map(o => o.getElement()).find(el => el && el.textContent);
+        await vi.waitFor(() => expect(tooltip()?.textContent).toBe('29.1 °C'));
+    });
+
     it('Inspect on a click inside the raster asks the server; beside the raster it does not ask', async () => {
         const { map, raster, dataset } = setup();
         raster.toggleRasterInspect();

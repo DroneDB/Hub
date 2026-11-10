@@ -64,7 +64,9 @@ describe('FR-RAS-35: the analysis panels, the profile chart and the split labels
     it('the axis text of the chart is 0.75rem (12px) and the paddings leave room for it', () => {
         const style = styleOf('js/features/viewers/map/RasterProfileChart.vue');
         expect(rule(style, '.profile-svg .label')).toContain('font-size: 0.75rem;');
-        expect(read('js/features/viewers/map/RasterProfileChart.vue')).toMatch(/padTop: 12,\s*padBottom: 20,\s*padLeft: 56,/);
+        // The left padding is that of the longest y label, 6.5 px a character at that font (FR-RAS-08)
+        expect(read('js/features/viewers/map/RasterProfileChart.vue')).toMatch(/padTop: 12,\s*padBottom: 20,\s*padRight: 8,/);
+        expect(read('js/features/viewers/map/RasterProfileChart.vue')).toContain('const LABEL_CHAR_WIDTH = 6.5;');
     });
 
     it('the split labels are 0.8rem', () => {

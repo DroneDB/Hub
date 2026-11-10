@@ -230,6 +230,13 @@ export default {
             type: Object,
             default: null
         },
+        // Paths of the layers of the saved view the map shows, as it was saved: the style the view records for them
+        // (none included) is the user's, so the map gives them no default style (FR-RAS-01). Empty on a new view and on
+        // the dataset map, whose rasters without a style get the default of their value info
+        savedLayers: {
+            type: Array,
+            default: () => []
+        },
         // Paths of the layers whose file is not the one the saved view was made with (a badge on their rows)
         changedPaths: {
             type: Array,
@@ -526,6 +533,8 @@ export default {
             this.reconcileAnalysisTarget();
             this.loadSavedMeasurements();
             this.restorePlantHealthFromHash(this.files);
+            // After the link's style: a raster without a style gets the default of its value info (FR-RAS-01)
+            this.seedRasterDefaults();
             this.viewZoomCap.schedule();
         },
 

@@ -80,6 +80,7 @@ const MapCoreStub = defineComponent({
     name: 'MapCore',
     props: {
         files: { type: Array, default: () => [] }, view: { type: Object, default: null }, changedPaths: { type: Array, default: () => [] },
+        savedLayers: { type: Array, default: () => [] },
         dataset: { type: Object, default: null }, standalone: Boolean, canWrite: Boolean, canDelete: Boolean, canAddLayers: Boolean,
         addLayerDisabled: Boolean, addLayerTitle: { type: String, default: '' }, linkTarget: { type: Object, default: null },
         shareNote: Boolean, canSave: Boolean
@@ -161,6 +162,8 @@ describe('MapViewer on a file', () => {
         expect(mapProps().standalone).toBe(true);
         expect(mapProps().linkTarget).toEqual({ path: 'f/a.tif' });
         expect(mapProps().shareNote).toBe(false);
+        // A new view records no style: the map gives its rasters their default (FR-RAS-01)
+        expect(mapProps().savedLayers).toEqual([]);
         expect(viewBar().text()).toContain('a.tif');
         expect(barButton('Save')).toBeDefined();
         expect(barButton('Save as new')).toBeUndefined();
@@ -254,6 +257,12 @@ describe('MapViewer on a saved view', () => {
         dataset.listOne.mockImplementation(async path => rasterEntry(path, path === 'f/a.tif' ? 'newer' : `h-${path}`));
         await open('/r/acme/site/views/v_k3j9x2ab', { dataset });
         expect(mapProps().changedPaths).toEqual(['f/a.tif']);
+    });
+
+    // FR-RAS-01: the map keeps the style the saved view records for its layers, none included
+    it('names the layers of the saved view to the map, whose styles are the user\'s', async () => {
+        await open('/r/acme/site/views/v_k3j9x2ab', { dataset: saved() });
+        expect(mapProps().savedLayers).toEqual(['f/a.tif', 'f/b.tif']);
     });
 });
 

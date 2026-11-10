@@ -30,7 +30,8 @@ import { useRasterLayers } from '@/composables/useRasterLayers';
 import { useAnalysisTarget, ANALYSIS_PANELS } from '@/composables/useAnalysisTarget';
 
 /**
- * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, view?: any }} props  `view`: the state of the view the map shows, null on the dataset map
+ * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, view?: any, savedLayers?: string[] }} props  `view`: the state of the view the map shows, null on the dataset map;
+ *   `savedLayers`: the layers of the saved view, whose styles are the user's
  * @param {{ onFileWritten?: (path: string) => void, onFileRemoved?: (path: string) => void }} [fileEvents]
  *   told when the map writes or removes a file of the dataset (the measurements)
  */
@@ -65,7 +66,8 @@ export function useMapFeatures(props, fileEvents = {}) {
         onFileWritten: () => fileEvents.onFileWritten || (() => {}),
         onFileRemoved: () => fileEvents.onFileRemoved || (() => {})
     });
-    const plantHealth = usePlantHealth({ dataset, rasterLayer, entry: () => null });
+    // The layers of a saved view keep the style it records, none included: the map seeds no default on them (FR-RAS-01)
+    const plantHealth = usePlantHealth({ dataset, rasterLayer, entry: () => null, savedLayers: () => props.savedLayers || [] });
     const raster = useRasterAnalysis({
         dataset, map, measureControls, rasterLayer, currentUnitPref,
         vizParamsByPath: plantHealth.vizParamsByPath,

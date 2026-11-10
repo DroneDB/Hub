@@ -67,8 +67,8 @@ describe('RasterAnalysisControls area statistics', () => {
         wrapper.vm.rasterInfo = { valueMin: 20, valueMax: 40, isThermal: true, calibration: {} };
         wrapper.vm.selectedFormula = 'KELVIN';
         await wrapper.setProps({ areaStats: { ...STATS, min: 20, stddev: 1.25, isThermal: true } });
-        expect(statRows()).toContain('Min: 293.1K');
-        expect(statRows()).toContain('Std dev: 1.3K');
+        expect(statRows()).toContain('Min: 293.2 K');
+        expect(statRows()).toContain('Std dev: 1.3 K');
     });
 
     it('shows the computation, then an error, and Clear asks the host to remove them', async () => {
@@ -94,8 +94,8 @@ describe('RasterAnalysisControls area statistics', () => {
 describe('RasterAnalysisControls unit', () => {
     it('is none for the raw values of a raster that is not an elevation model', async () => {
         await render({ areaStats: { ...STATS, min: 145, max: 402 }, filePath: 'Airborne_thermal_infrared_mosaic.tif' }, RAW_INFO);
-        expect(statRows()).toContain('Min: 145.00');
-        expect(statRows()).toContain('Max: 402.00');
+        expect(statRows()).toContain('Min: 145');
+        expect(statRows()).toContain('Max: 402');
         expect(statRows().join(' ')).not.toMatch(/ m\b/);
     });
 
@@ -228,3 +228,129 @@ describe('RasterAnalysisControls NoData value', () => {
     });
 });
 
+
+// FR-RAS-01, FR-RAS-17, FR-RAS-24: the default style is the one function (defaultVizParams) over the value info of the
+// server; a panel that is closed styles nothing, and closing it keeps the style of the layer
+describe('RasterAnalysisControls default style', () => {
+    // The value info of LisbonElevation.tif: negative heights, no NoData value, the stretch of ddb (D-041)
+    const LISBON = { valueMin: -6.3, valueMax: 216, bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', stretch: [{ min: -6.3, max: 216 }] };
+    const last = () => wrapper.emitted('vizParamsChanged').at(-1)[0];
+    const unitInput = () => wrapper.find('#raster-analysis-controls-unit-name');
+    // The Rescale range of the two fields (U-401 RescaleFields) as the panel's machine value "min,max", '' when both are empty
+    const rescaleShown = () => {
+        const min = wrapper.find('#raster-analysis-controls-rescale-min').element.value;
+        const max = wrapper.find('#raster-analysis-controls-rescale-max').element.value;
+        return min === '' && max === '' ? '' : `${min},${max}`;
+    };
+    const setRescale = async (min, max) => {
+        await wrapper.find('#raster-analysis-controls-rescale-min').setValue(min);
+        await wrapper.find('#raster-analysis-controls-rescale-max').setValue(max);
+    };
+    const resetButton = () => wrapper.find('button[title="Reset all visualization parameters to their defaults"]');
+
+    it('opens with a ramp stretched to the stretch of the value info, without a formula', async () => {
+        await render({}, LISBON);
+        expect(last()).toEqual({ colormap: 'viridis', rescale: '-6.3,216' });
+        expect(rescaleShown()).toBe('-6.3,216');
+    });
+
+    it('takes the range of the values when the value info has no stretch', async () => {
+        await render({}, { ...LISBON, stretch: undefined });
+        expect(last()).toEqual({ colormap: 'viridis', rescale: '-6.3,216' });
+    });
+
+    it('has the formula only for a thermal raster that has a calibration', async () => {
+        await render({}, { ...LISBON, isThermal: true, calibration: { a: 1 }, stretch: [{ min: 12.76, max: 35.27 }] });
+        expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '12.76,35.27' });
+    });
+
+    it('closing it keeps the style of the layer: nothing is emitted but the close', async () => {
+        await render({}, LISBON);
+        const before = wrapper.emitted('vizParamsChanged').length;
+        wrapper.vm.close();
+        await flushPromises();
+        expect(wrapper.emitted('vizParamsChanged')).toHaveLength(before);
+        expect(wrapper.emitted('close')).toHaveLength(1);
+    });
+
+    it('opens with the style the layer has, and emits it unchanged', async () => {
+        await render({ initialParams: { colormap: 'magma', rescale: '0,100' } }, LISBON);
+        expect(last()).toEqual({ colormap: 'magma', rescale: '0,100' });
+    });
+
+    it('takes the style of the layer again when it opens again', async () => {
+        await render({ initialParams: { colormap: 'magma', rescale: '0,100' } }, LISBON);
+        await wrapper.setProps({ visible: false });
+        await wrapper.setProps({ visible: true, initialParams: { colormap: 'plasma', rescale: '1,2' } });
+        await flushPromises();
+        expect(last()).toEqual({ colormap: 'plasma', rescale: '1,2' });
+    });
+
+    // FR-RAS-17: Stockpile Volume takes the raster with the panel closed
+    it('reads and styles nothing while it is closed, whatever raster the other tools take', async () => {
+        await render({ visible: false, filePath: null }, LISBON);
+        const dataset = wrapper.props('dataset');
+        await wrapper.setProps({ filePath: 'landfill/DTM22ok2025.tif' });
+        await flushPromises();
+        expect(dataset.getRasterValueInfo).not.toHaveBeenCalled();
+        expect(wrapper.emitted('vizParamsChanged')).toBeUndefined();
+
+        await wrapper.setProps({ visible: true });
+        await flushPromises();
+        expect(dataset.getRasterValueInfo).toHaveBeenCalledTimes(1);
+        expect(last()).toEqual({ colormap: 'viridis', rescale: '-6.3,216' });
+    });
+
+    it('Reset sets the Unit back to the default and emits the default style', async () => {
+        await render({ filePath: 'hatcreek/mosaic.tif' }, RAW_INFO);
+        await unitInput().setValue('dC');
+        expect(wrapper.find('.temp-range').text()).toContain('145 dC');
+        await setRescale('0', '5');
+        await resetButton().trigger('click');
+        await flushPromises();
+        expect(unitInput().element.value).toBe('');
+        expect(wrapper.find('.temp-range').text()).not.toContain('dC');
+        expect(rescaleShown()).toBe('145,402');
+        expect(last()).toEqual({ colormap: 'viridis', rescale: '145,402' });
+    });
+
+    it('Reset puts the unit of an elevation model back to metres and clears the NoData value', async () => {
+        await render({}, LISBON);
+        await unitInput().setValue('ft');
+        await byId('raster-nodata-input').setValue('0');
+        await resetButton().trigger('click');
+        await flushPromises();
+        expect(unitInput().element.value).toBe('m');
+        expect(byId('raster-nodata-input').element.value).toBe('');
+        expect(last()).toEqual({ colormap: 'viridis', rescale: '-6.3,216' });
+    });
+
+    // FR-RAS-24: without value info there is no range: Reset keeps the server's own stretch, not the 0-65535 fallback
+    it('Reset after a value info that failed to load sets no rescale', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const dataset = { getRasterValueInfo: vi.fn(async () => { throw new Error('500'); }) };
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset, filePath: 'odm_dem/dsm.tif' },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        await flushPromises();
+        expect(last()).toEqual({ colormap: 'viridis' });
+        await setRescale('0', '5');
+        await resetButton().trigger('click');
+        await flushPromises();
+        expect(rescaleShown()).toBe('');
+        expect(last()).toEqual({ colormap: 'viridis' });
+        expect(last().rescale).toBeUndefined();
+    });
+});
+
+// FR-RAS-28: one format for a value and its unit
+describe('RasterAnalysisControls value format', () => {
+    it('writes a Celsius value with one decimal and the symbol after a space', async () => {
+        await render({ spotInfo: { value: 29.06, x: 1, y: 1, hasGeo: false } },
+            { valueMin: 12.76, valueMax: 35.27, isThermal: true, calibration: {}, unit: 'Celsius' });
+        expect(byId('raster-spot-value').text()).toContain('29.1 °C');
+        expect(wrapper.find('.temp-range').text()).toContain('12.8 °C');
+        expect(wrapper.find('.temp-range').text()).toContain('35.3 °C');
+    });
+});

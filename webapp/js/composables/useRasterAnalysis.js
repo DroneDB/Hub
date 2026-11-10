@@ -14,9 +14,9 @@ import { PRIMARY } from '@/libs/palette';
 import { analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
-import { rasterValueUnit } from '@/libs/map/rasterUnit';
+import { rasterValueUnit, rasterValueParts } from '@/libs/map/rasterUnit';
 import { rasterLayerPath } from '@/libs/map/rasterLayers';
-import { formatNumber, lengthParts } from '@/libs/format';
+import { lengthParts } from '@/libs/format';
 import { measurementTooltipHtml } from '@/libs/map/olMeasurementConverter';
 
 // The server answers an area without any value with an error of its own
@@ -785,9 +785,8 @@ const definition = {
             const v = (info.value != null) ? info.value
                 : (Array.isArray(info.values) ? info.values.join(', ') : null);
             if (v == null) return '';
-            const unit = info.unit || info.units || '';
-            const num = (typeof v === 'number') ? formatNumber(v, 'value', { trim: true }) : v;
-            return unit ? `${num} ${unit}` : `${num}`;
+            // The one format of a raster value (FR-RAS-28): a number with its unit, "29.1 °C"
+            return rasterValueParts(v, info.unit || info.units || '').text;
         },
 
         _stopRasterInspect() {

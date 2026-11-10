@@ -24,7 +24,7 @@ describe('RasterProfileChart', () => {
         await w.vm.$nextTick();
         expect(summary(w)).toContain('Length: 820.21 ft');
         // The values stay in the unit of the raster
-        expect(summary(w)).toContain('Max: 112.5 m');
+        expect(summary(w)).toContain('Max: 112.50 m');
     });
 
     it('exports the samples as CSV, distances in metres and nodata left empty', () => {
@@ -33,6 +33,36 @@ describe('RasterProfileChart', () => {
         w.find('button[aria-label="Export CSV"]').trigger('click');
         expect(saved).toHaveBeenCalledWith(
             'index,distance_m,value,unit,lon,lat\r\n0,0,100,m,11,43\r\n1,250,,m,11.002,43\r\n', 'raster-profile.csv');
+    });
+});
+
+// FR-RAS-08: the labels of the y axis are the values with their unit, and the chart leaves room for them
+describe('RasterProfileChart y labels', () => {
+    const thermal = {
+        totalLength: 90, min: 12.76, max: 35.27, unit: '°C',
+        samples: [{ distance: 0, value: 12.76 }, { distance: 45, value: 20 }, { distance: 90, value: 35.27 }]
+    };
+    const labels = w => w.findAll('text.label').map(t => t.text());
+    const padLeft = w => Number(w.find('line.axis').attributes('x1'));
+
+    it('shows each label as the value and its unit, in the one format', () => {
+        const w = mount(RasterProfileChart, { props: { profile: thermal, unit: '°C', isThermal: true } });
+        expect(labels(w).slice(0, 2)).toEqual(['35.3 °C', '12.8 °C']);
+        expect(summary(w)).toContain('Min: 12.8 °C');
+        expect(summary(w)).toContain('Max: 35.3 °C');
+    });
+
+    it('leaves room on the left for the longest label, at about 6.5 px a character', () => {
+        const w = mount(RasterProfileChart, { props: { profile: thermal, unit: '°C', isThermal: true } });
+        // '35.3 °C' is 7 characters
+        expect(padLeft(w)).toBeGreaterThanOrEqual(7 * 6.5);
+        const longer = mount(RasterProfileChart, {
+            props: { profile: { ...thermal, min: -1234.5, max: 35.27 }, unit: 'W/m²' }
+        });
+        // Any other value has up to three decimals, trimmed, and the group separator of the locale (en): 13 characters
+        expect(labels(longer)[1]).toBe('-1,234.5 W/m²');
+        expect(padLeft(longer)).toBeGreaterThanOrEqual(13 * 6.5);
+        expect(padLeft(longer)).toBeGreaterThan(padLeft(w));
     });
 });
 

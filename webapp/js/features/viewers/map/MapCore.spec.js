@@ -110,7 +110,13 @@ vi.mock('@/libs/map/mapUtils', async importOriginal => {
 const { default: MapCore } = await import('./MapCore.vue');
 
 let wrapper;
-const dataset = { org: 'acme', ds: 'site', getFileContents: vi.fn(async () => { throw Object.assign(new Error('Not found'), { status: 404 }); }) };
+// The value info of a DEM with negative heights and no NoData value (the stretch is ddb's, D-041)
+const DEM_INFO = { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', valueMin: -6.3, valueMax: 216, stretch: [{ min: -6.3, max: 216 }] };
+const dataset = {
+    org: 'acme', ds: 'site',
+    getFileContents: vi.fn(async () => { throw Object.assign(new Error('Not found'), { status: 404 }); }),
+    getRasterValueInfo: vi.fn(async () => ({ ...DEM_INFO }))
+};
 
 /** Lets the debounced layer rebuild and the fit run. */
 const settle = async () => {
@@ -385,6 +391,46 @@ describe('the state of a view', () => {
         await wrapper.setProps({ view: viewOf(MAIN, [ADDED, MAIN], { view: wrapper.props('view').view }) });
         await settle();
         expect(reported).toEqual([]);
+    });
+});
+
+// FR-RAS-01: a DEM opens as a colour ramp over its range, not as the grey of the tiles; an orthophoto keeps its colours
+describe('the default style of a raster', () => {
+    it('seeds a single-band georaster with the default of its value info, and leaves the orthophoto alone', async () => {
+        dataset.getRasterValueInfo.mockClear();
+        await mountMap([file(MAIN), file(ADDED)], { standalone: false });
+        expect(dataset.getRasterValueInfo.mock.calls.map(c => c[0])).toEqual(['dsm.tif']);
+        expect(wrapper.vm.vizParamsByPath).toEqual({ 'dsm.tif': { colormap: 'viridis', rescale: '-6.3,216' } });
+    });
+
+    // A saved view records the style of its layers, none included (saved before this release, or in the Original view)
+    it('leaves a layer of a saved view without a style: no value info, no style, nothing reported', async () => {
+        dataset.getRasterValueInfo.mockClear();
+        await mountView([MAIN], { state: { view: SAVED_POSITION }, extra: { savedLayers: [MAIN.path] } });
+        expect(dataset.getRasterValueInfo).not.toHaveBeenCalled();
+        expect(wrapper.vm.vizParamsByPath).toEqual({});
+        expect(wrapper.vm.rasterLayer.getLayers().getArray()[0].getSource().vizParams).toBeNull();
+        expect(reported).toEqual([]);
+    });
+
+    it('seeds a DEM the saved view does not record (added by the user), and leaves the saved one as it is', async () => {
+        dataset.getRasterValueInfo.mockClear();
+        await mountView([THIRD, MAIN], { state: { view: SAVED_POSITION }, extra: { savedLayers: [MAIN.path] } });
+        expect(dataset.getRasterValueInfo.mock.calls.map(c => c[0])).toEqual([THIRD.path]);
+        expect(reported.at(-1).layers).toEqual([
+            { path: THIRD.path, hash: THIRD.hash, opacity: 1, visible: true, vizParams: { colormap: 'viridis', rescale: '-6.3,216' } },
+            { path: MAIN.path, hash: MAIN.hash, opacity: 1, visible: true, vizParams: null }
+        ]);
+    });
+
+    it('seeds the DEM of a new view (a file opened on the map), whose state then has the style', async () => {
+        dataset.getRasterValueInfo.mockClear();
+        await mountView([MAIN], { state: { view: SAVED_POSITION } });
+        expect(dataset.getRasterValueInfo.mock.calls.map(c => c[0])).toEqual([MAIN.path]);
+        expect(reported.at(-1).layers[0].vizParams).toEqual({ colormap: 'viridis', rescale: '-6.3,216' });
+        // The state the map is given back keeps it: the default is not read again
+        expect(wrapper.vm.vizParamsByPath).toEqual({ [MAIN.path]: { colormap: 'viridis', rescale: '-6.3,216' } });
+        expect(dataset.getRasterValueInfo).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -8,8 +8,10 @@ import { mount, flushPromises } from '@vue/test-utils';
 
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null } } }));
 vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask: vi.fn() }) }));
-const copyText = vi.hoisted(() => vi.fn());
-vi.mock('@/composables/useCopyText', async importOriginal => ({ ...(await importOriginal()), copyText }));
+const copyText = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+// The clipboard: copyLinkWithNotice (useCopyText) copies through it
+vi.mock('clipboard-copy', () => ({ default: copyText }));
+const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 
 const { default: PlantHealthPanel } = await import('./PlantHealthPanel.vue');
 const { default: HistogramChart } = await import('./HistogramChart.vue');
@@ -38,22 +40,32 @@ const CLEAN_STATS = {
     }
 };
 
+// The default stretch of the index, as ddb gives it in the value info read with the formula (D-041): its 2nd to 98th
+// percentile, inside the range of the formula
+const STRETCH = { OUTLIER: [{ min: 0.3706, max: 0.9467 }], CLEAN: [{ min: 0.1, max: 0.85 }] };
+
 let wrapper;
-async function renderWith(formulaStats) {
-    const dataset = {
+let dataset;
+async function renderWith(formulaStats, { stretch = formulaStats === OUTLIER_STATS ? STRETCH.OUTLIER : STRETCH.CLEAN, initialParams = null, pick = 'NDVI' } = {}) {
+    dataset = {
         getRasterInfo: vi.fn(async () => ({ bands: [{}, {}, {}, {}, {}] })),
         getRasterMetadata: vi.fn(async (path, formula) => ({
             algorithms: ALGORITHMS,
             statistics: formula ? formulaStats : { 1: { min: 0, max: 1, mean: 0.5, std: 0.1 } }
-        }))
+        })),
+        getRasterValueInfo: vi.fn(async (path, options = {}) => (options.formula
+            ? { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', stretch }
+            : { bandCount: 5, dataType: 'UInt16', isThermal: false, unit: '' }))
     };
     wrapper = mount(PlantHealthPanel, {
-        props: { visible: true, dataset, filePath: 'odm_orthophoto/odm_orthophoto.tif' },
-        global: { stubs: { PlantHealthFormulasDialog: true, ColormapDropdown: true, BandSelector: true, Chart: true } }
+        props: { visible: true, dataset, filePath: 'odm_orthophoto/odm_orthophoto.tif', initialParams },
+        global: { stubs: { PlantHealthFormulasDialog: true, ColormapDropdown: true, BandSelector: true, Chart: true }, mocks: { $notify: notify } }
     });
     await flushPromises();
-    await wrapper.find('#plant-health-panel-formula').setValue('NDVI');
-    await flushPromises();
+    if (pick) {
+        await wrapper.find('#plant-health-panel-formula').setValue(pick);
+        await flushPromises();
+    }
     return wrapper;
 }
 const chart = () => wrapper.findComponent(HistogramChart);
@@ -63,10 +75,10 @@ const handlePositions = () => chart().findAll('[role="slider"]').map(h => parseF
 afterEach(() => wrapper?.unmount());
 
 describe('PlantHealthPanel histogram with outliers', () => {
-    it('stretches to the 2%-98% range and keeps the handles apart on the index range', async () => {
+    it('stretches to the 2%-98% range of ddb and keeps the handles apart on the index range', async () => {
         await renderWith(OUTLIER_STATS);
-        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.371');
-        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.947');
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.3706');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.9467');
         const { edges, counts } = chart().props('data');
         expect(counts).toEqual([]);
         expect(edges[0]).toBeCloseTo(0.3706 - (0.9467 - 0.3706));
@@ -81,8 +93,8 @@ describe('PlantHealthPanel histogram with outliers', () => {
         await renderWith(CLEAN_STATS);
         expect(chart().props('data')).toEqual({ counts: CLEAN_STATS[1].histogram.counts, edges: CLEAN_STATS[1].histogram.edges });
         expect(note().exists()).toBe(false);
-        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.100');
-        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.850');
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.1');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.85');
     });
 });
 
@@ -98,6 +110,83 @@ describe('PlantHealthPanel Copy Link', () => {
         expect(address).toMatch(/^\/r\/o\/d\/view\/abc\/map\?layer=a#path=odm_orthophoto%2Fodm_orthophoto\.tif&formula=NDVI/);
         expect(window.history.state).toEqual({ back: '/before', position: 2, current: address });
         expect(copyText).toHaveBeenCalledWith(window.location.href);
+    });
+
+    // FR-RAS-05: the copy is confirmed, and a failed one says so
+    it('says that the link was copied, and when it could not be', async () => {
+        notify.success.mockClear();
+        notify.error.mockClear();
+        await renderWith(CLEAN_STATS);
+        const copy = () => wrapper.find('button[title="Copy a shareable link with the current settings"]').trigger('click');
+        await copy();
+        await flushPromises();
+        expect(notify.success).toHaveBeenCalledWith('Link copied to the clipboard', { summary: 'Plant Health' });
+
+        copyText.mockRejectedValueOnce(new Error('denied'));
+        await copy();
+        await flushPromises();
+        expect(notify.error).toHaveBeenCalledWith('The link could not be copied', { summary: 'Plant Health' });
+    });
+
+    it('writes the formula, the colormap, the rescale and the stretch that the layer is given', async () => {
+        await renderWith(CLEAN_STATS);
+        await wrapper.find('button[title="Copy a shareable link with the current settings"]').trigger('click');
+        const params = new URLSearchParams(window.location.hash.slice(1));
+        expect(Object.fromEntries(params)).toEqual({
+            path: 'odm_orthophoto/odm_orthophoto.tif', formula: 'NDVI', colormap: 'rdylgn', rescale: '0.1,0.85', stretch: 'percentile'
+        });
+        // The layer is styled with the same
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({
+            formula: 'NDVI', colormap: 'rdylgn', rescale: '0.1,0.85', stretch: 'percentile'
+        });
+    });
+});
+
+// D-041: the default stretch of an index is ddb's, from the value info read with the formula; the Hub computes none
+describe('PlantHealthPanel default stretch', () => {
+    it('takes the stretch of the value info read with the formula, not one of its own', async () => {
+        // Percentiles in the statistics that differ from the stretch of ddb: the Hub must not use them
+        await renderWith(CLEAN_STATS, { stretch: [{ min: 0.21, max: 0.78 }] });
+        expect(dataset.getRasterValueInfo).toHaveBeenCalledWith('odm_orthophoto/odm_orthophoto.tif', { formula: 'NDVI' });
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.21');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.78');
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({
+            formula: 'NDVI', colormap: 'rdylgn', rescale: '0.21,0.78', stretch: 'percentile'
+        });
+    });
+
+    it('takes the range of the index values when the value info has no stretch', async () => {
+        await renderWith(CLEAN_STATS, { stretch: null });
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('-0.200');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.900');
+    });
+
+    it('keeps the range of a link over the default, and reads the index of the link', async () => {
+        await renderWith(CLEAN_STATS, {
+            pick: null, initialParams: { formula: 'NDVI', colormap: 'rdylgn', rescale: '-0.272,0.644', stretch: 'percentile' }
+        });
+        expect(dataset.getRasterMetadata).toHaveBeenCalledWith('odm_orthophoto/odm_orthophoto.tif', 'NDVI');
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('-0.272');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.644');
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({
+            formula: 'NDVI', colormap: 'rdylgn', rescale: '-0.272,0.644', stretch: 'percentile'
+        });
+    });
+
+    it('gives a link without a range the default stretch of its index', async () => {
+        await renderWith(CLEAN_STATS, { pick: null, initialParams: { formula: 'NDVI', colormap: 'rdylgn', stretch: 'percentile' } });
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({
+            formula: 'NDVI', colormap: 'rdylgn', rescale: '0.1,0.85', stretch: 'percentile'
+        });
+    });
+
+    // FR-RAS-05: the Copy Link of earlier releases wrote the rescale and the stretch without a formula
+    it('opens an old link with a rescale and no formula: the bands, without a stretch or a request for one', async () => {
+        await renderWith(CLEAN_STATS, { pick: null, initialParams: { bands: '4,2,1', rescale: '0.1,0.9', stretch: 'percentile' } });
+        expect(wrapper.find('#plant-health-panel-formula').element.value).toBe('');
+        expect(dataset.getRasterValueInfo).not.toHaveBeenCalled();
+        // Without a formula the panel styles with the bands; a rescale and a stretch are those of an index
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({ bands: '4,2,1' });
     });
 });
 
@@ -145,5 +234,15 @@ describe('PlantHealthPanel rescale fields', () => {
         const last = wrapper.emitted('vizParamsChanged').at(-1)[0];
         expect(last.rescale).toBe('0.1,0.9');
         expect(min().attributes('aria-invalid')).toBeUndefined();
+    });
+});
+
+describe('PlantHealthPanel close (FR-RAS-01)', () => {
+    it('closes without changing the style of the layer', () => {
+        const vm = { $emit: vi.fn(), reset: vi.fn() };
+        PlantHealthPanel.methods.close.call(vm);
+        expect(vm.reset).not.toHaveBeenCalled();
+        expect(vm.$emit).toHaveBeenCalledWith('close');
+        expect(vm.$emit).not.toHaveBeenCalledWith('vizParamsChanged', expect.anything());
     });
 });

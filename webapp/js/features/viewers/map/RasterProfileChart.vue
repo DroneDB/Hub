@@ -85,9 +85,15 @@
 <script>
 import { downloadCsv, toCsv } from '@/libs/csv';
 import { formatLength } from '@/libs/format';
+import { rasterValueParts } from '@/libs/map/rasterUnit';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import Window from '@/components/HubWindow.vue';
+
+// The y labels: the width of a character at the label font and the gap between a label and the axis
+const LABEL_CHAR_WIDTH = 6.5;
+const LABEL_GAP = 4;
+const MIN_PAD_LEFT = 32;
 
 /**
  * Elevation / value profile chart.
@@ -125,7 +131,6 @@ export default {
             height: 160,
             padTop: 12,
             padBottom: 20,
-            padLeft: 56,
             padRight: 8,
             hoverIdx: null,
             expandedOpen: false
@@ -134,6 +139,12 @@ export default {
     computed: {
         viewBox() { return `0 0 ${this.width} ${this.height}`; },
         title() { return this.isThermal ? 'Thermal Profile' : 'Value Profile'; },
+        // The room of the y labels: the longest of them at the label font (12px: about 6.5 px a character), so a value with its
+        // unit is never cut (FR-RAS-08)
+        padLeft() {
+            const chars = Math.max(...[this.yMin, this.yMax].map(v => this.formatValue(v).length));
+            return Math.max(MIN_PAD_LEFT, Math.ceil(chars * LABEL_CHAR_WIDTH) + LABEL_GAP + 4);
+        },
         chartWidth() { return this.width - this.padLeft - this.padRight; },
         chartHeight() { return this.height - this.padTop - this.padBottom; },
         samples() { return (this.profile && this.profile.samples) || []; },
@@ -240,11 +251,9 @@ export default {
             const t = (v - this.yMin) / this.yRange;
             return this.padTop + (1 - t) * this.chartHeight;
         },
+        // The value with its unit, as every raster value is written (FR-RAS-28)
         formatValue(v) {
-            if (v === null || v === undefined || Number.isNaN(v)) return 'n/d';
-            const abs = Math.abs(v);
-            const digits = abs >= 100 ? 1 : (abs >= 10 ? 2 : 3);
-            return `${v.toFixed(digits)}${this.unit ? ' ' + this.unit : ''}`;
+            return rasterValueParts(v, this.unit, { placeholder: 'n/d' }).text;
         },
         formatLength(m) {
             if (m === null || m === undefined) return '';

@@ -167,10 +167,12 @@ import { bytesToSize } from '@/libs/utils';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { downloadBlob } from '@/libs/download';
 import { pathutils } from 'ddb';
-import { copyText } from '@/composables/useCopyText';
+import { copyLinkWithNotice } from '@/composables/useCopyText';
+import { encodeVizParamsHash } from '@/libs/map/vizParamsHash';
 import { formatNumber, parseNumber } from '@/libs/format';
 import { splitRescale } from '@/libs/rescale';
-import { shownHistogram, percentileRange } from '@/libs/map/histogramRange';
+import { shownHistogram } from '@/libs/map/histogramRange';
+import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { useTimerGroup } from '@/composables/useTimers';
 import { replaceHash } from '@/libs/routeQuery';
 
@@ -206,6 +208,9 @@ export default {
             selectedColormap: 'rdylgn',
             selectedStretch: 'percentile',
             rescale: '',
+            // The default stretch of the selected index, ddb's (D-041): { formula, rescale } from the value info read
+            // with the formula, null until it is read or when it has none
+            indexStretch: null,
             availableFormulas: [],
             // Ids, or { id, name } from the raster metadata
             availableColormaps: INDEX_COLORMAPS,
@@ -266,10 +271,17 @@ export default {
                 ? `${outliers}. The histogram shows ${lo} to ${hi}.`
                 : `${outliers}, so the histogram cannot be drawn between ${lo} and ${hi}. Drag the handles to set the range.`;
         },
-        // The 2%-98% range, inside the formula's range; min / max without percentiles
+        // The "min,max" of ddb's default stretch of the selected index (D-041), '' until it is read or without one
+        indexRescale() {
+            const known = this.indexStretch;
+            return known && known.formula === this.selectedFormula && known.path === this.filePath ? known.rescale : '';
+        },
+        // The default stretch of the index (ddb's 2%-98% range inside the formula's range, D-041); min / max without it
         percentileStretch() {
+            const stretch = this.indexRescale ? this.indexRescale.split(',').map(Number) : null;
+            if (stretch && stretch.length === 2 && stretch.every(v => Number.isFinite(v))) return stretch;
             const s = this.firstBandStats;
-            return percentileRange(s, this.formulaRange) || [s ? (s.min || 0) : 0, s ? (s.max || 1) : 1];
+            return [s ? (s.min || 0) : 0, s ? (s.max || 1) : 1];
         },
         stretchRange() {
             const s = this.firstBandStats;
@@ -346,7 +358,9 @@ export default {
                     if (this.initialParams.colormap) this.selectedColormap = this.initialParams.colormap;
                     if (this.initialParams.rescale) this.rescale = this.initialParams.rescale;
                     if (this.initialParams.stretch) this.selectedStretch = this.initialParams.stretch;
-                    this.computeRescaleFromStretch();
+                    if (this.selectedFormula) await this.loadFormulaData();
+                    // The range of the link or the layer is the user's: only a style without one takes the default
+                    if (!this.initialParams.rescale) this.computeRescaleFromStretch();
                     this.apply();
                 }
             } catch (e) {
@@ -367,20 +381,49 @@ export default {
             if (!this.selectedFormula) {
                 this.rescale = '';
             }
-            try {
-                const meta = await this.dataset.getRasterMetadata(
-                    this.filePath, this.selectedFormula || undefined
-                );
-                this.metadata = meta;
-            } catch (e) {
-                console.error('Failed to load formula metadata:', e);
-            }
+            await this.loadFormulaData();
             this.computeRescaleFromStretch();
             this.apply();
         },
 
-        apply() {
-            this.originalView = false; // Any param change exits original view
+        // The statistics and histogram of the selected index (or of the raster without one), and its default stretch
+        async loadFormulaData() {
+            await Promise.all([
+                (async () => {
+                    try {
+                        this.metadata = await this.dataset.getRasterMetadata(this.filePath, this.selectedFormula || undefined);
+                    } catch (e) {
+                        console.error('Failed to load formula metadata:', e);
+                    }
+                })(),
+                this.loadIndexStretch()
+            ]);
+        },
+
+        // The default stretch of the selected index comes from ddb, read with the formula (D-041, FR-XC-24): the Hub
+        // computes none
+        async loadIndexStretch() {
+            const formula = this.selectedFormula;
+            const path = this.filePath;
+            if (!formula || !path || !this.dataset) {
+                this.indexStretch = null;
+                return;
+            }
+            if (this.indexRescale) return;
+            try {
+                const info = await this.dataset.getRasterValueInfo(path, { formula });
+                // Another index or raster was chosen while the info was read
+                if (formula !== this.selectedFormula || path !== this.filePath) return;
+                const { rescale } = defaultVizParams(info, { index: true });
+                this.indexStretch = rescale ? { formula, path, rescale } : null;
+            } catch (e) {
+                console.error('Failed to load the default stretch of the index:', e);
+                if (formula === this.selectedFormula && path === this.filePath) this.indexStretch = null;
+            }
+        },
+
+        // The style of the panel: what the layer, the export and the link carry (FR-RAS-05)
+        vizParams() {
             const params = {};
             if (this.selectedPreset) params.preset = this.selectedPreset;
             if (this.selectedFormula) params.formula = this.selectedFormula;
@@ -388,8 +431,12 @@ export default {
             if (this.selectedFormula && this.selectedColormap) params.colormap = this.selectedColormap;
             if (this.selectedFormula && this.rescale) params.rescale = this.rescale;
             if (this.selectedFormula && this.selectedStretch) params.stretch = this.selectedStretch;
+            return params;
+        },
 
-            this.$emit('vizParamsChanged', params);
+        apply() {
+            this.originalView = false; // Any param change exits original view
+            this.$emit('vizParamsChanged', this.vizParams());
         },
 
         debouncedApply() {
@@ -419,8 +466,8 @@ export default {
             }
         },
 
+        // Closing the panel keeps the layer's style (FR-RAS-01): only an edit or Reset changes it
         close() {
-            this.reset();
             this.$emit('close');
         },
 
@@ -446,8 +493,8 @@ export default {
             if (!s) return;
 
             if (this.selectedStretch === 'percentile') {
-                const [lo, hi] = percentileRange(s, this.formulaRange) || [s.min, s.max];
-                this.rescale = `${Number(lo).toFixed(3)},${Number(hi).toFixed(3)}`;
+                // ddb's default stretch of the index (D-041); the range of the values when the value info has none
+                this.rescale = this.indexRescale || `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
             } else if (this.selectedStretch === 'minmax') {
                 this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
             } else if (this.selectedStretch === 'stddev') {
@@ -472,12 +519,9 @@ export default {
 
         async exportGeoTiff() {
             if (!this.filePath || !this.dataset) return;
-            const params = { path: this.filePath };
-            if (this.selectedPreset) params.preset = this.selectedPreset;
-            if (this.selectedFormula) params.formula = this.selectedFormula;
-            if (this.customBands && !this.selectedPreset && !this.selectedFormula) params.bands = this.customBands;
-            if (this.selectedFormula && this.selectedColormap) params.colormap = this.selectedColormap;
-            if (this.selectedFormula && this.rescale) params.rescale = this.rescale;
+            // The export takes the style of the layer, without the kind of stretch that only the panel keeps
+            const params = { path: this.filePath, ...this.vizParams() };
+            delete params.stretch;
 
             try {
                 this.exporting = true;
@@ -499,21 +543,11 @@ export default {
             }
         },
 
-        copyLink() {
-            // Build hash params
-            const hashParams = new URLSearchParams();
-            hashParams.set('path', this.filePath);
-            if (this.selectedPreset) hashParams.set('preset', this.selectedPreset);
-            if (this.selectedFormula) hashParams.set('formula', this.selectedFormula);
-            if (this.customBands && !this.selectedPreset && !this.selectedFormula) hashParams.set('bands', this.customBands);
-            if (this.selectedFormula && this.selectedColormap) hashParams.set('colormap', this.selectedColormap);
-            if (this.rescale) hashParams.set('rescale', this.rescale);
-            if (this.selectedStretch) hashParams.set('stretch', this.selectedStretch);
+        async copyLink() {
             // Into the address bar, keeping the router's history state: the router's next
             // navigation would otherwise write back the address of its last one over this entry
-            replaceHash(hashParams.toString());
-
-            copyText(window.location.href);
+            replaceHash(encodeVizParamsHash(this.filePath, this.vizParams()));
+            await copyLinkWithNotice(window.location.href, this.$notify, 'Plant Health');
         },
 
         formatNum(val) {

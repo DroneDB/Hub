@@ -215,7 +215,8 @@ import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterAreaStats';
 import { nodataNumber } from '@/libs/ddb/dataset';
-import { rasterValueUnit } from '@/libs/map/rasterUnit';
+import { rasterValueParts } from '@/libs/map/rasterUnit';
+import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { formatNumber, formatNumberList } from '@/libs/format';
 
 const formatCount = n => formatNumber(n, 'count');
@@ -333,6 +334,10 @@ export default {
             const v = this.rasterInfo && !this.rasterInfo.nodataOverridden ? this.rasterInfo.nodata : null;
             return typeof v === 'number' ? `${v} (of the file)` : 'e.g. 0 (none if empty)';
         },
+        // The raster the open panel works on; null while it is closed
+        activePath() {
+            return this.visible ? this.filePath : null;
+        },
         displayUnit() {
             if (this.isThermal) {
                 return this.selectedFormula === 'KELVIN' ? 'K' : '°C';
@@ -354,9 +359,17 @@ export default {
     },
 
     watch: {
-        filePath: {
-            handler(val) {
-                if (val) this.loadRasterInfo();
+        // The panel reads and styles a raster only while it is open: another tool that takes the raster (Stockpile Volume,
+        // contours) changes the file path without it (FR-RAS-17)
+        activePath: {
+            handler(path) {
+                // A panel opened again takes the style of the layer again
+                this._initialParamsApplied = false;
+                if (!path) return;
+                // The same raster after a close keeps its Original view; another raster starts anew
+                if (path !== this._lastPath) this.originalView = false;
+                this._lastPath = path;
+                this.loadRasterInfo();
             },
             immediate: true
         }
@@ -366,41 +379,51 @@ export default {
         async loadRasterInfo() {
             if (!this.filePath || !this.dataset) return;
 
+            const path = this.filePath;
             this.loadError = false;
             try {
-                this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath, { nodata: this.nodataValue ?? undefined });
-
-                // Default colormap and unit based on raster kind (metres only for an elevation model)
-                if (this.isThermal) {
-                    this.selectedColormap = 'ironbow';
-                } else {
-                    this.selectedColormap = 'viridis';
-                    this.unitLabel = rasterValueUnit(this.rasterInfo);
-                }
-
-                // Initial rescale from observed range
-                if (this.rasterInfo.valueMin !== undefined && this.rasterInfo.valueMax !== undefined) {
-                    this.rescale = `${this.rasterInfo.valueMin.toFixed(1)},${this.rasterInfo.valueMax.toFixed(1)}`;
-                }
-
-                // Apply initial params from URL hash
-                if (this.initialParams && !this._initialParamsApplied) {
-                    this._initialParamsApplied = true;
-                    if (this.initialParams.formula) this.selectedFormula = this.initialParams.formula;
-                    if (this.initialParams.colormap) this.selectedColormap = this.initialParams.colormap;
-                    if (this.initialParams.rescale) this.rescale = this.initialParams.rescale;
-                    if (this.initialParams.nodata !== undefined && this.initialParams.nodata !== null) {
-                        this.nodata = String(this.initialParams.nodata);
-                    }
-                }
-
-                this.apply();
+                const info = await this.dataset.getRasterValueInfo(path, { nodata: this.nodataValue ?? undefined });
+                // The panel closed or moved to another raster while the info was read
+                if (!this.visible || path !== this.filePath) return;
+                this.rasterInfo = info;
+                this.useDefaults();
+                this.applyInitialParams();
             } catch (e) {
                 console.error('Failed to load raster info:', e);
+                if (!this.visible || path !== this.filePath) return;
                 // Fallback so colormap/rescale controls still work
                 this.rasterInfo = { valueMin: 0, valueMax: 65535, isThermal: false, isDirectValue: true, sensorId: '', unit: '' };
-                this.rescale = '';
                 this.loadError = true;
+                this.useDefaults();
+                this.applyInitialParams();
+            }
+        },
+
+        // The panel's fields at the default style of the raster (FR-RAS-24): the one function the map seeds a layer with.
+        // Without value info there is no range to stretch to: the tiles keep the server's own stretch (no rescale), not
+        // the range of the fallback info
+        useDefaults() {
+            const defaults = defaultVizParams(this.rasterInfo);
+            this.selectedFormula = defaults.formula || 'CELSIUS';
+            this.selectedColormap = defaults.colormap;
+            this.rescale = this.loadError ? '' : defaults.rescale;
+            this.unitLabel = defaults.unit;
+        },
+
+        // The style the layer has (URL hash, the panel's cache) over the defaults; a layer without one is styled with them,
+        // unless the user chose its original view
+        applyInitialParams() {
+            const initial = this.initialParams;
+            if (initial && !this._initialParamsApplied) {
+                this._initialParamsApplied = true;
+                if (initial.formula) this.selectedFormula = initial.formula;
+                if (initial.colormap) this.selectedColormap = initial.colormap;
+                if (initial.rescale !== undefined) this.rescale = initial.rescale;
+                if (initial.nodata !== undefined && initial.nodata !== null) {
+                    this.nodata = String(initial.nodata);
+                }
+                this.apply();
+            } else if (!this.originalView) {
                 this.apply();
             }
         },
@@ -419,9 +442,7 @@ export default {
             try {
                 this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath,
                     { nodata: this.nodataValue ?? undefined });
-                if (this.rasterInfo.valueMin !== undefined && this.rasterInfo.valueMax !== undefined) {
-                    this.rescale = `${this.rasterInfo.valueMin.toFixed(1)},${this.rasterInfo.valueMax.toFixed(1)}`;
-                }
+                this.rescale = defaultVizParams(this.rasterInfo).rescale;
             } catch (e) {
                 console.error('Failed to reload the raster info with the NoData value:', e);
                 this.$notify.error(e, { summary: 'NoData value' });
@@ -430,16 +451,23 @@ export default {
             this.apply();
         },
 
-        apply() {
-            this.originalView = false;
-            const params = {
-                formula: this.selectedFormula,
-                colormap: this.selectedColormap,
-                rescale: this.rescale
-            };
+        // The style of the panel: what the layer and the export carry. The formula is the thermal unit, so only a thermal
+        // raster has one (FR-RAS-24)
+        vizParams() {
+            const params = {};
+            if (this.isThermal && this.rasterInfo && this.rasterInfo.calibration) params.formula = this.selectedFormula;
+            params.colormap = this.selectedColormap;
+            if (this.rescale) params.rescale = this.rescale;
             // Sent with the vizParams of the layer (FR-RAS-31): tiles, the numbers and the export read the same pixels
             if (this.nodataValue !== null) params.nodata = this.nodataValue;
-            this.$emit('vizParamsChanged', params);
+            return params;
+        },
+
+        apply() {
+            // A closed panel styles nothing (FR-RAS-17)
+            if (!this.visible) return;
+            this.originalView = false;
+            this.$emit('vizParamsChanged', this.vizParams());
         },
 
         debouncedApply() {
@@ -447,21 +475,25 @@ export default {
             this.applyLater(() => this.apply(), 300);
         },
 
-        reset() {
-            this.selectedFormula = 'CELSIUS';
-            this.selectedColormap = this.isThermal ? 'ironbow' : 'viridis';
+        // Every setting goes back to the default style of the raster, the Unit and the NoData value too (FR-RAS-24)
+        async reset() {
+            const hadNodata = this.nodata !== '' && this.nodata !== null;
             this.nodata = '';
-            this.originalView = false;
-            if (this.rasterInfo) {
-                this.rescale = `${this.rasterInfo.valueMin.toFixed(1)},${this.rasterInfo.valueMax.toFixed(1)}`;
-            } else {
-                this.rescale = '';
+            if (hadNodata && this.filePath && this.dataset) {
+                // The range of the values is that of the file's own NoData value again
+                try {
+                    this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath);
+                    this.loadError = false;
+                } catch (e) {
+                    console.error('Failed to reload the raster info after Reset:', e);
+                }
             }
-            this.$emit('vizParamsChanged', {});
+            this.useDefaults();
+            this.apply();
         },
 
+        // Closing keeps the style of the layer: only a user edit and Reset change it (FR-RAS-01)
         close() {
-            this.reset();
             this.$emit('close');
         },
 
@@ -503,14 +535,7 @@ export default {
 
         async exportGeoTiff() {
             if (!this.filePath || !this.dataset) return;
-            const vizParams = {
-                formula: this.selectedFormula,
-                colormap: this.selectedColormap,
-                rescale: this.rescale,
-                nodata: this.nodataValue ?? undefined
-            };
-
-            const url = this.dataset.exportUrl(this.filePath, vizParams);
+            const url = this.dataset.exportUrl(this.filePath, this.vizParams());
             try {
                 this.exporting = true;
                 const resp = await this.dataset.registry.fetchRaw(url, { cache: 'no-store' });
@@ -525,25 +550,18 @@ export default {
             }
         },
 
+        // A value of the raster in its unit: the one format of the Hub (FR-RAS-28). A Kelvin raster is shown as the value plus
+        // 273.15 for now: the server will answer in the unit asked (D-022)
         formatValue(val) {
-            if (val === undefined || val === null) return '-';
-            if (typeof val !== 'number') return val;
-            if (this.isThermal) {
-                const unit = this.selectedFormula === 'KELVIN' ? 'K' : '°C';
-                const display = this.selectedFormula === 'KELVIN' ? val + 273.15 : val;
-                return `${display.toFixed(1)}${unit}`;
-            }
-            const unit = this.unitLabel ? ` ${this.unitLabel}` : '';
-            return `${val.toFixed(2)}${unit}`;
+            if (typeof val !== 'number') return val === undefined || val === null ? '-' : val;
+            const shown = this.isThermal && this.selectedFormula === 'KELVIN' ? val + 273.15 : val;
+            return rasterValueParts(shown, this.displayUnit).text;
         },
 
         // A spread of values (a standard deviation): in the raster's unit, without the offset
         // that turns Celsius into Kelvin
         formatSpread(val) {
-            if (typeof val !== 'number') return '-';
-            if (this.isThermal) return `${val.toFixed(1)}${this.displayUnit}`;
-            const unit = this.unitLabel ? ` ${this.unitLabel}` : '';
-            return `${val.toFixed(2)}${unit}`;
+            return typeof val === 'number' ? rasterValueParts(val, this.displayUnit).text : '-';
         }
     }
 };

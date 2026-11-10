@@ -34,7 +34,7 @@ import { ref } from 'vue';
 import { VIEWS_ICON } from '@/libs/icons';
 import ContextMenu from './ContextMenu.vue';
 import { savedViewUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
-import { copyText } from '@/composables/useCopyText';
+import { copyLinkWithNotice } from '@/composables/useCopyText';
 import { useNotify } from '@/composables/useNotify';
 
 const props = defineProps({
@@ -53,14 +53,7 @@ const current = ref(null);
 const open = v => openInNewTab(savedViewUrl(props.dataset, v.uid));
 const has = () => !!current.value;
 
-async function copyLink(v) {
-    try {
-        await copyText(absoluteUrl(savedViewUrl(props.dataset, v.uid)));
-        notify.success('Link copied to the clipboard', { summary: v.name });
-    } catch {
-        notify.error('The link could not be copied', { summary: v.name });
-    }
-}
+const copyLink = v => copyLinkWithNotice(absoluteUrl(savedViewUrl(props.dataset, v.uid)), notify, v.name);
 
 const menu = [
     { label: 'Open', icon: 'fa-regular fa-folder-open', isVisible: has, click: () => open(current.value) },

@@ -16,6 +16,26 @@ export function copyText(text) {
 }
 
 /**
+ * Copy a link and say so: "Link copied to the clipboard", or "The link could not be copied" (FR-RAS-05). The wording
+ * of every Copy Link of the Hub.
+ * @param {string} text  the link
+ * @param {{ success: Function, error: Function }} notify  the app notifier (libs/notify; this.$notify in a component)
+ * @param {string} [summary]  what the toast is about (the name of a view)
+ * @returns {Promise<boolean>} true when copied
+ */
+export async function copyLinkWithNotice(text, notify, summary) {
+    const options = summary ? { summary } : undefined;
+    try {
+        await copyText(text);
+    } catch {
+        notify.error('The link could not be copied', options);
+        return false;
+    }
+    notify.success('Link copied to the clipboard', options);
+    return true;
+}
+
+/**
  * @param {{ resetMs?: number }} [options]
  */
 export function useCopyText({ resetMs = 2000 } = {}) {

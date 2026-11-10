@@ -7,7 +7,8 @@ import { mount } from '@vue/test-utils';
 import { h } from 'vue';
 
 const m = vi.hoisted(() => ({ copyText: vi.fn(() => Promise.resolve()), success: vi.fn(), error: vi.fn() }));
-vi.mock('@/composables/useCopyText', () => ({ copyText: m.copyText }));
+// The clipboard: copyLinkWithNotice (useCopyText) copies through it
+vi.mock('clipboard-copy', () => ({ default: m.copyText }));
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => ({ success: m.success, error: m.error }) }));
 
 const SavedViews = (await import('./SavedViews.vue')).default;
