@@ -22,7 +22,7 @@
                 </button>
                 <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume" :disabled="splitMode"
                         data-testid="stockpile-toolbar-btn" @click="emit('analysis', 'stockpile')">
-                    <i class="fa-solid fa-layer-group" />
+                    <i :class="STOCKPILE_ICON" />
                 </button>
             </template>
         </div>
@@ -58,6 +58,7 @@
  */
 import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
+import { STOCKPILE_ICON } from '@/libs/icons';
 
 const props = defineProps({
     /** Zones from createControlZones */

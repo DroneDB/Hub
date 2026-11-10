@@ -100,6 +100,12 @@ const definition = {
             stockpileError: null,
             stockpileResult: null,
             stockpileDetectedPolygon: null,
+            // Every pile of the raster found at once (FR-MAP-25): null before a search, else the piles, the biggest first
+            stockpilePiles: null,
+            stockpilePilesLoading: false,
+            stockpilePilesError: null,
+            // The id of the pile of the list that was adopted (it shows as chosen)
+            stockpileChosenPile: null,
             stockpileMode: null, // 'click' | 'draw' | null
             // User-editable identification of the saved pile.
             stockpileTitle: '',
@@ -120,7 +126,12 @@ const definition = {
             // Counts the opens and closes of the panel and the piles measured in it: a saved pile
             // read for an earlier one is not shown (the panel may be open on another raster by
             // the time it is read, or show a pile the user measured meanwhile)
-            _stockpileRestoreTurn: 0
+            _stockpileRestoreTurn: 0,
+            // The same for the search of every pile: the answer of a search that a later one, the closing of the
+            // panel or another raster overtook is not shown
+            _stockpilePilesTurn: 0,
+            // The id of the draft pile taken from that list (another pile of the list replaces it while it is not saved)
+            _listStockpileFeatureId: null
         };
     },
     computed: {
@@ -172,6 +183,7 @@ const definition = {
             this.stockpileTitle = '';
             this.stockpileDescription = '';
             this._savedStockpileMaterial = null;
+            this._resetStockpilePiles();
             // The pile drawn for the raster the panel was open on is not this raster's
             this._clearStockpileOverlay();
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
@@ -335,6 +347,7 @@ const definition = {
 
         closeStockpileVolume() {
             this._stockpileRestoreTurn++;
+            this._resetStockpilePiles();
             this.stockpilePanelVisible = false;
             this.stockpileError = null;
             this.stockpileResult = null;
@@ -352,6 +365,7 @@ const definition = {
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
+            this._resetStockpilePiles();
             // Reset the loading flag so an in-flight detection that is taking
             // too long no longer blocks the panel - the request itself will
             // still complete in the background but its result will be ignored
@@ -377,12 +391,14 @@ const definition = {
          * detached from the previous draft and the identification fields are reset, otherwise
          * the previously-typed title/description would bleed into the next adopted feature (and
          * the watcher would overwrite the previous pile). It takes the turn of a saved pile still
-         * being read, so that pile does not replace this one when it arrives.
+         * being read, so that pile does not replace this one when it arrives. No pile of the list
+         * is the chosen one until adoptDetectedStockpile says so.
          */
         _startNewStockpile() {
             this._stockpileRestoreTurn++;
             this.stockpileLoading = true;
             this.stockpileError = null;
+            this.stockpileChosenPile = null;
             this._draftStockpileFeatureId = null;
             this.stockpileTitle = '';
             this.stockpileDescription = '';
@@ -404,20 +420,93 @@ const definition = {
                     radius: this.stockpileRadius,
                     sensitivity: this.stockpileSensitivity
                 });
-                this.stockpileDetectedPolygon = detection.polygon;
-
-                this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
-                const volume = await this._measureStockpile(detection.polygon);
-                this.stockpileResult = this._withStockpileEstimate({
-                    ...volume,
-                    confidence: detection.confidence,
-                    estimatedFromDetection: detection.estimatedVolume
-                });
-                this._adoptDraftStockpile(detection.polygon);
+                await this._measureDetectedStockpile(detection);
             } catch (e) {
                 console.error('Stockpile detection/calculation failed:', e);
                 this.stockpileError = friendlyStockpileError(e && e.message,
                     'Stockpile detection failed. Please try a different point or adjust the parameters.');
+                this.stockpileResult = null;
+            } finally {
+                this.stockpileLoading = false;
+            }
+        },
+
+        /**
+         * Measure a pile the detection found (one `detect` answer, or one pile of `detect-all`: `polygon`, `confidence`,
+         * `estimatedVolume`) from the base of the panel, show it and adopt it as the draft pile on the map.
+         */
+        async _measureDetectedStockpile(detection) {
+            this.stockpileDetectedPolygon = detection.polygon;
+            this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
+            const volume = await this._measureStockpile(detection.polygon);
+            this.stockpileResult = this._withStockpileEstimate({
+                ...volume,
+                confidence: detection.confidence,
+                estimatedFromDetection: detection.estimatedVolume
+            });
+            this._adoptDraftStockpile(detection.polygon);
+        },
+
+        /** The list of the piles found at once is forgotten (a search in flight is overtaken). */
+        _resetStockpilePiles() {
+            this._stockpilePilesTurn++;
+            this.stockpilePiles = null;
+            this.stockpilePilesLoading = false;
+            this.stockpilePilesError = null;
+            this.stockpileChosenPile = null;
+        },
+
+        /**
+         * "Find all piles" (FR-MAP-25): one scan of the whole raster, with the sensitivity of the panel. The piles are
+         * listed (the biggest first); the user adopts one with adoptDetectedStockpile.
+         */
+        async findAllStockpiles() {
+            if (!this.rasterFilePath || !this.dataset) return;
+            const turn = ++this._stockpilePilesTurn;
+            const path = this.rasterFilePath;
+            this.stockpilePilesLoading = true;
+            this.stockpilePilesError = null;
+            this.stockpileChosenPile = null;
+            try {
+                const found = await this.dataset.detectAllStockpiles(path, { sensitivity: this.stockpileSensitivity });
+                if (turn !== this._stockpilePilesTurn) return;
+                this.stockpilePiles = Array.isArray(found?.stockpiles) ? found.stockpiles : [];
+            } catch (e) {
+                console.error('Finding all the piles failed:', e);
+                if (turn !== this._stockpilePilesTurn) return;
+                this.stockpilePiles = null;
+                this.stockpilePilesError = friendlyStockpileError(e && e.message,
+                    'Could not find the piles of this raster. Try again, or adjust the sensitivity.');
+            } finally {
+                if (turn === this._stockpilePilesTurn) this.stockpilePilesLoading = false;
+            }
+        },
+
+        /**
+         * The user chose a pile of the list: it is measured like a pile found by a click, shown in the panel and drawn on
+         * the map as the draft pile, which the toolbar's Save writes with the others (FR-XC-30). Going through the list
+         * replaces the pile taken from it while that one is not saved, so piles 1, 2, 1 leave one pile on the map (pile 1),
+         * not three; a pile saved, clicked or drawn stays. The chosen pile chosen again changes nothing.
+         * @param {{ id: number, polygon: object, confidence?: number, estimatedVolume?: number }} pile
+         */
+        async adoptDetectedStockpile(pile) {
+            if (!pile || !pile.polygon || !this.rasterFilePath || !this.dataset) return;
+            const listDraft = this._draftStockpileFeatureId && this._draftStockpileFeatureId === this._listStockpileFeatureId
+                ? this._draftStockpileFeatureId : null;
+            // The chosen pile is on the map, or being measured for it
+            if (pile.id === this.stockpileChosenPile && (listDraft || this.stockpileLoading)) return;
+            const mc = this.measureControls;
+            if (listDraft && !(mc && mc.isSaved(listDraft))) this._removeDraftStockpileFromMeasureSource();
+            this._startNewStockpile();
+            // The list stays: the user may look at another pile of it
+            this.stockpileChosenPile = pile.id;
+            try {
+                await this._measureDetectedStockpile(pile);
+                this._listStockpileFeatureId = this._draftStockpileFeatureId;
+            } catch (e) {
+                console.error('Stockpile calculation failed:', e);
+                this.stockpileError = friendlyStockpileError(e && e.message,
+                    'Cannot calculate the volume of this pile. Try another one.');
                 this.stockpileResult = null;
             } finally {
                 this.stockpileLoading = false;

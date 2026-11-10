@@ -85,6 +85,42 @@ describe('the panels over the bottom of the map', () => {
     });
 });
 
+// FR-MAP-10: the hint "Photos are in images/ - Show" at the bottom centre of the map. A narrow or compact map (U-411) brings
+// the bottom-left controls under the middle: the scale bar (FR-MAP-30) stands 0.5rem up and about 3rem high
+describe('the hint of a folder whose subfolder has the map entries', () => {
+    const chipSource = readSource(__dirname, './GeoSubfolderChip.vue');
+    const chip = ruleOf(chipSource.slice(chipSource.indexOf('<style')), '.geo-subfolder-chip');
+    const mapCore = readSource(__dirname, './MapCore.vue');
+    const datasetMap = readSource(__dirname, './DatasetMap.vue');
+    const rem = (source, pattern) => Number(pattern.exec(source)[1]);
+
+    it('is in the map, where its reserves are defined: MapCore\'s overlay slot in .map-container, which DatasetMap fills', () => {
+        const container = mapCore.indexOf('class="map-container"');
+        const slot = mapCore.indexOf('<slot name="overlay" />');
+        expect(container).toBeGreaterThan(0);
+        expect(slot).toBeGreaterThan(container);
+        // The container closes before the dialogs of the map
+        expect(slot).toBeLessThan(mapCore.indexOf('<MapDialogs'));
+        expect(datasetMap).toMatch(/<template #overlay>\s*<GeoSubfolderChip /);
+    });
+
+    it('stands above the scale bar and the settings button at any size, as the bottom panels do', () => {
+        expect(chip).toMatch(/bottom:\s*var\(--map-bottom-reserve\)/);
+        expect(chip).not.toMatch(/bottom:\s*2\.5rem/);
+        const reserve = rem(ruleOf(css, '.map-container'), /--map-bottom-reserve:\s*([\d.]+)rem/);
+        const scaleBarBottom = rem(ruleOf(css, '.map-container .ol-scale-bar'), /bottom:\s*([\d.]+)rem/);
+        // The scale bar with its text is about 3rem high: its top is under the bottom of the hint
+        expect(scaleBarBottom + 3).toBeLessThanOrEqual(reserve);
+    });
+
+    it('keeps out of the toolbar rail, with the width of the map, and stays under the controls and the panels', () => {
+        expect(chip).toMatch(/max-width:\s*calc\(100% - 2 \* var\(--map-rail-reserve\)\)/);
+        expect(chip).toMatch(/z-index:\s*var\(--map-layer-bottom-panel\)/);
+        expect(chip).toMatch(/left:\s*50%/);
+        expect(chip).toMatch(/transform:\s*translateX\(-50%\)/);
+    });
+});
+
 describe('the layer panel on a phone', () => {
     const tablet = mediaBlock(layerPanelStyle, PHONE);
     const phone = mediaBlock(layerPanelStyle, 'max-width: 575.98px');

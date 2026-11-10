@@ -3,6 +3,7 @@ import ddb from 'ddb';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
 import { isGeoraster } from '@/libs/entryTypes';
 import FolderPicker from '@/components/FolderPicker.vue';
+import BuildManager from '@/libs/build/buildManager';
 import { resolveLayer, resolveLayers, toMapFiles, pickGeoraster } from './georasterLayers';
 
 vi.mock('@/libs/build/fileAvailabilityChecker', () => ({ default: { check: vi.fn() } }));
@@ -52,6 +53,21 @@ describe('resolveLayer', () => {
         FileAvailabilityChecker.check.mockResolvedValue({ available: false, title: 'Building' });
         const r = await resolveLayer(fakeDataset({ 'a.tif': raster('a.tif') }), 'a.tif');
         expect(r).toMatchObject({ status: 'unavailable', reason: 'Building' });
+    });
+
+    it('is building, with the footprint of the file, while the checker says its build runs (FR-RAS-09)', async () => {
+        const footprint = { type: 'Polygon', coordinates: [[[1, 2], [3, 2], [3, 4], [1, 2]]] };
+        const built = { ...raster('a.tif'), polygon_geom: footprint };
+        FileAvailabilityChecker.check.mockResolvedValue({ available: false, status: 'building', title: 'File Being Processed' });
+        const r = await resolveLayer(fakeDataset({ 'a.tif': built }), 'a.tif');
+        expect(r).toEqual({ status: 'unavailable', entry: built, reason: 'Building', building: true });
+    });
+
+    it('is not building for a build that failed or never ran', async () => {
+        FileAvailabilityChecker.check.mockResolvedValue({ available: false, status: 'queued', title: 'File Awaiting Processing' });
+        const r = await resolveLayer(fakeDataset({ 'a.tif': raster('a.tif') }), 'a.tif');
+        expect(r.building).toBeUndefined();
+        expect(r.reason).toBe('File Awaiting Processing');
     });
 
     it('is unavailable when the checker fails', async () => {
@@ -117,6 +133,21 @@ describe('toMapFiles', () => {
                 placeholder: { path: 'f/n.txt', kind: 'unavailable', text: 'Not a georaster: f/n.txt' }
             }
         ]);
+    });
+
+    it('shapes a layer that is building as a placeholder with its footprint and the progress of its build', () => {
+        const footprint = { type: 'Polygon', coordinates: [[[1, 2], [3, 2], [3, 4], [1, 2]]] };
+        const spy = vi.spyOn(BuildManager, 'getBuildProgress').mockReturnValue(62);
+        const ds = fakeDataset();
+        const resolved = new Map([['a.tif', { status: 'unavailable', entry: { ...raster('a.tif'), polygon_geom: footprint }, reason: 'Building', building: true }]]);
+
+        const [file] = toMapFiles(ds, ['a.tif'], resolved);
+
+        expect(file).toMatchObject({ path: 'ddb://org/ds/a.tif', entry: null, label: 'a.tif' });
+        expect(file.placeholder).toMatchObject({ path: 'a.tif', kind: 'building', text: 'Building: a.tif', footprint });
+        expect(file.placeholder.progress()).toBe(62);
+        expect(spy).toHaveBeenCalledWith(ds, 'a.tif');
+        spy.mockRestore();
     });
 
     it('treats a path that was never resolved as missing', () => {

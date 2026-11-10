@@ -117,6 +117,7 @@ import Button from 'primevue/button';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 import { countOf } from '@/libs/format';
+import { STOCKPILE_ICON } from '@/libs/icons';
 
 export default {
     components: { Window, Button, ConfirmDialog },
@@ -203,7 +204,7 @@ export default {
                 case 'point': return 'fa-solid fa-map-pin';
                 case 'length': return 'fa-solid fa-ruler';
                 case 'area': return 'fa-solid fa-draw-polygon';
-                case 'stockpile': return 'fa-solid fa-layer-group';
+                case 'stockpile': return STOCKPILE_ICON;
                 case 'profile': return 'fa-solid fa-route';
                 case 'contour': return 'fa-solid fa-map-pin';
                 default: return 'fa-solid fa-question';
@@ -307,14 +308,15 @@ export default {
     transition: opacity 0.15s;
 }
 
-.group-row:hover .group-actions {
+.group-row:hover .group-actions,
+.group-row:focus-within .group-actions {
     opacity: 1;
 }
 
 /* Measurement rows */
 .measurement-row {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
@@ -362,7 +364,8 @@ export default {
     transition: opacity 0.15s;
 }
 
-.measurement-row:hover .measurement-actions {
+.measurement-row:hover .measurement-actions,
+.measurement-row:focus-within .measurement-actions {
     opacity: 1;
 }
 
@@ -430,6 +433,13 @@ export default {
 
 .btn-new-group:hover {
     background-color: var(--ddb-bg-hover);
+}
+
+/* A row is one line with a name that shrinks (min-width 0) while there is room; on a phone it wraps under the name */
+@media (max-width: 575.98px) {
+    .measurement-row {
+        flex-wrap: wrap;
+    }
 }
 
 /* Touch: the row actions cannot wait for a hover, and the controls are big enough to hit */

@@ -35,6 +35,14 @@ const visibleLabels = w => menuItems(w).filter(i => i.label && (!i.isVisible || 
 const item = (w, label) => menuItems(w).find(i => i.label === label);
 
 describe('SavedViews', () => {
+    // FR-MAP-24: the Views group is a bookmark, not the split of Compare
+    it('marks the Views group with a bookmark', () => {
+        const w = mountViews();
+        const icons = w.find('button.group').findAll('i').map(i => i.classes().join(' '));
+        expect(icons).toContain('icon fa-solid fa-bookmark');
+        expect(icons.join(' ')).not.toContain('fa-table-columns');
+    });
+
     beforeEach(() => {
         vi.spyOn(window, 'open').mockReturnValue(null);
     });

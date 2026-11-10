@@ -813,6 +813,30 @@ describe('Zoom to layer (FR-MAP-08, FR-XC-23)', () => {
         info.mockRestore();
     });
 
+    // A raster that is building (FR-RAS-09): no layer to draw yet, but a footprint to look at
+    const BUILDING = {
+        path: 'ddb://acme/site/new.tif', entry: null, label: 'new.tif', selected: false,
+        placeholder: { path: 'new.tif', kind: 'building', text: 'Building: new.tif', footprint: FAR_POLYGON, progress: () => 40 }
+    };
+
+    it('looks at the footprint of a raster that is building, which has no layer to fit', async () => {
+        await mountMap([BUILDING]);
+        await moved();
+
+        expect(near(center(), farCenter)).toBe(true);
+    });
+
+    it('fits the footprint of a building raster for its row, as it does the extent of a drawn layer', async () => {
+        await mountMap([file(MAIN), BUILDING]);
+        await moved();
+        expect(near(center(), farCenter)).toBe(false);
+
+        expect(wrapper.vm.zoomToLayer('new.tif')).toBe(true);
+        await moved();
+
+        expect(near(center(), farCenter)).toBe(true);
+    });
+
     it('says nothing for a layer that is in view', async () => {
         await mountView([MAIN, THIRD], { base: MAIN });
         wrapper.vm.map.setSize([800, 600]);

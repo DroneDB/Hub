@@ -16,6 +16,9 @@
  *   it loads, and a file that is not a georaster is refused with a warning.
  * - A newer resolve supersedes an older one: the latest takes everything that is still
  *   unresolved, so the answer of an overtaken request is dropped and nothing is lost.
+ * - A layer whose file is being built is a placeholder that says so, with the progress and its footprint (the map looks
+ *   there). `useBuildCompletion` (FR-XC-16, FR-RAS-09) follows the layers that cannot be drawn: when the build of one
+ *   ends, that layer is resolved again, so the raster is drawn without a reload (a build that failed says so).
  * - A view in Viewer only (`embed`) neither adds, replaces nor removes a layer.
  *
  *   const layers = useViewLayers({ dataset, state, setState, baseEntry, savedData, dialogs, embed });
@@ -27,6 +30,7 @@ import { resolveLayers, toMapFiles, pickGeoraster } from '@/libs/map/georasterLa
 import { MAX_LAYERS } from '@/libs/views/viewState';
 import { addLayer, removeLayer, replaceLayer, startSplit } from '@/libs/views/layerRules';
 import { useNotify } from '@/composables/useNotify';
+import { useBuildCompletion } from '@/composables/useBuildCompletion';
 
 /** @typedef {import('@/libs/views/viewState').ViewState} ViewState */
 
@@ -83,6 +87,13 @@ export function useViewLayers({ dataset, state, setState, baseEntry, savedData =
         return next;
     }
     watch(layerKey, () => { if (pending.value) resolve(); }, { immediate: true });
+
+    // The layers that cannot be drawn now: one of them may be a file that is building (FR-RAS-09). The dataset is followed
+    // only while there is one, so a view of rasters that all draw adds no listener
+    const unavailablePaths = computed(() => layerPaths.value.filter(p => resolved.value.get(p)?.status === 'unavailable'));
+    useBuildCompletion(() => (unavailablePaths.value.length ? dataset : null), unavailablePaths, ({ filePath }) => {
+        if (layerPaths.value.includes(filePath)) resolve([filePath]);
+    });
 
     // Empty until every layer is resolved, so the map builds its layers once, with all of them
     const files = computed(/** @param {any[]} [previous] */ previous => {

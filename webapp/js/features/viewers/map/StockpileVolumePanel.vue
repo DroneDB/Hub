@@ -1,6 +1,6 @@
 <template>
     <AnalysisPanel v-if="visible" variant="stockpile" class="stockpile-panel" data-testid="stockpile-panel"
-                   icon="fa-solid fa-layer-group" title="Stockpile Volume" @close="$emit('close')">
+                   :icon="STOCKPILE_ICON" title="Stockpile Volume" @close="$emit('close')">
         <div class="panel-body">
             <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath"
                                   @update:model-value="path => $emit('selectTarget', path)" />
@@ -105,6 +105,37 @@
                 </button>
             </div>
 
+            <!-- Every pile of the raster at once (FR-MAP-25): the list adopts the chosen one as the draft pile -->
+            <div class="section find-all">
+                <button type="button" class="panel-btn find-all-btn" :disabled="loading || pilesLoading"
+                        data-testid="stockpile-find-all-btn" title="Scan the whole raster for piles, with the detection sensitivity above"
+                        @click="$emit('findAll')">
+                    <i :class="pilesLoading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-magnifying-glass-location'" aria-hidden="true" />
+                    {{ pilesLoading ? 'Finding piles…' : 'Find all piles' }}
+                </button>
+                <div v-if="pilesError" class="find-all-note error" data-testid="stockpile-piles-error">
+                    <i class="fas fa-exclamation-triangle" aria-hidden="true" /> {{ pilesError }}
+                </div>
+                <div v-else-if="piles && !piles.length" class="find-all-note" role="status" data-testid="stockpile-piles-empty">
+                    No piles found. Raise the detection sensitivity to find finer ones.
+                </div>
+                <div v-else-if="piles" class="pile-list" data-testid="stockpile-piles">
+                    <span class="section-label">{{ pilesTitle }}</span>
+                    <div class="pile-head" aria-hidden="true">
+                        <span>#</span><span>Area</span><span>Volume (est.)</span><span>Confidence</span>
+                    </div>
+                    <button v-for="(pile, index) in piles" :key="pile.id" type="button" class="pile-row"
+                            :class="{ chosen: pile.id === chosenPile }" :aria-pressed="String(pile.id === chosenPile)" :disabled="loading"
+                            :aria-label="`Pile ${index + 1}: ${pileSummary(pile)}`" data-testid="stockpile-pile"
+                            @click="$emit('pickPile', pile)">
+                        <span class="pile-rank">{{ index + 1 }}</span>
+                        <span>{{ formatArea(pile.areaM2) }}</span>
+                        <span>{{ formatVolume(pile.estimatedVolume) }}</span>
+                        <span>{{ formatConfidence(pile.confidence) }}</span>
+                    </button>
+                </div>
+            </div>
+
             <div v-if="mode === 'click'" ref="banner" class="section click-banner" data-testid="stockpile-click-banner">
                 <i class="fa-solid fa-crosshairs" />
                 <span data-testid="stockpile-hint">{{ clickHint }}</span>
@@ -204,6 +235,7 @@
 
 <script>
 import AnalysisPanel from './AnalysisPanel.vue';
+import { STOCKPILE_ICON } from '@/libs/icons';
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, EMPTY_CELL, formatDensity, formatMoney, formatNumber, formatVolume, formatWeight } from '@/libs/format';
@@ -213,6 +245,7 @@ import { drawingHint } from '@/libs/measureHints';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { currentLocation } from '@/libs/routeQuery';
 import { useAuthStore } from '@/stores/auth';
+import { DETECT_ALL_MAX_RESULTS } from '@/libs/ddb/dataset';
 
 /**
  * StockpileVolumePanel - Stockpile volume measurement panel.
@@ -240,6 +273,12 @@ export default {
         loading: { type: Boolean, default: false },
         error: { type: String, default: null },
         result: { type: Object, default: null },
+        // The piles of "Find all piles" (null: not searched; `{ id, areaM2, estimatedVolume, confidence }`, the biggest
+        // first), whether the search runs, why it failed, and the id of the pile adopted
+        piles: { type: Array, default: null },
+        pilesLoading: { type: Boolean, default: false },
+        pilesError: { type: String, default: null },
+        chosenPile: { type: Number, default: null },
         // The base of the pile shown; a pick is emitted (update:baseMethod) and the pile measured again
         baseMethod: { type: String, default: BASE_METHOD.LOWEST_PERIMETER },
         sensitivity: { type: Number, default: 0.5 },
@@ -260,7 +299,7 @@ export default {
         description: { type: String, default: '' }
     },
     emits: ['close', 'clickOnMap', 'drawPolygon', 'clearOverlay',
-        'cancelMode', 'exportGeoJson', 'selectTarget',
+        'cancelMode', 'exportGeoJson', 'selectTarget', 'findAll', 'pickPile',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
         'update:title', 'update:description'],
@@ -268,7 +307,7 @@ export default {
         return { auth: useAuthStore() };
     },
     data() {
-        return { customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false, settingsOpen: false };
+        return { STOCKPILE_ICON, customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false, settingsOpen: false };
     },
     computed: {
         // Below `sm`, while a mode is active or a result shows, the settings (base plane, sensitivity, radius, material) fold
@@ -319,6 +358,13 @@ export default {
                 return `Density must be at most ${formatNumber(limit, 3, { trim: true })} ${this.units.density.unit}`;
             }
             return 'Density must be greater than 0';
+        },
+        // A full list is the biggest of maybe more piles: the server counts its totalFound after the cut, so it cannot say
+        pilesTitle() {
+            const count = this.piles?.length ?? 0;
+            return count >= DETECT_ALL_MAX_RESULTS
+                ? `Largest ${formatNumber(count, 0)} piles`
+                : `Piles found (${formatNumber(count, 0)})`;
         },
         // The one hint of every drawing tool (libs/measureHints): how to place a point, finish and cancel
         clickHint() { return drawingHint('pick', { crosshair: true }); },
@@ -401,6 +447,13 @@ export default {
             const { factor, unit } = areaScale(v, this.unitPref);
             return `${this._fmt(v * factor, 'area')} ${unit}`;
         },
+        formatConfidence(c) {
+            return typeof c === 'number' && isFinite(c) ? `${this._fmt(c * 100, 0)}%` : EMPTY_CELL;
+        },
+        // What a row of the list says to a screen reader: its three figures
+        pileSummary(pile) {
+            return `${this.formatArea(pile.areaM2)}, ${this.formatVolume(pile.estimatedVolume)}, confidence ${this.formatConfidence(pile.confidence)}`;
+        },
         formatElevation(v) {
             if (v == null || !isFinite(v)) return EMPTY_CELL;
             return this.isImperial ? `${this._fmt(v * 3.28084, 'elevation')} ft` : `${this._fmt(v, 'elevation')} m`;
@@ -426,6 +479,74 @@ export default {
 
 <style scoped>
 /* Shared look and palette: css/_analysis-panel.scss */
+
+.find-all-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+}
+
+.find-all-note {
+    margin-top: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--panel-text-soft);
+}
+
+.find-all-note.error {
+    color: var(--panel-warn-text);
+}
+
+/* The list: one line per pile, as wide as the panel, scrolled when there are many */
+.pile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0.4rem;
+    max-height: 12rem;
+    overflow-y: auto;
+}
+
+.pile-head,
+.pile-row {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr 1.3fr 1fr;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.72rem;
+    text-align: right;
+}
+
+.pile-head {
+    color: var(--panel-muted);
+    padding: 0 0.4rem;
+}
+
+.pile-row {
+    width: 100%;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background: rgba(var(--ddb-glass-rgb), 0.08);
+    color: var(--panel-text-soft);
+    font-family: monospace;
+    cursor: pointer;
+}
+
+.pile-row:hover:not(:disabled) {
+    background: rgba(var(--ddb-glass-rgb), 0.18);
+}
+
+.pile-row.chosen {
+    border-color: var(--panel-accent);
+    color: var(--panel-text);
+}
+
+.pile-rank {
+    text-align: left;
+    color: var(--panel-muted);
+}
 
 /* The disclosure of the settings: a line the width of the panel */
 .settings-toggle {

@@ -678,3 +678,173 @@ describe('Click map and Draw (the shared drawing session)', () => {
         expect(calculate).toHaveBeenCalledTimes(1);
     });
 });
+
+// FR-MAP-25: "Find all piles" lists the piles of the raster, and the user adopts one as the draft pile
+describe('Find all piles (detect-all)', () => {
+    const OTHER = { type: 'Polygon', coordinates: [[[9.01, 45.01], [9.011, 45.01], [9.011, 45.011], [9.01, 45.01]]] };
+    const FOUND = {
+        stockpiles: [
+            { id: 0, polygon: POLYGON, estimatedVolume: 812.5, confidence: 0.91, baseElevation: 12, centroid: [9, 45], areaM2: 420, pixelCount: 90 },
+            { id: 1, polygon: OTHER, estimatedVolume: 40, confidence: 0.55, baseElevation: 11, centroid: [9.01, 45.01], areaM2: 30, pixelCount: 7 }
+        ],
+        totalFound: 2, sensitivityUsed: 0.5, minAreaUsed: 5
+    };
+
+    async function open() {
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+        dataset.detectAllStockpiles = vi.fn(async () => FOUND);
+    }
+    const piles = () => source.getFeatures().filter(f => f.get('measurementType') === 'stockpile');
+
+    it('asks for the piles of the raster with the sensitivity of the panel, and lists them as they come', async () => {
+        await open();
+        pile.stockpileSensitivity.value = 0.8;
+
+        await pile.findAllStockpiles();
+
+        expect(dataset.detectAllStockpiles).toHaveBeenCalledWith('dsm.tif', { sensitivity: 0.8 });
+        expect(pile.stockpilePiles.value.map(p => p.id)).toEqual([0, 1]);
+        expect(pile.stockpilePilesLoading.value).toBe(false);
+        expect(pile.stockpilePilesError.value).toBeNull();
+        // Listing is not adopting: nothing is drawn yet
+        expect(piles()).toHaveLength(0);
+    });
+
+    it('lists no piles for a raster without any, which is not an error', async () => {
+        await open();
+        dataset.detectAllStockpiles = vi.fn(async () => ({ stockpiles: [], totalFound: 0 }));
+        await pile.findAllStockpiles();
+        expect(pile.stockpilePiles.value).toEqual([]);
+        expect(pile.stockpilePilesError.value).toBeNull();
+    });
+
+    it('says so when the search fails, with no list', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        await open();
+        dataset.detectAllStockpiles = vi.fn(async () => { throw new Error('boom'); });
+        await pile.findAllStockpiles();
+        expect(pile.stockpilePiles.value).toBeNull();
+        expect(pile.stockpilePilesError.value).toBe('Could not find the piles of this raster. Try again, or adjust the sensitivity.');
+        expect(pile.stockpilePilesLoading.value).toBe(false);
+        error.mockRestore();
+    });
+
+    it('adopting a pile of the list measures it like a detected pile and draws it as the draft, keeping the list', async () => {
+        await open();
+        await pile.findAllStockpiles();
+
+        await pile.adoptDetectedStockpile(pile.stockpilePiles.value[0]);
+        await flushPromises();
+
+        // The base of a detected pile (best fit); the figures of the panel are the measured ones, with the detection's
+        expect(measuredBases).toEqual(['best_fit']);
+        expect(pile.stockpileResult.value).toMatchObject({ netVolume: 100, confidence: 0.91, estimatedFromDetection: 812.5, basePlaneMethod: 'best_fit' });
+        expect(pile.stockpileDetectedPolygon.value).toEqual(POLYGON);
+        expect(piles()).toHaveLength(1);
+        expect(draft().get('basePlaneMethod')).toBe('best_fit');
+        expect(pile.stockpileChosenPile.value).toBe(0);
+        expect(pile.stockpilePiles.value).toHaveLength(2);
+        expect(pile.stockpileLoading.value).toBe(false);
+    });
+
+    const adopt = async index => {
+        await pile.adoptDetectedStockpile(pile.stockpilePiles.value[index]);
+        await flushPromises();
+    };
+
+    it('adopting another pile of the list replaces the unsaved pile taken from it: piles 1, 2, 1 leave one pile, pile 1', async () => {
+        await open();
+        await pile.findAllStockpiles();
+        await adopt(0);
+        await adopt(1);
+        expect(piles()).toHaveLength(1);
+        expect(pile.stockpileChosenPile.value).toBe(1);
+        expect(pile.stockpileResult.value.estimatedFromDetection).toBe(40);
+
+        await adopt(0);
+        expect(piles()).toHaveLength(1);
+        expect(pile.stockpileChosenPile.value).toBe(0);
+        expect(pile.stockpileResult.value.estimatedFromDetection).toBe(812.5);
+        expect(pile.stockpileDetectedPolygon.value).toEqual(POLYGON);
+    });
+
+    it('choosing the chosen pile again does nothing: no new measure, the same pile on the map', async () => {
+        await open();
+        await pile.findAllStockpiles();
+        await adopt(0);
+        const id = draft().get('id');
+        const calculate = vi.spyOn(dataset, 'calculateStockpileVolume');
+
+        await adopt(0);
+
+        expect(calculate).not.toHaveBeenCalled();
+        expect(piles()).toHaveLength(1);
+        expect(draft().get('id')).toBe(id);
+        expect(pile.stockpileChosenPile.value).toBe(0);
+    });
+
+    it('keeps a pile of the list once saved: the next one of the list is a second pile', async () => {
+        await open();
+        await pile.findAllStockpiles();
+        await adopt(0);
+        savedIds.add(draft().get('id'));
+
+        await adopt(1);
+
+        expect(piles()).toHaveLength(2);
+        expect(pile.stockpileChosenPile.value).toBe(1);
+    });
+
+    it('keeps a pile found by a click: a pile of the list adopted next is a second pile, and no row is chosen meanwhile', async () => {
+        await open();
+        await pile.findAllStockpiles();
+        await adopt(0);
+        await pile.autoDetectAndCalculate(9, 45);
+        await flushPromises();
+        expect(pile.stockpileChosenPile.value).toBeNull();
+        expect(piles()).toHaveLength(2);
+
+        await adopt(0);
+
+        expect(piles()).toHaveLength(3);
+        expect(pile.stockpileChosenPile.value).toBe(0);
+    });
+
+    it('says why when the pile cannot be measured, and keeps the list', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        await open();
+        await pile.findAllStockpiles();
+        dataset.calculateStockpileVolume = async () => { throw new Error('Cannot calculate volume'); };
+
+        await pile.adoptDetectedStockpile(pile.stockpilePiles.value[0]);
+
+        expect(pile.stockpileError.value).toMatch(/Cannot calculate volume for this area/);
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpilePiles.value).toHaveLength(2);
+        error.mockRestore();
+    });
+
+    it('forgets the list when the panel closes, on Clear, and on another raster; an overtaken search is not shown', async () => {
+        await open();
+        await pile.findAllStockpiles();
+        pile.clearStockpileOverlay();
+        expect(pile.stockpilePiles.value).toBeNull();
+
+        await pile.findAllStockpiles();
+        pile.closeStockpileVolume();
+        expect(pile.stockpilePiles.value).toBeNull();
+
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+        let release;
+        dataset.detectAllStockpiles = vi.fn(() => new Promise(resolve => { release = () => resolve(FOUND); }));
+        const searching = pile.findAllStockpiles();
+        expect(pile.stockpilePilesLoading.value).toBe(true);
+        pile.openStockpileVolume('other.tif');
+        release();
+        await searching;
+        expect(pile.stockpilePiles.value).toBeNull();
+        expect(pile.stockpilePilesLoading.value).toBe(false);
+    });
+});

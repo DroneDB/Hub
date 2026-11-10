@@ -31,7 +31,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { b64decode, b64urlDecode } from '@/libs/base64';
 import { isGeoraster, canOpenInMap } from '@/libs/entryTypes';
 import { readHistoryState, writeHistoryState, replaceQueryKeys, currentLocation } from '@/libs/routeQuery';
-import { validateState, workingState, defaultState, buildEntryState, sameView } from '@/libs/views/viewState';
+import { validateState, workingState, defaultState, buildEntryState, sameView, MAX_NAME_LENGTH } from '@/libs/views/viewState';
 import { listViews, saveNewView, updateView, viewChange } from '@/libs/views/viewStore';
 import { fileViewUrl, savedViewUrl } from '@/libs/views/viewLinks';
 import { useViewerEntry } from '@/composables/useViewerEntry';
@@ -338,11 +338,27 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
         });
     }
 
-    /** Asks for a name and creates a view, whether or not the page shows a saved one. */
+    /**
+     * The name the first Save offers: the stem of the base file ("Hat Creek" for odx/Hat Creek.tif), cut to the length
+     * a name can have. The cut is by whole characters, never in the middle of an emoji (half of a surrogate pair), and
+     * the name stays within MAX_NAME_LENGTH UTF-16 units, the unit of the prompt's maxlength and of the name check.
+     */
+    function firstViewName() {
+        const base = state.value?.base.path;
+        if (!base) return '';
+        let name = '';
+        for (const char of Array.from(ddb.pathutils.stem(base))) {
+            if (name.length + char.length > MAX_NAME_LENGTH) break;
+            name += char;
+        }
+        return name;
+    }
+
+    /** Asks for a name and creates a view, whether or not the page shows a saved one (the prompt has a name in it, selected). */
     function createAsNew() {
         return createView(saved.value
             ? { title: 'Save view as', initialValue: `${saved.value.name} (copy)` }
-            : { title: 'Save view' });
+            : { title: 'Save view', initialValue: firstViewName() });
     }
 
     /** Save as new */
@@ -374,7 +390,8 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
         if (!checked) return;
         if (checked.change === 'deleted') {
             notify.warn('This view was deleted. Save it under a name to keep it.', { summary: 'View deleted' });
-            await createView({ title: 'Save view as', initialValue: '' });
+            // The deleted view's own name is the sensible one to keep it under
+            await createView({ title: 'Save view as', initialValue: saved.value.name });
             return;
         }
         if (checked.change === 'changed') {

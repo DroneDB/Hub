@@ -92,6 +92,13 @@ describe('MapToolbar analysis buttons', () => {
         expect(button('raster-analysis-toolbar-btn').title).toMatch(/Turn off split compare/);
     });
 
+    // FR-MAP-24: the pile is not the stack of layers, and not the split of Compare
+    it('have a mountain for the Stockpile button, apart from the icon of the Compare button', () => {
+        mountWith({ rasterCount: 2, canCompare: true });
+        expect(button('stockpile-toolbar-btn').querySelector('i').className).toBe('fa-solid fa-mountain');
+        expect(zones.topCenter.querySelector(COMPARE).querySelector('i').className).toBe('fa-solid fa-table-columns');
+    });
+
     it('ask for their panel', () => {
         mountWith({ rasterCount: 1 });
         button('stockpile-toolbar-btn').click();

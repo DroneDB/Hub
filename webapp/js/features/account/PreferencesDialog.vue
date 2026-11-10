@@ -102,6 +102,7 @@ import { DEVICE_PREF_DEFAULTS, PREF, PREF_DEFAULTS, prefChoice, removePref } fro
 import { followDatasetTablePreferences, followOrgPageSettings, getDatasetTablePreferences, getOrgPageSettings, orgPageChoice, saveDatasetTablePreferences,
     saveOrgPageSettings } from '@/libs/storageUtils';
 import { isPageSize } from '@/libs/pageSize';
+import { STOCKPILE_ICON } from '@/libs/icons';
 import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -360,7 +361,7 @@ const TABS = [
         ]
     },
     {
-        value: 'stockpiles', label: 'Stockpiles', icon: 'fa-solid fa-layer-group', sections: ['stockpiles'],
+        value: 'stockpiles', label: 'Stockpiles', icon: STOCKPILE_ICON, sections: ['stockpiles'],
         groups: [{ title: 'Materials', component: StockpileMaterialsEditor }]
     },
     {

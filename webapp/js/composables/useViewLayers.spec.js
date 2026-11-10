@@ -6,14 +6,31 @@ import { defaultState, newLayer } from '@/libs/views/viewState';
 const warn = vi.fn();
 vi.mock('@/libs/build/fileAvailabilityChecker', () => ({ default: { check: vi.fn().mockResolvedValue({ available: true }) } }));
 vi.mock('@/components/FolderPicker.vue', () => ({ default: { name: 'FolderPicker' } }));
+// The BuildManager as an event source the test fires (FR-RAS-09): no task list, no poll
+vi.mock('@/libs/build/buildManager', () => {
+    const listeners = new Set();
+    return {
+        default: {
+            on: (event, cb) => listeners.add(cb),
+            off: (event, cb) => listeners.delete(cb),
+            registerDataset: vi.fn(),
+            unregisterDataset: vi.fn(),
+            getBuildState: vi.fn(() => null),
+            getBuildProgress: vi.fn(() => 40),
+            fire: data => [...listeners].forEach(cb => cb(data)),
+            listenerCount: () => listeners.size
+        }
+    };
+});
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => ({ warn, error: vi.fn(), success: vi.fn() }) }));
 
 const { default: availability } = await import('@/libs/build/fileAvailabilityChecker');
+const { default: BuildManager } = await import('@/libs/build/buildManager');
 const { useViewLayers, AT_LIMIT_TITLE } = await import('./useViewLayers');
 
 const T = ddb.entry.type;
 const entryOf = (path, type = T.GEORASTER, hash = `h-${path}`) => ({ path, type, hash });
-const dataset = { listOne: vi.fn(), remoteUri: vi.fn(path => `ddb://o/d/${path}`) };
+const dataset = { baseApi: '/orgs/o/ds/d', listOne: vi.fn(), remoteUri: vi.fn(path => `ddb://o/d/${path}`) };
 
 /** A view whose base is `base` and whose layers are the paths (top first). */
 function viewOf(base, paths) {
@@ -450,5 +467,74 @@ describe('useViewLayers in Viewer only', () => {
         expect(dialogs.open).not.toHaveBeenCalled();
         expect(setState).not.toHaveBeenCalled();
         expect(layers.files.value).toHaveLength(2);
+    });
+});
+
+describe('useViewLayers a file that is building (FR-RAS-09, FR-XC-16)', () => {
+    const FOOTPRINT = { type: 'Polygon', coordinates: [[[10, 45], [10.01, 45], [10.01, 45.01], [10, 45]]] };
+    const BUILDING = { available: false, status: 'building', title: 'File Being Processed' };
+    const buildEnd = (filePath, newState = 'Succeeded') => BuildManager.fire({ dataset, filePath, newState });
+
+    beforeEach(() => {
+        dataset.listOne.mockImplementation(async path => ({ ...entryOf(path), polygon_geom: FOOTPRINT }));
+        availability.check.mockImplementation(async (_, entry) => (entry.path === 'raw.tif' ? BUILDING : { available: true }));
+    });
+
+    it('keeps a layer that is building as a placeholder that says so, with its footprint and its progress', async () => {
+        const { layers } = open(viewOf('raw.tif', ['raw.tif']));
+        await settled(layers);
+
+        const [file] = layers.files.value;
+        expect(file.entry).toBeNull();
+        expect(file.placeholder).toMatchObject({ path: 'raw.tif', kind: 'building', text: 'Building: raw.tif', footprint: FOOTPRINT });
+        expect(file.placeholder.progress()).toBe(40);
+    });
+
+    it('draws the raster when its build ends, without a reload', async () => {
+        const { layers } = open(viewOf('raw.tif', ['raw.tif', 'a.tif']));
+        await settled(layers);
+        expect(layers.files.value.find(f => f.label === 'raw.tif').entry).toBeNull();
+
+        availability.check.mockResolvedValue({ available: true });
+        buildEnd('raw.tif');
+
+        await vi.waitFor(() => expect(layers.files.value.find(f => f.label === 'raw.tif').entry).toMatchObject({ path: 'raw.tif' }));
+        expect(layers.files.value.find(f => f.label === 'raw.tif').placeholder).toBeUndefined();
+    });
+
+    it('says why when the build ended without the raster', async () => {
+        const { layers } = open(viewOf('raw.tif', ['raw.tif']));
+        await settled(layers);
+
+        availability.check.mockResolvedValue({ available: false, status: 'failed', title: 'Processing Error' });
+        buildEnd('raw.tif', 'Failed');
+
+        await vi.waitFor(() => expect(layers.files.value[0].placeholder.text).toBe('Processing Error: raw.tif'));
+        expect(layers.files.value[0].placeholder.kind).toBe('unavailable');
+    });
+
+    it('resolves again only the layer whose build ended, and only for the end of a build', async () => {
+        const { layers } = open(viewOf('raw.tif', ['raw.tif', 'a.tif']));
+        await settled(layers);
+        const calls = dataset.listOne.mock.calls.length;
+
+        buildEnd('a.tif');
+        buildEnd('elsewhere.tif');
+        buildEnd('raw.tif', 'Processing');
+        await new Promise(r => setTimeout(r, 0));
+        expect(dataset.listOne.mock.calls.length).toBe(calls);
+
+        buildEnd('raw.tif');
+        await vi.waitFor(() => expect(dataset.listOne.mock.calls.length).toBe(calls + 1));
+        expect(dataset.listOne).toHaveBeenLastCalledWith('raw.tif');
+    });
+
+    it('follows the dataset builds only while a layer cannot be drawn', async () => {
+        BuildManager.registerDataset.mockClear();
+        availability.check.mockResolvedValue({ available: true });
+        const { layers } = open(viewOf('a.tif', ['a.tif']));
+        await settled(layers);
+        expect(BuildManager.registerDataset).not.toHaveBeenCalled();
+        expect(BuildManager.listenerCount()).toBe(0);
     });
 });

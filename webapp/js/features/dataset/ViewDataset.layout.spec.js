@@ -12,7 +12,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 import ddb from 'ddb';
 
-const h_ = vi.hoisted(() => ({ dataset: null, selected: null, explorerAttrs: null, panelProps: null, maps: { mounted: 0, unmounted: 0 } }));
+const h_ = vi.hoisted(() => ({ dataset: null, selected: null, explorerAttrs: null, panelProps: null, mapAttrs: null, maps: { mounted: 0, unmounted: 0 } }));
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: vi.fn() }), useRoute: () => ({ params: { org: 'acme', ds: 'site' } }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
@@ -53,7 +53,8 @@ vi.mock('@/features/viewers/map/DatasetMap.vue', async () => {
         __esModule: true,
         default: vue.defineComponent({
             inheritAttrs: false,
-            setup(_, { expose }) {
+            setup(_, { expose, attrs }) {
+                h_.mapAttrs = attrs;
                 expose({ onTabActivated: () => {}, onPanelResized: () => {} });
                 vue.onMounted(() => { h_.maps.mounted++; });
                 vue.onUnmounted(() => { h_.maps.unmounted++; });
@@ -206,6 +207,21 @@ describe('ViewDataset follows the window across sm (FR-EXP-29)', () => {
         expect(wrapper.findComponent(TabSwitcher).element === tabsElement).toBe(true);
         expect(wrapper.find('.viewer-stub').element === viewer).toBe(true);
         expect(h_.maps).toEqual({ mounted: 1, unmounted: 0 });
+    });
+
+    // FR-MAP-10: the Map stays mounted once opened; its hint searches only while it is the tab on show
+    it('tells the Map whether it is the tab on show', async () => {
+        await open(1280);
+        const tabs = wrapper.findComponent(TabSwitcher);
+        tabs.vm.activateTab('map');
+        await flushPromises();
+        await vi.waitFor(() => expect(h_.maps.mounted).toBe(1));
+        expect(h_.mapAttrs.active).toBe(true);
+
+        tabs.vm.activateTab('explorer');
+        await flushPromises();
+        expect(h_.maps).toEqual({ mounted: 1, unmounted: 0 });
+        expect(h_.mapAttrs.active).toBe(false);
     });
 
     it('shows Files when the window grows past sm on the Browser tab, which leaves', async () => {

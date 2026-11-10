@@ -540,7 +540,8 @@ describe('useSavedView save on a new view', () => {
 
         const [component, props] = dialogs.open.mock.calls[0];
         expect(component.name).toBe('TextPromptDialog');
-        expect(props).toMatchObject({ title: 'Save view', label: 'Name', initialValue: '', maxLength: 100 });
+        // FR-MAP-23: the first Save offers the stem of the base file (f/a.tif -> a)
+        expect(props).toMatchObject({ title: 'Save view', label: 'Name', initialValue: 'a', maxLength: 100 });
         expect(dataset.metaAdd).toHaveBeenCalledTimes(1);
         const stored = dataset.metaAdd.mock.calls[0][1];
         expect(stored).toMatchObject({ name: 'Ortho over DSM', createdBy: 'user', view: { center: [3, 4], zoom: 6, rotation: 0 } });
@@ -758,6 +759,36 @@ describe('useSavedView save on a saved view', () => {
         expect(dialogs.open.mock.calls[0][1].title).toBe('View changed');
     });
 
+    it('offers the stem of the base file as the name of the first Save, whatever the folders and the extension', async () => {
+        const { view } = await open(fileUrl('odx/Hat Creek 08252018.tif'));
+        dialogs.open.mockResolvedValue(null);
+
+        await view.save();
+
+        expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save view', initialValue: 'Hat Creek 08252018' });
+    });
+
+    it('cuts a long stem by whole characters within the 100 UTF-16 units of a name: an emoji at position 100 goes whole', async () => {
+        const { view } = await open(fileUrl(`odx/${'a'.repeat(99)}😀bbb.tif`));
+        dialogs.open.mockResolvedValue(null);
+
+        await view.save();
+
+        // Not 99 a's and half of the emoji (a lone surrogate), and not 101 units, more than the prompt takes
+        expect(dialogs.open.mock.calls[0][1].initialValue).toBe('a'.repeat(99));
+    });
+
+    it('keeps an emoji before the cut and fills up to the 100 units', async () => {
+        const { view } = await open(fileUrl(`odx/${'a'.repeat(49)}😀${'b'.repeat(70)}.tif`));
+        dialogs.open.mockResolvedValue(null);
+
+        await view.save();
+
+        const name = dialogs.open.mock.calls[0][1].initialValue;
+        expect(name).toBe(`${'a'.repeat(49)}😀${'b'.repeat(49)}`);
+        expect(name.length).toBe(100);
+    });
+
     it('warns when the view was deleted, then saves it under a name of the user', async () => {
         const { view, dataset } = await openSaved();
         dataset.items = [];
@@ -766,7 +797,8 @@ describe('useSavedView save on a saved view', () => {
         await view.save();
 
         expect(notify.warn).toHaveBeenCalledWith('This view was deleted. Save it under a name to keep it.', { summary: 'View deleted' });
-        expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save view as', initialValue: '' });
+        // FR-MAP-23: the deleted view's own name is offered, not an empty field
+        expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save view as', initialValue: 'Ortho over DSM' });
         expect(dataset.items).toHaveLength(1);
         expect(view.saved.value.name).toBe('Back again');
         expect(view.saved.value.uid).not.toBe('v_1');

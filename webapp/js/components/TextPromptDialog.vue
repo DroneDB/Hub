@@ -2,7 +2,8 @@
     <Window :title="title" modal fixed-size max-width="90%" size-class="dialog-sm" :confirm-label="confirmLabel"
             :confirm-disabled="!valid" @confirm="confirm" @close="emit('close', null)">
         <label v-if="label" :for="inputId" class="prompt-label">{{ label }}</label>
-        <InputText :id="inputId" v-model="value" :maxlength="maxLength" :aria-label="label || title" data-autofocus fluid />
+        <InputText :id="inputId" v-model="value" :maxlength="maxLength" :aria-label="label || title" data-autofocus fluid
+                   @focus="selectOnFirstFocus" />
         <small class="prompt-hint">{{ hint }}</small>
     </Window>
 </template>
@@ -32,6 +33,16 @@ const value = ref(props.initialValue);
 const trimmed = computed(() => value.value.trim());
 const valid = computed(() => trimmed.value.length >= 1 && trimmed.value.length <= props.maxLength);
 const hint = computed(() => `${trimmed.value.length} / ${props.maxLength}`);
+
+// A name offered in the prompt is selected when the field first gets the focus (the dialog's own focus on opening it), so
+// typing replaces it and Enter keeps it; the focus that comes later (a click to place the caret) leaves the text alone
+let selected = false;
+/** @param {FocusEvent} event */
+function selectOnFirstFocus(event) {
+    if (selected) return;
+    selected = true;
+    if (event.target instanceof HTMLInputElement) event.target.select();
+}
 
 function confirm() {
     if (valid.value) emit('close', trimmed.value);

@@ -19,8 +19,9 @@
                     </template>
                     <template #map>
                         <Map v-if="openedTabs.map" ref="mapViewer" lazyload :files="listing.files.value" :dataset="dataset"
+                             :current-path="listing.currentPath.value" :loading="listing.isLoading.value" :active="activeTab === 'map'"
                              :can-write="canWrite" :can-delete="canDelete" @scroll-to="file => explorer && explorer.scrollTo && explorer.scrollTo(file)"
-                             @open-item="openItem" @vue:mounted="onMapMounted"
+                             @show-folder="showFolder" @open-item="openItem" @vue:mounted="onMapMounted"
                              @file-written="onMapFileWritten" @file-removed="path => listing.removed([path])" />
                     </template>
                     <template #explorer>
@@ -212,10 +213,13 @@ const stopHearingUploads = useUploadsStore().subscribe(params.org, params.ds, { 
 onBeforeUnmount(stopHearingUploads);
 const dialogs = useDialogs();
 // The tree that is on the page: the sidebar's, or on a phone the Browser tab's
+const activeTree = () => (phoneLayout.value ? mobileFileBrowser.value : fileBrowser.value) || fileBrowser.value || mobileFileBrowser.value;
 const refresh = () => {
-    const tree = (phoneLayout.value ? mobileFileBrowser.value : fileBrowser.value) || fileBrowser.value || mobileFileBrowser.value;
+    const tree = activeTree();
     if (tree) tree.refreshAndNavigate(listing.currentPath.value);
 };
+// The Map tab's "Photos are in images/ - Show" (FR-MAP-10): the tree opens that subfolder, and the map shows what it holds
+const showFolder = path => { activeTree()?.refreshAndNavigate(path); };
 const actions = useDatasetActions({ dataset, listing, dialogs, busy, canWrite, route: params, refresh, openItem: node => openItem(node) });
 const clipboard = useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite, showError: actions.showError });
 

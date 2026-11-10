@@ -16,7 +16,7 @@
             <div class="row-head">
                 <span class="raster-label" :title="layer.name">{{ labels[index] }}</span>
                 <span v-if="isChanged(layer)" class="changed-badge" :title="CHANGED_TEXT"><i class="fa-solid fa-circle-info" /> {{ CHANGED_TEXT }}</span>
-                <span v-if="layer.placeholder" class="placeholder-text" :title="layer.placeholder.text">{{ layer.placeholder.text }}</span>
+                <span v-if="layer.placeholder" class="placeholder-text" :title="placeholderText(layer)">{{ placeholderText(layer) }}</span>
                 <!-- Pressed = the layer is shown; the name stays the same, the state is aria-pressed -->
                 <button v-if="!layer.placeholder" class="row-btn eye-btn" type="button"
                         :aria-pressed="layer.visible !== false ? 'true' : 'false'"
@@ -50,7 +50,8 @@
                     <i class="fa-solid fa-arrows-rotate" />
                 </button>
                 <!-- Where the layer is: the map fits its extent (FR-MAP-08) -->
-                <button v-if="!layer.placeholder" class="row-btn zoom-btn" type="button" title="Zoom to layer"
+                <!-- A raster that is building has no layer yet, but a footprint to look at (FR-RAS-09) -->
+                <button v-if="!layer.placeholder || layer.placeholder.footprint" class="row-btn zoom-btn" type="button" title="Zoom to layer"
                         :aria-label="'Zoom to layer: ' + layer.name" @click.stop="$emit('zoom-to', layer.path)">
                     <i class="fa-solid fa-location-crosshairs" />
                 </button>
@@ -83,7 +84,7 @@
 <script>
 import { inject } from 'vue';
 import AddLayerButton from './AddLayerButton.vue';
-import { distinctLabels } from '@/libs/format';
+import { distinctLabels, formatNumber } from '@/libs/format';
 
 // The longest name a row shows; a longer one is cut in the middle, so its date and extension stay
 const LABEL_MAX = 22;
@@ -181,6 +182,12 @@ export default {
         toggleFold() {
             this.foldChosen = true;
             this.folded = !this.folded;
+        },
+        /** What the row of a layer that is not drawn says; a build that runs says how far it is (the state is reactive) */
+        placeholderText(layer) {
+            const { text, progress } = layer.placeholder;
+            const percent = typeof progress === 'function' ? progress() : null;
+            return percent == null ? text : text.replace(/^Building/, `Building ${formatNumber(percent, 0)} %`);
         },
         isChanged(layer) {
             return this.changedPaths.includes(layer.path);

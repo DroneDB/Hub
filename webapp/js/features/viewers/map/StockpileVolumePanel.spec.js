@@ -46,6 +46,14 @@ const num = (n, digits = 2) => n.toLocaleString(navigator.language, { maximumFra
 beforeEach(() => { h.auth.isLoggedIn = true; });
 afterEach(() => wrapper?.unmount());
 
+describe('StockpileVolumePanel icon (FR-MAP-24)', () => {
+    it('has a mountain in front of its title, not the stacked layers', () => {
+        render();
+        const icon = wrapper.find('.panel-title i');
+        expect(icon.classes()).toEqual(['fa-solid', 'fa-mountain']);
+    });
+});
+
 describe('StockpileVolumePanel', () => {
     it('shows the weight and the cost of the result, not weights of its own', () => {
         // A net volume larger than the cut one: the panel used to weigh the net volume itself
@@ -338,5 +346,77 @@ describe('StockpileVolumePanel custom density', () => {
         render({ material: '__custom__', customDensity: 1.5, result: RESULT });
         expect(wrapper.find('[data-testid="stockpile-weight-error"]').exists()).toBe(false);
         expect(text('stockpile-weight')).toBe('150 t');
+    });
+});
+
+// FR-MAP-25: "Find all piles" and the list of what it found
+describe('StockpileVolumePanel Find all piles', () => {
+    const PILES = [
+        { id: 0, areaM2: 1234.5, estimatedVolume: 8097.19, confidence: 0.912 },
+        { id: 3, areaM2: 40, estimatedVolume: 12.4, confidence: 0.5 }
+    ];
+    const button = () => wrapper.find('[data-testid="stockpile-find-all-btn"]');
+    const rows = () => wrapper.findAll('[data-testid="stockpile-pile"]');
+
+    it('has the action, which asks for the search', async () => {
+        render();
+        expect(button().text()).toBe('Find all piles');
+        await button().trigger('click');
+        expect(wrapper.emitted('findAll')).toHaveLength(1);
+    });
+
+    it('is busy while the search runs', () => {
+        render({ pilesLoading: true });
+        expect(button().text()).toBe('Finding piles…');
+        expect(button().attributes('disabled')).toBeDefined();
+    });
+
+    it('lists the area, the volume and the confidence of each pile, in the units of the panel', () => {
+        render({ piles: PILES, unitPref: 'metric' });
+        expect(wrapper.find('[data-testid="stockpile-piles"]').text()).toContain('Piles found (2)');
+        const cells = rows().map(r => r.findAll('span').map(s => s.text()));
+        expect(cells[0]).toEqual(['1', '1,234.5 m²', '8,097.19 m³', '91%']);
+        expect(cells[1]).toEqual(['2', '40 m²', '12.4 m³', '50%']);
+    });
+
+    it('says "Largest 50 piles" for a list as long as the search asks for (there may be more), and the count below it', () => {
+        const many = n => Array.from({ length: n }, (_, i) => ({ id: i, areaM2: 100 - i, estimatedVolume: 10, confidence: 0.5 }));
+        render({ piles: many(50) });
+        expect(wrapper.find('[data-testid="stockpile-piles"] .section-label').text()).toBe('Largest 50 piles');
+        wrapper.unmount();
+        render({ piles: many(49) });
+        expect(wrapper.find('[data-testid="stockpile-piles"] .section-label').text()).toBe('Piles found (49)');
+    });
+
+    it('lists them in yd³ and imperial areas for an imperial map', () => {
+        render({ piles: [PILES[0]], unitPref: 'imperial' });
+        const cells = rows()[0].findAll('span').map(s => s.text());
+        // 8097.19 m³ is 10,590.72 yd³ and 1234.5 m² is 13,288.05 ft² (FR-XC-08)
+        expect(cells[2]).toBe('10,590.72 yd³');
+        expect(cells[1]).toBe('13,288.05 ft²');
+    });
+
+    it('adopts the pile of a row that is clicked, and marks the chosen one', async () => {
+        render({ piles: PILES, chosenPile: 3 });
+        await rows()[0].trigger('click');
+        expect(wrapper.emitted('pickPile')).toEqual([[PILES[0]]]);
+        expect(rows()[1].attributes('aria-pressed')).toBe('true');
+        expect(rows()[1].classes()).toContain('chosen');
+        expect(rows()[0].attributes('aria-pressed')).toBe('false');
+    });
+
+    it('says when there is no pile, and when the search failed', () => {
+        render({ piles: [] });
+        expect(wrapper.find('[data-testid="stockpile-piles-empty"]').text()).toContain('No piles found');
+        wrapper.unmount();
+        render({ pilesError: 'Could not find the piles of this raster.' });
+        expect(wrapper.find('[data-testid="stockpile-piles-error"]').text()).toContain('Could not find the piles');
+        expect(wrapper.find('[data-testid="stockpile-piles"]').exists()).toBe(false);
+    });
+
+    it('shows no list before a search', () => {
+        render();
+        expect(wrapper.find('[data-testid="stockpile-piles"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="stockpile-piles-empty"]').exists()).toBe(false);
     });
 });

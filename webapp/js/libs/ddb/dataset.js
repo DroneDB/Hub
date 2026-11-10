@@ -8,6 +8,10 @@ import { BASE_METHOD } from '../stockpileBase';
 // handed to other software (see ShareEmbed).
 const TILE_FORMAT = "webp";
 
+// The piles "Find all piles" asks for (detect-all `maxResults`): the server keeps the biggest ones and counts its
+// `totalFound` after that cut, so a list this long may be the largest of more piles
+export const DETECT_ALL_MAX_RESULTS = 50;
+
 export default class Dataset {
     constructor(registry, org, ds) {
         this.registry = registry;
@@ -176,6 +180,23 @@ export default class Dataset {
     }
 
     /**
+     * Every pile of a DEM at once (a scan of the whole raster; the biggest first). Resolves to
+     * `{ stockpiles: [{ id, polygon, estimatedVolume, confidence, baseElevation, centroid, areaM2, pixelCount }],
+     * totalFound, sensitivityUsed, minAreaUsed }`: `polygon` is a WGS84 GeoJSON Polygon, `estimatedVolume` m³,
+     * `areaM2` m², `confidence` 0-1.
+     *
+     * @param {string} path Dataset-relative path of the elevation raster
+     * @param {Object} [options]
+     * @param {number} [options.sensitivity=0.5] 0-1, higher finds finer piles
+     * @param {number} [options.minArea=5] Smallest pile to report, in m²
+     * @param {number} [options.maxResults=DETECT_ALL_MAX_RESULTS] Most piles to return (the server caps it at 500)
+     */
+    async detectAllStockpiles(path, { sensitivity = 0.5, minArea = 5, maxResults = DETECT_ALL_MAX_RESULTS } = {}) {
+        const body = { path, sensitivity, minAreaM2: minArea, maxResults };
+        return this.registry.postRequest(`${this.baseApi}/stockpile/detect-all`, body);
+    }
+
+    /**
      * Generate contour lines (GeoJSON FeatureCollection of LineStrings with an
      * `elev` property) from a DEM/DSM/DTM raster.
      *
@@ -311,14 +332,16 @@ export default class Dataset {
 
     /**
      * @param {string} [query]  a file name pattern ('*' is any)
-     * @param {{ path?: string, recursive?: boolean, signal?: AbortSignal }} [options]  the folder to search in (the whole
-     *   dataset by default) and whether to go into its subfolders (the server's default is yes)
+     * @param {{ path?: string, recursive?: boolean, type?: number, signal?: AbortSignal }} [options]  the folder to search
+     *   in (the whole dataset by default), whether to go into its subfolders (the server's default is yes) and the one
+     *   entry type to return (`entry.type`, any by default)
      */
-    async search(query, { path, recursive, signal } = {}){
+    async search(query, { path, recursive, type, signal } = {}){
         const formData = new FormData();
         if (query !== undefined && query !== null) formData.append('query', query);
         if (path !== undefined && path !== null) formData.append('path', path);
         if (recursive !== undefined) formData.append('recursive', String(!!recursive));
+        if (type !== undefined && type !== null) formData.append('type', String(type));
         return this.registry.postFormData(`${this.baseApi}/search`, formData, { readOnly: true, signal });
     }
 

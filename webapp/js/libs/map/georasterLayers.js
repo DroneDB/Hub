@@ -10,13 +10,15 @@
  */
 import ddb from 'ddb';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
+import BuildManager from '@/libs/build/buildManager';
 import { isGeoraster } from '@/libs/entryTypes';
 import FolderPicker from '@/components/FolderPicker.vue';
 
 const { pathutils } = ddb;
 
 /**
- * @typedef {{ status: 'ok' | 'missing' | 'unavailable', entry: any, reason: string }} ResolvedLayer
+ * @typedef {{ status: 'ok' | 'missing' | 'unavailable', entry: any, reason: string, building?: boolean }} ResolvedLayer
+ *   `building`: an unavailable layer whose file is being built (FR-RAS-09): it is drawn when the build ends
  * @typedef {Map<string, ResolvedLayer>} ResolvedLayers  path -> what the file is now
  */
 
@@ -39,7 +41,11 @@ export async function resolveLayer(dataset, path) {
     if (!isGeoraster(entry)) return { status: 'unavailable', entry, reason: 'Not a georaster' };
     try {
         const availability = await FileAvailabilityChecker.check(dataset, entry, 'map');
-        if (!availability.available) return { status: 'unavailable', entry, reason: availability.title || 'Not available' };
+        if (!availability.available) {
+            // A build that runs ends with the raster: the layer waits for it, with its progress, and not as a missing file
+            if (availability.status === 'building') return { status: 'unavailable', entry, reason: 'Building', building: true };
+            return { status: 'unavailable', entry, reason: availability.title || 'Not available' };
+        }
     } catch (/** @type {any} */ e) {
         return { status: 'unavailable', entry, reason: e?.message || 'Not available' };
     }
@@ -83,10 +89,17 @@ export function toMapFiles(dataset, paths, resolved) {
         const uri = dataset.remoteUri(path);
         const label = pathutils.basename(path);
         if (r.status === 'ok') return { path: uri, entry: r.entry, label, selected: false };
-        return {
-            path: uri, entry: null, label, selected: false,
-            placeholder: { path, kind: r.status === 'missing' ? 'missing' : 'unavailable', text: `${r.reason}: ${path}` }
-        };
+        const kind = r.status === 'missing' ? 'missing' : r.building ? 'building' : 'unavailable';
+        const placeholder = { path, kind, text: `${r.reason}: ${path}` };
+        if (r.building) {
+            // The footprint is where the map looks while it builds; the progress is read when it is shown (the
+            // BuildManager's state is reactive), so a poll does not make a new placeholder and the map does not redraw
+            Object.assign(placeholder, {
+                footprint: r.entry?.polygon_geom ?? null,
+                progress: () => BuildManager.getBuildProgress(dataset, path)
+            });
+        }
+        return { path: uri, entry: null, label, selected: false, placeholder };
     });
 }
 

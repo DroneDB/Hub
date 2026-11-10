@@ -60,8 +60,10 @@
                                   v-model:custom-density="stockpileCustomDensity" v-model:custom-cost-per-ton="stockpileCustomCostPerTon"
                                   v-model:title="stockpileTitle" v-model:description="stockpileDescription"
                                   :base-method="stockpileBaseMethod" :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
-                                  :result="stockpileResult" :materials="stockpileMaterials" :currency="stockpileCurrency" :mode="stockpileMode" :unit-pref="currentUnitPref"
+                                  :result="stockpileResult" :piles="stockpilePiles" :piles-loading="stockpilePilesLoading" :piles-error="stockpilePilesError"
+                                  :chosen-pile="stockpileChosenPile" :materials="stockpileMaterials" :currency="stockpileCurrency" :mode="stockpileMode" :unit-pref="currentUnitPref"
                                   :target-candidates="analysisCandidates" :target-path="analysisTargetPath"
+                                  @find-all="findAllStockpiles" @pick-pile="adoptDetectedStockpile"
                                   @update:base-method="chooseStockpileBaseMethod"
                                   @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
                                   @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
@@ -70,6 +72,8 @@
             <!-- The toolbar's Copy link button opens and closes it: a press on it is not a press outside -->
             <MapLinkPanel v-if="linkPanelOpen && linkTarget" :dataset="dataset" :link-target="linkTarget" :note="shareNote" :can-save="canSave"
                           toggle="[data-map-link-toggle]" @close="linkPanelOpen = false" @save="$emit('save')" />
+            <!-- What the page puts over the map (DatasetMap: the hint of FR-MAP-10): in the map, so it has its reserves -->
+            <slot name="overlay" />
         </div>
         <MapDialogs :alert-dialog-open="alertDialogOpen" :alert-title="alertTitle" :alert-message="alertMessage"
                     :clear-measurements-dialog-open="clearMeasurementsDialogOpen"
@@ -704,6 +708,10 @@ export default {
                     const geom = f.entry && f.entry.type === ddb.entry.type.VECTOR && (f.entry.polygon_geom || f.entry.point_geom);
                     if (geom) extendExtent(ext, mercatorExtent(geom));
                 });
+                // A raster that is building has no layer yet: the map looks at where it will be (FR-RAS-09)
+                this.files.forEach(f => {
+                    if (f.placeholder?.footprint) extendExtent(ext, mercatorExtent(f.placeholder.footprint));
+                });
             }
             if (!isEmptyExtent(ext)) {
                 // Remember the first extent for Reset view
@@ -715,9 +723,12 @@ export default {
             }
         },
 
-        // The extent (EPSG:3857) of the raster layer of `path`; null while it is not drawn yet (or has no size to fit)
+        // The extent (EPSG:3857) of the raster layer of `path`; null while it is not drawn yet (or has no size to fit).
+        // A raster that is building is not drawn: its footprint stands in for the layer
         layerExtent: function (path) {
-            const extent = this.rasterLayerList.find(r => r.path === path)?.olLayer?.getExtent();
+            const row = this.rasterLayerList.find(r => r.path === path);
+            const footprint = row?.placeholder?.footprint;
+            const extent = row?.olLayer?.getExtent() ?? (footprint ? mercatorExtent(footprint) : null);
             return extent && !isEmptyExtent(extent) ? extent : null;
         },
 

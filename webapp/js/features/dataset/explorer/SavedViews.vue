@@ -6,7 +6,7 @@
             <li role="treeitem" :aria-expanded="expanded" aria-selected="false">
                 <button type="button" class="entry group" :aria-expanded="expanded" @click="expanded = !expanded" @contextmenu="current = null">
                     <i class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'" aria-hidden="true" />
-                    <i class="icon fa-solid fa-table-columns" aria-hidden="true" />
+                    <i class="icon" :class="VIEWS_ICON" aria-hidden="true" />
                     <span class="text">Views</span>
                 </button>
                 <ul v-show="expanded" role="group">
@@ -31,6 +31,7 @@
  * `delete` events). Names are shown as text, whatever they contain.
  */
 import { ref } from 'vue';
+import { VIEWS_ICON } from '@/libs/icons';
 import ContextMenu from './ContextMenu.vue';
 import { savedViewUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyText } from '@/composables/useCopyText';

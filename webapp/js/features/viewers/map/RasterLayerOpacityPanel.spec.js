@@ -377,3 +377,37 @@ describe('RasterLayerOpacityPanel zoom to layer (FR-MAP-08)', () => {
         expect(wrapper.find('button[aria-label="Zoom to layer: gone.tif"]').exists()).toBe(false);
     });
 });
+
+// FR-RAS-09: a raster that is building is a row that says so, with how far the build is, and it can be zoomed to
+describe('RasterLayerOpacityPanel a raster that is building', () => {
+    let percent;
+    const building = path => row(path, {
+        placeholder: { kind: 'building', path, text: `Building: ${path}`, footprint: { type: 'Polygon', coordinates: [[[1, 2], [3, 2], [3, 4], [1, 2]]] }, progress: () => percent }
+    });
+    const zoom = path => wrapper.find(`button[aria-label="Zoom to layer: ${path}"]`);
+
+    it('shows the progress of the build in the row', () => {
+        percent = 42;
+        render({ layers: [building('new.tif')] });
+        expect(wrapper.find('.placeholder-text').text()).toBe('Building 42 %: new.tif');
+    });
+
+    it('shows no number while the build reports none', () => {
+        percent = null;
+        render({ layers: [building('new.tif')] });
+        expect(wrapper.find('.placeholder-text').text()).toBe('Building: new.tif');
+    });
+
+    it('offers Zoom to layer, which asks for the footprint of the path', async () => {
+        percent = 10;
+        render({ layers: [building('new.tif'), row('a.tif')] });
+        expect(zoom('new.tif').exists()).toBe(true);
+        await zoom('new.tif').trigger('click');
+        expect(wrapper.emitted('zoom-to')).toEqual([['new.tif']]);
+    });
+
+    it('has no Zoom to layer on a row that is missing, which has no footprint', () => {
+        render({ layers: [missing('gone.tif')] });
+        expect(zoom('gone.tif').exists()).toBe(false);
+    });
+});

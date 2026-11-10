@@ -1,6 +1,13 @@
 import { entry, pathutils } from 'ddb';
 import { isArchivePath } from '@/libs/entryTypeCapabilities';
 
+/**
+ * One icon per meaning on the map and in the explorer (FR-MAP-24): a pile is a mountain (not the stacked layers of a
+ * raster layer or a merge), the saved views of a dataset are a bookmark (not the split of "Compare").
+ */
+export const STOCKPILE_ICON = 'fa-solid fa-mountain';
+export const VIEWS_ICON = 'fa-solid fa-bookmark';
+
 const typeIconMap = {
     [entry.type.DIRECTORY]: "fa-regular fa-folder",
     [entry.type.GENERIC]: "fa-regular fa-file",

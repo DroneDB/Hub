@@ -299,6 +299,15 @@ describe('Dataset.search', () => {
         expect([formData.get('query'), formData.get('path'), formData.get('recursive')]).toEqual(['*', 'newdir', 'true']);
         expect(options.signal).toBe(signal);
     });
+
+    // FR-MAP-10: the hint of the Map tab asks for one entry type (the server's EntryType: GeoImage is 3)
+    it('posts the entry type to return when asked', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.search('*', { path: 'site', recursive: true, type: 3 });
+        const [, formData] = post.mock.calls[0];
+        expect(names(formData)).toEqual(['query', 'path', 'recursive', 'type']);
+        expect(formData.get('type')).toBe('3');
+    });
 });
 
 describe('Dataset chunked upload sessions (FR-UPL-04, §7.1)', () => {
@@ -322,5 +331,28 @@ describe('Dataset chunked upload sessions (FR-UPL-04, §7.1)', () => {
         await ds.deleteChunkUpload('a/b c');
 
         expect(request).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/obj/chunk/a%2Fb%20c', 'DELETE');
+    });
+});
+
+describe('Dataset.detectAllStockpiles (FR-MAP-25)', () => {
+    it('posts the path, the sensitivity, the smallest area and the most piles to stockpile/detect-all', async () => {
+        const ds = makeDataset();
+        const answer = { stockpiles: [], totalFound: 0, sensitivityUsed: 0.7, minAreaUsed: 20 };
+        ds.registry.postRequest = vi.fn().mockResolvedValue(answer);
+
+        const found = await ds.detectAllStockpiles('odm_dem/dsm.tif', { sensitivity: 0.7, minArea: 20, maxResults: 10 });
+
+        expect(ds.registry.postRequest).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/stockpile/detect-all',
+            { path: 'odm_dem/dsm.tif', sensitivity: 0.7, minAreaM2: 20, maxResults: 10 });
+        expect(found).toBe(answer);
+    });
+
+    it('asks with the server defaults when the options are left out: sensitivity 0.5, 5 m², 50 piles', async () => {
+        const ds = makeDataset();
+        ds.registry.postRequest = vi.fn().mockResolvedValue({ stockpiles: [] });
+
+        await ds.detectAllStockpiles('dsm.tif');
+
+        expect(ds.registry.postRequest.mock.calls[0][1]).toEqual({ path: 'dsm.tif', sensitivity: 0.5, minAreaM2: 5, maxResults: 50 });
     });
 });
