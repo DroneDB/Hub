@@ -126,6 +126,8 @@ import ddb from 'ddb';
 import { defaultViewFor } from '@/libs/openItemDefaults';
 import { viewerUrl, VIEWER_ONLY_HELP } from '@/libs/views/viewLinks';
 import { escapeHtml } from '@/libs/sanitize';
+import reg from '@/libs/api/sharedRegistry';
+import { Features } from '@/libs/features';
 import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
 import MakeUnlistedPrompt from './MakeUnlistedPrompt.vue';
@@ -202,7 +204,9 @@ export default {
                 ds: this.ds,
                 scope: this.scope,
                 folderPath: this.folderPath,
-                entry: this.entry
+                entry: this.entry,
+                // Undefined from an older server: the helper then assumes 4096 px
+                maxWcsCoverageSizePixels: reg.features.value(Features.MAX_WCS_COVERAGE_SIZE_PIXELS) ?? undefined
             });
         },
         shareModeGroups() {

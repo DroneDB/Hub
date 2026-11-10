@@ -23,6 +23,8 @@ export const Features = {
     TASK_TOOLS: 'taskTools',
     // The input rules the Hub checks before submit (slug, e-mail, entry names, ...): libs/nameRules.js and libs/slug.js read them
     INPUT_RULES: 'inputRules',
+    // The longest side, in pixels, of a WCS GetCoverage output (FR-SHR-02): the Share dialog sizes its sample with it
+    MAX_WCS_COVERAGE_SIZE_PIXELS: 'maxWcsCoverageSizePixels',
     // The role names the server depends on (admin, deactivated): libs/roles.js reads them
     SYSTEM_ROLES: 'systemRoles'
 };
