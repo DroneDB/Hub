@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import AnalysisPanel from './AnalysisPanel.vue';
-import { readSource, ruleOf } from '@/specs/cssSource';
+import { readSource, ruleOf, mediaBlock } from '@/specs/cssSource';
 
 const mountPanel = (props = {}, attrs = {}) => mount(AnalysisPanel, {
     props: { icon: 'fas fa-leaf', title: 'Plant Health', variant: 'plant-health', ...props },
@@ -108,6 +108,21 @@ describe('AnalysisPanel', () => {
             expect(reserve('.analysis-panel--plant-health')).toBe('12.75rem');
             expect(reserve('.analysis-panel--raster')).toBe('18.75rem');
             expect(reserve('.analysis-panel--stockpile')).toBe('4.75rem');
+        });
+
+        it('is short on the phone sheet and stays in view there (U-415, FR-RAS-23): buttons in rows of 2rem, smaller reserves', () => {
+            const scss = readSource(__dirname, '../../../../css/_analysis-panel.scss');
+            const phone = mediaBlock(scss, 'max-width: 767.98px');
+            const reserve = selector => (ruleOf(phone, selector).match(/--panel-actions-reserve:\s*([\d.]+rem)/) || [])[1];
+            // Sticky on every screen: the phone block does not change its position
+            expect(ruleOf(scss, '.panel-actions')).toMatch(/position:\s*sticky/);
+            expect(ruleOf(phone, '.panel-actions')).not.toMatch(/position:/);
+            const button = ruleOf(phone, '.action-btn');
+            expect(button).toMatch(/flex-direction:\s*row/);
+            expect(button).toMatch(/min-height:\s*2rem/);
+            expect(reserve('.analysis-panel--plant-health')).toBe('8.75rem');
+            expect(reserve('.analysis-panel--raster')).toBe('13.25rem');
+            expect(reserve('.analysis-panel--stockpile')).toBe('4.25rem');
         });
 
         it('fades the body above the footer only while more of it is hidden below', async () => {

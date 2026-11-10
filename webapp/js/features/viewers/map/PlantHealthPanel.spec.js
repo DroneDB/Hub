@@ -566,7 +566,8 @@ describe('PlantHealthPanel footer', () => {
     it('has Reset, Original, Copy Link and the export control in the footer', async () => {
         await renderWith(CLEAN_STATS);
         const footer = wrapper.get('[data-testid="panel-actions"]');
-        expect(footer.findAll('button').map(b => b.text())).toEqual(['Reset', 'Original', 'Copy Link', 'Export', 'Visible extent']);
+        // The buttons with a text (the info button of the export note is an icon, U-415)
+        expect(footer.findAll('button').map(b => b.text()).filter(Boolean)).toEqual(['Reset', 'Original', 'Copy Link', 'Export', 'Visible extent']);
         expect(footer.find('[data-testid="raster-export"]').exists()).toBe(true);
         expect(wrapper.get('.panel-body').find('.actions-grid').exists()).toBe(false);
     });

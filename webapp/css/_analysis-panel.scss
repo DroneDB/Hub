@@ -350,8 +350,23 @@
             padding: 0.5rem;
         }
 
+        // The footer stays in view on the sheet too (FR-RAS-23), so it is short there (U-415): the icon beside the label,
+        // rows of 2rem rather than 2.6rem (the note of the export folds behind an info button, RasterExportButton)
         .panel-actions {
             padding: 0.4rem 0.5rem 0.5rem;
+
+            .action-btn {
+                flex-direction: row;
+                gap: 0.35rem;
+                min-width: 0;
+                min-height: 2rem;
+                padding: 0.25rem 0.3rem;
+            }
+
+            .action-label {
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
         }
 
         // The header buttons are 2rem, as the map buttons are, which sets the height of the folded sheet
@@ -376,6 +391,20 @@
                 display: none;
             }
         }
+    }
+
+    // The shorter footer of the sheet: rows of 2rem with their 0.4rem gap, the export control as its label and one row
+    // (about 4.4rem, the note folded), 0.9rem of padding and the 1.25rem fade
+    .analysis-panel--plant-health {
+        --panel-actions-reserve: 8.75rem; // one row and the export control
+    }
+
+    .analysis-panel--raster {
+        --panel-actions-reserve: 13.25rem; // three rows and the export control
+    }
+
+    .analysis-panel--stockpile {
+        --panel-actions-reserve: 4.25rem; // one row
     }
 
     // On a phone the open sheet is the task: it takes the place of the layer panel, and folding

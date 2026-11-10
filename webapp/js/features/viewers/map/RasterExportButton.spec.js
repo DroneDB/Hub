@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
+import { readSource, ruleOf, mediaBlock } from '@/specs/cssSource';
 
 const runHeavyTask = vi.fn();
 const heavyTasks = ref({});
@@ -104,6 +105,38 @@ describe('RasterExportButton the export of the whole raster', () => {
         expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
         await wrapper.setProps({ vizParams: { colormap: 'ironbow', bands: '1,2' } });
         expect(whole().attributes('aria-label')).toBe(bands);
+    });
+
+    it('folds its note behind an info button on a phone (U-415): the note stays the description of the buttons, the button shows it', async () => {
+        mountControl({ vizParams: { formula: 'CELSIUS', colormap: 'ironbow' } });
+        const note = wrapper.find('[data-testid="raster-export-note"]');
+        const toggle = wrapper.find('[data-testid="raster-export-note-toggle"]');
+        expect(toggle.attributes('aria-controls')).toBe(note.attributes('id'));
+        expect(toggle.attributes('aria-expanded')).toBe('false');
+        expect(toggle.attributes('aria-label')).toBe('What the export writes');
+        expect(note.classes()).not.toContain('is-open');
+        // Folded or not it is in the page, and the buttons name it as their description
+        expect(whole().attributes('aria-describedby')).toContain(note.attributes('id'));
+        expect(extent().attributes('aria-describedby')).toContain(note.attributes('id'));
+
+        await toggle.trigger('click');
+        expect(toggle.attributes('aria-expanded')).toBe('true');
+        expect(toggle.attributes('aria-label')).toBe('Hide what the export writes');
+        expect(note.classes()).toContain('is-open');
+        await toggle.trigger('click');
+        expect(note.classes()).not.toContain('is-open');
+    });
+
+    it('folds the note only below the phone breakpoint: the button is hidden and the note shown on a wider screen', () => {
+        const source = readSource(__dirname, 'RasterExportButton.vue');
+        const style = source.slice(source.indexOf('<style scoped>'));
+        const phone = mediaBlock(style, 'max-width: 767.98px');
+        expect(ruleOf(style, '.export-note-toggle')).toMatch(/display:\s*none/);
+        expect(ruleOf(phone, '.export-note-toggle')).toMatch(/display:\s*inline-flex/);
+        expect(ruleOf(phone, '.export-note:not(.is-open)')).toMatch(/clip:\s*rect\(0, 0, 0, 0\)/);
+        expect(ruleOf(phone, '.export-note:not(.is-open)')).not.toMatch(/display:\s*none/);
+        // Outside the media query nothing hides the note
+        expect(style.slice(0, style.indexOf('@media'))).not.toContain(':not(.is-open)');
     });
 
     it('submits the raster-export task with the style (not the stretch of the panel) and the file name, without a toast of its own', async () => {

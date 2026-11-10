@@ -1,6 +1,15 @@
 <template>
     <div class="raster-export section" data-testid="raster-export">
-        <span :id="labelId" class="section-label">Export</span>
+        <div class="export-head">
+            <span :id="labelId" class="section-label">Export</span>
+            <!-- On a phone the note folds behind this button, so that the footer of the sheet leaves room for the form
+                 (U-415); the label of the Export button says what the file is too -->
+            <button type="button" class="info-icon-btn export-note-toggle" :aria-expanded="String(noteOpen)" :aria-controls="noteId"
+                    :title="noteToggleLabel" :aria-label="noteToggleLabel" data-testid="raster-export-note-toggle"
+                    @click="noteOpen = !noteOpen">
+                <i class="fas fa-circle-info" aria-hidden="true" />
+            </button>
+        </div>
         <div class="export-actions" role="group" :aria-labelledby="labelId">
             <div class="export-choice">
                 <button type="button" class="panel-btn action-btn" :class="{ 'is-disabled': wholeDisabled }"
@@ -28,7 +37,7 @@
         <p v-if="exporter.extentReason.value" :id="extentReasonId" class="export-reason" data-testid="raster-export-extent-reason">
             {{ exporter.extentReason.value }}{{ exporter.extentOverLimit.value ? '. Zoom in to export less.' : '' }}
         </p>
-        <p :id="noteId" class="export-note" data-testid="raster-export-note">{{ note }}</p>
+        <p :id="noteId" class="export-note" :class="{ 'is-open': noteOpen }" data-testid="raster-export-note">{{ note }}</p>
         <HeavyTaskStatus :task="exporter.task.value" :error="exporter.error.value" label="Export" :phases="EXPORT_PHASES" cancellable
                          :cancelling="exporter.cancelling.value" @cancel="exporter.cancel" />
         <DialogHost :dialogs="dialogs" />
@@ -48,7 +57,7 @@
  * when there is a formula, or a colormap on one band (libddb 2.3.1), the bands scaled to 8 bits otherwise (the rule of ddb), never
  * the values.
  */
-import { computed, useId } from 'vue';
+import { computed, ref, useId } from 'vue';
 import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
@@ -88,6 +97,9 @@ const noteId = useId();
 // What the file is follows the style: ddb writes RGBA for a formula, and for a colormap on one band
 const wholeLabel = computed(() => exportLabel(props.vizParams, { singleBand: props.singleBand }));
 const note = computed(() => exportNote(props.vizParams, { singleBand: props.singleBand }));
+// The note shown on a phone, where it is folded by default (on a wider screen it is always shown, the button is hidden)
+const noteOpen = ref(false);
+const noteToggleLabel = computed(() => (noteOpen.value ? 'Hide what the export writes' : 'What the export writes'));
 
 const wholeDisabled = computed(() => !props.dataset || !props.filePath || exporter.running.value || !!exporter.wholeReason.value);
 const extentDisabled = computed(() => !props.dataset || !props.filePath || exporter.running.value || !!exporter.extentReason.value);
@@ -133,5 +145,38 @@ function onExtent() {
     font-size: 0.7rem;
     line-height: 1.3;
     color: var(--panel-text-soft);
+}
+.export-note-toggle {
+    display: none;
+}
+/* The phone sheet (the breakpoint of css/_analysis-panel.scss): the note, two lines under the buttons of a footer that
+   stays in view, folds behind an info button next to the label; folded it is still the description of the buttons
+   (visually hidden, not display: none) */
+@media (max-width: 767.98px) {
+    .export-head {
+        display: flex;
+        align-items: center;
+    }
+    .export-head .section-label {
+        margin-bottom: 0;
+    }
+    .export-note-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.5rem;
+        min-height: 1.5rem;
+    }
+    .export-note:not(.is-open) {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
 }
 </style>
