@@ -2,7 +2,8 @@
 /**
  * useViewerEntry - the file a viewer route shows: loads the entry named by the route
  * (/r/:org/:ds/view/:encodedPath/<viewer>), checks its type with one message, reads the
- * dataset permissions, selects the file in the session store and sets the page title.
+ * dataset permissions, selects the file in the session store, puts the dataset's root entry there (the
+ * breadcrumb of the header names the dataset from it) and sets the page title.
  *
  *   setup() {
  *       return useViewerEntry({ types: [ddb.entry.type.MODEL], typeLabel: 'a 3D model', title: 'Model' });
@@ -23,7 +24,7 @@
  * rest of the viewer still opens, and `entryLoaded` is true); other failures stay errors.
  * `title: null` leaves the page title to the caller.
  */
-import { ref, shallowRef, unref } from 'vue';
+import { onBeforeUnmount, ref, shallowRef, unref } from 'vue';
 import { useRoute } from 'vue-router';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
@@ -55,6 +56,16 @@ export function useViewerEntry({ types, accepts, typeLabel = 'this view', title,
     const error = ref('');
     /** @type {import('vue').ShallowRef<unknown>} */
     const loadError = shallowRef(null);
+    const session = useDatasetSessionStore();
+    // The dataset's root entry this viewer put in the session, taken out when the viewer goes
+    let sessionRoot = null;
+    // A dataset.info() that resolves after the viewer went must not put its root entry in the session: nothing would
+    // take it out, and the breadcrumb of the next page would name this dataset (FR-NAV-03)
+    let unmounted = false;
+    onBeforeUnmount(() => {
+        unmounted = true;
+        if (sessionRoot && session.rootEntry === sessionRoot) session.setRootEntry(null);
+    });
 
     /** The dataset path of the file, or null when the caller has none to load. */
     async function filePath() {
@@ -98,7 +109,13 @@ export function useViewerEntry({ types, accepts, typeLabel = 'this view', title,
 
         let permissions = { ...NO_PERMISSIONS };
         try {
-            permissions = permissionsOf((await ds.info())[0]);
+            const root = (await ds.info())[0];
+            permissions = permissionsOf(root);
+            // The header's breadcrumb names the dataset from it, as on the dataset page (FR-NAV-03)
+            if (!unmounted) {
+                session.setRootEntry(root);
+                sessionRoot = root;
+            }
         } catch (permError) {
             console.warn('Could not load dataset permissions:', permError);
         }
@@ -109,7 +126,7 @@ export function useViewerEntry({ types, accepts, typeLabel = 'this view', title,
         entry.value = e;
 
         if (e) {
-            useDatasetSessionStore().setSelectedFiles([{ path: ddbURI.value }]);
+            session.setSelectedFiles([{ path: ddbURI.value }]);
             if (title !== null) setTitle(`${ddb.pathutils.basename(e.path)} - ${title}`);
         }
         return true;

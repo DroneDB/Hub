@@ -60,6 +60,8 @@ const { actionMenuItem } = await import('@/libs/dataset/explorerActions');
 const AVAILABLE = { currentVersion: '2.0.0', latestVersion: '2.1.0', isUpdateAvailable: true, isSecurityUpdate: false, releaseNotes: 'Notes' };
 
 let wrapper;
+// The entries of the user menu, its groups opened (libs/userMenuItems.js)
+const flatMenu = items => items.flatMap(item => (item.items ? flatMenu(item.items) : [item]));
 async function render(info = AVAILABLE) {
     h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(info));
     wrapper = mount(HubHeader, {
@@ -93,12 +95,10 @@ describe('HubHeader update indicator', () => {
         expect(icon().attributes('title')).toContain('Registry 2.1.0 is available (current: 2.0.0)');
     });
 
-    it('sits right after the back-to-organization button', async () => {
+    it('is the first button of the actions, before the dataset actions and the user menu', async () => {
         await render();
         const buttons = [...wrapper.find('.right').element.children].filter(el => el.tagName === 'BUTTON');
-        const back = buttons.findIndex(b => b.getAttribute('title') === 'Back to organization');
-        expect(back).toBeGreaterThanOrEqual(0);
-        expect(buttons[back + 1].classList.contains('update-available-btn')).toBe(true);
+        expect(buttons[0].classList.contains('update-available-btn')).toBe(true);
     });
 
     it('has the upload indicator of the dataset page uploads (FR-UPL-04)', async () => {
@@ -188,7 +188,7 @@ describe('HubHeader user menu: Preferences', () => {
             attachTo: document.body
         });
         await flushPromises();
-        return wrapper.vm.userMenuItems;
+        return flatMenu(wrapper.vm.userMenuItems);
     }
     const labels = items => items.filter(i => !i.separator).map(i => i.label);
 
@@ -204,9 +204,9 @@ describe('HubHeader user menu: Preferences', () => {
         const items = await menuItems({ accountManagement: false });
         expect(labels(items)).toContain('Preferences');
         expect(labels(items)).not.toContain('My Account');
-        // a separator precedes it, so it is not glued to the storage entries
-        const at = items.findIndex(i => i.label === 'Preferences');
-        expect(items[at - 1].separator).toBe(true);
+        // it is in the Account group, which names it
+        const account = wrapper.vm.userMenuItems.find(i => i.label === 'Account');
+        expect(account.items.map(i => i.label)).toContain('Preferences');
     });
 
     it('is there for an admin too', async () => {
@@ -397,7 +397,7 @@ describe('HubHeader accessible names', () => {
 
     it('says what the number of the storage row is', async () => {
         await render();
-        const storageRow = () => wrapper.vm.userMenuItems.find(i => i.icon === 'fa-regular fa-hard-drive');
+        const storageRow = () => flatMenu(wrapper.vm.userMenuItems).find(i => i.icon === 'fa-regular fa-hard-drive');
         const nameOf = item => wrapper.vm.userMenuPt.item({ context: { item } })['aria-label'];
 
         wrapper.vm.storageInfo = { total: 10737418240, used: 1073741824, usedPercentage: 0.1, free: 9663676416 };
@@ -451,7 +451,7 @@ describe('HubHeader dataset actions', () => {
         const ctx = { getSelectedEntries: () => [tif, jpg], canWrite: true, emit: vi.fn() };
         expect(actionMenuItem('share-embed', ctx).isVisible()).toBe(false);
         expect(button('Share/Embed').exists()).toBe(false);
-        expect(button('Download').text()).toBe('2');
+        expect(button('Download').find('.ms-1').text()).toBe('2');
         session.setSelectedFiles([]);
         await flushPromises();
         expect(button('Share/Embed').exists()).toBe(false);
@@ -584,8 +584,8 @@ describe('HubHeader dataset actions', () => {
 });
 
 // FR-ACC-01 / FR-XC-05: an anonymous visitor of a shared dataset of a private organization
-describe('HubHeader back-to-organization look-up', () => {
-    const backButton = () => wrapper.find('button[title="Back to organization"]');
+describe('HubHeader organization look-up (breadcrumb)', () => {
+    const crumbs = () => wrapper.findAll('.hub-breadcrumb li').map(li => li.text());
     let original;
     beforeEach(() => { original = h.reg.Organization; });
     afterEach(() => { h.reg.Organization = original; });
@@ -608,21 +608,21 @@ describe('HubHeader back-to-organization look-up', () => {
         return { push, replace };
     }
 
-    it('asks for the organization without the global 401 handler', async () => {
-        const info = vi.fn(() => Promise.resolve({ isPublic: true }));
+    it('asks for the organization without the global 401 handler, and shows its name', async () => {
+        const info = vi.fn(() => Promise.resolve({ isPublic: true, name: 'Acme Inc' }));
         await renderWith(info, { loggedIn: true });
         expect(h.reg.Organization).toHaveBeenCalledWith('acme');
         expect(info).toHaveBeenCalledWith({ skipUnauthorized: true });
-        expect(backButton().exists()).toBe(true);
+        expect(crumbs()).toEqual(['Organizations', 'Acme Inc', 'site']);
     });
 
-    it.each([401, 403])('hides the button and does not navigate when the look-up answers %i', async status => {
+    it.each([401, 403])('shows the slug, not as a link, and does not navigate when the look-up answers %i', async status => {
         const { ApiError } = await import('@/libs/ddb/apiError');
         const info = vi.fn(() => Promise.reject(new ApiError('No access', status)));
         const { push, replace } = await renderWith(info);
         expect(info).toHaveBeenCalledWith({ skipUnauthorized: true });
-        expect(wrapper.vm.showBackToOrg).toBe(false);
-        expect(backButton().exists()).toBe(false);
+        expect(crumbs()).toEqual(['Organizations', 'acme', 'site']);
+        expect(wrapper.findAllComponents(RouterLinkStub).filter(l => l.props('to')?.name === 'Datasets')).toHaveLength(0);
         expect(push).not.toHaveBeenCalled();
         expect(replace).not.toHaveBeenCalled();
     });

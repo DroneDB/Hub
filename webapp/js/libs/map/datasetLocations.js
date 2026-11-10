@@ -3,8 +3,9 @@
  * datasetLocations - the pins of the overview map: where each dataset is, built from the
  * locations the server gives per organization.
  *
- * A dataset with a location (datasetPlaces) is pinned at the centre of its box and keeps the
- * box, which the map draws on demand.
+ * A dataset with a location (datasetPlaces) is pinned at the point the server gives for it (a position of
+ * its data in the densest cluster of it, FR-ORG-09) or, when it gives none (a dataset of one place), at the
+ * centre of its box. It keeps the box, which the map draws on demand.
  */
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
@@ -26,6 +27,25 @@ export function bboxExtent(bbox) {
     const [minLon, minLat, maxLon, maxLat] = bbox;
     const limit = 85.05112878;
     return transformExtent([minLon, Math.max(minLat, -limit), maxLon, Math.min(maxLat, limit)], EPSG.WGS84, EPSG.WEB_MERCATOR);
+}
+
+/**
+ * Where a dataset is pinned, in Web Mercator: its `point` ([lon, lat]) when the server gave a usable one inside its
+ * box, else the centre of its box. The centre of the box of a dataset with data in several places is in the sea
+ * between them.
+ * @param {{ bbox: number[], point?: number[]|null }} dataset  a dataset with a usable box
+ * @returns {number[]}
+ */
+export function pinCoordinate(dataset) {
+    const { bbox, point } = dataset;
+    if (isUsablePoint(point)) return getCenter(bboxExtent([point[0], point[1], point[0], point[1]]));
+    return getCenter(bboxExtent(bbox));
+}
+
+/** @param {unknown} point @returns {point is number[]} a longitude and a latitude of the earth */
+function isUsablePoint(point) {
+    return Array.isArray(point) && point.length === 2 && point.every(v => typeof v === 'number' && Number.isFinite(v))
+        && Math.abs(point[0]) <= 180 && Math.abs(point[1]) <= 90;
 }
 
 /**
@@ -69,7 +89,7 @@ export function buildLocations(groups, colours = organizationColours(groups.map(
         for (const dataset of group.datasets ?? []) {
             if (!isUsableBbox(dataset.bbox)) continue;
             const name = datasetName(dataset);
-            const feature = new Feature(new Point(getCenter(bboxExtent(dataset.bbox))));
+            const feature = new Feature(new Point(pinCoordinate({ bbox: dataset.bbox, point: dataset.point })));
             feature.setId(`${group.org}/${dataset.slug}`);
             feature.setProperties({ org: group.org, orgName, slug: dataset.slug, name, bbox: dataset.bbox, colour });
             features.push(feature);

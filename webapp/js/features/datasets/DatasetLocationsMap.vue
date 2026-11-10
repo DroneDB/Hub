@@ -1,6 +1,7 @@
 <template>
     <div class="dlm">
-        <div class="dlm-map-wrap">
+        <!-- map-container defines the reserves (--map-rail-reserve, --map-bottom-reserve) the fit keeps clear -->
+        <div class="dlm-map-wrap map-container">
             <div ref="mapEl" class="dlm-map" />
 
             <div class="ol-map-buttons ol-unselectable ol-control dlm-tools">
@@ -53,8 +54,8 @@
 
 <script setup>
 /**
- * DatasetLocationsMap - a map of where datasets are: one pin per dataset at the centre of its
- * bounding box, grouped into counted clusters when they crowd. The datasets that have no
+ * DatasetLocationsMap - a map of where datasets are: one pin per dataset at the point the server gives
+ * (a position of its data) or the centre of its bounding box, grouped into counted clusters when they crowd. The datasets that have no
  * location are not on it: the page lists them (UnlocatedDatasetsButton).
  *
  * The pins are the `groups` it is given, `{ org, orgName, datasets: [{ slug, name, bbox }] }` per
@@ -84,14 +85,15 @@ import { useMapBasemap } from '@/composables/useMapBasemap';
 import { useListenerBag } from '@/composables/useEventListener';
 import { buildLocations, bboxExtent, organizationColours } from '@/libs/map/datasetLocations';
 import { createLocationStyles } from '@/libs/map/locationStyles';
-import { FIT_OPTIONS } from '@/libs/map/mapUtils';
+import { FIT_OPTIONS, overviewFitPadding } from '@/libs/map/mapUtils';
+import { mapRailReserve, mapBottomReserve } from '@/libs/map/overlayPlacement';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 defineOptions({ name: 'DatasetLocationsMap' });
 
 const props = defineProps({
-    /** The datasets by organization: [{ org, orgName, datasets: [{ slug, name, bbox }] }] */
+    /** The datasets by organization: [{ org, orgName, datasets: [{ slug, name, bbox, point }] }] */
     groups: { type: Array, default: () => [] },
     /** More groups are still coming */
     loading: { type: Boolean, default: false },
@@ -160,6 +162,19 @@ watch(highlighted, pin => {
     boxSource.addFeature(box);
 });
 
+/**
+ * How the view fits the pins: 10% of the map around them plus the room of the toolbar rail and the bottom controls,
+ * read from the tokens of the map, so no pin sits at the edge or under a control (FR-ORG-09)
+ * @param {number} duration
+ */
+function fitOptions(duration) {
+    const current = map.value;
+    const size = current?.getSize?.();
+    if (!current || !size) return { ...FIT_OPTIONS, duration };
+    const padding = overviewFitPadding(size, { rail: mapRailReserve(current), bottom: mapBottomReserve(current) });
+    return { ...FIT_OPTIONS, padding, duration };
+}
+
 /** Moves the view to show every pin. @param {boolean} animate */
 function fitToPins(animate) {
     const view = map.value?.getView();
@@ -169,7 +184,7 @@ function fitToPins(animate) {
     if (extent[0] === extent[2] && extent[1] === extent[3]) {
         view.animate({ center: [extent[0], extent[1]], zoom: SINGLE_PLACE_ZOOM, duration });
     } else {
-        view.fit(extent, { ...FIT_OPTIONS, duration });
+        view.fit(extent, fitOptions(duration));
     }
 }
 

@@ -9,6 +9,24 @@ import { PRIMARY, ANALYSIS_YELLOW } from '@/libs/palette';
  */
 export const FIT_OPTIONS = Object.freeze({ padding: [40, 40, 40, 40], duration: 500, minResolution: 0.5, maxZoom: 22 });
 
+/** The share of the map size an overview map leaves free around the pins it fits (FR-ORG-09) */
+export const OVERVIEW_FIT_MARGIN = 0.1;
+
+/**
+ * The padding ([top, right, bottom, left], px) of an overview map that fits its pins: 10% of the map size on
+ * every side, plus what the toolbar rail takes on the right and what the bottom controls take at the bottom (the
+ * `--map-rail-reserve` and `--map-bottom-reserve` tokens of the map, FR-XC-20), so no pin lands at the edge or
+ * under a control.
+ * @param {number[]} mapSize  width and height of the map in px
+ * @param {{ rail: number, bottom: number }} reserves  in px
+ * @returns {number[]}
+ */
+export function overviewFitPadding([width, height], { rail, bottom }) {
+    const x = Math.round(width * OVERVIEW_FIT_MARGIN);
+    const y = Math.round(height * OVERVIEW_FIT_MARGIN);
+    return [y, x + rail, y + bottom, x];
+}
+
 /**
  * How a map fits its view to the extent of its files (FR-MAP-28): the same room and animation, and no limit
  * but the zoom range. A drone survey is a few hundred metres wide and has to fill the map; FIT_OPTIONS stops

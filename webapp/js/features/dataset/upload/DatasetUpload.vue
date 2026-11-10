@@ -115,7 +115,7 @@
                     </div>
                     <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
                         <template v-if="counts.error === 0">
-                            <i class="fa-solid fa-circle-check" /> All {{ counts.done }} files uploaded successfully!
+                            <i class="fa-solid fa-circle-check" /> {{ counts.done === 1 ? countOf(1, 'file') : `All ${countOf(counts.done, 'file')}` }} uploaded successfully!
                         </template>
                         <template v-else>
                             <i class="fa-solid fa-triangle-exclamation" /> {{ counts.done }} succeeded, {{ counts.error }} failed
@@ -166,7 +166,7 @@ import { orderCompanionsFirst } from '@/libs/uploadOrder';
 import { useUploadsStore } from '@/stores/uploads';
 import { notify } from '@/libs/notify';
 import { matchOpenUploads, storedPercent } from '@/libs/upload/openUploads';
-import { formatDurationSeconds } from '@/libs/format';
+import { formatDurationSeconds, countOf } from '@/libs/format';
 import reg from '@/libs/api/sharedRegistry';
 import { markRaw } from 'vue';
 
@@ -346,6 +346,7 @@ export default {
     },
     methods: {
         bytesToSize,
+        countOf,
         storedPercent,
 
         async loadOpenUploads() {

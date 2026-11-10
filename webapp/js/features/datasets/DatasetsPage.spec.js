@@ -154,10 +154,10 @@ describe('DatasetsPage map view', () => {
         expect(actions.find('input').exists()).toBe(false);
     });
 
-    it('has no search in the map view, which does not filter by it, and keeps the view where it was', async () => {
+    it('keeps the search in the map view, where it filters the pins (FR-ORG-10), and keeps the view where it was', async () => {
         pendingLocations();
         await render('map');
-        expect(wrapper.find('.list-toolbar input').exists()).toBe(false);
+        expect(wrapper.find('.list-toolbar input[aria-label="Search datasets"]').exists()).toBe(true);
         expect(wrapper.find('.list-toolbar .view-select').exists()).toBe(true);
     });
 

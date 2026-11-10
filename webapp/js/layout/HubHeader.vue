@@ -10,15 +10,22 @@
             </template>
         </RouterLink>
 
-        <nav class="right" aria-label="Main">
+        <!-- The main destinations, always in view; the current one says so (aria-current) (FR-NAV-01) -->
+        <nav v-if="primaryNav.length > 0" class="primary-nav" aria-label="Main">
+            <RouterLink v-for="link in primaryNav" :key="link.id" :to="link.to" class="primary-nav-link" :data-nav="link.id"
+                        :title="link.label">
+                <i :class="link.icon" aria-hidden="true" /><span class="primary-nav-label">{{ link.label }}</span>
+            </RouterLink>
+        </nav>
+
+        <!-- Where the user is: Organizations / organization / dataset (FR-NAV-03, FR-NAV-04) -->
+        <HubBreadcrumb v-if="params.org" class="header-crumbs" :org="String(params.org)" :ds="params.ds ? String(params.ds) : ''" />
+
+        <nav class="right" aria-label="Page actions and account">
 
             <!-- The uploads of the dataset page go on while the user is on another page (FR-UPL-04) -->
             <UploadIndicator />
 
-            <Button v-if="showBackToOrg" severity="secondary" size="small" text title="Back to organization"
-                    aria-label="Back to organization" @click="goToOrganization">
-                <i class="fa-solid fa-sitemap" />
-            </Button>
             <Button v-if="updateAvailable" class="update-available-btn" size="small" text
                     :title="updateTitle" :aria-label="updateLabel" @click="updateNotesOpen = true">
                 <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
@@ -29,15 +36,18 @@
                           :label="datasetActions.download.label" :disabled="!datasetActions.download.enabled"
                           :disabled-reason="datasetActions.download.disabledReason" @click="datasetActions.download.run()">
                 <i :class="datasetActions.download.icon" aria-hidden="true" />
+                <span class="header-action-label d-none d-md-inline">{{ SHORT_LABELS.download }}</span>
                 <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </ActionButton>
             <ActionButton v-if="showShare && onFilesTab && datasetActions['share-embed'].visible" severity="secondary" size="small" text
                           :label="datasetActions['share-embed'].label" @click="datasetActions['share-embed'].run()">
                 <i :class="datasetActions['share-embed'].icon" aria-hidden="true" />
+                <span class="header-action-label d-none d-md-inline">{{ SHORT_LABELS['share-embed'] }}</span>
             </ActionButton>
             <ActionButton v-if="showSettings && datasetActions.settings.visible" severity="secondary" size="small" text
                           :label="datasetActions.settings.label" @click="datasetActions.settings.run()">
                 <i :class="datasetActions.settings.icon" aria-hidden="true" />
+                <span class="header-action-label d-none d-md-inline">{{ SHORT_LABELS.settings }}</span>
             </ActionButton>
 
             <ConfirmDialog v-if="downloadConfirmOpen"
@@ -94,9 +104,12 @@
             <Button v-if="!loggedIn && !onLoginRoute" size="small" title="Sign In" aria-label="Sign In" @click="login">
                 <i class="fa-solid fa-lock" /><span class="d-none d-sm-inline ms-1">Sign In</span>
             </Button>
-            <Button v-else-if="loggedIn" severity="secondary" size="small" text
-                    :title="username" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
-                <i class="fa-solid fa-user" />
+            <!-- The user, named from md up, and the role of an administrator -->
+            <Button v-else-if="loggedIn" class="user-menu-button" severity="secondary" size="small" text
+                    :title="username" :aria-label="`${username} account menu`" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
+                <i class="fa-solid fa-user" aria-hidden="true" />
+                <span class="user-name d-none d-md-inline">{{ username }}</span>
+                <span v-if="isAdmin" class="user-role d-none d-md-inline">Admin</span>
             </Button>
             <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" :pt="userMenuPt" />
         </nav>
@@ -111,6 +124,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Alert from '@/components/HubAlert';
 import ActionButton from '@/components/ActionButton.vue';
+import HubBreadcrumb from '@/components/HubBreadcrumb.vue';
 import UploadIndicator from '@/layout/UploadIndicator.vue';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
@@ -133,9 +147,13 @@ import { currentLocation, currentPath } from '@/libs/routeQuery';
 import { downloadFromDataset, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { resolveAction } from '@/libs/dataset/explorerActions';
+import { userMenuItems, primaryNavItems, percentText } from '@/libs/userMenuItems';
 
 // The dataset actions of the header, in the registry (libs/dataset/explorerActions.js)
 const HEADER_ACTIONS = Object.freeze(['download', 'share-embed', 'settings']);
+// What each shows beside its icon from md up (FR-NAV-04); the accessible name stays the registry's label
+// ('Download entire dataset' contains 'Download')
+const SHORT_LABELS = Object.freeze({ download: 'Download', 'share-embed': 'Share', settings: 'Settings' });
 
 // Opened from the user menu only: its code loads the first time it is shown
 // Lazy: the release notes need the markdown renderer, which only admins who open them should load
@@ -146,6 +164,7 @@ export default {
     name: 'HubHeader',
     components: {
         ActionButton,
+        HubBreadcrumb,
         UploadIndicator,
         Alert,
         ConfirmDialog,
@@ -160,7 +179,7 @@ export default {
     setup() {
         const { runHeavyTask } = useHeavyTask();
         const { updateInfo, updateAvailable, enabled: updateCheckActive, load: loadUpdateInfo } = useUpdateCheck();
-        return { runHeavyTask, updateInfo, updateAvailable, updateCheckActive, loadUpdateInfo };
+        return { runHeavyTask, updateInfo, updateAvailable, updateCheckActive, loadUpdateInfo, SHORT_LABELS };
     },
     data: function () {
 
@@ -170,8 +189,6 @@ export default {
             showDownload: !!this.$route.params.ds,
             showShare: !!this.$route.params.ds,
             showSettings: !!this.$route.params.ds && !this.$route.params.encodedPath,
-            showBackToOrg: false,
-            orgInfoCache: {},
             isDownloading: false,
             downloadConfirmOpen: false,
             // The size of a selection with a folder, read while the question is open (null: not yet)
@@ -316,58 +333,30 @@ export default {
         onFilesTab: function () {
             return this.activeTab === 'explorer' || this.activeTab === 'filebrowser';
         },
+        // The user menu in labelled groups (libs/userMenuItems.js); the header only says what each entry does
         userMenuItems: function () {
-            const items = [];
-
-            items.push({ label: this.username + (this.isAdmin && this.username !== 'admin' ? ' - admin' : ''), disabled: true, class: 'user-menu-header' });
-            items.push({ separator: true });
-
-            if (this.fileUploads)
-                items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up', command: () => this.uploadFiles() });
-
-            items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap', command: () => this.myOrganizations() });
-            items.push({ label: 'My Datasets', icon: 'fa-solid fa-database', command: () => this.myDatasets() });
-
-            if (this.storageInfo) {
-                items.push({ separator: true });
-                // The row shows a bare number: its name says what the number is
-                const storage = (label, ariaLabel, command = () => {}) => ({ label, ariaLabel, icon: 'fa-regular fa-hard-drive', command });
-                if (this.storageInfo.total != null && this.storageInfo.used > 0) {
-                    const used = this.percent(this.storageInfo.usedPercentage, 2);
-                    items.push(storage(used, `Storage: ${used} used`, () => { this.storageInfoDialogOpen = true; }));
-                } else if (this.storageInfo.total != null && !this.storageInfo.used) {
-                    const total = this.bytes(this.storageInfo.total);
-                    items.push(storage(total, `Storage: ${total} total, none used`));
-                } else if (this.storageInfo.total == null) {
-                    const used = this.bytes(this.storageInfo.used);
-                    items.push(storage(used, `Storage: ${used} used`));
+            return userMenuItems({
+                loggedIn: this.loggedIn,
+                username: this.username,
+                isAdmin: this.isAdmin,
+                accountManagement: this.accountManagement,
+                usersManagement: this.usersManagement,
+                storage: this.storageInfo,
+                run: {
+                    myDatasets: () => this.myDatasets(),
+                    storage: () => { this.storageInfoDialogOpen = true; },
+                    account: () => this.manageAccount(),
+                    preferences: () => this.openPreferences(),
+                    users: () => this.manageUsers(),
+                    tasks: () => this.adminTasks(),
+                    config: () => this.adminConfig(),
+                    logout: () => this.logout()
                 }
-            }
-
-            if (this.loggedIn || (this.usersManagement && this.isAdmin) || this.isAdmin) {
-                items.push({ separator: true });
-            }
-            if (this.accountManagement && this.loggedIn) {
-                items.push({ label: 'My Account', icon: 'fa-solid fa-user', command: () => this.manageAccount() });
-            }
-            if (this.loggedIn) {
-                items.push({ label: 'Preferences', icon: 'fa-solid fa-sliders', command: () => this.openPreferences() });
-            }
-            if (this.usersManagement && this.isAdmin) {
-                items.push({ label: 'Manage Users', icon: 'fa-solid fa-users', command: () => this.manageUsers() });
-            }
-            if (this.isAdmin) {
-                items.push({ label: 'Tasks', icon: 'fa-solid fa-list-check', command: () => this.adminTasks() });
-                items.push({ separator: true });
-                items.push({ label: 'Configuration', icon: 'fa-solid fa-gear', command: () => this.adminConfig() });
-                items.push({ label: 'Hangfire', icon: 'fa-solid fa-fire', url: '/hangfire', target: '_blank', rel: 'noopener' });
-                items.push({ label: 'API Docs', icon: 'fa-solid fa-code', url: '/scalar/v1', target: '_blank', rel: 'noopener' });
-            }
-
-            items.push({ separator: true });
-            items.push({ label: 'Logout', icon: 'fa-solid fa-right-from-bracket', command: () => this.logout() });
-
-            return items;
+            });
+        },
+        // Organizations and Upload, as links of the header
+        primaryNav: function () {
+            return primaryNavItems({ loggedIn: this.loggedIn, fileUploads: this.fileUploads, home: this.homeTarget });
         }
     },
     watch: {
@@ -404,7 +393,6 @@ export default {
             if (!params.ds) useDatasetSessionStore().reset();
 
             this.params = params;
-            this.updateBackToOrgVisibility();
             this.openPreferencesFromLink();
         }
     },
@@ -422,7 +410,6 @@ export default {
 
         this.refreshStorageInfo();
         this.checkUserManagement();
-        this.updateBackToOrgVisibility();
         this.openPreferencesFromLink();
     },
     beforeUnmount: function () {
@@ -436,34 +423,6 @@ export default {
             this.storageInfoDialogOpen = false;
         },
 
-        goToOrganization: function () {
-            const org = this.$route.params.org;
-            if (org) {
-                this.$router.push({ name: 'Datasets', params: { org } });
-            }
-        },
-
-        updateBackToOrgVisibility: async function () {
-            const org = this.$route.params.org;
-            const ds = this.$route.params.ds;
-            if (!org || !ds) {
-                this.showBackToOrg = false;
-                return;
-            }
-            try {
-                let orgInfo = this.orgInfoCache[org];
-                if (!orgInfo) {
-                    // The user did not ask for it: an anonymous visitor of a shared dataset of a
-                    // private organization gets a 401 here, which only hides the button (FR-XC-05)
-                    orgInfo = await reg.Organization(org).info({ skipUnauthorized: true });
-                    this.orgInfoCache[org] = orgInfo;
-                }
-                this.showBackToOrg = orgInfo.isPublic || (orgInfo.permissions && orgInfo.permissions.canRead);
-            } catch {
-                this.showBackToOrg = false;
-            }
-        },
-
         refreshStorageInfo: async function () {
             if (!HubOptions.disableStorageInfo) {
                 try {
@@ -472,9 +431,6 @@ export default {
                     console.log(e.message);
                 }
             }
-        },
-        uploadFiles: function () {
-            this.$router.push({ name: "Upload" });
         },
         // The session may have gone since the menu was drawn (cleared storage, a sign-out
         // elsewhere): then the header catches up and the user signs in again, coming back here.
@@ -489,9 +445,6 @@ export default {
             const home = homeLocation();
             const target = home.name === 'Datasets' ? home : { name: 'Datasets', params: { org: this.username } };
             this.$router.push(target);
-        },
-        myOrganizations: function () {
-            this.$router.push({ name: "Organizations" });
         },
         manageUsers: function () {
             this.$router.push({ name: "Users" });
@@ -639,10 +592,7 @@ export default {
             this.$refs.userMenu.toggle(event);
         },
 
-        percent: function (value, places) {
-            if (!value) return '';
-            return (value * 100).toFixed(places) + '%';
-        },
+        percent: percentText,
         bytes: function (value) {
             return bytesToSize(value);
         },
@@ -662,6 +612,7 @@ export default {
     width: 100%;
     box-shadow: var(--ddb-shadow-sm);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     z-index: 2;
     gap: var(--ddb-spacing-xs);
@@ -710,6 +661,75 @@ export default {
         display: flex;
         align-items: center;
         gap: var(--ddb-spacing-xs);
+    }
+
+    /* Organizations and Upload: icons on a phone, with their names from sm */
+    .primary-nav {
+        display: flex;
+        align-items: center;
+        gap: var(--ddb-spacing-xs);
+        margin-left: var(--ddb-spacing-sm);
+    }
+
+    .primary-nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--ddb-spacing-xs);
+        min-height: 2rem;
+        padding: 0 var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-md);
+        color: var(--ddb-text-secondary);
+        text-decoration: none;
+        font-size: var(--ddb-font-size-sm);
+    }
+
+    .primary-nav-link:hover {
+        color: var(--ddb-text);
+        background: var(--ddb-bg-hover);
+    }
+
+    .primary-nav-link[aria-current="page"] {
+        color: var(--ddb-text);
+        font-weight: 600;
+        background: var(--ddb-bg-hover);
+    }
+
+    .primary-nav-label {
+        display: none;
+    }
+
+    @media screen and (min-width: 576px) {
+        .primary-nav-label {
+            display: inline;
+        }
+    }
+
+    /* Between the logo and the buttons from md; on a row of its own below, so a long name has the width of the screen */
+    .header-crumbs {
+        flex: 1 1 0;
+        min-width: 0;
+        margin-left: var(--ddb-spacing-md);
+    }
+
+    @media screen and (max-width: 767.98px) {
+        .header-crumbs {
+            order: 3;
+            flex: 1 0 100%;
+            margin-left: 0;
+        }
+    }
+
+    .user-name,
+    .header-action-label {
+        margin-left: var(--ddb-spacing-xs);
+    }
+
+    .user-role {
+        margin-left: var(--ddb-spacing-xs);
+        padding: 0 var(--ddb-spacing-xs);
+        border-radius: var(--ddb-radius-md);
+        background: var(--ddb-bg-hover);
+        font-size: var(--ddb-font-size-sm);
     }
 }
 

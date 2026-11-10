@@ -117,6 +117,23 @@ describe('ViewDataset detail panel and root entry', () => {
         expect(useDatasetSessionStore().rootEntry).toBeNull();
     });
 
+    it('starts without the root entry of another dataset a late answer left in the session, until its own arrives (FR-NAV-03)', async () => {
+        const pinia = createPinia();
+        setActivePinia(pinia);
+        useDatasetSessionStore().setRootEntry({ path: 'ddb://h/acme/other', properties: { meta: { name: { data: 'Other' } } } });
+        let answer;
+        h_.dataset = { baseApi: 'acme/site', info: vi.fn(() => new Promise(resolve => { answer = resolve; })), metaGet: vi.fn(() => Promise.resolve([])) };
+        document.body.insertAdjacentHTML('beforeend', '<div id="app"></div>');
+        wrapper = mount(ViewDataset, { global: { stubs, plugins: [pinia] } });
+        await flushPromises();
+
+        expect(useDatasetSessionStore().rootEntry).toBeNull();
+
+        answer([ROOT]);
+        await flushPromises();
+        expect(useDatasetSessionStore().rootEntry).toEqual(ROOT);
+    });
+
     it('gives the open detail panel the live selection and the write permission', async () => {
         await open();
         const [a, b, c] = [file('a.jpg', T.IMAGE, MB), file('b.jpg', T.IMAGE, MB), file('c.jpg', T.IMAGE, MB)];

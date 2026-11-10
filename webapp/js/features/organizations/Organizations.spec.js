@@ -165,6 +165,14 @@ describe('Public organizations (D-003)', () => {
         expect(card('Open').text()).toContain('Public');
     });
 
+    it('draws the delete of a card as a text button, not a solid one, and keeps the edit outlined (FR-ORG-15)', async () => {
+        const owner = { canRead: true, canWrite: true, canDelete: true, canManageMembers: true };
+        await renderPage([{ slug: 'mine', name: 'Mine', owner: 'ann', isPublic: false, permissions: owner }]);
+        const del = card('Mine').find('button[aria-label="Delete organization"]');
+        expect(del.classes()).toEqual(expect.arrayContaining(['p-button-danger', 'p-button-text']));
+        expect(card('Mine').find('button[aria-label="Edit organization"]').classes()).toContain('p-button-outlined');
+    });
+
     it('says what the default list holds when it is empty, and offers to create one', async () => {
         await renderPage([]);
         expect(wrapper.find('[data-org-empty-hint]').text())

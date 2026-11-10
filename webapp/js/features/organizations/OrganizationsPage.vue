@@ -119,8 +119,9 @@
                                         severity="secondary" outlined size="small" :loading="org.editing"
                                         :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
                                         title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
+                                <!-- Not solid: the delete of every card would dominate the list (FR-ORG-15) -->
                                 <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
-                                        severity="danger" size="small" :loading="org.deleting"
+                                        severity="danger" text size="small" :loading="org.deleting"
                                         :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
                                         title="Delete" aria-label="Delete organization" @click.stop="handleDelete(org)" />
                             </div>

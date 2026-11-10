@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref } from 'vue';
+import { defineComponent, h, ref } from 'vue';
+import { mount } from '@vue/test-utils';
 import ddb from 'ddb';
 import { ApiError, loadErrorKind, LoadErrorKind } from '@/libs/ddb/apiError';
 import { b64encode } from '@/libs/base64';
@@ -7,13 +8,15 @@ import { b64encode } from '@/libs/base64';
 const route = { params: {} };
 const dataset = { listOne: vi.fn(), info: vi.fn(), remoteUri: vi.fn(path => `ddb://o/d/${path}`) };
 const setSelectedFiles = vi.fn();
+// The session's root entry, as the store keeps it
+const session = { rootEntry: null, setSelectedFiles, setRootEntry: vi.fn(entry => { session.rootEntry = entry; }) };
 const setTitle = vi.fn();
 const organization = vi.fn(() => ({ Dataset: () => dataset }));
 
 vi.mock('vue-router', () => ({ useRoute: () => route }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { Organization: (...args) => organization(...args) } }));
 vi.mock('@/libs/utils', () => ({ setTitle: (...args) => setTitle(...args) }));
-vi.mock('@/stores/datasetSession', () => ({ useDatasetSessionStore: () => ({ setSelectedFiles }) }));
+vi.mock('@/stores/datasetSession', () => ({ useDatasetSessionStore: () => session }));
 
 const { useViewerEntry } = await import('./useViewerEntry');
 
@@ -22,6 +25,7 @@ const rootWith = permissions => [{ path: '', properties: { permissions } }];
 
 beforeEach(() => {
     vi.clearAllMocks();
+    session.rootEntry = null;
     route.params = { org: 'o', ds: 'd', encodedPath: b64encode('f/a.tif') };
     dataset.listOne.mockImplementation(async path => entryOf(path));
     dataset.info.mockResolvedValue(rootWith({ canRead: true, canWrite: true, canDelete: false }));
@@ -38,6 +42,42 @@ describe('useViewerEntry from the route', () => {
         expect(setSelectedFiles).toHaveBeenCalledWith([{ path: 'ddb://o/d/f/a.tif' }]);
         expect(setTitle).toHaveBeenCalledWith('a.tif - Map');
         expect(v.loading.value).toBe(false);
+    });
+
+    it('puts the root entry of the dataset in the session, for the name in the breadcrumb, and takes it out when the viewer goes (FR-NAV-03)', async () => {
+        const root = { path: '', properties: { meta: { name: { data: 'Bulk dataset 26' } }, permissions: { canRead: true } } };
+        dataset.info.mockResolvedValue([root]);
+        let v;
+        const wrapper = mount(defineComponent({ setup() { v = useViewerEntry({ title: 'Map' }); return () => h('div'); } }));
+        expect(await v.entryLoaded).toBe(true);
+        expect(session.rootEntry).toBe(root);
+        wrapper.unmount();
+        expect(session.rootEntry).toBeNull();
+    });
+
+    it('does not put a root entry in the session when the dataset answers after the viewer went (FR-NAV-03)', async () => {
+        let answer;
+        dataset.info.mockImplementation(() => new Promise(resolve => { answer = resolve; }));
+        let v;
+        const wrapper = mount(defineComponent({ setup() { v = useViewerEntry({ title: 'Map' }); return () => h('div'); } }));
+        await vi.waitFor(() => expect(dataset.info).toHaveBeenCalled());
+        wrapper.unmount();
+
+        answer([{ path: '', properties: { meta: { name: { data: 'Late' } }, permissions: { canRead: true } } }]);
+        await v.entryLoaded;
+
+        expect(session.setRootEntry).not.toHaveBeenCalled();
+        expect(session.rootEntry).toBeNull();
+    });
+
+    it('leaves a root entry of another page alone when the viewer goes', async () => {
+        let v;
+        const wrapper = mount(defineComponent({ setup() { v = useViewerEntry({ title: 'Map' }); return () => h('div'); } }));
+        await v.entryLoaded;
+        const other = { path: 'other' };
+        session.rootEntry = other;
+        wrapper.unmount();
+        expect(session.rootEntry).toBe(other);
     });
 
     it('reports a route without a file as a link that is not valid', async () => {

@@ -159,6 +159,9 @@ const loadError = shallowRef(null);
 const loadKind = computed(() => loadErrorKind(loadError.value));
 // A dataset opened after one that did not load starts with the toolbar's actions
 session.setUnavailable(false);
+// Nor does it start with the root entry of the page before it (a viewer of another dataset, whose answer came late): the
+// breadcrumb would name that dataset until this one's own root entry arrives (FR-NAV-03)
+session.setRootEntry(null);
 // The phone layout (FR-EXP-29): a window below `sm`, the breakpoint of libs/responsiveColumns.js (as the bottom
 // navigation), not the screen of libs/responsive's isMobile. It follows the window (a phone that rotates, a window
 // resized): there the tree is the Browser tab and the detail of a file the Properties tab, and the splitter hides its

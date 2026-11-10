@@ -359,7 +359,8 @@ describe('DatasetUpload', () => {
             await flush();
 
             expect(sent.length).toBe(requests + 1);
-            expect(wrapper.text()).toContain('All 1 files uploaded successfully');
+            expect(wrapper.text()).toContain('1 file uploaded successfully');
+            expect(wrapper.text()).not.toContain('All 1');
         });
 
         it('Cancel removes the chunks of the files not committed and closes; the dialog does not cancel on unmount', async () => {

@@ -8,6 +8,7 @@
 
 /** What the tokens are when the map does not define them (the values of css/ol-controls.css) */
 const FALLBACK_RAIL_PX = 64;
+const FALLBACK_BOTTOM_PX = 64;
 const FALLBACK_REM_PX = 16;
 
 /**
@@ -88,6 +89,15 @@ function tokenPx(element, name, fallback) {
  */
 export function mapRailReserve(map) {
     return tokenPx(map.getTargetElement(), '--map-rail-reserve', FALLBACK_RAIL_PX);
+}
+
+/**
+ * The height the bottom controls keep at the bottom of the map, in px (the `--map-bottom-reserve` token).
+ * @param {import('ol/Map').default} map
+ * @returns {number}
+ */
+export function mapBottomReserve(map) {
+    return tokenPx(map.getTargetElement(), '--map-bottom-reserve', FALLBACK_BOTTOM_PX);
 }
 
 /**

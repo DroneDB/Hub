@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isUsableBbox, unlocatedDatasets } from './datasetPlaces';
+import { datasetMatchesSearch, isUsableBbox, unlocatedDatasets } from './datasetPlaces';
 
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const dataset = (slug, bbox, name) => ({ slug, name, bbox });
@@ -59,5 +59,23 @@ describe('unlocatedDatasets', () => {
     it('is empty when every dataset has a place, or there are none', () => {
         expect(unlocatedDatasets([group('a', [dataset('a1', [1, 1, 2, 2])]), group('b', [])])).toEqual([]);
         expect(unlocatedDatasets([{ org: 'c' }])).toEqual([]);
+    });
+});
+
+describe('datasetMatchesSearch (FR-ORG-10)', () => {
+    const ds = { slug: 'roof-2024', name: 'Roof Survey', tagline: 'Tiles and Gutters', bbox: [1, 1, 2, 2] };
+
+    it.each([['survey'], ['ROOF-20'], ['gutters'], ['  tiles and  '], ['']])('matches %j in the name, the slug or the tagline, trimmed and without regard to case', text => {
+        expect(datasetMatchesSearch(ds, text)).toBe(true);
+    });
+
+    it('matches an empty or blank text to every dataset, one with neither name nor tagline included', () => {
+        expect(datasetMatchesSearch({ slug: 'a' }, '   ')).toBe(true);
+    });
+
+    it('does not match a text that is in none of them, nor one that spans two of them', () => {
+        expect(datasetMatchesSearch(ds, 'orthophoto')).toBe(false);
+        expect(datasetMatchesSearch(ds, 'survey roof-2024')).toBe(false);
+        expect(datasetMatchesSearch({ slug: 'a', name: null, tagline: null }, 'null')).toBe(false);
     });
 });

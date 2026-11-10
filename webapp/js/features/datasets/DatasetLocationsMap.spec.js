@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
+import { toLonLat } from 'ol/proj';
 
 const olMap = vi.hoisted(() => ({ current: null }));
 
@@ -34,7 +35,10 @@ vi.mock('ol', async () => {
             this.updateSize = vi.fn();
             this.setPixelRatio = vi.fn();
             this.getView = () => this.view;
-            this.getTargetElement = () => ({ style: {} });
+            // The size the fit pads by, and the element that carries the reserve tokens
+            this.size = [1000, 500];
+            this.getSize = () => this.size;
+            this.getTargetElement = () => this.target;
             this.hit = null;
             this.forEachFeatureAtPixel = vi.fn((pixel, callback, o) => {
                 const layer = options.layers[1];
@@ -131,6 +135,18 @@ describe('DatasetLocationsMap pins', () => {
         expect(map().options.target).toBe(wrapper.find('.dlm-map').element);
     });
 
+    it('pins a dataset at its point when it has one, not at the centre of its box (FR-ORG-09)', async () => {
+        // New York and Rome: the centre of the box is in the Atlantic
+        render({ groups: [group('acme', [{ slug: 'two', bbox: [-74, 40.5, 12.6, 42], point: [12.5, 41.9] }, ds('one', [10, 40, 12, 42])])] });
+        await flushPromises();
+        const pin = slug => pinSource().getFeatures().find(f => f.get('slug') === slug).getGeometry().getCoordinates();
+        const [x, y] = pin('two');
+        const [lon, lat] = toLonLat([x, y]);
+        expect(lon).toBeCloseTo(12.5, 6);
+        expect(lat).toBeCloseTo(41.9, 6);
+        expect(pinSource().getFeatures().find(f => f.get('slug') === 'two').get('bbox')).toEqual([-74, 40.5, 12.6, 42]);
+    });
+
     it('adds the pins of groups as they arrive and starts again from a new set', async () => {
         render({ groups: [group('a', [ds('a1', [10, 40, 12, 42])])] });
         await flushPromises();
@@ -148,7 +164,8 @@ describe('DatasetLocationsMap pins', () => {
         await flushPromises();
         const [extent, options] = map().view.fit.mock.lastCall;
         expect(extent).toEqual(pinSource().getExtent());
-        expect(options).toEqual({ ...FIT_OPTIONS, duration: 0 });
+        // 10% of the map (1000 x 500) around the pins and the reserves of the rail (4rem) and the bottom controls (4rem)
+        expect(options).toEqual({ ...FIT_OPTIONS, padding: [50, 164, 114, 100], duration: 0 });
 
         map().view.fit.mockClear();
         await wrapper.setProps({ groups: [group('a', [ds('a1', [10, 40, 12, 42]), ds('a2', [20, 30, 21, 31])]), group('b', [ds('b1', [50, 50, 51, 51])])] });
@@ -158,7 +175,29 @@ describe('DatasetLocationsMap pins', () => {
         await wrapper.setProps({ loading: true });
         map().view.fit.mockClear();
         await wrapper.setProps({ loading: false });
-        expect(map().view.fit.mock.lastCall[1]).toEqual(FIT_OPTIONS);
+        expect(map().view.fit.mock.lastCall[1]).toEqual({ ...FIT_OPTIONS, padding: [50, 164, 114, 100] });
+    });
+
+    it('pads the fit by 10% of the map and the reserves read from the map, not by fixed pixels (FR-ORG-09)', async () => {
+        render({ groups: [group('a', [ds('a1', [10, 40, 12, 42]), ds('a2', [20, 30, 21, 31])])] });
+        await flushPromises();
+        // The element that carries the tokens must be in the document for its computed style
+        const target = document.createElement('div');
+        target.style.setProperty('--map-rail-reserve', '100px');
+        target.style.setProperty('--map-bottom-reserve', '30px');
+        document.body.appendChild(target);
+        map().target = target;
+        map().size = [800, 600];
+        map().view.fit.mockClear();
+        await wrapper.find('.dlm-tools button').trigger('click');
+        expect(map().view.fit.mock.lastCall[1].padding).toEqual([60, 180, 90, 80]);
+        target.remove();
+    });
+
+    it('marks the map as a map-container, which defines the reserve tokens', async () => {
+        render();
+        await flushPromises();
+        expect(wrapper.find('.dlm-map-wrap').classes()).toContain('map-container');
     });
 
     it('stops following the pins once the user touches the map', async () => {
@@ -258,7 +297,7 @@ describe('DatasetLocationsMap buttons', () => {
         map().view.fit.mockClear();
 
         await wrapper.find('button[aria-label="Reset view"]').trigger('click');
-        expect(map().view.fit).toHaveBeenCalledWith(pinSource().getExtent(), FIT_OPTIONS);
+        expect(map().view.fit).toHaveBeenCalledWith(pinSource().getExtent(), { ...FIT_OPTIONS, padding: [50, 164, 114, 100] });
         expect(wrapper.find('.dlm-popup-name').exists()).toBe(false);
 
         map().view.fit.mockClear();

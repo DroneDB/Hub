@@ -18,17 +18,21 @@
                             </div>
                             <div>
                                 <div class="org-title-row">
-                                    <Skeleton v-if="loading && !orgInfo" width="16rem" height="2rem" />
-                                    <h1 v-else class="my-0">{{ orgName }}</h1>
-                                    <Button v-if="canManageOrg" severity="secondary" text rounded size="small" title="Edit Organization" aria-label="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
+                                    <!-- The pencil follows the last word of the name, whatever the lines it takes (FR-ORG-21) -->
+                                    <span class="org-title">
+                                        <Skeleton v-if="loading && !orgInfo" width="16rem" height="2rem" />
+                                        <h1 v-else class="my-0 org-name">{{ orgName }}</h1>
+                                        <Button v-if="canManageOrg" class="org-edit" severity="secondary" text rounded size="small" title="Edit Organization" aria-label="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
+                                    </span>
                                     <div class="org-tags d-flex align-items-center gap-2 flex-wrap">
                                         <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                             {{ orgInfo.owner }}
                                         </Tag>
                                         <VisibilityTag v-if="orgInfo" rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
-                                        <!-- (the count is not known before the first page) -->
-                                        <Tag rounded severity="info" icon="fa-solid fa-database">
-                                            {{ loading ? '…' : totalDatasets }}
+                                        <!-- The datasets of the organization, not those a search shows (the count is not known before the first page) (FR-ORG-10) -->
+                                        <Tag rounded severity="info" icon="fa-solid fa-database"
+                                             :title="loading ? undefined : countOf(orgTotal, 'dataset')">
+                                            {{ loading ? '…' : orgTotal }}
                                         </Tag>
                                         <Tag v-if="userRole" rounded severity="contrast" icon="fa-solid fa-shield-halved">
                                             {{ userRole }}
@@ -52,9 +56,9 @@
             </div>
 
             <!-- How the datasets are shown: the search, the datasets without a location, list or map -->
-            <ListToolbar ref="searchField" v-model:search="searchQuery" :search-label="view === 'list' ? 'Search datasets' : ''">
+            <ListToolbar ref="searchField" v-model:search="searchQuery" search-label="Search datasets">
                 <template #end>
-                    <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" />
+                    <UnlocatedDatasetsButton v-if="view === 'map'" :groups="visibleLocationGroups" />
                     <ViewSelect v-model="view" label="Show the datasets as" />
                 </template>
             </ListToolbar>
@@ -85,7 +89,7 @@
                 </Column>
             </DataTable>
             <!-- Where the datasets are -->
-            <DatasetLocationsMap v-else-if="view === 'map'" :groups="locationGroups" :loading="locationsLoading" />
+            <DatasetLocationsMap v-else-if="view === 'map'" :groups="visibleLocationGroups" :loading="locationsLoading" />
             <!-- Nothing to list: the empty state, not an empty table with its header (FR-ORG-13) -->
             <EmptyState v-else-if="datasets.length === 0" title="No datasets found" items="datasets" :query="searchQuery"
                         class="ds-empty" @clear="searchQuery = ''; $refs.searchField?.focus()">
@@ -172,8 +176,9 @@
                                 severity="secondary" outlined size="small" :loading="slotProps.data.editing"
                                 :disabled="slotProps.data.editing || slotProps.data.deleting" icon="fa-solid fa-pencil"
                                 aria-label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
+                        <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
-                                severity="danger" size="small" :loading="slotProps.data.deleting"
+                                severity="danger" text size="small" :loading="slotProps.data.deleting"
                                 :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
                                 class="ms-1" aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
                         <Button severity="secondary" text size="small" icon="fa-solid fa-ellipsis-vertical" class="ms-1 ds-row-menu"
@@ -189,9 +194,9 @@
             <!-- Pagination; while the first page loads the bar is there, hidden, so that the page size counts it -->
             <div v-if="view === 'list' && (loading || totalPages > 0)" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2"
                  :class="{ 'ds-pagination-placeholder': loading }" :aria-hidden="loading ? 'true' : undefined">
-                <span>
+                <span class="ds-pagination-text">
                     Showing {{ datasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
-                    {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ totalDatasets }} datasets
+                    {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ countOf(totalDatasets, 'dataset') }}<template v-if="filteredOut">, {{ orgTotal }} in the organization</template>
                 </span>
                 <Paginator v-if="loading || totalPages > 1" class="ds-paginator"
                            :rows="Number(itemsPerPage)" :total-records="totalDatasets"
@@ -236,6 +241,7 @@ import { DatasetLocationsMap } from './locationsMap';
 import UnlocatedDatasetsButton from './UnlocatedDatasetsButton.vue';
 import { setTitle, bytesToSize, formatTimeAgo, parseTimestamp } from '@/libs/utils';
 import { datasetName } from '@/libs/api/registryUtils';
+import { datasetMatchesSearch } from '@/libs/map/datasetPlaces';
 import { getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences } from '@/libs/storageUtils';
 import { shallowRef } from 'vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -266,7 +272,7 @@ const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { visibilityLabel } from '@/libs/visibility';
-import { formatDateTime, formatNumber } from '@/libs/format';
+import { formatDateTime, formatNumber, countOf } from '@/libs/format';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { isUnauthorized, loadErrorKind } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
@@ -338,6 +344,8 @@ export default {
             // The page shown (the server searches, sorts and pages)
             datasets: [],
             totalDatasets: 0,
+            // The datasets of the organization as the last load without a search counted them (null: none yet)
+            unfilteredTotal: null,
             // Every slug of the organization, for the create/rename/import dialogs (loaded when
             // one opens)
             forbiddenSlugs: [],
@@ -467,6 +475,25 @@ export default {
                 sortColumn: this.sortColumn, sortDirection: this.sortDirection
             });
         },
+        // The datasets of the organization, whatever the search shows (FR-ORG-10): what the page counted when none narrows
+        // the list, else the count the organization carries (its members get one), else the last count without a search
+        orgTotal: function () {
+            if (!this.searchTerm) return this.totalDatasets;
+            const counted = this.orgInfo?.datasetCount;
+            return Number.isFinite(counted) ? counted : (this.unfilteredTotal ?? this.totalDatasets);
+        },
+        // A search leaves fewer datasets than the organization has
+        filteredOut: function () {
+            return !!this.searchTerm && this.orgTotal > this.totalDatasets;
+        },
+        // The map shows what the search matches, by name, slug or tagline, as the list does (FR-ORG-10)
+        visibleLocationGroups: function () {
+            if (!this.searchTerm.trim()) return this.locationGroups;
+            return this.locationGroups.map(group => ({
+                ...group,
+                datasets: group.datasets.filter(ds => datasetMatchesSearch(ds, this.searchTerm))
+            }));
+        },
         totalPages: function () {
             return Math.ceil(this.totalDatasets / this.itemsPerPage);
         },
@@ -577,6 +604,7 @@ export default {
             });
         },
         bytesToSize,
+        countOf,
         datasetName,
         visibilityLabel,
 
@@ -902,6 +930,7 @@ export default {
                 if (request.signal.aborted) return;
                 this.datasets = items.map(ds => this.toRow(ds));
                 this.totalDatasets = total;
+                if (!this.searchTerm) this.unfilteredTotal = total;
                 // Past the last page (a dataset was deleted, the search narrowed): show the last one
                 if (this.datasets.length === 0 && total > 0 && this.currentPage > 1)
                     this.currentPage = Math.max(1, Math.ceil(total / this.itemsPerPage));
@@ -994,7 +1023,20 @@ export default {
         // A dataset was added or removed: the page, the total and the locations change
         reloadDatasets() {
             this.invalidateLocations();
+            // The count the organization carries moved too (its members get one), and one counted before the search is stale
+            if (this.searchTerm) this.unfilteredTotal = null;
+            this.refreshOrgCount();
             return this.reloadPage();
+        },
+
+        // The organization's own count of its datasets, asked again; the header does without it when that fails
+        async refreshOrgCount() {
+            try {
+                const info = await this.org.info();
+                if (this.orgInfo && Number.isFinite(info?.datasetCount)) this.orgInfo = { ...this.orgInfo, datasetCount: info.datasetCount };
+            } catch (e) {
+                console.warn('Could not read the dataset count of the organization:', e);
+            }
         },
 
         // The locations loaded are out of date: the map asks again, now if it is shown
@@ -1106,14 +1148,16 @@ export default {
         flex-shrink: 0;
         padding: var(--ddb-spacing-md) 0;
 
+        /* The actions go under the identity when the name needs the room (FR-ORG-21) */
         .org-header-layout {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: var(--ddb-spacing-xl);
+            gap: var(--ddb-spacing-md) var(--ddb-spacing-xl);
         }
 
         .org-identity {
-            flex: 1;
+            flex: 1 1 28rem;
             min-width: 0;
         }
 
@@ -1141,6 +1185,22 @@ export default {
             flex-wrap: wrap;
         }
 
+        /* The name and its pencil are one run of text, so the pencil stays after the last word, on the last line */
+        .org-title {
+            display: inline;
+            min-width: 0;
+        }
+
+        .org-title .org-name {
+            display: inline;
+            overflow-wrap: anywhere;
+        }
+
+        .org-title .org-edit {
+            vertical-align: middle;
+            margin-inline-start: var(--ddb-spacing-xs);
+        }
+
         .org-description {
             color: var(--ddb-text-secondary);
             font-size: var(--ddb-font-size-sm);
@@ -1154,6 +1214,11 @@ export default {
                 flex-direction: column;
                 align-items: stretch;
                 gap: var(--ddb-spacing-md);
+            }
+
+            /* In a column the basis would be a height */
+            .org-identity {
+                flex: 0 0 auto;
             }
 
             /* Create takes the room the other actions leave */

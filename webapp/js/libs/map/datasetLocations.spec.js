@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { transformExtent } from 'ol/proj';
-import { buildLocations, bboxExtent, organizationColours } from './datasetLocations';
+import { buildLocations, bboxExtent, organizationColours, pinCoordinate } from './datasetLocations';
 
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const dataset = (slug, bbox, name) => ({ slug, name, bbox });
@@ -14,6 +14,34 @@ describe('bboxExtent', () => {
 
     it('stays finite at the poles', () => {
         expect(bboxExtent([-180, -90, 180, 90]).every(Number.isFinite)).toBe(true);
+    });
+});
+
+describe('pinCoordinate (FR-ORG-09)', () => {
+    // A dataset with data in New York and Rome: the centre of its box is in the Atlantic
+    const bbox = [-74, 40.5, 12.6, 42];
+
+    it('is the point of the dataset when the server gives one', () => {
+        expect(pinCoordinate({ bbox, point: [12.5, 41.9] })).toEqual(transformExtent([12.5, 41.9, 12.5, 41.9], 'EPSG:4326', 'EPSG:3857').slice(0, 2));
+    });
+
+    it('is the centre of the box when there is no point', () => {
+        const [minX, minY, maxX, maxY] = bboxExtent(bbox);
+        const expected = [(minX + maxX) / 2, (minY + maxY) / 2];
+        expect(pinCoordinate({ bbox })).toEqual(expected);
+        expect(pinCoordinate({ bbox, point: null })).toEqual(expected);
+    });
+
+    it.each([[[200, 10]], [[10, 95]], [[NaN, 1]], [[1]], [['a', 'b']], ['x']])('ignores an unusable point %j', point => {
+        expect(pinCoordinate({ bbox, point })).toEqual(pinCoordinate({ bbox }));
+    });
+
+    it('pins the dataset of buildLocations at its point, and keeps its box for the outline', () => {
+        const { features } = buildLocations([group('acme', [{ slug: 'two', bbox, point: [12.5, 41.9] }, dataset('one', [10, 40, 12, 42])])]);
+        expect(features[0].getGeometry().getCoordinates()).toEqual(transformExtent([12.5, 41.9, 12.5, 41.9], 'EPSG:4326', 'EPSG:3857').slice(0, 2));
+        expect(features[0].get('bbox')).toEqual(bbox);
+        const [minX, minY, maxX, maxY] = bboxExtent([10, 40, 12, 42]);
+        expect(features[1].getGeometry().getCoordinates()).toEqual([(minX + maxX) / 2, (minY + maxY) / 2]);
     });
 });
 

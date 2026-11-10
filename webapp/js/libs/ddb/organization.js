@@ -46,7 +46,7 @@ export default class Organization {
      * the user may see.
      * @param {object} [opts]
      * @param {AbortSignal} [opts.signal]
-     * @returns {Promise<Array<{slug: string, name: string|null, bbox: number[]|null}>>}
+     * @returns {Promise<Array<{slug: string, name: string|null, tagline?: string|null, bbox: number[]|null, point?: number[]|null}>>}
      */
     async datasetLocations(opts = {}) {
         const locations = await this.registry.getRequest(`/orgs/${this.org}/locations`, { cache: false, signal: opts.signal });

@@ -12,7 +12,9 @@
  * @typedef {object} LocatedDataset
  * @property {string} slug
  * @property {string|null} [name]
+ * @property {string|null} [tagline]  what the dataset list's search also matches (FR-ORG-10)
  * @property {number[]|null} [bbox]
+ * @property {number[]|null} [point]  where to pin it, [lon, lat]: a position of its data (none: the centre of the box)
  *
  * @typedef {object} LocationGroup  the datasets of one organization, as the server lists them
  * @property {string} org  slug of the organization
@@ -47,6 +49,18 @@ export const groupName = group => group.orgName || group.org;
 
 /** The name shown for a dataset: its name, else its slug. @param {LocatedDataset} dataset */
 export const datasetName = dataset => dataset.name || dataset.slug;
+
+/**
+ * Whether the dataset matches the text of the search, as the server's search of the dataset list does (FR-ORG-10): the
+ * text, trimmed and without regard to case, is in its name, its slug or its tagline. An empty text matches every dataset.
+ * @param {LocatedDataset} dataset
+ * @param {string} text
+ */
+export function datasetMatchesSearch(dataset, text) {
+    const term = text.trim().toLowerCase();
+    if (!term) return true;
+    return [dataset.name, dataset.slug, dataset.tagline].some(field => !!field && field.toLowerCase().includes(term));
+}
 
 /**
  * The datasets of the groups that have no usable box, in the order of the groups.
