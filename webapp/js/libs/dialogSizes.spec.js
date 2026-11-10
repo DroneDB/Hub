@@ -69,7 +69,8 @@ describe('the size classes', () => {
 describe('the footer of a window', () => {
     it('sticks to the bottom of the scrolling content, so the buttons stay in view (FR-UPL-08)', () => {
         const rule = blockAt(scss, scss.indexOf('.window-footer {'));
-        expect(rule).toMatch(/position: sticky;\s*bottom: 0;/);
+        // at the edge of the scrolling content: a sticky box sticks inside the padding, so bottom: 0 held it over the last row
+        expect(rule).toMatch(/position: sticky;\s*bottom: calc\(-1 \* var\(--window-pad\)\);/);
         // it takes the space of the content's bottom padding: the buttons do not move at the end of the content
         expect(rule).toContain('margin-bottom: calc(-1 * var(--window-pad));');
         expect(rule).toContain('padding-bottom: var(--window-pad);');
