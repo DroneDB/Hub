@@ -335,3 +335,181 @@ describe('datasetGone event (FR-UPL-05, D-004)', () => {
         }
     });
 });
+
+/**
+ * Background imports (FR-UPL-10, FR-XC-16): the store tracks an import that outlives its dialog and page, tells once when it
+ * ends, and lets the dataset's monitor go.
+ */
+describe('background imports', () => {
+    const listeners = [];
+    afterEach(() => {
+        for (const [evt, fn] of listeners.splice(0)) taskMonitor.off(evt, fn);
+    });
+    function watch(event) {
+        const seen = [];
+        const fn = d => seen.push(d);
+        taskMonitor.on(event, fn);
+        listeners.push([event, fn]);
+        return seen;
+    }
+    const importTask = over => makeTask({ taskId: 'imp1', toolId: 'import-dataset', state: 'Processing', progressPercent: 40, path: null, ...over });
+    function datasetWith(listRef) {
+        const dataset = makeDataset();
+        dataset.getTasks.mockImplementation(async () => listRef.tasks);
+        return dataset;
+    }
+
+    it('keeps the dataset followed while the import runs, and lists it with its progress', async () => {
+        const list = { tasks: [importTask()] };
+        const dataset = datasetWith(list);
+
+        taskMonitor.trackImport(dataset, 'imp1');
+        await vi.waitFor(() => expect(taskMonitor.getImports(dataset)).toHaveLength(1));
+
+        expect(taskMonitor.getImports(dataset)[0]).toMatchObject({ taskId: 'imp1', progressPercent: 40 });
+        list.tasks = [importTask({ state: 'Succeeded', progressPercent: 100 })];
+        await taskMonitor.forceRefresh(dataset);
+    });
+
+    it('says once when the import ends, with its last state, and lets the monitor go', async () => {
+        const list = { tasks: [importTask()] };
+        const dataset = datasetWith(list);
+        const ended = watch('importEnded');
+        taskMonitor.trackImport(dataset, 'imp1');
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+        expect(ended).toHaveLength(0);
+
+        list.tasks = [importTask({ state: 'Succeeded', progressPercent: 100 })];
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(ended).toHaveLength(1);
+        expect(ended[0]).toMatchObject({ dataset, gone: false, task: { taskId: 'imp1', state: 'Succeeded' } });
+        // The reference of the track is released: with no other holder the store is dropped
+        expect(taskMonitor.getImports(dataset)).toEqual([]);
+    });
+
+    it('says a failed import ended, and tracks one task once', async () => {
+        const list = { tasks: [importTask()] };
+        const dataset = datasetWith(list);
+        const ended = watch('importEnded');
+        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackImport(dataset, 'imp1');
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+        list.tasks = [importTask({ state: 'Failed' })];
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(dataset.getTasks).toHaveBeenCalled();
+        expect(ended).toHaveLength(1);
+        expect(ended[0].task.state).toBe('Failed');
+    });
+
+    it('says the import ended when its dataset is gone (the rollback of a failed import deletes it)', async () => {
+        const list = { tasks: [importTask()] };
+        const dataset = datasetWith(list);
+        const ended = watch('importEnded');
+        taskMonitor.trackImport(dataset, 'imp1');
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+        dataset.getTasks.mockRejectedValue(new ApiError('not found', 404));
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(ended).toHaveLength(1);
+        expect(ended[0]).toMatchObject({ gone: true, task: { taskId: 'imp1' } });
+    });
+
+    it('finds the imports that run after a reload with one task-list request, and tracks them', async () => {
+        const list = { tasks: [makeTask({ taskId: 'b1', state: 'Succeeded' }), importTask(), importTask({ taskId: 'old', state: 'Succeeded' })] };
+        const dataset = datasetWith(list);
+        const ended = watch('importEnded');
+
+        const running = await taskMonitor.findImports(dataset);
+
+        expect(running.map(t => t.taskId)).toEqual(['imp1']);
+        expect(dataset.getTasks.mock.calls.length).toBeGreaterThanOrEqual(1);
+        await vi.waitFor(() => expect(taskMonitor.getImports(dataset)).toHaveLength(1));
+        list.tasks = [importTask({ state: 'Succeeded' })];
+        await taskMonitor.forceRefresh(dataset);
+        expect(ended).toHaveLength(1);
+    });
+
+    // The list holds the newest 200 tasks: a run with many builds pushes the import out of it
+    describe('an import the task list leaves out', () => {
+        const builds = n => Array.from({ length: n }, (_, i) => makeTask({ taskId: `b${i}`, state: 'Processing' }));
+
+        it('is asked for by id and ends when that says it ended', async () => {
+            const list = { tasks: [importTask()] };
+            const dataset = datasetWith(list);
+            dataset.getTask = vi.fn(async () => ({ taskId: 'imp1', toolId: 'import-dataset', state: 'Succeeded', progress: { percent: 100 } }));
+            const ended = watch('importEnded');
+            taskMonitor.trackImport(dataset, 'imp1');
+            await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+            expect(dataset.getTask).not.toHaveBeenCalled();
+
+            list.tasks = builds(200);
+            await taskMonitor.forceRefresh(dataset);
+            await vi.waitFor(() => expect(ended).toHaveLength(1));
+
+            expect(dataset.getTask).toHaveBeenCalledWith('imp1');
+            expect(ended[0]).toMatchObject({ dataset, gone: false, task: { taskId: 'imp1', toolId: 'import-dataset', state: 'Succeeded' } });
+            // Let go: the next poll does not ask again
+            await taskMonitor.forceRefresh(dataset);
+            expect(dataset.getTask).toHaveBeenCalledTimes(1);
+        });
+
+        it('keeps following it while it runs', async () => {
+            const list = { tasks: [] };
+            const dataset = datasetWith(list);
+            dataset.getTask = vi.fn(async () => ({ taskId: 'imp1', toolId: 'import-dataset', state: 'Processing' }));
+            const ended = watch('importEnded');
+            taskMonitor.trackImport(dataset, 'imp1');
+            await vi.waitFor(() => expect(dataset.getTask).toHaveBeenCalledTimes(1));
+            await Promise.resolve();
+            expect(ended).toHaveLength(0);
+
+            dataset.getTask.mockResolvedValue({ taskId: 'imp1', toolId: 'import-dataset', state: 'Failed', error: 'Archive is corrupt' });
+            await taskMonitor.forceRefresh(dataset);
+            await vi.waitFor(() => expect(ended).toHaveLength(1));
+            expect(ended[0].task).toMatchObject({ state: 'Failed', error: 'Archive is corrupt' });
+        });
+
+        it('ends, as it was last seen, when the task is not found any more', async () => {
+            const list = { tasks: [importTask()] };
+            const dataset = datasetWith(list);
+            dataset.getTask = vi.fn(async () => { throw new ApiError('Not found', 404); });
+            const ended = watch('importEnded');
+            taskMonitor.trackImport(dataset, 'imp1');
+            await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+            list.tasks = builds(3);
+            await taskMonitor.forceRefresh(dataset);
+            await vi.waitFor(() => expect(ended).toHaveLength(1));
+            expect(ended[0]).toMatchObject({ gone: false, task: { taskId: 'imp1', state: 'Processing' } });
+        });
+
+        it('is asked for again on the next poll when the request failed', async () => {
+            const list = { tasks: builds(2) };
+            const dataset = datasetWith(list);
+            dataset.getTask = vi.fn(async () => { throw new ApiError('Server error', 500); });
+            const ended = watch('importEnded');
+            taskMonitor.trackImport(dataset, 'imp1');
+            await vi.waitFor(() => expect(dataset.getTask).toHaveBeenCalledTimes(1));
+
+            dataset.getTask.mockResolvedValue({ taskId: 'imp1', state: 'Succeeded' });
+            await taskMonitor.forceRefresh(dataset);
+            await vi.waitFor(() => expect(ended).toHaveLength(1));
+            expect(dataset.getTask).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    it('finds nothing, and tracks nothing, for a dataset with no import running or whose list cannot be read', async () => {
+        const quiet = datasetWith({ tasks: [importTask({ state: 'Succeeded' })] });
+        expect(await taskMonitor.findImports(quiet)).toEqual([]);
+        expect(quiet.getTasks).toHaveBeenCalledTimes(1);
+
+        const broken = makeDataset();
+        broken.getTasks.mockRejectedValue(new Error('offline'));
+        expect(await taskMonitor.findImports(broken)).toEqual([]);
+    });
+});

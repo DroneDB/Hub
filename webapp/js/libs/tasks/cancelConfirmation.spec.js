@@ -29,6 +29,8 @@ describe('cancelConfirmation', () => {
             .toBe('The output written so far is deleted.');
         expect(cancelConfirmation({ toolId: 'align-raster' }, 'Align').warningMessage)
             .toBe('The output written so far is deleted.');
+        expect(cancelConfirmation({ toolId: 'mask-borders' }, 'Mask Borders').warningMessage)
+            .toBe('The masked file written so far is deleted.');
         const q = cancelConfirmation({ toolId: 'photogrammetry' }, 'Photogrammetry');
         expect(q.warningTitle).toBe('This cannot be undone.');
         expect(q.warningMessage).toBe('The output written so far is deleted, and so is the dataset, if this task created it.');

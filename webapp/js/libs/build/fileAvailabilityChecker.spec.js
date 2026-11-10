@@ -48,24 +48,69 @@ describe('unified viewer gate', () => {
         expect(dataset.listOne).toHaveBeenCalledTimes(1);
     });
 
-    it('says the output is missing when the fresh listing has none either', async () => {
+    it('says the file was never built when the fresh listing has no output and no build is known', async () => {
         const dataset = datasetListing(model());
         const result = await checker.check(dataset, model(), 'unified');
-        expect(result).toMatchObject({ available: false, status: 'not-found' });
+        expect(result).toMatchObject({ available: false, status: 'queued', actions: expect.arrayContaining(['start-build']) });
+        expect(result.message).not.toContain('may need to be (re)built');
         expect(dataset.listOne).toHaveBeenCalledTimes(1);
     });
 
     it('trusts an entry the viewer just listed: no second listing', async () => {
         const dataset = datasetListing(model({ artifacts: [TILES] }));
         const result = await checker.check(dataset, model(), 'unified', { current: true });
-        expect(result).toMatchObject({ available: false, status: 'not-found' });
+        expect(result).toMatchObject({ available: false, status: 'queued' });
         expect(dataset.listOne).not.toHaveBeenCalled();
     });
 
-    it('a model that has only the Nexus output is not ready for the unified viewer', async () => {
+    // FR-VWR-08: a missing artifact does not give a fixed message: the build state says why (running, on hold, failed)
+    describe('a model without its 3D Tiles output (FR-VWR-08)', () => {
+        const current = { current: true };
+
+        it('is building while a build job runs', async () => {
+            buildManager.getBuildState.mockReturnValue({ path: 'house.obj', currentState: 'Processing' });
+            const result = await checker.check(datasetListing(null), model(), 'unified', current);
+            expect(result).toMatchObject({ available: false, status: 'building', buildState: { currentState: 'Processing' } });
+        });
+
+        it('is building while the build is queued', async () => {
+            taskMonitor.getTasks.mockReturnValue([{ toolId: 'build', path: 'house.obj', state: 'Enqueued' }]);
+            const result = await checker.check(datasetListing(null), model(), 'unified', current);
+            expect(result).toMatchObject({ available: false, status: 'building' });
+        });
+
+        it('is failed after a build that failed', async () => {
+            buildManager.getBuildState.mockReturnValue({ path: 'house.obj', currentState: 'Failed' });
+            const result = await checker.check(datasetListing(null), model(), 'unified', current);
+            expect(result).toMatchObject({ available: false, status: 'failed', actions: expect.arrayContaining(['retry-build']) });
+        });
+
+        it('is on hold when the entry says its build waits for files', async () => {
+            const held = model({ buildStatus: 'pending', buildMissingDependencies: ['house.mtl'] });
+            const result = await checker.check(datasetListing(held), held, 'unified', current);
+            expect(result).toMatchObject({ available: false, status: 'blocked' });
+        });
+
+        it('is ready once the artifact is listed, though an older job failed', async () => {
+            buildManager.getBuildState.mockReturnValue({ path: 'house.obj', currentState: 'Failed' });
+            const result = await checker.check(datasetListing(null), model({ artifacts: [TILES] }), 'unified', current);
+            expect(result).toMatchObject({ available: true, status: 'ready' });
+        });
+    });
+
+    // A legacy build (Nexus only) is complete for libddb: a build that is not forced does nothing, so it is a rebuild
+    it('a model that has only the Nexus output needs a rebuild for the unified viewer, not a first build', async () => {
         const nxz = { role: 'model.nexus', url: '/orgs/o/ds/d/build/m/nxs/model.nxz' };
         const result = await checker.check(datasetListing(model({ artifacts: [nxz] })), model({ artifacts: [nxz] }), 'unified', { current: true });
-        expect(result.available).toBe(false);
+        expect(result).toMatchObject({ available: false, status: 'rebuild', title: 'Rebuild Needed', actions: ['cancel', 'retry-build'] });
+        expect(result.message).toBe("The file 'house.obj' was built before this viewer could show it: its build has no output for this viewer.\n\nRebuild it to open it here.");
+    });
+
+    it('a Nexus-only model whose last build job succeeded is a rebuild too', async () => {
+        buildManager.getBuildState.mockReturnValue({ path: 'house.obj', currentState: 'Succeeded' });
+        const nxz = { role: 'model.nexus', url: '/orgs/o/ds/d/build/m/nxs/model.nxz' };
+        const result = await checker.check(datasetListing(null), model({ artifacts: [nxz] }), 'unified', { current: true });
+        expect(result).toMatchObject({ available: false, status: 'rebuild' });
     });
 
     it('a failed listing is an error, not a missing artifact', async () => {
@@ -86,9 +131,9 @@ describe('model viewer gate: either multiresolution model opens it', () => {
         expect(dataset.listOne).not.toHaveBeenCalled();
     });
 
-    it('is not ready with only the 3D Tiles listed: the build of the model is awaited', async () => {
+    it('is not ready with only the 3D Tiles listed: the model is built, so it needs a rebuild (FR-VWR-08)', async () => {
         const result = await checker.check(datasetListing(model({ artifacts: [TILES] })), model({ artifacts: [TILES] }), 'model', { current: true });
-        expect(result).toMatchObject({ available: false, status: 'queued' });
+        expect(result).toMatchObject({ available: false, status: 'rebuild' });
     });
 
     it('lists the entry again when its snapshot has no model: a build may have finished since', async () => {
@@ -234,7 +279,7 @@ describe('which types need a build (the server decides)', () => {
         reg.features.values = served([14, 16]);
         const tiles = { path: 'city.3tz', hash: 't', type: T.TILES3D };
         const result = await checker.check(datasetListing(tiles), tiles, 'unified', { current: true });
-        expect(result).toMatchObject({ available: false, status: 'not-found' });
+        expect(result).toMatchObject({ available: false, status: 'queued' });
         reg.features.clear();
     });
 });

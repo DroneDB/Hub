@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { isBuilt, entryBuildStatus, shownBuildStatus, isBuildStopped, applyBuildFields, currentEntry } from './entryBuild';
+import { isBuilt, entryBuildStatus, shownBuildStatus, isBuildStopped, applyBuildFields, currentEntry, shownBuildState, buildWord, BUILD_WORDS } from './entryBuild';
 
 const COG = { role: 'raster.cog', url: '/orgs/o/ds/d/build/h/cog/cog.tif', mediaType: 'image/tiff' };
 
@@ -89,5 +89,31 @@ describe('currentEntry', () => {
     it('does not hide a failed listing', async () => {
         const dataset = { listOne: vi.fn(async () => { throw new Error('Cannot find: a/ortho.tif'); }) };
         await expect(currentEntry(dataset, stale, () => false)).rejects.toThrow('Cannot find');
+    });
+});
+
+describe('the words of the build states (FR-EXP-21, FR-EXP-07)', () => {
+    it('is one table: the badge, the caption and the tooltip read it', () => {
+        expect(BUILD_WORDS).toEqual({ built: 'Built', building: 'Building\u2026', queued: 'Queued', pending: 'On hold', failed: 'Failed' });
+    });
+
+    it('says a build that runs is Building…, whatever the entry says, and a job that failed is Failed', () => {
+        expect(buildWord({ currentState: 'Processing' }, { buildStatus: 'queued' })).toBe('Building\u2026');
+        expect(buildWord({ currentState: 'Enqueued' }, {})).toBe('Building\u2026');
+        expect(buildWord({ currentState: 'Failed' }, { artifacts: [COG] })).toBe('Failed');
+    });
+
+    it('says what the entry says without a job: Built, Queued, On hold, Failed, and Building… when the server says it runs', () => {
+        expect(buildWord(null, { artifacts: [COG] })).toBe('Built');
+        expect(buildWord(null, { buildStatus: 'queued' })).toBe('Queued');
+        expect(buildWord(null, { buildStatus: 'pending' })).toBe('On hold');
+        expect(buildWord(null, { buildStatus: 'failed' })).toBe('Failed');
+        expect(buildWord(null, { artifacts: [COG], buildStatus: 'building' })).toBe('Building\u2026');
+    });
+
+    it('has no word for an entry with no build, and a job that succeeded does not make one', () => {
+        expect(shownBuildState(null, {})).toBeNull();
+        expect(buildWord({ currentState: 'Succeeded' }, {})).toBe('');
+        expect(buildWord({ currentState: 'Succeeded' }, { artifacts: [COG] })).toBe('Built');
     });
 });

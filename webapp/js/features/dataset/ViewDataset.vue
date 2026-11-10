@@ -24,17 +24,25 @@
                              @file-written="onMapFileWritten" @file-removed="path => listing.removed([path])" />
                     </template>
                     <template #explorer>
-                        <div class="detail-layout">
-                            <div class="detail-main" :class="{ 'with-detail': showDetail }">
-                                <Explorer v-if="viewMode === 'grid'" ref="explorer" v-bind="explorerProps" :tile-size="tileSize" v-on="fileEvents" />
-                                <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
+                        <div class="explorer-tab">
+                            <!-- An import into this dataset runs (FR-UPL-10): the page says so with its progress, and links to the Tasks tab -->
+                            <div v-if="runningImport" class="import-banner" role="status">
+                                <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true" />
+                                <span>{{ importBannerText }}</span>
+                                <Button label="View in Tasks" severity="secondary" size="small" text @click="tabs.activateTab('tasks')" />
                             </div>
-                            <div v-if="showDetail" id="dataset-detail-side" ref="detailSide" class="detail-side">
-                                <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
+                            <div class="detail-layout">
+                                <div class="detail-main" :class="{ 'with-detail': showDetail }">
+                                    <Explorer v-if="viewMode === 'grid'" ref="explorer" v-bind="explorerProps" :tile-size="tileSize" v-on="fileEvents" />
+                                    <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
+                                </div>
+                                <div v-if="showDetail" id="dataset-detail-side" ref="detailSide" class="detail-side">
+                                    <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
+                                </div>
+                                <!-- Below lg, the drawer the user closed comes back from here, not with the next selection -->
+                                <Button v-if="detailReopenable" ref="detailReopen" class="detail-reopen" icon="fa-solid fa-circle-info" label="Details"
+                                        severity="secondary" aria-controls="dataset-detail-side" aria-expanded="false" @click="openDrawer" />
                             </div>
-                            <!-- Below lg, the drawer the user closed comes back from here, not with the next selection -->
-                            <Button v-if="detailReopenable" ref="detailReopen" class="detail-reopen" icon="fa-solid fa-circle-info" label="Details"
-                                    severity="secondary" aria-controls="dataset-detail-side" aria-expanded="false" @click="openDrawer" />
                         </div>
                     </template>
                     <template #tasks>
@@ -68,6 +76,7 @@ import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import icons from '@/libs/icons';
 import { setTitle } from '@/libs/utils';
+import { formatNumber } from '@/libs/format';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { Features } from '@/libs/features';
 import { PREF } from '@/libs/preferences';
@@ -535,7 +544,7 @@ const toolbarContext = {
 const tools = computed(() => explorerTools(toolbarContext));
 const explorerProps = computed(() => ({
     files: listing.files.value, tools: tools.value, currentPath: listing.currentPath.value, dataset,
-    canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value
+    canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value, importing: !!runningImport.value
 }));
 
 // ---- Session and lifecycle -------------------------------------------------------------
@@ -554,8 +563,27 @@ function onDatasetGone({ dataset: gone, error: e }) {
     session.setUnavailable(true);
 }
 
+// An import into this dataset runs (FR-UPL-10, FR-XC-16): read from the background-task store, which the page follows through
+// the BuildManager (the dataset's task list) and which an import started on another page keeps alive. When it ends the
+// files it brought join the list.
+const runningImport = ref(null);
+const importBannerText = computed(() => {
+    const percent = Math.round(runningImport.value?.progressPercent ?? 0);
+    return `${percent > 0 ? `Importing\u2026 ${formatNumber(percent, 0)} %` : 'Importing\u2026'} \u2014 the files appear here when the import ends.`;
+});
+function syncRunningImport() {
+    const next = taskMonitor.getImports(dataset)[0] ?? null;
+    const ended = runningImport.value && !next && !loadError.value;
+    runningImport.value = next;
+    if (ended) listing.reload();
+}
+function onTasksUpdated({ dataset: changed }) {
+    if (changed && datasetKey(changed) === datasetKey(dataset)) syncRunningImport();
+}
+
 onMounted(() => {
     taskMonitor.on('datasetGone', onDatasetGone);
+    taskMonitor.on('tasksUpdated', onTasksUpdated);
     document.getElementById('app').classList.add('fullpage');
     setTitle(params.ds);
     loadViews();
@@ -566,6 +594,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     taskMonitor.off('datasetGone', onDatasetGone);
+    taskMonitor.off('tasksUpdated', onTasksUpdated);
     document.getElementById('app').classList.remove('fullpage');
     BuildManager.unregisterDataset(dataset);
     session.setUnavailable(false);
@@ -574,6 +603,29 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* The Files tab: the import banner above the list and the detail panel */
+.explorer-tab {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.import-banner {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+    background: var(--ddb-info-bg);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
+}
+
+.explorer-tab > .detail-layout {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+}
+
 .detail-layout {
     display: flex;
     height: 100%;

@@ -18,7 +18,7 @@ let stop;
 function listen() {
     const events = useBuildEvents();
     events.watchBuildEvents(() => dataset);
-    stop = () => BuildManager.eventListeners.buildStateChanged.splice(0);
+    stop = () => BuildManager.eventListeners.buildStateChanged.clear();
     return events;
 }
 
@@ -29,9 +29,9 @@ beforeEach(() => {
 });
 afterEach(() => {
     stop?.();
-    BuildManager.eventListeners.buildStarted?.splice(0);
-    BuildManager.eventListeners.buildError?.splice(0);
-    BuildManager.eventListeners.newBuildableFilesDetected?.splice(0);
+    BuildManager.eventListeners.buildStarted?.clear();
+    BuildManager.eventListeners.buildError?.clear();
+    BuildManager.eventListeners.newBuildableFilesDetected?.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
 });
@@ -180,7 +180,7 @@ describe('useBuildEvents', () => {
         expect(notify.error).toHaveBeenCalledOnce();
         expect(notify.error).toHaveBeenCalledWith('Build failed for a.tif', { summary: 'Build Failed' });
         // The listener is gone and the window timer with it: nothing is told twice
-        expect(BuildManager.eventListeners.buildStateChanged).toHaveLength(0);
+        expect(BuildManager.eventListeners.buildStateChanged.size).toBe(0);
         vi.advanceTimersByTime(BUILD_TOAST_WINDOW_MS);
         expect(notify.error).toHaveBeenCalledOnce();
     });

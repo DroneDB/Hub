@@ -123,6 +123,11 @@
                                          class="ds-name stretched-link" @keydown="onNameKeydown($event, slotProps.data)">
                                 {{ slotProps.data.name || slotProps.data.slug }}
                             </router-link>
+                            <!-- An import runs: the row says so, with its progress, from the background-task store (FR-UPL-10) -->
+                            <Tag v-if="slotProps.data.slug in importProgress" severity="info" rounded class="ds-importing" role="status"
+                                 icon="fa-solid fa-circle-notch fa-spin">
+                                {{ importingText(slotProps.data.slug) }}
+                            </Tag>
                         </span>
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
                     </template>
@@ -267,7 +272,8 @@ const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { visibilityLabel } from '@/libs/visibility';
-import { formatDateTime } from '@/libs/format';
+import { formatDateTime, formatNumber } from '@/libs/format';
+import taskMonitor from '@/libs/tasks/taskMonitor';
 import { isUnauthorized, loadErrorKind } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
 import { hasOpenOverlay } from '@/composables/useOverlay';
@@ -351,6 +357,8 @@ export default {
             dsDialogOpen: false,
 
             importDialogOpen: false,
+            // The imports that run, by dataset slug: their progress (0-100) from the background-task store (FR-UPL-10)
+            importProgress: {},
 
             // Blocking overlay flag while a new dataset is being created (HubLoader.vue)
             creatingDataset: false,
@@ -518,6 +526,15 @@ export default {
         }
     },
     created() {
+        // The imports that run are in the store of the app: the row follows it, and the list reloads when one ends
+        // (FR-UPL-10, FR-XC-16). Not reactive on its own: the store tells when its tasks change
+        this._onTasksUpdated = () => this.refreshImports();
+        this._onImportEnded = ({ dataset }) => {
+            if (this.datasets.some(ds => this.org?.Dataset(ds.slug).baseApi === dataset.baseApi)) this.reloadDatasets();
+            this.refreshImports();
+        };
+        taskMonitor.on('tasksUpdated', this._onTasksUpdated);
+        taskMonitor.on('importEnded', this._onImportEnded);
         // The table settings follow the Preferences page, other tabs and the account; the watchers
         // above do not store them again (saveDatasetTablePreferences skips the values already stored)
         this._stopFollowingPreferences = followDatasetTablePreferences(prefs => {
@@ -554,6 +571,8 @@ export default {
         this.measureRows();
     },
     beforeUnmount() {
+        taskMonitor.off('tasksUpdated', this._onTasksUpdated);
+        taskMonitor.off('importEnded', this._onImportEnded);
         this._stopFollowingPreferences?.();
         clearTimeout(this._searchTimer);
         this._listRequest?.abort();
@@ -672,8 +691,10 @@ export default {
             const slug = payload && payload.slug;
 
             if (action === 'started') {
-                // Keep the dialog open and show the new dataset as importing.
+                // Keep the dialog open and show the new dataset as importing. The store of the app follows the task from
+                // here on: it goes on when the dialog closes ("Run in background") or the page is left
                 this.addImportingEntry(payload);
+                if (payload.taskId) taskMonitor.trackImport(this.org.Dataset(payload.slug), payload.taskId);
                 return;
             }
 
@@ -927,10 +948,40 @@ export default {
                 if (this.datasets.length === 0 && total > 0 && this.currentPage > 1)
                     this.currentPage = Math.max(1, Math.ceil(total / this.itemsPerPage));
                 this.datasets.forEach(ds => this.preloadDatasetThumbnail(ds));
+                this.findImports(this.datasets, request.signal);
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 throw e;
             }
+        },
+
+        // The imports that run in the datasets of the page, after a load or a reload (FR-UPL-10): one task-list request per
+        // row, and the store tracks the ones that run (no other poll); the rows show them as they are found
+        async findImports(rows, signal) {
+            try {
+                await Promise.all(rows.filter(ds => !ds.isTemporary && ds.permissions?.canRead !== false).map(async ds => {
+                    const running = await taskMonitor.findImports(this.org.Dataset(ds.slug));
+                    if (running.length && !signal?.aborted) this.refreshImports();
+                }));
+            } catch (e) {
+                // Best effort: the list is there without the tags
+                console.warn('Could not look for running imports:', e);
+            }
+        },
+
+        // Which rows have an import running, and how far it is, from the store
+        refreshImports() {
+            const progress = {};
+            for (const ds of this.datasets) {
+                const running = this.org ? taskMonitor.getImports(this.org.Dataset(ds.slug)) : [];
+                if (running.length) progress[ds.slug] = Math.round(running[0].progressPercent ?? 0);
+            }
+            this.importProgress = progress;
+        },
+
+        importingText(slug) {
+            const percent = this.importProgress[slug];
+            return percent > 0 ? `Importing\u2026 ${formatNumber(percent, 0)} %` : 'Importing\u2026';
         },
 
         // Where the datasets are, asked once for the visit to the organization (a dataset added,

@@ -101,4 +101,19 @@ describe('the empty file list', () => {
         await flushPromises();
         expect(w.find('.empty-state button').exists()).toBe(false);
     });
+
+    // FR-UPL-10: the files of an import that runs are coming, so the folder is not said to be empty
+    it('does not say the folder is empty while an import runs, in the grid and in the table', async () => {
+        setActivePinia(createPinia());
+        w = mount(DatasetExplorer, { props: { files: [], dataset: { org: 'o', ds: 'd' }, canWrite: true, importing: true }, attachTo: document.body, global: { plugins: [PrimeVue], stubs } });
+        await flushPromises();
+        expect(w.text()).not.toContain('This folder is empty');
+        expect(w.find('.empty-state-actions').exists()).toBe(false);
+        w.unmount();
+
+        w = mount(TableView, { props: { files: [], dataset: { org: 'o', ds: 'd' }, canWrite: true, importing: true }, attachTo: document.body, global: { plugins: [PrimeVue], stubs } });
+        await flushPromises();
+        expect(w.text()).not.toContain('This folder is empty');
+        expect(w.find('.empty-state-actions').exists()).toBe(false);
+    });
 });

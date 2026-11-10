@@ -214,15 +214,6 @@ export default class Dataset {
         return this.registry.postRequest(`${this.baseApi}/contours`, body);
     }
 
-    async checkMaskedFileExists(path) {
-        return this.registry.postRequest(`${this.baseApi}/mask-borders/check`, { path });
-    }
-
-    /** Starts masking the borders of path; an existing masked copy is replaced only with overwrite (409 otherwise). */
-    async maskBorders(path, near = 15, white = false, overwrite = false) {
-        return this.registry.postRequest(`${this.baseApi}/mask-borders`, { path, near, white, overwrite });
-    }
-
     exportUrl(path, vizParams = {}) {
         let url = `${this.baseApi}/export?path=${encodeURIComponent(path)}&format=geotiff`;
         if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;

@@ -36,6 +36,15 @@
 
             <div class="container-wrapper">
                 <slot />
+                <!-- The file cannot open yet: its build is missing, running, on hold or failed (FR-VWR-08, FR-XC-16) -->
+                <div v-if="build" class="viewer-build" role="status" aria-live="polite" :data-status="build.status">
+                    <i class="fa-solid viewer-build-icon" :class="build.status === 'building' ? 'fa-circle-notch fa-spin' : 'fa-triangle-exclamation'" aria-hidden="true" />
+                    <div class="viewer-build-title">{{ build.title }}</div>
+                    <p class="viewer-build-text">{{ build.text }}</p>
+                    <p v-if="build.error" class="viewer-build-error" role="alert">{{ build.error }}</p>
+                    <Button v-if="build.canBuild" :label="build.actionLabel" icon="fa-solid fa-hammer" severity="primary" size="small"
+                            @click="emit('build')" />
+                </div>
                 <!-- Embedded there is no view bar: the same button stands over the view, in the corner the viewer leaves free -->
                 <button v-if="fullscreenOverlay" type="button" class="viewer-fullscreen-overlay" :class="fullscreenCorner"
                         :title="fullscreenTitle" :aria-label="fullscreenLabel" :aria-pressed="isFullscreen" @click="toggleFullscreen">
@@ -98,7 +107,8 @@
  * and the file name, or the viewer's own content in its `bar` slot; none when embedded), the
  * error message, the page state of a file that did not load (ResourceState, from `load-error`),
  * the loading indicator, the viewer area, an optional settings button with its panel, and an
- * optional navigation toolbar.
+ * optional navigation toolbar. A viewer whose file waits for its build passes the state in `build`
+ * (useViewerBuild): the shell shows it, with the Build / Rebuild button (the `build` event), over the view.
  *
  * The settings open in a panel docked inside the viewer area, on the side of the settings button
  * (a default side when there is none, as in the splat viewer, which has its own button and sets
@@ -126,6 +136,7 @@ import { useRoute } from 'vue-router';
 import ddb from 'ddb';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/HubMessage.vue';
+import Button from 'primevue/button';
 import ResourceState from '@/components/ResourceState.vue';
 import { useOverlay } from '@/composables/useOverlay';
 import { b64decode } from '@/libs/base64';
@@ -163,9 +174,14 @@ const props = defineProps({
     /** Asked on the key F: false leaves the key to the viewer (a key of its own mode), anything else toggles fullscreen */
     fullscreenKey: { type: Function, default: null },
     /** The gestures the viewer understands, listed in the help of the toolbar: [{ input: 'Left drag', action: 'Rotate' }] */
-    gestures: { type: Array, default: () => [] }
+    gestures: { type: Array, default: () => [] },
+    /**
+     * The build state of a file that cannot open yet (useViewerBuild's `notice`: status, title, text, canBuild, actionLabel,
+     * error): shown over the view with the Build / Rebuild button when `canBuild`; null when the file opens
+     */
+    build: { type: Object, default: null }
 });
-const emit = defineEmits(['home']);
+const emit = defineEmits(['home', 'build']);
 
 // The side the settings panel takes when the viewer has no settings button of the shell (the splat viewer has its own)
 const DEFAULT_PANEL_SIDE = 'right';
@@ -402,6 +418,46 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
     min-height: 0;
     width: 100%;
     position: relative;
+}
+
+/* The build state of a file that cannot open yet: centred over the (empty) view */
+.viewer-build {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-md);
+    text-align: center;
+    color: var(--ddb-text);
+    background: var(--ddb-bg);
+}
+
+.dark .viewer-build {
+    color: var(--ddb-text-on-dark);
+    background: var(--ddb-viewer-bg);
+}
+
+.viewer-build-icon {
+    font-size: 2rem;
+}
+
+.viewer-build-title {
+    font-weight: 600;
+    font-size: var(--ddb-font-size-lg, 1.1rem);
+}
+
+.viewer-build-text,
+.viewer-build-error {
+    max-width: 32rem;
+    margin: 0;
+}
+
+.viewer-build-error {
+    font-weight: 600;
 }
 
 /* Embedded: the fullscreen button over the view, in the corner the viewer leaves free (`fullscreen-corner`) */

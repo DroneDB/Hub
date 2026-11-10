@@ -69,7 +69,8 @@
                 </Column>
                 <template #empty>
                     <LoadingSpinner v-if="isLoadingFiles" />
-                    <div v-else class="text-center p-4">
+                    <!-- Not while an import runs: its files are coming (the banner of the page says so, FR-UPL-10) -->
+                    <div v-else-if="!importing" class="text-center p-4">
                         <FolderEmptyState :can-write="canWrite" @upload="$emit('upload')" @import-from-url="$emit('importFromUrl')" />
                     </div>
                 </template>
@@ -129,6 +130,8 @@ export default {
         dataset: { type: Object, required: true },
         expandedGrid: { type: Boolean, default: false },
         canWrite: { type: Boolean, default: false },
+        // An import into the dataset runs: the empty-folder hint is not shown (FR-UPL-10)
+        importing: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
     emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],

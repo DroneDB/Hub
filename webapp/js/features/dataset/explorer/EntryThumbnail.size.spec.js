@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { thumbs, entry as ddbEntry } from 'ddb';
 import { createThumbnailQueue } from '@/libs/thumbnailQueue';
+import BuildManager from '@/libs/build/buildManager';
 
 const EntryThumbnail = (await import('./EntryThumbnail.vue')).default;
 
@@ -14,7 +15,7 @@ const file = {
     label: 'a.jpg', path: 'ddb://hub.test/acme/site/a.jpg', icon: 'fa-solid fa-image', selected: false,
     entry: { path: 'a.jpg', type: ddbEntry.type.GEOIMAGE, hash: 'h' }
 };
-const mountTile = size => mount(EntryThumbnail, { props: { file, size, dataset: { org: 'acme', ds: 'site' } } });
+const mountTile = size => mount(EntryThumbnail, { props: { file, size, dataset: { org: 'acme', ds: 'site', getTasks: async () => [] } } });
 const requested = () => thumbs.fetch.mock.calls.map(c => c[1]);
 
 beforeEach(() => {
@@ -89,7 +90,7 @@ describe('EntryThumbnail size in the Explorer queue (FR-EXP-43)', () => {
         };
     }
     const mountLazy = (thumbnailLoader, name = 'a.jpg') => mount(EntryThumbnail, {
-        props: { file: { ...file, label: name, path: `ddb://hub.test/acme/site/${name}` }, size: 128, lazyLoad: true, dataset: { org: 'acme', ds: 'site' } },
+        props: { file: { ...file, label: name, path: `ddb://hub.test/acme/site/${name}` }, size: 128, lazyLoad: true, dataset: { org: 'acme', ds: 'site', getTasks: async () => [] } },
         global: { provide: { thumbnailLoader } }
     });
     const src = w => w.find('img').exists() ? w.find('img').attributes('src') : null;
@@ -112,24 +113,32 @@ describe('EntryThumbnail size in the Explorer queue (FR-EXP-43)', () => {
     });
 
     it('gives its turn back when a build starts while its image loads or waits (the image is no longer shown)', async () => {
+        // A file that libddb builds: the build the user starts is the BuildManager's, which the tile follows (FR-XC-16)
+        const dataset = {
+            org: 'acme', ds: 'site', baseApi: '/orgs/acme/ds/site', getTasks: async () => [],
+            listOne: async () => ({ type: ddbEntry.type.POINTCLOUD }), build: async () => true
+        };
+        const cloud = name => ({ ...file, label: name, path: `ddb://hub.test/acme/site/${name}`, entry: { path: name, type: ddbEntry.type.POINTCLOUD, hash: 'h' } });
+        const tile = (l, name) => mount(EntryThumbnail, { props: { file: cloud(name), size: 128, lazyLoad: true, dataset }, global: { provide: { thumbnailLoader: l } } });
         const l = loader();
-        const w = mountLazy(l);
+        const w = tile(l, 'a.laz');
         await l.show(w);
         expect(l.queue.running).toBe(1);
-        w.vm.onBuildStarted({ dataset: w.props('dataset'), filePath: 'a.jpg' });
+        await BuildManager.startBuild(dataset, 'a.laz');
         await flushPromises();
         expect(l.queue.running).toBe(0);
 
         const busy = l.queue.enqueue(() => {});
-        const v = mountLazy(l, 'b.jpg');
+        const v = tile(l, 'b.laz');
         await l.show(v);
-        v.vm.onBuildStarted({ dataset: v.props('dataset'), filePath: 'a.jpg' });
+        await BuildManager.startBuild(dataset, 'b.laz');
         busy.release();
         await flushPromises();
         expect(l.queue.running).toBe(0);
         expect(src(v)).toBe(null);
         w.unmount();
         v.unmount();
+        BuildManager.cleanup();
     });
 
     it('a tile whose image is loading when the size changes ends with the L image', async () => {

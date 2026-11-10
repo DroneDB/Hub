@@ -1,7 +1,7 @@
 <template>
     <ViewerShell id="unified-viewer" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading" :load-error="loadError"
                  :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings"
-                 nav-toolbar :gestures="GESTURES" @home="goHome">
+                 nav-toolbar :gestures="GESTURES" :build="buildNotice" @home="goHome" @build="startBuild">
         <template #loading>
             <LoadingSpinner :label="loadingText" />
             <LoadProgress :progress="progress" />
@@ -57,6 +57,7 @@ import ViewerShell from '@/components/ViewerShell.vue';
 import RangeSetting from '@/components/RangeSetting.vue';
 import MeasureToolbar from '@/components/MeasureToolbar.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
+import { useViewerBuild, isBuildWait } from '@/composables/useViewerBuild';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
@@ -70,7 +71,11 @@ import { NAV_GESTURES, showNavHintOnce } from './navKeys';
 defineOptions({ name: 'UnifiedViewer' });
 
 // Type checks are the viewer's own (several types; .3tz indexed as generic)
-const { entry, dataset, loading, error, loadError, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
+const { entry, dataset, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
+// A file that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends (FR-VWR-08)
+const { notice: buildNotice, setAvailability, build: startBuild } = useViewerBuild({
+    dataset, path: () => entry.value?.path, canWrite, reload: reloadAfterBuild
+});
 const { settings, resetSettings } = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]);
 const notify = useNotify();
 
@@ -133,7 +138,15 @@ async function load() {
         // empty scene (the dataset page checks before opening; a direct URL comes here)
         const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
         const availability = await FileAvailabilityChecker.check(dataset.value, viewable, 'unified', { current: true });
-        if (!availability.available) throw new Error(availability.message || `${viewable.path} is not available in the 3D viewer.`);
+        if (!availability.available) {
+            // Its build is running, on hold, failed or missing: the shell says so, the viewer opens when the build ends
+            if (isBuildWait(availability)) {
+                setAvailability(availability);
+                return;
+            }
+            throw new Error(availability.message || `${viewable.path} is not available in the 3D viewer.`);
+        }
+        setAvailability(null);
 
         scene = new UnifiedScene(await loadGiro3dLibs(), viewEl.value, { settings, view, notify });
         measureTool = new MeasureTool(scene, count => { measureCount.value = count; });
@@ -147,6 +160,16 @@ async function load() {
     } finally {
         loading.value = false;
         view.progress = null;
+    }
+}
+
+// The build ended: the file as listed now, and the viewer opens it
+async function reloadAfterBuild() {
+    try {
+        entry.value = await dataset.value.listOne(entry.value.path);
+        await load();
+    } catch (e) {
+        error.value = e.message;
     }
 }
 

@@ -24,6 +24,7 @@ const ROLLED_BACK = Object.freeze({
     'archive-extract': 'The files extracted so far are deleted.',
     'merge-multispectral': 'The output written so far is deleted.',
     'align-raster': 'The output written so far is deleted.',
+    'mask-borders': 'The masked file written so far is deleted.',
     'photogrammetry': 'The output written so far is deleted, and so is the dataset, if this task created it.'
 });
 

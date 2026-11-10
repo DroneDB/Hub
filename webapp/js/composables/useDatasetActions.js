@@ -25,7 +25,9 @@ import { formatAlignResult } from '@/libs/dataset/alignResult';
 import { skippedSentence } from '@/libs/tasks/extractSummary';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
-import { useConfirmReplace } from '@/composables/useConfirmReplace';
+import { useConfirmReplace, existingItem, replaceConflictPath, conflictIsFolder } from '@/composables/useConfirmReplace';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { MASK_BORDERS_TOOL, maskedOutputPath } from '@/libs/dataset/maskBorders';
 import Alert from '@/components/HubAlert.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DeleteResultDialog from '@/features/dataset/dialogs/DeleteResultDialog.vue';
@@ -65,6 +67,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     const notify = useNotify();
     const confirm = useConfirm(dialogs);
     const confirmReplace = useConfirmReplace(dialogs);
+    const { runHeavyTask } = useHeavyTask();
 
     function showError(error, title = 'Error') {
         dialogs.open(Alert, { title, message: String((error && error.message) || error) });
@@ -437,20 +440,47 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         dialogs.open(SplatTrainingExportDialog, { file, dataset });
     }
 
+    /**
+     * Mask Borders is a heavy task like Align (FR-PRC-12, D-013): the Registry writes `<name>_masked.tif` next to the source,
+     * indexes it and queues its build under its own name. When the task ends the new file joins the list at once and the
+     * toast names it. An existing copy is replaced only after the user confirmed it (FR-XC-07): from the listing in view,
+     * or from the 409 of a copy that appeared since.
+     */
     function maskBorders(item) {
         dialogs.open(MaskBordersDialog, {
             entry: item,
             onClose: async action => {
                 if (action !== 'confirm') return;
+                const source = item.entry.path;
+                const submit = overwrite => runHeavyTask(dataset, MASK_BORDERS_TOOL, {
+                    params: { path: source, overwrite }, notify: false,
+                    onSubmitted: () => notify.info(`Masking started for ${item.label}...`, { summary: 'Mask Borders', life: 'normal' })
+                });
                 try {
-                    const check = await dataset.checkMaskedFileExists(item.entry.path);
-                    if (check.exists && !await confirmReplace(check.outputPath)) return;
-                    // The Registry replaces an existing copy only when asked: the user has just confirmed it
-                    await dataset.maskBorders(item.entry.path, undefined, undefined, check.exists === true);
-                    notify.info(`Masking started for ${item.label}...`, { summary: 'Mask Borders', life: 'normal' });
-                    BuildManager.startPolling(dataset);
+                    // The copy is where the Registry writes it, in the letter case of an existing entry (D-040)
+                    let outputPath = maskedOutputPath(source);
+                    const listed = existingItem(outputPath, listing.files.value);
+                    let overwrite = false;
+                    if (listed) {
+                        if (!await confirmReplace(listed.entry.path)) return;
+                        overwrite = true;
+                        outputPath = listed.entry.path;
+                    }
+                    try {
+                        await submit(overwrite);
+                    } catch (e) {
+                        // The copy appeared after the list was read: ask once, then replace it. A folder is never replaced
+                        const conflict = overwrite ? null : replaceConflictPath(e);
+                        if (!conflict || await conflictIsFolder(dataset, conflict, listing.files.value)) throw e;
+                        if (!await confirmReplace(conflict)) return;
+                        outputPath = conflict;
+                        await submit(true);
+                    }
+                    await listing.addEntry(outputPath).catch(e => console.warn('Could not show the masked file in the list:', e));
+                    notify.success(`Masked file ready: ${pathutils.basename(outputPath)}`, { summary: 'Mask Borders', life: 'normal' });
                 } catch (e) {
-                    notify.error(e.message);
+                    // The task's row says why it failed: the toast says it too, with the reason of the Registry
+                    notify.error(e.message, { summary: 'Mask Borders failed', life: 'long' });
                 }
             }
         });

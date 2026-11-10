@@ -20,7 +20,8 @@
                 <LoadingSpinner />
             </div>
             <div v-else-if="files.length === 0" class="explorer-notice text-center m-3">
-                <FolderEmptyState :can-write="canWrite" @upload="$emit('upload')" @import-from-url="$emit('importFromUrl')" />
+                <!-- Not while an import runs: its files are coming (the banner of the page says so, FR-UPL-10) -->
+                <FolderEmptyState v-if="!importing" :can-write="canWrite" @upload="$emit('upload')" @import-from-url="$emit('importFromUrl')" />
             </div>
             <!-- Large folders: only the rows on screen are rendered -->
             <VirtualScroller v-else-if="virtualGrid" ref="grid" v-slot="{ item: row }" class="thumbnail-grid"
@@ -103,6 +104,8 @@ export default {
         tools: { type: Array, default: null },
         dataset: { type: Object, required: true },
         canWrite: { type: Boolean, default: false },
+        // An import into the dataset runs: the empty-folder hint is not shown (FR-UPL-10)
+        importing: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false },
         // The size of the thumbnails: 's' (128 px), 'm' (192) or 'l' (256), FR-EXP-43
         tileSize: { type: String, default: 's' }

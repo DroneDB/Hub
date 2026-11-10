@@ -14,7 +14,7 @@ function mountTile(entryFields) {
         label: 'cloud.laz', path: 'ddb://hub.test/acme/site/cloud.laz', icon: 'fa-solid fa-cloud', selected: false,
         entry: { path: 'cloud.laz', type: ddbEntry.type.POINTCLOUD, ...entryFields }
     };
-    return mount(EntryThumbnail, { props: { file, dataset: { org: 'acme', ds: 'site' } } });
+    return mount(EntryThumbnail, { props: { file, dataset: { org: 'acme', ds: 'site', getTasks: async () => [] } } });
 }
 
 let EntryThumbnail;

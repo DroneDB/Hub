@@ -36,25 +36,26 @@ class BuildManager {
         this.eventListeners = {};
         this.datasets = new Map();
         this._acquired = new Set(); // datasetKeys holding a taskMonitor reference
+        this._registrations = new Map(); // datasetKey -> how many views follow it (registerDataset)
         this._listed = new Set(); // datasetKeys whose build states come from a fetched task list
     }
 
     /* ---- event system ---- */
 
+    // The listeners of each event are a Set: every tile of a large folder adds one and takes it away again, so
+    // `off` must not scan the others
     on(event, callback) {
-        if (!this.eventListeners[event]) this.eventListeners[event] = [];
-        this.eventListeners[event].push(callback);
+        if (!this.eventListeners[event]) this.eventListeners[event] = new Set();
+        this.eventListeners[event].add(callback);
     }
     off(event, callback) {
-        if (this.eventListeners[event]) {
-            const idx = this.eventListeners[event].indexOf(callback);
-            if (idx > -1) this.eventListeners[event].splice(idx, 1);
-        }
+        this.eventListeners[event]?.delete(callback);
     }
     emit(event, data) {
-        (this.eventListeners[event] || []).forEach(cb => {
+        // A copy: a listener may remove itself (or another) while the event is told
+        for (const cb of [...(this.eventListeners[event] ?? [])]) {
             try { cb(data); } catch (e) { console.error('Event listener error:', e); }
-        });
+        }
     }
 
     /* ---- dataset key (libs/tasks/taskStates) ---- */
@@ -65,8 +66,16 @@ class BuildManager {
 
     /* ---- dataset registration & initialisation ---- */
 
+    /**
+     * Follow the builds of a dataset. Counted: the dataset page, a viewer and a tile can each follow the same dataset,
+     * and it stops being followed when the last of them lets go (unregisterDataset).
+     */
     registerDataset(dataset) {
         const key = this.getDatasetKey(dataset);
+        const count = this._registrations.get(key) ?? 0;
+        this._registrations.set(key, count + 1);
+        // A later reference follows what the first one set up
+        if (count > 0) return;
         this.datasets.set(key, dataset);
         // Subscribe once; check against all registered datasets, not just the first one. Any change
         // of the task list counts: a state change, a new task, a task deleted
@@ -84,9 +93,15 @@ class BuildManager {
         this._sync(dataset);
     }
 
-    /** Drop this dataset's monitor reference and cached build state. */
+    /** Let go of the dataset: the last reference drops its monitor reference and its cached build state. */
     unregisterDataset(dataset) {
         const key = this.getDatasetKey(dataset);
+        const count = this._registrations.get(key) ?? 0;
+        if (count > 1) {
+            this._registrations.set(key, count - 1);
+            return;
+        }
+        this._registrations.delete(key);
         if (this._acquired.delete(key)) taskMonitor.release(dataset);
         this.datasets.delete(key);
         this._buildByPath.delete(key);
@@ -156,6 +171,15 @@ class BuildManager {
         if (!cache || !cache.has(filePath)) return null;
         const task = cache.get(filePath);
         return { path: task.path, currentState: task.state };
+    }
+
+    /**
+     * How far the shown build of a file is (0-100), or null when it reports none (not running, or just started and not
+     * listed yet). Reactive like getBuildState.
+     */
+    getBuildProgress(dataset, filePath) {
+        const task = this._buildByPath.get(this.getDatasetKey(dataset))?.get(filePath);
+        return typeof task?.progressPercent === 'number' ? task.progressPercent : null;
     }
 
     /* ---- start/force build ---- */
@@ -233,12 +257,15 @@ class BuildManager {
     /* ---- cleanup ---- */
 
     cleanup() {
+        // Every reference goes, whoever still holds one
+        this._registrations.clear();
         for (const ds of Array.from(this.datasets.values())) this.unregisterDataset(ds);
         taskMonitor.off('tasksUpdated', this._boundOnTasksUpdated);
         this._boundOnTasksUpdated = null;
         this._buildByPath.clear();
         this.datasets.clear();
         this._acquired.clear();
+        this._registrations.clear();
         this._listed.clear();
         this.eventListeners = {};
     }

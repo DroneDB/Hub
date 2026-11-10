@@ -44,7 +44,8 @@ const VIEW_ARTIFACT_ROLES = {
  * Availability check result
  * @typedef {Object} AvailabilityResult
  * @property {boolean} available - Whether the file is available for visualization
- * @property {string} status - Status: 'ready', 'building', 'queued', 'failed', 'not-buildable', 'not-found'
+ * @property {string} status - Status: 'ready', 'building', 'queued' (never built), 'rebuild' (built without the
+ *   artifact the viewer needs), 'blocked', 'failed', 'unknown', 'not-found', 'error'
  * @property {string} message - Descriptive message for the user
  * @property {string} title - Message title
  * @property {Object|null} buildState - Build state if available
@@ -77,18 +78,15 @@ class FileAvailabilityChecker {
         if (viewType === 'unified') {
             const roles = this.getRequiredArtifact(entry.type, viewType, entry);
             if (roles) {
-                const available = await this.hasArtifact(dataset, entry, roles, options.current);
-                if (available) {
+                const listed = options.current ? entry : await currentEntry(dataset, entry, e => !!findArtifactIn(e, roles));
+                if (findArtifactIn(listed, roles)) {
                     return { available: true, status: 'ready', message: '', title: '', buildState: null, actions: [] };
                 }
-                return {
-                    available: false,
-                    status: 'not-found',
-                    message: `'${this.getFileName(entry.path)}' is not available in the 3D viewer.\n\nThe required output has not been produced yet - this file may need to be (re)built.`,
-                    title: 'Not available in 3D viewer',
-                    buildState: null,
-                    actions: ['close']
-                };
+                // The artifact is not there: why is the build state's to say (running, on hold, failed, never built),
+                // as for any viewer, from the entry just listed. The viewer shows that state with its Build / Rebuild
+                // action and loads the file when the build ends (useViewerBuild, FR-XC-16), not a fixed message that
+                // never changes (FR-VWR-08)
+                return this.checkBuildableFile(dataset, listed, viewType, { ...options, current: true });
             }
         }
 
@@ -171,7 +169,20 @@ class FileAvailabilityChecker {
             if (listed.buildStatus === 'failed')
                 return this.handleExistingBuildState({ path: entry.path, currentState: 'Failed' }, entry);
 
-            // 3. Buildable file without its build - needs processing
+            // 3. Built, but without the artifact this viewer needs (a model built before 3D Tiles has only its
+            // Nexus output): only a forced build makes it, libddb skips a build that is complete (FR-VWR-08)
+            if (roles && isBuilt(listed)) {
+                return {
+                    available: false,
+                    status: 'rebuild',
+                    message: `The file '${this.getFileName(entry.path)}' was built before this viewer could show it: its build has no output for this viewer.\n\nRebuild it to open it here.`,
+                    title: 'Rebuild Needed',
+                    buildState: null,
+                    actions: ['cancel', 'retry-build']
+                };
+            }
+
+            // 4. Buildable file without its build - needs processing
             return {
                 available: false,
                 status: 'queued',
@@ -244,16 +255,6 @@ class FileAvailabilityChecker {
             buildState: buildState,
             actions: ['cancel', 'retry-build']
         };
-    }
-
-    /**
-     * Whether the entry lists the artifact (a role, or an any-of list of roles). The entry DTO
-     * carries the artifacts that exist, so nothing is probed; one that was listed before its build
-     * finished lists none, and is checked once against a fresh listing (unless it is `current`).
-     */
-    async hasArtifact(dataset, entry, roles, current = false) {
-        const listed = current ? entry : await currentEntry(dataset, entry, e => !!findArtifactIn(e, roles));
-        return !!findArtifactIn(listed, roles);
     }
 
     /**

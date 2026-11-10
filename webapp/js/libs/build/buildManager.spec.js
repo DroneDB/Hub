@@ -209,3 +209,58 @@ describe('latestTaskByPath', async () => {
         expect(latestTaskByPath([{ taskId: '4', path: null }]).size).toBe(0);
     });
 });
+
+describe('following a dataset (registerDataset is counted)', async () => {
+    const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
+
+    it('keeps the dataset followed until the last view lets go: a viewer opened on the page does not stop the page', () => {
+        manager.cleanup();
+        taskMonitor.acquire.mockClear();
+        taskMonitor.release.mockClear();
+        const ds = { baseApi: '/orgs/o/ds/counted' };
+
+        manager.registerDataset(ds); // the dataset page
+        manager.registerDataset(ds); // a view of it
+        expect(taskMonitor.acquire).toHaveBeenCalledTimes(1);
+
+        manager.unregisterDataset(ds);
+        expect(taskMonitor.release).not.toHaveBeenCalled();
+        expect(manager.datasets.has(manager.getDatasetKey(ds))).toBe(true);
+
+        manager.unregisterDataset(ds);
+        expect(taskMonitor.release).toHaveBeenCalledTimes(1);
+        expect(manager.datasets.has(manager.getDatasetKey(ds))).toBe(false);
+    });
+
+    it('tells how far the shown build of a file is', () => {
+        manager.cleanup();
+        const ds = { baseApi: '/orgs/o/ds/progress' };
+        taskMonitor.getTasks.mockReturnValue([{ taskId: '1', toolId: 'build', path: 'a.obj', state: 'Processing', progressPercent: 35, createdAt: '2026-11-01T10:00:00Z' }]);
+        manager.registerDataset(ds);
+        expect(manager.getBuildProgress(ds, 'a.obj')).toBe(35);
+        expect(manager.getBuildProgress(ds, 'b.obj')).toBeNull();
+        manager.cleanup();
+    });
+});
+
+describe('event listeners', () => {
+    it('removes one listener among many, and a listener that removes itself while told does not skip another', () => {
+        manager.cleanup();
+        const calls = [];
+        const many = Array.from({ length: 1000 }, (_, i) => () => calls.push(i));
+        for (const cb of many) manager.on('buildStateChanged', cb);
+        manager.off('buildStateChanged', many[500]);
+        expect(manager.eventListeners.buildStateChanged.size).toBe(999);
+
+        const leaving = () => { calls.push('leaving'); manager.off('buildStateChanged', leaving); };
+        manager.cleanup();
+        calls.length = 0;
+        const last = () => calls.push('last');
+        manager.on('buildStateChanged', leaving);
+        manager.on('buildStateChanged', last);
+        manager.emit('buildStateChanged', {});
+        manager.emit('buildStateChanged', {});
+        expect(calls).toEqual(['leaving', 'last', 'last']);
+        manager.cleanup();
+    });
+});

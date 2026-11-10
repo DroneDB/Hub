@@ -1,7 +1,7 @@
 <template>
     <!-- Not a tab stop, and its keys are the list's: the list holds the focus and names its active tile (useListNavigation, FR-EXP-09) -->
     <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/interactive-supports-focus -- the listbox is the focusable element (aria-activedescendant) -->
-    <div class="thumbnail" :class="{ selected: file.selected, active }" :title="getTitleText"
+    <div class="thumbnail" :class="{ selected: file.selected, active }" :title="titleText"
          role="option" :aria-selected="!!file.selected"
          :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
         <!-- A second cue of the selection besides the tint and the outline (FR-EXP-10) -->
@@ -12,8 +12,8 @@
                  :src="thumbnail" alt="" style="max-width: 100%; max-height: 100%;" @load="handleImageLoad"
                  @error="handleImageError">
 
-            <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
-            <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
+            <!-- The type icon: the fallback when there is no thumbnail, and under the spinner of a build, dimmed (FR-EXP-07) -->
+            <i v-else-if="shownIcon && !loading" class="icon icon-file" :class="[shownIcon, { 'build-dimmed': buildLoading }]" :style="iconStyle" />
 
             <!-- Build loading spinner (highest priority) -->
             <i v-if="buildLoading" class="fa-solid fa-circle-notch fa-spin loading" />
@@ -22,7 +22,10 @@
             <i v-else-if="loading" class="fa-solid fa-circle-notch fa-spin loading" />
 
             <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
-            <i v-else-if="!thumbnail && !icon" class="fa-solid fa-circle-notch fa-spin loading" />
+            <i v-else-if="!thumbnail && !shownIcon" class="fa-solid fa-circle-notch fa-spin loading" />
+
+            <!-- What the spinner stands for, in the words of the build states (the badge and the tooltip use them too) -->
+            <span v-if="buildLoading" class="build-caption">{{ buildingWord }}</span>
 
             <!-- Build Status Badges: only for non-default states (queued/pending/failed) -->
             <div v-if="!buildLoading && !loading && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
@@ -37,15 +40,15 @@
 import { thumbs } from 'ddb';
 import Mouse from '@/libs/mouse';
 import Keyboard from '@/libs/keyboard';
-import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
-import taskMonitor from '@/libs/tasks/taskMonitor';
-import { isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
-import { shownBuildStatus, isBuildStopped } from '@/libs/build/entryBuild';
+import { shownBuildStatus, isBuildStopped, isBuilt, BUILD_WORDS } from '@/libs/build/entryBuild';
+import { useBuildCompletion } from '@/composables/useBuildCompletion';
+import { tileTitle } from '@/libs/dataset/tileTitle';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import { tileCssVars } from './tileGeometry';
+import { getCurrentInstance } from 'vue';
 
 export default {
     name: 'EntryThumbnail',
@@ -78,6 +81,17 @@ export default {
         }
     },
     emits: ['clicked', 'open'],
+    setup(props) {
+        // The wait for the build of the file is the shared one (FR-XC-16): the build the tile shows is the BuildManager's, and
+        // the end of a build comes through onBuildEnd. A file that is not built by libddb waits for nothing
+        const instance = getCurrentInstance();
+        const buildable = () => isBuildableType(props.file.entry.type);
+        const { buildState, building } = useBuildCompletion(
+            () => (buildable() ? props.dataset : null),
+            () => [props.file.entry.path],
+            end => /** @type {any} */ (instance?.proxy)?.onBuildEnd(end));
+        return { buildState, buildLoading: building };
+    },
     data: function () {
         const label = this.file.label;
 
@@ -86,8 +100,6 @@ export default {
             thumbnail: null,
             icon: null,
             error: null,
-            buildState: null,
-            buildLoading: false,
             loading: false,
             // Bounded retry state (see libs/build/thumbRetryPolicy)
             retryNumber: 0,
@@ -116,19 +128,21 @@ export default {
         effectiveBuildStatus() {
             return shownBuildStatus(this.buildState, this.file.entry);
         },
-        getTitleText() {
+        // The type icon shown: the one the tile set, and while the file builds the file's own (dimmed under the spinner)
+        shownIcon() {
+            return this.icon || (this.buildLoading ? this.file.icon : null);
+        },
+        buildingWord() {
+            return BUILD_WORDS.building;
+        },
+        // Name, type, size and build state in plain words (FR-EXP-21), or the error of the tile
+        titleText() {
             if (this.error) return this.error;
-            // The job's state, unless the entry says more (a job that succeeded can leave a build on hold)
-            if (this.buildState && this.effectiveBuildStatus !== 'pending' && this.effectiveBuildStatus !== 'queued') {
-                return `${this.file.path}\nBuild Status: ${this.buildState.currentState}`;
-            }
-            if (this.effectiveBuildStatus === 'pending') {
-                return `${this.file.path}\n${describeEntryPendingBuild(this.file.entry).text}`;
-            }
-            if (this.effectiveBuildStatus === 'queued') {
-                return `${this.file.path}\nQueued for processing`;
-            }
-            return this.file.path;
+            const title = tileTitle(this.file.entry, this.buildState ? { currentState: this.buildState.currentState } : null);
+            // A build on hold says what it waits for
+            return this.effectiveBuildStatus === 'pending'
+                ? `${title}\n${describeEntryPendingBuild(this.file.entry).text}`
+                : title;
         },
         shouldShowBuildBadge() {
             return !!this.effectiveBuildStatus;
@@ -159,6 +173,16 @@ export default {
         }
     },
     watch: {
+        // A build started or running: no thumbnail is on show and none is asked for (a build that starts again takes the
+        // image away; no load or error event will come, so its turn goes to the next tile)
+        buildLoading(running) {
+            if (!running) return;
+            this.cancelImageRequest();
+            this.loading = false;
+            this.error = null;
+            this.thumbnail = null;
+            this.icon = this.file.icon;
+        },
         // Another tile size: a thumbnail shown comes again at the step of the new size (FR-EXP-43, FR-XC-32), now
         // when the tile is in view, else when it comes into view. A tile still waiting for its turn needs nothing:
         // its URL is built when the turn comes.
@@ -183,14 +207,8 @@ export default {
                 }
             });
         }
-
-        // Setup build listeners if dataset is available
-        if (this.dataset) {
-            this.setupBuildListeners();
-        }
     },
     beforeUnmount() {
-        this.cleanupBuildListeners();
         this.thumbnailLoader?.visibility.unobserve(this.$el);
         this.cancelImageRequest();
         if (this.loadTimeout) clearTimeout(this.loadTimeout);
@@ -301,7 +319,6 @@ export default {
                 this.thumbnail = null;
                 this.icon = this.file.icon;
                 this.loading = false;
-                this.buildLoading = false;
             } else {
                 this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
             }
@@ -342,69 +359,25 @@ export default {
                 return; // Skip if error (unless forced)
             }
 
-            // For buildable files, check if there's an active build or if it needs building
+            // A buildable file whose build runs shows its icon under the spinner, and asks for no thumbnail: the end of the
+            // build brings it (onBuildEnd)
             if (this.dataset && isBuildableType(this.file.entry.type)) {
-                try {
-                    // Check BuildManager cache first (more reliable)
-                    const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
-
-                    if (buildState) {
-                        const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
-
-                        if (activeStates.includes(buildState.currentState)) {
-                            this.buildLoading = true;
-                            this.buildState = buildState;
-                            this.icon = this.file.icon;
-                            return;
-                        }
-
-                        // If build failed or succeeded, continue with thumbnail load
-                        this.buildState = buildState;
-                    } else {
-                        // No build state found in buildManager cache — check taskMonitor store
-                        const tasks = taskMonitor.getTasks(this.dataset);
-                        const buildTasks = tasks.filter(t => t.toolId === 'build');
-                        const activeBuild = buildTasks.find(build =>
-                            build.path === this.file.entry.path &&
-                            !isWaitingBackgroundTask(build) &&
-                            (build.state === 'Processing' ||
-                             build.state === 'Enqueued' ||
-                             build.state === 'Scheduled' ||
-                             build.state === 'Awaiting' ||
-                             build.state === 'Created')
-                        );
-
-                        if (activeBuild) {
-                            this.buildLoading = true;
-                            this.buildState = { path: activeBuild.path, currentState: activeBuild.state };
-                            this.icon = this.file.icon;
-                            return;
-                        }
-
-                        const hasSuccessfulBuild = buildTasks.find(build =>
-                            build.path === this.file.entry.path &&
-                            build.state === 'Succeeded'
-                        );
-
-                        if (!hasSuccessfulBuild) {
-                            this.icon = this.file.icon;
-                        }
-                    }
-                } catch {
-                    // If build check fails, continue with thumbnail load
+                if (this.buildLoading) {
+                    this.icon = this.file.icon;
+                    return;
                 }
+                // No build of its own to explain it: the icon, until the thumbnail is there
+                if (!this.buildState && !isBuilt(this.file.entry)) this.icon = this.file.icon;
             }
 
             this.loading = true;
 
             try {
                 if (hasThumbnail(this.file.entry.type)) {
-                    this.buildLoading = false; // Clear build loading when thumbnail succeeds
                     this.showImage();
                 } else {
                     this.icon = this.file.icon;
                     this.loading = false;
-                    this.buildLoading = false; // Clear build loading when using icon
                 }
             } catch (e) {
                 this.failLoad(e);
@@ -419,7 +392,6 @@ export default {
             if (this.dataset && isBuildableType(this.file.entry.type) && !this.buildState) {
                 this.icon = this.file.icon;
             } else {
-                this.buildLoading = false;
                 this.showError(e);
             }
         },
@@ -435,51 +407,20 @@ export default {
             this.$emit("open", this);
         },
 
-        // Build management methods
-
-        setupBuildListeners() {
-            if (!this.dataset) return;
-
-            // Listen to build events (only for UI feedback)
-            BuildManager.on('buildStateChanged', this.onBuildStateChanged);
-            BuildManager.on('buildStarted', this.onBuildStarted);
-        },
-
-        cleanupBuildListeners() {
-            BuildManager.off('buildStateChanged', this.onBuildStateChanged);
-            BuildManager.off('buildStarted', this.onBuildStarted);
-        },
-
-        onBuildStateChanged(data) {
-            if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
-                this.buildState = data.buildInfo;
-                this.buildLoading = false;
-
-                // If build succeeded, refresh the thumbnail
-                if (data.newState === 'Succeeded') {
-                    // Clear existing state and reload
-                    this.thumbnail = null;
-                    this.error = null;
-                    this.icon = null;
-                    this.loading = false;
-                    this.loadThumbnail(true);
-                }
-            }
-        },
-
-        onBuildStarted(data) {
-            if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
-                // The image goes away (no load or error event will come): its turn goes to the next tile
-                this.cancelImageRequest();
-                this.buildLoading = true;
-                this.loading = false;
-                this.error = null;
-                this.thumbnail = null;
+        // A build of the file ended (the shared wait of FR-XC-16): a build that succeeded makes the thumbnail, so it loads
+        // again with a fresh retry budget; one that failed leaves the icon, which the badge of the build explains
+        onBuildEnd(end) {
+            this.cancelImageRequest();
+            this.thumbnail = null;
+            this.error = null;
+            this.loading = false;
+            if (end.succeeded) {
+                this.icon = null;
+                this.loadThumbnail(true);
+            } else {
                 this.icon = this.file.icon;
             }
-        },
-
-
+        }
     }
 }
 </script>
@@ -591,6 +532,20 @@ export default {
     top: 63%;
     left: 50%;
     margin-left: -0.5rem;
+}
+
+/* A file that builds: its type icon dimmed under the spinner, and the state in words at the foot of the tile (FR-EXP-07) */
+.thumbnail .container i.icon-file.build-dimmed {
+    opacity: 0.35;
+}
+
+.thumbnail .build-caption {
+    position: absolute;
+    bottom: var(--ddb-spacing-xs);
+    left: 0;
+    right: 0;
+    font-size: var(--ddb-font-size-sm);
+    color: var(--ddb-text);
 }
 
 /* Build Status Badges */

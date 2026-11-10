@@ -511,6 +511,7 @@ export default {
             // Tell the parent the dataset now exists so it can show it in the list.
             this.$emit('close', 'started', {
                 slug: result.dsSlug || this.slug,
+                taskId: result.taskId,
                 name: this.name,
                 visibility: this.visibility
             });

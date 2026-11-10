@@ -49,6 +49,43 @@ export function shownBuildStatus(job, entry) {
 }
 
 /**
+ * The words of the build states, in one table keyed by the state `shownBuildState` gives: the badge, the caption of a tile
+ * that builds (FR-EXP-07) and the tile's tooltip (FR-EXP-21) read it, so a state has one name everywhere.
+ */
+export const BUILD_WORDS = Object.freeze({
+    built: 'Built',
+    building: 'Building\u2026',
+    queued: 'Queued',
+    pending: 'On hold',
+    failed: 'Failed'
+});
+
+/**
+ * The state of the entry's build to put in words: 'failed' (the job failed, or the entry says so), 'building' (a job is
+ * active, or the server says the build runs), 'queued', 'pending' (on hold), 'built' (the entry has its build), or null
+ * for an entry with no build to speak of.
+ * @param {{ currentState: string } | null | undefined} job  the build job of the entry, if any
+ * @param {{ buildStatus?: string, artifacts?: any[] } | null | undefined} entry
+ * @returns {'failed' | 'building' | 'queued' | 'pending' | 'built' | null}
+ */
+export function shownBuildState(job, entry) {
+    if (job?.currentState === 'Failed') return 'failed';
+    if (job && isActiveState(job.currentState)) return 'building';
+    if (entry?.buildStatus === 'building') return 'building';
+    return entryBuildStatus(entry) ?? (isBuilt(entry) ? 'built' : null);
+}
+
+/**
+ * The word for the entry's build state ('Built', 'Building…', 'Queued', 'On hold', 'Failed'), or '' when there is none.
+ * @param {{ currentState: string } | null | undefined} job
+ * @param {{ buildStatus?: string, artifacts?: any[] } | null | undefined} entry
+ */
+export function buildWord(job, entry) {
+    const state = shownBuildState(job, entry);
+    return state ? BUILD_WORDS[state] : '';
+}
+
+/**
  * Whether no build of the entry is under way or coming: it failed, or it is on hold until the
  * user adds what it needs. What the build makes (a thumbnail, tiles) does not appear by itself.
  * @param {{ currentState: string } | null | undefined} job  the build job of the entry, if any

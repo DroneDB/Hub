@@ -1,6 +1,7 @@
 <template>
     <ViewerShell id="splat" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading" :load-error="loadError"
-                 settings-title="View settings" settings-id="splat-settings" fullscreen-button>
+                 settings-title="View settings" settings-id="splat-settings" fullscreen-button
+                 :build="buildNotice" @build="startBuild">
         <template #loading>
             <LoadingSpinner label="Loading Gaussian Splat..." />
             <LoadProgress :progress="progress" />
@@ -95,6 +96,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import LoadProgress from '@/components/LoadProgress.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
+import { useViewerBuild, isBuildWait } from '@/composables/useViewerBuild';
 import { useEventListener, useListenerBag } from '@/composables/useEventListener';
 import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
@@ -136,6 +138,10 @@ defineOptions({ name: 'SplatViewer' });
 
 const { entry, dataset, ddbURI, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.GAUSSIAN_SPLAT], typeLabel: 'a Gaussian Splat', title: 'Gaussian Splat'
+});
+// A splat that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends (FR-VWR-08)
+const { notice: buildNotice, setAvailability, build: startBuild } = useViewerBuild({
+    dataset, path: () => entry.value?.path, canWrite, reload: reloadAfterBuild
 });
 const notify = useNotify();
 const dialogs = useDialogs();
@@ -330,7 +336,15 @@ async function loadSplat() {
     // build state says why not when a direct link opens a splat that is not built (yet)
     const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
     const availability = await FileAvailabilityChecker.check(dataset.value, entry.value, 'splat', { current: true });
-    if (!availability.available) throw new Error(availability.message || `${entry.value.path} is not available in the splat viewer.`);
+    if (!availability.available) {
+        // Its build is running, on hold, failed or missing: the shell says so, the viewer opens when the build ends
+        if (isBuildWait(availability)) {
+            setAvailability(availability);
+            return;
+        }
+        throw new Error(availability.message || `${entry.value.path} is not available in the splat viewer.`);
+    }
+    setAvailability(null);
 
     const splatEntry = dataset.value.Entry(entry.value);
     // The level-of-detail .rad streams by range requests; the plain .spz is the fallback of
@@ -630,8 +644,7 @@ function stepCamera(step) {
 
 // ---- Lifecycle --------------------------------------------------------------------------
 
-onMounted(async () => {
-    if (!await entryLoaded) return;
+async function openSplat() {
     loading.value = true;
     try {
         await loadSplat();
@@ -642,6 +655,21 @@ onMounted(async () => {
         loading.value = false;
         progress.value = null;
     }
+}
+
+// The build ended: the splat as listed now, and the viewer opens it
+async function reloadAfterBuild() {
+    try {
+        entry.value = await dataset.value.listOne(entry.value.path);
+    } catch (e) {
+        if (!unmounted) error.value = e.message;
+        return;
+    }
+    await openSplat();
+}
+
+onMounted(async () => {
+    if (await entryLoaded) await openSplat();
 });
 
 // The render loop, the streaming, the WebGL context and the pivot marker go with the page
