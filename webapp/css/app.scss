@@ -548,10 +548,14 @@ $window-margin-wide: 2rem; // and on a tablet or a desktop
     // The buttons stay in view while the content scrolls (FR-UPL-08): the footer sticks to the
     // bottom edge of the scrolling content. Its padding takes the space of the content's bottom
     // padding (the negative margin), so the buttons do not move when the content ends.
+    // A sticky box sticks inside the scroll container's padding, not at its edge: bottom: 0 would
+    // hold the footer --window-pad above the edge, over the end of the content (a window that fits
+    // then covered its last row and could not scroll it into view). The negative offset puts it on
+    // the edge, where it ends with the content.
     .window-footer {
         flex-wrap: wrap;
         position: sticky;
-        bottom: 0;
+        bottom: calc(-1 * var(--window-pad));
         z-index: 1;
         margin-bottom: calc(-1 * var(--window-pad));
         padding-top: var(--ddb-spacing-md);

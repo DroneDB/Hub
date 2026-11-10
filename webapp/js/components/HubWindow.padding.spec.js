@@ -49,6 +49,17 @@ describe('the content padding of a window', () => {
         expect(rules.map(r => r.getPropertyValue('--p-dialog-content-padding')).filter(Boolean)).toEqual([]);
     });
 
+    it('is also the offset the footer sticks at, so the footer never covers the end of the content', () => {
+        // A sticky box sticks inside the scroll container's padding: with bottom: 0 the footer stood --window-pad
+        // above the bottom edge, over the last row of a window that fits (the Verify button of Import, which could
+        // not be scrolled out from under it). bottom: -<padding> puts it on the edge, after the content.
+        const footerRule = css.slice(css.indexOf('.p-dialog.window-dialog .window-footer {'));
+        const body = footerRule.slice(0, footerRule.indexOf('}'));
+        expect(body).toMatch(/position: sticky;/);
+        expect(body).toMatch(/bottom: calc\(-1 \* var\(--window-pad\)\);/);
+        expect(body).not.toMatch(/bottom: 0;/);
+    });
+
     it('is set once, in the stylesheet of the windows (not by a theme override)', () => {
         expect(css.match(/--p-dialog-content-padding:/g)).toHaveLength(1);
         expect(css).toContain('--p-dialog-content-padding: 0 var(--window-pad) var(--window-pad) var(--window-pad);');
