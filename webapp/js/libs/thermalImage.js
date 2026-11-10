@@ -144,7 +144,12 @@ export function thermalFields(entry, info, units = 'metric') {
         if (Number.isFinite(cal.atmosphericTemperature)) {
             fields['atmospheric temperature'] = rasterValueParts(cal.atmosphericTemperature, '°C').text;
         }
-        if (Number.isFinite(cal.relativeHumidity)) fields['relative humidity'] = `${formatNumber(cal.relativeHumidity, 0)} %`;
+        // ddb gives the humidity as a fraction (0 to 1) from the FLIR CameraInfo record; the XMP fallback can still be a
+        // percentage, so a value over 2 is read as one (the rule of ddb)
+        if (Number.isFinite(cal.relativeHumidity)) {
+            const percent = cal.relativeHumidity > 2 ? cal.relativeHumidity : cal.relativeHumidity * 100;
+            fields['relative humidity'] = `${formatNumber(percent, 0)} %`;
+        }
     }
     return Object.keys(fields).length ? fields : null;
 }

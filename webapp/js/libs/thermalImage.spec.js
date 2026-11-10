@@ -101,7 +101,7 @@ describe('the radiometric picture', () => {
     it('lists the thermal fields for the details panel: sensor, range, emissivity, distance and the conditions', () => {
         const entry = { properties: { make: 'FLIR Systems AB', model: 'FLIR Vue Pro R' } };
         const full = { ...info, calibration: { emissivity: 0.95, objectDistance: 5, reflectedApparentTemperature: 20,
-            atmosphericTemperature: 25, relativeHumidity: 50 } };
+            atmosphericTemperature: 25, relativeHumidity: 0.5 } };
         expect(thermalFields(entry, full)).toEqual({
             sensor: 'FLIR Systems AB FLIR Vue Pro R',
             range: '-5.5 °C to 36.6 °C',
@@ -112,6 +112,8 @@ describe('the radiometric picture', () => {
             'relative humidity': '50 %'
         });
         expect(thermalFields(entry, full, 'imperial')['object distance']).toBe('16.4 ft');
+        // A percentage from the XMP fallback (over 2) is not multiplied again
+        expect(thermalFields(entry, { ...full, calibration: { relativeHumidity: 50 } })['relative humidity']).toBe('50 %');
         expect(thermalFields({ properties: {} }, { ...info, calibration: undefined })).toEqual({ range: '-5.5 °C to 36.6 °C' });
         expect(thermalFields(entry, null)).toBeNull();
     });
