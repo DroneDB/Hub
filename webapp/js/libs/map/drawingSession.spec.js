@@ -169,8 +169,22 @@ describe('finishing', () => {
         start();
         addPoint(10, 10);
         addPoint(20, 20);
+        // Its two presses of the main button, in one place
+        pointer('pointerdown', 30, 30, 0);
+        pointer('pointerdown', 32, 31, 0);
         map.dispatchEvent({ type: 'dblclick', map, coordinate: [0, 0], pixel: [0, 0] });
         expect(geometries()).toEqual([[[10, 10], [20, 20]]]);
+    });
+
+    it('a dblclick of OpenLayers whose two presses were apart is not a double click: the line stays open', () => {
+        start();
+        addPoint(10, 10);
+        addPoint(20, 20);
+        pointer('pointerdown', 30, 30, 0);
+        pointer('pointerdown', 30 + 13, 30, 0);
+        map.dispatchEvent({ type: 'dblclick', map, coordinate: [0, 0], pixel: [0, 0] });
+        expect(source.getFeatures()).toHaveLength(0);
+        expect(session.drawing).toBe(true);
     });
 
     it('a line of one point is dropped, not kept: a feature that has no length', () => {
@@ -329,6 +343,12 @@ describe('on a rendered map, with the pointer', () => {
         ptr('pointerup', x, y, 0, 0);
         vi.advanceTimersByTime(300);
     };
+    // A click with no wait after it: the next one within 250 ms makes a dblclick of OpenLayers, wherever it is
+    const quickClick = (x, y) => {
+        ptr('pointermove', x, y, -1, 0);
+        ptr('pointerdown', x, y, 0, 1);
+        ptr('pointerup', x, y, 0, 0);
+    };
     const rightPress = (x, y) => ptr('pointerdown', x, y, 2, 2);
     const rightRelease = (x, y) => ptr('pointerup', x, y, 2, 0);
     const realRightClick = (x, y) => { rightPress(x, y); rightRelease(x, y); vi.advanceTimersByTime(300); };
@@ -349,6 +369,40 @@ describe('on a rendered map, with the pointer', () => {
         // The right button did not start the next line where it was pressed
         expect(session.drawing).toBe(false);
         expect(session.sketch).toBeNull();
+        expect(session.active).toBe(true);
+    });
+
+    it('keeps the first point clicked just after the tool\'s button (within 250 ms): the two clicks are no double click', () => {
+        // The click on the button of the tool reaches the viewport too (the controls are in it), before the session
+        quickClick(390, 10);
+        start();
+        quickClick(100, 100);
+        vi.advanceTimersByTime(300);
+        expect(session.drawing).toBe(true);
+        leftClick(200, 100);
+        realRightClick(250, 150);
+        expect(geometries()).toEqual([[[-100, 50], [0, 50]]]);
+    });
+
+    it('two quick clicks in two places are two points, not a double click that ends the line', () => {
+        start();
+        quickClick(100, 100);
+        quickClick(200, 100);
+        vi.advanceTimersByTime(300);
+        leftClick(200, 200);
+        expect(source.getFeatures()).toHaveLength(0);
+        realRightClick(250, 150);
+        expect(geometries()).toEqual([[[-100, 50], [0, 50], [0, -50]]]);
+    });
+
+    it('a double click in one place finishes the line there, and starts no other', () => {
+        start();
+        leftClick(100, 100);
+        quickClick(200, 100);
+        quickClick(200, 100);
+        vi.advanceTimersByTime(300);
+        expect(geometries()).toEqual([[[-100, 50], [0, 50]]]);
+        expect(session.drawing).toBe(false);
         expect(session.active).toBe(true);
     });
 

@@ -11,8 +11,8 @@
  *     point under the crosshair (the centre of the view) when the map is focused, so a tool works without
  *     a pointer; the crosshair is drawn over the centre of the map while the session runs;
  *   - the mouse: a click of the main button adds a point (the other buttons never start, add or place
- *     anything); a double click or a right click (a right-button release after a move of 4 CSS px or
- *     less, `isRightClick`) finishes the shape, a longer right-drag pans the map (a pan of the right
+ *     anything); a double click (two presses of the main button in one place, `DOUBLE_CLICK_MAX_MOVE_PX`) or a
+ *     right click (a right-button release after a move of 4 CSS px or less, `isRightClick`) finishes the shape, a longer right-drag pans the map (a pan of the right
  *     button, there while the session runs) and is not a click; the browser's context menu stays away
  *     from the map while a tool is armed;
  *   - the tool lock: the measurement toolbar is disabled, once, so that another tool cannot start on top;
@@ -81,6 +81,13 @@ export function createToolLock(toolbar) {
     };
 }
 
+/**
+ * The two presses of a double click are this far apart or less (CSS pixels): the snap tolerance of the Draw interaction,
+ * where its second click finishes the shape itself. OpenLayers reports a `dblclick` for any two clicks within 250 ms
+ * wherever they are: two quick points of a line, or the click on the tool's button and the first point.
+ */
+export const DOUBLE_CLICK_MAX_MOVE_PX = 12;
+
 // The contextmenu that follows the release of a right click that ended the session is still the tool's, for this long
 const MENU_GUARD_MS = 500;
 
@@ -143,6 +150,8 @@ export class DrawingSession {
         this.corner = /** @type {number[] | null} */ (null);
         this.lock = createToolLock(options.toolbar);
         this.rightDown = /** @type {{ button: number, clientX: number, clientY: number } | null} */ (null);
+        // The last two presses of the main button on the map, for what is a double click
+        this.mainDowns = /** @type {{ clientX: number, clientY: number }[]} */ ([]);
         // When the last right click was, to keep the page's menu away from the contextmenu that follows it
         this.rightClickedAt = -Infinity;
         this.inDrawEnd = false;
@@ -315,7 +324,7 @@ export class DrawingSession {
             viewport.addEventListener('contextmenu', this.onContextMenu);
             if (this.options.crosshair !== false) this.showCrosshair(viewport);
         }
-        this.dblClickKey = this.map.on('dblclick', () => { this.finishDrawing(); });
+        this.dblClickKey = this.map.on('dblclick', () => { if (this.isDoubleClick()) this.finishDrawing(); });
         // lifetime: owner (removed in detach())
         window.addEventListener('keydown', this.onKeyDown, true);
     }
@@ -337,7 +346,19 @@ export class DrawingSession {
     /** @param {PointerEvent} e */
     onPointerDown = e => {
         if (e.button === RIGHT_BUTTON) this.rightDown = { button: e.button, clientX: e.clientX, clientY: e.clientY };
+        else if (e.button === 0) this.mainDowns = [...this.mainDowns.slice(-1), { clientX: e.clientX, clientY: e.clientY }];
     };
+
+    /**
+     * Whether the `dblclick` of OpenLayers is one: its two presses were on the map, in one place. A press before the
+     * session (the click on the tool's button) or a quick click elsewhere is not the first half of it, else the first
+     * point of a line would be dropped, or a line finished at its second point.
+     */
+    isDoubleClick() {
+        const [first, second] = this.mainDowns;
+        if (!first || !second) return false;
+        return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY) <= DOUBLE_CLICK_MAX_MOVE_PX;
+    }
 
     /** A right click finishes the shape; a right-drag is not one. @param {PointerEvent} e */
     onPointerUp = e => {
