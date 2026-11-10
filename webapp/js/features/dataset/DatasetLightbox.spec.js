@@ -31,6 +31,7 @@ const files = [
     file('c.jpg', IMAGE, { width: 6000, height: 4000, make: 'Autel' })
 ];
 
+const WAIT = 10000;
 const mounted = [];
 function mountLightbox() {
     const w = mount(DatasetLightbox, { props: { dataset }, attachTo: document.body, global: { plugins: [PrimeVue] } });
@@ -44,7 +45,10 @@ const q = sel => document.querySelector(sel);
 beforeAll(async () => {
     await Promise.all([import('./PhotoLightbox.vue'), import('./VideoLightbox.vue')]);
 }, 60000);
-const shown = sel => vi.waitFor(() => expect(q(sel)).not.toBeNull(), { timeout: 5000, interval: 10 });
+// Every wait polls up to a deadline that is shorter than the timeout of the test (below), so a slow
+// machine fails with the assertion that did not come true, not with a bare timeout of the test.
+const until = assertion => vi.waitFor(assertion, { timeout: WAIT, interval: 10 });
+const shown = sel => until(() => expect(q(sel)).not.toBeNull());
 
 afterEach(() => {
     mounted.splice(0).forEach(w => w.unmount());
@@ -52,7 +56,7 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-describe('DatasetLightbox', () => {
+describe('DatasetLightbox', { timeout: WAIT * 2 }, () => {
     it('supports photos and videos only', () => {
         const w = mountLightbox();
         expect(w.vm.supports(files[0].entry)).toBe(true);
@@ -83,19 +87,20 @@ describe('DatasetLightbox', () => {
         w.vm.open(files[0], files);
         await shown('.photo-lightbox-overlay');
         q('[aria-label="Information"]').click();
-        await flushPromises();
-        expect(q('.photo-lightbox-info').textContent).toContain('DJI');
+        await until(() => expect(q('.photo-lightbox-info').textContent).toContain('DJI'));
         q('[aria-label="Next photo"]').click();
-        await flushPromises();
-        expect(q('.photo-lightbox-name').textContent).toBe('b.jpg');
-        expect(q('.photo-lightbox-info').textContent).toContain('Parrot');
+        await until(() => {
+            expect(q('.photo-lightbox-name').textContent).toBe('b.jpg');
+            expect(q('.photo-lightbox-info').textContent).toContain('Parrot');
+        });
         q('[aria-label="Previous photo"]').click();
-        await flushPromises();
+        await until(() => expect(q('.photo-lightbox-name').textContent).toBe('a.jpg'));
         q('[aria-label="Previous photo"]').click();
-        await flushPromises();
         // around the start: the last photo
-        expect(q('.photo-lightbox-name').textContent).toBe('c.jpg');
-        expect(q('.photo-lightbox-info').textContent).toContain('Autel');
+        await until(() => {
+            expect(q('.photo-lightbox-name').textContent).toBe('c.jpg');
+            expect(q('.photo-lightbox-info').textContent).toContain('Autel');
+        });
     });
 
     it('closes the viewer', async () => {
@@ -103,8 +108,7 @@ describe('DatasetLightbox', () => {
         w.vm.open(files[0], files);
         await shown('.photo-lightbox-overlay');
         q('[aria-label="Close"]').click();
-        await flushPromises();
-        expect(q('.photo-lightbox-overlay')).toBeNull();
+        await until(() => expect(q('.photo-lightbox-overlay')).toBeNull());
     });
 
     it('opens a video in the video lightbox, with the dataset path and the inline URL', async () => {
@@ -122,10 +126,9 @@ describe('DatasetLightbox', () => {
         w.vm.open(files[2], files);
         await shown('.video-lightbox-overlay');
         q('video').dispatchEvent(new Event('error'));
-        await flushPromises();
+        await shown('.video-lightbox-download');
         q('.video-lightbox-download').click();
-        await flushPromises();
-        expect(dataset.downloadWithCheck).toHaveBeenCalledWith(['photos/clip.mp4']);
+        await until(() => expect(dataset.downloadWithCheck).toHaveBeenCalledWith(['photos/clip.mp4']));
     });
 
     it('does nothing for a folder without photos', async () => {
