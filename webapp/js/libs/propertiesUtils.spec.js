@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
-import { formatCadCrs, tidyProperties, formatDimensions, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties, visibleMeta, HIDDEN_META_KEYS } from './propertiesUtils';
+import { formatCadCrs, tidyProperties, formatDimensions, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties, visibleMeta, formatModifiedDate, HIDDEN_META_KEYS } from './propertiesUtils';
 
 const entry = (crs, units = 'm') => ({ properties: { vector: { crs, units } } });
 
@@ -262,8 +262,109 @@ describe('buildAllProperties of the dataset entry', () => {
             }
         };
         const props = buildAllProperties(file);
-        expect(props.entries).toBe(6);
+        expect(props.entries).toBe('6');
         expect(props).not.toHaveProperty('permissions');
         expect(props).not.toHaveProperty('hasThumbnail');
+    });
+});
+
+describe('the properties of the dataset root (FR-EXP-25)', () => {
+    const root = {
+        path: 'ddb://h/o/explorer-copy', type: ddb.entry.type.DRONEDB, size: 42050000, mtime: 1700000000,
+        properties: {
+            entries: 16, readme: 'README.md', permissions: { canRead: true }, hasThumbnail: true,
+            meta: {
+                id: { id: 'e3f1c2a0-5b7d-4c1e-9a64-0d2f8b1a77c3', data: 'f9d2', mtime: 1700000000 },
+                name: { id: '0b1d7a22-aaaa-4c5d-8e1f-9a3c5d7e9f10', data: 'T Explorer Copy', mtime: 1700000000 },
+                tagline: { id: '7c1d7a22-bbbb-4c5d-8e1f-9a3c5d7e9f11', data: 'Explorer audit copy', mtime: 1700000000 },
+                visibility: { id: '2c1d7a22-cccc-4c5d-8e1f-9a3c5d7e9f12', data: 1, mtime: 1700000000 },
+                license: { id: '3c1d7a22-dddd-4c5d-8e1f-9a3c5d7e9f13', data: 'CC-BY-4.0', mtime: 1700000000 }
+            }
+        }
+    };
+
+    it('reads the name, tagline, visibility, license, entries, size and date as words', () => {
+        const props = buildAllProperties({ entry: root });
+        expect(props.name).toBe('T Explorer Copy');
+        expect(props.tagline).toBe('Explorer audit copy');
+        expect(props.visibility).toBe('Unlisted');
+        expect(props.license).toBe('Creative Commons Attribution 4.0 International');
+        expect(props.entries).toBe('16');
+        expect(props.size).toBe('40.1 MB');
+        expect(props.modified).toBe(formatModifiedDate(1700000000));
+        expect(props.readme).toBe('README.md');
+    });
+
+    it('writes the entry count with the number format (grouped digits)', () => {
+        const big = { ...root, properties: { ...root.properties, entries: 12345 } };
+        expect(buildAllProperties({ entry: big }).entries).toBe('12,345');
+    });
+
+    it('has a Created row from the creation date of the Registry, written as every date is', () => {
+        const created = Date.UTC(2026, 2, 4, 10, 30, 15);
+        const expected = new Date(created).toLocaleString('en-US', {
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        expect(buildAllProperties({ entry: root }, 'metric', { created }).created).toBe(expected);
+        // an ISO text (the DTO as JSON) is the same moment
+        expect(buildAllProperties({ entry: root }, 'metric', { created: '2026-03-04T10:30:15Z' }).created).toBe(expected);
+        expect(Object.keys(buildAllProperties({ entry: root }, 'metric', { created }))).toContain('created');
+    });
+
+    it('has no Created row until the creation date is known, or when it is not a date', () => {
+        expect(buildAllProperties({ entry: root })).not.toHaveProperty('created');
+        expect(buildAllProperties({ entry: root }, 'metric', { created: 'soon' })).not.toHaveProperty('created');
+    });
+
+    it('shows no id, no epoch time and no number as the visibility by default', () => {
+        const text = JSON.stringify(buildAllProperties({ entry: root }));
+        expect(text).not.toContain('e3f1c2a0-5b7d-4c1e-9a64-0d2f8b1a77c3');
+        expect(text).not.toContain('0b1d7a22');
+        expect(text).not.toContain('1700000000');
+        expect(buildAllProperties({ entry: root })).not.toHaveProperty('metadata');
+        expect(buildAllProperties({ entry: root })).not.toHaveProperty('permissions');
+    });
+
+    it('gives the metadata as it is stored with raw, for the "Show raw metadata" toggle', () => {
+        const props = buildAllProperties({ entry: root }, 'metric', { raw: true });
+        expect(props.metadata.name).toEqual({ id: '0b1d7a22-aaaa-4c5d-8e1f-9a3c5d7e9f10', data: 'T Explorer Copy', mtime: 1700000000 });
+        expect(props.metadata.visibility.data).toBe(1);
+    });
+
+    it('names a dataset without a display name by its slug, and leaves out what it does not have', () => {
+        const bare = { path: 'ddb://h/o/survey-a', type: ddb.entry.type.DRONEDB, size: 0, properties: { entries: 0, meta: { visibility: { data: 0 } } } };
+        const props = buildAllProperties({ entry: bare });
+        expect(props.name).toBe('survey-a');
+        expect(props.visibility).toBe('Private');
+        expect(props).not.toHaveProperty('tagline');
+        expect(props).not.toHaveProperty('license');
+        expect(props).not.toHaveProperty('size');
+        expect(props).not.toHaveProperty('modified');
+    });
+
+    it('does not change the properties of a file', () => {
+        const photo = { path: 'a.jpg', type: ddb.entry.type.IMAGE, size: 1024, mtime: 1, properties: { meta: { x: { id: 'g', data: 'y' } } } };
+        expect(buildAllProperties({ entry: photo }).metadata).toEqual({ x: { id: 'g', data: 'y' } });
+    });
+});
+
+describe('a warning that libddb tags with a code (FR-EXP-18)', () => {
+    const dwg = properties => ({ entry: { path: 'plan.dwg', type: ddb.entry.type.VECTOR, size: 10, properties } });
+
+    it('says it in words for users, not as the setup message of the server, and shows no code row', () => {
+        const props = buildAllProperties(dwg({
+            warning: 'vector parse failed: DWG support needs dwg2dxf (LibreDWG); set DDB_DWG2DXF_PATH or install dwg2dxf next to ddb',
+            warningCode: 'dwg-converter-missing'
+        }));
+        expect(props.warning).toBe('DWG drawings cannot be read on this server; export the drawing as DXF and upload that.');
+        expect(props).not.toHaveProperty('warningCode');
+        expect(JSON.stringify(props)).not.toContain('DDB_DWG2DXF_PATH');
+    });
+
+    it('keeps the text of a warning without a code, or with a code it does not know', () => {
+        expect(buildAllProperties(dwg({ warning: 'footprint unavailable: no CRS' })).warning).toBe('footprint unavailable: no CRS');
+        const props = buildAllProperties(dwg({ warning: 'new reason', warningCode: 'from-a-newer-libddb' }));
+        expect(props.warning).toBe('new reason');
+        expect(props).not.toHaveProperty('warningCode');
     });
 });

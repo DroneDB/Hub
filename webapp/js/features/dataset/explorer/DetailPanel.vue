@@ -10,7 +10,7 @@
             </h3>
             <Button severity="secondary" outlined title="Close" aria-label="Close" icon="fa-solid fa-xmark" @click="handleClose" />
         </div>
-        <div class="detail-content selection-summary">
+        <div ref="detailContent" class="detail-content selection-summary">
             <p v-if="summary.hasFolder" class="selection-note">The size does not count what is inside the folders.</p>
             <p class="selection-types">{{ summary.typesText }}</p>
             <ul class="selection-names text-selectable">
@@ -36,7 +36,7 @@
             <Button severity="secondary" outlined title="Close" aria-label="Close" icon="fa-solid fa-xmark" @click="handleClose" />
         </div>
 
-        <div class="detail-content">
+        <div ref="detailContent" class="detail-content">
             <!-- Thumbnail section -->
             <div v-if="hasThumbnailSupport" class="thumbnail-section">
                 <div ref="thumbnailContainer" class="thumbnail-container">
@@ -299,6 +299,8 @@ export default {
         file: {
             immediate: true,
             handler(newFile) {
+                // Another file starts at the top: the scroll position of the one before would show its preview cropped (FR-EXP-34)
+                this.scrollToTop();
                 if (newFile) {
                     this.loadDetails();
                 } else {
@@ -322,6 +324,14 @@ export default {
         this._boxObserver?.disconnect();
     },
     methods: {
+        // The content scrolls inside the panel (.detail-content); a panel that has no content yet has nothing to reset
+        scrollToTop() {
+            const reset = () => { if (this.$refs.detailContent) this.$refs.detailContent.scrollTop = 0; };
+            reset();
+            // The element of the new file is rendered after this change: the same reset once it is there
+            this.$nextTick(reset);
+        },
+
         // The size to request for the preview: the box's width times the pixel ratio, in the steps of
         // FR-XC-32 (a bitmap of the box's CSS size is soft on a 2x screen, FR-EXP-41)
         previewRequestSize() {

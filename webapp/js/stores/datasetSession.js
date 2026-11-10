@@ -23,6 +23,9 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
     // The dataset's root entry: its file count (properties.entries) and total size, for the header's
     // whole-dataset download question (FR-EXP-27)
     const rootEntry = shallowRef(null);
+    // When the dataset was created, from the Registry's dataset list (the root entry does not carry it): the
+    // Created row of its Properties (FR-EXP-25). Null until it is read.
+    const creationDate = ref(/** @type {number|string|null} */ (null));
 
     /** @param {Array<object>} files */
     function setSelectedFiles(files) {
@@ -58,6 +61,11 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
         rootEntry.value = entry || null;
     }
 
+    /** @param {number|string|null} value */
+    function setCreationDate(value) {
+        creationDate.value = value ?? null;
+    }
+
     /** Leaving the dataset: nothing selected, no tab, no archive in progress, nothing refused. */
     function reset() {
         selectedFiles.value = [];
@@ -66,10 +74,11 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
         unavailable.value = false;
         canWrite.value = false;
         rootEntry.value = null;
+        creationDate.value = null;
     }
 
     return {
-        selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable, canWrite, rootEntry,
-        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, setRootEntry, reset
+        selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable, canWrite, rootEntry, creationDate,
+        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, setRootEntry, setCreationDate, reset
     };
 });

@@ -9,6 +9,7 @@ import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
+import { buildWarningOf } from '@/libs/build/buildWarnings';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
 import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
@@ -45,11 +46,13 @@ const VIEW_ARTIFACT_ROLES = {
  * @typedef {Object} AvailabilityResult
  * @property {boolean} available - Whether the file is available for visualization
  * @property {string} status - Status: 'ready', 'building', 'queued' (never built), 'rebuild' (built without the
- *   artifact the viewer needs), 'blocked', 'failed', 'unknown', 'not-found', 'error'
+ *   artifact the viewer needs), 'blocked', 'failed', 'unsupported' (the server cannot read this file: processing it
+ *   again does not help), 'unknown', 'not-found', 'error'
  * @property {string} message - Descriptive message for the user
  * @property {string} title - Message title
  * @property {Object|null} buildState - Build state if available
  * @property {Array<string>} actions - Available actions for the user
+ * @property {string} [hint] - What the administrator of the server does about it ('unsupported'), shown in the details
  */
 
 class FileAvailabilityChecker {
@@ -142,6 +145,21 @@ class FileAvailabilityChecker {
 
             if (isReady(listed)) {
                 return { available: true, status: 'ready', message: '', title: '', buildState: job, actions: [] };
+            }
+
+            // The server cannot read this kind of file, as libddb tags it (a DWG on a server without its converter): the
+            // user is told so, and no build is offered, because processing the file again cannot help (FR-EXP-18)
+            const unsupported = buildWarningOf(listed);
+            if (unsupported && !unsupported.retry) {
+                return {
+                    available: false,
+                    status: 'unsupported',
+                    message: unsupported.text,
+                    title: unsupported.title,
+                    buildState: null,
+                    actions: ['close', 'details'],
+                    hint: unsupported.adminHint
+                };
             }
 
             // Deferred: it waits for files the dataset lacks, or for a retry after a temporary error. Checked

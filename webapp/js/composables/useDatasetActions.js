@@ -16,7 +16,6 @@ import { lazyComponent } from '@/libs/lazyComponent';
 import { renameDataset } from '@/libs/api/registryUtils';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
-import emitter from '@/libs/eventBus';
 import { itemFor } from '@/libs/dataset/explorerItems';
 import { CONFIRM_RESCAN, CONFIRM_REBUILD, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
@@ -25,6 +24,7 @@ import { formatAlignResult } from '@/libs/dataset/alignResult';
 import { skippedSentence } from '@/libs/tasks/extractSummary';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
+import { useUploadsStore } from '@/stores/uploads';
 import { useConfirmReplace, existingItem, replaceConflictPath, conflictIsFolder } from '@/composables/useConfirmReplace';
 import { namesClash, nameClashMessage } from '@/libs/nameRules';
 import { useHeavyTask } from '@/composables/useHeavyTask';
@@ -63,8 +63,10 @@ const { pathutils } = ddb;
  * @param {{ org: string, ds: string }} ctx.route
  * @param {(item: any) => void} ctx.openItem   opens an item as a double click does
  * @param {() => void} ctx.refresh            re-reads the folder on show (tree and list)
+ * @param {(path: string) => void} [ctx.showFolder]  the tree refreshes and opens a folder ('' is the root)
+ * @param {() => void} [ctx.rootChanged]    the dataset's own entry changed (its name, tagline, visibility, README): the page reads it again
  */
-export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, route, openItem, refresh }) {
+export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, route, openItem, refresh, showFolder, rootChanged }) {
     const notify = useNotify();
     const confirm = useConfirm(dialogs);
     const confirmReplace = useConfirmReplace(dialogs);
@@ -341,16 +343,61 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     const properties = files => { if (files.length) dialogs.open(Properties, { files }); };
     const share = file => dialogs.open(ShareEmbed, { file });
 
+    /**
+     * The Settings window. A new README opens in the text editor, in this page and wherever the list is (no new
+     * browser tab, which a popup blocker stops, FR-EXP-36); the README of the dataset opens from there in its viewer
+     * and in the editor (FR-EXP-24). A new URL slug takes the page to it.
+     */
     function settings() {
         const dialog = dialogs.open(SettingsDialog, () => ({
             dataset, canWrite: canWrite.value,
             onRescanRequested: () => rescan(dialog),
+            onChanged: () => rootChanged?.(),
+            confirmSlugChange: confirmStopUploads,
+            onFileSaved: path => listing.addEntry(path).catch(e => console.warn(`Could not show ${path} in the file list:`, e)),
+            onSlugRenamed: slug => {
+                busy.value = true;
+                window.location.href = `/r/${route.org}/${slug}`;
+            },
             onAddMarkdown: (document, entry) => {
                 listing.uploaded([entry]);
                 dialog.close();
-                openItem({ label: document, entry, path: dataset.remoteUri(document) });
-            }
+                editText(entry);
+            },
+            onOpenReadme: path => openReadme(dialog, path, false),
+            onEditReadme: path => openReadme(dialog, path, true)
         }));
+    }
+
+    /**
+     * Asked before the URL slug changes (FR-EXP-24): the page goes to the new address, which stops the uploads of this
+     * dataset that are still running (their queue belongs to the old address). True when there are none, or the user agrees.
+     * @returns {Promise<boolean>}
+     */
+    async function confirmStopUploads() {
+        const left = useUploadsStore().uploads
+            .filter(u => u.org === dataset.org && u.ds === dataset.ds)
+            .reduce((sum, u) => sum + u.left, 0);
+        if (!left) return true;
+        return confirm({
+            title: 'Change URL',
+            message: `<p>${countOf(left, 'file')} of this dataset ${left === 1 ? 'is' : 'are'} still uploading.</p>`
+                + '<p>Changing the URL stops the upload: the files that are not yet in the dataset will not be added.</p>',
+            confirmText: 'Stop uploads and change URL',
+            danger: true
+        });
+    }
+
+    /** Opens the README of the dataset, from the Settings window, in its viewer or in the editor. */
+    async function openReadme(settingsDialog, path, edit) {
+        try {
+            const entry = await dataset.listOne(path);
+            settingsDialog.close();
+            if (edit) editText(entry);
+            else openItem({ label: pathutils.basename(entry.path), entry, path: dataset.remoteUri(entry.path) });
+        } catch (e) {
+            showError(e, 'Readme');
+        }
     }
 
     async function rescan(settingsDialog) {
@@ -392,15 +439,17 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 if (covers.length) {
                     const paths = covers.map(e => e.path);
                     await dataset.deleteObjs(paths);
-                    emitter.emit('deleteEntries', paths);
+                    listing.removed(paths);
                 }
                 const res = await dataset.registry.fetchRaw(dataset.thumbUrl(file.entry.path, 1024));
                 if (!res.ok) throw new Error(`Failed to fetch thumbnail: ${res.statusText}`);
                 const blob = await res.blob();
                 // The replace was confirmed above
                 await dataset.uploadObj(candidates[0], new File([blob], candidates[0], { type: blob.type }), { overwrite: true });
-                notify.success('Dataset cover set successfully', { summary: 'Cover Set' });
-                emitter.emit('addItems', []);
+                // The cover is a file of the dataset (in its root): the toast names it, and the list and the tree show it (FR-EXP-30)
+                await listing.addEntry(candidates[0]).catch(e => console.warn('Could not show the cover in the file list:', e));
+                notify.success(`Saved as ${candidates[0]} in the dataset root`, { summary: 'Cover Set' });
+                rootChanged?.();
             });
         } catch (e) {
             showError(e, 'Set as Dataset Cover');
@@ -495,6 +544,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 else notify.success(where, { summary: 'Extract Completed', life: 'normal' });
                 await listing.reload(result.destPath);
                 if (result.deletedArchive && result.archivePath) listing.removed([result.archivePath]);
+                // The page shows the destination, and the tree its new folders (FR-EXP-19), as the docs say
+                showFolder?.(result.destPath || '');
             }
         });
     }
@@ -555,7 +606,11 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     function editText(entry, readonly = false) {
         dialogs.open(TextEditorDialog, {
             dataset, entry, readonly: readonly || !canWrite.value,
-            onSaved: path => notify.success(`File saved: ${path}`, { summary: 'File Saved' })
+            onSaved: path => {
+                notify.success(`File saved: ${path}`, { summary: 'File Saved' });
+                // The README of the dataset is shown on its page: it reads the file again
+                if (path === 'README.md') rootChanged?.();
+            }
         });
     }
 

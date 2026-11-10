@@ -14,13 +14,15 @@ vi.mock('@/features/dataset/dialogs/SettingsDialog.vue', () => ({ default: {} })
 vi.mock('@/features/dataset/ShareEmbed.vue', () => ({ default: {} }));
 
 let listing;
+let showFolder;
 
 async function extractAndClose(result) {
     const dialogs = { open: vi.fn() };
     listing = { reload: vi.fn().mockResolvedValue(), removed: vi.fn() };
+    showFolder = vi.fn();
     const actions = useDatasetActions({
         dataset: { org: 'org', ds: 'ds' }, listing, dialogs, busy: ref(false), canWrite: ref(true),
-        route: { org: 'org', ds: 'ds' }, openItem: vi.fn(), refresh: vi.fn()
+        route: { org: 'org', ds: 'ds' }, openItem: vi.fn(), refresh: vi.fn(), showFolder
     });
     actions.extract({ entry: { path: 'good.zip' } });
     const props = dialogs.open.mock.calls[0][1];
@@ -55,5 +57,21 @@ describe('Extract of the dataset page', () => {
         await extractAndClose({ destPath: 'out' });
 
         expect(notify.success).toHaveBeenCalledWith('Archive extracted to out', { summary: 'Extract Completed', life: 'normal' });
+    });
+
+    // FR-EXP-19: the docs say the Hub opens the destination folder, and the tree gets the new folders
+    it('opens the destination folder in the tree and the list (and the archive that was deleted leaves the list)', async () => {
+        await extractAndClose({ destPath: 'extracted/gltf', archivePath: 'models/zips/model-gltf.zip', deletedArchive: true, summary: { extracted: 2, skipped: 0, entries: [], more: 0 } });
+
+        expect(listing.reload).toHaveBeenCalledWith('extracted/gltf');
+        expect(listing.removed).toHaveBeenCalledWith(['models/zips/model-gltf.zip']);
+        expect(showFolder).toHaveBeenCalledTimes(1);
+        expect(showFolder).toHaveBeenCalledWith('extracted/gltf');
+    });
+
+    it('opens the root when the archive is extracted there', async () => {
+        await extractAndClose({ destPath: '', summary: { extracted: 1, skipped: 0, entries: [], more: 0 } });
+
+        expect(showFolder).toHaveBeenCalledWith('');
     });
 });

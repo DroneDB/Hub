@@ -5,8 +5,11 @@ import ddb from 'ddb';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { formatGroundResolution } from '@/libs/groundResolution';
-import { fixedLengthParts, formatDateTime, formatNumber, formatSpeed, joinNumberTexts, UNKNOWN } from '@/libs/format';
+import { fixedLengthParts, formatBytes, formatDateTime, formatNumber, formatSpeed, joinNumberTexts, UNKNOWN } from '@/libs/format';
+import { visibilityLabel } from '@/libs/visibility';
+import { Licenses } from '@/libs/licenses';
 import { VIEWS_KEY } from '@/libs/views/viewStore';
+import { buildWarningOf } from '@/libs/build/buildWarnings';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
 // Meta keys that hold app data (saved map views are raw JSON), not something to show users.
@@ -238,16 +241,49 @@ export function formatCadCrs(entry, { forDialog = false } = {}) {
     }
 }
 
+/** Whether an entry is the root of a dataset (what the Registry lists as its own entry). */
+export const isDatasetEntry = entry => !!entry && entry.type === ddb.entry.type.DRONEDB;
+
+/**
+ * The properties of the dataset's own entry as people read them (FR-EXP-25): its name, tagline, visibility as a label,
+ * license by name, how many entries it holds, its size and when it was changed. The ids of the metadata rows, their
+ * epoch times and the visibility as a number are in the raw view (`raw`), not here.
+ * @param {Object} entry - The dataset's root entry
+ * @param {number|string|Date|null} [created] - When the dataset was created (the Registry's creationDate, not in the entry)
+ * @returns {Object}
+ */
+function buildDatasetProperties(entry, created) {
+    const props = {};
+    const meta = entry.properties?.meta ?? {};
+    const text = key => (meta[key]?.data == null ? '' : String(meta[key].data).trim());
+    props['name'] = ddb.utils.entryLabel(entry);
+    if (text('tagline')) props['tagline'] = text('tagline');
+    const visibility = meta.visibility?.data;
+    if (visibility != null && visibility !== '') props['visibility'] = visibilityLabel(Number(visibility));
+    if (text('license')) props['license'] = Licenses[text('license')]?.name ?? text('license');
+    if (typeof entry.properties?.entries === 'number') props['entries'] = formatNumber(entry.properties.entries, 0);
+    if (entry.size) props['size'] = formatBytes(entry.size);
+    const createdMs = created instanceof Date ? created.getTime() : typeof created === 'string' ? Date.parse(created) : created;
+    if (typeof createdMs === 'number' && Number.isFinite(createdMs)) props['created'] = formatDateTime(createdMs, { placeholder: UNKNOWN, seconds: true });
+    if (entry.mtime) props['modified'] = formatModifiedDate(entry.mtime);
+    if (entry.properties?.readme) props['readme'] = entry.properties.readme;
+    return props;
+}
+
 /**
  * The rows of the properties table of a file: its type, path, size, dates, coordinates
- * and entry properties, with lengths, speeds and areas in the user's units.
+ * and entry properties, with lengths, speeds and areas in the user's units. The dataset's own entry has
+ * readable rows (buildDatasetProperties), and the raw metadata with `raw`.
  * @param {Object} file - The file object with entry property
  * @param {string} [units] - 'metric' or 'imperial' (the measurement units preference)
+ * @param {{ raw?: boolean, created?: number|string|Date|null }} [options] - raw: the metadata of a dataset as it is stored
+ *   (ids, epoch times); created: when the dataset was created (its Created row)
  * @returns {Object|null}
  */
-export function buildAllProperties(file, units = 'metric') {
+export function buildAllProperties(file, units = 'metric', { raw = false, created = null } = {}) {
     if (!file) return null;
     const entry = file.entry;
+    if (isDatasetEntry(entry) && !raw) return buildDatasetProperties(entry, created);
     const props = {};
 
     props['type'] = getFileTypeName(entry.type);
@@ -280,6 +316,11 @@ export function buildAllProperties(file, units = 'metric') {
             }
         }
         formatMeasuredProperties(props, units);
+        // A warning libddb tagged with a code is said in words for users, not as the server's setup message; the
+        // code itself is not a row (FR-EXP-18)
+        delete props.warningCode;
+        const coded = buildWarningOf(entry);
+        if (coded) props.warning = coded.text;
         // A georaster's resolution in ground units; tidyProperties falls back to its geotransform
         if (entry.properties.geotransform) {
             const resolution = formatGroundResolution(entry.polygon_geom, entry.properties.width, entry.properties.height, units);

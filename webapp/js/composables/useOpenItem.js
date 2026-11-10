@@ -40,7 +40,7 @@ export function useOpenItem({ dataset, route, canWrite, dialogs, actions, showIn
         const dialog = dialogs.open(FileAvailabilityDialog, {
             show: true, dataset, entry: node.entry,
             title: availability.title, message: availability.message, status: availability.status,
-            actions: availability.actions, buildState: availability.buildState,
+            actions: availability.actions, buildState: availability.buildState, hint: availability.hint,
             onBuildStarted: entry => notify.info(`Build started for ${pathutils.basename(entry.path)}`, { summary: 'Build Started' }),
             // The job has ended: the viewer opens when the entry lists what it needs (a job that
             // succeeded can leave the build on hold), else the dialog says what is missing

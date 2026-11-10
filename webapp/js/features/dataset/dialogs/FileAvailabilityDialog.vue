@@ -14,6 +14,11 @@
                         <div class="progress-timer">{{ formatWaitTime() }}</div>
                     </div>
 
+                    <!-- What the administrator of the server does, for a file the server cannot read (FR-EXP-18) -->
+                    <p v-if="hint && showDetails" class="admin-hint">
+                        <strong>For the administrator:</strong> {{ hint }}
+                    </p>
+
                     <!-- Build details if available -->
                     <div v-if="buildState && showDetails" class="build-details">
                         <h4>Build Details</h4>
@@ -112,6 +117,11 @@ export default {
         entry: {
             type: Object,
             required: true
+        },
+        // What the administrator does about a file the server cannot read, shown under Show Details
+        hint: {
+            type: String,
+            default: ''
         }
     },
     emits: ['close', 'build-started', 'error', 'build-completed', 'build-failed', 'timeout'],
@@ -233,6 +243,7 @@ export default {
                 case 'failed':
                     return 'error';
                 case 'blocked':
+                case 'unsupported':
                     return 'warn';
                 case 'queued':
                     return 'info';
@@ -263,6 +274,11 @@ export default {
 <style scoped>
 .file-availability-dialog {
     max-width: 37.5rem;
+}
+
+.admin-hint {
+    margin: var(--ddb-spacing-md) 0 0;
+    color: var(--ddb-text-secondary);
 }
 
 .build-progress {

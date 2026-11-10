@@ -9,7 +9,7 @@
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
-                 :src="thumbnail" alt="" style="max-width: 100%; max-height: 100%;" @load="handleImageLoad"
+                 :src="thumbnail" alt="" @load="handleImageLoad"
                  @error="handleImageError">
 
             <!-- The type icon: the fallback when there is no thumbnail, and under the spinner of a build, dimmed (FR-EXP-07) -->
@@ -516,9 +516,13 @@ export default {
 
 /* .thumbnail .container.bordered - drop shadow removed */
 
+/* The image fills the square box of the thumbnail and shows whole (FR-EXP-33): a landscape photo is as wide as the
+   tile, with the neutral background above and below it, not a smaller picture at the foot of the box */
 .thumbnail .container img {
-    max-width: 100%;
-    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--ddb-bg-subtle);
 }
 
 .thumbnail .container img.hide {

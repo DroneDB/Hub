@@ -42,6 +42,18 @@ describe('the tile layout', () => {
         expect(tileCssVars()).toEqual({ '--tile-spacing': '0.25rem', '--tile-label-lines': 2, '--tile-label-line-height': 1.5 });
     });
 
+    it('lets the thumbnail fill its square box and show whole on a neutral background (FR-EXP-33)', () => {
+        const rule = css.slice(css.indexOf('.thumbnail .container img {'));
+        const block = rule.slice(0, rule.indexOf('}'));
+        expect(block).toMatch(/width:\s*100%/);
+        expect(block).toMatch(/height:\s*100%/);
+        expect(block).toMatch(/object-fit:\s*contain/);
+        expect(block).toMatch(/background:\s*var\(--ddb-bg-subtle\)/);
+        // the box is the geometry's: the thumbnail side, and the image no longer sets its own maximum inline
+        expect(source('EntryThumbnail.vue')).not.toMatch(/alt=""\s+style=/);
+        expect(tileHeight({ rootFontPx: 16, fontPx: 16, size: TILE_SIZES.s })).toBe(4 + 4 + 4 + 4 + 128 + 4 + 48);
+    });
+
     it('sizes the grid columns from the cell width the virtual grid counts with', () => {
         const explorerCss = styleOf('DatasetExplorer.vue');
         expect(explorerCss).toMatch(/minmax\(var\(--grid-cell-width\), 1fr\)/);

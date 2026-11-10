@@ -283,3 +283,45 @@ describe('which types need a build (the server decides)', () => {
         reg.features.clear();
     });
 });
+
+// FR-EXP-18: a DWG on a server without the converter is not a corrupted file and a build cannot help
+describe('a vector that the server cannot read (FR-EXP-18)', () => {
+    const dwg = (extra = {}) => ({
+        path: 'house_plan.dwg', hash: 'd', type: T.VECTOR,
+        properties: { warning: 'vector parse failed: DWG support needs dwg2dxf (LibreDWG); set DDB_DWG2DXF_PATH or install dwg2dxf next to ddb', warningCode: 'dwg-converter-missing' },
+        ...extra
+    });
+
+    it('tells the user, with no retry or build action, and keeps the setup text for the administrator', async () => {
+        const entry = dwg();
+        const result = await checker.check(datasetListing(entry), entry, 'map');
+        expect(result).toMatchObject({
+            available: false, status: 'unsupported', title: 'DWG Not Supported',
+            message: 'DWG drawings cannot be read on this server; export the drawing as DXF and upload that.',
+            actions: ['close', 'details'],
+            hint: 'The server needs the dwg2dxf converter (LibreDWG): install dwg2dxf next to ddb, or set DDB_DWG2DXF_PATH. '
+            + 'Then rescan the dataset (Dataset Settings, Rescan Dataset; the Registry endpoint is POST /orgs/{org}/ds/{ds}/rescan): '
+            + 'the drawings already in it keep their warning until they are indexed again.'
+        });
+        expect(result.actions).not.toContain('retry-build');
+        expect(result.actions).not.toContain('start-build');
+        expect(result.message).not.toContain('corrupted');
+        expect(result.message).not.toContain('DDB_DWG2DXF_PATH');
+    });
+
+    it('does so also when a build of it failed (the job says Failed, the code says why)', async () => {
+        const entry = dwg({ buildStatus: 'failed' });
+        buildManager.getBuildState.mockReturnValue({ path: 'house_plan.dwg', currentState: 'Failed' });
+        const result = await checker.check(datasetListing(entry), entry, 'map');
+        expect(result).toMatchObject({ available: false, status: 'unsupported' });
+        expect(result.actions).not.toContain('retry-build');
+    });
+
+    it('keeps the generic failure, with its retry, for a failed vector without the code', async () => {
+        const entry = dwg({ properties: { warning: 'vector parse failed: something else' }, buildStatus: 'failed' });
+        buildManager.getBuildState.mockReturnValue({ path: 'house_plan.dwg', currentState: 'Failed' });
+        const result = await checker.check(datasetListing(entry), entry, 'map');
+        expect(result).toMatchObject({ available: false, status: 'failed' });
+        expect(result.actions).toContain('retry-build');
+    });
+});

@@ -12,6 +12,8 @@
                 </div>
             </template>
             <template #second>
+                <!-- The name, visibility and tagline of the dataset above its tabs (FR-EXP-14) -->
+                <DatasetHeader :entry="rootEntry" />
                 <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="initialTab ?? mainTabs[0].key" position="top"
                              :hide-single="false" bottom-nav-phone @tab-change="onTabChange">
                     <template v-if="phoneLayout" #filebrowser>
@@ -38,19 +40,21 @@
                                     <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
                                 </div>
                                 <div v-if="showDetail" id="dataset-detail-side" ref="detailSide" class="detail-side">
-                                    <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
+                                    <DetailPanel :file="shownFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
                                 </div>
                                 <!-- Below lg, the drawer the user closed comes back from here, not with the next selection -->
                                 <Button v-if="detailReopenable" ref="detailReopen" class="detail-reopen" icon="fa-solid fa-circle-info" label="Details"
                                         severity="secondary" aria-controls="dataset-detail-side" aria-expanded="false" @click="openDrawer" />
                             </div>
+                            <!-- The README of the dataset under the files of its root (FR-EXP-14) -->
+                            <DatasetReadme v-if="readmePath && readmeEntry" :dataset="dataset" :path="readmePath" :entry="readmeEntry" :version="readmeVersion" @open="openReadme" />
                         </div>
                     </template>
                     <template #tasks>
                         <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :can-write="canWrite" />
                     </template>
                     <template v-if="phoneLayout" #properties>
-                        <DetailPanel :file="detailFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
+                        <DetailPanel :file="shownFile" :selection="listing.selected.value" :can-write="canWrite" :dataset="dataset" :views="views" v-on="detailEvents" />
                     </template>
                 </TabSwitcher>
             </template>
@@ -86,6 +90,7 @@ import { loadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
+import emitter from '@/libs/eventBus';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
@@ -126,6 +131,8 @@ import Explorer from './explorer/DatasetExplorer.vue';
 import TableView from './explorer/TableView.vue';
 import DetailPanel from './explorer/DetailPanel.vue';
 import DatasetLightbox from './DatasetLightbox.vue';
+import DatasetHeader from './DatasetHeader.vue';
+import DatasetReadme from './DatasetReadme.vue';
 
 // The Map tab mounts on first activation (prefetched: instant on a warm connection)
 const Map = lazyComponent(() => import(/* webpackChunkName: "dataset-map", webpackPrefetch: true */ '@/features/viewers/map/DatasetMap.vue'), { showLoader: false });
@@ -180,14 +187,15 @@ const expandedGrid = usePreference(PREF.TABLE_EXPANDED_GRID, true);
 const tileSizePref = usePreference(PREF.TILE_SIZE, '');
 const xwide = useMediaMatch(XWIDE_MEDIA_QUERY);
 const tileSize = computed(() => tileSizeChoice(tileSizePref.value, xwide.value));
+// The file the user asked the detail panel to show (a click on it, the tree opening it); shownFile, below, is what it shows
 const detailFile = ref(null);
 // Below lg (and from sm) the detail panel is a drawer over the list (FR-EXP-17). Once the user closes it, a selection
 // does not open it again: its Details button does. From lg it is a column that follows the selection, as before.
 const belowLg = useMediaMatch(TABLET_MEDIA_QUERY);
 const drawerMode = computed(() => belowLg.value && !phoneLayout.value);
 const drawerClosed = ref(false);
-const showDetail = computed(() => !!detailFile.value && !phoneLayout.value && !(drawerMode.value && drawerClosed.value));
-const detailReopenable = computed(() => drawerMode.value && drawerClosed.value && !!detailFile.value);
+const showDetail = computed(() => !!shownFile.value && !phoneLayout.value && !(drawerMode.value && drawerClosed.value));
+const detailReopenable = computed(() => drawerMode.value && drawerClosed.value && !!shownFile.value);
 
 // Permissions are on the dataset's root entry
 const rootEntry = ref(null);
@@ -207,6 +215,17 @@ const detailSide = ref(null);
 const detailReopen = ref(null);
 
 const listing = useDatasetListing(dataset);
+// What the panel shows: that file as the list holds it now. A file that left the list (deleted, moved, the archive
+// that an extraction deleted) is not shown any more: the panel shows the first item that is still selected, else it
+// closes (FR-EXP-06, FR-EXP-19); a file the list replaces by a newer item keeps its panel.
+const shownFile = computed(() => {
+    const asked = detailFile.value;
+    if (!asked) return null;
+    const path = asked.entry?.path;
+    return listing.files.value.find(f => f.entry?.path === path) ?? listing.selected.value[0] ?? null;
+});
+// A panel that closed because its file is gone does not open again for a file that comes back at that path
+watch(shownFile, file => { if (!file) detailFile.value = null; });
 // An upload that ends while this dataset is open shows in its listing, also one that the user started on another page
 // and that went on in the background (FR-UPL-04)
 const stopHearingUploads = useUploadsStore().subscribe(params.org, params.ds, { added: entries => listing.uploaded(entries) });
@@ -220,7 +239,9 @@ const refresh = () => {
 };
 // The Map tab's "Photos are in images/ - Show" (FR-MAP-10): the tree opens that subfolder, and the map shows what it holds
 const showFolder = path => { activeTree()?.refreshAndNavigate(path); };
-const actions = useDatasetActions({ dataset, listing, dialogs, busy, canWrite, route: params, refresh, openItem: node => openItem(node) });
+const actions = useDatasetActions({
+    dataset, listing, dialogs, busy, canWrite, route: params, refresh, showFolder, rootChanged: reloadRoot, openItem: node => openItem(node)
+});
 const clipboard = useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite, showError: actions.showError });
 
 // ---- Map tab ---------------------------------------------------------------------------
@@ -420,16 +441,93 @@ function onCurrentUriChanged(uri) {
     listing.isLoading.value = true;
 }
 
+// The root entry of the dataset: its permissions, the header's name, visibility and tagline, the README, the page title
+function applyRootEntry(entry) {
+    rootEntry.value = entry;
+    session.setRootEntry(entry);
+    syncReadme(entry);
+    // A new name shows on the root of the tree at once, the tree stays as it is (FR-EXP-24)
+    const label = entry ? ddb.utils.entryLabel(entry) : '';
+    for (const tree of [fileBrowser.value, mobileFileBrowser.value]) tree?.setRootLabel?.(label);
+    const name = entry?.properties?.meta?.name;
+    if (name) setTitle(name.data);
+}
+
+// The README of the dataset, under the files at its root
+const readmePath = computed(() => {
+    const readme = rootEntry.value?.properties?.readme;
+    return !listing.currentPath.value && typeof readme === 'string' && readme ? readme : '';
+});
+// The README as the dataset lists it (its size, hash and time), null until it is known
+const readmeEntry = ref(null);
+// Raised when the README file changed (its hash or time), so the README panel reads the file again: not on every read of the
+// root entry (a setting, the cover, an upload)
+const readmeVersion = ref(0);
+const readmeStamp = entry => (entry ? `${entry.hash ?? ''}|${entry.mtime ?? ''}` : '');
+let readmeReads = 0;
+
+/** Looks up the README entry of the root entry; the panel reads the file again only when that entry changed. */
+async function syncReadme(root) {
+    const path = root?.properties?.readme;
+    const read = ++readmeReads;
+    if (typeof path !== 'string' || !path) {
+        readmeEntry.value = null;
+        return;
+    }
+    let found;
+    try {
+        found = await dataset.listOne(path);
+    } catch (e) {
+        if (isAbort(e)) return;
+        // Not found in the list: the panel tries the file itself, as it does not know its size
+        found = { path };
+    }
+    if (read !== readmeReads) return;
+    const changed = readmeStamp(found) !== readmeStamp(readmeEntry.value) || readmeEntry.value?.path !== found.path;
+    readmeEntry.value = found;
+    if (changed) readmeVersion.value++;
+}
+
+/**
+ * Reads the root entry again, after a change to it: a setting saved in the Settings window, the README written, added,
+ * moved or deleted. A read that fails keeps what the page has.
+ */
+async function reloadRoot() {
+    try {
+        const entries = await dataset.info({ signal: requestSignal });
+        if (entries.length) applyRootEntry(entries[0]);
+    } catch (e) {
+        if (!isAbort(e)) console.warn('Could not read the dataset again:', e);
+    }
+}
+
+// The README comes and goes with the list: an item of that path that the list or the tree gets, or loses
+const READMES = ['README.md'];
+const touchesReadme = paths => paths.some(path => READMES.includes(path));
+const onItemsAdded = items => { if (touchesReadme((items || []).map(i => i.entry?.path))) reloadRoot(); };
+const onEntriesDeleted = paths => { if (touchesReadme(paths || [])) reloadRoot(); };
+emitter.on('addItems', onItemsAdded);
+emitter.on('deleteEntries', onEntriesDeleted);
+onBeforeUnmount(() => {
+    emitter.off('addItems', onItemsAdded);
+    emitter.off('deleteEntries', onEntriesDeleted);
+});
+
+// The README panel's Open: the Markdown viewer, as a double click on the file
+async function openReadme(path) {
+    try {
+        const entry = listing.files.value.find(f => f.entry.path === path)?.entry ?? await dataset.listOne(path);
+        openItem({ label: ddb.pathutils.basename(entry.path), entry, path: dataset.remoteUri(entry.path) });
+    } catch (e) {
+        actions.showError(e, 'Readme');
+    }
+}
+
 // The dataset's root entries (and its permissions and title) for the tree
 async function rootNodes() {
     try {
         const entries = await dataset.info({ signal: requestSignal });
-        if (entries.length) {
-            rootEntry.value = entries[0];
-            session.setRootEntry(entries[0]);
-        }
-        const name = entries[0]?.properties?.meta?.name;
-        if (name) setTitle(name.data);
+        if (entries.length) applyRootEntry(entries[0]);
         return entries.map(e => ({
             icon: icons.getForType(e.type, e.path), label: ddb.utils.entryLabel(e), path: e.path,
             expanded: true, entry: e, isExpandable: ddb.entry.isDirectory(e)
@@ -591,10 +689,22 @@ onMounted(() => {
     document.getElementById('app').classList.add('fullpage');
     setTitle(params.ds);
     loadViews();
+    loadCreationDate();
     BuildManager.registerDataset(dataset);
     BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
     watchBuildEvents(() => dataset, (message, title) => actions.showError(message, title));
 });
+
+/** When the dataset was created: the Registry's dataset list has it, the root entry does not (FR-EXP-25). Read once. */
+async function loadCreationDate() {
+    try {
+        const list = await reg.Organization(params.org).datasets({ slugs: [params.ds] });
+        const mine = Array.isArray(list) ? list.find(d => d.slug === params.ds) : null;
+        session.setCreationDate(mine?.creationDate ?? null);
+    } catch (e) {
+        if (!isAbort(e)) console.warn('Could not read when the dataset was created:', e);
+    }
+}
 
 onBeforeUnmount(() => {
     taskMonitor.off('datasetGone', onDatasetGone);
@@ -603,6 +713,7 @@ onBeforeUnmount(() => {
     BuildManager.unregisterDataset(dataset);
     session.setUnavailable(false);
     session.setRootEntry(null);
+    session.setCreationDate(null);
 });
 </script>
 

@@ -317,6 +317,15 @@ export default {
         },
 
         /**
+         * Shows another name on the root of the tree, in place (the dataset was renamed, FR-EXP-24): the tree is not
+         * read again, so what is expanded stays expanded.
+         */
+        setRootLabel: function (label) {
+            const root = this.nodes.find(n => n.root);
+            if (root && label && root.label !== label) root.label = label;
+        },
+
+        /**
          * Refresh the tree and then navigate back to targetPath (the path
          * relative to the dataset root, e.g. "folderA/folderB"). Expands the
          * tree level by level; if a folder along the way no longer exists, it
