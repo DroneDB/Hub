@@ -11,9 +11,8 @@
  *   exporter.exportWhole() / exporter.exportExtent() / exporter.cancel()
  *   exporter.wholeReason, exporter.extentReason, exporter.task, exporter.error, exporter.running
  *
- * 'Visible extent' needs a server whose libddb exports a window (`rasterExportWindow` of /sys/features, libddb 2.3): on
- * any other it is disabled with its reason (FR-XC-22) and never submitted. While the estimate of a new extent is read, the
- * last one is kept and the reason is 'Checking size…'.
+ * While the estimate of a new extent is read, the last one is kept and the reason of 'Visible extent' is 'Checking size…'
+ * (FR-XC-22).
  */
 import { ref, computed, watch } from 'vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
@@ -23,7 +22,7 @@ import { downloadBlob } from '@/libs/download';
 import { notify } from '@/libs/notify';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { exportRefusal, exportFileName, exportTaskParams, exportSubmitMessage, EXPORT_WINDOW_UNSUPPORTED, EXPORT_CHECKING_SIZE } from '@/libs/map/rasterExport';
+import { exportRefusal, exportFileName, exportTaskParams, exportSubmitMessage, EXPORT_CHECKING_SIZE } from '@/libs/map/rasterExport';
 
 /** How long the control rests before an estimate is read (a pan sends many moves; a panel that opens reads its own info first) */
 export const ESTIMATE_DELAY_MS = 400;
@@ -63,9 +62,6 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     const extentPending = ref(false);
     let requests = 0;
 
-    /** The server exports a window (libddb 2.3, /sys/features); an older server, which does not say it, does not (FR-XC-22) */
-    const windowSupported = reg.features.get(Features.RASTER_EXPORT_WINDOW);
-
     const nodataOf = () => {
         const v = vizParams()?.nodata;
         return typeof v === 'number' ? v : undefined;
@@ -83,15 +79,14 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     /** Why the whole raster cannot be exported (the sizes of the Registry), or '' */
     const wholeReason = computed(() => exportRefusal(wholeBytes.value, limit.value));
     /** The estimate of the visible extent is over the limit (the reason is a size, not a wait) */
-    const extentOverLimit = computed(() => !!(windowSupported && bbox() && wholeReason.value && !extentPending.value
+    const extentOverLimit = computed(() => !!(bbox() && wholeReason.value && !extentPending.value
         && exportRefusal(extentEstimate.value, limit.value, { extent: true })));
     /**
-     * Why the visible extent cannot be exported: a server that exports no window, the map's extent unknown, the estimate of
-     * a new extent not read yet, or its estimate over the limit. A window is never larger than the raster: when the whole
+     * Why the visible extent cannot be exported: the map's extent unknown, the estimate of a new extent not read yet, or its
+     * estimate over the limit. A window is never larger than the raster: when the whole
      * raster fits, so does the window.
      */
     const extentReason = computed(() => {
-        if (!windowSupported) return EXPORT_WINDOW_UNSUPPORTED;
         if (!bbox()) return 'The visible extent of the map is not known yet';
         if (!wholeReason.value) return '';
         if (extentPending.value) return EXPORT_CHECKING_SIZE;
@@ -114,8 +109,8 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     }
 
     let extentRequests = 0;
-    /** Whether the estimate of the visible extent is needed: a window the server exports, of a raster over the limit */
-    const needsExtentEstimate = () => !!(windowSupported && dataset() && path() && bbox() && wholeReason.value);
+    /** Whether the estimate of the visible extent is needed: the window of a raster over the limit */
+    const needsExtentEstimate = () => !!(dataset() && path() && bbox() && wholeReason.value);
 
     async function loadExtentEstimate() {
         const current = ++extentRequests;
@@ -164,7 +159,7 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     async function run(extent) {
         const d = dataset();
         const p = path();
-        if (!d || !p || running.value || (extent && !windowSupported)) return;
+        if (!d || !p || running.value) return;
         // Busy before the first await: a second click finds it set
         running.value = true;
         error.value = '';
@@ -193,7 +188,7 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     }
 
     return {
-        task, running, error, refusedExtent, cancelling, windowSupported,
+        task, running, error, refusedExtent, cancelling,
         wholeBytes, limit, extentEstimate, extentPending, wholeReason, extentReason, extentOverLimit,
         exportWhole: () => run(false),
         exportExtent: () => run(true),

@@ -27,8 +27,8 @@ function namedBandCount(vizParams) {
 }
 
 /**
- * Whether the export is the RGBA picture of a style (FR-RAS-26). The rule is that of ddb (raster_export.cpp, exportRaster;
- * since DroneDB 2.3.1): a formula makes the RGBA picture, and so does a colormap when the export is exactly one band, as the
+ * Whether the export is the RGBA picture of a style (FR-RAS-26). The rule is that of ddb (raster_export.cpp, exportRaster):
+ * a formula makes the RGBA picture, and so does a colormap when the export is exactly one band, as the
  * bands of the style name it, or as the raster has it (`singleBand`: a raster of one data band, a DEM; the panel of Raster
  * Analysis is for such a raster). Several bands, or a preset, are written as bands scaled to 8 bits and the colormap is not
  * applied to them.
@@ -64,9 +64,6 @@ export function exportNote(vizParams, options) {
 
 /** The second export: what the map shows now, at the resolution of the raster (D-023). */
 export const EXPORT_EXTENT_LABEL = 'Export visible extent';
-
-/** Why 'Export visible extent' is disabled on a server whose libddb exports no window (FR-XC-22; the submit refuses it). */
-export const EXPORT_WINDOW_UNSUPPORTED = 'Needs a newer server (libddb 2.3)';
 
 /** Why 'Export visible extent' waits while the estimate of the new extent is read (FR-XC-22). */
 export const EXPORT_CHECKING_SIZE = 'Checking size…';

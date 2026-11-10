@@ -78,8 +78,8 @@ describe('exportSubmitMessage', () => {
     });
 
     it('gives the reason at the window member, else the message of the error', () => {
-        const old = Object.assign(new Error('Bad Request'), { status: 400, errors: { bbox: ['Exporting the visible extent needs libddb 2.3 or later'] } });
-        expect(exportSubmitMessage(old)).toBe('Exporting the visible extent needs libddb 2.3 or later');
+        const outside = Object.assign(new Error('Bad Request'), { status: 400, errors: { bbox: ['bbox must be minLon,minLat,maxLon,maxLat in WGS 84'] } });
+        expect(exportSubmitMessage(outside)).toBe('bbox must be minLon,minLat,maxLon,maxLat in WGS 84');
         expect(exportSubmitMessage(new Error('The rescale value is invalid'))).toBe('The rescale value is invalid');
     });
 });
@@ -94,7 +94,7 @@ describe('the words of the control', () => {
     });
 });
 
-describe('the label follows the style (FR-RAS-26, the rule of ddb 2.3.1: a formula, or a colormap on exactly one band, makes the RGBA image)', () => {
+describe('the label follows the style (FR-RAS-26, the rule of ddb: a formula, or a colormap on exactly one band, makes the RGBA image)', () => {
     it('is the styled image for a formula, with or without a colormap', () => {
         expect(exportsStyledImage({ formula: 'NDVI', colormap: 'rdylgn' })).toBe(true);
         expect(exportsStyledImage({ formula: 'CELSIUS' })).toBe(true);

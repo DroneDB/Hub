@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 
-// The algorithm list of DDBGetRasterMetadata (libddb 2.3): id, name and requiredBands of its 18 formulas
+// The algorithm list of DDBGetRasterMetadata: id, name and requiredBands of its 18 formulas
 const SAMPLE = [
     ['VARI', 'Visual Atmospheric Resistance Index', ['Red', 'Green', 'Blue']],
     ['EXG', 'Excess Green Index', ['Red', 'Green', 'Blue']],
@@ -77,33 +77,10 @@ describe('PlantHealthFormulasDialog', () => {
         expect(wrapper.text()).toContain('Bands required: Red, NIR');
     });
 
-    it('reads the bands from the reason of a server whose list has no requiredBands', () => {
-        const wrapper = mountDialog([{ id: 'NDRE', name: 'NDRE', disabled: true, disabledReason: 'Requires bands: NRe' }]);
-        expect(wrapper.vm.entries[0].bands).toBe('NIR, Red edge');
-        expect(wrapper.text()).toContain('Not available on this raster: Requires bands: NRe');
-        // Without either, the line is left out rather than saying nothing
+    it('leaves the line of the bands out for a formula the list gives none', () => {
         const none = mountDialog([{ id: 'XYZ', name: 'XYZ' }]);
+        expect(none.vm.entries[0].bands).toBe('');
         expect(none.text()).not.toContain('Bands required');
-    });
-
-    it('keeps the curated bands of an enabled formula of a 2.2 host, whose list has no requiredBands and no reason', () => {
-        // The list of ddb 2.2: id, name, expression and help, and a reason only for a disabled formula
-        const v22 = SAMPLE.map(f => {
-            const copy = { ...f };
-            delete copy.requiredBands;
-            return copy;
-        });
-        v22[0] = { ...v22[0], disabled: true, disabledReason: 'Requires bands: RGB' };
-        const wrapper = mountDialog(v22);
-        const entries = wrapper.vm.entries;
-        for (const entry of entries) expect(entry.bands, entry.id).not.toBe('');
-        const bandsOf = id => entries.find(e => e.id === id).bands;
-        expect(bandsOf('VARI')).toBe('Red, Green, Blue');
-        expect(bandsOf('NDVI')).toBe('Red, NIR');
-        expect(bandsOf('NDRE')).toBe('NIR, Red edge');
-        expect(bandsOf('EVI')).toBe('Red, Blue, NIR');
-        expect(bandsOf('KELVIN')).toBe('Thermal');
-        expect(wrapper.text()).toContain('Bands required: Red, NIR');
     });
 
     it('says so when there is no formula', () => {

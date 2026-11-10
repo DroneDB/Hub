@@ -6,8 +6,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 
-// The server features: no export limit of its own (the value info says it), a server that exports a window (libddb 2.3)
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null, get: name => name === 'rasterExportWindow' } } }));
+// The server features: no export limit of its own (the value info says it)
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null, get: () => undefined } } }));
 const heavy = vi.hoisted(() => ({ runHeavyTask: vi.fn(), tasks: null }));
 vi.mock('@/composables/useHeavyTask', async () => {
     const { ref } = await import('vue');
@@ -84,7 +84,7 @@ const handlePositions = () => chart().findAll('[role="slider"]').map(h => parseF
 
 afterEach(() => wrapper?.unmount());
 
-// The server (ddb 2.2) bins the range worth showing itself and counts the values outside it
+// The server (ddb) bins the range worth showing itself and counts the values outside it
 const SERVER_OUTLIER_STATS = {
     1: {
         min: -191.73, max: 278.52, mean: 0.77, std: 1.05, percentiles: { p2: 0.3706, p98: 0.9467 },

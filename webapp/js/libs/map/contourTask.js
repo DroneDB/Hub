@@ -91,8 +91,8 @@ export function contourLevelsWarning(levels, mode = 'interval', noun = 'elevatio
 }
 
 /**
- * What a result says about being cut at the cap of the server: `truncated` and `featureCap` (ddb 2.3). Empty when the result
- * is complete or comes from a server that does not say.
+ * What a result says about being cut at the cap of the server: `truncated` and `featureCap` of ddb. Empty when the result
+ * is complete.
  * @param {{ truncated?: boolean, featureCap?: number }|null|undefined} result
  * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model (FR-RAS-25)
  * @returns {{ truncated: boolean, title: string, message: string }}

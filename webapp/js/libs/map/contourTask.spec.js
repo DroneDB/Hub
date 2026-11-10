@@ -104,7 +104,7 @@ describe('contourTruncation', () => {
         expect(contourTruncation({ truncated: true, featureCap: 100000 }).message).toContain('limit the elevation range');
     });
 
-    it('says nothing of a complete result, or of a server that does not say', () => {
+    it('says nothing of a complete result, or of no result', () => {
         expect(contourTruncation({ truncated: false, featureCap: 100000 })).toEqual({ truncated: false, title: '', message: '' });
         expect(contourTruncation({})).toEqual({ truncated: false, title: '', message: '' });
         expect(contourTruncation(null).truncated).toBe(false);

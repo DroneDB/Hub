@@ -14,8 +14,6 @@ export const Features = {
     PASSWORD_POLICY: 'passwordPolicy',
     DATASET_THUMBNAIL_CANDIDATES: 'datasetThumbnailCandidates',
     MAX_EXPORT_SIZE_BYTES: 'maxExportSizeBytes',
-    // Whether a raster export takes the visible extent (a window; libddb 2.3): absent on an older server, which refuses it
-    RASTER_EXPORT_WINDOW: 'rasterExportWindow',
     DISABLE_ANONYMOUS_BULK_DOWNLOADS: 'disableAnonymousBulkDownloads',
     BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES: 'bulkDownloadAsyncThresholdBytes',
     // What libddb does with each entry type, and the archives the server extracts

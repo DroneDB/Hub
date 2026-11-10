@@ -20,9 +20,8 @@ const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warn: vi.fn
 vi.mock('@/libs/notify', () => ({ notify }));
 const downloadBlob = vi.hoisted(() => vi.fn());
 vi.mock('@/libs/download', () => ({ downloadBlob }));
-// The server features: the export limit, and whether the server exports a window (libddb 2.3)
-const flags = vi.hoisted(() => ({ rasterExportWindow: true }));
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => 1073741824, get: name => flags[name] === true } } }));
+// The server features: the export limit
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => 1073741824 } } }));
 
 const { default: RasterExportButton } = await import('./RasterExportButton.vue');
 const { ESTIMATE_DELAY_MS } = await import('@/composables/useRasterExport');
@@ -52,7 +51,6 @@ const extent = () => wrapper.find('[data-testid="raster-export-extent"]');
 const status = () => wrapper.find('[data-testid="heavy-task-status"]');
 
 beforeEach(() => {
-    flags.rasterExportWindow = true;
     runHeavyTask.mockReset();
     confirmCancel.mockReset();
     notify.success.mockClear();
@@ -99,7 +97,7 @@ describe('RasterExportButton the export of the whole raster', () => {
         await wrapper.setProps({ vizParams: { colormap: 'ironbow' } });
         expect(whole().attributes('aria-label')).toBe(bands);
 
-        // A colormap on a raster of one data band is the styled image too (ddb 2.3.1), several bands of it are not
+        // A colormap on a raster of one data band is the styled image too (the rule of ddb), several bands of it are not
         await wrapper.setProps({ singleBand: true });
         expect(whole().attributes('aria-label')).toBe(styled);
         expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
@@ -342,48 +340,6 @@ describe('RasterExportButton the visible extent while its estimate is read', () 
         expect(wrapper.find('[data-testid="raster-export-extent-reason"]').text()).toBe(
             'Too large to export the visible extent: about 1.4 GB > 1 GB limit. Zoom in to export less.');
         expect(extent().attributes('aria-disabled')).toBe('true');
-    });
-});
-
-describe('RasterExportButton on a server that exports no window (FR-XC-22)', () => {
-    for (const [name, value] of [['false', false], ['missing (an older server)', undefined]]) {
-        it(`keeps Visible extent focusable and disabled with the visible reason when the feature is ${name}, and never submits it`, async () => {
-            flags.rasterExportWindow = value;
-            const dataset = makeDataset();
-            vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-            mountControl({ info: HUGE }, dataset);
-            await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
-            await flushPromises();
-
-            const button = extent();
-            expect(button.element.tagName).toBe('BUTTON');
-            expect(button.attributes('disabled')).toBeUndefined();
-            expect(button.attributes('tabindex')).toBeUndefined();
-            expect(button.attributes('aria-disabled')).toBe('true');
-            const reason = wrapper.find('[data-testid="raster-export-extent-reason"]');
-            expect(reason.text()).toBe('Needs a newer server (libddb 2.3)');
-            expect(button.attributes('aria-describedby').split(' ')).toContain(reason.attributes('id'));
-            expect(button.attributes('title')).toBe('Export visible extent: Needs a newer server (libddb 2.3)');
-            // The whole raster over the limit does not point to an export this server cannot do
-            expect(wrapper.find('[data-testid="raster-export-whole-reason"]').text()).toBe('Too large to export: about 9.3 GB > 1 GB limit.');
-            // No estimate of a window is read
-            expect(dataset.getRasterValueInfo).not.toHaveBeenCalled();
-
-            await button.trigger('click');
-            await flushPromises();
-            expect(runHeavyTask).not.toHaveBeenCalled();
-        });
-    }
-
-    it('still exports the whole raster', async () => {
-        flags.rasterExportWindow = false;
-        runHeavyTask.mockResolvedValue({ taskId: 't1' });
-        mountControl();
-        expect(extent().attributes('aria-disabled')).toBe('true');
-        await whole().trigger('click');
-        await flushPromises();
-        expect(runHeavyTask).toHaveBeenCalledOnce();
-        expect(runHeavyTask.mock.calls[0][2].params).not.toHaveProperty('bbox');
     });
 });
 

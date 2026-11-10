@@ -32,7 +32,7 @@
         </div>
         <!-- The reasons are text, not a tooltip: a keyboard user reads them at the button (FR-XC-22) -->
         <p v-if="exporter.wholeReason.value" :id="wholeReasonId" class="export-reason" data-testid="raster-export-whole-reason">
-            {{ exporter.wholeReason.value }}.{{ exporter.windowSupported ? ' Use Visible extent to export it in parts.' : '' }}
+            {{ exporter.wholeReason.value }}. Use Visible extent to export it in parts.
         </p>
         <p v-if="exporter.extentReason.value" :id="extentReasonId" class="export-reason" data-testid="raster-export-extent-reason">
             {{ exporter.extentReason.value }}{{ exporter.extentOverLimit.value ? '. Zoom in to export less.' : '' }}
@@ -51,11 +51,10 @@
  * FR-XC-15), and a toast and the download when the file is ready. 'Visible extent' exports the window of the map at the
  * native resolution of the raster, so a raster over the limit goes out in parts. An export that is refused for its size
  * stays a button that can be focused, with the reason as visible text (FR-XC-22: 'Too large to export: about 9.3 GB >
- * 1 GB limit'); the size and the limit are those of the Registry (value info). 'Visible extent' is disabled the same way on
- * a server whose libddb exports no window ('Needs a newer server (libddb 2.3)') and while the estimate of a new extent is
- * read ('Checking size…'). The label says what the file is and follows the style (FR-RAS-26): a styled RGBA picture
- * when there is a formula, or a colormap on one band (libddb 2.3.1), the bands scaled to 8 bits otherwise (the rule of ddb), never
- * the values.
+ * 1 GB limit'); the size and the limit are those of the Registry (value info). 'Visible extent' is disabled the same way
+ * while the estimate of a new extent is read ('Checking size…'). The label says what the file is and follows the style
+ * (FR-RAS-26): a styled RGBA picture when there is a formula, or a colormap on one band, the bands scaled to 8 bits
+ * otherwise (the rule of ddb), never the values.
  */
 import { computed, ref, useId } from 'vue';
 import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
@@ -75,7 +74,7 @@ const props = defineProps({
     vizParams: { type: Object, default: () => ({}) },
     /** The visible extent of the map in WGS 84 (minLon, minLat, maxLon, maxLat), null while it is not known */
     bbox: { type: Array, default: null },
-    /** The raster has one data band (a DEM): a colormap on it makes the styled image, as ddb 2.3.1 exports it */
+    /** The raster has one data band (a DEM): a colormap on it makes the styled image, as ddb exports it */
     singleBand: { type: Boolean, default: false },
     /** The value info the panel already has: its estimate and limit are used instead of reading them again */
     info: { type: Object, default: null },

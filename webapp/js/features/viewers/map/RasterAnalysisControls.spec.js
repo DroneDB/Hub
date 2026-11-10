@@ -7,8 +7,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 
-// A server that exports a window (libddb 2.3, rasterExportWindow of /sys/features)
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null, get: name => name === 'rasterExportWindow' } } }));
+// The server features: no export limit of its own (the value info says it)
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null, get: () => undefined } } }));
 
 const { default: RasterAnalysisControls } = await import('./RasterAnalysisControls.vue');
 const { ESTIMATE_DELAY_MS } = await import('@/composables/useRasterExport');
@@ -391,7 +391,7 @@ describe('RasterAnalysisControls export', () => {
         expect(byId('raster-export-extent').attributes('aria-disabled')).toBeUndefined();
     });
 
-    // FR-RAS-26: ddb 2.3.1 writes the RGBA image of a DEM painted with a colormap (as of a formula, the thermal unit)
+    // FR-RAS-26: ddb writes the RGBA image of a DEM painted with a colormap (as of a formula, the thermal unit)
     it('names the file of the export after the style: a styled image for an elevation raster with its colormap and for a thermal unit', async () => {
         await render();
         expect(byId('raster-export-whole').attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
