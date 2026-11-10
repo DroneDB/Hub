@@ -82,6 +82,7 @@ export function useMapFeatures(props, fileEvents = {}) {
     });
     const contours = useContourLines({
         dataset, measureControls, rasterFilePath: raster.rasterFilePath,
+        vizParamsByPath: plantHealth.vizParamsByPath,
         showAlert, showFlash
     });
     const tooltip = useMapTooltip({ map, vectorLayers, dialogs: () => dialogs });

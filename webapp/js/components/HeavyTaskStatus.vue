@@ -70,7 +70,10 @@ const emit = defineEmits(['cancel']);
 
 const view = computed(() => describeHeavyTask(props.task, { error: props.error || null, phases: props.phases }));
 // Only a task that exists and has not ended: a failure, a result or a refusal has nothing to cancel
-const canCancel = computed(() => props.cancellable && !!props.task && (view.value?.kind === 'queued' || view.value?.kind === 'running'));
+// The server's actions decide when the task carries them (FR-XC-15): no Cancel for a caller who may not cancel
+const serverAllowsCancel = computed(() => !Array.isArray(props.task?.actions) || props.task.actions.includes('cancel'));
+const canCancel = computed(() => props.cancellable && !!props.task && serverAllowsCancel.value
+    && (view.value?.kind === 'queued' || view.value?.kind === 'running'));
 </script>
 
 <style scoped>

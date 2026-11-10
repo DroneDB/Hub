@@ -130,6 +130,11 @@ describe('HeavyTaskStatus', () => {
             expect(cancelButton(show({ ...props, cancellable: true })).exists()).toBe(false);
         });
 
+        it('follows the actions the server gives the task: no Cancel without cancel, Cancel with it', () => {
+            expect(cancelButton(show({ task: { state: 'Processing', percent: 5, actions: ['viewLog'] }, cancellable: true })).exists()).toBe(false);
+            expect(cancelButton(show({ task: { state: 'Processing', percent: 5, actions: ['viewLog', 'cancel'] }, cancellable: true })).exists()).toBe(true);
+        });
+
         it('waits while a cancel is being asked', () => {
             const w = show({ task: { state: 'Processing', percent: 5 }, cancellable: true, cancelling: true });
             expect(cancelButton(w).element.disabled).toBe(true);

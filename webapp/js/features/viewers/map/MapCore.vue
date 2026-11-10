@@ -54,6 +54,7 @@
                                     @open-contour-dialog="openContourDialog" @select-target="selectAnalysisTarget" />
             <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
                                   :raster-min="contourRasterMin" :raster-max="contourRasterMax" :initial-options="contourLastOptions"
+                                  :dataset="dataset" :task="contourTask" :error="contourError || ''"
                                   @generate="generateContourLines" @cancel="closeContourDialog" />
             <StockpileVolumePanel v-model:sensitivity="stockpileSensitivity"
                                   v-model:radius="stockpileRadius" v-model:material="stockpileMaterial"

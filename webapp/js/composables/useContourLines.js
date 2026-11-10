@@ -4,9 +4,14 @@
  * the shared OL measurements layer so they can be persisted via the regular
  * toolbar Save button.
  *
+ * Every request runs as the heavy task `raster-contours` (FR-RAS-11, NFR-001): the dialog follows the task with
+ * HeavyTaskStatus (progress, Cancel), the lines are the artifact of the task, and a result the server cut at its cap says so.
+ *
  * Host requirements:
- *  - this.dataset (Dataset instance exposing generateContours)
+ *  - this.dataset (Dataset instance exposing submitTask, getTask and taskResult)
  *  - this.rasterFilePath (shared with useRasterAnalysis / useStockpileVolume)
+ *  - this.vizParamsByPath (optional; the styles of the layers, shared with useRasterAnalysis): the contours are read with
+ *    the NoData value of the layer (FR-RAS-31)
  *  - this.measureControls (the OL measurements controller, same one used by
  *    useStockpileVolume) for importFromGeoJSON and source access.
  *
@@ -15,7 +20,10 @@
  * persisted via the toolbar Save button (which clears the flag) are kept.
  */
 import { buildContourFeature, colorForElevation } from '@/libs/map/contourStorage';
+import { CONTOUR_TOOL_ID, contourTaskParams, contourTruncation } from '@/libs/map/contourTask';
 import { createFeatureScope } from '@/composables/featureScope';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { formatNumber } from '@/libs/format';
 
 function friendlyContourError(raw, fallback) {
     if (!raw) return fallback;
@@ -40,7 +48,10 @@ const definition = {
         return {
             contourDialogVisible: false,
             contourLoading: false,
+            // Why the request was refused before a task existed (a 400 of the submit): shown by the task status
             contourError: null,
+            // The task of the latest request (its state is read from the live entries of useHeavyTask)
+            contourTaskId: null,
             // Last-used options so the dialog re-opens with prior values.
             contourLastOptions: null,
             // Cached raster min/max for the dialog hint (populated lazily).
@@ -48,6 +59,12 @@ const definition = {
             contourRasterMax: null,
             contourUnit: ''
         };
+    },
+    computed: {
+        // The live entry of the task of the latest request: queued, running, failed with its reason, cancelled
+        contourTask() {
+            return this.contourTaskId ? this.heavyTasks[this.contourTaskId] ?? null : null;
+        }
     },
     methods: {
         /**
@@ -65,6 +82,8 @@ const definition = {
                 if (rasterInfoLike.unit) this.contourUnit = rasterInfoLike.unit;
             }
             this.contourError = null;
+            // A task of an earlier request has nothing to say to a new one
+            if (!this.contourLoading) this.contourTaskId = null;
             this.contourDialogVisible = true;
         },
 
@@ -73,14 +92,23 @@ const definition = {
         },
 
         /**
-         * Generate contour lines on the backend and inject them into the
-         * shared measurements layer.
+         * The options of the values the layer is read with (the NoData value it is styled with, FR-RAS-31).
+         */
+        _contourValueOptions() {
+            const style = this.vizParamsByPath && this.rasterFilePath ? this.vizParamsByPath[this.rasterFilePath] : null;
+            return style && style.nodata !== undefined && style.nodata !== '' ? { nodata: style.nodata } : {};
+        },
+
+        /**
+         * Generate contour lines on the backend (the task `raster-contours`) and inject them into the shared
+         * measurements layer. The dialog stays open while the task runs, with its progress and a Cancel; it closes when the
+         * lines are on the map. A result the server cut at its cap says so.
          *
          * @param {Object} options - Payload from ContourOptionsDialog.
          */
         async generateContourLines(options) {
             if (!this.dataset
-                || typeof this.dataset.generateContours !== 'function') {
+                || typeof this.dataset.submitTask !== 'function') {
                 this.contourError = 'Dataset is not available.';
                 return;
             }
@@ -93,12 +121,20 @@ const definition = {
                 this.contourError = 'Measurement layer is not ready.';
                 return;
             }
+            if (this.contourLoading) return;
 
             this.contourLoading = true;
             this.contourError = null;
+            this.contourTaskId = null;
             try {
-                const result = await this.dataset.generateContours(
-                    this.rasterFilePath, options);
+                // The task shows its own failure, with the message of the server: no toast of the poller, no alert
+                const entry = await this.runHeavyTask(this.dataset, CONTOUR_TOOL_ID, {
+                    path: this.rasterFilePath,
+                    params: contourTaskParams(options, this._contourValueOptions()),
+                    notify: false,
+                    onSubmitted: submitted => { this.contourTaskId = submitted.taskId; }
+                });
+                const result = JSON.parse(await (await this.dataset.taskResult(entry.taskId)).text());
                 if (!result || result.type !== 'FeatureCollection'
                     || !Array.isArray(result.features)) {
                     throw new Error('Unexpected contour response.');
@@ -125,17 +161,19 @@ const definition = {
                 // Success toast - non-intrusive feedback.
                 if (typeof this.showFlash === 'function') {
                     const n = result.features.length;
-                    this.showFlash(`Generated ${n} contour line${n === 1 ? '' : 's'}.`, 'positive');
+                    this.showFlash(`Generated ${formatNumber(n, 0)} contour line${n === 1 ? '' : 's'}.`, 'positive');
                 }
+                // The lines stop at the cap of the server (FR-RAS-11): a message the user acknowledges
+                const cut = contourTruncation(result);
+                if (cut.truncated && typeof this.showAlert === 'function') this.showAlert(cut.title, cut.message);
             } catch (e) {
-                console.error('Contour generation failed:', e);
-                const raw = e && (e.message || e.error || e.toString());
-                const friendly = friendlyContourError(raw,
-                    'Could not generate contours. Check raster validity and parameters.');
-                this.contourError = friendly;
-                // Modal error dialog so the user does not miss the failure.
-                if (typeof this.showAlert === 'function') {
-                    this.showAlert('Contour generation failed', friendly);
+                // A task that failed or was cancelled is shown by its status in the dialog (FR-XC-06); anything else
+                // (the submit was refused, an unreadable result) has no task row to say it
+                if (!(e && e.task)) {
+                    console.error('Contour generation failed:', e);
+                    const raw = e && (e.message || e.error || e.toString());
+                    this.contourError = friendlyContourError(raw,
+                        raw || 'Could not generate contours. Check raster validity and parameters.');
                 }
             } finally {
                 this.contourLoading = false;
@@ -245,5 +283,14 @@ const definition = {
  * @param {Record<string, any>} externals
  */
 export function useContourLines(externals) {
-    return createFeatureScope({ ...definition, externals });
+    // Follows the task of a request until it ends; stops with the component that owns the map
+    const heavy = useHeavyTask();
+    return createFeatureScope({
+        ...definition,
+        externals: {
+            ...externals,
+            runHeavyTask: () => heavy.runHeavyTask,
+            heavyTasks: () => heavy.heavyTasks.value
+        }
+    });
 }
