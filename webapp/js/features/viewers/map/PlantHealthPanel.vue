@@ -79,8 +79,9 @@
 
             <!-- Rescale (when formula is active) -->
             <div v-if="selectedFormula" class="section">
-                <label for="plant-health-panel-rescale" class="section-label">Rescale</label>
-                <input id="plant-health-panel-rescale" v-model="rescale" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" @change="onRescaleManualChange">
+                <span id="plant-health-panel-rescale-label" class="section-label">Rescale</span>
+                <!-- The same Min and Max fields as the raster panel; a bad range shows its error here and the layer keeps the last valid one (FR-RAS-20) -->
+                <RescaleFields v-model="rescale" id-prefix="plant-health-panel-rescale" @commit="onRescaleManualChange" />
             </div>
 
             <!-- Histogram -->
@@ -158,6 +159,7 @@ import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import { colormap, INDEX_COLORMAPS } from '@/libs/map/colormaps';
 import BandSelector from '@/features/viewers/map/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
+import RescaleFields from './RescaleFields.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge } from '@/libs/exportSize';
@@ -166,7 +168,8 @@ import { useHeavyTask } from '@/composables/useHeavyTask';
 import { downloadBlob } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { copyText } from '@/composables/useCopyText';
-import { formatNumber } from '@/libs/format';
+import { formatNumber, parseNumber } from '@/libs/format';
+import { splitRescale } from '@/libs/rescale';
 import { shownHistogram, percentileRange } from '@/libs/map/histogramRange';
 import { useTimerGroup } from '@/composables/useTimers';
 import { replaceHash } from '@/libs/routeQuery';
@@ -179,7 +182,7 @@ import { replaceHash } from '@/libs/routeQuery';
  * rescaling, and copy-link functionality.
  */
 export default {
-    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner },
+    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner, RescaleFields },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -286,10 +289,11 @@ export default {
                 }
                 case 'custom':
                     if (this.rescale) {
-                        const parts = this.rescale.split(',');
-                        const lo = parts.length >= 1 ? parseFloat(parts[0]) : NaN;
-                        const hi = parts.length >= 2 ? parseFloat(parts[1]) : NaN;
-                        if (!isNaN(lo) && !isNaN(hi)) return [lo, hi];
+                        // The machine value "min,max" (libs/rescale.js)
+                        const { min, max } = splitRescale(this.rescale);
+                        const lo = parseNumber(min);
+                        const hi = parseNumber(max);
+                        if (Number.isFinite(lo) && Number.isFinite(hi)) return [lo, hi];
                     }
                     break;
             }

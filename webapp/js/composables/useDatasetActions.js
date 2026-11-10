@@ -26,7 +26,7 @@ import { skippedSentence } from '@/libs/tasks/extractSummary';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import { useConfirmReplace, existingItem, replaceConflictPath, conflictIsFolder } from '@/composables/useConfirmReplace';
-import { namesClash } from '@/libs/nameRules';
+import { namesClash, nameClashMessage } from '@/libs/nameRules';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { MASK_BORDERS_TOOL, maskedOutputPath } from '@/libs/dataset/maskBorders';
 import Alert from '@/components/HubAlert.vue';
@@ -101,22 +101,30 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         }));
     }
 
+    /**
+     * The New folder dialog. It runs the request itself (`createFolder` below), so that a refusal of the Registry (a name
+     * that exists: 409) shows at its name field and the dialog stays open with the typed text (FR-EXP-15, FR-XC-11).
+     */
     function newFolder() {
+        const folder = listing.currentPath.value || '';
         dialogs.open(NewFolderDialog, () => ({
-            busy: busy.value,
-            onClose: (id, name) => { if (id === 'createFolder' && name) createFolder(name); }
+            folder,
+            siblings: entryPaths(listing.files.value),
+            createFolder: name => createFolder(name, folder)
         }));
     }
 
-    async function createFolder(name) {
-        const folder = listing.currentPath.value;
-        await withBusy(async () => {
-            try {
-                const entry = await dataset.createFolder(folder ? `${folder}/${name}` : name);
-                listing.added([itemFor(dataset, entry, { empty: true })]);
-            } catch (e) {
-                showError(e, 'Create folder');
-            }
+    /** The dataset paths of the items of a listing (what the name checks of the dialogs compare). */
+    function entryPaths(items) {
+        return (items || []).map(f => f?.entry?.path).filter(Boolean);
+    }
+
+    /** Creates the folder and adds it to the listing; a failure is thrown for the dialog to show at its field. */
+    function createFolder(name, folder = listing.currentPath.value) {
+        return withBusy(async () => {
+            const entry = await dataset.createFolder(folder ? `${folder}/${name}` : name);
+            listing.added([itemFor(dataset, entry, { empty: true })]);
+            return entry;
         });
     }
 
@@ -170,11 +178,11 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     /**
      * Moves or renames an item on the server and in the views. A pure move never triggers a
      * build (builds are by hash); a rename does when it makes the file buildable. A drag move offers Undo in its
-     * toast (FR-EXP-16, FR-XC-23): the item goes back to the path it came from; a move that replaced an entry
-     * (`undoable: false`) offers none, as the entry it replaced cannot come back.
-     * Resolves to the item at its new path, or null when the move failed.
+     * toast (FR-EXP-16, FR-XC-23): the item goes back to the path it came from. The Registry never moves onto a name
+     * that exists (409, D-040): a move replaces nothing, and a refused one says that the name is taken, with no Undo.
+     * Resolves to the item at its new path, or null when the move failed (with `throws`, the failure is thrown instead).
      */
-    async function moveItem(file, newPath, { action = 'rename', silent = false, undoable = true } = {}) {
+    async function moveItem(file, newPath, { action = 'rename', silent = false, throws = false } = {}) {
         try {
             const oldPath = file.entry.path;
             const updated = await dataset.moveObj(oldPath, newPath);
@@ -183,7 +191,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             item.label = pathutils.basename(newPath);
             if (updated && typeof updated === 'object') item.entry = updated;
             else item.entry.path = newPath;
-            // A replace: the destination's old item goes too
+            // The path was free on the server (a name that exists is refused): an item the views still show there is stale
             listing.drop([newPath]);
             listing.removed([oldPath]);
             listing.added([item]);
@@ -191,10 +199,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 BuildManager.onFilesAdded(dataset, [item.entry]);
             }
             if (!silent) {
-                if (action === 'move' && undoable) {
+                if (action === 'move') {
                     notify.success('File moved successfully', { summary: 'Moved', action: { label: 'Undo', run: () => undoMove(item, oldPath) } });
-                } else if (action === 'move') {
-                    notify.success('File moved successfully', { summary: 'Moved' });
                 } else if (action === 'undo') {
                     notify.success('The move was undone', { summary: 'Moved' });
                 } else {
@@ -203,6 +209,13 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             }
             return item;
         } catch (e) {
+            // A caller that shows the failure itself (the Rename dialog, at its field) gets it thrown
+            if (throws) throw e;
+            if (action === 'move' && e?.status === 409) {
+                // The name is taken in the destination folder (D-040): the Registry's words, and nothing moved
+                showError(e.message || nameClashMessage(pathutils.basename(newPath)), 'Name already taken');
+                return null;
+            }
             showError(e, action === 'rename' ? 'Rename file' : action === 'undo' ? 'Undo move' : 'Move file');
             return null;
         }
@@ -237,40 +250,28 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     }
 
     /**
-     * Whether a move to `path` replaces an entry: the listing knows when the path is in the folder on show, else the
-     * server's listing of its folder says (a failed read: yes, so that no Undo is offered that could not undo).
+     * The Rename dialog. It runs the request itself (`renameEntry`, `renameDataset` for the dataset root): a name that exists
+     * is refused at its field before any request, and a refusal of the Registry (a 409, a slug that is taken) shows there
+     * too, with the dialog open and the typed name (FR-EXP-04, FR-XC-11).
      */
-    async function moveReplaces(path) {
-        if (listing.inView(path)) return !!existingItem(path, listing.files.value);
-        try {
-            return await pathTaken(path);
-        } catch (e) {
-            console.warn(`Cannot read the folder of ${path}:`, e);
-            return true;
-        }
-    }
-
     function rename(file) {
         if (!file) return;
         dialogs.open(RenameDialog, () => ({
-            busy: busy.value, file, allEntries: listing.files.value,
-            onClose: (id, newPath, entry, sidecarsInfo) => {
-                if (!newPath) return;
-                if (id === 'rename') renameWithSidecars(file, newPath, sidecarsInfo);
-                else if (id === 'renameddb') renameThisDataset(newPath);
-            }
+            file, allEntries: listing.files.value, siblings: entryPaths(listing.files.value),
+            renameEntry: (newPath, { sidecars } = {}) => renameWithSidecars(file, newPath, sidecars),
+            renameDataset: name => renameThisDataset(name)
         }));
     }
 
-    async function renameWithSidecars(file, newPath, sidecarsInfo) {
-        const sidecars = (sidecarsInfo && sidecarsInfo.sidecars) || [];
-        await withBusy(async () => {
-            await moveItem(file, newPath, { silent: sidecars.length > 0 });
+    /** Renames the item, then its sidecars. A failure of the item is thrown (the dialog shows it); a sidecar's is a toast. */
+    function renameWithSidecars(file, newPath, sidecars = []) {
+        return withBusy(async () => {
+            await moveItem(file, newPath, { silent: sidecars.length > 0, throws: true });
             if (!sidecars.length) return;
             try {
                 for (const sc of sidecars) {
                     const item = listing.files.value.find(f => f.entry.path === sc.oldPath);
-                    if (item) await moveItem(item, sc.newPath, { silent: true });
+                    if (item) await moveItem(item, sc.newPath, { silent: true, throws: true });
                     else await dataset.moveObj(sc.oldPath, sc.newPath);
                 }
                 notify.success(`File and ${countOf(sidecars.length, 'sidecar')} renamed successfully`, { summary: 'Renamed' });
@@ -280,14 +281,18 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         });
     }
 
-    async function renameThisDataset(slug) {
+    /**
+     * Renames this dataset: its name and the slug made of it. A failure is thrown for the dialog to show at its field; a
+     * renamed dataset is opened at its new URL (the page stays busy until it goes).
+     */
+    async function renameThisDataset(name) {
         busy.value = true;
         try {
-            const ds = await renameDataset(route.org, route.ds, slug);
-            window.location.href = `/r/${route.org}/${ds.slug}`;
+            const ds = await renameDataset(route.org, route.ds, name);
+            window.location.href = `/r/${route.org}/${ds?.slug || route.ds}`;
         } catch (e) {
-            showError(e, 'Rename');
             busy.value = false;
+            throw e;
         }
     }
 
@@ -312,8 +317,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         } else if (ddb.entry.isDirectory(source.entry) && (destPath + '/').startsWith(source.entry.path + '/')) {
             notify.warn('Cannot move a folder onto itself or one of its descendants', { summary: 'Move' });
         } else {
-            // A move onto an entry of the same kind and name replaces it (the Registry's move): no Undo then
-            await withBusy(async () => moveItem(source, destPath, { action: 'move', undoable: !(await moveReplaces(destPath)) }));
+            // A move onto a name that exists is refused by the Registry (409, D-040): it says that the name is taken, with no Undo
+            await withBusy(() => moveItem(source, destPath, { action: 'move' }));
         }
     }
 

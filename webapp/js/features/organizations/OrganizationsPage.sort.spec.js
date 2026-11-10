@@ -119,7 +119,7 @@ describe('OrganizationsPage create', () => {
     async function create(created) {
         reg.orgs.createOrganization = vi.fn(() => Promise.resolve(created));
         wrapper.vm.orgDialogMode = 'new';
-        await wrapper.vm.handleOrganizationClose('ok', { slug: created.slug, name: created.name, description: '', isPublic: false });
+        await wrapper.vm.saveOrganization({ slug: created.slug, name: created.name, description: '', isPublic: false });
         await flushPromises();
     }
 
@@ -144,5 +144,75 @@ describe('OrganizationsPage create', () => {
         const added = wrapper.vm.organizations[0];
         expect(added.permissions).toEqual({ canRead: true });
         expect(added.owner).toBe('ann');
+    });
+});
+
+// FR-ORG-04: the dialog closed on a failed create and the typed name was lost; now it stays open at the field
+describe('OrganizationsPage create with a failure', () => {
+    const WindowStub = {
+        props: ['busy', 'confirmLabel'],
+        emits: ['confirm', 'close'],
+        template: '<div><slot /><button type="button" data-confirm @click="$emit(\'confirm\')">{{ confirmLabel }}</button></div>'
+    };
+    const mountWithDialog = async list => {
+        reg.orgs.getOrganizations = vi.fn(() => answer(list));
+        wrapper = mount(OrganizationsPage, {
+            attachTo: document.body,
+            global: {
+                plugins: [PrimeVue],
+                mocks: { $router: { push: vi.fn() }, $notify: notify },
+                stubs: {
+                    OrganizationMembersDialog: true, MessageDialog: true, DialogHost: true, EmptyState: true, Paginator: true,
+                    Window: WindowStub, RouterLink: { props: ['to'], template: '<a><slot /></a>' }
+                }
+            }
+        });
+        await flushPromises();
+        wrapper.vm.handleNew();
+        await flushPromises();
+    };
+    const type = async (name, value) => { await wrapper.find(`[name="${name}"]`).setValue(value); await flushPromises(); };
+    const create = async () => { await wrapper.find('[data-confirm]').trigger('click'); await flushPromises(); };
+    afterEach(() => { notify.error.mockClear(); notify.success.mockClear(); });
+
+    it('keeps the dialog open with the typed values and shows the error at the field the Registry names', async () => {
+        await mountWithDialog([dto('other')]);
+        reg.orgs.createOrganization = vi.fn(() => Promise.reject(Object.assign(new Error('The organization already exists'), {
+            status: 409, errors: { slug: ['The organization already exists'] }
+        })));
+        await type('name', 'Hidden Team');
+        await type('description', 'What I typed');
+        await create();
+
+        expect(reg.orgs.createOrganization).toHaveBeenCalledExactlyOnceWith({ slug: 'hidden-team', name: 'Hidden Team', description: 'What I typed', isPublic: false });
+        expect(wrapper.vm.orgDialogOpen).toBe(true);
+        expect(wrapper.find('#organization-dialog-slug-error').text()).toBe('The organization already exists');
+        expect(wrapper.find('[name="name"]').element.value).toBe('Hidden Team');
+        expect(wrapper.find('[name="description"]').element.value).toBe('What I typed');
+        expect(notify.error).not.toHaveBeenCalled();
+        expect(wrapper.vm.organizations.map(o => o.slug)).toEqual(['other']);
+        expect(wrapper.vm.creatingOrganization).toBe(false);
+    });
+
+    it('sends no request for the slug of an organization of the list, and says so at the slug field', async () => {
+        await mountWithDialog([dto('survey-team', { name: 'Survey Team' })]);
+        reg.orgs.createOrganization = vi.fn();
+        await type('name', 'Survey Team');
+        await create();
+
+        expect(reg.orgs.createOrganization).not.toHaveBeenCalled();
+        expect(wrapper.find('#organization-dialog-slug-error').text()).toBe('An organization with this slug already exists');
+        expect(wrapper.vm.orgDialogOpen).toBe(true);
+    });
+
+    it('closes the dialog and adds the organization when the create goes through', async () => {
+        await mountWithDialog([dto('other')]);
+        reg.orgs.createOrganization = vi.fn(() => Promise.resolve(dto('new-team', { name: 'New Team', owner: 'ann' })));
+        await type('name', 'New Team');
+        await create();
+
+        expect(wrapper.vm.orgDialogOpen).toBe(false);
+        expect(wrapper.vm.organizations.map(o => o.slug)).toEqual(['other', 'new-team']);
+        expect(notify.success).toHaveBeenCalledWith('Organization created successfully', { summary: 'Organization Created' });
     });
 });

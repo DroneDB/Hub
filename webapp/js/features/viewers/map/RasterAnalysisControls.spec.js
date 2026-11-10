@@ -140,3 +140,42 @@ describe('RasterAnalysisControls elevation model', () => {
         expect(wrapper.emitted('selectTarget')).toEqual([['odm_dem/dtm.tif']]);
     });
 });
+
+// FR-RAS-10: Rescale is two number fields; a range that is not valid shows its error at the field and the map does not change
+describe('RasterAnalysisControls rescale fields', () => {
+    const min = () => wrapper.find('#raster-analysis-controls-rescale-min');
+    const max = () => wrapper.find('#raster-analysis-controls-rescale-max');
+    const changes = () => (wrapper.emitted('vizParamsChanged') || []).length;
+    const settle = async () => { await new Promise(resolve => setTimeout(resolve, 400)); await flushPromises(); };
+
+    it('starts from the observed range of the raster, in two fields', async () => {
+        await render();
+        expect(min().element.value).toBe('194.7');
+        expect(max().element.value).toBe('229.5');
+    });
+
+    // The fields are typed in the order that never makes a valid range on the way (a valid one is applied)
+    it.each([
+        [[['min', 'abc'], ['max', '10']], 'min', 'Min must be a number'],
+        [[['max', ''], ['min', '0']], 'max', 'Enter Max, or empty both fields for an automatic range'],
+        [[['max', '10'], ['min', '40']], 'min', 'Min must be less than Max']
+    ])('typing %j shows the error at the %s field and sends no vizParamsChanged', async (steps, field, message) => {
+        await render();
+        await settle();
+        const before = changes();
+        for (const [name, value] of steps) await (name === 'min' ? min() : max()).setValue(value);
+        await settle();
+        expect(changes()).toBe(before);
+        expect(wrapper.find(`[data-testid="rescale-${field}-error"]`).text()).toBe(message);
+        expect((field === 'min' ? min() : max()).attributes('aria-invalid')).toBe('true');
+    });
+
+    it('reads "12,5" as 12.5 and sends the machine value', async () => {
+        await render();
+        await settle();
+        await min().setValue('0');
+        await max().setValue('12,5');
+        await settle();
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0].rescale).toBe('0,12.5');
+    });
+});

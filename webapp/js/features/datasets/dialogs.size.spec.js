@@ -30,23 +30,26 @@ const widthStyle = dialog => dialog.getAttribute('style') || '';
 
 describe('a size class gives the dialog its width', () => {
     it('DatasetDialog is dialog-lg and keeps the same class and no inline size while a duplicate name is typed', async () => {
-        const dialog = await mountIt(DatasetDialog, { mode: 'new', forbiddenSlugs: ['t-orgs-upload'] });
+        const dialog = await mountIt(DatasetDialog, { mode: 'new', forbiddenSlugs: ['t-orgs-upload'], save: () => {} });
         expect(dialog.classList.contains('dialog-lg')).toBe(true);
         expect(widthStyle(dialog)).not.toContain('width');
-        wrapper.vm.ds.name = 'T Orgs Upload';
+        const name = dialog.querySelector('#dataset-dialog-dataset-name');
+        name.value = 'T Orgs Upload';
+        name.dispatchEvent(new Event('input'));
         await flushPromises();
-        expect(dialog.textContent).toContain('already in use');
+        expect(dialog.textContent).toContain('A dataset with this slug already exists');
         expect(dialog.classList.contains('dialog-lg')).toBe(true);
         expect(widthStyle(dialog)).not.toContain('width');
-        wrapper.vm.ds.name = 'Another name';
+        name.value = 'Another name';
+        name.dispatchEvent(new Event('input'));
         await flushPromises();
-        expect(dialog.textContent).not.toContain('already in use');
+        expect(dialog.textContent).not.toContain('A dataset with this slug already exists');
         expect(dialog.className.split(' ').filter(c => c.startsWith('dialog-'))).toEqual(['dialog-lg']);
         expect(widthStyle(dialog)).not.toContain('width');
     });
 
     it('OrganizationDialog is dialog-lg, with no inline size', async () => {
-        const dialog = await mountIt(OrganizationDialog, { mode: 'new' });
+        const dialog = await mountIt(OrganizationDialog, { mode: 'new', save: () => {} });
         expect(dialog.classList.contains('dialog-lg')).toBe(true);
         expect(widthStyle(dialog)).not.toContain('width');
     });

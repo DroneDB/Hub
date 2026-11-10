@@ -230,18 +230,29 @@ describe('photogrammetry new dataset name', () => {
     const build = newDatasetName => {
         const vm = {
             optionsError: '',
+            newDatasetNameError: '',
+            _focusField: vi.fn(),
             selectedPreset: { label: 'Custom (JSON array)' },
             customOptions: [],
             photogrammetryForm: { preset: 'custom', optionsText: '', createNewDataset: true, newDatasetName, newDatasetVisibility: 0 }
         };
-        return { params: TaskHistory.methods._buildSubmitParams.call(vm), error: vm.optionsError };
+        return { params: TaskHistory.methods._buildSubmitParams.call(vm), error: vm.newDatasetNameError, options: vm.optionsError, vm };
     };
     const RULE = "Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'";
 
-    it('refuses what the Registry refuses, with its rule', () => {
+    // FR-PRC-34: the error of the name is under the name input, which takes the focus; the options error is not used for it
+    it('refuses what the Registry refuses, with its rule, under the name field', () => {
         for (const name of ['a', 'a--b', 'Survey 2026', '-survey']) {
-            expect(build(name)).toEqual({ params: null, error: RULE });
+            const { params, error, options, vm } = build(name);
+            expect({ params, error, options }).toEqual({ params: null, error: RULE, options: '' });
+            expect(vm._focusField).toHaveBeenCalledWith('task-history-new-dataset-name');
         }
+    });
+
+    it('asks for a name under the name field, not with the options', () => {
+        const { params, error, options, vm } = build('  ');
+        expect({ params, error, options }).toEqual({ params: null, error: 'A new dataset name is required.', options: '' });
+        expect(vm._focusField).toHaveBeenCalledWith('task-history-new-dataset-name');
     });
 
     it('accepts what the Registry accepts: an underscore, a trailing dash, two characters', () => {
@@ -249,6 +260,37 @@ describe('photogrammetry new dataset name', () => {
             expect(build(name).params).toMatchObject({ createNewDataset: true, newDatasetName: name });
             expect(build(name).error).toBe('');
         }
+    });
+});
+
+// FR-PRC-34: a path error is shown once, inline, with the focus on its field: no window with Close and OK
+describe('photogrammetry path errors', () => {
+    const submit = async form => {
+        const vm = {
+            optionsError: '', folderPathError: '', destPathError: '', newDatasetNameError: '',
+            photogrammetryForm: { preset: 'custom', optionsText: '', createNewDataset: false, folder: '', destPath: 'out', ...form },
+            validateDatasetPath: TaskHistory.methods.validateDatasetPath,
+            _buildSubmitParams: vi.fn(() => null),
+            _focusField: vi.fn(),
+            confirm: vi.fn()
+        };
+        await TaskHistory.methods.submitPhotogrammetry.call(vm);
+        return vm;
+    };
+
+    it('shows an image folder that starts with "/" only inline, with the focus on the field', async () => {
+        const vm = await submit({ folder: '/images' });
+        expect(vm.folderPathError).toBe('Image folder must not start with "/" or "\\" - use a path relative to the dataset root.');
+        expect(vm.confirm).not.toHaveBeenCalled();
+        expect(vm._focusField).toHaveBeenCalledExactlyOnceWith('task-history-image-folder');
+        expect(vm._buildSubmitParams).not.toHaveBeenCalled();
+    });
+
+    it('shows an output folder that is absolute only inline, with the focus on the field', async () => {
+        const vm = await submit({ destPath: 'C:\\out' });
+        expect(vm.destPathError).toBe('Output folder must not be an absolute path.');
+        expect(vm.confirm).not.toHaveBeenCalled();
+        expect(vm._focusField).toHaveBeenCalledExactlyOnceWith('task-history-output-folder');
     });
 });
 

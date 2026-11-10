@@ -38,6 +38,25 @@ describe('PasteConflictDialog', () => {
         expect(wrapper.emitted('resolve')).toEqual([['overwrite'], ['skip'], ['cancel']]);
     });
 
+    // A move inside one dataset cannot replace (the Registry answers 409, D-040): Keep both or Skip only
+    describe('without Replace (a move inside one dataset)', () => {
+        const move = paths => open(paths, { verb: 'move', keepBoth: true, replace: false });
+
+        it('offers Keep both and Skip, no Replace or Overwrite, and resolves one choice per file', async () => {
+            const wrapper = move(['photos/a.tif', 'photos/b.tif']);
+            expect(wrapper.find('h1').text()).toBe('Move Conflict');
+            expect(wrapper.text()).toContain('being moved');
+            expect(wrapper.text()).not.toContain('Replace it');
+            expect(wrapper.findAll('button').map(b => b.text())).toEqual(['Cancel', 'Skip', 'Keep both']);
+            expect(button(wrapper, 'Replace')).toBeUndefined();
+            expect(button(wrapper, 'Overwrite All')).toBeUndefined();
+
+            await button(wrapper, 'Keep both').trigger('click');
+            await button(wrapper, 'Skip').trigger('click');
+            expect(wrapper.emitted('resolve')).toEqual([[['keep', 'skip']]]);
+        });
+    });
+
     describe('with Keep both (uploads)', () => {
         const upload = paths => open(paths, { verb: 'upload', keepBoth: true });
 

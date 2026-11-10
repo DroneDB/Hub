@@ -94,11 +94,11 @@
                                 <div class="d-flex align-items-center gap-2">
                                     <i class="fa-solid fa-sitemap" aria-hidden="true" />
                                     <!-- The whole card opens the organization (stretched link) -->
-                                    <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link">
+                                    <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link" :title="org.name ? org.name : org.slug">
                                         {{ org.name ? org.name : org.slug }}
                                     </router-link>
                                 </div>
-                                <div v-if="org.description" class="org-card-description mt-1">{{ org.description }}</div>
+                                <div v-if="org.description" class="org-card-description mt-1" :title="org.description">{{ org.description }}</div>
                                 <div v-if="org.lastModified != null || org.datasetCount != null" class="org-card-stats mt-1">
                                     <span v-if="org.datasetCount != null">{{ org.datasetCount }} {{ org.datasetCount === 1 ? 'dataset' : 'datasets' }}</span>
                                     <span v-if="org.datasetCount != null && org.lastModified != null" aria-hidden="true">&middot;</span>
@@ -146,6 +146,7 @@
         <DialogHost :dialogs="dialogs" />
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
+                            :forbidden-slugs="organizations.map(o => o.slug)" :save="saveOrganization"
                             @close="handleOrganizationClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="selectedOrgForMembers.slug"
@@ -552,71 +553,60 @@ export default {
             this.newOrganization();
         },
 
-        async handleOrganizationClose(res, neworg) {
+        // The dialog is closed when the organization is saved or the user gives up; a failure of the save stays in the
+        // dialog, at the field the Registry names, with the typed values (FR-ORG-04)
+        handleOrganizationClose() {
             this.orgDialogOpen = false;
+            this.orgDialogModel = null;
+        },
 
-            if (res == "close" || !neworg) {
-                this.orgDialogModel = null;
-                return;
-            }
-
+        /**
+         * The request of the dialog: creates or updates the organization and the list. A failure is thrown for the dialog
+         * to show (it names the field, D-047), so the dialog stays open with what the user typed.
+         */
+        async saveOrganization(neworg) {
             if (this.orgDialogMode == "new") {
-                this.orgDialogModel = null;
-                this.orgDialogOpen = false;
                 this.creatingOrganization = true;
 
                 try {
-                    let ret = await reg.orgs.createOrganization({
+                    const ret = await reg.orgs.createOrganization({
                         slug: neworg.slug,
                         name: neworg.name,
                         description: neworg.description,
                         isPublic: neworg.isPublic
                     });
-                    if (ret) {
-                        // The organization as the server made it, with its dates; the answer carries
-                        // no permissions (the creator owns it)
-                        const created = organizationRow(ret);
-                        this.organizations.push({
-                            ...created,
-                            owner: created.owner || this.userName,
-                            permissions: created.permissions ?? CREATOR_PERMISSIONS
-                        });
-                        this.$notify.success('Organization created successfully', { summary: 'Organization Created' });
-                    } else {
-                        this.$notify.error('Failed to create organization "' + neworg.slug + '"');
-                        console.error(ret);
-                    }
-                } catch (e) {
-                    console.error(e);
-                    this.$notify.error('Failed to create organization: ' + e.message);
-                }
-                this.creatingOrganization = false;
+                    if (!ret) throw new Error('Failed to create organization "' + neworg.slug + '"');
 
+                    // The organization as the server made it, with its dates; the answer carries
+                    // no permissions (the creator owns it)
+                    const created = organizationRow(ret);
+                    this.organizations.push({
+                        ...created,
+                        owner: created.owner || this.userName,
+                        permissions: created.permissions ?? CREATOR_PERMISSIONS
+                    });
+                    this.$notify.success('Organization created successfully', { summary: 'Organization Created' });
+                } finally {
+                    this.creatingOrganization = false;
+                }
             } else if (this.orgDialogMode == "edit") {
-                let org = this.orgDialogModel;
+                const org = this.orgDialogModel;
                 if (!org) return;
-                this.orgDialogModel = null;
-                this.orgDialogOpen = false;
                 this.loading = true;
 
                 try {
-                    let ret = await reg.orgs.updateOrganization(org.slug, neworg.name, neworg.description, neworg.isPublic);
-                    if (ret) {
-                        let orgitem = this.organizations.find(o => o.slug == org.slug);
-                        orgitem.slug = org.slug;
-                        orgitem.name = neworg.name;
-                        orgitem.description = neworg.description;
-                        orgitem.isPublic = neworg.isPublic;
-                        this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
-                    } else {
-                        this.$notify.error('Failed to update organization "' + org.slug + '"');
-                        console.error(ret);
-                    }
-                } catch (e) {
-                    console.error(e);
-                    this.$notify.error('Failed to update organization: ' + e.message);
+                    const ret = await reg.orgs.updateOrganization(org.slug, neworg.name, neworg.description, neworg.isPublic);
+                    if (!ret) throw new Error('Failed to update organization "' + org.slug + '"');
+
+                    const orgitem = this.organizations.find(o => o.slug == org.slug);
+                    orgitem.slug = org.slug;
+                    orgitem.name = neworg.name;
+                    orgitem.description = neworg.description;
+                    orgitem.isPublic = neworg.isPublic;
+                    this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
+                } finally {
+                    this.loading = false;
                 }
-                this.loading = false;
             }
         },
 
@@ -788,6 +778,12 @@ export default {
             color: inherit;
             text-decoration: none;
             overflow-wrap: anywhere;
+            /* A long name is two lines, the whole of it in the tooltip (FR-ORG-14) */
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            overflow: hidden;
         }
 
         .org-name:focus-visible {
@@ -804,6 +800,13 @@ export default {
         .org-card-description {
             color: var(--ddb-text-secondary);
             font-size: var(--ddb-font-size-sm);
+            overflow-wrap: anywhere;
+            /* A long description is two lines, the whole of it in the tooltip (FR-ORG-14) */
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            overflow: hidden;
         }
 
         .org-card-stats {

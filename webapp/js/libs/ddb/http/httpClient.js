@@ -20,6 +20,7 @@ const STATUS_TEXT = {
     400: 'Bad Request',
     401: 'Unauthorized',
     403: 'Forbidden',
+    404: 'Not found',
     422: 'Unprocessable Entity',
     429: 'Too Many Requests',
     500: 'Internal Server Error',
@@ -110,7 +111,6 @@ async function parseBody(response, status, responseType) {
  * @returns {Promise<never>}
  */
 async function throwFor(response, status) {
-    if (status === 404) fail('Not found', 404);
     const fallback = STATUS_TEXT[status]
         ?? (status >= 500 ? 'Server Error' : status >= 400 ? 'Client Error' : 'Unexpected Response');
     try {
@@ -118,6 +118,8 @@ async function throwFor(response, status) {
             const json = await response.json();
             fail(failureMessageOf(json) || fallback, status, json);
         }
+        // A 404 page of a proxy or of the web server is HTML, not a message (FR-ORG-23: the Registry's 404 says what is missing)
+        if (status === 404 && !contentTypeOf(response).includes('text/plain')) fail(fallback, status);
         const text = await response.text();
         fail(text || fallback, status);
     } catch (error) {

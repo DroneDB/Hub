@@ -9,7 +9,8 @@
  *             repopulate destination entries after paste)
  * - target:  { orgSlug, dsSlug, basePath, dataset }
  * - source:  { orgSlug, dsSlug, basePath, dataset }
- * - options: { conflictMode: 'overwrite'|'skip'|'ask' }
+ * - options: { conflictMode: 'overwrite'|'skip'|'ask' } (copies and transfers); a move inside one dataset
+ *            takes { names: { [path]: freeName }, skip: [path] } instead (it cannot overwrite)
  *
  * The active dataset for API calls depends on the strategy:
  *   - intra:  uses target.dataset (== source.dataset)
@@ -38,26 +39,27 @@ function buildResult() {
     return { succeeded: [], failed: {}, skipped: [] };
 }
 
+/**
+ * A move inside one dataset (PUT /obj). The Registry refuses a move onto a name that exists (409, D-040) and the
+ * endpoint has no overwrite: a conflict is decided before the paste, per item, as Keep both (`options.names`: the
+ * free name the item gets in the target folder) or Skip (`options.skip`: not sent). Any refusal is a failure.
+ */
 class IntraDatasetMoveStrategy {
     async execute(items, source, target, options) {
         const result = buildResult();
         const dataset = target.dataset;
-        const overwrite = options.conflictMode === 'overwrite';
+        const names = options.names || {};
+        const skip = new Set(options.skip || []);
 
         for (const item of items) {
-            const dest = destFor(item, target);
+            if (skip.has(item.path)) { result.skipped.push(item.path); continue; }
+            const dest = names[item.path] ? joinPath(target.basePath || '', names[item.path]) : destFor(item, target);
             if (item.path === dest) { result.skipped.push(item.path); continue; }
             try {
-                // Server-side move uses PUT /obj which doesn't accept overwrite=true natively.
-                // We follow the same flow as drag&drop rename (single endpoint, server enforces).
                 await dataset.moveObj(item.path, dest);
                 result.succeeded.push({ source: item.path, dest });
             } catch (err) {
-                if (!overwrite && options.conflictMode === 'skip') {
-                    result.skipped.push(item.path);
-                } else {
-                    result.failed[item.path] = err.message || String(err);
-                }
+                result.failed[item.path] = err.message || String(err);
             }
         }
         return result;

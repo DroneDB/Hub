@@ -49,11 +49,13 @@
                         <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
                         <div class="d-flex gap-2">
                             <InputText id="task-history-image-folder" v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
-                                       placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
+                                       placeholder="Leave empty to use dataset root" :invalid="!!folderPathError"
+                                       :aria-invalid="folderPathError ? 'true' : undefined" :aria-describedby="folderPathError ? 'task-history-image-folder-error' : undefined"
+                                       @input="folderPathError = ''" />
                             <Button icon="fa-regular fa-folder-open" severity="secondary"
                                     title="Browse dataset" aria-label="Browse dataset" @click="openImageFolderPicker" />
                         </div>
-                        <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
+                        <small v-if="folderPathError" id="task-history-image-folder-error" class="error-text d-block">{{ folderPathError }}</small>
                         <small v-else class="muted">All images under this folder will be processed.</small>
                     </div>
 
@@ -138,11 +140,13 @@
                         <label for="task-history-output-folder" class="d-block mb-1"><strong>Output folder</strong></label>
                         <div class="d-flex gap-2">
                             <InputText id="task-history-output-folder" v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
-                                       placeholder="photogrammetry_output" @input="destPathError = ''" />
+                                       placeholder="photogrammetry_output" :invalid="!!destPathError"
+                                       :aria-invalid="destPathError ? 'true' : undefined" :aria-describedby="destPathError ? 'task-history-output-folder-error' : undefined"
+                                       @input="destPathError = ''" />
                             <Button icon="fa-regular fa-folder-open" severity="secondary"
                                     title="Browse dataset" aria-label="Browse dataset" @click="openOutputFolderPicker" />
                         </div>
-                        <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
+                        <small v-if="destPathError" id="task-history-output-folder-error" class="error-text d-block">{{ destPathError }}</small>
                         <small v-else class="muted">Extracted files will be placed in this folder.</small>
                     </div>
 
@@ -150,8 +154,13 @@
                         <div class="mb-3">
                             <label for="task-history-new-dataset-name" class="d-block mb-1"><strong>New dataset name</strong></label>
                             <InputText id="task-history-new-dataset-name" v-model="photogrammetryForm.newDatasetName" class="w-100"
-                                       placeholder="photogrammetry-results" />
-                            <small class="muted">A slug: {{ slugRuleText }}</small>
+                                       placeholder="photogrammetry-results" :invalid="!!newDatasetNameError"
+                                       :aria-invalid="newDatasetNameError ? 'true' : undefined"
+                                       :aria-describedby="newDatasetNameError ? 'task-history-new-dataset-name-error' : 'task-history-new-dataset-name-help'"
+                                       @input="newDatasetNameError = ''" />
+                            <!-- The error of the name is under the name, not with the options (FR-PRC-34) -->
+                            <small v-if="newDatasetNameError" id="task-history-new-dataset-name-error" class="error-text d-block">{{ newDatasetNameError }}</small>
+                            <small v-else id="task-history-new-dataset-name-help" class="muted">A slug: {{ slugRuleText }}</small>
                         </div>
                         <div class="mb-3">
                             <label id="task-history-visibility-label" for="task-history-visibility" class="d-block mb-1"><strong>Visibility</strong></label>
@@ -337,6 +346,8 @@ export default {
                 newDatasetVisibility: DEFAULT_VISIBILITY
             },
             optionsError: '',
+            // The refusal of the name of the new dataset, under its field (FR-PRC-34)
+            newDatasetNameError: '',
             folderPathError: '',
             destPathError: '',
             checkingNode: false,
@@ -567,6 +578,7 @@ export default {
 
         openPhotogrammetryDialog() {
             this.optionsError = '';
+            this.newDatasetNameError = '';
             this.folderPathError = '';
             this.destPathError = '';
             this.nodeStatus = null;
@@ -690,17 +702,20 @@ export default {
             if (!this.photogrammetryForm.createNewDataset) {
                 if (!this.photogrammetryForm.destPath || !this.photogrammetryForm.destPath.trim()) {
                     this.destPathError = 'An output folder path is required.';
+                    this._focusField('task-history-output-folder');
                     return null;
                 }
             } else {
                 if (!this.photogrammetryForm.newDatasetName || !this.photogrammetryForm.newDatasetName.trim()) {
-                    this.optionsError = 'A new dataset name is required.';
+                    this.newDatasetNameError = 'A new dataset name is required.';
+                    this._focusField('task-history-new-dataset-name');
                     return null;
                 }
                 // The slug rule of the Registry (FR-XC-12, libs/slug.js), the text the Registry answers with
                 const slugError = slugProblem(this.photogrammetryForm.newDatasetName, 'Dataset');
                 if (slugError) {
-                    this.optionsError = slugError;
+                    this.newDatasetNameError = slugError;
+                    this._focusField('task-history-new-dataset-name');
                     return null;
                 }
             }
@@ -725,27 +740,29 @@ export default {
             return params;
         },
 
-        _showPathError(message) {
-            this.confirm({ title: 'Invalid path', message: escapeHtml(message), confirmText: 'OK', cancelText: 'Close' });
+        // The focus goes to the field that shows the error (FR-PRC-34): the window is rendered outside the page, so by id
+        _focusField(id) {
+            this.$nextTick(() => document.getElementById(id)?.focus());
         },
 
         async submitPhotogrammetry() {
             this.optionsError = '';
             this.folderPathError = '';
             this.destPathError = '';
+            this.newDatasetNameError = '';
 
-            // #5: clean dataset-relative path validation.
+            // #5: clean dataset-relative path validation: one error, inline at the field, which takes the focus (FR-PRC-34)
             const folderErr = this.validateDatasetPath(this.photogrammetryForm.folder, 'Image folder');
             if (folderErr) {
                 this.folderPathError = folderErr;
-                this._showPathError(folderErr);
+                this._focusField('task-history-image-folder');
                 return;
             }
             if (!this.photogrammetryForm.createNewDataset) {
                 const destErr = this.validateDatasetPath(this.photogrammetryForm.destPath, 'Output folder');
                 if (destErr) {
                     this.destPathError = destErr;
-                    this._showPathError(destErr);
+                    this._focusField('task-history-output-folder');
                     return;
                 }
             }

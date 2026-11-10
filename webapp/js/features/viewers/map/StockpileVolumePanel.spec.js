@@ -286,3 +286,57 @@ describe('StockpileVolumePanel on a map narrower than sm (FR-MAP-16)', () => {
         expect(wrapper.find('[data-testid="stockpile-click-banner"]').exists()).toBe(true);
     });
 });
+
+// FR-MAP-27: a custom material with a density the catalog refuses says so at the field, and the rows stay with the reason
+describe('StockpileVolumePanel custom density', () => {
+    const density = () => wrapper.find('[data-testid="stockpile-custom-density"]');
+    const error = () => wrapper.find('[data-testid="stockpile-density-error"]');
+
+    it('shows no error for a density the catalog accepts', () => {
+        render({ material: '__custom__', customDensity: 1.5 });
+        expect(error().exists()).toBe(false);
+        expect(density().attributes('aria-invalid')).toBeUndefined();
+    });
+
+    it.each([0, -3])('says "Density must be greater than 0" at the field for %d, marked invalid', value => {
+        render({ material: '__custom__', customDensity: value });
+        expect(error().text()).toBe('Density must be greater than 0');
+        expect(density().attributes('aria-invalid')).toBe('true');
+        expect(density().attributes('aria-describedby')).toBe('stockpile-volume-panel-density-error');
+    });
+
+    it('reads the typed value in the user unit: 0 and a negative number emit a stored density of 0 or less, which the panel refuses', async () => {
+        render({ material: '__custom__', customDensity: 1.5 });
+        await density().setValue('-3');
+        expect(wrapper.emitted('update:customDensity').at(-1)[0]).toBeLessThan(0);
+        await wrapper.setProps({ customDensity: wrapper.emitted('update:customDensity').at(-1)[0] });
+        expect(error().text()).toBe('Density must be greater than 0');
+    });
+
+    it('says the upper limit in the unit of the user for a density above it', () => {
+        render({ material: '__custom__', customDensity: 31 });
+        expect(error().text()).toBe('Density must be at most 30 t/m³');
+        wrapper.unmount();
+        render({ material: '__custom__', customDensity: 31, unitPref: 'imperial' });
+        // 30 t/m³ in short tons per cubic yard: 30 x 0.8428 ... the limit the user reads, in their unit
+        expect(error().text()).toMatch(/^Density must be at most [\d.,]+ ST\/yd³$/);
+        expect(error().text()).not.toContain('t/m³');
+    });
+
+    it('keeps the Weight and Est. cost rows with the reason when the custom density is refused', () => {
+        render({ material: '__custom__', customDensity: 0, result: { ...RESULT, weightEstimate: undefined, costEstimate: undefined } });
+        expect(text('stockpile-weight-error')).toBe('Density must be greater than 0');
+        expect(text('stockpile-cost-error')).toBe('Density must be greater than 0');
+        expect(wrapper.find('[data-testid="stockpile-weight"]').exists()).toBe(false);
+    });
+
+    it('does not say it for another material, nor when the pile has its weight', () => {
+        render({ material: 'gravel', customDensity: 0, result: { ...RESULT, weightEstimate: undefined, costEstimate: undefined } });
+        expect(error().exists()).toBe(false);
+        expect(wrapper.find('[data-testid="stockpile-weight-error"]').exists()).toBe(false);
+        wrapper.unmount();
+        render({ material: '__custom__', customDensity: 1.5, result: RESULT });
+        expect(wrapper.find('[data-testid="stockpile-weight-error"]').exists()).toBe(false);
+        expect(text('stockpile-weight')).toBe('150 t');
+    });
+});

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import ddb from 'ddb';
-import { isCadDrawing, crsRequest } from './cadCrs';
+import { isCadDrawing, crsRequest, crsProblem } from './cadCrs';
 
 vi.mock('@/libs/build/buildManager', () => ({ default: {}, BUILD_STATES: {} }));
 vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {} }));
@@ -49,47 +49,25 @@ describe('Tools › Set Coordinate System', () => {
     });
 });
 
-describe('SetCrsDialog', () => {
-    // No @vue/test-utils here: bind the options to a plain object, as Vue binds `this`
-    async function dialog(entry, setCadCrs = vi.fn(async (path) => ({ path: path.replace(/\.\w+$/, '.prj') }))) {
-        const options = (await import('@/features/dataset/dialogs/SetCrsDialog.vue')).default;
-        const ctx = { file: { entry }, dataset: { setCadCrs }, $emit: vi.fn() };
-        Object.assign(ctx, options.data.call(ctx));
-        for (const [name, fn] of Object.entries(options.computed))
-            Object.defineProperty(ctx, name, { get: fn.bind(ctx) });
-        for (const [name, fn] of Object.entries(options.methods)) ctx[name] = fn.bind(ctx);
-        return ctx;
-    }
+// FR-PRC-31: the form of the value, checked before Apply; the server says whether it exists
+describe('crsProblem', () => {
+    it.each(['EPSG:32632', 'epsg:2193', 'PROJCS["WGS 84 / UTM zone 32N",GEOGCS["WGS 84"]]', 'GEOGCS["WGS 84"]', 'PROJCRS["x"]', 'GEOGCRS["x"]', 'COMPD_CS["x"]', 'COMPD["x"]'])(
+        'accepts %s', value => {
+            expect(crsProblem(value)).toBeNull();
+        });
 
-    it('starts from the drawing\'s current setting', async () => {
-        const fromPrj = await dialog({ type: T.VECTOR, path: 'site/plan.dwg',
-            properties: { vector: { crs: { source: 'prj', label: 'EPSG:32632' } } } });
-        expect(fromPrj.mode).toBe('system');
-        expect(fromPrj.crs).toBe('EPSG:32632');
-        expect(fromPrj.prjName).toBe('plan.prj');
-
-        const local = await dialog({ type: T.VECTOR, path: 'plan.dxf',
-            properties: { vector: { crs: { source: 'prj', label: 'local' } } } });
-        expect(local.mode).toBe('local');
-        expect(local.canApply).toBe(true);
+    it('accepts a bare number once crsRequest has read it as an EPSG code', () => {
+        expect(crsProblem(crsRequest('system', '32632'))).toBeNull();
+        expect(crsProblem(crsRequest('system', ' 99999999 '))).toBeNull();
     });
 
-    it('sends the request and reports the .prj', async () => {
-        const d = await dialog({ type: T.VECTOR, path: 'site/plan.dwg', properties: {} });
-        expect(d.canApply).toBe(false);
-        d.crs = '2193';
-        await d.apply();
-        expect(d.dataset.setCadCrs).toHaveBeenCalledWith('site/plan.dwg', 'EPSG:2193');
-        expect(d.$emit).toHaveBeenCalledWith('close', 'set', { prjPath: 'site/plan.prj' });
+    it.each(['abc', 'EPSG:', 'EPSG:abc', '32632x', 'PROJ["x"]', 'UTM 32N'])('refuses %s, saying what is expected', value => {
+        expect(crsProblem(crsRequest('system', value))).toBe('Enter an EPSG code (such as 32632 or EPSG:32632) or a WKT definition (starting with PROJCS or GEOGCS).');
     });
 
-    it('shows the server\'s error and stays open', async () => {
-        const d = await dialog({ type: T.VECTOR, path: 'plan.dwg', properties: {} },
-            vi.fn(async () => { throw new Error('Not a coordinate system: nope'); }));
-        d.crs = 'nope';
-        await d.apply();
-        expect(d.errorMessage).toBe('Not a coordinate system: nope');
-        expect(d.$emit).not.toHaveBeenCalled();
-        expect(d.saving).toBe(false);
+    it('asks for a value when there is none', () => {
+        expect(crsProblem(crsRequest('system', '   '))).toBe('Enter a coordinate system.');
+        expect(crsProblem('')).toBe('Enter a coordinate system.');
+        expect(crsProblem(undefined)).toBe('Enter a coordinate system.');
     });
 });

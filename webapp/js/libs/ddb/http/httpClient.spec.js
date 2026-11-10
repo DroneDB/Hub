@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createHttpClient } from './httpClient';
-import { isForbidden } from '../apiError';
+import { isForbidden, isNotFound } from '../apiError';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -76,6 +76,36 @@ describe('httpClient error messages', () => {
 });
 
 // FR-XC-05: a request the user did not start can opt out of the global 401 handler
+// FR-ORG-23: the Registry's 404 says what is missing ("No user named x"); callers test the status, never the text
+describe('httpClient 404 messages', () => {
+    it('reads the detail of a ProblemDetails 404 as the message, and keeps the errors member', async () => {
+        respondWith(404, { title: 'Not Found', status: 404, detail: 'No user named nosuchuser123', errors: { userName: ['No user named nosuchuser123'] } },
+            'application/problem+json');
+        const error = await client().send('/orgs/x/members', { method: 'POST' }).catch(e => e);
+        expect(error.status).toBe(404);
+        expect(error.message).toBe('No user named nosuchuser123');
+        expect(error.errors).toEqual({ userName: ['No user named nosuchuser123'] });
+        expect(isNotFound(error)).toBe(true);
+    });
+
+    it('says "Not found" for a 404 with no body, and for the HTML page of a web server', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(null, { status: 404 }));
+        expect((await client().send('/x').catch(e => e)).message).toBe('Not found');
+        vi.restoreAllMocks();
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response('<html><body>404 Not Found</body></html>', { status: 404, headers: { 'Content-Type': 'text/html' } }));
+        const error = await client().send('/x').catch(e => e);
+        expect(error.status).toBe(404);
+        expect(error.message).toBe('Not found');
+    });
+
+    it('reads a plain text 404', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response("Cannot find 'a.geojson'", { status: 404, headers: { 'Content-Type': 'text/plain' } }));
+        expect((await client().send('/x').catch(e => e)).message).toBe("Cannot find 'a.geojson'");
+    });
+});
+
 describe('httpClient skipUnauthorized', () => {
     const withHandler = () => {
         const onUnauthorized = vi.fn();

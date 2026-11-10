@@ -174,13 +174,12 @@ import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import ProgressBar from 'primevue/progressbar';
 import { bytesToSize } from '@/libs/utils';
-import { slugFromName } from '@/libs/api/registryUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { IMPORT_SOURCES, getImportSource, splitRegistryLink } from './importSources';
 import { formatDurationSeconds } from '@/libs/format';
-import { slugProblem } from '@/libs/slug';
+import { slugProblem, suggestSlug, uniqueSlug } from '@/libs/slug';
 
 /**
  * ImportDatasetDialog - Import a remote dataset (another Registry instance or a downloadable
@@ -302,7 +301,7 @@ export default {
 
     watch: {
         name(val) {
-            if (!this.slugEdited) this.slug = this.uniqueSlug(slugFromName(val) || '');
+            if (!this.slugEdited) this.slug = uniqueSlug(suggestSlug(val), this.forbiddenSlugs);
         }
     },
 
@@ -326,18 +325,6 @@ export default {
 
     methods: {
         bytesToSize,
-
-        // Returns the base slug, or the first free "<base>-N" variant when it is already in use,
-        // so a fresh import (or a retry after a failed one) does not collide with an existing dataset.
-        uniqueSlug(base) {
-            if (!base) return '';
-            if (!this.forbiddenSlugs.includes(base)) return base;
-            for (let i = 2; i < 1000; i++) {
-                const candidate = `${base}-${i}`;
-                if (!this.forbiddenSlugs.includes(candidate)) return candidate;
-            }
-            return base;
-        },
 
         onSourceChange() {
             // Reset the param object to just the fields of the selected source.
@@ -461,7 +448,7 @@ export default {
                 if (res.reachable) {
                     this.name = res.suggestedName || this.name || '';
                     this.slugEdited = false;
-                    this.slug = this.uniqueSlug(res.suggestedSlug || slugFromName(this.name) || '');
+                    this.slug = uniqueSlug(res.suggestedSlug || suggestSlug(this.name), this.forbiddenSlugs);
                     this.showNextStep();
                 } else {
                     this.verifyError = res.note || 'The source is not reachable.';

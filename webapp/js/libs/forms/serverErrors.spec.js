@@ -20,6 +20,14 @@ describe('fieldErrorsOf (D-047)', () => {
         expect(fieldErrorsOf(e, { userName: 'username' })).toEqual({ username: 'Taken.' });
     });
 
+    // The Registry's keys are camelCase ("name", "slug"); an older answer ("Name") lands at the same field
+    it('maps a member to the field of the form whatever the letter case of the key', () => {
+        const lower = new ApiError('x', 400, { errors: { name: ['The name is too long: use 1 to 256 characters'], slug: ['Taken'] } });
+        expect(fieldErrorsOf(lower, {}, ['name', 'slug'])).toEqual({ name: 'The name is too long: use 1 to 256 characters', slug: 'Taken' });
+        const upper = new ApiError('x', 400, { errors: { Name: ['The name is too long: use 1 to 256 characters'], SLUG: ['Taken'] } });
+        expect(fieldErrorsOf(upper, {}, ['name', 'slug'])).toEqual({ name: 'The name is too long: use 1 to 256 characters', slug: 'Taken' });
+    });
+
     it('never maps by the text of the message', () => {
         const e = new ApiError('Cannot change user password: PasswordMismatch - Incorrect password.', 400);
         expect(fieldErrorsOf(e, { currentPassword: 'oldPassword' }, ['oldPassword'])).toEqual({});

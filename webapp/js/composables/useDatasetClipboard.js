@@ -10,6 +10,7 @@ import { resolvePasteStrategy } from '@/composables/usePasteStrategy';
 import { selectionBasePath } from '@/features/dataset/explorer/treeSelection';
 import { itemFor, isInFolder } from '@/libs/dataset/explorerItems';
 import { useNotify } from '@/composables/useNotify';
+import { freeName, namesClash } from '@/libs/nameRules';
 import PasteConflictDialog from '@/features/dataset/dialogs/PasteConflictDialog.vue';
 import PasteResultDialog from '@/features/dataset/dialogs/PasteResultDialog.vue';
 
@@ -65,9 +66,41 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         }
     }
 
-    const askConflict = items => new Promise(resolve => {
-        const dialog = dialogs.open(PasteConflictDialog, { items, onResolve: mode => { dialog.close(); resolve(mode); } });
+    /** @param {object[]} items @param {object} [extra]  more props of the prompt */
+    const askConflict = (items, extra = {}) => new Promise(resolve => {
+        const dialog = dialogs.open(PasteConflictDialog, { items, ...extra, onResolve: mode => { dialog.close(); resolve(mode); } });
     });
+
+    /**
+     * A move inside one dataset cannot replace (the Registry answers 409 for a name that exists, D-040, and PUT /obj
+     * has no overwrite): each conflict is Keep both (the item gets a free name, FR-XC-07) or Skip. Resolves to the
+     * options of the move ({ names, skip }), or null when the user cancelled.
+     * @param {object[]} conflicts  the clipboard items whose names exist in the folder
+     * @param {object[]} items  every item that is moved
+     * @param {string[]} existing  the names in the folder
+     * @param {string} folder  the target folder
+     */
+    async function askMoveConflicts(conflicts, items, existing, folder) {
+        const dest = it => (folder ? `${folder}/` : '') + pathutils.basename(it.path);
+        const choices = await askConflict(conflicts.map(it => ({ path: dest(it) })), { verb: 'move', keepBoth: true, replace: false });
+        if (choices === 'cancel' || !Array.isArray(choices)) return null;
+        const conflicting = new Set(conflicts.map(it => it.path));
+        // The free names avoid the folder's names and the names the other moved items bring
+        const taken = [...existing, ...items.filter(it => !conflicting.has(it.path)).map(it => pathutils.basename(it.path))];
+        /** @type {Record<string, string>} */
+        const names = {};
+        const skip = [];
+        conflicts.forEach((it, i) => {
+            if (choices[i] === 'keep') {
+                const name = freeName(pathutils.basename(it.path), taken);
+                taken.push(name);
+                names[it.path] = name;
+            } else {
+                skip.push(it.path);
+            }
+        });
+        return { names, skip };
+    }
 
     /** New items for what was pasted, from the clipboard's entries (hash and properties kept). */
     async function pastedItems(succeeded, items) {
@@ -109,16 +142,26 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         } catch (e) {
             return showError(e, 'Paste');
         }
-        const existing = await namesIn(target.basePath);
-        const conflicts = items.filter(it => existing.has(pathutils.basename(it.path)));
-        const conflictMode = conflicts.length ? await askConflict(conflicts) : 'overwrite';
-        if (conflictMode === 'cancel') return;
+        const existing = [...await namesIn(target.basePath)];
+        // Names in a folder are compared as the Registry compares them (letter case ignored, D-040)
+        const conflicts = items.filter(it => existing.some(name => namesClash(name, pathutils.basename(it.path))));
+        let options;
+        if (sameDataset && mode === 'cut') {
+            const decided = conflicts.length ? await askMoveConflicts(conflicts, items, existing, target.basePath) : { names: {}, skip: [] };
+            if (!decided) return;
+            options = decided;
+        } else {
+            // A copy and a transfer between datasets can overwrite (their endpoints take `overwrite`)
+            const conflictMode = conflicts.length ? await askConflict(conflicts) : 'overwrite';
+            if (conflictMode === 'cancel') return;
+            options = { conflictMode };
+        }
 
         const sourceDataset = sameDataset ? dataset : reg.Organization(source.orgSlug).Dataset(source.dsSlug);
         busy.value = true;
         let result;
         try {
-            result = await strategy.execute(items, { ...source, dataset: sourceDataset }, target, { conflictMode });
+            result = await strategy.execute(items, { ...source, dataset: sourceDataset }, target, options);
         } catch (e) {
             return showError(e, 'Paste');
         } finally {
@@ -127,8 +170,8 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
 
         if (mode === 'cut' && sameDataset && result.succeeded.length) listing.removed(result.succeeded.map(s => s.source));
         if (result.succeeded.length) listing.added(await pastedItems(result.succeeded, items));
-        // A cut is used up; a copy stays on the clipboard
-        if (mode === 'cut') clipboard.clear();
+        // What a cut moved is used up; what it did not move (skipped, failed) stays on the clipboard, and a copy stays
+        if (mode === 'cut') clipboard.removePaths(result.succeeded.map(s => s.source));
 
         if (!Object.keys(result.failed).length && !result.skipped.length) {
             notify.success(`${countOf(result.succeeded.length, 'item')} ${mode === 'cut' ? 'moved' : 'copied'} successfully`, { summary: 'Paste' });

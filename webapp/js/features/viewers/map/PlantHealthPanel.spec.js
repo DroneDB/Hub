@@ -65,7 +65,8 @@ afterEach(() => wrapper?.unmount());
 describe('PlantHealthPanel histogram with outliers', () => {
     it('stretches to the 2%-98% range and keeps the handles apart on the index range', async () => {
         await renderWith(OUTLIER_STATS);
-        expect(wrapper.find('#plant-health-panel-rescale').element.value).toBe('0.371,0.947');
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.371');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.947');
         const { edges, counts } = chart().props('data');
         expect(counts).toEqual([]);
         expect(edges[0]).toBeCloseTo(0.3706 - (0.9467 - 0.3706));
@@ -80,7 +81,8 @@ describe('PlantHealthPanel histogram with outliers', () => {
         await renderWith(CLEAN_STATS);
         expect(chart().props('data')).toEqual({ counts: CLEAN_STATS[1].histogram.counts, edges: CLEAN_STATS[1].histogram.edges });
         expect(note().exists()).toBe(false);
-        expect(wrapper.find('#plant-health-panel-rescale').element.value).toBe('0.100,0.850');
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.100');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.850');
     });
 });
 
@@ -108,5 +110,40 @@ describe('HistogramChart handles', () => {
         const left = w.findAll('[role="slider"]').map(h => h.attributes('style'));
         expect(left).toEqual(['left: 0%;', 'left: 100%;']);
         w.unmount();
+    });
+});
+
+// FR-RAS-20: the Rescale of the layer is two number fields; a range that is not valid marks its field and the last valid one is kept
+describe('PlantHealthPanel rescale fields', () => {
+    const min = () => wrapper.find('#plant-health-panel-rescale-min');
+    const max = () => wrapper.find('#plant-health-panel-rescale-max');
+    const changes = () => (wrapper.emitted('vizParamsChanged') || []).length;
+    const settle = async () => { await new Promise(resolve => setTimeout(resolve, 400)); await flushPromises(); };
+
+    // The fields are typed in the order that never makes a valid range on the way (a valid one is applied)
+    it.each([
+        [[['min', 'abc'], ['max', '1']], 'min', 'Min must be a number'],
+        [[['max', ''], ['min', '0']], 'max', 'Enter Max, or empty both fields for an automatic range'],
+        [[['max', '-1'], ['min', '1']], 'min', 'Min must be less than Max']
+    ])('typing %j emits nothing and marks the %s field', async (steps, field, message) => {
+        await renderWith(CLEAN_STATS);
+        await settle();
+        const before = changes();
+        for (const [name, value] of steps) await (name === 'min' ? min() : max()).setValue(value);
+        await settle();
+        expect(changes()).toBe(before);
+        expect((field === 'min' ? min() : max()).attributes('aria-invalid')).toBe('true');
+        expect(wrapper.find(`[data-testid="rescale-${field}-error"]`).text()).toBe(message);
+    });
+
+    it('applies a valid range typed with a comma as the machine value', async () => {
+        await renderWith(CLEAN_STATS);
+        await settle();
+        await min().setValue('0,1');
+        await max().setValue('0,9');
+        await settle();
+        const last = wrapper.emitted('vizParamsChanged').at(-1)[0];
+        expect(last.rescale).toBe('0.1,0.9');
+        expect(min().attributes('aria-invalid')).toBeUndefined();
     });
 });

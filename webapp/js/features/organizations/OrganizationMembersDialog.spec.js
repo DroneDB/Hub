@@ -122,6 +122,28 @@ describe('OrganizationMembersDialog', () => {
         expect(nameInput().value).toBe('nobody');
     });
 
+    // FR-ORG-23: the Registry names the field of its refusal (errors.userName, D-047)
+    it('shows "No user named x" at the user name field, from errors.userName, not in the banner', async () => {
+        reg.orgs.addOrganizationMember = vi.fn(() => Promise.reject(new ApiError('No user named nosuchuser123', 404, {
+            errors: { userName: ['No user named nosuchuser123'] }
+        })));
+        await render();
+        await typeName('nosuchuser123');
+        addButton().click();
+        await flushPromises();
+        const error = document.getElementById('organization-members-dialog-user-error');
+        expect(error.textContent).toBe('No user named nosuchuser123');
+        expect(nameInput().getAttribute('aria-invalid')).toBe('true');
+        expect(nameInput().getAttribute('aria-describedby')).toContain('organization-members-dialog-user-error');
+        expect(document.querySelector('.p-message-error')).toBeNull();
+        expect(nameInput().value).toBe('nosuchuser123');
+
+        // typing again clears it
+        await typeName('nosuchuser1234');
+        expect(document.getElementById('organization-members-dialog-user-error')).toBeNull();
+        expect(nameInput().getAttribute('aria-invalid')).toBeNull();
+    });
+
     it('asks before you drop your own row below Admin; Cancel puts Admin back and saves nothing', async () => {
         reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
         await render();

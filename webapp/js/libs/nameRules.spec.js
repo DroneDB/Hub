@@ -9,7 +9,8 @@ import vectors from './__vectors__/input-rules.json';
 import {
     FALLBACK_INPUT_RULES, inputRule, isEmail, emailProblem, emailDescription, isEntryName, nameClashMessage, namesClash,
     freeName, isCronDisableWord, isCronMacro, cronDisableWords, cronFieldCount, hasLatinLetterOrDigit, latinNameProblem,
-    isName, nameDescription, userNameProblem, roleNameProblem, invalidNameMessage
+    isName, nameDescription, userNameProblem, roleNameProblem, invalidNameMessage,
+    entryNameProblem, namesInFolder, displayNameLimits, descriptionMaxLength, displayNameLengthProblem, descriptionLengthProblem
 } from './nameRules';
 
 const serve = features => { reg.features.values = features; };
@@ -49,6 +50,14 @@ describe.each([
         setup();
         expect(vectors.latinName.accept.filter(n => !hasLatinLetterOrDigit(n))).toEqual([]);
         expect(vectors.latinName.reject.filter(n => hasLatinLetterOrDigit(n))).toEqual([]);
+    });
+
+    // The letters NFD does not decompose but the slug transliterates (ToSlug): the pattern lists them
+    it('the letters the slug transliterates are Latin letters', () => {
+        setup();
+        expect(inputRule('latinName').pattern).toBe('[A-Za-z0-9ØøÆæßẞŁł]');
+        expect(['Ø', 'ø', 'Æ', 'æ', 'ß', 'ẞ', 'Ł', 'ł'].filter(n => !hasLatinLetterOrDigit(n))).toEqual([]);
+        expect(latinNameProblem('Łł')).toBeNull();
     });
 });
 
@@ -200,5 +209,92 @@ describe('freeName (FR-XC-07)', () => {
 
     it('ignores siblings that are not names', () => {
         expect(freeName('a.tif', [null, undefined, 'a.tif'])).toBe('a (2).tif');
+    });
+});
+
+describe('namesInFolder', () => {
+    it('gives the names of the entries whose parent is the folder, from paths or objects', () => {
+        const entries = ['a.tif', 'sub/b.tif', { path: 'sub/c.tif' }, 'sub/deeper/d.tif', { path: 'e.txt' }, null, ''];
+        expect(namesInFolder(entries, '')).toEqual(['a.tif', 'e.txt']);
+        expect(namesInFolder(entries, 'sub')).toEqual(['b.tif', 'c.tif']);
+        expect(namesInFolder(entries, 'sub/deeper')).toEqual(['d.tif']);
+        expect(namesInFolder(undefined, '')).toEqual([]);
+    });
+});
+
+// FR-EXP-04, FR-EXP-05, FR-EXP-15, D-034, D-040
+describe('entryNameProblem', () => {
+    const entries = ['README.md', 'odm_orthophoto.tif', 'Sub', 'Sub/inner.txt'];
+
+    it('refuses a blank name', () => {
+        expect(entryNameProblem('', entries)).toBe('Enter a name');
+        expect(entryNameProblem('   ', entries)).toBe('Enter a name');
+        expect(entryNameProblem(null, entries)).toBe('Enter a name');
+    });
+
+    it("refuses a '/' or a '\\' as the dialogs do (D-034), saying what the name is of", () => {
+        expect(entryNameProblem('x/y', entries)).toBe('Names cannot contain /');
+        expect(entryNameProblem('x/y', entries, { label: 'Folder' })).toBe('Folder names cannot contain /');
+        expect(entryNameProblem('x\\y', entries, { label: 'File' })).toBe('File names cannot contain \\');
+    });
+
+    it('refuses what the published entry name rule refuses', () => {
+        const rule = `The name is not valid: use ${FALLBACK_INPUT_RULES.entryName.description}`;
+        for (const name of ['.', '..', 'C:', '.ddb', '.DDB']) expect(entryNameProblem(name, [])).toBe(rule);
+        // The root reserved name only at the root of the dataset
+        expect(entryNameProblem('.uploads', [])).toBe(rule);
+        expect(entryNameProblem('.uploads', [], { folder: 'sub' })).toBeNull();
+        // The rule of the Registry accepts names that the Rename dialog used to refuse
+        expect(entryNameProblem('.hidden', [])).toBeNull();
+        expect(entryNameProblem('a..b', [])).toBeNull();
+    });
+
+    it("refuses the name of a sibling in the Registry's words, compared without regard to letter case", () => {
+        expect(entryNameProblem('odm_orthophoto.tif', entries, { selfPath: 'README.md' }))
+            .toBe("A file or folder named 'odm_orthophoto.tif' already exists in this folder");
+        // the existing entry's own case, as conflictPath says
+        expect(entryNameProblem('readme.MD', entries, { folder: '' })).toBe("A file or folder named 'README.md' already exists in this folder");
+        expect(entryNameProblem('sub', entries)).toBe("A file or folder named 'Sub' already exists in this folder");
+        expect(entryNameProblem(' sub ', entries)).toBe("A file or folder named 'Sub' already exists in this folder");
+    });
+
+    it('compares only the siblings in the same folder', () => {
+        expect(entryNameProblem('inner.txt', entries)).toBeNull();
+        expect(entryNameProblem('inner.txt', entries, { folder: 'Sub' })).toBe("A file or folder named 'inner.txt' already exists in this folder");
+        // a rename: the folder of the entry
+        expect(entryNameProblem('inner.txt', entries, { selfPath: 'Sub/other.txt' })).toBe("A file or folder named 'inner.txt' already exists in this folder");
+        expect(entryNameProblem('README.md', entries, { selfPath: 'Sub/other.txt' })).toBeNull();
+    });
+
+    it('does not count the entry that is renamed as its own sibling: a change of case only is fine', () => {
+        expect(entryNameProblem('readme.md', entries, { selfPath: 'README.md' })).toBeNull();
+        expect(entryNameProblem('Readme.md', ['README.md', 'readme.md'], { selfPath: 'README.md' })).toBe("A file or folder named 'readme.md' already exists in this folder");
+    });
+
+    it('accepts a name that nothing has', () => {
+        expect(entryNameProblem('new folder', entries)).toBeNull();
+        expect(entryNameProblem('Notes.txt', entries, { selfPath: 'README.md' })).toBeNull();
+    });
+});
+
+// FR-ORG-14: the limits of the Registry (published, with the built-in copy for an older one)
+describe('name and description limits', () => {
+    it('are 1 to 256 characters for a name and 2000 for a description, as the Registry publishes them', () => {
+        expect(displayNameLimits()).toEqual({ min: 1, max: 256 });
+        expect(descriptionMaxLength()).toBe(2000);
+    });
+
+    it('refuses a name over the limit and a description over the limit, in the Registry\'s words', () => {
+        expect(displayNameLengthProblem('x'.repeat(256))).toBeNull();
+        expect(displayNameLengthProblem('x'.repeat(257))).toBe('The name is too long: use 1 to 256 characters');
+        expect(descriptionLengthProblem('x'.repeat(2000))).toBeNull();
+        expect(descriptionLengthProblem('x'.repeat(2001))).toBe('The description is too long: use up to 2000 characters');
+    });
+
+    it('follow the limits the server publishes', () => {
+        serve({ inputRules: { displayName: { minLength: 1, maxLength: 10 }, descriptionText: { maxLength: 20 } } });
+        expect(displayNameLimits().max).toBe(10);
+        expect(descriptionMaxLength()).toBe(20);
+        expect(displayNameLengthProblem('x'.repeat(11))).not.toBeNull();
     });
 });

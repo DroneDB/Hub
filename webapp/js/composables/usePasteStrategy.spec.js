@@ -39,6 +39,28 @@ describe('resolvePasteStrategy', () => {
         expect(result.failed).toEqual({});
     });
 
+    // D-040: PUT /obj cannot overwrite; a conflict is decided before the move, as Keep both (a free name) or Skip
+    it('moves inside one dataset to the free name of a Keep both, sends nothing for a Skip, and reports a refusal as failed', async () => {
+        const moveObj = vi.fn(async (from) => {
+            if (from === 'a/three.jpg') throw Object.assign(new Error("A file or folder named 'three.jpg' already exists in this folder"), { status: 409 });
+        });
+        const inside = { orgSlug: 'org', dsSlug: 'ds', basePath: 'dest', dataset: { moveObj } };
+        const moved = [{ path: 'a/one.jpg' }, { path: 'a/two.jpg' }, { path: 'a/three.jpg' }];
+        const result = await resolvePasteStrategy({ orgSlug: 'org', dsSlug: 'ds' }, 'cut', inside)
+            .execute(moved, inside, inside, { names: { 'a/one.jpg': 'one (2).jpg' }, skip: ['a/two.jpg'] });
+        expect(moveObj.mock.calls).toEqual([['a/one.jpg', 'dest/one (2).jpg'], ['a/three.jpg', 'dest/three.jpg']]);
+        expect(result.succeeded).toEqual([{ source: 'a/one.jpg', dest: 'dest/one (2).jpg' }]);
+        expect(result.skipped).toEqual(['a/two.jpg']);
+        expect(result.failed).toEqual({ 'a/three.jpg': "A file or folder named 'three.jpg' already exists in this folder" });
+    });
+
+    it('copies inside one dataset with the overwrite the user chose (the copy endpoint takes it)', async () => {
+        const copyObj = vi.fn().mockResolvedValue(undefined);
+        const inside = { orgSlug: 'org', dsSlug: 'ds', basePath: 'dest', dataset: { copyObj } };
+        await resolvePasteStrategy({ orgSlug: 'org', dsSlug: 'ds' }, 'copy', inside).execute(items, inside, inside, { conflictMode: 'overwrite' });
+        expect(copyObj).toHaveBeenCalledWith('a/one.jpg', 'dest/one.jpg', true);
+    });
+
     it('rejects an unknown mode', () => {
         expect(() => resolvePasteStrategy(null, 'paste', target)).toThrow(/paste/);
     });

@@ -66,7 +66,12 @@
                         <label>
                             <span>Density ({{ units.density.unit }})</span>
                             <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
-                                   class="panel-input" data-testid="stockpile-custom-density">
+                                   class="panel-input" data-testid="stockpile-custom-density"
+                                   :aria-invalid="densityProblem ? 'true' : undefined"
+                                   :aria-describedby="densityProblem ? 'stockpile-volume-panel-density-error' : undefined">
+                            <!-- The rule of the material catalog (isValidDensity), in the user's unit (FR-MAP-27) -->
+                            <small v-if="densityProblem" id="stockpile-volume-panel-density-error" class="density-error" role="alert"
+                                   data-testid="stockpile-density-error">{{ densityProblem }}</small>
                         </label>
                         <label>
                             <span>Cost / {{ units.perWeight.unit }} ({{ currency }})</span>
@@ -168,6 +173,16 @@
                         <span class="result-label">Est. cost</span>
                         <span class="result-value" data-testid="stockpile-cost">{{ formatCost(result.costEstimate) }}</span>
                     </template>
+
+                    <!-- A custom material with a density the catalog refuses: the rows stay, with the reason (FR-MAP-27) -->
+                    <template v-if="densityProblem && !result.weightEstimate">
+                        <span class="result-label">Weight</span>
+                        <span class="result-value density-error" data-testid="stockpile-weight-error">{{ densityProblem }}</span>
+                    </template>
+                    <template v-if="densityProblem && !result.costEstimate">
+                        <span class="result-label">Est. cost</span>
+                        <span class="result-value density-error" data-testid="stockpile-cost-error">{{ densityProblem }}</span>
+                    </template>
                 </div>
                 <div v-if="!showFillRow" class="fill-hint" data-testid="stockpile-fill-hint">
                     <i class="fas fa-info-circle" />
@@ -192,7 +207,7 @@ import AnalysisPanel from './AnalysisPanel.vue';
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, EMPTY_CELL, formatDensity, formatMoney, formatNumber, formatVolume, formatWeight } from '@/libs/format';
-import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
+import { CUSTOM_MATERIAL_SLUG, MAX_DENSITY_TON_PER_M3, isValidDensity, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
 import { BASE_METHOD, BASE_METHODS } from '@/libs/stockpileBase';
 import { drawingHint } from '@/libs/measureHints';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
@@ -292,6 +307,19 @@ export default {
             set(v) { this.$emit('update:description', v); }
         },
         units() { return bulkUnits(this.unitPref); },
+        /**
+         * What is wrong with the density of the custom material, or '': the rule of the material catalog (more than 0, at most
+         * MAX_DENSITY_TON_PER_M3, checked on the stored t/m³ value), the limit said in the user's unit (FR-MAP-27).
+         */
+        densityProblem() {
+            if (this.material !== this.customSlug || isValidDensity(this.customDensity)) return '';
+            const typed = this.customDensity;
+            if (Number.isFinite(typed) && typed > MAX_DENSITY_TON_PER_M3) {
+                const limit = shownMaterialValue(MAX_DENSITY_TON_PER_M3, 'densityTonPerM3', this.units);
+                return `Density must be at most ${formatNumber(limit, 3, { trim: true })} ${this.units.density.unit}`;
+            }
+            return 'Density must be greater than 0';
+        },
         // The one hint of every drawing tool (libs/measureHints): how to place a point, finish and cancel
         clickHint() { return drawingHint('pick', { crosshair: true }); },
         drawHint() { return drawingHint('area', { crosshair: true }); },
@@ -552,6 +580,11 @@ export default {
     border-radius: 0.25rem;
     padding: 0.25rem 0.4rem;
     font-size: 0.8rem;
+}
+
+/* The density the catalog refuses, at its field and in the Weight and Est. cost rows (FR-MAP-27) */
+.density-error {
+    color: var(--ddb-danger);
 }
 
 .result-actions {

@@ -209,23 +209,18 @@
         <DialogHost :dialogs="dialogs" />
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
-                       :org-slug="$route.params.org" @close="handleDatasetClose" />
+                       :org-slug="$route.params.org" :save="saveDataset" @close="handleDatasetClose" />
 
         <ImportDatasetDialog v-if="importDialogOpen" :org-slug="$route.params.org" :forbidden-slugs="forbiddenSlugs"
                              @close="handleImportClose" />
 
-        <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel"
+        <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel" :save="saveOrganization"
                             @close="handleOrgDialogClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="$route.params.org"
                                    :can-manage-members="orgInfo?.permissions?.canManageMembers || false"
                                    @permissions-changed="reloadOrgInfo"
                                    @close="closeMembersDialog" />
-
-        <!-- Full-screen feedback while a new dataset is being created -->
-        <div v-if="creatingDataset" class="ds-overlay-wrapper">
-            <Loader />
-        </div>
 
     </div>
 </template>
@@ -251,7 +246,6 @@ import ImportDatasetDialog from './ImportDatasetDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import OrganizationDialog from '@/features/organizations/OrganizationDialog.vue';
 import OrganizationMembersDialog from '@/features/organizations/OrganizationMembersDialog.vue';
-import Loader from '@/components/HubLoader.vue';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -300,7 +294,6 @@ export default {
         ImportDatasetDialog,
         OrganizationDialog,
         OrganizationMembersDialog,
-        Loader,
         Button,
         DataTable,
         Column,
@@ -359,9 +352,6 @@ export default {
             importDialogOpen: false,
             // The imports that run, by dataset slug: their progress (0-100) from the background-task store (FR-UPL-10)
             importProgress: {},
-
-            // Blocking overlay flag while a new dataset is being created (HubLoader.vue)
-            creatingDataset: false,
 
             orgEditDialogOpen: false,
             orgDialogModel: null,
@@ -713,131 +703,102 @@ export default {
             }
         },
 
-        async handleDatasetClose(res, newds) {
-            // Ignore stray duplicate closes (e.g. double Enter on the name field)
-            if (this.creatingDataset) return;
-
+        handleDatasetClose() {
             this.dsDialogOpen = false;
+            this.dsDialogModel = null;
+        },
 
-            if (res == "close") {
-                this.dsDialogModel = null;
-                return;
+        /**
+         * The request of the dataset dialog (D-046, FR-XC-11): it runs while the dialog is open, and a failure is thrown for
+         * the dialog to show at its field (a slug that is taken: `errors.slug`) or in its form-level message, with the dialog
+         * open and what was typed. No toast says it while the dialog is on show.
+         */
+        saveDataset(newds) {
+            return this.dsDialogMode === 'edit' ? this.updateDataset(this.dsDialogModel, newds) : this.createDataset(newds);
+        },
+
+        async createDataset(newds) {
+            // A row for the dataset that is being made, until the list is read again
+            this.datasets.unshift({
+                slug: newds.slug,
+                creationDate: Date.now(),
+                lastModified: Date.now(),
+                visibility: newds.visibility,
+                entries: 0,
+                size: 0,
+                editing: false,
+                deleting: false,
+                name: newds.name,
+                tagline: newds.tagline || '',
+                permissions: { canRead: true, canWrite: true, canDelete: true },
+                thumbError: false,
+                thumbLoaded: false,
+                thumbUrl: '/images/dataset-placeholder.svg',
+                loading: true,
+                isTemporary: true
+            });
+
+            try {
+                const ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility, newds.tagline);
+                if (!ret) throw new Error(`Failed to create dataset "${newds.slug}"`);
+            } catch (e) {
+                this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
+                throw e;
             }
 
-            if (this.dsDialogMode == "new") {
-                this.dsDialogModel = null;
-                this.creatingDataset = true;
+            // The server places the new dataset in the sort order
+            await this.reloadDatasets();
+            this.$notify.success('Dataset created successfully', { summary: 'Dataset Created' });
 
-                try {
-                    // Set loading state for the UI
-                    const loadingIndicator = { loading: true, isTemporary: true };
-                    this.datasets.unshift({
-                        slug: newds.slug,
-                        creationDate: Date.now(),
-                        lastModified: Date.now(),
-                        visibility: newds.visibility,
-                        entries: 0,
-                        size: 0,
-                        editing: false,
-                        deleting: false,
-                        name: newds.name,
-                        tagline: newds.tagline || '',
-                        permissions: { canRead: true, canWrite: true, canDelete: true },
-                        thumbError: false,
-                        thumbLoaded: false,
-                        thumbUrl: '/images/dataset-placeholder.svg',
-                        ...loadingIndicator
-                    });
+            // Navigate to the newly created dataset if the user has enabled the preference
+            if (newds.openAfterCreate) {
+                this.$router.push({ name: "ViewDataset", params: { org: this.$route.params.org, ds: newds.slug } });
+            }
+        },
 
-                    let ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility, newds.tagline);
-                    if (ret) {
-                        // The server places the new dataset in the sort order
-                        await this.reloadDatasets();
+        async updateDataset(model, newds) {
+            const dsitem = this.datasets.find(o => o.slug == model.slug);
+            if (dsitem) dsitem['editing'] = true;
+            let renamed = false;
 
-                        this.$notify.success('Dataset created successfully', { summary: 'Dataset Created' });
+            try {
+                let dsobj = this.org.Dataset(model.slug);
 
-                        // Navigate to the newly created dataset if the user has enabled the preference
-                        if (newds.openAfterCreate) {
-                            this.$router.push({
-                                name: "ViewDataset",
-                                params: {
-                                    org: this.$route.params.org,
-                                    ds: newds.slug
-                                }
-                            });
-                        }
-                    } else {
-                        // Remove the temporary dataset on error
-                        this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
-                        this.$notify.error('Failed to create dataset "' + newds.slug + '"');
-                        console.error(ret);
-                    }
-                } catch (e) {
-                    // Remove the temporary dataset on error
-                    this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
-                    console.error(e);
-                    this.$notify.error('Failed to create dataset: ' + e.message);
-                } finally {
-                    this.creatingDataset = false;
-                }
-
-            } else if (this.dsDialogMode == "edit") {
-                let ds = this.dsDialogModel;
-                this.dsDialogModel = null;
-
-                let dsitem = this.datasets.find(o => o.slug == ds.slug);
-                dsitem['editing'] = true;
-                let renamed = false;
-
-                try {
-                    let dsobj = this.org.Dataset(ds.slug);
-
-                    // Only a new slug the user asked for (Change URL) renames the dataset: its links change.
-                    // It goes first, so a refused slug sends nothing else and the dataset stays as it was.
-                    if (newds.changeSlug && newds.slug && newds.slug !== ds.slug) {
-                        let ret;
-                        try {
-                            ret = await dsobj.rename(newds.slug);
-                        } catch (e) {
-                            console.error(e);
-                            this.$notify.error(`The URL was not changed: ${e.message}`, { summary: 'Dataset Not Updated' });
-                            dsitem['editing'] = false;
-                            return;
-                        }
-                        dsitem['slug'] = ret?.slug || newds.slug;
-                        renamed = true;
-                        dsobj = this.org.Dataset(dsitem['slug']);
-                    }
-
-                    // The name is the display name: saving it keeps the URL (FR-ORG-08)
-                    await dsobj.metaSet('name', newds.name);
+                // Only a new slug the user asked for (Change URL) renames the dataset: its links change.
+                // It goes first, so a refused slug sends nothing else and the dataset stays as it was.
+                if (newds.changeSlug && newds.slug && newds.slug !== model.slug) {
+                    const ret = await dsobj.rename(newds.slug);
+                    const slug = ret?.slug || newds.slug;
+                    if (dsitem) dsitem['slug'] = slug;
+                    // The dialog stays open when a later step fails: it then edits the dataset at its new slug
+                    model.slug = slug;
                     renamed = true;
-
-                    // Visibility only: the name is saved above
-                    let update = await dsobj.update(undefined, newds.visibility);
-
-                    // Handle tagline update
-                    if (newds.tagline) {
-                        await dsobj.metaSet('tagline', newds.tagline);
-                    } else {
-                        await dsobj.metaUnset('tagline');
-                    }
-
-                    if (update) {
-                        // Update the object in the local dataset
-                        dsitem['name'] = newds.name;
-                        dsitem['visibility'] = newds.visibility;
-                        dsitem['tagline'] = newds.tagline || '';
-                        this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
-                    }
-                } catch (e) {
-                    console.error(e);
-                    this.$notify.error('Failed to update dataset: ' + e.message);
+                    dsobj = this.org.Dataset(slug);
                 }
+
+                // The name is the display name: saving it keeps the URL (FR-ORG-08)
+                await dsobj.metaSet('name', newds.name);
+                renamed = true;
+
+                // Visibility only: the name is saved above
+                const update = await dsobj.update(undefined, newds.visibility);
+
+                if (newds.tagline) {
+                    await dsobj.metaSet('tagline', newds.tagline);
+                } else {
+                    await dsobj.metaUnset('tagline');
+                }
+
+                if (dsitem) {
+                    dsitem['name'] = newds.name;
+                    dsitem['visibility'] = newds.visibility;
+                    dsitem['tagline'] = newds.tagline || '';
+                }
+                if (update) this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
+            } finally {
                 // The pins know the dataset by its slug and name, which the edit changed
                 if (renamed) this.invalidateLocations();
-
-                dsitem['editing'] = false;
+                if (dsitem) dsitem['editing'] = false;
             }
         },
 
@@ -1081,34 +1042,25 @@ export default {
             this.orgEditDialogOpen = true;
         },
 
-        async handleOrgDialogClose(res, neworg) {
+        handleOrgDialogClose() {
             this.orgEditDialogOpen = false;
-
-            if (res === 'close' || !neworg) {
-                this.orgDialogModel = null;
-                return;
-            }
-
-            try {
-                const ret = await reg.orgs.updateOrganization(
-                    this.$route.params.org,
-                    neworg.name,
-                    neworg.description,
-                    neworg.isPublic
-                );
-                if (ret) {
-                    this.orgName = neworg.name || this.$route.params.org;
-                    this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
-                    setTitle(this.orgName);
-                    this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
-                } else {
-                    this.error = 'Failed to update organization';
-                }
-            } catch (e) {
-                console.error(e);
-                this.error = 'Failed to update organization: ' + e.message;
-            }
             this.orgDialogModel = null;
+        },
+
+        // The request of the dialog: a failure is thrown for the dialog to show at its field, and the dialog stays open
+        async saveOrganization(neworg) {
+            const ret = await reg.orgs.updateOrganization(
+                this.$route.params.org,
+                neworg.name,
+                neworg.description,
+                neworg.isPublic
+            );
+            if (!ret) throw new Error('Failed to update organization');
+
+            this.orgName = neworg.name || this.$route.params.org;
+            this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
+            setTitle(this.orgName);
+            this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
         },
 
         openMembersDialog() {
@@ -1299,13 +1251,6 @@ export default {
     .ds-row-spinner {
         width: 2rem;
         height: 2rem;
-    }
-
-    /* HubLoader.vue is position:absolute, so pin it to the viewport via this wrapper */
-    .ds-overlay-wrapper {
-        position: fixed;
-        inset: 0;
-        z-index: 1000;
     }
 
     .ds-name {

@@ -27,15 +27,18 @@ import { fieldErrorsOf, formMessageOf } from '@/libs/forms/serverErrors';
  *   aliases?: Record<string, string>,
  *   dependents?: Record<string, string[]>,
  *   formMessage?: (error: unknown) => string,
- *   fieldErrors?: boolean
+ *   fieldErrors?: boolean,
+ *   statusFields?: Record<number, string>
  * }} options
  *   fields: the names of the fields of the form;
  *   aliases: the form field by the request member that names it in `errors` (`{ currentPassword: 'oldPassword' }`);
  *   dependents: the fields to check again when a field changes (`{ newPassword: ['confirmPassword'] }`);
  *   formMessage: the text of an error that names no field (default: the message of the error);
- *   fieldErrors: false to never map a failed request to the fields (default true)
+ *   fieldErrors: false to never map a failed request to the fields (default true);
+ *   statusFields: the field that an answer of a status refuses when its body names none (`{ 409: 'name' }`:
+ *   a name that exists is a 409 that belongs to the name field, D-040)
  */
-export function useHubForm({ fields, aliases = {}, dependents = {}, formMessage = formMessageOf, fieldErrors = true }) {
+export function useHubForm({ fields, aliases = {}, dependents = {}, formMessage = formMessageOf, fieldErrors = true, statusFields = {} }) {
     /** The Form component (`ref="formRef"`). */
     const formRef = ref(/** @type {any} */ (null));
     const busy = ref(false);
@@ -106,6 +109,10 @@ export function useHubForm({ fields, aliases = {}, dependents = {}, formMessage 
             await action(e.values);
         } catch (error) {
             const byField = fieldErrors ? fieldErrorsOf(error, aliases, fields) : {};
+            const statusField = fieldErrors ? statusFields[/** @type {any} */ (error)?.status] : undefined;
+            if (!Object.keys(byField).length && statusField && fields.includes(statusField)) {
+                byField[statusField] = formMessage(error);
+            }
             if (Object.keys(byField).length) {
                 Object.assign(serverErrors, byField);
                 await focusFirstInvalid();

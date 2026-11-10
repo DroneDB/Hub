@@ -224,7 +224,7 @@ describe('OrganizationsPage map view', () => {
         reg.orgs.createOrganization = vi.fn(() => new Promise(resolve => { created = resolve; }));
 
         wrapper.vm.orgDialogMode = 'new';
-        const closing = wrapper.vm.handleOrganizationClose('save', { slug: 'c', name: 'C', description: '', isPublic: false });
+        const closing = wrapper.vm.saveOrganization({ slug: 'c', name: 'C', description: '', isPublic: false });
         await flushPromises();
         // The map stays while the server creates it
         expect(wrapper.find('.map-stub').exists()).toBe(true);
@@ -251,7 +251,7 @@ describe('OrganizationsPage map view', () => {
         await render([dto('a')]);
         reg.orgs.createOrganization = vi.fn(() => Promise.resolve(dto('empty', { datasetCount: 0 })));
         wrapper.vm.orgDialogMode = 'new';
-        await wrapper.vm.handleOrganizationClose('save', { slug: 'empty', name: 'Empty', description: '', isPublic: false });
+        await wrapper.vm.saveOrganization({ slug: 'empty', name: 'Empty', description: '', isPublic: false });
         await flushPromises();
         expect(wrapper.vm.organizations.map(o => o.slug)).toEqual(['a', 'empty']);
         expect(requests.map(r => r.slug)).toEqual(['a']);

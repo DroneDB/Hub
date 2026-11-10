@@ -19,7 +19,8 @@
                     A file or folder named <strong>{{ basename(current.path) }}</strong> already exists in
                     <template v-if="folderOf(current.path)">the folder <strong>{{ folderOf(current.path) }}</strong></template>
                     <template v-else>this folder</template>.
-                    Replace it, keep both (the file being {{ participle }} gets a new name), or skip the file?
+                    <template v-if="replace">Replace it, keep both (the file being {{ participle }} gets a new name), or skip the file?</template>
+                    <template v-else>Keep both (the file being {{ participle }} gets a new name), or skip the file?</template>
                 </p>
                 <p v-if="items.length > 1" class="conflict-count">Conflict {{ index + 1 }} of {{ items.length }}</p>
                 <div v-if="remaining > 1" class="apply-all">
@@ -39,7 +40,7 @@
                 <Button severity="secondary" label="Cancel" @click="cancel" />
                 <Button class="conflict-skip" label="Skip" icon="fa-solid fa-forward" @click="decide('skip')" />
                 <Button class="conflict-keep" label="Keep both" icon="fa-solid fa-clone" @click="decide('keep')" />
-                <Button class="conflict-replace" severity="danger" label="Replace" icon="fa-solid fa-pen-to-square" @click="decide('replace')" />
+                <Button v-if="replace" class="conflict-replace" severity="danger" label="Replace" icon="fa-solid fa-pen-to-square" @click="decide('replace')" />
             </template>
         </template>
     </Window>
@@ -53,7 +54,7 @@ import ddb from 'ddb';
 import { pluralize } from '@/libs/format';
 const { pathutils } = ddb;
 
-const PARTICIPLES = { paste: 'pasted', upload: 'uploaded' };
+const PARTICIPLES = { paste: 'pasted', upload: 'uploaded', move: 'moved' };
 
 /**
  * The prompt for names that exist in the destination folder (FR-UPL-03, FR-XC-07).
@@ -61,7 +62,8 @@ const PARTICIPLES = { paste: 'pasted', upload: 'uploaded' };
  * Paste (the default): one choice for every file, `resolve` with 'overwrite', 'skip' or 'cancel'.
  * With `keepBoth` (uploads): the files one at a time, each with Replace, Keep both or Skip, and
  * "Apply to all" for the rest; `resolve` with one choice per item ('replace' | 'keep' | 'skip', in
- * the order of `items`) or 'cancel'.
+ * the order of `items`) or 'cancel'. Without `replace` (a move inside one dataset: the Registry
+ * cannot move onto a name that exists, D-040) Replace is not offered: Keep both or Skip.
  */
 export default {
     components: { Window, Button, Checkbox },
@@ -80,6 +82,11 @@ export default {
         keepBoth: {
             type: Boolean,
             default: false
+        },
+        /** With `keepBoth`: offer Replace too (false: Keep both or Skip only). */
+        replace: {
+            type: Boolean,
+            default: true
         }
     },
     emits: ['resolve'],

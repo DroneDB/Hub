@@ -206,7 +206,7 @@ describe('Public organizations (D-003)', () => {
 
     it('the dialog explains Public under its checkbox', async () => {
         wrapper = mount(OrganizationDialog, {
-            props: { mode: 'new' },
+            props: { mode: 'new', save: vi.fn() },
             global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /></div>' } } }
         });
         await flushPromises();

@@ -27,11 +27,11 @@ async function render(component, props) {
 
 describe('Dataset and organization dialogs', () => {
     it.each([
-        ['a new dataset', DatasetDialog, { mode: 'new' }, 'Create dataset', ['Cancel', 'Create']],
-        ['a dataset', DatasetDialog, { mode: 'edit', model: { slug: 'survey-2026', name: 'Survey 2026' } }, 'Edit Survey 2026', ['Cancel', 'Save']],
-        ['a dataset without a name', DatasetDialog, { mode: 'edit', model: { slug: 'survey-2026', name: '' } }, 'Edit survey-2026', ['Cancel', 'Save']],
-        ['a new organization', OrganizationDialog, { mode: 'new' }, 'Create organization', ['Cancel', 'Create']],
-        ['an organization', OrganizationDialog, { mode: 'edit', model: { slug: 'acme', name: 'Acme Corp', description: '', isPublic: false } }, 'Edit Acme Corp', ['Cancel', 'Save']]
+        ['a new dataset', DatasetDialog, { mode: 'new', save: () => {} }, 'Create dataset', ['Cancel', 'Create']],
+        ['a dataset', DatasetDialog, { mode: 'edit', save: () => {}, model: { slug: 'survey-2026', name: 'Survey 2026' } }, 'Edit Survey 2026', ['Cancel', 'Save']],
+        ['a dataset without a name', DatasetDialog, { mode: 'edit', save: () => {}, model: { slug: 'survey-2026', name: '' } }, 'Edit survey-2026', ['Cancel', 'Save']],
+        ['a new organization', OrganizationDialog, { mode: 'new', save: () => {} }, 'Create organization', ['Cancel', 'Create']],
+        ['an organization', OrganizationDialog, { mode: 'edit', save: () => {}, model: { slug: 'acme', name: 'Acme Corp', description: '', isPublic: false } }, 'Edit Acme Corp', ['Cancel', 'Save']]
     ])('%s', async (_, component, props, title, buttons) => {
         expect(await render(component, props)).toEqual({ title, buttons });
     });

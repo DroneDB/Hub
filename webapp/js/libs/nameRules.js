@@ -20,7 +20,8 @@ import { Features } from '@/libs/features';
  * @typedef {{ message: string, caseInsensitive: boolean }} NameClashRule
  * @typedef {{ disableWords: string[], minFields: number, maxFields: number, macros: string[], description: string }} CronRule
  * @typedef {{ pattern: string, normalization: string, description: string, message: string, messageWithoutSlug: string }} LatinNameRule
- * @typedef {{ slug: PatternRule, name: PatternRule, email: PatternRule, entryName: EntryNameRule, nameClash: NameClashRule, cron: CronRule, latinName: LatinNameRule }} InputRules
+ * @typedef {{ pattern: string|null, minLength: number|null, maxLength: number|null, description: string, message: string|null }} LengthRule
+ * @typedef {{ slug: PatternRule, name: PatternRule, email: PatternRule, entryName: EntryNameRule, nameClash: NameClashRule, cron: CronRule, latinName: LatinNameRule, displayName: LengthRule, descriptionText: LengthRule }} InputRules
  */
 
 /** The rules as the Registry publishes them (Registry.Web.UnitTest golden sys-features.json). */
@@ -64,11 +65,25 @@ export const FALLBACK_INPUT_RULES = /** @type {Readonly<InputRules>} */ (Object.
         description: "leave it empty for the default schedule; 'disabled', 'off' or 'none' (any case) turns the job off; a macro such as '@daily' is a schedule; any other value has 5 or 6 fields separated by spaces"
     }),
     latinName: Object.freeze({
-        pattern: '[A-Za-z0-9]',
+        pattern: '[A-Za-z0-9ØøÆæßẞŁł]',
         normalization: 'NFD',
         description: 'the name needs a Latin letter (a–z) or a digit (accents are dropped), unless you enter a slug',
         message: 'Use at least one Latin letter (a–z) or digit in the name, or enter a slug',
         messageWithoutSlug: 'Use at least one Latin letter (a–z) or digit'
+    }),
+    displayName: Object.freeze({
+        pattern: null,
+        minLength: 1,
+        maxLength: 256,
+        description: '1 to 256 characters',
+        message: 'The name is too long: use 1 to 256 characters'
+    }),
+    descriptionText: Object.freeze({
+        pattern: null,
+        minLength: null,
+        maxLength: 2000,
+        description: 'up to 2000 characters',
+        message: 'The description is too long: use up to 2000 characters'
     })
 }));
 
@@ -274,6 +289,56 @@ export function freeName(name, siblings) {
     }
 }
 
+/**
+ * The names of the entries of a folder, from the entries (paths, or objects with a `path`) of a
+ * listing: the entries whose parent is `folder`.
+ * @param {Iterable<string | { path?: string } | null | undefined>} entries
+ * @param {string} folder  the dataset path of the folder ('' for the root)
+ * @returns {string[]}
+ */
+export function namesInFolder(entries, folder) {
+    /** @type {string[]} */
+    const names = [];
+    for (const entry of entries ?? []) {
+        const path = typeof entry === 'string' ? entry : entry?.path;
+        if (typeof path !== 'string' || path === '') continue;
+        const slash = path.lastIndexOf('/');
+        const parent = slash < 0 ? '' : path.slice(0, slash);
+        if (parent === folder) names.push(path.slice(slash + 1));
+    }
+    return names;
+}
+
+/**
+ * What is wrong with the name of an entry that a dialog creates or renames to, or null (FR-EXP-04,
+ * FR-EXP-05, FR-EXP-15): blank, a '/' or '\\' (the Hub dialogs take one name, not a path, D-034), a name
+ * that the published entry name rule refuses, and a sibling that holds the name (the Registry's
+ * case rule, D-040), in the Registry's words ("A file or folder named '<name>' already exists in
+ * this folder"). The name is checked as typed after the spaces around it are dropped.
+ * @param {string|null|undefined} name
+ * @param {Iterable<string | { path?: string } | null | undefined>} [siblings]  the entries of the
+ *   listing (paths or objects with a `path`); the ones in the folder of the new name count
+ * @param {{ selfPath?: string|null, folder?: string|null, label?: string }} [options]
+ *   selfPath: the entry that is renamed (it is not its own sibling; the folder of the name is its
+ *   folder); folder: the folder of a new entry ('' for the root); label: what the name is of, in
+ *   the refusal of a '/' ("Folder", default "Names" as "Names cannot contain /")
+ * @returns {string|null}
+ */
+export function entryNameProblem(name, siblings = [], { selfPath = null, folder = null, label = '' } = {}) {
+    const text = typeof name === 'string' ? name.trim() : '';
+    if (text === '') return 'Enter a name';
+    const subject = label ? `${label} names` : 'Names';
+    if (text.includes('/')) return `${subject} cannot contain /`;
+    if (text.includes('\\')) return `${subject} cannot contain \\`;
+
+    const parent = folder ?? (selfPath && selfPath.includes('/') ? selfPath.slice(0, selfPath.lastIndexOf('/')) : '');
+    if (!isEntryName(text, { atRoot: parent === '' })) return `The name is not valid: use ${entryNameDescription()}`;
+
+    const own = selfPath ? selfPath.slice(selfPath.lastIndexOf('/') + 1) : null;
+    const clash = namesInFolder(siblings, parent).find(sibling => namesClash(sibling, text) && sibling !== own);
+    return clash === undefined ? null : nameClashMessage(clash);
+}
+
 // ---- Cron -----------------------------------------------------------------------------------
 
 /** The cron rule as a form shows it. */
@@ -353,4 +418,38 @@ export function latinNameProblem(name, { slug = null, withSlugField = true } = {
     if (hasLatinLetterOrDigit(name) || hasLatinLetterOrDigit(slug)) return null;
     const rule = inputRule('latinName');
     return withSlugField ? rule.message : rule.messageWithoutSlug;
+}
+
+// ---- Length of names and descriptions (FR-ORG-14) -------------------------------------------
+
+/** The limits of the name of an organization or a dataset: `{ min, max }`. */
+export function displayNameLimits() {
+    const rule = inputRule('displayName');
+    return { min: rule.minLength ?? 1, max: rule.maxLength ?? 256 };
+}
+
+/** The longest description of an organization. */
+export function descriptionMaxLength() {
+    return inputRule('descriptionText').maxLength ?? 2000;
+}
+
+/**
+ * What is wrong with the length of a name, or null (the published limits; the message is the
+ * Registry's own).
+ * @param {string|null|undefined} name
+ * @returns {string|null}
+ */
+export function displayNameLengthProblem(name) {
+    if (typeof name !== 'string') return null;
+    return name.length > displayNameLimits().max ? inputRule('displayName').message : null;
+}
+
+/**
+ * What is wrong with the length of a description, or null.
+ * @param {string|null|undefined} text
+ * @returns {string|null}
+ */
+export function descriptionLengthProblem(text) {
+    if (typeof text !== 'string') return null;
+    return text.length > descriptionMaxLength() ? inputRule('descriptionText').message : null;
 }

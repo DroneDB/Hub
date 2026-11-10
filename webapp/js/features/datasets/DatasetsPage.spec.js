@@ -17,6 +17,7 @@ vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 const { default: DatasetsPage } = await import('./DatasetsPage.vue');
 const { datasetListQuery } = await import('@/libs/datasetList');
 const { PREF, applyAccountValue, _resetPrefListenersForTests } = await import('@/libs/preferences');
+const { ApiError } = await import('@/libs/ddb/apiError');
 
 const serverDataset = extra => ({
     slug: 'ds', creationDate: '2026-01-01T00:00:00Z', size: 1, properties: { entries: 2, meta: {} },
@@ -237,7 +238,7 @@ describe('DatasetsPage map view', () => {
 
         datasetApi.rename.mockClear();
         wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
-        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof-2026', changeSlug: true });
+        await wrapper.vm.saveDataset({ name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof-2026', changeSlug: true });
         await flushPromises();
         expect(datasetApi.rename).toHaveBeenCalledWith('roof-2026');
         expect(wrapper.vm.datasets[0].slug).toBe('roof-2026');
@@ -257,7 +258,7 @@ describe('DatasetsPage map view', () => {
         await render();
         for (const fn of Object.values(datasetApi)) fn.mockClear();
         wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
-        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'ds', changeSlug: false });
+        await wrapper.vm.saveDataset({ name: 'Roof 2026', visibility: 0, tagline: '', slug: 'ds', changeSlug: false });
         await flushPromises();
         expect(datasetApi.metaSet).toHaveBeenCalledWith('name', 'Roof 2026');
         expect(datasetApi.rename).not.toHaveBeenCalled();
@@ -271,7 +272,7 @@ describe('DatasetsPage map view', () => {
         await render();
         for (const fn of Object.values(datasetApi)) fn.mockClear();
         wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
-        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof', changeSlug: true });
+        await wrapper.vm.saveDataset({ name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof', changeSlug: true });
         await flushPromises();
         expect(datasetApi.rename).toHaveBeenCalledWith('roof');
         expect(datasetApi.metaSet).toHaveBeenCalledWith('name', 'Roof 2026');
@@ -280,22 +281,49 @@ describe('DatasetsPage map view', () => {
         expect(wrapper.vm.datasets[0].slug).toBe('roof');
     });
 
-    it('sends nothing else when the rename is refused, and says the URL did not change', async () => {
+    // D-046: the dialog runs the request, so a refusal is thrown for it to show at its field; no toast, the dialog stays open
+    it('sends nothing else when the rename is refused, and throws the refusal for the dialog', async () => {
         pendingLocations();
         await render();
         for (const fn of Object.values(datasetApi)) fn.mockClear();
-        datasetApi.rename.mockImplementationOnce(() => Promise.reject(new Error('Dataset slug is invalid')));
+        const taken = Object.assign(new Error("Dataset 'roof' already exists"), { status: 400, errors: { slug: ["Dataset 'roof' already exists"] } });
+        datasetApi.rename.mockImplementationOnce(() => Promise.reject(taken));
         const notify = wrapper.vm.$notify;
         notify.error.mockClear();
         wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
-        await wrapper.vm.handleDatasetClose('save', { name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof', changeSlug: true });
+        await expect(wrapper.vm.saveDataset({ name: 'Roof 2026', visibility: 0, tagline: '', slug: 'roof', changeSlug: true })).rejects.toBe(taken);
         await flushPromises();
         expect(datasetApi.rename).toHaveBeenCalledWith('roof');
         expect(datasetApi.metaSet).not.toHaveBeenCalled();
         expect(datasetApi.update).not.toHaveBeenCalled();
         expect(datasetApi.metaUnset).not.toHaveBeenCalled();
-        expect(notify.error).toHaveBeenCalledWith('The URL was not changed: Dataset slug is invalid', expect.anything());
+        expect(notify.error).not.toHaveBeenCalled();
+        expect(wrapper.vm.dsDialogOpen).toBe(true);
         expect(wrapper.vm.datasets[0]).toMatchObject({ slug: 'ds', editing: false });
+    });
+
+    it('creates a dataset in the dialog, and throws a refusal of the Registry with the temporary row gone', async () => {
+        pendingLocations();
+        await render();
+        const createDataset = vi.fn(() => Promise.reject(Object.assign(new Error('Dataset with this slug already exists'),
+            { status: 400, errors: { slug: ['Dataset with this slug already exists'] } })));
+        wrapper.vm.org.createDataset = createDataset;
+        const notify = wrapper.vm.$notify;
+        notify.error.mockClear();
+        wrapper.vm.newDataset();
+        const before = wrapper.vm.datasets.map(d => d.slug);
+
+        await expect(wrapper.vm.saveDataset({ name: 'Survey', visibility: 0, tagline: '', slug: 'survey', openAfterCreate: false }))
+            .rejects.toMatchObject({ errors: { slug: ['Dataset with this slug already exists'] } });
+
+        expect(createDataset).toHaveBeenCalledExactlyOnceWith('survey', 'Survey', 0, '');
+        expect(wrapper.vm.datasets.map(d => d.slug)).toEqual(before);
+        expect(notify.error).not.toHaveBeenCalled();
+        expect(wrapper.vm.dsDialogOpen).toBe(true);
+
+        createDataset.mockResolvedValueOnce({ slug: 'survey' });
+        await wrapper.vm.saveDataset({ name: 'Survey', visibility: 0, tagline: '', slug: 'survey', openAfterCreate: false });
+        expect(notify.success).toHaveBeenCalledWith('Dataset created successfully', { summary: 'Dataset Created' });
     });
 
     it('stores the view with the other table settings, which reach the account whole', async () => {
@@ -320,69 +348,190 @@ describe('DatasetsPage map view', () => {
 
 describe('DatasetsPage edit dialog (DatasetDialog)', () => {
     let dialog;
+    let save;
     afterEach(() => {
         dialog?.unmount();
         dialog = null;
         document.body.innerHTML = '';
     });
 
+    const WindowStub = {
+        props: ['busy', 'confirmLabel'],
+        emits: ['confirm', 'close'],
+        template: '<div :data-busy="busy"><slot /><button type="button" data-confirm :disabled="busy" @click="$emit(\'confirm\')">{{ confirmLabel }}</button></div>'
+    };
+
     async function open(props) {
         const { default: DatasetDialog } = await import('./DatasetDialog.vue');
+        save = vi.fn().mockResolvedValue(undefined);
         dialog = mount(DatasetDialog, {
-            props: { orgSlug: 'org', forbiddenSlugs: ['taken'], ...props },
-            global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /></div>' } } }
+            props: { orgSlug: 'org', forbiddenSlugs: ['taken'], save, ...props },
+            attachTo: document.body,
+            global: { plugins: [PrimeVue], stubs: { Window: WindowStub } }
         });
         await flushPromises();
     }
     const edit = () => open({ mode: 'edit', model: { slug: 'survey-2026', name: 'Survey 2026', visibility: 0, tagline: '' } });
-    const closed = () => dialog.emitted('close').at(-1);
+    const type = async (selector, value) => { await dialog.find(selector).setValue(value); await flushPromises(); };
+    const confirm = async () => { await dialog.find('[data-confirm]').trigger('click'); await flushPromises(); };
+    const sent = () => save.mock.calls.at(-1)[0];
 
     it('keeps the slug on a name edit: no slug field until Change URL is ticked', async () => {
         await edit();
         expect(dialog.find('#dataset-dialog-slug').exists()).toBe(false);
-        await dialog.find('#dataset-dialog-dataset-name').setValue('Roof 2026');
-        dialog.vm.close('save');
-        expect(closed()).toEqual(['save', expect.objectContaining({ name: 'Roof 2026', slug: 'survey-2026', changeSlug: false })]);
+        await type('#dataset-dialog-dataset-name', 'Roof 2026');
+        await confirm();
+        expect(sent()).toEqual(expect.objectContaining({ name: 'Roof 2026', slug: 'survey-2026', changeSlug: false }));
+        expect(dialog.emitted('close')).toEqual([['save']]);
     });
 
-    it('warns that the old links stop working, and checks the new slug with the Registry rule', async () => {
+    it('warns that the old links stop working, and checks the new slug with the Registry rule at submit', async () => {
         await edit();
         await dialog.find('#dataset-dialog-change-slug').setValue(true);
+        await flushPromises();
         expect(dialog.text()).toContain('Links to /r/org/survey-2026 will stop working');
-        await dialog.find('#dataset-dialog-slug').setValue('Roof 2026');
-        expect(dialog.text()).toContain("Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'");
-        expect(dialog.vm.isValid()).toBe(false);
-        await dialog.find('#dataset-dialog-slug').setValue('taken');
-        expect(dialog.vm.isValid()).toBe(false);
-        await dialog.find('#dataset-dialog-slug').setValue('roof-2026');
-        expect(dialog.vm.isValid()).toBe(true);
-        dialog.vm.close('save');
-        expect(closed()).toEqual(['save', expect.objectContaining({ slug: 'roof-2026', changeSlug: true })]);
+        await type('#dataset-dialog-slug', 'Roof 2026');
+        expect(dialog.find('#dataset-dialog-slug-error').text()).toBe("Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'");
+        // D-046: Save stays enabled; a submit sends nothing while a field is invalid
+        expect(dialog.find('[data-confirm]').attributes('disabled')).toBeUndefined();
+        await confirm();
+        expect(save).not.toHaveBeenCalled();
+        await type('#dataset-dialog-slug', 'taken');
+        expect(dialog.find('#dataset-dialog-slug-error').text()).toBe('A dataset with this slug already exists in this organization.');
+        await confirm();
+        expect(save).not.toHaveBeenCalled();
+        await type('#dataset-dialog-slug', 'roof-2026');
+        await confirm();
+        expect(sent()).toEqual(expect.objectContaining({ slug: 'roof-2026', changeSlug: true }));
     });
 
-    it('shows the Latin letter rule at the name field: a new dataset has no slug field, an edit has one', async () => {
+    // D-035: a new dataset has its slug field (FR-ORG-05): a name with no Latin letter or digit needs a slug the user enters
+    it('shows the Latin letter rule at the name field of a new dataset; a slug the user enters answers it', async () => {
         await open({ mode: 'new' });
-        await dialog.find('#dataset-dialog-dataset-name').setValue('Москва');
-        expect(dialog.find('#dataset-dialog-name-error').text()).toBe('Use at least one Latin letter (a–z) or digit');
-        expect(dialog.vm.isValid()).toBe(false);
+        await type('#dataset-dialog-dataset-name', 'Москва');
+        expect(dialog.find('#dataset-dialog-name-error').text()).toBe('Use at least one Latin letter (a–z) or digit in the name, or enter a slug');
+        // The slug is not proposed for a name that has no Latin letter or digit
+        expect(dialog.find('#dataset-dialog-new-slug').element.value).toBe('');
+        await confirm();
+        expect(save).not.toHaveBeenCalled();
+        await type('#dataset-dialog-new-slug', 'moskva');
+        expect(dialog.find('#dataset-dialog-name-error').exists()).toBe(false);
+        await confirm();
+        expect(sent()).toEqual(expect.objectContaining({ name: 'Москва', slug: 'moskva' }));
+        expect(dialog.emitted('close')).toEqual([['create']]);
+    });
+
+    // D-035: the dataset keeps its slug, so an edit is never refused for a name with no Latin letter or digit
+    it('does not refuse a name with no Latin letter or digit on an edit, with or without Change URL', async () => {
+        await edit();
+        await type('#dataset-dialog-dataset-name', 'Москва');
+        expect(dialog.find('#dataset-dialog-name-error').exists()).toBe(false);
+        await confirm();
+        expect(sent()).toEqual(expect.objectContaining({ name: 'Москва', slug: 'survey-2026', changeSlug: false }));
         dialog.unmount();
 
+        save.mockClear();
         await edit();
-        await dialog.find('#dataset-dialog-dataset-name').setValue('Москва');
-        expect(dialog.find('#dataset-dialog-name-error').text()).toBe('Use at least one Latin letter (a–z) or digit in the name, or enter a slug');
+        await type('#dataset-dialog-dataset-name', 'Москва');
         await dialog.find('#dataset-dialog-change-slug').setValue(true);
-        await dialog.find('#dataset-dialog-slug').setValue('moskva');
+        await flushPromises();
         expect(dialog.find('#dataset-dialog-name-error').exists()).toBe(false);
-        expect(dialog.vm.isValid()).toBe(true);
+        await type('#dataset-dialog-slug', 'moskva');
+        await confirm();
+        expect(sent()).toEqual(expect.objectContaining({ name: 'Москва', slug: 'moskva', changeSlug: true }));
     });
 
-    it('checks the slug a new dataset gets from its name', async () => {
+    // FR-ORG-05: the slug is made from the name with the accents transliterated, and the user edits it
+    it('shows the slug a new dataset gets from its name, transliterated, and lets the user edit it', async () => {
         await open({ mode: 'new' });
-        await dialog.find('#dataset-dialog-dataset-name').setValue('a');
-        expect(dialog.text()).toContain('Dataset slug is invalid');
-        expect(dialog.vm.isValid()).toBe(false);
-        await dialog.find('#dataset-dialog-dataset-name').setValue('Survey Team');
-        expect(dialog.vm.isValid()).toBe(true);
+        const slug = () => dialog.find('#dataset-dialog-new-slug').element.value;
+        await type('#dataset-dialog-dataset-name', 'Ørsted Café Ü');
+        expect(slug()).toBe('orsted-cafe-u');
+        await type('#dataset-dialog-dataset-name', 'a');
+        expect(slug()).toBe('a0');
+        await type('#dataset-dialog-dataset-name', 'Survey Team');
+        expect(slug()).toBe('survey-team');
+
+        // Edited by the user: it no longer follows the name
+        await type('#dataset-dialog-new-slug', 'my-survey');
+        await type('#dataset-dialog-dataset-name', 'Another name');
+        expect(slug()).toBe('my-survey');
+        await confirm();
+        expect(sent()).toEqual(expect.objectContaining({ name: 'Another name', slug: 'my-survey' }));
+    });
+
+    it('lets the slug follow the name again once the user empties it', async () => {
+        await open({ mode: 'new' });
+        await type('#dataset-dialog-dataset-name', 'Roof Team');
+        await type('#dataset-dialog-new-slug', 'my-roof');
+        await type('#dataset-dialog-new-slug', '');
+        await type('#dataset-dialog-dataset-name', 'Roof Team 2');
+        expect(dialog.find('#dataset-dialog-new-slug').element.value).toBe('roof-team-2');
+    });
+
+    it('checks the slug of a new dataset with the Registry rule, and against the slugs that exist, at the slug field', async () => {
+        await open({ mode: 'new' });
+        await type('#dataset-dialog-dataset-name', 'Survey Team');
+        await type('#dataset-dialog-new-slug', 'Bad Slug');
+        expect(dialog.find('#dataset-dialog-new-slug-error').text()).toContain('Dataset slug is invalid');
+        await type('#dataset-dialog-new-slug', 'taken');
+        expect(dialog.find('#dataset-dialog-new-slug-error').text()).toBe('A dataset with this slug already exists in this organization.');
+        await confirm();
+        expect(save).not.toHaveBeenCalled();
+        expect(dialog.find('#dataset-dialog-new-slug').attributes('aria-invalid')).toBe('true');
+        expect(document.activeElement).toBe(dialog.find('#dataset-dialog-new-slug').element);
+        await type('#dataset-dialog-new-slug', 'survey-team');
+        await confirm();
+        expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    // D-046, FR-ORG-04: Create stays enabled; an empty form shows its errors at the fields and sends nothing
+    it('keeps Create enabled and shows the errors of an empty form at the fields on submit', async () => {
+        await open({ mode: 'new' });
+        expect(dialog.find('[data-confirm]').attributes('disabled')).toBeUndefined();
+        expect(dialog.find('#dataset-dialog-name-error').exists()).toBe(false);
+        await confirm();
+        expect(save).not.toHaveBeenCalled();
+        expect(dialog.find('#dataset-dialog-name-error').text()).toBe('Enter a name');
+        expect(dialog.find('#dataset-dialog-dataset-name').attributes('aria-invalid')).toBe('true');
+        expect(document.activeElement).toBe(dialog.find('#dataset-dialog-dataset-name').element);
+    });
+
+    // FR-ORG-04, D-047: a duplicate the Registry finds shows at the slug field, the dialog stays open with the typed values
+    it('shows a refusal of the Registry at the field it names, or a 409 at the slug field, and stays open', async () => {
+        await open({ mode: 'new', forbiddenSlugs: [] });
+        await type('#dataset-dialog-dataset-name', 'Survey');
+        await type('#dataset-dialog-tagline', 'Typed tagline');
+        save.mockRejectedValueOnce(new ApiError('Dataset with this slug already exists', 400, { errors: { slug: ['Dataset with this slug already exists'] } }));
+        await confirm();
+        expect(save).toHaveBeenCalledTimes(1);
+        expect(dialog.find('#dataset-dialog-new-slug-error').text()).toBe('Dataset with this slug already exists');
+        expect(dialog.find('#dataset-dialog-dataset-name').element.value).toBe('Survey');
+        expect(dialog.find('#dataset-dialog-tagline').element.value).toBe('Typed tagline');
+        expect(dialog.emitted('close')).toBeUndefined();
+
+        save.mockRejectedValueOnce(new ApiError('Conflict', 409));
+        await type('#dataset-dialog-new-slug', 'survey-2');
+        await confirm();
+        expect(dialog.find('#dataset-dialog-new-slug-error').text()).toBe('Conflict');
+        expect(dialog.find('.form-error').exists()).toBe(false);
+
+        save.mockRejectedValueOnce(new ApiError('Internal server error', 500));
+        await type('#dataset-dialog-new-slug', 'survey-3');
+        await confirm();
+        expect(dialog.find('.form-error').text()).toBe('Internal server error');
+        expect(dialog.emitted('close')).toBeUndefined();
+    });
+
+    // FR-ORG-14: the Registry's limit of a name, with a counter like the tagline's
+    it('limits the name to the 256 characters of the Registry, with a counter', async () => {
+        await open({ mode: 'new' });
+        const name = dialog.find('#dataset-dialog-dataset-name');
+        expect(name.attributes('maxlength')).toBe('256');
+        expect(dialog.find('#dataset-dialog-name-count').text()).toBe('0/256');
+        await type('#dataset-dialog-dataset-name', 'x'.repeat(190));
+        expect(dialog.find('#dataset-dialog-name-count').text()).toBe('190/256');
+        expect(dialog.find('#dataset-dialog-new-slug').element.value).toBe('x'.repeat(128));
     });
 });
 

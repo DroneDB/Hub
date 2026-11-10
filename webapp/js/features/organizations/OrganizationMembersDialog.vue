@@ -24,7 +24,12 @@
                         <div class="d-flex gap-3 flex-wrap align-items-start">
                             <div style="flex: 7 1 12rem;">
                                 <label for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User name</label>
-                                <InputText id="organization-members-dialog-user" v-model.trim="newMember.userName" class="w-100" autocomplete="off" spellcheck="false" placeholder="Exact user name" aria-describedby="organization-members-dialog-user-hint" @keyup.enter="addMember" />
+                                <InputText id="organization-members-dialog-user" v-model.trim="newMember.userName" class="w-100" autocomplete="off" spellcheck="false" placeholder="Exact user name"
+                                           :invalid="!!userNameError" :aria-invalid="userNameError ? 'true' : undefined"
+                                           :aria-describedby="userNameError ? 'organization-members-dialog-user-error organization-members-dialog-user-hint' : 'organization-members-dialog-user-hint'"
+                                           @input="userNameError = ''" @keyup.enter="addMember" />
+                                <!-- The Registry names the field of its refusal (errors.userName, D-047): 'No user named x' shows here, not in the banner -->
+                                <FieldError id="organization-members-dialog-user-error" :message="userNameError" />
                                 <small id="organization-members-dialog-user-hint" class="d-block mt-1 text-muted">Type the exact user name; it is checked when you add the member.</small>
                             </div>
                             <div style="flex: 5 1 9rem;">
@@ -124,6 +129,8 @@ import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
+import FieldError from '@/components/FieldError.vue';
+import { fieldErrorsOf } from '@/libs/forms/serverErrors';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { formatDate } from '@/libs/format';
@@ -136,7 +143,7 @@ const ADMIN = 3;
 const sortByUserName = members => [...members].sort((a, b) => a.userName.localeCompare(b.userName, undefined, { sensitivity: 'base' }));
 
 export default {
-    components: { Window, ConfirmDialog, Select, InputText, Button, PrimeMessage },
+    components: { Window, ConfirmDialog, Select, InputText, Button, PrimeMessage, FieldError },
 
     props: {
         orgSlug: { type: String, required: true },
@@ -153,6 +160,8 @@ export default {
         return {
             loading: true,
             error: null,
+            // The refusal of the user name the Registry answered with, shown at the field
+            userNameError: '',
             featureEnabled: false,
             members: [],
             addingMember: false,
@@ -220,6 +229,7 @@ export default {
 
             this.addingMember = true;
             this.error = null;
+            this.userNameError = '';
             try {
                 await reg.orgs.addOrganizationMember(
                     this.orgSlug,
@@ -237,7 +247,9 @@ export default {
                 this.$notify.success('Member added successfully', { summary: 'Member Added' });
 
             } catch (e) {
-                this.error = e.message || 'Failed to add member';
+                const atField = fieldErrorsOf(e, {}, ['userName']).userName;
+                if (atField) this.userNameError = atField;
+                else this.error = e.message || 'Failed to add member';
             } finally {
                 this.addingMember = false;
             }

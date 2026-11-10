@@ -1,13 +1,14 @@
 /**
  * A drag move offers Undo (FR-EXP-16, FR-XC-23): the toast of the move carries an Undo action that moves the item back to the
- * path it came from. A rename carries none. A move that replaced an entry offers none (that entry cannot come back), and an
- * Undo whose old path holds an entry again is refused and moves nothing.
+ * path it came from. A rename carries none. A move onto a name that exists is refused by the Registry (409, D-040): it says
+ * that the name is taken and offers no Undo. An Undo whose old path holds an entry again is refused and moves nothing.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import ddb from 'ddb';
 import { useDialogs } from './useDialogs';
 import { useDatasetActions } from './useDatasetActions';
+import { ApiError } from '@/libs/ddb/apiError';
 
 const notify = vi.hoisted(() => ({ success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => notify }));
@@ -77,24 +78,18 @@ describe('Undo of a drag move', () => {
         expect(listing.added).toHaveBeenCalledTimes(1);
     });
 
-    it('offers no Undo for a move that replaced an entry of the destination folder (the server lists it)', async () => {
-        dataset.list.mockResolvedValueOnce([{ path: 'x/notes.txt', type: T.GENERIC, size: 3 }]);
-
-        await actions.move(item('notes.txt', T.GENERIC), item('x', T.DIRECTORY));
-
-        expect(dataset.list).toHaveBeenCalledWith('x');
-        expect(dataset.moveObj).toHaveBeenCalledWith('notes.txt', 'x/notes.txt');
-        expect(notify.success.mock.calls).toEqual([['File moved successfully', { summary: 'Moved' }]]);
-    });
-
-    it('offers no Undo for a move that replaced an entry of the folder on show (the listing knows, nothing is asked)', async () => {
-        listing.inView = path => path.startsWith('x/');
-        listing.files.value = [item('x/Notes.TXT', T.GENERIC)];
+    // D-040: the Registry refuses a move onto a name that exists (no replace, so no extra listing is asked first)
+    it('says that the name is taken when the server refuses the move with 409, offers no Undo and moves nothing', async () => {
+        dataset.moveObj.mockRejectedValueOnce(new ApiError("A file or folder named 'Notes.TXT' already exists in this folder", 409, { conflictPath: 'x/Notes.TXT' }));
 
         await actions.move(item('notes.txt', T.GENERIC), item('x', T.DIRECTORY));
 
         expect(dataset.list).not.toHaveBeenCalled();
-        expect(notify.success.mock.calls).toEqual([['File moved successfully', { summary: 'Moved' }]]);
+        expect(dataset.moveObj).toHaveBeenCalledExactlyOnceWith('notes.txt', 'x/notes.txt');
+        expect(alertProps()).toMatchObject({ title: 'Name already taken', message: "A file or folder named 'Notes.TXT' already exists in this folder" });
+        expect(notify.success).not.toHaveBeenCalled();
+        expect(listing.removed).not.toHaveBeenCalled();
+        expect(listing.added).not.toHaveBeenCalled();
     });
 
     it('refuses an Undo when the old path holds an entry again, and moves nothing', async () => {

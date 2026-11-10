@@ -114,4 +114,34 @@ describe('useHubForm (FR-XC-11)', () => {
         await submit();
         expect(wrapper.find('.ef').text()).toBe('Nope.');
     });
+
+    // D-040: a name that exists is a 409 without a field member: it belongs to the name field (statusFields)
+    it('puts an answer of a mapped status that names no field at the field of that status', async () => {
+        mountForm(vi.fn().mockRejectedValue(new ApiError('A file or folder named "x" already exists in this folder', 409, { conflictPath: 'x' })),
+            { statusFields: { 409: 'a' } });
+        await type('a', '1');
+        await type('b', '2');
+        await submit();
+        expect(wrapper.find('.ea').text()).toBe('A file or folder named "x" already exists in this folder');
+        expect(wrapper.find('.ef').exists()).toBe(false);
+        await type('a', '12');
+        expect(wrapper.find('.ea').exists()).toBe(false);
+    });
+
+    it('prefers the field the answer names to the field of its status, and ignores a status that is not mapped', async () => {
+        mountForm(vi.fn().mockRejectedValue(new ApiError('x', 409, { errors: { b: ['Bad b.'] } })), { statusFields: { 409: 'a' } });
+        await type('a', '1');
+        await type('b', '2');
+        await submit();
+        expect(wrapper.find('.eb').text()).toBe('Bad b.');
+        expect(wrapper.find('.ea').exists()).toBe(false);
+        wrapper.unmount();
+
+        mountForm(vi.fn().mockRejectedValue(new ApiError('Server error', 500)), { statusFields: { 409: 'a' } });
+        await type('a', '1');
+        await type('b', '2');
+        await submit();
+        expect(wrapper.find('.ef').text()).toBe('Server error');
+        expect(wrapper.find('.ea').exists()).toBe(false);
+    });
 });

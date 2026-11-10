@@ -208,9 +208,10 @@ export function buildRowNotes(file) {
 /**
  * Readable origin of a CAD drawing's coordinate system, from the
  * properties.vector.crs that DroneDB records at index time. Returns null for
- * entries without that information (non-CAD vectors, other types).
+ * entries without that information (non-CAD vectors, other types). `forDialog` leaves out
+ * the pointer to Tools › Set Coordinate System, which the Set Coordinate System dialog is.
  */
-export function formatCadCrs(entry) {
+export function formatCadCrs(entry, { forDialog = false } = {}) {
     const vector = entry && entry.properties && entry.properties.vector;
     const crs = vector && vector.crs;
     if (!crs || !crs.source) return null;
@@ -225,9 +226,13 @@ export function formatCadCrs(entry) {
         case 'layer':
             return crs.label || 'From the file';
         case 'lonlat':
-            return 'WGS84 (EPSG:4326), assumed: the file has no coordinate system. Change it with Tools › Set Coordinate System';
+            return forDialog
+                ? 'WGS84 (EPSG:4326), assumed: the file has no coordinate system'
+                : 'WGS84 (EPSG:4326), assumed: the file has no coordinate system. Change it with Tools › Set Coordinate System';
         case 'none':
-            return `None: local drawing coordinates${units}. Place it on the map with Tools › Set Coordinate System`;
+            return forDialog
+                ? `None: local drawing coordinates${units}`
+                : `None: local drawing coordinates${units}. Place it on the map with Tools › Set Coordinate System`;
         default:
             return null;
     }

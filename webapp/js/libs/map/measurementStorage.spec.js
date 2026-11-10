@@ -496,7 +496,8 @@ describe('with the Registry client: a missing file is the client\'s 404, and the
         const error = await dataset.getFileContents('cloud_measurements.geojson').catch(e => e);
         expect(error).toBeInstanceOf(ApiError);
         expect(error.status).toBe(404);
-        expect(error.message).toBe('Not found');
+        // The 404 carries the Registry's own text now (FR-ORG-23); callers test the status
+        expect(error.message).toBe("Cannot find 'cloud_measurements.geojson'");
     });
 
     it('the first save of the map writes a new 2.0 file; load before it is nothing', async () => {

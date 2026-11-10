@@ -190,3 +190,38 @@ test('FR-XC-22: the keyboard reaches a disabled toolbar action and its reason', 
     }
     assert.deepEqual(found, { disabled: 'true', reason: 'Select one file to rename', title: 'Rename: Select one file to rename' });
 });
+
+// FR-EXP-04, FR-EXP-05, FR-EXP-15 (written, not run in the unit's own check: needs a running Registry and a browser)
+test('EXP-04: renaming a file to the name of a sibling shows an inline error, and the dialog stays open', async () => {
+    const { page, errors } = await newPage();
+    await openFiles(page);
+    await page.waitForSelector(`#explorer .thumbnail:has-text("README.md"), #explorer tr:has-text("README.md")`, { timeout: 15000 });
+    await page.click(`#explorer .thumbnail:has-text("README.md"), #explorer tr:has-text("README.md")`);
+    await page.click('.hub-toolbar button[aria-label="Rename"]');
+    const field = page.locator('#rename-name');
+    await field.waitFor({ state: 'visible', timeout: 10000 });
+    await field.fill(RASTER);
+    await page.keyboard.press('Enter');
+    const message = page.locator('#rename-name-error');
+    await message.waitFor({ state: 'visible', timeout: 10000 });
+    assert.equal(await message.textContent(), `A file or folder named '${RASTER}' already exists in this folder`);
+    assert.equal(await field.getAttribute('aria-invalid'), 'true');
+    assert.equal(await field.inputValue(), RASTER);
+    assert.deepEqual(errors, []);
+});
+
+test('EXP-15/EXP-05: the New folder field is neutral, refuses a / and a name that exists, and keeps the typed text', async () => {
+    const { page } = await newPage();
+    await openFiles(page);
+    await page.click('.hub-toolbar button[aria-label="New folder"]');
+    const field = page.locator('#new-folder-name');
+    await field.waitFor({ state: 'visible', timeout: 10000 });
+    assert.equal(await page.locator('#new-folder-name-error').count(), 0, 'no error before typing');
+    await field.fill('x/y');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#new-folder-name-error').textContent(), 'Folder names cannot contain /');
+    await field.fill('README.md');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#new-folder-name-error').textContent(), "A file or folder named 'README.md' already exists in this folder");
+    assert.equal(await field.inputValue(), 'README.md');
+});

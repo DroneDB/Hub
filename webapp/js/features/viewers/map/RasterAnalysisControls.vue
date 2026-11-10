@@ -53,8 +53,9 @@
 
             <!-- Rescale -->
             <div class="section">
-                <label for="raster-analysis-controls-rescale" class="section-label">Rescale</label>
-                <input id="raster-analysis-controls-rescale" v-model="rescale" class="panel-input" placeholder="e.g. 0,50 (auto if empty)" @change="onRescaleChange">
+                <span id="raster-analysis-controls-rescale-label" class="section-label">Rescale</span>
+                <!-- Min and Max, numbers in the user's locale; a bad range shows its error here and the map keeps the last valid one (FR-RAS-10) -->
+                <RescaleFields v-model="rescale" id-prefix="raster-analysis-controls-rescale" @commit="onRescaleChange" />
             </div>
 
             <!-- Spot Info: the last value read with Inspect -->
@@ -188,6 +189,7 @@ import AnalysisPanel from './AnalysisPanel.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
+import RescaleFields from './RescaleFields.vue';
 import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -203,7 +205,7 @@ import { formatNumber, formatNumberList } from '@/libs/format';
 const formatCount = n => formatNumber(n, 'count');
 
 export default {
-    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect },
+    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect, RescaleFields },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
