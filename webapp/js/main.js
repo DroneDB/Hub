@@ -112,14 +112,14 @@ window.addEventListener('load', function () {
         // surface a one-shot dialog now (versions match again at this point).
         const updateNotice = consumePendingUpdateNotice();
 
-        const app = createApp(App, {
-            notice: updateNotice,
-            versions: {
-                hubVersion: features?.hubVersion ?? null,
-                registryVersion: features?.registryVersion ?? null,
-                ddbVersion: features?.ddbVersion ?? null
-            }
-        });
+        const versions = {
+            hubVersion: features?.hubVersion ?? null,
+            registryVersion: features?.registryVersion ?? null,
+            ddbVersion: features?.ddbVersion ?? null
+        };
+        const app = createApp(App, { notice: updateNotice, versions });
+        // The running versions, for the administrator's menu in the header (FR-NAV-08): read once, not loaded again
+        app.provide('versions', versions);
 
         // Pinia before the router: the route guards read the auth store
         const pinia = createPinia();

@@ -28,6 +28,19 @@
                 </div>
             </div>
 
+            <!-- The users selected in the table, and what can be done to all of them at once (FR-ADM-23) -->
+            <div v-if="selectedUsers.length" class="bulk-bar" role="region" aria-label="Actions for the selected users">
+                <span class="bulk-count" role="status">{{ countOf(selectedUsers.length, 'user') }} selected</span>
+                <Button severity="secondary" size="small" icon="fa-solid fa-user-tag" label="Add role" @click="bulkMode = 'role'" />
+                <Button severity="secondary" size="small" icon="fa-solid fa-building" label="Add to organization" @click="bulkMode = 'organization'" />
+                <Button v-if="canDisableUsers && activeSelected.length" severity="warn" size="small" icon="fa-solid fa-user-slash"
+                        label="Disable" :disabled="bulkBusy" @click="bulkDisable" />
+                <Button v-if="canDisableUsers && disabledSelected.length" severity="secondary" size="small" icon="fa-solid fa-user-check"
+                        label="Enable" :disabled="bulkBusy" @click="bulkEnable" />
+                <Button severity="danger" size="small" icon="fa-solid fa-trash" label="Delete" :disabled="bulkBusy" @click="bulkDelete" />
+                <Button text size="small" label="Clear selection" @click="selected = []" />
+            </div>
+
             <!-- Users Table -->
             <!-- A page holds the rows that fit the height, or the rows the user chose (FR-ADM-29) -->
             <DataTable ref="table" v-model:first="first" :value="filteredUsers" data-key="userName" :class="STACKED_TABLE_CLASS"
@@ -41,6 +54,17 @@
                     <Select :model-value="pageSize" :options="pageSizeChoices" option-label="label" option-value="value"
                             aria-label="Users per page" class="page-size-select" @update:model-value="rows => onPage({ rows })" />
                 </template>
+                <!-- The checkbox of a row (not for the built-in admin); the header one selects every user that the search shows -->
+                <Column class="users-col-fit users-col-select" v-bind="stackedColumn(undefined, undefined, {}, {})">
+                    <template #header>
+                        <Checkbox :model-value="allSelected" :indeterminate="someSelected" binary input-id="users-select-all"
+                                  aria-label="Select all users" :disabled="!selectableUsers.length" @update:model-value="toggleAll" />
+                    </template>
+                    <template #body="slotProps">
+                        <Checkbox v-if="selectableUser(slotProps.data)" :model-value="selected.includes(slotProps.data.userName)" binary
+                                  :aria-label="`Select ${slotProps.data.userName}`" @update:model-value="toggleUser(slotProps.data, $event)" />
+                    </template>
+                </Column>
                 <Column field="userName" :sortable="true" v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
                     <template #header>
                         <i class="fa-solid fa-user" /> Username
@@ -69,19 +93,26 @@
                 </Column>
                 <Column field="organizationCount" header="Organizations" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Organizations', 'md', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
-                        <Button size="small" title="Manage Organizations" severity="secondary" icon="fa-solid fa-sitemap"
+                        <Button size="small" :title="organizationsLabel(slotProps.data)" :aria-label="organizationsLabel(slotProps.data)"
+                                severity="secondary" icon="fa-solid fa-sitemap"
                                 :label="String(slotProps.data.organizationCount)" @click="showUserOrganizations(slotProps.data)" />
                     </template>
                 </Column>
                 <Column field="datasetCount" header="Datasets" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
                 <Column field="storageUsed" header="Storage" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
-                        <div v-if="slotProps.data.storageQuota">
-                            {{ bytesToSize(slotProps.data.storageUsed) }} / {{ bytesToSize(slotProps.data.storageQuota) }}
-                            <ProgressBar :value="getStoragePercentage(slotProps.data)" style="height: 1rem;" class="mt-1" />
+                        <!-- The bar is amber from 90 % and red from 100 % (D-030); with no quota there is no bar -->
+                        <div v-if="!usageOf(slotProps.data).unlimited">
+                            {{ usageOf(slotProps.data).usedText }} / {{ usageOf(slotProps.data).totalText }}
+                            <ProgressBar :value="usageOf(slotProps.data).barValue" :show-value="false" style="height: 1rem;" class="mt-1"
+                                         :aria-label="`Storage used by ${slotProps.data.userName}`"
+                                         :aria-valuetext="`${usageOf(slotProps.data).percentText} used`"
+                                         :pt="{ value: { style: { background: usageOf(slotProps.data).color } } }" />
+                            <small v-if="usageOf(slotProps.data).severity !== 'ok'" class="storage-warning"
+                                   :style="{ color: usageOf(slotProps.data).color }">{{ usageOf(slotProps.data).percentText }} used</small>
                         </div>
                         <div v-else>
-                            {{ bytesToSize(slotProps.data.storageUsed) }} / Unlimited
+                            {{ usageOf(slotProps.data).usedText }} / Unlimited
                         </div>
                     </template>
                 </Column>
@@ -140,53 +171,30 @@
         <!-- The Disable question -->
         <DialogHost :dialogs="dialogs" />
 
-        <!-- Delete User Confirmation Dialog -->
-        <!-- Deleting all the data asks for the user name to be typed; a transfer does not -->
+        <!-- Delete User Confirmation Dialog: one user, or the selected ones with the same choices (FR-ADM-17, FR-ADM-23) -->
+        <!-- Deleting all the data asks for the user name (several users: their number) to be typed; a transfer does not -->
         <ConfirmDialog v-if="showDeleteDialog"
                        v-bind="deleteDialog"
-                       :require-text="deleteSuccessor ? '' : (userToDelete?.userName || '')"
                        @close="handleDeleteDialogClose">
             <template #extra>
-                <div class="delete-options">
-                    <div class="field">
-                        <label id="users-transfer-data-to-successor-label" for="users-transfer-data-to-successor" class="d-block mb-1 fw-semibold">Transfer data to successor (optional)</label>
-                        <Select v-model="deleteSuccessor" input-id="users-transfer-data-to-successor" aria-labelledby="users-transfer-data-to-successor-label" :options="successorOptions" option-label="label" option-value="value" placeholder="-- Delete all data --" show-clear class="w-100" />
-                        <small class="d-block mt-1 text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
-                    </div>
-
-                    <div v-if="deleteSuccessor" class="field">
-                        <span id="users-conflict-label" class="d-block fw-semibold">Conflict Resolution Strategy</span>
-                        <div class="radio-group" role="radiogroup" aria-labelledby="users-conflict-label">
-                            <div class="radio-item">
-                                <input id="conflict-rename" v-model="deleteConflictResolution" type="radio" value="Rename">
-                                <label for="conflict-rename">Rename conflicting datasets</label>
-                            </div>
-                            <div class="radio-item">
-                                <input id="conflict-overwrite" v-model="deleteConflictResolution" type="radio" value="Overwrite">
-                                <label for="conflict-overwrite">Overwrite existing datasets</label>
-                            </div>
-                            <div class="radio-item">
-                                <input id="conflict-halt" v-model="deleteConflictResolution" type="radio" value="HaltOnConflict">
-                                <label for="conflict-halt">Stop if conflict detected</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <PrimeMessage v-if="!deleteSuccessor" severity="warn" :closable="false">
-                        <i class="fa-solid fa-triangle-exclamation" />
-                        <strong>Warning:</strong> All user data (organizations, datasets, files) will be permanently deleted.
-                    </PrimeMessage>
-                    <PrimeMessage v-else severity="info" :closable="false">
-                        <i class="fa-solid fa-circle-info" />
-                        Organizations and datasets will be transferred to <strong>{{ deleteSuccessor }}</strong>.
-                    </PrimeMessage>
-                </div>
+                <UserDeleteOptions v-model:successor="deleteSuccessor" v-model:conflict-resolution="deleteConflictResolution"
+                                   :choices="successorOptions" :several="usersToDelete.length > 1" />
             </template>
         </ConfirmDialog>
 
+        <!-- Add role / Add to organization for the selected users -->
+        <BulkUsersDialog v-if="bulkMode" :mode="bulkMode" :users="selectedUsers" :available-roles="availableRoles" @close="handleCloseBulk" />
+
         <!-- Delete Result Dialog -->
-        <Window v-if="showDeleteResultDialog" id="deleteResultDialog" title="User Deleted Successfully" modal max-width="50%" fixed-size @close="closeDeleteResultDialog">
-            <p>User <strong>{{ deleteResult && deleteResult.userName }}</strong> has been deleted.</p>
+        <Window v-if="showDeleteResultDialog" id="deleteResultDialog" :title="deleteResultTitle" modal max-width="50%" fixed-size @close="closeDeleteResultDialog">
+            <p v-if="deleteOutcome.done.length === 1">User <strong>{{ deleteOutcome.done[0] }}</strong> has been deleted.</p>
+            <p v-else>Deleted {{ countOf(deleteOutcome.done.length, 'user') }}: <strong>{{ deleteOutcome.done.join(', ') }}</strong>.</p>
+            <PrimeMessage v-if="deleteOutcome.failed.length" severity="error" role="alert" :closable="false" class="mb-3">
+                {{ countOf(deleteOutcome.failed.length, 'user') }} could not be deleted:
+                <ul class="mb-0">
+                    <li v-for="failure in deleteOutcome.failed" :key="failure.userName"><strong>{{ failure.userName }}</strong>: {{ failure.message }}</li>
+                </ul>
+            </PrimeMessage>
 
             <div v-if="deleteResult" class="delete-result-details">
                 <div v-if="deleteResult.successor" class="result-item">
@@ -230,12 +238,15 @@ import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import AddUserDialog from './AddUserDialog.vue';
+import BulkUsersDialog from './BulkUsersDialog.vue';
+import UserDeleteOptions from './UserDeleteOptions.vue';
 import EditUserDialog from './EditUserDialog.vue';
 import ChangePasswordDialog from './ChangePasswordDialog.vue';
 import OrganizationsDialog from './OrganizationsDialog.vue';
 import RoleManagementDialog from './RoleManagementDialog.vue';
 import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
 import Button from 'primevue/button';
+import Checkbox from 'primevue/checkbox';
 import ActionButton from '@/components/ActionButton.vue';
 import PrimeMessage from 'primevue/message';
 import Chip from 'primevue/chip';
@@ -247,13 +258,16 @@ import ProgressBar from 'primevue/progressbar';
 import SearchField from '@/components/SearchField.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
-import { formatDateTime, UNKNOWN } from '@/libs/format';
-import { deleteConfirmation } from '@/libs/deleteConfirmation';
+import { formatDateTime, countOf, UNKNOWN } from '@/libs/format';
+import { confirmDialogProps } from '@/libs/deleteConfirmation';
+import { storageUsage } from '@/libs/storageUsage';
+import { selectableUser, successorChoices, bulkSummary, sumDeleteResults } from '@/libs/userBulk';
 import { userDeleteBlockReason } from '@/libs/deleteBlockReason';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
 import { useStackedLayout } from '@/composables/useStackedLayout';
-import { isDisabledUser, pickableRoles, publishesSystemRoles } from '@/libs/roles';
+import { isAdminRole, isDisabledUser, pickableRoles, publishesSystemRoles } from '@/libs/roles';
+import { Features } from '@/libs/features';
 import { escapeHtml } from '@/libs/sanitize';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
@@ -279,12 +293,15 @@ export default {
         ConfirmDialog,
         DialogHost,
         AddUserDialog,
+        BulkUsersDialog,
+        UserDeleteOptions,
         EditUserDialog,
         ChangePasswordDialog,
         OrganizationsDialog,
         RoleManagementDialog,
         OrganizationManagementDialog,
         Button,
+        Checkbox,
         ActionButton,
         PrimeMessage,
         Chip,
@@ -309,7 +326,7 @@ export default {
             initial: getAdminPageSize(PREF.ADMIN_USERS)
         });
         // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order (D-026)
-        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), userDeleteBlockReason, ...sizing, table, page };
+        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), userDeleteBlockReason, selectableUser, countOf, ...sizing, table, page };
     },
     data: function () {
         return {
@@ -325,13 +342,22 @@ export default {
             showOrganizationManagement: false,
             showDeleteDialog: false,
             showDeleteResultDialog: false,
-            userToDelete: null,
+            // The users the Delete question is about: one, or the selected ones
+            usersToDelete: [],
             currentUser: null,
+
+            // The user names ticked in the table (FR-ADM-23), and the bulk action that runs
+            selected: [],
+            bulkBusy: false,
+            // 'role' or 'organization' while its dialog is open
+            bulkMode: null,
 
             // Delete options
             deleteSuccessor: null,
             deleteConflictResolution: 'Rename',
             deleteResult: null,
+            // Which users the delete removed, and which it could not
+            deleteOutcome: { done: [], failed: [] },
 
             // The offset of the first user of the page shown
             first: 0,
@@ -356,25 +382,49 @@ export default {
                 return userName.includes(query) || email.includes(query);
             });
         },
-        successorOptions() {
-            if (!this.userToDelete) return [];
-            return this.users
-                .filter(u => u.userName !== this.userToDelete.userName)
-                .map(u => ({ label: u.userName, value: u.userName }));
+        // The users ticked, as the rows now are
+        selectedUsers() {
+            return this.users.filter(user => this.selected.includes(user.userName));
         },
-        // Title, body and buttons from the delete-text builder; the body says what goes with
-        // the user when no successor takes their data
+        activeSelected() {
+            return this.selectedUsers.filter(user => !isDisabledUser(user));
+        },
+        disabledSelected() {
+            return this.selectedUsers.filter(isDisabledUser);
+        },
+        // The users the header checkbox selects: those the search shows, but the built-in admin
+        selectableUsers() {
+            return this.filteredUsers.filter(selectableUser);
+        },
+        allSelected() {
+            return this.selectableUsers.length > 0 && this.selectableUsers.every(user => this.selected.includes(user.userName));
+        },
+        someSelected() {
+            return !this.allSelected && this.selectableUsers.some(user => this.selected.includes(user.userName));
+        },
+        // Who can take the data over: not one of the users being deleted, and not a disabled user
+        successorOptions() {
+            return successorChoices(this.users, this.usersToDelete.map(user => user.userName));
+        },
+        // Title, body and buttons from the delete-text builder; the body says what goes with the user, or with the
+        // users, when no successor takes their data
         deleteDialog() {
-            const user = this.userToDelete;
-            if (!user) return { message: '' };
+            const users = this.usersToDelete;
+            if (!users.length) return { message: '' };
             // The row counts every organization the user is a member of, while a delete removes
             // only the ones they own: no counts. storageUsed is the size of what they own.
+            const stored = users.map(user => user.storageUsed);
             const lost = this.deleteSuccessor ? [] : [
                 'the organizations they own and all their datasets',
-                Number.isFinite(user.storageUsed) && `${bytesToSize(user.storageUsed)} of files`
+                stored.every(Number.isFinite) && `${bytesToSize(stored.reduce((sum, size) => sum + size, 0))} of files`
             ].filter(Boolean);
-            const { title, message, confirmText, cancelText } = deleteConfirmation({ kind: 'user', items: [user.userName], lost });
-            return { title, message, confirmText, cancelText, confirmButtonClass: 'danger' };
+            // Deleting all the data asks for the user name to be typed (several users: how many); a transfer does not
+            return confirmDialogProps({ kind: 'user', items: users.map(user => user.userName), lost, typed: !this.deleteSuccessor });
+        },
+        deleteResultTitle() {
+            const { done, failed } = this.deleteOutcome;
+            if (!failed.length && done.length === 1) return 'User Deleted Successfully';
+            return failed.length ? `${done.length} of ${done.length + failed.length} users deleted` : `${done.length} users deleted`;
         }
     },
     watch: {
@@ -385,6 +435,8 @@ export default {
         // Another search is another list: its first page
         searchQuery() {
             this.first = 0;
+            // A bulk action must not reach users that the search no longer shows
+            this.selected = this.selected.filter(name => this.filteredUsers.some(user => user.userName === name));
         }
     },
 
@@ -397,6 +449,10 @@ export default {
 
     methods: {
         bytesToSize,
+        // The quota is a bar only where the server applies it: the storage limiter is on and the user is not an administrator
+        usageOf: user => storageUsage(user.storageUsed, reg.features.get(Features.STORAGE_LIMITER) && !(user.roles ?? []).some(isAdminRole) ? user.storageQuota : null),
+        // 'Manage organizations of tadminuser (2)': the name of the button, which shows only the number (FR-ADM-09)
+        organizationsLabel: user => `Manage organizations of ${user.userName} (${user.organizationCount})`,
         isDisabledUser,
         pickableRoles,
 
@@ -415,6 +471,8 @@ export default {
                     switching: false
                 }));
                 this.availableRoles = rolesData;
+                // A user that is gone is not selected any more
+                this.selected = this.selected.filter(name => this.users.some(user => user.userName === name));
             } catch (e) {
                 if (!isUnauthorized(e)) this.error = e.message;
             }
@@ -439,11 +497,6 @@ export default {
         // The date the user was created; a user created before the Registry stored it has none: "Unknown"
         formatCreated(date) {
             return formatDateTime(date, { placeholder: UNKNOWN });
-        },
-
-        getStoragePercentage(user) {
-            if (!user.storageQuota) return 0;
-            return Math.round((user.storageUsed / user.storageQuota) * 100);
         },
 
         editUser(user) {
@@ -496,12 +549,85 @@ export default {
             }
         },
 
+        // ---- selection (FR-ADM-23) ----
+
+        toggleUser(user, checked) {
+            const others = this.selected.filter(name => name !== user.userName);
+            this.selected = checked ? [...others, user.userName] : others;
+        },
+
+        // The header checkbox: every user the search shows (but the built-in admin), or none of them
+        toggleAll(checked) {
+            const shown = this.selectableUsers.map(user => user.userName);
+            const others = this.selected.filter(name => !shown.includes(name));
+            this.selected = checked ? [...others, ...shown] : others;
+        },
+
+        // ---- bulk actions ----
+
+        async bulkDisable() {
+            const targets = this.activeSelected;
+            const names = targets.map(user => user.userName);
+            const confirmed = await this.confirm({
+                title: targets.length === 1 ? `Disable user “${names[0]}”` : `Disable ${targets.length} users`,
+                message: `<strong>${names.map(escapeHtml).join(', ')}</strong> will no longer be able to sign in, and their open sessions lose access at once. Their data is kept, and Enable gives the access back.`,
+                confirmText: 'Disable',
+                danger: true
+            });
+            if (!confirmed) return;
+            await this.bulkSwitch(targets, 'disable');
+        },
+
+        async bulkEnable() {
+            await this.bulkSwitch(this.disabledSelected, 'enable');
+        },
+
+        // One request per user, one after the other; the Registry refuses your own account and the last active admin (400)
+        async bulkSwitch(targets, action) {
+            this.bulkBusy = true;
+            const done = [];
+            const failed = [];
+            for (const user of targets) {
+                try {
+                    if (action === 'disable') await reg.admin.disableUser(user.userName);
+                    else await reg.admin.enableUser(user.userName);
+                    done.push(user.userName);
+                } catch (e) {
+                    if (isUnauthorized(e)) { this.bulkBusy = false; return; }
+                    failed.push({ userName: user.userName, message: e.message });
+                }
+            }
+            const text = bulkSummary(action === 'disable' ? 'Disabled' : 'Enabled', { done, failed });
+            if (failed.length) this.$notify.warn(text, { summary: action === 'disable' ? 'Disable Users' : 'Enable Users', life: 'long' });
+            else this.$notify.success(text, { summary: action === 'disable' ? 'Users Disabled' : 'Users Enabled' });
+            this.bulkBusy = false;
+            await this.loadData();
+        },
+
+        bulkDelete() {
+            this.startDelete(this.selectedUsers.filter(selectableUser));
+        },
+
+        handleCloseBulk(result) {
+            this.bulkMode = null;
+            if (result === 'updated') this.loadData();
+        },
+
+        // ---- delete ----
+
         async handleDelete(user) {
             if (userDeleteBlockReason(user)) return;
-            this.userToDelete = user;
+            this.startDelete([user]);
+        },
+
+        // The question for one user or several: the same choices and the same typed confirmation (FR-ADM-17, FR-ADM-23)
+        startDelete(users) {
+            if (!users.length) return;
+            this.usersToDelete = users;
             this.deleteSuccessor = null;
             this.deleteConflictResolution = 'Rename';
             this.deleteResult = null;
+            this.deleteOutcome = { done: [], failed: [] };
             this.showDeleteDialog = true;
         },
 
@@ -513,46 +639,54 @@ export default {
             }
         },
 
+        // One request per user, one after the other, then one report of what went through and what did not
         async confirmDelete() {
-            if (!this.userToDelete) return;
+            const users = this.usersToDelete;
+            if (!users.length) return;
 
-            try {
-                this.userToDelete.deleting = true;
-
-                // Perform the delete operation with optional successor
-                const result = await reg.admin.deleteUser(
-                    this.userToDelete.userName,
-                    this.deleteSuccessor,
-                    this.deleteConflictResolution
-                );
-
-                // Store result for display
-                this.deleteResult = result;
-
-                // Remove user from list
-                this.users = this.users.filter(u => u.userName !== this.userToDelete.userName);
-
-                // Close delete dialog and show result dialog
-                this.showDeleteDialog = false;
-                // The result dialog reports the delete: no toast as well
-                this.showDeleteResultDialog = true;
-
-            } catch (e) {
-                this.$notify.error('Failed to delete user: ' + e.message);
-                this.error = e.message;
-                if (this.userToDelete) {
-                    this.userToDelete.deleting = false;
+            const done = [];
+            const failed = [];
+            const results = [];
+            for (const user of users) {
+                try {
+                    user.deleting = true;
+                    // Perform the delete operation with optional successor
+                    results.push(await reg.admin.deleteUser(user.userName, this.deleteSuccessor, this.deleteConflictResolution));
+                    done.push(user.userName);
+                } catch (e) {
+                    failed.push({ userName: user.userName, message: e.message });
+                    user.deleting = false;
                 }
-                // Don't close dialog on error so user can see the error message
             }
+
+            // One user that could not be deleted: the question stays open with its error, as it always did
+            if (users.length === 1 && failed.length) {
+                this.$notify.error('Failed to delete user: ' + failed[0].message);
+                this.error = failed[0].message;
+                return;
+            }
+
+            // Store the result for display: the one of a single delete, or what all of them did
+            this.deleteResult = users.length === 1 ? (results[0] ?? null) : sumDeleteResults(results, this.deleteSuccessor);
+            this.deleteOutcome = { done, failed };
+
+            // Remove the users from the list and from the selection
+            this.users = this.users.filter(u => !done.includes(u.userName));
+            this.selected = this.selected.filter(name => !done.includes(name));
+
+            // Close delete dialog and show result dialog
+            this.showDeleteDialog = false;
+            // The result dialog reports the delete: no toast as well
+            this.showDeleteResultDialog = true;
         },
 
         closeDeleteResultDialog() {
             this.showDeleteResultDialog = false;
             this.deleteResult = null;
-            this.userToDelete = null;
-            // Reload to refresh data if successor was used
-            if (this.deleteSuccessor) {
+            const several = this.usersToDelete.length > 1;
+            this.usersToDelete = [];
+            // Reload to refresh data if a successor was used, or if several users were deleted
+            if (this.deleteSuccessor || several) {
                 this.loadData();
             }
         },
@@ -674,21 +808,27 @@ export default {
 
 
 
-.delete-options .field {
-    margin-bottom: 0.75rem;
-}
-
-.radio-group {
+/* The users ticked, and what to do to all of them */
+.bulk-bar {
     display: flex;
-    flex-direction: column;
-    gap: var(--ddb-spacing-xs);
-    margin-top: var(--ddb-spacing-xs);
-}
-
-.radio-item {
-    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--ddb-spacing-xs);
+    margin-bottom: 0.75rem;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border: 1px solid var(--ddb-border);
+    border-radius: var(--ddb-radius-md);
+    background: var(--ddb-bg-surface);
+}
+
+.bulk-count {
+    margin-right: auto;
+    font-weight: 600;
+}
+
+.storage-warning {
+    display: block;
+    font-weight: 600;
 }
 
 </style>

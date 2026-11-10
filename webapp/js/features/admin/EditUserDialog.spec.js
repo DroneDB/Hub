@@ -10,10 +10,15 @@ import PrimeVue from 'primevue/config';
 import PrimeMessage from 'primevue/message';
 
 const updateUser = vi.fn();
+const setUserQuota = vi.fn();
+const limiter = { on: true };
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
-        admin: { updateUser: (...args) => updateUser(...args) },
-        features: { value: name => (name === 'systemRoles' ? ['admin', 'deactivated'] : null) }
+        admin: { updateUser: (...args) => updateUser(...args), setUserQuota: (...args) => setUserQuota(...args) },
+        features: {
+            value: name => (name === 'systemRoles' ? ['admin', 'deactivated'] : null),
+            get: name => (name === 'storageLimiter' ? limiter.on : false)
+        }
     }
 }));
 
@@ -38,8 +43,9 @@ async function render(user = { userName: 'bob', email: 'bob@example.com', roles:
 }
 const type = async (name, value) => { await wrapper.find(`input[name="${name}"]`).setValue(value); await flushPromises(); };
 const confirm = async () => { await wrapper.find('[data-confirm]').trigger('click'); await flushPromises(); };
+const quotaInput = () => wrapper.find('#edit-user-dialog-quota');
 const emailError = () => wrapper.find('#edit-user-dialog-email-error');
-afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; updateUser.mockReset(); notify.success.mockReset(); notify.error.mockReset(); });
+afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; limiter.on = true; setUserQuota.mockReset(); updateUser.mockReset(); notify.success.mockReset(); notify.error.mockReset(); });
 
 describe('EditUserDialog', () => {
     it('fills the form with the user, and keeps Update User enabled', async () => {
@@ -127,5 +133,104 @@ describe('EditUserDialog', () => {
         expect(wrapper.find('.form-error').exists()).toBe(true);
         await type('email', 'bob2@example.com');
         expect(wrapper.find('.form-error').exists()).toBe(false);
+    });
+});
+
+// FR-ADM-16: the storage quota of a user, in MB, sent alone and only when it changed
+describe('EditUserDialog storage quota', () => {
+    const MB = 1024 * 1024;
+    const bob = (extra = {}) => ({ userName: 'bob', email: 'bob@example.com', roles: ['editor'], storageQuota: 40 * MB, storageUsed: 3 * MB, ...extra });
+
+    it('shows the quota in MB, with its label and how much is used', async () => {
+        await render(bob());
+        expect(wrapper.find('label[for="edit-user-dialog-quota"]').text()).toBe('Storage quota (MB, empty = unlimited)');
+        expect(quotaInput().element.value).toBe('40');
+        expect(wrapper.find('#edit-user-dialog-quota-help').text()).toContain('3 MB used now');
+        expect(quotaInput().attributes('aria-describedby')).toBe('edit-user-dialog-quota-help');
+    });
+
+    it('shows an empty field (Unlimited) for a user without a quota', async () => {
+        await render(bob({ storageQuota: null }));
+        expect(quotaInput().element.value).toBe('');
+        expect(quotaInput().attributes('placeholder')).toBe('Unlimited');
+    });
+
+    it('sets the quota with a call that carries only the quota, after the profile', async () => {
+        updateUser.mockResolvedValue(true);
+        setUserQuota.mockResolvedValue({});
+        await render(bob({ storageQuota: null }));
+        await quotaInput().setValue('64');
+        await quotaInput().trigger('blur');
+        await confirm();
+        expect(setUserQuota).toHaveBeenCalledTimes(1);
+        expect(setUserQuota).toHaveBeenCalledWith('bob', 64);
+        expect(wrapper.emitted('close')[0]).toEqual(['updated']);
+    });
+
+    it('removes the quota when the field is emptied (null)', async () => {
+        updateUser.mockResolvedValue(true);
+        setUserQuota.mockResolvedValue({});
+        await render(bob());
+        // The user selects the number and deletes it; the field takes the empty text when it loses the focus
+        quotaInput().element.value = '';
+        await quotaInput().trigger('blur');
+        await confirm();
+        expect(setUserQuota).toHaveBeenCalledWith('bob', null);
+    });
+
+    it('sends no quota call when the quota is as it was', async () => {
+        updateUser.mockResolvedValue(true);
+        await render(bob());
+        await confirm();
+        expect(updateUser).toHaveBeenCalledTimes(1);
+        expect(setUserQuota).not.toHaveBeenCalled();
+    });
+
+    it('shows the field off, with the reason, when the storage limiter is off, and sends no quota', async () => {
+        limiter.on = false;
+        updateUser.mockResolvedValue(true);
+        await render(bob());
+        expect(quotaInput().attributes('disabled')).toBeDefined();
+        expect(wrapper.find('#edit-user-dialog-quota-help').text()).toBe('Storage limiter is off on this server');
+        await confirm();
+        expect(setUserQuota).not.toHaveBeenCalled();
+    });
+
+    it('with the limiter off, still removes a stored quota, with a call that carries a null quota', async () => {
+        limiter.on = false;
+        updateUser.mockResolvedValue(true);
+        setUserQuota.mockResolvedValue({});
+        await render(bob());
+        expect(wrapper.find('.stale-quota').text()).toContain('A quota of 40 MB is stored but not applied.');
+        expect(quotaInput().element.value).toBe('');
+        await wrapper.find('.stale-quota button').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('.stale-quota').text()).toBe('The stored quota is removed when you update the user.');
+        await confirm();
+        expect(setUserQuota).toHaveBeenCalledTimes(1);
+        expect(setUserQuota).toHaveBeenCalledWith('bob', null);
+    });
+
+    it('with the limiter off and no stored quota, offers no removal', async () => {
+        limiter.on = false;
+        await render(bob({ storageQuota: null }));
+        expect(wrapper.find('.stale-quota').exists()).toBe(false);
+    });
+
+    it('with the limiter on, offers no separate removal (the field is emptied)', async () => {
+        await render(bob());
+        expect(wrapper.find('.stale-quota').exists()).toBe(false);
+    });
+
+    it('shows a refusal of the quota once, in the window', async () => {
+        updateUser.mockResolvedValue(true);
+        setUserQuota.mockRejectedValue(new ApiError('Cannot set the quota', 400));
+        await render(bob());
+        await quotaInput().setValue('10');
+        await quotaInput().trigger('blur');
+        await confirm();
+        expect(wrapper.findAll('.form-error')).toHaveLength(1);
+        expect(wrapper.find('.form-error').text()).toBe('Cannot set the quota');
+        expect(wrapper.emitted('close')).toBeUndefined();
     });
 });

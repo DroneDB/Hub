@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
-const reg = vi.hoisted(() => ({ admin: {}, features: { value: () => null } }));
+const reg = vi.hoisted(() => ({ admin: {}, features: { value: () => null, get: () => false } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: UsersPage } = await import('./UsersPage.vue');
@@ -50,13 +50,14 @@ describe('UsersPage as stacked cards', () => {
         await render();
         expect(wrapper.find('.p-datatable').classes()).toContain('stacked-table');
         const labels = wrapper.find('tbody tr').findAll('td').map(td => td.attributes('data-label') ?? null);
-        expect(labels).toEqual([null, 'Email', 'Roles', 'Organizations', 'Datasets', 'Storage', 'Created', null]);
+        // The first cell is the checkbox of the row (FR-ADM-23)
+        expect(labels).toEqual([null, null, 'Email', 'Roles', 'Organizations', 'Datasets', 'Storage', 'Created', null]);
     });
 
     it('shows e-mail, roles and storage from sm up, in the card and in the row (FR-ADM-18)', async () => {
         await render();
         const classes = wrapper.find('tbody tr').findAll('td').map(stackClasses);
-        expect(classes).toEqual(['stack-col', 'stack-col', 'stack-col', 'stack-col stack-col-md', 'stack-col stack-col-lg', 'stack-col', 'stack-col stack-col-xl', 'stack-col']);
+        expect(classes).toEqual(['stack-col', 'stack-col', 'stack-col', 'stack-col', 'stack-col stack-col-md', 'stack-col stack-col-lg', 'stack-col', 'stack-col stack-col-xl', 'stack-col']);
         // The header hides with its column
         expect(wrapper.findAll('thead th').map(stackClasses)).toEqual(classes);
         // Nothing is hidden outright any more

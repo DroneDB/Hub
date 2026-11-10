@@ -8,8 +8,10 @@
             <div class="d-flex flex-wrap gap-2">
                 <Button severity="secondary" icon="fa-solid fa-rotate-left" label="Discard edits"
                         :disabled="loading || !editCount" @click="resetToDefaults" />
-                <Button severity="primary" icon="fa-solid fa-copy" label="Copy AppSettings JSON"
-                        :disabled="loading" @click="copyToClipboard" />
+                <Button severity="secondary" icon="fa-solid fa-file-lines" label="Copy full file"
+                        :disabled="loading" :title="FULL_FILE_TITLE" @click="copyFullFile" />
+                <Button severity="primary" icon="fa-solid fa-copy" label="Copy changes"
+                        :disabled="loading" :title="CHANGES_TITLE" @click="copyChanges" />
             </div>
         </div>
 
@@ -32,166 +34,170 @@
                 <EmailTemplatesCard ref="emailTemplatesCard" />
             </div>
 
-            <Accordion :active-index="activeIndex" class="config-accordion">
-                <!-- The header is named by the section title alone (the Custom/Default tag describes it) -->
-                <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx"
-                              :pt="{ header: { 'aria-label': section.title, 'aria-describedby': `config-section-state-${sIdx}` } }">
-                    <template #header>
+            <Accordion v-model:value="activeSection" class="config-accordion">
+                <AccordionPanel v-for="(section, sIdx) in sections" :key="sIdx" :value="String(sIdx)">
+                    <!-- The header is named by the section title alone (the Custom/Default tag describes it) -->
+                    <AccordionHeader :pt="{ root: { 'aria-label': section.title, 'aria-describedby': `config-section-state-${sIdx}` } }">
                         <span class="section-header">
                             {{ section.title }}
                             <Tag v-if="isSectionActive(sIdx)" :id="`config-section-state-${sIdx}`" value="Custom" severity="info" size="small" class="ms-2" />
                             <Tag v-else :id="`config-section-state-${sIdx}`" value="Default" severity="secondary" size="small" class="ms-2" />
                             <Tag v-if="invalidCount(sIdx)" :value="`${invalidCount(sIdx)} invalid`" severity="danger" size="small" class="ms-2" />
                         </span>
-                    </template>
-                    <!-- A section in its default state is as legible and editable as a custom one: the tag says
+                    </AccordionHeader>
+                    <AccordionContent>
+                        <!-- A section in its default state is as legible and editable as a custom one: the tag says
                          which it is, and a custom one has a bar along its edge (FR-ADM-15) -->
-                    <div :class="['config-section-content', { 'config-section-custom': isSectionActive(sIdx) }]">
-                        <p class="section-description">{{ section.description }}</p>
+                        <div :class="['config-section-content', { 'config-section-custom': isSectionActive(sIdx) }]">
+                            <p class="section-description">{{ section.description }}</p>
 
-                        <div class="config-fields-grid">
-                            <div v-for="(field, fIdx) in section.fields" :key="fIdx"
-                                 class="config-field">
-                                <div class="field-header">
-                                    <label :for="`field-${sIdx}-${fIdx}`">{{ field.displayName }}</label>
-                                    <div class="field-tags">
-                                        <Tag v-if="isInfoField(field)" value="Read-only" severity="secondary" size="small" />
-                                        <Tag v-else-if="field.sensitive && isFieldModified(sIdx, fIdx)"
-                                             value="Modified" severity="info" size="small" />
-                                        <Tag v-else-if="field.sensitive && field.isSet"
-                                             value="Set (masked)" severity="info" size="small" />
-                                        <Tag v-else-if="field.sensitive && !field.isSet"
-                                             value="Not set" severity="secondary" size="small" />
-                                        <Tag v-else-if="isFieldModified(sIdx, fIdx)"
-                                             value="Modified" severity="info" size="small" />
-                                        <Tag v-else value="Default" severity="success" size="small" />
+                            <div class="config-fields-grid">
+                                <div v-for="(field, fIdx) in section.fields" :key="fIdx"
+                                     class="config-field">
+                                    <div class="field-header">
+                                        <label :for="`field-${sIdx}-${fIdx}`">{{ field.displayName }}</label>
+                                        <div class="field-tags">
+                                            <Tag v-if="isInfoField(field)" value="Read-only" severity="secondary" size="small" />
+                                            <Tag v-else-if="field.sensitive && isFieldModified(sIdx, fIdx)"
+                                                 value="Modified" severity="info" size="small" />
+                                            <Tag v-else-if="field.sensitive && field.isSet"
+                                                 value="Set (masked)" severity="info" size="small" />
+                                            <Tag v-else-if="field.sensitive && !field.isSet"
+                                                 value="Not set" severity="secondary" size="small" />
+                                            <Tag v-else-if="isFieldModified(sIdx, fIdx)"
+                                                 value="Modified" severity="info" size="small" />
+                                            <Tag v-else value="Default" severity="success" size="small" />
+                                        </div>
                                     </div>
-                                </div>
 
-                                <!-- info: shown, not a setting -->
-                                <InputText v-if="isInfoField(field)"
-                                           :id="`field-${sIdx}-${fIdx}`"
-                                           :model-value="field.currentValue"
-                                           readonly class="info-value" />
+                                    <!-- info: shown, not a setting -->
+                                    <InputText v-if="isInfoField(field)"
+                                               :id="`field-${sIdx}-${fIdx}`"
+                                               :model-value="field.currentValue"
+                                               readonly class="info-value" />
 
-                                <!-- text -->
-                                <InputText v-else-if="field.fieldType === 'text' && !field.sensitive"
-                                           :id="`field-${sIdx}-${fIdx}`"
-                                           :model-value="getFieldValue(sIdx, fIdx, field)"
-                                           :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                           @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-
-                                <!-- password / sensitive -->
-                                <template v-else-if="field.fieldType === 'password' || field.sensitive">
-                                    <div v-if="!isFieldModified(sIdx, fIdx)" class="sensitive-display">
-                                        <span v-if="field.isSet" class="sensitive-set">
-                                            <i class="fa-solid fa-lock me-1" /> (set, masked)
-                                        </span>
-                                        <span v-else class="sensitive-not-set">
-                                            <i class="fa-solid fa-lock-open me-1" /> (not set)
-                                        </span>
-                                        <Button severity="secondary" size="small"
-                                                text class="ms-2" @click="onSensitiveChange(sIdx, fIdx)">Change</Button>
-                                    </div>
-                                    <Password v-else :id="`field-${sIdx}-${fIdx}`"
-                                              :model-value="getFieldValue(sIdx, fIdx, field)"
-                                              :feedback="false"
-                                              toggle-mask placeholder="Enter value..."
-                                              :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                              @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                </template>
-
-                                <!-- number -->
-                                <div v-else-if="field.fieldType === 'number'" class="number-input-wrapper">
-                                    <InputNumber :id="`field-${sIdx}-${fIdx}`"
-                                                 :model-value="getFieldNumber(sIdx, fIdx, field)"
-                                                 :min="field.minValue"
-                                                 :max="field.maxValue" mode="decimal"
-                                                 :use-grouping="false" :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                                 @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                    <span v-if="field.unit" class="input-unit">{{ field.unit }}</span>
-                                </div>
-
-                                <!-- bool -->
-                                <ToggleSwitch v-else-if="field.fieldType === 'bool'"
-                                              :id="`field-${sIdx}-${fIdx}`"
-                                              :model-value="getFieldBool(sIdx, fIdx, field)"
-                                              @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-
-                                <!-- enum -->
-                                <Select v-else-if="field.fieldType === 'enum'"
-                                        :id="`field-${sIdx}-${fIdx}`"
-                                        :model-value="getFieldValue(sIdx, fIdx, field)"
-                                        :options="field.enumOptions"
-                                        :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                        @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-
-                                <!-- timespan -->
-                                <div v-else-if="field.fieldType === 'timespan'" class="timespan-input-wrapper">
-                                    <InputText :id="`field-${sIdx}-${fIdx}`"
+                                    <!-- text -->
+                                    <InputText v-else-if="field.fieldType === 'text' && !field.sensitive"
+                                               :id="`field-${sIdx}-${fIdx}`"
                                                :model-value="getFieldValue(sIdx, fIdx, field)"
-                                               :placeholder="fieldPlaceholder(field)"
-                                               :invalid="!!problemOf(sIdx, fIdx)"
-                                               :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
-                                               :aria-describedby="describedBy(sIdx, fIdx)"
                                                :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
                                                @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                    <small :id="`field-${sIdx}-${fIdx}-hint`" class="timespan-hint">{{ fieldHint(field) }}</small>
-                                    <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
+
+                                    <!-- password / sensitive -->
+                                    <template v-else-if="field.fieldType === 'password' || field.sensitive">
+                                        <div v-if="!isFieldModified(sIdx, fIdx)" class="sensitive-display">
+                                            <span v-if="field.isSet" class="sensitive-set">
+                                                <i class="fa-solid fa-lock me-1" /> (set, masked)
+                                            </span>
+                                            <span v-else class="sensitive-not-set">
+                                                <i class="fa-solid fa-lock-open me-1" /> (not set)
+                                            </span>
+                                            <Button severity="secondary" size="small"
+                                                    text class="ms-2" @click="onSensitiveChange(sIdx, fIdx)">Change</Button>
+                                        </div>
+                                        <Password v-else :id="`field-${sIdx}-${fIdx}`"
+                                                  :model-value="getFieldValue(sIdx, fIdx, field)"
+                                                  :feedback="false"
+                                                  toggle-mask placeholder="Enter value..."
+                                                  :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                                  @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                    </template>
+
+                                    <!-- number -->
+                                    <div v-else-if="field.fieldType === 'number'" class="number-input-wrapper">
+                                        <InputNumber :id="`field-${sIdx}-${fIdx}`"
+                                                     :model-value="getFieldNumber(sIdx, fIdx, field)"
+                                                     :min="field.minValue"
+                                                     :max="field.maxValue" mode="decimal"
+                                                     :use-grouping="false" :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                                     @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                        <span v-if="field.unit" class="input-unit">{{ field.unit }}</span>
+                                    </div>
+
+                                    <!-- bool -->
+                                    <ToggleSwitch v-else-if="field.fieldType === 'bool'"
+                                                  :id="`field-${sIdx}-${fIdx}`"
+                                                  :model-value="getFieldBool(sIdx, fIdx, field)"
+                                                  @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                    <!-- enum -->
+                                    <Select v-else-if="field.fieldType === 'enum'"
+                                            :id="`field-${sIdx}-${fIdx}`"
+                                            :model-value="getFieldValue(sIdx, fIdx, field)"
+                                            :options="field.enumOptions"
+                                            :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                            @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                    <!-- timespan -->
+                                    <div v-else-if="field.fieldType === 'timespan'" class="timespan-input-wrapper">
+                                        <InputText :id="`field-${sIdx}-${fIdx}`"
+                                                   :model-value="getFieldValue(sIdx, fIdx, field)"
+                                                   :placeholder="fieldPlaceholder(field)"
+                                                   :invalid="!!problemOf(sIdx, fIdx)"
+                                                   :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
+                                                   :aria-describedby="describedBy(sIdx, fIdx)"
+                                                   :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                                   @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                        <small :id="`field-${sIdx}-${fIdx}-hint`" class="timespan-hint">{{ fieldHint(field) }}</small>
+                                        <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
+                                    </div>
+
+                                    <!-- cron -->
+                                    <div v-else-if="field.fieldType === 'cron'" class="cron-input-wrapper">
+                                        <InputText :id="`field-${sIdx}-${fIdx}`"
+                                                   :model-value="getFieldValue(sIdx, fIdx, field)"
+                                                   :placeholder="fieldPlaceholder(field)"
+                                                   :invalid="!!problemOf(sIdx, fIdx)"
+                                                   :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
+                                                   :aria-describedby="describedBy(sIdx, fIdx)"
+                                                   :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                                   @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                        <small :id="`field-${sIdx}-${fIdx}-hint`" class="cron-hint">
+                                            {{ fieldHint(field) }} Check it at
+                                            <a href="https://crontab.guru" target="_blank" rel="noopener">crontab.guru</a>
+                                        </small>
+                                        <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
+                                    </div>
+
+                                    <!-- array -->
+                                    <!-- A list of values: Enter adds the typed one -->
+                                    <AutoComplete v-else-if="field.fieldType === 'array'"
+                                                  :input-id="`field-${sIdx}-${fIdx}`"
+                                                  :model-value="getFieldArray(sIdx, fIdx, field)"
+                                                  multiple :typeahead="false" class="w-100"
+                                                  @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                    <!-- json (fallback) -->
+                                    <template v-else>
+                                        <Textarea :id="`field-${sIdx}-${fIdx}`"
+                                                  :model-value="getFieldValue(sIdx, fIdx, field)"
+                                                  :rows="3"
+                                                  :invalid="!!problemOf(sIdx, fIdx)"
+                                                  :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
+                                                  :aria-describedby="describedBy(sIdx, fIdx)"
+                                                  :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                                  @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                        <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
+                                    </template>
+
+                                    <small :id="`field-${sIdx}-${fIdx}-description`" class="field-description">{{ field.description }}</small>
                                 </div>
+                            </div>
 
-                                <!-- cron -->
-                                <div v-else-if="field.fieldType === 'cron'" class="cron-input-wrapper">
-                                    <InputText :id="`field-${sIdx}-${fIdx}`"
-                                               :model-value="getFieldValue(sIdx, fIdx, field)"
-                                               :placeholder="fieldPlaceholder(field)"
-                                               :invalid="!!problemOf(sIdx, fIdx)"
-                                               :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
-                                               :aria-describedby="describedBy(sIdx, fIdx)"
-                                               :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                               @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                    <small :id="`field-${sIdx}-${fIdx}-hint`" class="cron-hint">
-                                        {{ fieldHint(field) }} Check it at
-                                        <a href="https://crontab.guru" target="_blank" rel="noopener">crontab.guru</a>
-                                    </small>
-                                    <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
-                                </div>
-
-                                <!-- array -->
-                                <Chips v-else-if="field.fieldType === 'array'"
-                                       :id="`field-${sIdx}-${fIdx}`"
-                                       :model-value="getFieldArray(sIdx, fIdx, field)"
-                                       @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-
-                                <!-- json (fallback) -->
-                                <template v-else>
-                                    <Textarea :id="`field-${sIdx}-${fIdx}`"
-                                              :model-value="getFieldValue(sIdx, fIdx, field)"
-                                              :rows="3"
-                                              :invalid="!!problemOf(sIdx, fIdx)"
-                                              :aria-invalid="problemOf(sIdx, fIdx) ? 'true' : undefined"
-                                              :aria-describedby="describedBy(sIdx, fIdx)"
-                                              :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
-                                              @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
-                                    <FieldError :id="`field-${sIdx}-${fIdx}-error`" :message="problemOf(sIdx, fIdx)" />
-                                </template>
-
-                                <small :id="`field-${sIdx}-${fIdx}-description`" class="field-description">{{ field.description }}</small>
+                            <div class="section-actions mt-3">
+                                <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left"
+                                        label="Discard section edits" @click="resetSection(sIdx)" />
                             </div>
                         </div>
-
-                        <div class="section-actions mt-3">
-                            <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left"
-                                    label="Discard section edits" @click="resetSection(sIdx)" />
-                        </div>
-                    </div>
-                </AccordionTab>
+                    </AccordionContent>
+                </AccordionPanel>
             </Accordion>
 
             <div v-if="editCount" class="edits-bar" role="status">
                 <span class="edits-count">{{ editCount === 1 ? '1 edit' : `${editCount} edits` }}, not on the server until you merge them into appsettings.json</span>
                 <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left" label="Discard edits" @click="resetToDefaults" />
-                <Button severity="primary" size="small" icon="fa-solid fa-copy" label="Copy AppSettings JSON" @click="copyToClipboard" />
+                <Button severity="secondary" size="small" icon="fa-solid fa-file-lines" label="Copy full file" :title="FULL_FILE_TITLE" @click="copyFullFile" />
+                <Button severity="primary" size="small" icon="fa-solid fa-copy" label="Copy changes" :title="CHANGES_TITLE" @click="copyChanges" />
             </div>
         </div>
 
@@ -208,14 +214,16 @@ import EmailTemplatesCard from '@/features/admin/EmailTemplatesCard.vue';
 import UsageAndContactCard from '@/features/admin/UsageAndContactCard.vue';
 import reg from '@/libs/api/sharedRegistry';
 import Accordion from 'primevue/accordion';
-import AccordionTab from 'primevue/accordiontab';
+import AccordionPanel from 'primevue/accordionpanel';
+import AccordionHeader from 'primevue/accordionheader';
+import AccordionContent from 'primevue/accordioncontent';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import InputNumber from 'primevue/inputnumber';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Select from 'primevue/select';
 import Password from 'primevue/password';
-import Chips from 'primevue/chips';
+import AutoComplete from 'primevue/autocomplete';
 import Textarea from 'primevue/textarea';
 import Tag from 'primevue/tag';
 import PrimeMessage from 'primevue/message';
@@ -224,8 +232,11 @@ import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { copyText } from '@/composables/useCopyText';
 import { isForbidden } from '@/libs/ddb/apiError';
 import { deniedLocation } from '@/libs/authRoutes';
-import { settingPath, setSettingAt } from '@/libs/appSettingsJson';
+import { buildAppSettings } from '@/libs/appSettingsJson';
 import { VALIDATED_TYPES, fieldProblem, fieldPlaceholder, fieldHint } from '@/libs/configValidators';
+
+const CHANGES_TITLE = 'Copies only the keys you edited, to merge into the appsettings.json of the server';
+const FULL_FILE_TITLE = 'Copies every setting, to start an appsettings.json from. A secret that is set shows as <CHANGE-ME>';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
@@ -238,8 +249,8 @@ export default {
 
     components: {
         DialogHost, FieldError, LoadingSpinner, UsageAndContactCard, EmailTemplatesCard,
-        Accordion, AccordionTab, Button, InputText, InputNumber,
-        ToggleSwitch, Select, Password, Chips, Textarea, Tag, PrimeMessage
+        Accordion, AccordionPanel, AccordionHeader, AccordionContent, Button, InputText, InputNumber,
+        ToggleSwitch, Select, Password, AutoComplete, Textarea, Tag, PrimeMessage
     },
 
     setup() {
@@ -252,7 +263,7 @@ export default {
                 || !!vm.$refs.usageCard?.dirty || !!vm.$refs.emailTemplatesCard?.dirty),
             message: 'The edits on this page are lost when you leave. Leave and discard them?'
         });
-        return { dialogs };
+        return { dialogs, CHANGES_TITLE, FULL_FILE_TITLE };
     },
 
     data() {
@@ -260,7 +271,8 @@ export default {
             sections: [],
             // The page loads on mount: the cards below the spinner are mounted once, after the load
             loading: true,
-            activeIndex: [0],
+            // The section that is open: the value of its panel (the first one at first)
+            activeSection: '0',
             // Map<"sIdx-fIdx", newValue>
             modifiedFields: {},
             // Set of section indices that became active due to editing
@@ -431,91 +443,44 @@ export default {
             this.$notify.info('The fields of this section are back to the values of the server.', { summary: 'Edits discarded' });
         },
 
-        // ---- JSON generation ----
+        // ---- copy ----
 
-        // The settings in the shape of appsettings.json: AppSettings, and ConnectionStrings and
-        // Serilog next to it (see libs/appSettingsJson.js)
-        generateAppSettingsJson() {
-            const obj = {};
-
-            for (let sIdx = 0; sIdx < this.sections.length; sIdx++) {
-                const section = this.sections[sIdx];
-
-                for (let fIdx = 0; fIdx < section.fields.length; fIdx++) {
-                    const field = section.fields[fIdx];
-                    if (this.isInfoField(field)) continue;
-                    const key = sIdx + '-' + fIdx;
-                    const isModified = key in this.modifiedFields;
-
-                    // Determine the value to use
-                    let rawValue;
-                    if (field.sensitive) {
-                        if (isModified && this.modifiedFields[key] !== '') {
-                            rawValue = this.modifiedFields[key];
-                        } else if (field.isSet) {
-                            rawValue = '<CHANGE-ME>';
-                        } else {
-                            continue; // not set and not modified -> skip
-                        }
-                    } else if (isModified) {
-                        rawValue = this.modifiedFields[key];
-                    } else {
-                        rawValue = field.currentValue;
-                    }
-
-                    // Convert to proper type
-                    let value;
-                    switch (field.fieldType) {
-                        case 'number':
-                            value = rawValue === null || rawValue === '' ? null : Number(rawValue);
-                            break;
-                        case 'bool':
-                            value = rawValue === 'True' || rawValue === true;
-                            break;
-                        case 'array':
-                            value = Array.isArray(rawValue) ? rawValue :
-                                (typeof rawValue === 'string' ? rawValue.split(',').map(s => s.trim()).filter(Boolean) : []);
-                            break;
-                        case 'json':
-                            // Parse the JSON text into an object so it serializes as structured JSON.
-                            try {
-                                value = typeof rawValue === 'string' && rawValue.trim()
-                                    ? JSON.parse(rawValue)
-                                    : null;
-                            } catch {
-                                value = rawValue; // keep raw (invalid) text visible for the admin to fix
-                            }
-                            break;
-                        case 'timespan':
-                            value = rawValue || null;
-                            break;
-                        default:
-                            value = rawValue;
-                            break;
-                    }
-
-                    // Skip null/empty values that match defaults; an unedited empty cron is the default of its job
-                    if (value === null || value === '') {
-                        if (!field.sensitive && (field.defaultValue === rawValue || (field.fieldType === 'cron' && !isModified))) continue;
-                    }
-
-                    setSettingAt(obj, settingPath(section.name, field.key), value);
-                }
-            }
-
-            return JSON.stringify(obj, null, 2);
+        // Only the keys that were edited, to merge into the appsettings.json of the server (the default action, D-005)
+        copyChanges() {
+            this.copy('changes');
         },
 
-        copyToClipboard() {
+        // Every setting, as a file to start from; the secrets that are set are placeholders to fill in
+        copyFullFile() {
+            this.copy('full');
+        },
+
+        copy(mode) {
             // Both Copy buttons stay enabled; with an invalid value nothing is copied, and the page says how many (D-046)
             if (this.invalidFields.length) {
                 this.copyBlocked = true;
-                document.getElementById(this.invalidFields[0].id)?.focus();
+                // The field may be in a section that is closed: open it first
+                this.activeSection = String(this.invalidFields[0].sIdx);
+                const id = this.invalidFields[0].id;
+                this.$nextTick(() => document.getElementById(id)?.focus());
                 return;
             }
             this.copyBlocked = false;
-            copyText(this.generateAppSettingsJson()).then(() => {
-                this.$notify.success('AppSettings JSON copied to clipboard.', { summary: 'Copied' });
+            // The text is built in libs/appSettingsJson.js, in the shape of appsettings.json
+            const { json, count, placeholders } = buildAppSettings({ sections: this.sections, modified: this.modifiedFields, mode });
+            if (mode === 'changes' && !count) {
+                this.$notify.info('No setting is edited, so there is nothing to copy. Copy full file gives every setting.', { summary: 'Nothing to copy' });
+                return;
+            }
+            copyText(json).then(() => {
+                if (mode === 'changes') {
+                    this.$notify.success(count === 1 ? 'Copied 1 key. Merge it into appsettings.json.' : `Copied ${count} keys. Merge them into appsettings.json.`,
+                        { summary: 'Copied' });
+                } else if (placeholders.length) {
+                    this.$notify.warn(`Copied the full file. Fill in: ${placeholders.join(', ')}.`, { summary: 'Copied', life: 'long' });
+                } else {
+                    this.$notify.success('Copied the full file.', { summary: 'Copied' });
+                }
             }).catch(() => {
                 this.$notify.error('Failed to copy to clipboard.', { life: 'short' });
             });

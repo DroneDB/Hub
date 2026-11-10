@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
-const reg = vi.hoisted(() => ({ admin: {}, features: { value: () => null } }));
+const reg = vi.hoisted(() => ({ admin: {}, features: { value: () => null, get: () => false } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: UsersPage } = await import('./UsersPage.vue');

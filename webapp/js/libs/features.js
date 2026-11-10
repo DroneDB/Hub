@@ -28,5 +28,7 @@ export const Features = {
     // The longest side, in pixels, of a WCS GetCoverage output (FR-SHR-02): the Share dialog sizes its sample with it
     MAX_WCS_COVERAGE_SIZE_PIXELS: 'maxWcsCoverageSizePixels',
     // The role names the server depends on (admin, deactivated): libs/roles.js reads them
-    SYSTEM_ROLES: 'systemRoles'
+    SYSTEM_ROLES: 'systemRoles',
+    // Whether the server applies the per-user storage quota (EnableStorageLimiter): a quota is set in Edit User only when it does
+    STORAGE_LIMITER: 'storageLimiter'
 };

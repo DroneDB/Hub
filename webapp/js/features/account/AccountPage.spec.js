@@ -102,6 +102,49 @@ describe('AccountPage', () => {
         expect(wrapper.find('.storage-details').text()).toContain('Unlimited');
     });
 
+    // FR-ACC-12, FR-ACC-17 (D-030)
+    describe('storage quota', () => {
+        const MB = 1024 * 1024;
+        const showStorage = async (used, total) => {
+            h.reg.storageInfo = vi.fn(() => Promise.resolve({ used, total }));
+            await render();
+        };
+        const bar = () => wrapper.find('[role="progressbar"]');
+
+        it('shows no progress bar for an unlimited storage, only the used size and Unlimited', async () => {
+            await showStorage(0, null);
+            expect(bar().exists()).toBe(false);
+            expect(wrapper.find('.storage-details').text()).toBe('0 B usedUnlimited');
+            expect(wrapper.find('.storage-percentage').exists()).toBe(false);
+        });
+
+        it('names the bar of a quota and gives its value as text', async () => {
+            await showStorage(10 * MB, 40 * MB);
+            expect(bar().attributes('aria-label')).toBe('Storage used');
+            expect(bar().attributes('aria-valuetext')).toBe('25% of 40 MB used');
+            expect(wrapper.find('.storage-percentage').text()).toBe('25% used');
+            expect(wrapper.find('.storage-bar-container .p-message').exists()).toBe(false);
+        });
+
+        it('warns near the limit in amber (90 %)', async () => {
+            await showStorage(36 * MB, 40 * MB);
+            expect(wrapper.find('.storage-percentage').attributes('style')).toContain('var(--ddb-warning)');
+            const message = wrapper.find('.storage-bar-container .p-message');
+            expect(message.classes()).toContain('p-message-warn');
+            expect(message.text()).toBe('Storage is almost full: 90% of 40 MB used.');
+        });
+
+        it('shows 130 % and an error message when the user is over the quota; the bar stops at 100', async () => {
+            await showStorage(52 * MB, 40 * MB);
+            expect(wrapper.find('.storage-percentage').text()).toBe('130% used');
+            expect(wrapper.find('.storage-percentage').attributes('style')).toContain('var(--ddb-danger)');
+            expect(bar().attributes('aria-valuenow')).toBe('100');
+            const message = wrapper.find('.storage-bar-container .p-message');
+            expect(message.classes()).toContain('p-message-error');
+            expect(message.text()).toContain('Storage quota reached: 52 MB used of 40 MB');
+        });
+    });
+
     it('signs out only from the Logout button, not from a click on the Session card', async () => {
         h.reg.logout = vi.fn();
         await render();

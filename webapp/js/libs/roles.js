@@ -84,3 +84,20 @@ export function roleDescription(role) {
     if (isSystemRole(role)) return 'System role';
     return 'Custom user role';
 }
+
+/**
+ * The roles to send when a user's roles change (Edit User, Add role): the wanted ones, without "deactivated". A
+ * Registry that lists its system roles keeps "deactivated" itself (and refuses it in the list); an older one replaces
+ * every role, so a disabled user gets it back, or the change would enable them.
+ * @param {string[]|null|undefined} wanted  the roles the user is to have
+ * @param {string[]|null|undefined} current  the roles the user has now
+ * @returns {string[]}
+ */
+export function rolesToSend(wanted, current) {
+    const result = [...(wanted ?? [])];
+    if (!publishesSystemRoles()) {
+        const deactivated = (current || []).find(isDeactivatedRole);
+        if (deactivated) result.push(deactivated);
+    }
+    return result;
+}

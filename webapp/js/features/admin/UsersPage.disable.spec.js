@@ -12,7 +12,7 @@ import PrimeVue from 'primevue/config';
 const h = vi.hoisted(() => ({ features: {} }));
 const reg = vi.hoisted(() => ({
     admin: {},
-    features: { value: name => h.features[name] ?? null }
+    features: { value: name => h.features[name] ?? null, get: name => h.features[name] === true }
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 

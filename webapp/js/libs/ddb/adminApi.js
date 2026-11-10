@@ -105,6 +105,16 @@ export default class AdminApi {
     }
 
     /**
+     * Sets or removes the storage quota of a user (FR-ADM-16). Only the quota key of the user's metadata is sent: the Registry
+     * merges it into the metadata, which keeps its other keys. This is the one place that names the key (`MagicStrings.MaxStorageKey`).
+     * @param {string} userName
+     * @param {number|null} megabytes  the quota in MB; null removes it (no limit)
+     */
+    async setUserQuota(userName, megabytes) {
+        return await this.registry.postRequest(`/users/${encodeURIComponent(userName)}/meta`, { maxStorageMB: megabytes ?? null });
+    }
+
+    /**
      * Disables a user: they can no longer sign in (the server adds the system role 'deactivated').
      * 204; 404 for an unknown user, 400 for your own account or the last active admin.
      * @param {string} userName

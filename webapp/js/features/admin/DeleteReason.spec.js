@@ -6,7 +6,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
-const reg = vi.hoisted(() => ({ admin: {}, orgs: {}, features: { value: () => null } }));
+const reg = vi.hoisted(() => ({ admin: {}, orgs: {}, features: { value: () => null, get: () => false } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: UsersPage } = await import('./UsersPage.vue');

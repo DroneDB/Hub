@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { userMenuItems, primaryNavItems, storageEntry, percentText } from './userMenuItems';
+import { userMenuItems, primaryNavItems, storageEntry, versionsLine } from './userMenuItems';
 
 const run = () => ({
     myDatasets: vi.fn(), storage: vi.fn(), account: vi.fn(), preferences: vi.fn(), users: vi.fn(), tasks: vi.fn(), config: vi.fn(), logout: vi.fn()
@@ -31,13 +31,14 @@ describe('userMenuItems (FR-NAV-01)', () => {
         const items = userMenuItems(state({ isAdmin: true }));
         expect(items.map(i => i.label)).toEqual(['maria - admin', 'Administration', 'Account']);
         const admin = group(items, 'Administration').items;
-        expect(labels(admin)).toEqual(['Manage Users', 'Tasks', 'Configuration', 'Hangfire', 'API Docs']);
+        expect(labels(admin)).toEqual(['Manage Users', 'Tasks', 'Configuration', 'Hangfire', 'API Docs', 'System health']);
         // The administrator's entries are not among the account's, nor the account's among them
         expect(labels(group(items, 'Account').items)).not.toContain('Tasks');
         expect(labels(admin)).not.toContain('Preferences');
         // The pages of Hangfire and the API open in a new tab, safely
         expect(admin.find(i => i.label === 'Hangfire')).toMatchObject({ url: '/hangfire', target: '_blank', rel: 'noopener' });
         expect(admin.find(i => i.label === 'API Docs')).toMatchObject({ url: '/scalar/v1', target: '_blank', rel: 'noopener' });
+        expect(admin.find(i => i.label === 'System health')).toMatchObject({ url: '/health', target: '_blank', rel: 'noopener' });
     });
 
     it('has no Administration group for a user who is not an administrator', () => {
@@ -46,7 +47,7 @@ describe('userMenuItems (FR-NAV-01)', () => {
 
     it('has no Manage Users without local authentication, and no My Account for a remote user', () => {
         const items = userMenuItems(state({ isAdmin: true, usersManagement: false, accountManagement: false }));
-        expect(labels(group(items, 'Administration').items)).toEqual(['Tasks', 'Configuration', 'Hangfire', 'API Docs']);
+        expect(labels(group(items, 'Administration').items)).toEqual(['Tasks', 'Configuration', 'Hangfire', 'API Docs', 'System health']);
         expect(labels(group(items, 'Account').items)).not.toContain('My Account');
     });
 
@@ -64,39 +65,84 @@ describe('userMenuItems (FR-NAV-01)', () => {
     it('puts the storage row after the datasets in the Account group', () => {
         const s = state({ storage: { total: 1000, used: 100, usedPercentage: 0.1 } });
         const account = group(userMenuItems(s), 'Account').items;
-        expect(labels(account).slice(0, 2)).toEqual(['My Datasets', '10.00%']);
+        expect(labels(account).slice(0, 2)).toEqual(['My Datasets', 'Storage: 100 B of 1,000 B · 10%']);
         account[1].command();
         expect(s.run.storage).toHaveBeenCalledTimes(1);
     });
 });
 
-describe('storageEntry', () => {
-    const rowOf = info => { const e = storageEntry(info, () => {}); return e && [e.label, e.ariaLabel]; };
+describe('storageEntry (FR-ACC-11)', () => {
+    const MB = 1024 * 1024;
+    const rowOf = info => { const e = storageEntry(info, () => {}); return e && e.label; };
 
-    it('says what the bare number is', () => {
-        expect(rowOf({ total: 10737418240, used: 1073741824, usedPercentage: 0.1 })).toEqual(['10.00%', 'Storage: 10.00% used']);
-        expect(rowOf({ total: 10737418240, used: 0 })).toEqual(['10 GB', 'Storage: 10 GB total, none used']);
-        expect(rowOf({ total: null, used: 2048 })).toEqual(['2 KB', 'Storage: 2 KB used']);
+    it('writes a text that says what the numbers are, for each shape of the storage', () => {
+        expect(rowOf({ total: 40 * MB, used: 5 * MB })).toBe('Storage: 5 MB of 40 MB · 12.5%');
+        expect(rowOf({ total: 40 * MB, used: 0 })).toBe('Storage: 0 B of 40 MB');
+        expect(rowOf({ total: null, used: 190.86 * MB })).toBe('Storage: 190.86 MB used · Unlimited');
+        expect(rowOf({ total: null, used: 0 })).toBe('Storage: 0 B used · Unlimited');
+    });
+
+    it('has no separate accessible name: the visible text is the name', () => {
+        expect(storageEntry({ total: 40 * MB, used: 5 * MB }, () => {})).not.toHaveProperty('ariaLabel');
     });
 
     it('is nothing before the storage is read', () => {
-        expect(storageEntry(null)).toBeNull();
+        expect(storageEntry(null, () => {})).toBeNull();
     });
 
-    it('opens the breakdown only for a row that has one', () => {
-        const open = vi.fn();
-        storageEntry({ total: 1000, used: 10, usedPercentage: 0.01 }, open).command();
-        expect(open).toHaveBeenCalledTimes(1);
-        expect(() => storageEntry({ total: 1000, used: 0 }, open).command()).not.toThrow();
-        expect(open).toHaveBeenCalledTimes(1);
+    it('does the same for every shape: it opens the Storage Info (never an empty command)', () => {
+        for (const info of [{ total: 1000, used: 10 }, { total: 1000, used: 0 }, { total: null, used: 2048 }, { total: null, used: 0 }]) {
+            const open = vi.fn();
+            const row = storageEntry(info, open);
+            expect(typeof row.command).toBe('function');
+            row.command();
+            expect(open).toHaveBeenCalledTimes(1);
+        }
+    });
+
+    it('is amber from 90 % and red from 100 % of the quota (D-030), and plain below', () => {
+        expect(storageEntry({ total: 100, used: 89 }, () => {}).class).toBe('user-menu-storage');
+        expect(storageEntry({ total: 100, used: 90 }, () => {}).class).toBe('user-menu-storage user-menu-storage-warn');
+        expect(storageEntry({ total: 100, used: 130 }, () => {}).class).toBe('user-menu-storage user-menu-storage-over');
+        expect(rowOf({ total: 100, used: 130 })).toBe('Storage: 130 B of 100 B · 130%');
+        expect(storageEntry({ total: null, used: 1e9 }, () => {}).class).toBe('user-menu-storage');
     });
 });
 
-describe('percentText', () => {
-    it('writes a fraction as a percentage, and nothing for none', () => {
-        expect(percentText(0.1234, 1)).toBe('12.3%');
-        expect(percentText(0, 1)).toBe('');
-        expect(percentText(null, 1)).toBe('');
+describe('versions and System health (FR-NAV-08)', () => {
+    const adminState = over => state({ isAdmin: true, ...over });
+    const adminItems = s => group(userMenuItems(s), 'Administration').items;
+
+    it('writes the running versions as one line, leaving out the ones not known', () => {
+        expect(versionsLine({ registryVersion: '2.7.1', hubVersion: '2.7.0', ddbVersion: '2.2.0' })).toBe('Registry 2.7.1 · Hub 2.7.0 · ddb 2.2.0');
+        expect(versionsLine({ registryVersion: '2.7.1', hubVersion: null })).toBe('Registry 2.7.1');
+        expect(versionsLine({})).toBe('');
+        expect(versionsLine(null)).toBe('');
+    });
+
+    it('shows an administrator the versions on a disabled line after the links', () => {
+        const items = adminItems(adminState({ versions: { registryVersion: '2.7.1', hubVersion: '2.7.0', ddbVersion: '2.2.0' } }));
+        const line = items[items.length - 1];
+        expect(line).toMatchObject({ label: 'Registry 2.7.1 · Hub 2.7.0 · ddb 2.2.0', disabled: true });
+        expect(line).not.toHaveProperty('command');
+        expect(items[items.length - 2]).toEqual({ separator: true });
+    });
+
+    it('has no version line when no version is known, and none for a user who is not an administrator', () => {
+        expect(adminItems(adminState({ versions: {} })).map(i => i.label)).not.toContain(undefined);
+        expect(adminItems(adminState({ versions: {} })).some(i => i.class === 'user-menu-version')).toBe(false);
+        const items = userMenuItems(state({ versions: { registryVersion: '2.7.1' } }));
+        expect(JSON.stringify(items)).not.toContain('2.7.1');
+        expect(JSON.stringify(items)).not.toContain('System health');
+    });
+
+    it('says in the name of each page that opens in a new tab that it does, and marks it', () => {
+        const external = adminItems(adminState()).filter(i => i.url);
+        expect(external.map(i => i.ariaLabel)).toEqual(['Hangfire (opens in a new tab)', 'API Docs (opens in a new tab)', 'System health (opens in a new tab)']);
+        for (const item of external) {
+            expect(item.class).toBe('user-menu-external');
+            expect(item.ariaLabel.startsWith(item.label)).toBe(true);
+        }
     });
 });
 

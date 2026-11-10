@@ -62,10 +62,11 @@ const AVAILABLE = { currentVersion: '2.0.0', latestVersion: '2.1.0', isUpdateAva
 let wrapper;
 // The entries of the user menu, its groups opened (libs/userMenuItems.js)
 const flatMenu = items => items.flatMap(item => (item.items ? flatMenu(item.items) : [item]));
-async function render(info = AVAILABLE) {
+async function render(info = AVAILABLE, provide = {}) {
     h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(info));
     wrapper = mount(HubHeader, {
         global: {
+            provide,
             plugins: [PrimeVue, createPinia()],
             mocks: { $route: { params: { org: 'acme', ds: 'site' } }, $router: { push: vi.fn() } },
             stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: { props: ['info'], template: '<div class="notes-stub">{{ info.latestVersion }}</div>' }, Menu: true, ShareEmbed: true }
@@ -395,20 +396,114 @@ describe('HubHeader accessible names', () => {
         expect(wrapper.find('nav[aria-label="Main"]').exists()).toBe(true);
     });
 
-    it('says what the number of the storage row is', async () => {
+    // FR-ACC-11: every shape of the storage has a row with a text and the one command, to open the Storage Info
+    it('gives the storage row a text that says what it is, and the command that opens the Storage Info, for each shape', async () => {
         await render();
+        const MB = 1024 * 1024;
         const storageRow = () => flatMenu(wrapper.vm.userMenuItems).find(i => i.icon === 'fa-regular fa-hard-drive');
-        const nameOf = item => wrapper.vm.userMenuPt.item({ context: { item } })['aria-label'];
 
-        wrapper.vm.storageInfo = { total: 10737418240, used: 1073741824, usedPercentage: 0.1, free: 9663676416 };
-        expect(nameOf(storageRow())).toBe(`Storage: ${storageRow().label} used`);
-        expect(storageRow().label).toMatch(/%/);
-
-        wrapper.vm.storageInfo = { total: 10737418240, used: 0 };
-        expect(nameOf(storageRow())).toBe(`Storage: ${storageRow().label} total, none used`);
+        for (const [info, label] of [
+            [{ total: 40 * MB, used: 5 * MB, usedPercentage: 0.125 }, 'Storage: 5 MB of 40 MB · 12.5%'],
+            [{ total: 40 * MB, used: 0 }, 'Storage: 0 B of 40 MB'],
+            [{ total: null, used: 190.86 * MB }, 'Storage: 190.86 MB used · Unlimited'],
+            [{ total: null, used: 0 }, 'Storage: 0 B used · Unlimited']
+        ]) {
+            wrapper.vm.storageInfo = info;
+            wrapper.vm.storageInfoDialogOpen = false;
+            expect(storageRow().label).toBe(label);
+            expect(wrapper.vm.userMenuPt.item({ context: { item: storageRow() } })).toEqual({});
+            storageRow().command();
+            expect(wrapper.vm.storageInfoDialogOpen).toBe(true);
+        }
 
         // The other rows keep their label as their name
         expect(wrapper.vm.userMenuPt.item({ context: { item: { label: 'Logout' } } })).toEqual({});
+    });
+
+    it('colours the storage row amber from 90 % and red from 100 % (D-030)', async () => {
+        await render();
+        const labelPt = used => {
+            wrapper.vm.storageInfo = { total: 100, used };
+            const row = flatMenu(wrapper.vm.userMenuItems).find(i => i.icon === 'fa-regular fa-hard-drive');
+            return wrapper.vm.userMenuPt.itemLabel({ context: { item: row } });
+        };
+        expect(labelPt(89)).toEqual({});
+        expect(labelPt(90).style.color).toBe('var(--ddb-warning)');
+        expect(labelPt(130).style.color).toBe('var(--ddb-danger)');
+    });
+
+    it('shows the Storage Info of an unlimited storage as text, without a bar, and of a quota with the real percentage', async () => {
+        await render();
+        const MB = 1024 * 1024;
+        wrapper.vm.storageInfo = { total: null, used: 3 * MB };
+        wrapper.vm.storageInfoDialogOpen = true;
+        await flushPromises();
+        expect(document.body.textContent).toContain('3 MB used · Unlimited');
+        expect(document.body.querySelector('.storage-info-content [role="progressbar"]')).toBeNull();
+
+        wrapper.vm.storageInfo = { total: 40 * MB, used: 52 * MB };
+        await flushPromises();
+        const bar = document.body.querySelector('.storage-info-content [role="progressbar"]');
+        expect(bar.getAttribute('aria-label')).toBe('Storage used');
+        expect(document.body.querySelector('.storage-percentage').textContent.trim()).toBe('130%');
+        expect(document.body.textContent).toContain('Storage quota reached');
+    });
+
+    // FR-ACC-20: the avatar button says what it opens and whether it is open
+    it('names the user menu button "Account menu for <user>", and aria-expanded follows the menu', async () => {
+        await render();
+        const button = () => wrapper.find('.user-menu-button');
+        expect(button().attributes('aria-label')).toBe('Account menu for admin');
+        expect(button().attributes('aria-expanded')).toBe('false');
+        const menu = wrapper.findComponent({ name: 'Menu' });
+        menu.vm.$emit('show');
+        await flushPromises();
+        expect(button().attributes('aria-expanded')).toBe('true');
+        menu.vm.$emit('hide');
+        await flushPromises();
+        expect(button().attributes('aria-expanded')).toBe('false');
+    });
+
+    it('gives the focus back to the button when the menu closes with the focus inside it (Tab), and leaves it elsewhere', async () => {
+        await render();
+        const button = wrapper.find('.user-menu-button').element;
+        const list = document.createElement('ul');
+        const item = document.createElement('li');
+        item.tabIndex = 0;
+        list.appendChild(item);
+        document.body.appendChild(list);
+        // The header in the document, so that its button can have the focus
+        document.body.appendChild(wrapper.element);
+        // The popup's element, as the PrimeVue Menu exposes it
+        wrapper.findComponent({ name: 'Menu' }).vm.container = list;
+
+        item.focus();
+        wrapper.findComponent({ name: 'Menu' }).vm.$emit('hide');
+        expect(document.activeElement).toBe(button);
+
+        // A menu closed by a click elsewhere keeps the focus where the user put it
+        const other = document.createElement('input');
+        document.body.appendChild(other);
+        other.focus();
+        wrapper.findComponent({ name: 'Menu' }).vm.$emit('hide');
+        expect(document.activeElement).toBe(other);
+        list.remove();
+        other.remove();
+    });
+
+    // FR-NAV-08
+    it('shows an administrator System health and the running versions in the menu, from the provided versions', async () => {
+        await render(AVAILABLE, { versions: { registryVersion: '2.7.1', hubVersion: '2.7.0', ddbVersion: '2.2.0' } });
+        const admin = wrapper.vm.userMenuItems.find(i => i.label === 'Administration').items;
+        expect(admin.find(i => i.label === 'System health')).toMatchObject({ url: '/health', target: '_blank' });
+        expect(admin.find(i => i.disabled)).toMatchObject({ label: 'Registry 2.7.1 · Hub 2.7.0 · ddb 2.2.0' });
+    });
+
+    it('has no System health or version line for a user who is not an administrator', async () => {
+        h.auth.isAdmin = false;
+        await render(AVAILABLE, { versions: { registryVersion: '2.7.1' } });
+        expect(flatMenu(wrapper.vm.userMenuItems).map(i => i.label)).not.toContain('System health');
+        expect(JSON.stringify(wrapper.vm.userMenuItems)).not.toContain('2.7.1');
     });
 });
 

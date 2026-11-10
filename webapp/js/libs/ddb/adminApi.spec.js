@@ -45,3 +45,25 @@ describe('AdminApi.updateUser (FR-ADM-07)', () => {
         expect(putRequest).toHaveBeenNthCalledWith(2, '/users/bob', { roles: [], email: '' });
     });
 });
+
+describe('AdminApi.setUserQuota (FR-ADM-16)', () => {
+    const post = () => {
+        const postRequest = vi.fn(() => Promise.resolve({}));
+        return { admin: new AdminApi(/** @type {any} */ ({ postRequest })), postRequest };
+    };
+
+    it('sends only the quota key of the metadata, in MB', async () => {
+        const { admin, postRequest } = post();
+        await admin.setUserQuota('bob smith', 40);
+        expect(postRequest).toHaveBeenCalledWith('/users/bob%20smith/meta', { maxStorageMB: 40 });
+        expect(Object.keys(postRequest.mock.calls[0][1])).toEqual(['maxStorageMB']);
+    });
+
+    it('sends null to remove the quota (an empty value, or none)', async () => {
+        const { admin, postRequest } = post();
+        await admin.setUserQuota('bob', null);
+        await admin.setUserQuota('bob', undefined);
+        expect(postRequest).toHaveBeenNthCalledWith(1, '/users/bob/meta', { maxStorageMB: null });
+        expect(postRequest).toHaveBeenNthCalledWith(2, '/users/bob/meta', { maxStorageMB: null });
+    });
+});

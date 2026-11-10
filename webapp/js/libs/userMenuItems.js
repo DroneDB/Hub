@@ -5,7 +5,7 @@
  * links (Organizations, Upload). The header renders them and owns what each command does, which it passes in.
  * The same pattern as libs/dataset/explorerTools.js and libs/contextMenuItems.js.
  */
-import { bytesToSize } from '@/libs/utils';
+import { storageUsage } from '@/libs/storageUsage';
 
 /**
  * @typedef {object} StorageInfo
@@ -37,57 +37,69 @@ import { bytesToSize } from '@/libs/utils';
  * @property {boolean} accountManagement  the user manages their account here (a local user)
  * @property {boolean} usersManagement  users are managed here (local authentication)
  * @property {StorageInfo|null} storage  null: not read, or hidden
+ * @property {Versions|null} [versions]  the running versions (an administrator sees them, with System health)
  * @property {Record<'myDatasets'|'storage'|'account'|'preferences'|'users'|'tasks'|'config'|'logout', () => void>} run
  *   what each entry does
  */
 
 /**
- * A fraction as a percentage ('12.50%'); nothing for 0 or none.
- * @param {number|null|undefined} value  0..1
- * @param {number} places
- * @returns {string}
- */
-export function percentText(value, places) {
-    if (!value) return '';
-    return (value * 100).toFixed(places) + '%';
-}
-
-/**
- * The storage row of the menu: what is used, or what the quota is. The row shows a bare number, so its name says what
- * the number is. Null when there is nothing to show.
+ * The storage row of the menu (FR-ACC-11): the text says what the numbers are ("Storage: 190.86 MB used · Unlimited",
+ * "Storage: 0 B of 40 MB", "Storage: 5 MB of 40 MB · 12.5%") whatever the shape of the storage, and the row always does one
+ * thing: it opens the Storage Info (`open`). From 90 % of the quota the row is amber, from 100 % red (D-030). Null when
+ * there is nothing to show.
  * @param {StorageInfo|null|undefined} info
- * @param {() => void} [open]  what the row does when there is a breakdown to show
+ * @param {() => void} open  what the row does
  * @returns {MenuItem|null}
  */
 export function storageEntry(info, open) {
     if (!info) return null;
-    const row = (/** @type {string} */ label, /** @type {string} */ ariaLabel, command = () => {}) =>
-        ({ label, ariaLabel, icon: 'fa-regular fa-hard-drive', command });
-    if (info.total != null && Number(info.used) > 0) {
-        const used = percentText(info.usedPercentage, 2);
-        return row(used, `Storage: ${used} used`, open);
-    }
-    if (info.total != null && !info.used) {
-        const total = bytesToSize(info.total);
-        return row(total, `Storage: ${total} total, none used`);
-    }
-    if (info.total == null) {
-        const used = bytesToSize(info.used);
-        return row(used, `Storage: ${used} used`);
-    }
-    return null;
+    const usage = storageUsage(info.used, info.total);
+    return {
+        label: `Storage: ${usage.label}`,
+        icon: 'fa-regular fa-hard-drive',
+        class: usage.severity === 'ok' ? 'user-menu-storage' : `user-menu-storage user-menu-storage-${usage.severity}`,
+        command: open
+    };
+}
+
+/**
+ * @typedef {object} Versions  what GET /sys/features says about the running software
+ * @property {string|null} [registryVersion]
+ * @property {string|null} [hubVersion]
+ * @property {string|null} [ddbVersion]
+ */
+
+/**
+ * The running versions as one line ("Registry 2.7.1 · Hub 2.7.0 · ddb 2.2.0"); '' when none is known.
+ * @param {Versions|null|undefined} versions
+ */
+export function versionsLine(versions) {
+    if (!versions) return '';
+    return [['Registry', versions.registryVersion], ['Hub', versions.hubVersion], ['ddb', versions.ddbVersion]]
+        .filter(([, version]) => version)
+        .map(([name, version]) => `${name} ${version}`)
+        .join(' · ');
+}
+
+/**
+ * A page of the server that opens in a new tab: its name says so, and the menu marks it with an arrow.
+ * @param {string} label @param {string} icon @param {string} url
+ * @returns {MenuItem}
+ */
+function externalEntry(label, icon, url) {
+    return { label, ariaLabel: `${label} (opens in a new tab)`, icon, url, target: '_blank', rel: 'noopener', class: 'user-menu-external' };
 }
 
 /**
  * The user menu, in groups. The first entry names the user (disabled). The Account group has the user's datasets,
  * their storage, My Account (a local user), Preferences and Logout; the Administration group, for an administrator,
- * has Users (local authentication), Tasks, Configuration, and the Hangfire and API documentation pages, which open
- * in a new tab.
+ * has Users (local authentication), Tasks, Configuration, and the Hangfire, API documentation and System health pages,
+ * which open in a new tab (their names say so), and the running versions on a line of their own (FR-NAV-08).
  * @param {MenuState} state
  * @returns {MenuItem[]}  empty when nobody is signed in
  */
 export function userMenuItems(state) {
-    const { loggedIn, username, isAdmin, accountManagement, usersManagement, storage, run } = state;
+    const { loggedIn, username, isAdmin, accountManagement, usersManagement, storage, versions, run } = state;
     if (!loggedIn) return [];
 
     /** @type {MenuItem[]} */
@@ -111,8 +123,14 @@ export function userMenuItems(state) {
         if (usersManagement) admin.push({ label: 'Manage Users', icon: 'fa-solid fa-users', command: run.users });
         admin.push({ label: 'Tasks', icon: 'fa-solid fa-list-check', command: run.tasks });
         admin.push({ label: 'Configuration', icon: 'fa-solid fa-gear', command: run.config });
-        admin.push({ label: 'Hangfire', icon: 'fa-solid fa-fire', url: '/hangfire', target: '_blank', rel: 'noopener' });
-        admin.push({ label: 'API Docs', icon: 'fa-solid fa-code', url: '/scalar/v1', target: '_blank', rel: 'noopener' });
+        admin.push(externalEntry('Hangfire', 'fa-solid fa-fire', '/hangfire'));
+        admin.push(externalEntry('API Docs', 'fa-solid fa-code', '/scalar/v1'));
+        admin.push(externalEntry('System health', 'fa-solid fa-heart-pulse', '/health'));
+        const running = versionsLine(versions);
+        if (running) {
+            admin.push({ separator: true });
+            admin.push({ label: running, disabled: true, class: 'user-menu-version' });
+        }
         items.splice(1, 0, { label: 'Administration', items: admin });
     }
     return items;

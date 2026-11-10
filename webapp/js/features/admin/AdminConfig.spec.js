@@ -44,7 +44,7 @@ let wrapper;
 let notify;
 async function show(stubs = { UsageAndContactCard: true, EmailTemplatesCard: true }, config = CONFIG) {
     h.sys.config = vi.fn(() => Promise.resolve(structuredClone(config)));
-    notify = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+    notify = { success: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() };
     wrapper = mount(AdminConfig, {
         attachTo: document.body,
         global: {
@@ -56,6 +56,7 @@ async function show(stubs = { UsageAndContactCard: true, EmailTemplatesCard: tru
     await flushPromises();
     return wrapper;
 }
+const buttonOf = label => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === label);
 const fieldOf = key => [...document.querySelectorAll('.config-field')].find(f => f.querySelector('label')?.textContent === key);
 // A card that exposes a dirty state, as the real ones do
 const dirtyCard = (name, dirty) => ({ name, template: '<div />', setup(_, { expose }) { expose({ dirty }); } });
@@ -118,9 +119,9 @@ describe('AdminConfig', () => {
         expect(info.textContent).not.toContain('Default');
     });
 
-    it('leaves informational values out of the AppSettings JSON, and writes the keys where Registry reads them', async () => {
+    it('leaves informational values out of the full file, and writes the keys where Registry reads them', async () => {
         await show();
-        [...document.querySelectorAll('button')].find(b => b.textContent.includes('Copy AppSettings JSON')).click();
+        buttonOf('Copy full file').click();
         await flushPromises();
 
         expect(h.copyText).toHaveBeenCalledTimes(1);
@@ -274,7 +275,7 @@ describe('AdminConfig', () => {
         };
         const errorOf = key => fieldOf(key).querySelector('.field-error')?.textContent ?? null;
         const copy = async () => {
-            [...document.querySelectorAll('button')].find(b => b.textContent.includes('Copy AppSettings JSON')).click();
+            buttonOf('Copy changes').click();
             await flushPromises();
         };
 
@@ -312,9 +313,10 @@ describe('AdminConfig', () => {
             await type('ThumbnailsCacheExpiration', 'not-a-time');
             await type('RecoverCron', 'every day please');
             await type('Favicon', '{ not json');
-            const copyButtons = [...document.querySelectorAll('button')].filter(b => b.textContent.includes('Copy AppSettings JSON'));
-            expect(copyButtons).toHaveLength(2);
-            expect(copyButtons.map(b => b.disabled)).toEqual([false, false]);
+            // Copy changes and Copy full file, in the top bar and in the edits bar
+            const copyButtons = [...document.querySelectorAll('button')].filter(b => ['Copy changes', 'Copy full file'].includes(b.textContent.trim()));
+            expect(copyButtons.map(b => b.textContent.trim())).toEqual(['Copy full file', 'Copy changes', 'Copy full file', 'Copy changes']);
+            expect(copyButtons.map(b => b.disabled)).toEqual([false, false, false, false]);
 
             await copy();
 
@@ -367,7 +369,8 @@ describe('AdminConfig', () => {
             expect(errorOf('Odd')).toBeNull();
             expect(input('Odd').getAttribute('aria-invalid')).toBeNull();
 
-            await copy();
+            buttonOf('Copy full file').click();
+            await flushPromises();
             expect(document.querySelector('.invalid-summary')).toBeNull();
             expect(h.copyText).toHaveBeenCalledTimes(1);
 
@@ -392,6 +395,86 @@ describe('AdminConfig', () => {
             expect(fieldOf('RecoverCron').querySelector('.cron-hint').textContent).toContain('disabled, off, none (any case) turns the job off');
             expect(fieldOf('ThumbnailsCacheExpiration').querySelector('.timespan-hint').textContent)
                 .toContain('Days, or [days.]hh:mm[:ss]');
+        });
+    });
+
+    // FR-ADM-12 and D-005: Copy changes is the default, Copy full file the second action
+    describe('the two Copy actions', () => {
+        const SECTIONS = {
+            sections: [{
+                name: 'Auth', title: 'Auth', description: 'Auth settings', isActive: false,
+                fields: [
+                    field('TokenExpirationInDays', 'number', '7'),
+                    { ...field('Secret', 'password', null, null), sensitive: true, isSet: true },
+                    field('Name', 'text', 'x')
+                ]
+            }]
+        };
+        const setDays = async days => {
+            wrapper.findComponent({ name: 'InputNumber' }).vm.$emit('update:modelValue', days);
+            await flushPromises();
+        };
+
+        it('Copy changes gives only the edited keys, and its toast says to merge them into appsettings.json', async () => {
+            await show(undefined, SECTIONS);
+            await setDays(30);
+            buttonOf('Copy changes').click();
+            await flushPromises();
+
+            expect(JSON.parse(h.copyText.mock.calls[0][0])).toEqual({ AppSettings: { TokenExpirationInDays: 30 } });
+            expect(h.copyText.mock.calls[0][0]).not.toContain('<CHANGE-ME>');
+            expect(notify.success).toHaveBeenCalledWith('Copied 1 key. Merge it into appsettings.json.', { summary: 'Copied' });
+        });
+
+        it('says how many keys it copied, and has nothing to copy when nothing is edited', async () => {
+            await show(undefined, SECTIONS);
+            buttonOf('Copy changes').click();
+            await flushPromises();
+            expect(h.copyText).not.toHaveBeenCalled();
+            expect(notify.info).toHaveBeenCalledWith(expect.stringContaining('nothing to copy'), { summary: 'Nothing to copy' });
+        });
+
+        it('Copy full file gives every setting, and its toast lists the keys to fill in', async () => {
+            await show(undefined, SECTIONS);
+            buttonOf('Copy full file').click();
+            await flushPromises();
+
+            expect(JSON.parse(h.copyText.mock.calls[0][0])).toEqual({
+                AppSettings: { TokenExpirationInDays: 7, Secret: '<CHANGE-ME>', Name: 'x' }
+            });
+            expect(notify.warn).toHaveBeenCalledWith('Copied the full file. Fill in: AppSettings:Secret.', { summary: 'Copied', life: 'long' });
+        });
+    });
+
+    // FR-ADM-25: no PrimeVue deprecation warning, and the list field still edits
+    describe('PrimeVue components', () => {
+        it('writes no console warning when the page mounts', async () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => { });
+            await show(undefined, {
+                sections: [{
+                    name: 'Misc', title: 'Misc', description: 'd', isActive: false,
+                    fields: [field('Names', 'array', 'a, b')]
+                }]
+            });
+            expect(warn).not.toHaveBeenCalled();
+            warn.mockRestore();
+        });
+
+        it('edits a list field: the chips show the values, and a new value is part of the copy', async () => {
+            await show(undefined, {
+                sections: [{
+                    name: 'Misc', title: 'Misc', description: 'd', isActive: false,
+                    fields: [field('Names', 'array', 'a, b')]
+                }]
+            });
+            const chips = () => [...fieldOf('Names').querySelectorAll('.p-autocomplete-chip, [data-pc-section="chip"]')].map(c => c.textContent.trim());
+            expect(chips()).toEqual(['a', 'b']);
+
+            wrapper.findComponent({ name: 'AutoComplete' }).vm.$emit('update:modelValue', ['a', 'b', 'c']);
+            await flushPromises();
+            buttonOf('Copy changes').click();
+            await flushPromises();
+            expect(JSON.parse(h.copyText.mock.calls[0][0])).toEqual({ AppSettings: { Names: ['a', 'b', 'c'] } });
         });
     });
 });

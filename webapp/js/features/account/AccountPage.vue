@@ -40,12 +40,21 @@
                         <h2><i class="fa-solid fa-database" /> Storage</h2>
                         <div class="storage-bar-container">
                             <div class="storage-details">
-                                <span class="used">{{ formatBytes(storageUsed) }} used</span>
-                                <span v-if="storageTotal" class="available">of {{ formatBytes(storageTotal) }}</span>
-                                <span v-else class="available">Unlimited</span>
+                                <span class="used">{{ usage.usedText }} used</span>
+                                <span class="available">{{ usage.unlimited ? 'Unlimited' : `of ${usage.totalText}` }}</span>
                             </div>
-                            <ProgressBar v-if="storageTotal" :value="storagePercentage" :show-value="true" />
-                            <ProgressBar v-else :value="100" :show-value="false" />
+                            <!-- With no quota there is no bar and no percentage: nothing is full. With one, the bar and the text
+                                 give the real percentage (over 100 % too) in the colour of its severity (D-030) -->
+                            <template v-if="!usage.unlimited">
+                                <ProgressBar :value="usage.barValue" :show-value="false" aria-label="Storage used"
+                                             :aria-valuetext="`${usage.percentText} of ${usage.totalText} used`"
+                                             :pt="{ value: { style: { background: usage.color } } }" />
+                                <div class="storage-percentage" :style="{ color: usage.color }">{{ usage.percentText }} used</div>
+                                <PrimeMessage v-if="usage.message" :severity="usage.severity === 'over' ? 'error' : 'warn'" :closable="false"
+                                              icon="fa-solid fa-triangle-exclamation" class="mt-2">
+                                    {{ usage.message }}
+                                </PrimeMessage>
+                            </template>
                         </div>
                         <div class="mt-3">
                             <Button icon="fa-solid fa-upload" label="Upload Files" @click="handleUpload" />
@@ -99,9 +108,10 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import ProgressBar from 'primevue/progressbar';
 import Tag from 'primevue/tag';
+import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { bytesToSize } from '@/libs/utils';
+import { storageUsage } from '@/libs/storageUsage';
 import { xAuthLogout } from '@/libs/api/xauth';
 import { loginLocation } from '@/libs/authRoutes';
 
@@ -109,7 +119,7 @@ export default {
     name: 'AccountPage',
     components: {
         LoadingSpinner,
-        Message, ChangePwdDialog, UploadDiagnostics, Button, Card, ProgressBar, Tag
+        Message, ChangePwdDialog, UploadDiagnostics, Button, Card, ProgressBar, Tag, PrimeMessage
     },
     data: function () {
         return {
@@ -134,17 +144,15 @@ export default {
         }
     },
     computed: {
-        storagePercentage() {
-            if (!this.storageTotal || this.storageTotal === 0) return 0;
-            return Math.min(100, Math.round((this.storageUsed / this.storageTotal) * 100));
+        // The state of the quota: the one helper of the header, the Account page and Admin > Users (libs/storageUsage.js)
+        usage() {
+            return storageUsage(this.storageUsed, this.storageTotal);
         }
     },
     mounted: async function () {
         await this.loadUserInfo();
     },
     methods: {
-        formatBytes: bytesToSize,
-
         async loadUserInfo() {
             this.loading = true;
             this.username = reg.getUsername() || '';
@@ -161,7 +169,7 @@ export default {
                 this.email = profile.email || '';
                 this.organizationsCount = profile.organizations?.length ?? 0;
                 this.storageUsed = storage.used || 0;
-                this.storageTotal = storage.total || null;
+                this.storageTotal = storage.total ?? null;
             } catch (e) {
                 this.error = e.message;
             }
@@ -262,6 +270,11 @@ export default {
 
 .storage-bar-container .storage-details .available {
     color: var(--ddb-text-secondary);
+}
+
+.storage-bar-container .storage-percentage {
+    margin-top: 0.25rem;
+    font-weight: bold;
 }
 
 .action-row {

@@ -118,7 +118,7 @@ describe('the main navigation (FR-NAV-01)', () => {
         const button = wrapper.find('.user-menu-button');
         expect(button.find('.user-name').text()).toBe('maria');
         expect(button.find('.user-role').exists()).toBe(false);
-        expect(button.attributes('aria-label')).toBe('maria account menu');
+        expect(button.attributes('aria-label')).toBe('Account menu for maria');
         wrapper.unmount();
         h.auth.isAdmin = true;
         await renderAt('/r');
@@ -130,7 +130,7 @@ describe('the main navigation (FR-NAV-01)', () => {
         await renderAt('/r');
         const groups = wrapper.vm.userMenuItems.filter(i => i.items).map(i => [i.label, i.items.filter(e => !e.separator).map(e => e.label)]);
         expect(groups).toEqual([
-            ['Administration', ['Manage Users', 'Tasks', 'Configuration', 'Hangfire', 'API Docs']],
+            ['Administration', ['Manage Users', 'Tasks', 'Configuration', 'Hangfire', 'API Docs', 'System health']],
             ['Account', ['My Datasets', 'My Account', 'Preferences', 'Logout']]
         ]);
         // The destinations of the primary navigation are not repeated in the menu

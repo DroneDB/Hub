@@ -717,3 +717,14 @@ $window-margin-wide: 2rem; // and on a tablet or a desktop
     color: var(--ddb-text-muted);
     font-size: var(--ddb-font-size-sm);
 }
+
+// A page of the server that the user menu opens in a new tab is marked with an arrow (FR-NAV-08); the menu is
+// rendered in <body>, so the rule is global
+.p-menu-item.user-menu-external .p-menu-item-label::after {
+    content: '\f08e';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 0.7em;
+    margin-inline-start: 0.4rem;
+    opacity: 0.7;
+}

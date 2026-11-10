@@ -75,3 +75,112 @@ function fillSinks(root) {
         sinks[i] = { Name: DEFAULT_SINKS[i], ...(sinks[i] || {}) };
     }
 }
+
+/** What a sensitive setting that is set shows in a copy of the whole file: the admin fills it in before use */
+export const PLACEHOLDER = '<CHANGE-ME>';
+
+/**
+ * The name of a setting as .NET writes it ("AppSettings:Smtp:Password").
+ * @param {(string|number)[]} path
+ */
+export function settingName(path) {
+    return path.join(':');
+}
+
+/**
+ * @typedef {object} AppSettingsCopy
+ * @property {string} json  the document, indented
+ * @property {number} count  the settings in it
+ * @property {string[]} placeholders  the settings that hold PLACEHOLDER, which the admin fills in ('full' mode only)
+ */
+
+/**
+ * The text to put in appsettings.json from the sections of GET /sys/config and the fields the admin edited (D-005).
+ *
+ *   'changes'  only the edited fields: the admin merges them into the file they have. A secret that was not typed
+ *              again is not a change.
+ *   'full'     every setting the server runs with, to start a file from. A secret that is set (the server never
+ *              sends it) is PLACEHOLDER, listed in `placeholders`.
+ *
+ * @param {{ sections: any[], modified: Record<string, any>, mode: 'changes' | 'full' }} options
+ *   modified  the edited values by "sectionIndex-fieldIndex"
+ * @returns {AppSettingsCopy}
+ */
+export function buildAppSettings({ sections, modified, mode }) {
+    /** @type {Record<string, any>} */
+    const root = {};
+    let count = 0;
+    /** @type {string[]} */
+    const placeholders = [];
+
+    sections.forEach((section, sIdx) => section.fields.forEach((/** @type {any} */ field, /** @type {number} */ fIdx) => {
+        if (field.fieldType === 'info') return;
+        const key = `${sIdx}-${fIdx}`;
+        const isModified = key in modified;
+        if (mode === 'changes' && !isModified) return;
+
+        // The value to use
+        let rawValue;
+        let placeholder = false;
+        if (field.sensitive) {
+            if (isModified && modified[key] !== '') {
+                rawValue = modified[key];
+            } else if (mode === 'full' && field.isSet) {
+                rawValue = PLACEHOLDER;
+                placeholder = true;
+            } else {
+                return; // not set, or not typed again: nothing to write
+            }
+        } else if (isModified) {
+            rawValue = modified[key];
+        } else {
+            rawValue = field.currentValue;
+        }
+
+        const value = typedValue(field, rawValue);
+
+        // A JSON field with no value (null) that was not edited has nothing to write: a null would replace the default
+        // the server runs with, which is not null
+        if (field.fieldType === 'json' && !isModified && value === null) return;
+
+        // Skip null/empty values that match defaults; an unedited empty cron is the default of its job
+        if (value === null || value === '') {
+            if (!field.sensitive && (field.defaultValue === rawValue || (field.fieldType === 'cron' && !isModified))) return;
+        }
+
+        const path = settingPath(section.name, field.key);
+        setSettingAt(root, path, value);
+        count++;
+        if (placeholder) placeholders.push(settingName(path));
+    }));
+
+    return { json: JSON.stringify(root, null, 2), count, placeholders };
+}
+
+/**
+ * The value of a field in the type appsettings.json holds it in.
+ * @param {{ fieldType: string }} field
+ * @param {any} rawValue
+ */
+function typedValue(field, rawValue) {
+    switch (field.fieldType) {
+        case 'number':
+            return rawValue === null || rawValue === '' ? null : Number(rawValue);
+        case 'bool':
+            return rawValue === 'True' || rawValue === true;
+        case 'array':
+            return Array.isArray(rawValue) ? rawValue
+                : (typeof rawValue === 'string' ? rawValue.split(',').map(s => s.trim()).filter(Boolean) : []);
+        case 'json':
+            // Parse the JSON text into an object so it serializes as structured JSON
+            try {
+                return typeof rawValue === 'string' && rawValue.trim() ? JSON.parse(rawValue) : null;
+            } catch {
+                return rawValue; // keep raw (invalid) text visible for the admin to fix
+            }
+        case 'timespan':
+            return rawValue || null;
+        default:
+            return rawValue;
+    }
+}

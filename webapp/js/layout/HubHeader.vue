@@ -62,40 +62,34 @@
 
             <PreferencesDialog v-if="preferencesOpen && loggedIn" :initial-tab="preferencesTab" @close="preferencesOpen = false" />
 
-            <Alert v-if="storageInfoDialogOpen" title="Storage Info" @close="handleStorageInfoDialogClose">
+            <!-- What the storage is, whatever its shape: a quota with its bar (the real percentage), or no quota (FR-ACC-11, FR-ACC-17) -->
+            <Alert v-if="storageInfoDialogOpen && storageNow" title="Storage Info" @close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
-                    <template v-if="storageInfo.used > 0">
-                        <ProgressBar :value="storagePercent" :show-value="false"
-                                     :pt="{ value: { style: { background: storageBarColor } } }"
+                    <p v-if="storageNow.unlimited" class="storage-unlimited">{{ storageNow.label }}</p>
+                    <template v-else>
+                        <ProgressBar :value="storageNow.barValue" :show-value="false"
+                                     aria-label="Storage used" :aria-valuetext="`${storageNow.percentText} used`"
+                                     :pt="{ value: { style: { background: storageNow.color } } }"
                                      class="storage-progress-bar" />
-                        <div class="storage-percentage" :style="{ color: storageBarColor }">
-                            {{ percent(storageInfo.usedPercentage, 1) }}
+                        <div class="storage-percentage" :style="{ color: storageNow.color }">
+                            {{ storageNow.percentText }}
                         </div>
                         <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: var(--ddb-text-secondary);">
                             <thead><tr>
                                 <th><b>Total</b></th>
                                 <th><b>Used</b></th>
-                                <th v-if="storageInfo.free > 0"><b>Free</b></th>
+                                <th><b>Free</b></th>
                             </tr></thead>
                             <tbody><tr>
-                                <td>{{ bytes(storageInfo.total) }}</td>
-                                <td>{{ bytes(storageInfo.used) }}</td>
-                                <td v-if="storageInfo.free > 0">{{ bytes(storageInfo.free) }}</td>
+                                <td>{{ storageNow.totalText }}</td>
+                                <td>{{ storageNow.usedText }}</td>
+                                <td>{{ bytes(storageNow.free) }}</td>
                             </tr></tbody>
                         </table>
-                        <PrimeMessage v-if="storageInfo.free <= 0" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
-                            No storage left!
+                        <PrimeMessage v-if="storageNow.message" :severity="storageNow.severity === 'over' ? 'error' : 'warn'" :closable="false"
+                                      icon="fa-solid fa-triangle-exclamation" size="small" class="mt-2">
+                            {{ storageNow.message }}
                         </PrimeMessage>
-                    </template>
-                    <template v-else>
-                        <table style="width: 100%; margin-bottom: 0; color: var(--ddb-text-secondary);">
-                            <thead><tr>
-                                <th><b>Total</b></th>
-                            </tr></thead>
-                            <tbody><tr>
-                                <td>{{ bytes(storageInfo.total) }}</td>
-                            </tr></tbody>
-                        </table>
                     </template>
                 </div>
             </Alert>
@@ -106,12 +100,13 @@
             </Button>
             <!-- The user, named from md up, and the role of an administrator -->
             <Button v-else-if="loggedIn" class="user-menu-button" severity="secondary" size="small" text
-                    :title="username" :aria-label="`${username} account menu`" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
+                    :title="username" :aria-label="`Account menu for ${username}`" aria-haspopup="true" :aria-expanded="menuOpen"
+                    aria-controls="user_menu" @click="toggleUserMenu">
                 <i class="fa-solid fa-user" aria-hidden="true" />
                 <span class="user-name d-none d-md-inline">{{ username }}</span>
                 <span v-if="isAdmin" class="user-role d-none d-md-inline">Admin</span>
             </Button>
-            <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" :pt="userMenuPt" />
+            <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" :pt="userMenuPt" @show="menuOpen = true" @hide="onMenuHide" />
         </nav>
 
         <ShareEmbed v-if="shareFile" :file="shareFile" @close="handleCloseShareEmbed" />
@@ -131,6 +126,7 @@ import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { xAuthLogout } from '@/libs/api/xauth';
 import { bytesToSize } from '@/libs/utils';
+import { storageUsage } from '@/libs/storageUsage';
 import emitter from '@/libs/eventBus';
 import Button from 'primevue/button';
 import Menu from 'primevue/menu';
@@ -147,7 +143,7 @@ import { currentLocation, currentPath } from '@/libs/routeQuery';
 import { downloadFromDataset, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { resolveAction } from '@/libs/dataset/explorerActions';
-import { userMenuItems, primaryNavItems, percentText } from '@/libs/userMenuItems';
+import { userMenuItems, primaryNavItems } from '@/libs/userMenuItems';
 
 // The dataset actions of the header, in the registry (libs/dataset/explorerActions.js)
 const HEADER_ACTIONS = Object.freeze(['download', 'share-embed', 'settings']);
@@ -176,6 +172,8 @@ export default {
         ProgressBar,
         PrimeMessage
     },
+    // The versions of the software that runs (from /sys/features, provided by main.js), for the administrator's menu
+    inject: { versions: { from: 'versions', default: () => ({}) } },
     setup() {
         const { runHeavyTask } = useHeavyTask();
         const { updateInfo, updateAvailable, enabled: updateCheckActive, load: loadUpdateInfo } = useUpdateCheck();
@@ -198,6 +196,8 @@ export default {
             stopSizeReading: null,
             storageInfo: null,
             storageInfoDialogOpen: false,
+            // The user menu is open (aria-expanded of its button)
+            menuOpen: false,
             usersManagement: false,
             accountManagement: false,
             shareFile: null,
@@ -215,7 +215,14 @@ export default {
                 // An item's ariaLabel replaces the label as its accessible name
                 item: ({ context }) => (context.item?.ariaLabel ? { 'aria-label': context.item.ariaLabel } : {}),
                 itemIcon: { style: { width: '1.25rem', display: 'inline-flex', justifyContent: 'center' } },
-                itemLabel: ({ context }) => (context.item?.class === 'user-menu-header' ? { style: { fontWeight: 'bold' } } : {})
+                itemLabel: ({ context }) => {
+                    const cls = context.item?.class ?? '';
+                    if (cls === 'user-menu-header') return { style: { fontWeight: 'bold' } };
+                    // A storage row from 90 % of the quota is amber, from 100 % red (D-030)
+                    if (cls.includes('user-menu-storage-over')) return { style: { color: 'var(--ddb-danger)', fontWeight: 'bold' } };
+                    if (cls.includes('user-menu-storage-warn')) return { style: { color: 'var(--ddb-warning)', fontWeight: 'bold' } };
+                    return {};
+                }
             };
         },
         ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
@@ -242,17 +249,9 @@ export default {
             };
             return Object.fromEntries(HEADER_ACTIONS.map(id => [id, resolveAction(id, ctx, 'header')]));
         },
-        storageBarColor: function () {
-            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 'var(--ddb-success)';
-            const pct = this.storageInfo.usedPercentage * 100;
-            if (pct >= 90) return 'var(--ddb-danger)';
-            if (pct >= 70) return 'var(--ddb-warning)';
-            if (pct >= 50) return 'var(--ddb-warning)';
-            return 'var(--ddb-success)';
-        },
-        storagePercent: function () {
-            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 0;
-            return Math.min(this.storageInfo.usedPercentage * 100, 100);
+        // The state of the storage quota, from the one helper (libs/storageUsage.js); null until it is read
+        storageNow: function () {
+            return this.storageInfo ? storageUsage(this.storageInfo.used, this.storageInfo.total) : null;
         },
         homeTarget: function () {
             return homeLocation();
@@ -342,6 +341,7 @@ export default {
                 accountManagement: this.accountManagement,
                 usersManagement: this.usersManagement,
                 storage: this.storageInfo,
+                versions: this.versions,
                 run: {
                     myDatasets: () => this.myDatasets(),
                     storage: () => { this.storageInfoDialogOpen = true; },
@@ -592,7 +592,15 @@ export default {
             this.$refs.userMenu.toggle(event);
         },
 
-        percent: percentText,
+        // The menu closed. When it closed while its list had the focus (Tab, or Escape) the list is gone with
+        // the menu, and the focus would be lost: it goes back to the button, from where Tab moves on (FR-ACC-20)
+        onMenuHide: function () {
+            this.menuOpen = false;
+            const container = this.$refs.userMenu?.container;
+            const button = this.$el?.querySelector?.('.user-menu-button');
+            if (container && button && container.contains(document.activeElement)) button.focus();
+        },
+
         bytes: function (value) {
             return bytesToSize(value);
         },

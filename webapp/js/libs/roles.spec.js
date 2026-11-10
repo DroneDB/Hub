@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import reg from '@/libs/api/sharedRegistry';
 import {
-    isAdminRole, isSystemRole, isDeactivatedRole, isDisabledUser, pickableRoles, publishesSystemRoles, roleDescription, systemRoles
+    isAdminRole, isSystemRole, isDeactivatedRole, isDisabledUser, pickableRoles, publishesSystemRoles, roleDescription, systemRoles, rolesToSend
 } from './roles';
 
 const serve = features => { reg.features.values = features; };
@@ -48,5 +48,19 @@ describe('roles', () => {
         expect(isDisabledUser({ roles: ['admin'] })).toBe(false);
         expect(isDisabledUser({})).toBe(false);
         expect(isDisabledUser(null)).toBe(false);
+    });
+});
+
+describe('rolesToSend', () => {
+    it('sends the wanted roles as they are to a Registry that lists its system roles (it keeps deactivated itself)', () => {
+        serve({ systemRoles: ['admin', 'deactivated'] });
+        expect(rolesToSend(['editor'], ['viewer', 'deactivated'])).toEqual(['editor']);
+    });
+
+    it('gives a disabled user the role that blocks sign-in back on an older Registry, which replaces every role', () => {
+        serve({});
+        expect(rolesToSend(['editor'], ['viewer', 'Deactivated'])).toEqual(['editor', 'Deactivated']);
+        expect(rolesToSend(['editor'], ['viewer'])).toEqual(['editor']);
+        expect(rolesToSend(null, undefined)).toEqual([]);
     });
 });
