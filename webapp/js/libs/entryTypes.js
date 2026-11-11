@@ -1,49 +1,44 @@
 import ddb from 'ddb';
-import { OpenItemDefaults } from '@/libs/openItemDefaults';
-
-// Types that have a dedicated viewer (derived from OpenItemDefaults)
-const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
+import { isArchivePath } from '@/libs/entryTypeCapabilities';
 
 // Type groupings used across the application
 const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR, ddb.entry.type.GEOVIDEO];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
-const THUMBNAIL_CANDIDATE_TYPES = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER, ddb.entry.type.GAUSSIAN_SPLAT];
-const VIDEO_TYPES = [ddb.entry.type.VIDEO, ddb.entry.type.GEOVIDEO];
 
 // Helper functions
-function hasDedicatedViewer(type) {
-    return TYPES_WITH_DEDICATED_VIEWER.includes(type);
-}
-
 function isMapViewable(type) {
     return MAP_VIEWABLE_TYPES.includes(type);
+}
+
+/**
+ * True for a vector without geolocation: a CAD drawing (DXF/DWG) with no coordinate
+ * system, flagged by DroneDB at index time (properties.georeferenced === false). It has
+ * no map footprint and no MVT tiles; it is shown without a globe in the unified viewer.
+ */
+function isLocalVector(entry) {
+    return !!entry && entry.type === ddb.entry.type.VECTOR &&
+        !!entry.properties && entry.properties.georeferenced === false;
+}
+
+/**
+ * The one rule of "this entry opens in the map": the explorer's Open Map (toolbar and menu) and the
+ * map viewer page (which refuses any other file) both ask it. A drawing without geolocation has
+ * nothing to place on a map.
+ */
+function canOpenInMap(entry) {
+    return !!entry && isMapViewable(entry.type) && !isLocalVector(entry);
 }
 
 function isPanoramaType(type) {
     return PANORAMA_TYPES.includes(type);
 }
 
-function isVideoType(type) {
-    return VIDEO_TYPES.includes(type);
-}
-
-function isThumbnailCandidate(type) {
-    return THUMBNAIL_CANDIDATE_TYPES.includes(type);
-}
-
 function isDroneDB(type) {
     return type === ddb.entry.type.DRONEDB;
 }
 
-// Returns true when the entry is a (supported) compressed archive file.
-// Mirrors the formats handled by the backend SharpCompress extractor.
-const ARCHIVE_EXTENSION_RE = /\.(zip|rar|7z|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|xz)$/i;
-
-// True when a path looks like a supported archive (extension-based, no entry needed).
-function isArchivePath(path) {
-    return !!path && ARCHIVE_EXTENSION_RE.test(path);
-}
-
+// Returns true when the entry is a (supported) compressed archive file: the extensions are the
+// server's (libs/entryTypeCapabilities.js).
 function isArchiveFile(entry) {
     if (!entry || !entry.path) return false;
     if (ddb.entry.isDirectory(entry)) return false;
@@ -54,6 +49,12 @@ function isArchiveFile(entry) {
 function countDataBands(entry) {
     if (!entry || !Array.isArray(entry.properties?.bands)) return 0;
     return entry.properties.bands.filter(b => b.colorInterp !== 'Alpha').length;
+}
+
+// The one definition of "a georaster entry": the compare view, the context menu, the detail panel
+// and the map's added layers all accept exactly these. Takes no entry (nothing selected) as false.
+function isGeoraster(entry) {
+    return !!entry && entry.type === ddb.entry.type.GEORASTER;
 }
 
 function isPlantHealthCapable(entry) {
@@ -86,6 +87,7 @@ const TYPE_DISPLAY_NAMES = {
     [ddb.entry.type.DRONEDB]: 'DroneDB',
     [ddb.entry.type.MARKDOWN]: 'Markdown',
     [ddb.entry.type.VIDEO]: 'Video',
+    [ddb.entry.type.GEOVIDEO]: 'GeoVideo',
     [ddb.entry.type.MODEL]: '3D Model',
     [ddb.entry.type.PANORAMA]: 'Panorama',
     [ddb.entry.type.GEOPANORAMA]: 'GeoPanorama',
@@ -116,22 +118,15 @@ function sortEntriesDirectoriesFirst(entries, getPath, descending = false) {
 }
 
 export {
-    TYPES_WITH_DEDICATED_VIEWER,
-    MAP_VIEWABLE_TYPES,
-    PANORAMA_TYPES,
-    THUMBNAIL_CANDIDATE_TYPES,
-    VIDEO_TYPES,
-    TYPE_DISPLAY_NAMES,
-    hasDedicatedViewer,
     isMapViewable,
+    isLocalVector,
+    canOpenInMap,
     isPanoramaType,
-    isVideoType,
-    isThumbnailCandidate,
     isDroneDB,
+    isGeoraster,
     isPlantHealthCapable,
     isRasterAnalysisCapable,
     getTypeDisplayName,
     sortEntriesDirectoriesFirst,
-    isArchiveFile,
-    isArchivePath
+    isArchiveFile
 };

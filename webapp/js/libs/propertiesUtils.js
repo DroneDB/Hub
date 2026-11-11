@@ -3,7 +3,23 @@
  */
 import ddb from 'ddb';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { bytesToSize } from '@/libs/utils';
+import { bytesToSize, formatTimeAgo } from '@/libs/utils';
+import { formatGroundResolution } from '@/libs/groundResolution';
+import { fixedLengthParts, formatBytes, formatDateTime, formatNumber, formatSpeed, joinNumberTexts, UNKNOWN } from '@/libs/format';
+import { visibilityLabel } from '@/libs/visibility';
+import { Licenses } from '@/libs/licenses';
+import { VIEWS_KEY } from '@/libs/views/viewStore';
+import { buildWarningOf } from '@/libs/build/buildWarnings';
+import { pointLonLat } from '@/libs/ddb/pointGeom';
+
+// Meta keys that hold app data (saved map views are raw JSON), not something to show users.
+// A Registry that has not been updated still sends the views in the dataset's properties.
+export const HIDDEN_META_KEYS = [VIEWS_KEY];
+
+/** The meta of an entry without the keys that are not for users to read. */
+export function visibleMeta(meta) {
+    return Object.fromEntries(Object.entries(meta ?? {}).filter(([key]) => !HIDDEN_META_KEYS.includes(key)));
+}
 
 /**
  * Extracts the best display name from a feature's properties, checking various property names
@@ -72,32 +88,119 @@ export function getFileSizeDisplay(entry) {
 }
 
 /**
- * Format modification timestamp to locale string
+ * The modification time as every date is written (formatDateTime, with seconds), or "Unknown"
  * @param {number} mtime - Unix timestamp (seconds)
  * @returns {string}
  */
 export function formatModifiedDate(mtime) {
-    if (!mtime) return '--';
-    return new Date(mtime * 1000).toLocaleString();
+    return formatDateTime(mtime ? mtime * 1000 : null, { placeholder: UNKNOWN, seconds: true });
 }
 
 /**
- * Format coordinates from point_geom geometry
+ * How long ago an entry was modified, e.g. "2 minutes ago"
+ * @param {number} mtime - Unix timestamp (seconds)
+ * @returns {string} empty when there is no timestamp
+ */
+export function formatModifiedTimeAgo(mtime) {
+    return mtime ? formatTimeAgo(mtime * 1000) : '';
+}
+
+const hasAltitude = coords => typeof coords[2] === 'number';
+
+/**
+ * The coordinates of a point_geom to paste elsewhere: "latitude, longitude" or
+ * "latitude, longitude, altitude" (altitude with two decimals). Latitude comes first, as
+ * Google Maps and the OpenStreetMap search read a pasted pair; the row shows GeoJSON order.
  * @param {Object} pointGeom - The point_geom object
  * @returns {string|null}
  */
-export function formatCoordinates(pointGeom) {
-    if (!pointGeom || !pointGeom.geometry || !pointGeom.geometry.coordinates) return null;
-    const coords = pointGeom.geometry.coordinates;
-    let coordStr = '';
-    if (pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name) {
-        coordStr += pointGeom.crs.properties.name + ' ';
+export function pointCoordinatesText(pointGeom) {
+    const coords = pointLonLat(pointGeom);
+    if (!coords) return null;
+    const parts = [coords[1], coords[0]];
+    if (hasAltitude(coords)) parts.push(coords[2].toFixed(2));
+    return parts.join(', ');
+}
+
+// The decimals of a longitude or a latitude (about 1 mm)
+const COORDINATE_DECIMALS = 8;
+
+/**
+ * Format coordinates from point_geom geometry: "EPSG:4326 lon, lat, altm", the altitude
+ * in the user's units ("altft" for imperial). Every part is a number of the browser's locale
+ * (libs/format.js) without group separators, joined by joinNumberTexts: a comma-decimal locale
+ * separates them with "; " ("9,1234; 45,678; 123,45m"). Lon and lat keep up to 8 decimals,
+ * the altitude has 2.
+ * @param {Object} pointGeom - The point_geom object
+ * @param {string} [units] - 'metric' or 'imperial'
+ * @returns {string|null}
+ */
+function formatCoordinates(pointGeom, units) {
+    const coords = pointLonLat(pointGeom);
+    if (!coords) return null;
+    const crsName = pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name;
+    // No group separators: a projected coordinate would read as several numbers
+    const plain = { trim: true, grouping: false };
+    const parts = [formatNumber(coords[0], COORDINATE_DECIMALS, plain), formatNumber(coords[1], COORDINATE_DECIMALS, plain)];
+    if (hasAltitude(coords)) {
+        const { value, unit } = fixedLengthParts(coords[2], units, undefined, { grouping: false });
+        parts.push(`${value}${unit}`);
     }
-    coordStr += coords[0] + ', ' + coords[1];
-    if (coords[2] !== undefined) {
-        coordStr += ', ' + coords[2].toFixed(2) + 'm';
+    return (crsName ? crsName + ' ' : '') + joinNumberTexts(parts);
+}
+
+// EPSG and ESRI codes ("EPSG:32633", "ESRI:102100", the "EPSG::4326" of an OGC URN).
+// epsg.io serves both authorities at https://epsg.io/<code>; the prefixed form is a 404.
+const CRS_CODE_RE = /\b(EPSG|ESRI)::?(\d+)\b/gi;
+
+/**
+ * Splits a text into parts, where each EPSG or ESRI code is a part with the
+ * epsg.io page that describes it. Text without a code is one part without href.
+ * @param {string} text
+ * @returns {{ text: string, href?: string }[]}
+ */
+export function linkCrsCodes(text) {
+    if (typeof text !== 'string' || !text) return [{ text: text ?? '' }];
+    const parts = [];
+    let last = 0;
+    for (const m of text.matchAll(CRS_CODE_RE)) {
+        if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+        parts.push({ text: m[0], href: `https://epsg.io/${m[2]}` });
+        last = m.index + m[0].length;
     }
-    return coordStr;
+    if (last < text.length) parts.push({ text: text.slice(last) });
+    return parts;
+}
+
+/**
+ * The values the properties table copies, by row key: the size row copies the
+ * file hash, the coordinates row the latitude, longitude (and altitude).
+ * @param {Object} file - The file object with entry property
+ * @returns {Object<string, { text: string, label: string }>}
+ */
+export function buildCopyableValues(file) {
+    const entry = file && file.entry;
+    if (!entry) return {};
+    const values = {};
+    if (entry.hash) values.size = { text: entry.hash, label: 'hash' };
+    const coordinates = pointCoordinatesText(entry.point_geom);
+    if (coordinates) {
+        const altitude = hasAltitude(pointLonLat(entry.point_geom)) ? ', altitude' : '';
+        values.coordinates = { text: coordinates, label: `latitude, longitude${altitude}` };
+    }
+    return values;
+}
+
+/**
+ * The notes shown under the values of the rows of a file's properties table:
+ * { rowKey: text }. The modified row shows how long ago that was.
+ * @param {Object} file - The file object with entry property
+ * @returns {Object}
+ */
+export function buildRowNotes(file) {
+    const entry = file && file.entry;
+    if (!entry || !entry.mtime) return {};
+    return { modified: formatModifiedTimeAgo(entry.mtime) };
 }
 
 /**
@@ -105,9 +208,82 @@ export function formatCoordinates(pointGeom) {
  * @param {Object} file - The file object with entry property
  * @returns {Object|null}
  */
-export function buildAllProperties(file) {
+/**
+ * Readable origin of a CAD drawing's coordinate system, from the
+ * properties.vector.crs that DroneDB records at index time. Returns null for
+ * entries without that information (non-CAD vectors, other types). `forDialog` leaves out
+ * the pointer to Tools › Set Coordinate System, which the Set Coordinate System dialog is.
+ */
+export function formatCadCrs(entry, { forDialog = false } = {}) {
+    const vector = entry && entry.properties && entry.properties.vector;
+    const crs = vector && vector.crs;
+    if (!crs || !crs.source) return null;
+    const units = vector.units ? `, units: ${vector.units}` : '';
+    switch (crs.source) {
+        case 'prj':
+            return crs.label === 'local'
+                ? `None: local drawing coordinates, set by the .prj file${units}`
+                : `${crs.label} (from the .prj file)`;
+        case 'geodata':
+            return `${crs.label} (stored in the drawing)`;
+        case 'layer':
+            return crs.label || 'From the file';
+        case 'lonlat':
+            return forDialog
+                ? 'WGS84 (EPSG:4326), assumed: the file has no coordinate system'
+                : 'WGS84 (EPSG:4326), assumed: the file has no coordinate system. Change it with Tools › Set Coordinate System';
+        case 'none':
+            return forDialog
+                ? `None: local drawing coordinates${units}`
+                : `None: local drawing coordinates${units}. Place it on the map with Tools › Set Coordinate System`;
+        default:
+            return null;
+    }
+}
+
+/** Whether an entry is the root of a dataset (what the Registry lists as its own entry). */
+export const isDatasetEntry = entry => !!entry && entry.type === ddb.entry.type.DRONEDB;
+
+/**
+ * The properties of the dataset's own entry as people read them (FR-EXP-25): its name, tagline, visibility as a label,
+ * license by name, how many entries it holds, its size and when it was changed. The ids of the metadata rows, their
+ * epoch times and the visibility as a number are in the raw view (`raw`), not here.
+ * @param {Object} entry - The dataset's root entry
+ * @param {number|string|Date|null} [created] - When the dataset was created (the Registry's creationDate, not in the entry)
+ * @returns {Object}
+ */
+function buildDatasetProperties(entry, created) {
+    const props = {};
+    const meta = entry.properties?.meta ?? {};
+    const text = key => (meta[key]?.data == null ? '' : String(meta[key].data).trim());
+    props['name'] = ddb.utils.entryLabel(entry);
+    if (text('tagline')) props['tagline'] = text('tagline');
+    const visibility = meta.visibility?.data;
+    if (visibility != null && visibility !== '') props['visibility'] = visibilityLabel(Number(visibility));
+    if (text('license')) props['license'] = Licenses[text('license')]?.name ?? text('license');
+    if (typeof entry.properties?.entries === 'number') props['entries'] = formatNumber(entry.properties.entries, 0);
+    if (entry.size) props['size'] = formatBytes(entry.size);
+    const createdMs = created instanceof Date ? created.getTime() : typeof created === 'string' ? Date.parse(created) : created;
+    if (typeof createdMs === 'number' && Number.isFinite(createdMs)) props['created'] = formatDateTime(createdMs, { placeholder: UNKNOWN, seconds: true });
+    if (entry.mtime) props['modified'] = formatModifiedDate(entry.mtime);
+    if (entry.properties?.readme) props['readme'] = entry.properties.readme;
+    return props;
+}
+
+/**
+ * The rows of the properties table of a file: its type, path, size, dates, coordinates
+ * and entry properties, with lengths, speeds and areas in the user's units. The dataset's own entry has
+ * readable rows (buildDatasetProperties), and the raw metadata with `raw`.
+ * @param {Object} file - The file object with entry property
+ * @param {string} [units] - 'metric' or 'imperial' (the measurement units preference)
+ * @param {{ raw?: boolean, created?: number|string|Date|null }} [options] - raw: the metadata of a dataset as it is stored
+ *   (ids, epoch times); created: when the dataset was created (its Created row)
+ * @returns {Object|null}
+ */
+export function buildAllProperties(file, units = 'metric', { raw = false, created = null } = {}) {
     if (!file) return null;
     const entry = file.entry;
+    if (isDatasetEntry(entry) && !raw) return buildDatasetProperties(entry, created);
     const props = {};
 
     props['type'] = getFileTypeName(entry.type);
@@ -118,23 +294,113 @@ export function buildAllProperties(file) {
     if (entry.mtime) {
         props['modified'] = formatModifiedDate(entry.mtime);
     }
-    const coordStr = formatCoordinates(entry.point_geom);
+    const coordStr = formatCoordinates(entry.point_geom, units);
     if (coordStr) {
         props['coordinates'] = coordStr;
     }
-    if (entry.properties && entry.properties.meta) {
-        props['metadata'] = entry.properties.meta;
+    const cadCrs = formatCadCrs(entry);
+    if (cadCrs) {
+        props['coordinate system'] = cadCrs;
+    }
+    const meta = visibleMeta(entry.properties?.meta);
+    if (Object.keys(meta).length) {
+        props['metadata'] = meta;
     }
 
-    // Extended properties (exclude meta and permissions)
+    // Extended properties (exclude meta, and what the Registry adds to the dataset's own entry: permissions, whether it has a cover)
     if (entry.properties) {
-        const excluded = ['meta', 'permissions'];
+        const excluded = ['meta', 'permissions', 'hasThumbnail'];
         for (const key in entry.properties) {
             if (!excluded.includes(key)) {
                 props[key] = entry.properties[key];
             }
         }
+        formatMeasuredProperties(props, units);
+        // A warning libddb tagged with a code is said in words for users, not as the server's setup message; the
+        // code itself is not a row (FR-EXP-18)
+        delete props.warningCode;
+        const coded = buildWarningOf(entry);
+        if (coded) props.warning = coded.text;
+        // A georaster's resolution in ground units; tidyProperties falls back to its geotransform
+        if (entry.properties.geotransform) {
+            const resolution = formatGroundResolution(entry.polygon_geom, entry.properties.width, entry.properties.height, units);
+            if (resolution) props['resolution'] = resolution;
+        }
     }
 
     return Object.keys(props).length > 0 ? props : null;
+}
+
+// Image properties DroneDB stores in m/s and in metres
+const SPEED_PROPERTIES = ['flightSpeed', 'flightSpeed3D', 'flightSpeedX', 'flightSpeedY', 'flightSpeedZ'];
+const LENGTH_PROPERTIES = ['gpsXYAccuracy', 'gpsZAccuracy'];
+
+// Shows the speeds and lengths of the properties in the user's units, in place
+function formatMeasuredProperties(props, units) {
+    for (const key of SPEED_PROPERTIES) {
+        if (typeof props[key] === 'number') props[key] = formatSpeed(props[key], units);
+    }
+    for (const key of LENGTH_PROPERTIES) {
+        if (typeof props[key] === 'number') props[key] = fixedLengthParts(props[key], units).text;
+    }
+}
+
+/**
+ * Width and height in pixels with the megapixels they make: "3581 x 3854 ~ 13.8Mpx".
+ * The megapixels are left out when either side is not a positive number.
+ * @param {number} width
+ * @param {number} height
+ * @returns {string}
+ */
+export function formatDimensions(width, height) {
+    const text = `${width} x ${height}`;
+    const pixels = Number(width) * Number(height);
+    if (!(pixels > 0)) return text;
+    return `${text} ~ ${(pixels / 1e6).toFixed(1)}Mpx`;
+}
+
+/**
+ * Tidies an object of entry or feature properties for display, in place: a geotransform
+ * becomes a resolution (unless buildAllProperties gave one in ground units), width and height one "Dimensions" row, internal fields
+ * are dropped and the sensor is upper-cased.
+ * @param {Object} props  a copy of the properties (it is changed)
+ * @returns {Object} props
+ */
+export function tidyProperties(props) {
+    if (props.geotransform) {
+        // Without a footprint the pixel size is only known in the units of the coordinate system
+        if (props.resolution === undefined && Array.isArray(props.geotransform) && typeof props.geotransform[1] === 'number') {
+            props.resolution = `${Number(props.geotransform[1].toPrecision(3))} per pixel, in coordinate system units`;
+        }
+        delete props.geotransform;
+    }
+    if (props.width !== undefined && props.height !== undefined) {
+        props['Dimensions'] = formatDimensions(props.width, props.height);
+        delete props.width;
+        delete props.height;
+    }
+    delete props.projection;
+    delete props.focalLength35;
+    delete props.orientation;
+    if (props.sensor) {
+        props.sensor = props.sensor.toUpperCase();
+    }
+    return props;
+}
+
+/** A property key as a label: "focalLength" becomes "Focal Length". */
+export function beautifyKey(name) {
+    if (typeof name !== 'string') return name;
+    return name[0].toUpperCase() + name.substring(1).replace(/([a-z])([A-Z0-9])/g, '$1 $2');
+}
+
+/** True for an absolute http or https URL (a value shown as a link). */
+export function isUrl(str) {
+    if (!str) return false;
+    try {
+        const url = new URL(str);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
 }

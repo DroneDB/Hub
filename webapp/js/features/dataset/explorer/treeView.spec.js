@@ -8,8 +8,11 @@
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { isPathRemoved, liveSelectionEntries, selectionBasePath } from './treeSelection';
-import clipboard from '@/composables/useClipboard';
-import fileOperations from '@/composables/useFileOperations';
+import { setActivePinia, createPinia } from 'pinia';
+import { useClipboardStore } from '@/stores/clipboard';
+import { ref, computed } from 'vue';
+import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
+import { notify } from '@/libs/notify';
 import ddb from 'ddb';
 
 const FILE = ddb.entry.type.GENERIC;
@@ -28,7 +31,6 @@ let FileBrowser;
 
 beforeAll(async () => {
     // FileBrowser reads the runtime env at import time.
-    window.__env = { isElectron: () => false };
     FileBrowser = (await import('./FileBrowser.vue')).default;
 });
 
@@ -166,113 +168,109 @@ describe('FileBrowser.handleTreeKeyDown', () => {
     });
 });
 
+// A dataset page for the clipboard: its folder on show, its files and selection
+function fakePage({ currentPath = 'other', files = [], list = vi.fn(async () => []) } = {}) {
+    const filesRef = ref(files);
+    const listing = { currentPath: ref(currentPath), files: filesRef, selected: computed(() => filesRef.value.filter(f => f.selected)) };
+    const dataset = { org: 'org', ds: 'ds', list };
+    const dialogs = { open: vi.fn(() => Object.assign(Promise.resolve(), { close: vi.fn() })) };
+    const showError = vi.fn();
+    const clip = useDatasetClipboard({ dataset, listing, dialogs, busy: ref(false), canWrite: ref(true), showError });
+    return { clip, dataset, dialogs, showError };
+}
+
 describe('clipboard copy/cut from the tree', () => {
-    const { clipboardCopySelected, clipboardCutSelected, _clipboardSelection, _selectedItemsForClipboard } = fileOperations.methods;
-
-    function fakeView({ currentPath = 'other', selectedFiles = [] } = {}) {
-        const vm = {
-            canWrite: true,
-            currentPath,
-            selectedFiles,
-            contextMenuFiles: selectedFiles,
-            dataset: { org: 'org', ds: 'ds' },
-            $toast: { add: vi.fn() }
-        };
-        vm._clipboardSelection = (s) => _clipboardSelection.call(vm, s);
-        vm._selectedItemsForClipboard = () => _selectedItemsForClipboard.call(vm);
-        return vm;
-    }
-
-    beforeEach(() => clipboard.clear());
+    let clipboard;
+    beforeEach(() => {
+        sessionStorage.clear(); // the store restores the last clipboard of the tab
+        setActivePinia(createPinia());
+        clipboard = useClipboardStore();
+        for (const k of ['success', 'info', 'warn']) vi.spyOn(notify, k).mockImplementation(() => {});
+    });
 
     it('records a selected folder with its parent as the source folder', () => {
         // Selecting a folder in the tree sets currentPath to the folder itself.
-        const vm = fakeView({ currentPath: 'a/folder' });
-
-        clipboardCopySelected.call(vm, [nodeData('a/folder', DIR)]);
-
-        expect(clipboard.state.mode).toBe('copy');
-        expect(clipboard.state.source).toEqual({ orgSlug: 'org', dsSlug: 'ds', basePath: 'a' });
-        expect(clipboard.state.items.map(i => i.path)).toEqual(['a/folder']);
+        const { clip } = fakePage({ currentPath: 'a/folder' });
+        clip.copy([nodeData('a/folder', DIR)]);
+        expect(clipboard.mode).toBe('copy');
+        expect(clipboard.source).toEqual({ orgSlug: 'org', dsSlug: 'ds', basePath: 'a' });
+        expect(clipboard.items.map(i => i.path)).toEqual(['a/folder']);
     });
 
     it('cuts explicit items and skips the dataset root', () => {
-        const vm = fakeView();
-
-        clipboardCutSelected.call(vm, [nodeData('', ddb.entry.type.DRONEDB), nodeData('top.jpg')]);
-
-        expect(clipboard.state.mode).toBe('cut');
-        expect(clipboard.state.source.basePath).toBe('');
-        expect(clipboard.state.items.map(i => i.path)).toEqual(['top.jpg']);
+        const { clip } = fakePage();
+        clip.cut([nodeData('', ddb.entry.type.DRONEDB), nodeData('top.jpg')]);
+        expect(clipboard.mode).toBe('cut');
+        expect(clipboard.source.basePath).toBe('');
+        expect(clipboard.items.map(i => i.path)).toEqual(['top.jpg']);
     });
 
     it('still uses the explorer selection and current folder without arguments', () => {
-        const file = nodeData('other/x.jpg');
-        const vm = fakeView({ currentPath: 'other', selectedFiles: [file] });
-
-        clipboardCopySelected.call(vm);
-
-        expect(clipboard.state.source.basePath).toBe('other');
-        expect(clipboard.state.items.map(i => i.path)).toEqual(['other/x.jpg']);
+        const file = { ...nodeData('other/x.jpg'), selected: true };
+        const { clip } = fakePage({ currentPath: 'other', files: [file] });
+        clip.copy();
+        expect(clipboard.source.basePath).toBe('other');
+        expect(clipboard.items.map(i => i.path)).toEqual(['other/x.jpg']);
     });
 
     it('warns when the explicit selection is empty', () => {
-        const vm = fakeView();
-        clipboardCopySelected.call(vm, []);
-        expect(clipboard.state.mode).toBe(null);
-        expect(vm.$toast.add).toHaveBeenCalledWith(expect.objectContaining({ detail: 'No items selected' }));
+        const { clip } = fakePage();
+        clip.copy([]);
+        expect(clipboard.mode).toBe(null);
+        expect(notify.info).toHaveBeenCalledWith('No items selected', { summary: 'Copy' });
     });
 });
 
 describe('paste conflict detection', () => {
-    const { clipboardPaste, _pasteTargetNames } = fileOperations.methods;
+    let clipboard;
+    beforeEach(() => {
+        sessionStorage.clear();
+        setActivePinia(createPinia());
+        clipboard = useClipboardStore();
+        for (const k of ['success', 'info', 'warn']) vi.spyOn(notify, k).mockImplementation(() => {});
+    });
 
-    function fakeView({ list, fileBrowserFiles }) {
-        const vm = {
-            canWrite: true,
-            currentPath: 'dest',
-            fileBrowserFiles,
-            dataset: { org: 'org', ds: 'ds', list },
-            $toast: { add: vi.fn() },
-            showError: vi.fn(),
-            _askPasteConflict: vi.fn(async () => 'cancel'),
-            _resolveSourceDataset: vi.fn()
-        };
-        vm._pasteTargetNames = (p) => _pasteTargetNames.call(vm, p);
-        return vm;
-    }
-
-    beforeEach(() => clipboard.clear());
+    // The conflict dialog answers "cancel": the paste stops there
+    const cancelConflicts = dialogs => dialogs.open.mockImplementation((component, props) => {
+        queueMicrotask(() => props.onResolve('cancel'));
+        return Object.assign(Promise.resolve(), { close: vi.fn() });
+    });
 
     it('asks about conflicts that are not in the loaded file list', async () => {
         clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg')]);
-        // A file selected in the tree leaves only that file in fileBrowserFiles.
-        const vm = fakeView({
+        // A file selected in the tree leaves only that file in the list
+        const { clip, dataset, dialogs } = fakePage({
+            currentPath: 'dest',
             list: vi.fn(async () => [{ path: 'dest/a.jpg' }, { path: 'dest/b.jpg' }]),
-            fileBrowserFiles: [nodeData('dest/b.jpg')]
+            files: [nodeData('dest/b.jpg')]
         });
-
-        await clipboardPaste.call(vm);
-
-        expect(vm.dataset.list).toHaveBeenCalledWith('dest');
-        expect(vm._askPasteConflict).toHaveBeenCalledOnce();
-        expect(vm._askPasteConflict.mock.calls[0][0].map(i => i.path)).toEqual(['src/a.jpg']);
+        cancelConflicts(dialogs);
+        await clip.paste();
+        expect(dataset.list).toHaveBeenCalledWith('dest');
+        expect(dialogs.open).toHaveBeenCalledOnce();
+        expect(dialogs.open.mock.calls[0][1].items.map(i => i.path)).toEqual(['src/a.jpg']);
     });
 
     it('lists the dataset root for a root destination', async () => {
-        const vm = fakeView({ list: vi.fn(async () => [{ path: 'a.jpg' }]), fileBrowserFiles: [] });
-        expect(await vm._pasteTargetNames('')).toEqual(new Set(['a.jpg']));
-        expect(vm.dataset.list).toHaveBeenCalledWith(undefined);
+        clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg')]);
+        const { clip, dataset, dialogs } = fakePage({ currentPath: null, list: vi.fn(async () => [{ path: 'a.jpg' }]) });
+        cancelConflicts(dialogs);
+        await clip.paste();
+        expect(dataset.list).toHaveBeenCalledWith(undefined);
+        expect(dialogs.open).toHaveBeenCalledOnce();
     });
 
     it('falls back to the loaded files of the destination when listing fails', async () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const vm = fakeView({
+        clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg'), nodeData('src/b.jpg')]);
+        const { clip, dialogs } = fakePage({
+            currentPath: 'dest',
             list: vi.fn(async () => { throw new Error('offline'); }),
-            fileBrowserFiles: [nodeData('dest/a.jpg'), nodeData('elsewhere/b.jpg')]
+            files: [nodeData('dest/a.jpg'), nodeData('elsewhere/b.jpg')]
         });
-
-        expect(await vm._pasteTargetNames('dest')).toEqual(new Set(['a.jpg']));
+        cancelConflicts(dialogs);
+        await clip.paste();
+        expect(dialogs.open.mock.calls[0][1].items.map(i => i.path)).toEqual(['src/a.jpg']);
         warn.mockRestore();
     });
 });
@@ -284,6 +282,7 @@ describe('selection cleanup on deleteEntries', () => {
         const kept = treeNode('keep.jpg');
         const inside = treeNode('gone/a.jpg');
         const vm = {};
+        TreeView.created.call(vm);
         TreeView.mounted.call(vm);
         vm.selectedNodes = [kept, inside];
         vm.rangeStartNode = inside;
@@ -295,6 +294,102 @@ describe('selection cleanup on deleteEntries', () => {
         expect(vm.rangeStartNode).toBe(null);
         expect(vm.focusedNode).toBe(kept);
         TreeView.beforeUnmount.call(vm);
+    });
+
+    it('TreeView forwards file-system events to its nodes and moves the other selected nodes', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const TreeView = (await import('./TreeView.vue')).default;
+        const vm = { datasetDrop: { move: vi.fn() } };
+        TreeView.created.call(vm);
+        TreeView.mounted.call(vm);
+        vm.moveSelected = (dest, primary) => TreeView.methods.moveSelected.call(vm, dest, primary);
+        const node = path => ({ selected: false, node: { entry: { path } }, removeChildren: vi.fn(), addItems: vi.fn(), openFromTree: vi.fn() });
+        const a = node('a.jpg'), b = node('b.jpg'), c = node('c.jpg');
+        [a, b, c].forEach(n => vm._nodes.add(n));
+
+        const items = [{ entry: { path: 'x.jpg' } }];
+        emitter.emit('addItems', items);
+        emitter.emit('folderOpened', ['/', 'f']);
+        emitter.emit('deleteEntries', ['gone']);
+        for (const n of [a, b, c]) {
+            expect(n.addItems).toHaveBeenCalledWith(items);
+            expect(n.openFromTree).toHaveBeenCalledWith(['/', 'f']);
+            expect(n.removeChildren).toHaveBeenCalledWith(['gone']);
+        }
+
+        a.selected = b.selected = true;
+        const dest = { entry: { path: 'dest' } };
+        vm.moveSelected(dest, 'a.jpg');
+        expect(vm.datasetDrop.move).toHaveBeenCalledTimes(1);
+        expect(vm.datasetDrop.move).toHaveBeenCalledWith(b.node, dest);
+        expect(a.selected || b.selected).toBe(false);
+        TreeView.beforeUnmount.call(vm);
+    });
+
+    it('TreeView moves no other node when the dragged node is not one of the selected', async () => {
+        const TreeView = (await import('./TreeView.vue')).default;
+        const vm = { datasetDrop: { move: vi.fn() } };
+        TreeView.created.call(vm);
+        TreeView.mounted.call(vm);
+        const node = (path, selected) => ({ selected, node: { entry: { path } }, removeChildren: vi.fn(), addItems: vi.fn(), openFromTree: vi.fn() });
+        const a = node('a.jpg', false), b = node('b.jpg', true), c = node('c.jpg', true);
+        [a, b, c].forEach(n => vm._nodes.add(n));
+
+        // a.jpg was moved by its own drop handler: b.jpg and c.jpg stay, and stay selected
+        TreeView.methods.moveSelected.call(vm, { entry: { path: 'dest' } }, 'a.jpg');
+        expect(vm.datasetDrop.move).not.toHaveBeenCalled();
+        expect(b.selected && c.selected).toBe(true);
+        TreeView.beforeUnmount.call(vm);
+    });
+
+    describe('a drag from one tree node dropped on another', () => {
+        // Real TreeNodes registered with the real TreeView.moveSelected; dataTransfer is shared
+        // by the dragstart and the drop, as in a browser
+        async function mountTree() {
+            const { mount } = await import('@vue/test-utils');
+            const TreeView = (await import('./TreeView.vue')).default;
+            const TreeNode = (await import('./TreeNode.vue')).default;
+            const datasetDrop = { move: vi.fn(), upload: vi.fn() };
+            const tree = { datasetDrop, _nodes: new Set() };
+            const treeRegistry = {
+                add: n => tree._nodes.add(n), remove: n => tree._nodes.delete(n),
+                moveSelected: (dest, primary) => TreeView.methods.moveSelected.call(tree, dest, primary)
+            };
+            const mountNode = (path, type = FILE) => mount(TreeNode, {
+                props: { node: nodeData(path, type), getChildren: async () => [], canWrite: true },
+                global: { provide: { treeRegistry, datasetDrop } }
+            });
+            const nodes = { a: mountNode('a.jpg'), b: mountNode('b.jpg'), dest: mountNode('dest', DIR) };
+            const store = {};
+            const evt = {
+                preventDefault: vi.fn(), stopPropagation: vi.fn(),
+                dataTransfer: { setData: (k, v) => { store[k] = v; }, getData: k => store[k] || '', types: ['item'] }
+            };
+            const drag = (from, to) => {
+                from.vm.onDragStart(evt, from.props('node'));
+                to.vm.onItemDrop(evt, to.props('node'));
+            };
+            return { nodes, datasetDrop, drag };
+        }
+
+        it('moves only the dragged node when it is not selected, and keeps the selection', async () => {
+            const { nodes, datasetDrop, drag } = await mountTree();
+            nodes.b.vm.selected = true;
+            drag(nodes.a, nodes.dest);
+            expect(datasetDrop.move).toHaveBeenCalledTimes(1);
+            expect(datasetDrop.move.mock.calls[0][0].entry.path).toBe('a.jpg');
+            expect(datasetDrop.move.mock.calls[0][1].entry.path).toBe('dest');
+            expect(nodes.a.vm.selected).toBe(false);
+            expect(nodes.b.vm.selected).toBe(true);
+        });
+
+        it('moves the whole selection when the dragged node is one of the selected', async () => {
+            const { nodes, datasetDrop, drag } = await mountTree();
+            nodes.a.vm.selected = nodes.b.vm.selected = true;
+            drag(nodes.a, nodes.dest);
+            expect(datasetDrop.move.mock.calls.map(c => c[0].entry.path)).toEqual(['a.jpg', 'b.jpg']);
+            expect(nodes.a.vm.selected || nodes.b.vm.selected).toBe(false);
+        });
     });
 
     it('FileBrowser forgets a deleted lastSelectedNode', async () => {

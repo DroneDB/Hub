@@ -1,18 +1,14 @@
 <template>
-    <div id="notfound">
-        <h3>Ups! Invalid URL.</h3>
-        <h5>If you think this is an error, please <a href="https://github.com/DroneDB/Hub/issues">report it?</a></h5>
-
-        <a href="/">Go To Home</a>
-    </div>
+    <!-- The page itself: it scrolls in <main> (.page-scroll, app.scss) -->
+    <ResourceState kind="not-found" resource="page" :name="$route.path" class="page-scroll" />
 </template>
 
-<script>
-</script>
+<script setup>
+/**
+ * NotFound - the page of an address that matches no route: the "not found" state of
+ * ResourceState, with the ways out of every missing thing (FR-XC-13).
+ */
+import ResourceState from '@/components/ResourceState.vue';
 
-<style scoped>
-#notfound {
-    text-align: center;
-    padding: 0.75rem;
-}
-</style>
+defineOptions({ name: 'NotFound' });
+</script>

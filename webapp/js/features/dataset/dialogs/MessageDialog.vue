@@ -1,18 +1,18 @@
 <template>
-    <Window title="Information" id="info" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="info" title="Information" modal max-width="70%" fixed-size @close="$emit('close', 'close')">
 
         {{ message }}
 
-        <br />
+        <br>
 
         <div class="text-end mt-3">
-            <Button @click="close('close')" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="$emit('close', 'close')" />
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 
 export default {
@@ -20,8 +20,10 @@ export default {
         Window, Button
     },
 
-    props: ["message"],
-    emits: ['onClose'],
+    props: {
+        message: { type: String, default: '' }
+    },
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -29,9 +31,6 @@ export default {
     mounted: function () {
     },
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        }
     }
 }
 </script>

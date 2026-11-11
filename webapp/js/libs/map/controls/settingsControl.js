@@ -1,0 +1,35 @@
+import { Control } from 'ol/control';
+import { controlButton } from './controlButton';
+
+/**
+ * Map settings control - a single button that opens the MapSettingsDialog.
+ */
+class SettingsControl extends Control {
+    /**
+     * @param {Object} [opt_options] Control options.
+     * @param {Function} opt_options.onOpenSettings - Called when the settings button is clicked.
+     */
+    constructor(opt_options) {
+        const options = opt_options || {};
+
+        const btn = controlButton('Map Settings', 'Change basemap, units, and display options.', '/images/settings.svg');
+
+        const element = document.createElement('div');
+        element.className = 'ol-settings ol-unselectable ol-control';
+        element.appendChild(btn);
+
+        super({
+            element: element,
+            target: options.target,
+        });
+
+        this.onOpenSettings = options.onOpenSettings || (() => {});
+
+        // lifetime: element (the control's own button)
+        btn.addEventListener('click', () => {
+            this.onOpenSettings();
+        });
+    }
+}
+
+export default SettingsControl;

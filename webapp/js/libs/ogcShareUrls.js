@@ -1,7 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * Pure helper that builds the URLs to expose a dataset / folder / single entry
  * via the OGC services implemented by the Registry backend (WMS, WMTS, WFS,
@@ -16,8 +12,11 @@
  *   /orgs/{org}/ds/{ds}/ogcapi/...   (no folder route)
  *
  * Layer eligibility (see Registry.Web/Services/Adapters/OgcLayerCatalog.cs):
- * only GeoRaster and Vector entries are catalogued. WMS/WMTS expose both;
- * WCS exposes only rasters; WFS / OGC API Features only vectors.
+ * only GeoRaster and Vector entries are catalogued. OGC_SERVICE_TABLE says which
+ * services serve which entry type: WMS and WCS only rasters (WMS renders no vector
+ * layer, FR-SHR-04), WFS / OGC API Features only vectors, WMTS (vector tiles through
+ * the RESTful template) and OGC API Tiles both. The contract test checks the table and
+ * the WMTS template against what the Registry serves (FR-XC-31).
  *
  * Client URL guidance:
  * - serviceUrl / landing is the connection URL to paste into most desktop GIS clients.
@@ -26,8 +25,78 @@
  */
 
 import ddb from 'ddb';
+import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 
 const TYPE = ddb.entry.type;
+
+/**
+ * Build artifact a desktop GIS (QGIS) can stream directly, by entry type. Other
+ * types have none and are downloaded instead.
+ */
+const STREAMABLE_ARTIFACT_ROLES = Object.freeze({
+    [TYPE.POINTCLOUD]: ArtifactRole.POINTCLOUD_COPC,
+    [TYPE.GEORASTER]: ArtifactRole.RASTER_COG,
+    [TYPE.VECTOR]: ArtifactRole.VECTOR_GPKG
+});
+
+/**
+ * @param {number} entryType
+ * @returns {string|null} the ArtifactRole to stream, or null when the type has none
+ */
+export function streamableArtifactRole(entryType) {
+    return STREAMABLE_ARTIFACT_ROLES[entryType] ?? null;
+}
+
+/**
+ * The tile matrix set of the WMTS RESTful template: the one GetCapabilities lists
+ * (Registry `WmtsConformance.DefaultTileMatrixSet`, FR-SHR-01). The Registry also accepts
+ * `WebMercatorQuad` as an alias, so links shared with it keep working.
+ */
+export const WMTS_TILE_MATRIX_SET = 'GoogleMapsCompatible';
+
+/** The only style the Registry publishes (`WmtsConformance.DefaultStyle`). */
+export const WMTS_STYLE = 'default';
+
+/**
+ * The WCS output limit assumed when the server does not publish `maxWcsCoverageSizePixels`
+ * in /sys/features (an older Registry kept 4096 px, FR-SHR-02).
+ */
+export const DEFAULT_MAX_WCS_COVERAGE_SIZE_PIXELS = 4096;
+
+/**
+ * One table of the OGC services by entry type (FR-SHR-04, FR-XC-31): the entry types a
+ * service serves, and the reason shown for the other entry types.
+ */
+export const OGC_SERVICE_TABLE = Object.freeze({
+    wms: {
+        entryTypes: [TYPE.GEORASTER],
+        reason: 'WMS is only available for GeoRaster entries.'
+    },
+    wmts: { entryTypes: [TYPE.GEORASTER, TYPE.VECTOR], reason: '' },
+    wfs: {
+        entryTypes: [TYPE.VECTOR],
+        reason: 'WFS is only available for Vector entries.'
+    },
+    wcs: {
+        entryTypes: [TYPE.GEORASTER],
+        reason: 'WCS is only available for GeoRaster entries.'
+    },
+    ogcApiFeatures: {
+        entryTypes: [TYPE.VECTOR],
+        reason: 'OGC API Features is only available for Vector entries.'
+    },
+    ogcApiTiles: { entryTypes: [TYPE.GEORASTER, TYPE.VECTOR], reason: '' }
+});
+
+/**
+ * The services that serve an entry type.
+ * @param {number} entryType
+ * @returns {string[]}
+ */
+export function ogcServicesOfEntryType(entryType) {
+    return Object.keys(OGC_SERVICE_TABLE)
+        .filter(svc => OGC_SERVICE_TABLE[svc].entryTypes.includes(entryType));
+}
 
 const NA_OGC_API_FOLDER =
     'OGC API endpoints are not available for folder scoping. ' +
@@ -59,6 +128,18 @@ function encodeFolder(p) {
         .join('/');
 }
 
+/**
+ * Escape a layer path as one URL segment the way the Registry writes it into the `ResourceURL` templates of
+ * GetCapabilities (.NET `Uri.EscapeDataString`): `encodeURIComponent` also escapes `!'()*`, which it leaves as they
+ * are. `odm_orthophoto/odm_orthophoto.tif` is `odm_orthophoto%2Fodm_orthophoto.tif`.
+ * @param {string} layerPath
+ * @returns {string}
+ */
+export function escapeLayerPath(layerPath) {
+    return encodeURIComponent(layerPath)
+        .replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 /** Build the dataset root URL. */
 function datasetRoot(opts) {
     const { org, ds } = opts;
@@ -85,6 +166,29 @@ function ogcApiBase(opts) {
 }
 
 /**
+ * The size of the sample GetCoverage (WCS 2.0 scaling extension): the raster at its own
+ * size, or smaller so that its longest side is within the server's limit and the aspect
+ * ratio is kept. Null when the raster size is not known.
+ * @param {any} entry
+ * @param {number} limit
+ * @returns {{width: number, height: number}|null}
+ */
+function coverageSize(entry, limit) {
+    const width = Number(entry?.properties?.width);
+    const height = Number(entry?.properties?.height);
+    if (!(width > 0) || !(height > 0)) return null;
+
+    const longest = Math.max(width, height);
+    if (longest <= limit) return { width, height };
+
+    const scale = limit / longest;
+    return {
+        width: Math.min(limit, Math.max(1, Math.round(width * scale))),
+        height: Math.min(limit, Math.max(1, Math.round(height * scale)))
+    };
+}
+
+/**
  * @param {object} opts
  * @param {string} opts.baseUrl         e.g. "https://hub.dronedb.app"
  * @param {string} opts.org             organization slug
@@ -92,6 +196,8 @@ function ogcApiBase(opts) {
  * @param {'dataset'|'folder'|'entry'} opts.scope
  * @param {string} [opts.folderPath]    folder path, required when scope === 'folder'
  * @param {object} [opts.entry]         ddb entry object, required when scope === 'entry'
+ * @param {number} [opts.maxWcsCoverageSizePixels]  `maxWcsCoverageSizePixels` of /sys/features
+ *                                      (4096 when the server does not publish it)
  * @returns {object} per-service descriptor
  */
 export function buildOgcShareUrls(opts) {
@@ -145,6 +251,11 @@ export function buildOgcShareUrls(opts) {
     let allowVector;
     let layerName;
 
+    const published = Number(opts.maxWcsCoverageSizePixels);
+    const wcsLimit = Number.isInteger(published) && published > 0
+        ? published
+        : DEFAULT_MAX_WCS_COVERAGE_SIZE_PIXELS;
+
     if (scope === 'entry') {
         if (!entry || !isOgcEligibleEntry(entry)) {
             const reason = 'Only GeoRaster and Vector entries can be shared via OGC services.';
@@ -167,8 +278,14 @@ export function buildOgcShareUrls(opts) {
 
     const layerEnc = layerName != null ? encodeURIComponent(layerName) : null;
 
-    // ---- WMS: raster + vector, rendered map images ----------------------------
-    if (allowRaster || allowVector) {
+    // The entry types of the scope; a service is offered when the table lists one of them
+    const scopeTypes = [];
+    if (allowRaster) scopeTypes.push(TYPE.GEORASTER);
+    if (allowVector) scopeTypes.push(TYPE.VECTOR);
+    const offers = svc => OGC_SERVICE_TABLE[svc].entryTypes.some(t => scopeTypes.includes(t));
+
+    // ---- WMS: georaster only, rendered map images (no vector layer is rendered) -
+    if (offers('wms')) {
         const base = serviceBase(opts, 'wms');
 
         result.wms.serviceUrl = base;
@@ -181,10 +298,12 @@ export function buildOgcShareUrls(opts) {
                 `&STYLES=&CRS=EPSG:3857&BBOX={minx},{miny},{maxx},{maxy}` +
                 `&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=TRUE`;
         }
+    } else if (scope === 'entry') {
+        result.wms.reason = OGC_SERVICE_TABLE.wms.reason;
     }
 
     // ---- WMTS: raster/image tiles and, when supported by clients, vector tiles -
-    if (allowRaster || allowVector) {
+    if (offers('wmts')) {
         const base = serviceBase(opts, 'wmts');
 
         result.wmts.serviceUrl = base;
@@ -196,13 +315,14 @@ export function buildOgcShareUrls(opts) {
             const ext = allowVector && !allowRaster ? 'pbf' : 'png';
             const wmtsRoot = `${datasetRoot(opts)}/wmts`;
 
+            // The layer is named by its real path, as the ResourceURL template of GetCapabilities does
             result.wmts.restTileTemplate =
-                `${wmtsRoot}/1.0.0/${layerEnc}/default/WebMercatorQuad/{z}/{y}/{x}.${ext}`;
+                `${wmtsRoot}/1.0.0/${escapeLayerPath(layerName)}/${WMTS_STYLE}/${WMTS_TILE_MATRIX_SET}/{z}/{y}/{x}.${ext}`;
         }
     }
 
     // ---- WFS: vector only -----------------------------------------------------
-    if (allowVector) {
+    if (offers('wfs')) {
         const base = serviceBase(opts, 'wfs');
 
         result.wfs.serviceUrl = base;
@@ -215,11 +335,11 @@ export function buildOgcShareUrls(opts) {
                 `&TYPENAMES=${layerEnc}&count=100&outputFormat=application/json`;
         }
     } else if (scope === 'entry') {
-        result.wfs.reason = 'WFS is only available for Vector entries.';
+        result.wfs.reason = OGC_SERVICE_TABLE.wfs.reason;
     }
 
     // ---- WCS: raster only -----------------------------------------------------
-    if (allowRaster) {
+    if (offers('wcs')) {
         const base = serviceBase(opts, 'wcs');
 
         result.wcs.serviceUrl = base;
@@ -227,12 +347,16 @@ export function buildOgcShareUrls(opts) {
         result.wcs.supported = true;
 
         if (layerEnc) {
+            // A raster larger than the server's limit would be refused without a size
+            const size = coverageSize(entry, wcsLimit);
+            const scale = size ? `&SCALESIZE=Long(${size.width}),Lat(${size.height})` : '';
+
             result.wcs.getCoverage =
                 `${base}?service=WCS&request=GetCoverage&version=2.0.1` +
-                `&CoverageId=${layerEnc}&FORMAT=image/tiff`;
+                `&CoverageId=${layerEnc}&FORMAT=image/tiff${scale}`;
         }
     } else if (scope === 'entry') {
-        result.wcs.reason = 'WCS is only available for GeoRaster entries.';
+        result.wcs.reason = OGC_SERVICE_TABLE.wcs.reason;
     }
 
     // ---- OGC API: no folder route --------------------------------------------
@@ -242,7 +366,7 @@ export function buildOgcShareUrls(opts) {
     } else {
         const apiRoot = ogcApiBase(opts);
 
-        if (allowVector) {
+        if (offers('ogcApiFeatures')) {
             result.ogcApiFeatures.landing = apiRoot;
             result.ogcApiFeatures.collections = `${apiRoot}/collections`;
             result.ogcApiFeatures.supported = true;
@@ -252,11 +376,10 @@ export function buildOgcShareUrls(opts) {
                     `${apiRoot}/collections/${layerEnc}/items?limit=100&f=json`;
             }
         } else if (scope === 'entry') {
-            result.ogcApiFeatures.reason =
-                'OGC API Features is only available for Vector entries.';
+            result.ogcApiFeatures.reason = OGC_SERVICE_TABLE.ogcApiFeatures.reason;
         }
 
-        if (allowRaster || allowVector) {
+        if (offers('ogcApiTiles')) {
             result.ogcApiTiles.landing = apiRoot;
             result.ogcApiTiles.supported = true;
 

@@ -1,5 +1,5 @@
 <template>
-    <Window title="Measurements" id="measurement-list" @onClose="$emit('onClose')" modal fixedSize sizeClass="dialog-md">
+    <Window id="measurement-list" title="Measurements" modal fixed-size size-class="dialog-md" @close="$emit('close')">
         <div class="measurement-list-content">
             <div v-if="measurements.length === 0" class="no-measurements">
                 No measurements on the map.
@@ -9,44 +9,45 @@
                 <template v-for="group in groupedStructure.groups" :key="group.id">
                     <!-- Group header row -->
                     <div class="group-row" :style="{ borderLeftColor: group.color }">
-                        <button class="btn-icon btn-collapse" @click="toggleGroupCollapse(group.id)"
-                            :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'">
-                            <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
+                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'"
+                                @click="toggleGroupCollapse(group.id)">
+                            <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                         </button>
-                        <button class="btn-icon btn-visibility" @click="$emit('toggleGroupVisibility', group.id)"
-                            :title="group.visible ? 'Hide group' : 'Show group'">
-                            <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'"></i>
+                        <button class="btn-icon btn-visibility" :title="group.visible ? 'Hide group' : 'Show group'" :aria-label="group.visible ? 'Hide group' : 'Show group'"
+                                @click="$emit('toggleGroupVisibility', group.id)">
+                            <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" />
                         </button>
+                        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- double click is a shortcut for the Rename button -->
                         <span class="group-name" @dblclick="startRenameGroup(group)">{{ group.name }}</span>
                         <span class="group-count">({{ group.items.length }})</span>
                         <div class="group-actions">
-                            <button class="btn-icon btn-rename" @click="startRenameGroup(group)" title="Rename group">
-                                <i class="fa-solid fa-pencil"></i>
+                            <button class="btn-icon btn-rename" title="Rename group" aria-label="Rename group" @click="startRenameGroup(group)">
+                                <i class="fa-solid fa-pencil" />
                             </button>
-                            <button class="btn-icon btn-delete-group" @click="confirmDeleteGroup(group)" title="Delete group and its measurements">
-                                <i class="fa-solid fa-trash"></i>
+                            <button class="btn-icon btn-delete-group" title="Delete group and its measurements" aria-label="Delete group and its measurements" @click="confirmDeleteGroup(group)">
+                                <i class="fa-solid fa-trash" />
                             </button>
                         </div>
                     </div>
                     <!-- Group measurements -->
                     <template v-if="!collapsedGroups.has(group.id)">
                         <div v-for="m in group.items" :key="'g-' + group.id + '-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
-                            class="measurement-row measurement-row--nested">
-                            <i :class="typeIcon(m.type)" class="type-icon"></i>
+                             class="measurement-row measurement-row--nested">
+                            <i :class="typeIcon(m.type)" class="type-icon" />
                             <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
                             <span class="measurement-value">{{ m.value || '' }}</span>
                             <div class="measurement-actions">
                                 <select class="group-select" :value="m.groupId || ''"
-                                    @change="$emit('moveMeasurementToGroup', m, $event.target.value)"
-                                    title="Move to group">
+                                        title="Move to group" aria-label="Move to group"
+                                        @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <button class="btn-icon btn-edit" @click="$emit('editMeasurement', m)" title="Edit">
-                                    <i class="fa-solid fa-pencil"></i>
+                                <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
+                                    <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" @click="confirmDelete(m)" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
+                                <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
+                                    <i class="fa-solid fa-trash" />
                                 </button>
                             </div>
                         </div>
@@ -56,31 +57,31 @@
                 <!-- Ungrouped measurements -->
                 <template v-if="groupedStructure.ungrouped.length > 0">
                     <div v-if="groups.length > 0" class="group-row group-row--ungrouped">
-                        <button class="btn-icon btn-collapse" @click="toggleGroupCollapse('__ungrouped__')"
-                            :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'">
-                            <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
+                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'"
+                                @click="toggleGroupCollapse('__ungrouped__')">
+                            <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                         </button>
                         <span class="group-name group-name--dim">Ungrouped</span>
                         <span class="group-count">({{ groupedStructure.ungrouped.length }})</span>
                     </div>
                     <template v-if="!collapsedGroups.has('__ungrouped__') || groups.length === 0">
                         <div v-for="m in groupedStructure.ungrouped" :key="'ung-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
-                            class="measurement-row" :class="{ 'measurement-row--nested': groups.length > 0 }">
-                            <i :class="typeIcon(m.type)" class="type-icon"></i>
+                             class="measurement-row" :class="{ 'measurement-row--nested': groups.length > 0 }">
+                            <i :class="typeIcon(m.type)" class="type-icon" />
                             <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
                             <span class="measurement-value">{{ m.value || '' }}</span>
                             <div class="measurement-actions">
                                 <select v-if="groups.length > 0" class="group-select" :value="m.groupId || ''"
-                                    @change="$emit('moveMeasurementToGroup', m, $event.target.value)"
-                                    title="Move to group">
+                                        title="Move to group" aria-label="Move to group"
+                                        @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <button class="btn-icon btn-edit" @click="$emit('editMeasurement', m)" title="Edit">
-                                    <i class="fa-solid fa-pencil"></i>
+                                <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
+                                    <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" @click="confirmDelete(m)" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
+                                <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
+                                    <i class="fa-solid fa-trash" />
                                 </button>
                             </div>
                         </div>
@@ -91,50 +92,35 @@
 
         <!-- Footer toolbar -->
         <div class="measurement-list-footer">
-            <button class="btn-new-group" @click="$emit('createGroup')" title="Create a new group">
-                <i class="fa-solid fa-folder-plus"></i>
+            <button class="btn-new-group" title="Create a new group" @click="$emit('createGroup')">
+                <i class="fa-solid fa-folder-plus" />
                 New Group
             </button>
-            <Button label="Close" @click="$emit('onClose')" severity="secondary" />
+            <Button label="Close" severity="secondary" @click="$emit('close')" />
         </div>
 
         <!-- Confirm delete measurement -->
         <ConfirmDialog v-if="deleteConfirmOpen"
-            title="Delete Measurement"
-            :message="deleteConfirmMessage"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteConfirm" />
+                       v-bind="deleteConfirmDialog"
+                       @close="handleDeleteConfirm" />
 
         <!-- Confirm delete group -->
         <ConfirmDialog v-if="deleteGroupConfirmOpen"
-            title="Delete Group"
-            :message="deleteGroupConfirmMessage"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteGroupConfirm" />
+                       v-bind="deleteGroupConfirmDialog"
+                       @close="handleDeleteGroupConfirm" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window';
+import Window from '@/components/HubWindow';
 import Button from 'primevue/button';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { confirmDialogProps } from '@/libs/deleteConfirmation';
+import { countOf } from '@/libs/format';
+import { STOCKPILE_ICON } from '@/libs/icons';
 
 export default {
     components: { Window, Button, ConfirmDialog },
-    emits: [
-        'onClose',
-        'deleteMeasurement',
-        'editMeasurement',
-        'createGroup',
-        'renameGroup',
-        'deleteGroup',
-        'toggleGroupVisibility',
-        'moveMeasurementToGroup'
-    ],
     props: {
         measurements: {
             type: Array,
@@ -145,6 +131,16 @@ export default {
             default: () => []
         }
     },
+    emits: [
+        'close',
+        'deleteMeasurement',
+        'editMeasurement',
+        'createGroup',
+        'renameGroup',
+        'deleteGroup',
+        'toggleGroupVisibility',
+        'moveMeasurementToGroup'
+    ],
     data() {
         return {
             deleteConfirmOpen: false,
@@ -155,15 +151,21 @@ export default {
         };
     },
     computed: {
-        deleteConfirmMessage() {
-            if (!this.pendingDeleteItem) return '';
-            const name = this.pendingDeleteItem.name || this.typeLabel(this.pendingDeleteItem.type);
-            const value = this.pendingDeleteItem.value ? ` (${this.pendingDeleteItem.value})` : '';
-            return `Are you sure you want to delete "${name}${value}"?`;
+        deleteConfirmDialog() {
+            const m = this.pendingDeleteItem;
+            if (!m) return { message: '' };
+            const name = m.name || this.typeLabel(m.type);
+            return confirmDialogProps({ kind: 'measurement', items: [{ name, note: m.value ? `(${m.value})` : '' }] });
         },
-        deleteGroupConfirmMessage() {
-            if (!this.pendingDeleteGroup) return '';
-            return `Delete group "${this.pendingDeleteGroup.name}" and all its measurements?`;
+        deleteGroupConfirmDialog() {
+            const group = this.pendingDeleteGroup;
+            if (!group) return { message: '' };
+            const count = Array.isArray(group.items) ? group.items.length : null;
+            return confirmDialogProps({
+                kind: 'measurement group',
+                items: [group.name],
+                lost: [count === null ? 'all its measurements' : `its ${countOf(count, 'measurement')}`]
+            });
         },
         groupedStructure() {
             const groupMap = {};
@@ -202,7 +204,7 @@ export default {
                 case 'point': return 'fa-solid fa-map-pin';
                 case 'length': return 'fa-solid fa-ruler';
                 case 'area': return 'fa-solid fa-draw-polygon';
-                case 'stockpile': return 'fa-solid fa-layer-group';
+                case 'stockpile': return STOCKPILE_ICON;
                 case 'profile': return 'fa-solid fa-route';
                 case 'contour': return 'fa-solid fa-map-pin';
                 default: return 'fa-solid fa-question';
@@ -256,19 +258,20 @@ export default {
 .no-measurements {
     text-align: center;
     padding: 2rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     font-style: italic;
 }
 
 /* Group row */
 .group-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0.5rem;
-    background-color: var(--surface-section, rgba(0,0,0,0.03));
-    border-left: 3px solid var(--ddb-primary, #3388ff);
-    border-bottom: var(--ddb-border-width, 1px) solid var(--surface-border, #dee2e6);
+    background-color: var(--ddb-bg-subtle);
+    border-left: 3px solid var(--ddb-primary);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-weight: 600;
     font-size: 0.9rem;
     color: var(--ddb-text);
@@ -278,9 +281,9 @@ export default {
 }
 
 .group-row--ungrouped {
-    border-left-color: var(--ddb-border, #dee2e6);
+    border-left-color: var(--ddb-border);
     font-weight: 500;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
 }
 
 .group-name {
@@ -294,7 +297,7 @@ export default {
 
 .group-count {
     font-size: 0.78rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     font-weight: 400;
 }
 
@@ -305,17 +308,19 @@ export default {
     transition: opacity 0.15s;
 }
 
-.group-row:hover .group-actions {
+.group-row:hover .group-actions,
+.group-row:focus-within .group-actions {
     opacity: 1;
 }
 
 /* Measurement rows */
 .measurement-row {
     display: flex;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
-    border-bottom: var(--ddb-border-width, 1px) solid var(--surface-border, #dee2e6);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-size: 0.87rem;
 }
 
@@ -324,17 +329,18 @@ export default {
 }
 
 .measurement-row:hover {
-    background-color: var(--surface-hover, rgba(0,0,0,0.04));
+    background-color: var(--ddb-bg-hover);
 }
 
 .type-icon {
     width: 1rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     flex-shrink: 0;
 }
 
 .measurement-name {
-    flex: 1;
+    flex: 1 1 6rem;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -342,7 +348,7 @@ export default {
 
 .measurement-value {
     font-size: 0.78rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     white-space: nowrap;
     max-width: 8rem;
     overflow: hidden;
@@ -352,22 +358,24 @@ export default {
 .measurement-actions {
     display: flex;
     align-items: center;
+    margin-left: auto;
     gap: 0.1rem;
     opacity: 0;
     transition: opacity 0.15s;
 }
 
-.measurement-row:hover .measurement-actions {
+.measurement-row:hover .measurement-actions,
+.measurement-row:focus-within .measurement-actions {
     opacity: 1;
 }
 
 /* Group select dropdown */
 .group-select {
     font-size: 0.75rem;
-    border: var(--ddb-border-width, 1px) solid var(--ddb-border);
+    border: var(--ddb-border-width) solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
     padding: 0.1rem 0.25rem;
-    background: var(--surface-0, #fff);
+    background: var(--ddb-bg-surface);
     color: var(--ddb-text);
     cursor: pointer;
     max-width: 7rem;
@@ -381,22 +389,22 @@ export default {
     padding: 0.2rem 0.35rem;
     border-radius: 0.25rem;
     font-size: 0.78rem;
-    color: var(--ddb-text, #495057);
+    color: var(--ddb-text);
     line-height: 1;
 }
 
 .btn-icon:hover {
-    background-color: rgba(0, 0, 0, 0.06);
+    background-color: rgba(var(--ddb-ink-rgb), 0.06);
 }
 
 .btn-delete,
 .btn-delete-group {
-    color: var(--ddb-danger, #dc3545);
+    color: var(--ddb-danger);
 }
 
 .btn-delete:hover,
 .btn-delete-group:hover {
-    background-color: rgba(220, 53, 69, 0.1);
+    background-color: rgba(var(--ddb-danger-rgb), 0.1);
 }
 
 /* Footer */
@@ -406,7 +414,7 @@ export default {
     justify-content: space-between;
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: var(--ddb-border-width, 1px) solid var(--surface-border, #dee2e6);
+    border-top: var(--ddb-border-width) solid var(--ddb-border);
 }
 
 .btn-new-group {
@@ -414,7 +422,7 @@ export default {
     align-items: center;
     gap: 0.4rem;
     background: none;
-    border: var(--ddb-border-width, 1px) solid var(--ddb-border);
+    border: var(--ddb-border-width) solid var(--ddb-border);
     padding: 0.35rem 0.75rem;
     border-radius: var(--ddb-radius-sm);
     cursor: pointer;
@@ -424,6 +432,38 @@ export default {
 }
 
 .btn-new-group:hover {
-    background-color: var(--surface-hover, rgba(0, 0, 0, 0.04));
+    background-color: var(--ddb-bg-hover);
+}
+
+/* A row is one line with a name that shrinks (min-width 0) while there is room; on a phone it wraps under the name */
+@media (max-width: 575.98px) {
+    .measurement-row {
+        flex-wrap: wrap;
+    }
+}
+
+/* Touch: the row actions cannot wait for a hover, and the controls are big enough to hit */
+@media (hover: none), (max-width: 575.98px) {
+    .group-actions,
+    .measurement-actions {
+        opacity: 1;
+    }
+
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2rem;
+        min-height: 2rem;
+        font-size: 0.9rem;
+    }
+
+    .group-select {
+        min-height: 2rem;
+    }
+
+    .btn-new-group {
+        min-height: 2.5rem;
+    }
 }
 </style>

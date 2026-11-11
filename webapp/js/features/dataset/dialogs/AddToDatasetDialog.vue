@@ -1,17 +1,16 @@
 <template>
-    <Window :title="dialogTitle" id="addToDataset" @onClose="close" modal :closable="closable" :fixedSize="true">
+    <Window id="addToDataset" :title="dialogTitle" modal :closable="closable" :fixed-size="true" @close="close">
         <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
-            @onUpload="onUploaded" @done="done" :filesToUpload="filesToUpload"
-            @update:closable="updateClosable" @onClose="close"
-            @update:waitingForFiles="updateWaitingForFiles"
-            @importFromUrl="$emit('importFromUrl')"></DatasetUpload>
+                       :files-to-upload="filesToUpload" @upload="onUploaded" @done="done"
+                       @update:closable="updateClosable" @close="close"
+                       @update:waiting-for-files="updateWaitingForFiles"
+                       @import-from-url="$emit('importFromUrl')" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import DatasetUpload from '@/features/dataset/upload/DatasetUpload.vue';
-import { clone } from '@/libs/utils';
 
 export default {
     components: {
@@ -19,8 +18,13 @@ export default {
         DatasetUpload
     },
 
-    props: ['organization', 'dataset', 'path', 'filesToUpload'],
-    emits: ['onClose', 'importFromUrl'],
+    props: {
+        organization: { type: String, required: true },
+        dataset: { type: String, required: true },
+        path: { type: String, default: null },
+        filesToUpload: { type: Array, default: null }
+    },
+    emits: ['close', 'importFromUrl'],
 
     data: function () {
         return {
@@ -38,7 +42,7 @@ export default {
     },
     methods: {
         close: function (uploadSuccess) {
-            this.$emit('onClose', this.uploaded, uploadSuccess);
+            this.$emit('close', this.uploaded, uploadSuccess);
         },
         onUploaded: function (file) {
             this.uploaded.push(file);

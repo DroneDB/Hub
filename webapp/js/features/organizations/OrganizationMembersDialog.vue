@@ -1,10 +1,9 @@
 <template>
     <div>
-        <Toast position="bottom-left" />
-        <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal width="43.75rem" fixedSize>
+        <Window id="organizationMembersDialog" title="Manage Members" modal size-class="dialog-xl" fixed-size @close="$emit('close')">
             <div class="members-dialog">
                 <!-- Loading state -->
-                <div v-if="loading" class="ui active centered inline loader"></div>
+                <div v-if="loading" class="ui active centered inline loader" />
 
                 <!-- Error message -->
                 <PrimeMessage v-if="error" severity="error" @close="error = null">
@@ -20,63 +19,76 @@
                 <!-- Members list -->
                 <div v-if="featureEnabled">
                     <!-- Add member section -->
-                    <div class="mb-3" v-if="canManageMembers">
+                    <div v-if="canManageMembers" class="mb-3">
                         <h3>Add Member</h3>
-                        <div class="d-flex gap-3 flex-wrap align-items-end">
-                            <div style="flex: 7;">
-                                <label class="d-block mb-1 fw-semibold">User</label>
-                                <Select v-model="newMember.userName" :options="availableUsers" optionLabel="displayName" optionValue="userName" filter placeholder="Search user..." class="w-100" />
+                        <div class="d-flex gap-3 flex-wrap align-items-start">
+                            <div style="flex: 7 1 12rem;">
+                                <label for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User name</label>
+                                <InputText id="organization-members-dialog-user" v-model.trim="newMember.userName" class="w-100" autocomplete="off" spellcheck="false" placeholder="Exact user name"
+                                           :invalid="!!userNameError" :aria-invalid="userNameError ? 'true' : undefined"
+                                           :aria-describedby="userNameError ? 'organization-members-dialog-user-error organization-members-dialog-user-hint' : 'organization-members-dialog-user-hint'"
+                                           @input="userNameError = ''" @keyup.enter="addMember" />
+                                <!-- The Registry names the field of its refusal (errors.userName, D-047): 'No user named x' shows here, not in the banner -->
+                                <FieldError id="organization-members-dialog-user-error" :message="userNameError" />
+                                <small id="organization-members-dialog-user-hint" class="d-block mt-1 text-muted">Type the exact user name; it is checked when you add the member.</small>
                             </div>
-                            <div style="flex: 5;">
-                                <label class="d-block mb-1 fw-semibold">Permissions</label>
-                                <Select v-model="newMember.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                            <div style="flex: 5 1 9rem;">
+                                <label id="organization-members-dialog-permissions-label" for="organization-members-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
+                                <Select v-model="newMember.permissions" input-id="organization-members-dialog-permissions" aria-labelledby="organization-members-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                             </div>
-                            <div style="flex: 4;">
-                                <label class="d-block mb-1">&nbsp;</label>
-                                <Button severity="info" @click="addMember" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" />
+                            <div style="flex: 0 0 auto;">
+                                <span class="d-block mb-1" aria-hidden="true">&nbsp;</span>
+                                <Button :disabled="!canAdd" icon="fa-solid fa-plus" label="Add" @click="addMember" />
                             </div>
                         </div>
                     </div>
 
                     <!-- Current members table -->
                     <h3>Current Members</h3>
-                    <table class="ui celled table" v-if="members.length > 0">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Permissions</th>
-                                <th>Granted</th>
-                                <th v-if="canManageMembers">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="member in members" :key="member.userName">
-                                <td>{{ member.userName }}</td>
-                                <td>{{ member.email }}</td>
-                                <td>
-                                    <Select v-if="canManageMembers"
-                                            v-model="member.permissions"
-                                            :options="permissionsOptions"
-                                            optionLabel="label"
-                                            optionValue="value"
-                                            @change="updatePermission(member)"
-                                            class="w-full" />
-                                    <span v-else>{{ member.permissionName }}</span>
-                                </td>
-                                <td>
-                                    <span v-if="member.grantedAt">
-                                        {{ formatDate(member.grantedAt) }}
-                                        <span v-if="member.grantedBy"> by {{ member.grantedBy }}</span>
-                                    </span>
-                                    <span v-else>-</span>
-                                </td>
-                                <td v-if="canManageMembers">
-                                    <Button severity="danger" size="small" @click="removeMember(member)" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <!-- The table scrolls in a box of its own with a sticky header: the Add Member form above and the
+                         Close button in the footer stay in view however many members there are (FR-ORG-26) -->
+                    <div v-if="members.length > 0" class="members-scroll">
+                        <table class="ui celled table stacked-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th :class="stackedFrom('sm')">Email</th>
+                                    <th>Permissions</th>
+                                    <th :class="stackedFrom('sm')">Granted</th>
+                                    <th v-if="canManageMembers">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="member in members" :key="member.userName">
+                                    <td><strong>{{ member.userName }}</strong></td>
+                                    <td v-bind="stackedCell('Email', 'sm')">{{ member.email }}</td>
+                                    <td v-bind="stackedCell('Permissions')">
+                                        <Select v-if="canManageMembers"
+                                                :model-value="member.permissions"
+                                                :aria-label="`Permissions of ${member.userName}`"
+                                                :options="permissionsOptions"
+                                                option-label="label"
+                                                option-value="value"
+                                                class="w-100"
+                                                @update:model-value="value => changePermission(member, value)" />
+                                        <span v-else>{{ member.permissionName }}</span>
+                                    </td>
+                                    <td v-bind="stackedCell('Granted', 'sm')">
+                                        <span v-if="member.grantedAt">
+                                            {{ formatDate(member.grantedAt) }}
+                                            <span v-if="member.grantedBy"> by {{ member.grantedBy }}</span>
+                                        </span>
+                                        <span v-else>-</span>
+                                    </td>
+                                    <td v-if="canManageMembers">
+                                        <!-- On a phone only the icon, named for the member -->
+                                        <Button severity="danger" size="small" class="member-remove" :disabled="removingMember === member.userName"
+                                                icon="fa-solid fa-trash" label="Remove" :aria-label="`Remove ${member.userName}`" @click="removeMember(member)" />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
                     <div v-else>
                         <PrimeMessage severity="info" :closable="false">
@@ -85,50 +97,73 @@
                     </div>
                 </div>
 
-                <!-- Footer -->
-                <div class="d-flex justify-content-end gap-2 mt-4">
-                    <Button @click="close" severity="secondary" label="Close" />
-                </div>
             </div>
 
+            <template #footer>
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
+            </template>
+
             <ConfirmDialog v-if="removeMemberDialogOpen"
-                title="Remove Member"
-                :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
-                confirmText="Remove"
-                cancelText="Cancel"
-                confirmButtonClass="danger"
-                @onClose="handleRemoveMemberDialogClose">
-            </ConfirmDialog>
+                           title="Remove Member"
+                           :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
+                           confirm-text="Remove"
+                           cancel-text="Cancel"
+                           confirm-button-class="danger"
+                           @close="handleRemoveMemberDialogClose" />
+
+            <ConfirmDialog v-if="selfDemotion"
+                           title="Remove your admin rights?"
+                           :message="selfDemotionMessage"
+                           confirm-text="Remove my admin rights"
+                           cancel-text="Cancel"
+                           confirm-button-class="danger"
+                           @close="handleSelfDemotionClose" />
         </Window>
     </div>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import Toast from 'primevue/toast';
+import FieldError from '@/components/FieldError.vue';
+import { fieldErrorsOf } from '@/libs/forms/serverErrors';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import { formatDate } from '@/libs/format';
+import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
+
+const ADMIN = 3;
+
+// The server sends the members in the order of its table (the Registry sorts them too, but an older one does not):
+// by user name, upper and lower case alike
+const sortByUserName = members => [...members].sort((a, b) => a.userName.localeCompare(b.userName, undefined, { sensitivity: 'base' }));
 
 export default {
-    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Toast },
+    components: { Window, ConfirmDialog, Select, InputText, Button, PrimeMessage, FieldError },
 
     props: {
         orgSlug: { type: String, required: true },
         canManageMembers: { type: Boolean, default: false }
     },
-    emits: ['onClose'],
+    // permissions-changed: the user changed their own permissions (the parent reads them again
+    // and passes canManageMembers: false once they may no longer manage the members)
+    emits: ['close', 'permissions-changed'],
+    setup() {
+        return { stackedFrom, stackedCell };
+    },
 
     data() {
         return {
             loading: true,
             error: null,
+            // The refusal of the user name the Registry answered with, shown at the field
+            userNameError: '',
             featureEnabled: false,
             members: [],
-            allUsers: [],
             addingMember: false,
             removingMember: null,
             newMember: {
@@ -137,6 +172,8 @@ export default {
             },
             removeMemberDialogOpen: false,
             memberToRemove: null,
+            // Your own row dropping below Admin, waiting for the answer: { member, previous }
+            selfDemotion: null,
             permissionsOptions: [
                 { value: 0, label: 'Read Only' },
                 { value: 1, label: 'Read/Write' },
@@ -147,11 +184,13 @@ export default {
     },
 
     computed: {
-        availableUsers() {
-            const memberUserNames = this.members.map(m => m.userName);
-            return this.allUsers
-                .filter(u => !memberUserNames.includes(u.userName))
-                .map(u => ({ ...u, displayName: `${u.userName} (${u.email})` }));
+        canAdd() {
+            return !!this.newMember.userName.trim() && !this.addingMember;
+        },
+        selfDemotionMessage() {
+            const level = this.permissionsOptions.find(o => o.value === this.selfDemotion?.member.permissions)?.label ?? '';
+            return `<p>You are changing your own permissions in this organization to <strong>${level}</strong>.</p>`
+                + '<p>You will no longer be able to manage its members; only another admin can give you the rights back.</p>';
         }
     },
 
@@ -166,20 +205,14 @@ export default {
 
             try {
                 // Check if feature is enabled
-                this.featureEnabled = reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+                this.featureEnabled = reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
 
                 if (!this.featureEnabled) {
                     this.loading = false;
                     return;
                 }
 
-                // Load members
-                this.members = await reg.getOrganizationMembers(this.orgSlug);
-
-                // Load all users if can manage (for adding new members)
-                if (this.canManageMembers) {
-                    this.allUsers = await reg.users();
-                }
+                this.members = sortByUserName(await reg.orgs.getOrganizationMembers(this.orgSlug));
 
             } catch (e) {
                 this.error = e.message || 'Failed to load members';
@@ -189,14 +222,18 @@ export default {
             }
         },
 
+        // The user list is not exposed to organization owners: the name is typed and the
+        // server says when there is no such user (or it is already a member)
         async addMember() {
-            if (!this.newMember.userName) return;
+            if (!this.canAdd) return;
 
             this.addingMember = true;
+            this.error = null;
+            this.userNameError = '';
             try {
-                await reg.addOrganizationMember(
+                await reg.orgs.addOrganizationMember(
                     this.orgSlug,
-                    this.newMember.userName,
+                    this.newMember.userName.trim(),
                     this.newMember.permissions
                 );
 
@@ -207,27 +244,54 @@ export default {
                 this.newMember.userName = '';
                 this.newMember.permissions = 1;
 
-                this.$toast.add({ severity: 'success', summary: 'Member Added', detail: 'Member added successfully', life: 3000 });
+                this.$notify.success('Member added successfully', { summary: 'Member Added' });
 
             } catch (e) {
-                this.error = e.message || 'Failed to add member';
+                const atField = fieldErrorsOf(e, {}, ['userName']).userName;
+                if (atField) this.userNameError = atField;
+                else this.error = e.message || 'Failed to add member';
             } finally {
                 this.addingMember = false;
             }
         },
 
+        isSelf(member) {
+            return member.userName === reg.getUsername();
+        },
+
+        // The row shows the new level at once; dropping your own row below Admin asks first and
+        // puts the previous level back on Cancel
+        changePermission(member, value) {
+            const previous = member.permissions;
+            if (value === previous) return;
+            member.permissions = value;
+            if (this.isSelf(member) && previous === ADMIN && value < ADMIN) {
+                this.selfDemotion = { member, previous };
+                return;
+            }
+            this.updatePermission(member);
+        },
+
+        handleSelfDemotionClose(action) {
+            const { member, previous } = this.selfDemotion;
+            this.selfDemotion = null;
+            if (action === 'confirm') this.updatePermission(member);
+            else member.permissions = previous;
+        },
+
         async updatePermission(member) {
             try {
-                await reg.updateMemberPermissions(
+                await reg.orgs.updateMemberPermissions(
                     this.orgSlug,
                     member.userName,
                     member.permissions
                 );
-                this.$toast.add({ severity: 'success', summary: 'Permissions Updated', detail: 'Permissions saved successfully', life: 3000 });
+                this.$notify.success('Permissions saved successfully', { summary: 'Permissions Updated' });
+                if (this.isSelf(member)) this.$emit('permissions-changed');
             } catch (e) {
-                this.error = e.message || 'Failed to update permissions';
-                // Reload to get correct state
+                // The server's state first (loadData clears the error), then why it failed
                 await this.loadData();
+                this.error = e.message || 'Failed to update permissions';
             }
         },
 
@@ -246,9 +310,9 @@ export default {
 
             this.removingMember = this.memberToRemove.userName;
             try {
-                await reg.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
+                await reg.orgs.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
                 await this.loadData();
-                this.$toast.add({ severity: 'success', summary: 'Member Removed', detail: 'Member removed successfully', life: 3000 });
+                this.$notify.success('Member removed successfully', { summary: 'Member Removed' });
             } catch (e) {
                 this.error = e.message || 'Failed to remove member';
             } finally {
@@ -257,26 +321,38 @@ export default {
             }
         },
 
-        formatDate(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString();
-        },
+        formatDate,
 
-        close() {
-            this.$emit('onClose');
-        }
     }
 };
 </script>
 
 <style scoped>
 
-.add-member-section {
-    margin-bottom: 1rem;
+table.ui.celled.table {
+    margin-top: 0;
 }
 
-table.ui.celled.table {
+/* The member table: at most half the screen (and 28rem) high, scrolling inside; its header sticks to the top */
+.members-scroll {
     margin-top: 0.5rem;
+    max-height: min(28rem, 50vh);
+    overflow-y: auto;
+}
+
+@media only screen and (min-width: 576px) {
+    .members-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--ddb-bg-light);
+    }
+}
+
+/* A phone card: Remove is its icon (named for the member by its aria-label) */
+@media only screen and (max-width: 575.98px) {
+    .member-remove :deep(.p-button-label) {
+        display: none;
+    }
 }
 </style>

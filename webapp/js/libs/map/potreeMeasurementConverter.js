@@ -1,67 +1,35 @@
 /**
- * Utility to convert Potree measurements to GeoJSON and vice versa
+ * Utility to convert Potree measurements to GeoJSON and vice versa.
+ *
+ * The positions of a point cloud are in its own CRS already (the decoder applies the scale and offset
+ * of the file), so a measurement's local coordinates are those of the CRS and its GeoJSON geometry is
+ * that position reprojected to longitude and latitude (pointCloudGeometry). A cloud with no SRS that
+ * proj4 can use has no geometry in WGS84: the geometry then holds the local coordinates, and the file
+ * has no `crs` member (measurementFormat), so they are never labelled as WGS84.
  */
+
+import { write, VIEW } from '@/libs/map/measurementFormat';
+import { projectorFor, geometryOf } from '@/libs/map/pointCloudGeometry';
 
 /**
  * Convert a Potree measurement to a GeoJSON Feature
  * @param {Potree.Measure} measure - Potree measurement
- * @param {Object} coordinateSystem - Coordinate system from EPT
+ * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
  * @returns {Object} GeoJSON Feature
  */
-export function measureToGeoJSON(measure, coordinateSystem) {
-    const points = measure.points.map(point => {
-        // Convert local coordinates to geographic
-        const coords = localToGeographic(point.position, coordinateSystem);
-        return coords;
-    });
+function measureToGeoJSON(measure, projector) {
+    const points = measure.points.map(point => projector.toGeographic(point.position));
 
-    // Determine geometry type based on measurement type
-    let geometry;
+    // The kind of measurement, from what the measure shows
     let measurementType;
+    if (measure.showArea && measure.closed) measurementType = 'area';
+    else if (measure.showHeight) measurementType = 'height';
+    else if (measure.showCircle) measurementType = 'circle';
+    else if (measure.showAngles) measurementType = 'angle';
+    else if (points.length === 1) measurementType = 'point';
+    else measurementType = 'distance';
 
-    if (measure.showArea && measure.closed) {
-        // Polygon for areas
-        measurementType = 'area';
-        geometry = {
-            type: 'Polygon',
-            coordinates: [points.concat([points[0]])] // Close the polygon
-        };
-    } else if (measure.showHeight) {
-        // LineString for heights (2 vertical points)
-        measurementType = 'height';
-        geometry = {
-            type: 'LineString',
-            coordinates: points
-        };
-    } else if (measure.showCircle) {
-        // Point for circles
-        measurementType = 'circle';
-        geometry = {
-            type: 'Point',
-            coordinates: points[0]
-        };
-    } else if (measure.showAngles) {
-        // Point for angles
-        measurementType = 'angle';
-        geometry = {
-            type: 'Point',
-            coordinates: points[1] // Center point
-        };
-    } else if (points.length === 1) {
-        // Single point
-        measurementType = 'point';
-        geometry = {
-            type: 'Point',
-            coordinates: points[0]
-        };
-    } else {
-        // LineString for distances
-        measurementType = 'distance';
-        geometry = {
-            type: 'LineString',
-            coordinates: points
-        };
-    }
+    const geometry = geometryOf(measurementType, points);
 
     // Build properties
     const properties = {
@@ -126,10 +94,10 @@ export function measureToGeoJSON(measure, coordinateSystem) {
  * Convert a GeoJSON Feature to a Potree measurement
  * @param {Object} feature - GeoJSON Feature
  * @param {Potree.Viewer} viewer - Potree viewer
- * @param {Object} coordinateSystem - Coordinate system
+ * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
  * @returns {Potree.Measure} Potree measurement
  */
-export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
+function geoJSONToMeasure(feature, viewer, projector) {
     const measure = new Potree.Measure();
     const props = feature.properties;
 
@@ -180,9 +148,7 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
         coordinates = props.localCoordinates;
     } else {
         // Otherwise convert from geographic to local
-        coordinates = coordinates.map(coord =>
-            geographicToLocal(coord, coordinateSystem)
-        );
+        coordinates = coordinates.map(coord => projector.toLocal(coord));
     }
 
     // Add points to measurement
@@ -195,17 +161,19 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
 }
 
 /**
- * Export all viewer measurements in GeoJSON format
+ * Export all viewer measurements in GeoJSON format: the document of the 3D viewer's measurements (its
+ * features and its section of the file), which the storage merges into the file next to the 2D map's.
  * @param {Potree.Viewer} viewer - Potree viewer
  * @param {string} pointCloudPath - Point cloud path
- * @param {Object} coordinateSystem - Coordinate system
+ * @param {Object} coordinateSystem - Coordinate system of the point cloud ({ srs, scale, offset, bounds })
  * @returns {Object} GeoJSON FeatureCollection
  */
-export function exportMeasurements(viewer, pointCloudPath, coordinateSystem, groups = []) {
+export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
     const measurements = viewer.scene.measurements || [];
+    const projector = projectorFor(coordinateSystem);
 
     // Collect all features from measurements
-    const features = measurements.map(m => measureToGeoJSON(m, coordinateSystem));
+    const features = measurements.map(m => measureToGeoJSON(m, projector));
 
     // Also export annotations
     const annotations = [];
@@ -214,49 +182,29 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem, gro
     });
 
     annotations.forEach(annotation => {
-        const feature = annotationToGeoJSON(annotation, coordinateSystem);
+        const feature = annotationToGeoJSON(annotation, projector);
         if (feature) {
             features.push(feature);
         }
     });
 
-    const geojson = {
-        type: 'FeatureCollection',
-        crs: {
-            type: 'name',
-            properties: {
-                name: 'EPSG:4326' // Output is always in WGS84
-            }
-        },
-        metadata: {
-            version: groups && groups.length > 0 ? '1.1' : '1.0',
-            pointCloudFile: pointCloudPath,
-            createdAt: new Date().toISOString(),
-            modifiedAt: new Date().toISOString(),
-            application: 'Registry-Potree',
-            coordinateSystem: coordinateSystem, // Save original system for reference
-            ...(groups && groups.length > 0 ? { groups } : {})
-        },
-        features: features
-    };
-
-    return geojson;
+    return write(null, VIEW.POINT_CLOUD, features, { pointCloudFile: pointCloudPath, coordinateSystem });
 }
 
 /**
  * Convert an annotation to GeoJSON Feature
  * @param {Potree.Annotation} annotation - Potree annotation
- * @param {Object} coordinateSystem - Coordinate system
+ * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
  * @returns {Object|null} GeoJSON Feature or null if annotation is invalid
  */
-function annotationToGeoJSON(annotation, coordinateSystem) {
+function annotationToGeoJSON(annotation, projector) {
     // Skip annotations without valid position
     if (!annotation || !annotation.position) {
         console.warn('Skipping annotation without valid position:', annotation?.title);
         return null;
     }
 
-    const coords = localToGeographic(annotation.position, coordinateSystem);
+    const coords = projector.toGeographic(annotation.position);
 
     return {
         type: 'Feature',
@@ -278,10 +226,10 @@ function annotationToGeoJSON(annotation, coordinateSystem) {
  * Convert a GeoJSON Feature to an annotation
  * @param {Object} feature - GeoJSON Feature
  * @param {Potree.Viewer} viewer - Potree viewer
- * @param {Object} coordinateSystem - Coordinate system
+ * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
  * @returns {Potree.Annotation} Potree annotation
  */
-function geoJSONToAnnotation(feature, viewer, coordinateSystem) {
+function geoJSONToAnnotation(feature, viewer, projector) {
     const props = feature.properties;
 
     // Get position from local coordinates if available, otherwise convert from geographic
@@ -289,7 +237,7 @@ function geoJSONToAnnotation(feature, viewer, coordinateSystem) {
     if (props.localCoordinates && props.localCoordinates.length >= 3) {
         position = props.localCoordinates;
     } else {
-        position = geographicToLocal(feature.geometry.coordinates, coordinateSystem);
+        position = projector.toLocal(feature.geometry.coordinates);
     }
 
     const annotation = new Potree.Annotation({
@@ -314,6 +262,7 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
     }
 
     const imported = [];
+    const projector = projectorFor(coordinateSystem);
 
     geojson.features.forEach(feature => {
         try {
@@ -321,12 +270,12 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
 
             if (props.measurementType === 'annotation') {
                 // Import as annotation
-                const annotation = geoJSONToAnnotation(feature, viewer, coordinateSystem);
+                const annotation = geoJSONToAnnotation(feature, viewer, projector);
                 viewer.scene.annotations.add(annotation);
                 imported.push(annotation);
             } else {
                 // Import as measurement
-                const measure = geoJSONToMeasure(feature, viewer, coordinateSystem);
+                const measure = geoJSONToMeasure(feature, viewer, projector);
                 viewer.scene.addMeasurement(measure);
                 imported.push(measure);
             }
@@ -337,97 +286,6 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
 
     console.log(`Imported ${imported.length} measurements/annotations`);
     return imported;
-}
-
-// ============================================================================
-// Helper Functions for Coordinate Transformation
-// ============================================================================
-
-/**
- * Convert local coordinates to geographic
- * @param {THREE.Vector3} localCoords - Local coordinates
- * @param {Object} coordinateSystem - Coordinate system from EPT
- * @returns {Array} [lon, lat, alt]
- */
-function localToGeographic(localCoords, coordinateSystem) {
-    const { scale, offset, srs } = coordinateSystem;
-
-    // Apply scale and offset
-    const x = localCoords.x * scale[0] + offset[0];
-    const y = localCoords.y * scale[1] + offset[1];
-    const z = localCoords.z * scale[2] + offset[2];
-
-    // Extract SRS definition (can be string EPSG code or object with wkt property)
-    let srsDefinition = null;
-    if (typeof srs === 'string') {
-        srsDefinition = srs;
-    } else if (srs && typeof srs === 'object') {
-        // Handle nested structure like {"srs":{"wkt":"..."}}
-        if (srs.srs && srs.srs.wkt) {
-            srsDefinition = srs.srs.wkt;
-        } else if (srs.wkt) {
-            srsDefinition = srs.wkt;
-        }
-    }
-
-    // If no SRS or already WGS84, return directly
-    if (!srsDefinition) {
-        return [x, y, z];
-    }
-
-    // Use proj4 to transform to WGS84 (proj4 handles both EPSG codes and WKT)
-    if (typeof proj4 !== 'undefined') {
-        try {
-            const transformed = proj4(srsDefinition, 'EPSG:4326', [x, y]);
-            return [transformed[0], transformed[1], z];
-        } catch (e) {
-            console.warn('Projection failed, using raw coordinates:', e);
-            return [x, y, z];
-        }
-    }
-
-    // Fallback if proj4 not available
-    return [x, y, z];
-}
-
-/**
- * Convert geographic coordinates to local
- * @param {Array} geoCoords - [lon, lat, alt]
- * @param {Object} coordinateSystem - Coordinate system
- * @returns {Array} Local [x, y, z]
- */
-function geographicToLocal(geoCoords, coordinateSystem) {
-    const { scale, offset, srs } = coordinateSystem;
-    let [x, y, z] = geoCoords;
-
-    // Extract SRS definition (can be string EPSG code or object with wkt property)
-    let srsDefinition = null;
-    if (typeof srs === 'string') {
-        srsDefinition = srs;
-    } else if (srs && typeof srs === 'object') {
-        // Handle nested structure like {"srs":{"wkt":"..."}}
-        if (srs.srs && srs.srs.wkt) {
-            srsDefinition = srs.srs.wkt;
-        } else if (srs.wkt) {
-            srsDefinition = srs.wkt;
-        }
-    }
-
-    // Transform from WGS84 to local system if necessary
-    if (srsDefinition && typeof proj4 !== 'undefined') {
-        try {
-            [x, y] = proj4('EPSG:4326', srsDefinition, [x, y]);
-        } catch (e) {
-            console.warn('Reverse projection failed:', e);
-        }
-    }
-
-    // Remove offset and scale
-    x = (x - offset[0]) / scale[0];
-    y = (y - offset[1]) / scale[1];
-    z = (z - offset[2]) / scale[2];
-
-    return [x, y, z];
 }
 
 // ============================================================================

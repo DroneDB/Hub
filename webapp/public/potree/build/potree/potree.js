@@ -51881,8 +51881,12 @@
 			let spriteWidth = 2 * margin + textWidth + 2 * this.borderThickness;
 			let spriteHeight = this.fontsize * 1.4 + 2 * this.borderThickness;
 
-			context.canvas.width = spriteWidth;
-			context.canvas.height = spriteHeight;
+			// The text is drawn at TextSprite.resolutionScale x the sprite's size (the pixel ratio of the screen, FR-XC-32):
+			// the sprite keeps its size in the scene, its texture has more pixels
+			const resolutionScale = TextSprite.resolutionScale || 1;
+			context.canvas.width = Math.ceil(spriteWidth * resolutionScale);
+			context.canvas.height = Math.ceil(spriteHeight * resolutionScale);
+			context.scale(resolutionScale, resolutionScale);
 			context.font = 'Bold ' + this.fontsize + 'px ' + this.fontface;
 
 			// background color
@@ -60428,8 +60432,9 @@ void main() {
 
 		updateMaterial (material, visibleNodes, camera, renderer) {
 			material.fov = camera.fov * (Math.PI / 180);
-			material.screenWidth = renderer.domElement.clientWidth;
-			material.screenHeight = renderer.domElement.clientHeight;
+			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio, FR-XC-32)
+			material.screenWidth = renderer.domElement.width;
+			material.screenHeight = renderer.domElement.height;
 			material.spacing = this.pcoGeometry.spacing; // * Math.max(this.scale.x, this.scale.y, this.scale.z);
 			material.near = camera.near;
 			material.far = camera.far;
@@ -61957,8 +61962,9 @@ void main() {
 
 		updateMaterial (material, visibleNodes, camera, renderer) {
 			material.fov = camera.fov * (Math.PI / 180);
-			material.screenWidth = renderer.domElement.clientWidth;
-			material.screenHeight = renderer.domElement.clientHeight;
+			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio, FR-XC-32)
+			material.screenWidth = renderer.domElement.width;
+			material.screenHeight = renderer.domElement.height;
 			material.spacing = this.pcoGeometry.spacing;
 			material.near = camera.near;
 			material.far = camera.far;
@@ -63372,6 +63378,13 @@ void main() {
 			}
 		}
 
+		/** How many pixels of `target` (the drawing buffer when null) a CSS px is: 1 for a target of the CSS size (the pick). */
+		pointSizeScale(target){
+			const cssWidth = this.threeRenderer.getSize(this.sizeTmp ?? (this.sizeTmp = new Vector2())).width;
+			const width = target ? target.width : this.threeRenderer.domElement.width;
+			return cssWidth > 0 && width > 0 ? Math.round(100 * width / cssWidth) / 100 : 1;
+		}
+
 		renderOctree(octree, nodes, camera, target, params = {}){
 
 			let gl = this.gl;
@@ -63621,9 +63634,17 @@ void main() {
 				}
 
 
-				shader.setUniform1f("size", material.size);
-				shader.setUniform1f("maxSize", material.uniforms.maxSize.value);
-				shader.setUniform1f("minSize", material.uniforms.minSize.value);
+				// Point sizes are CSS px (the material, the Appearance menu and the pick keep them so); they are
+				// drawn in the pixels of the target: the size of the drawing buffer is the CSS size x the pixel ratio (FR-XC-32).
+				// The shader draws `size` as pixels for a fixed size, and for an attenuated size with an orthographic
+				// camera; the other sizes are multiplied by uScreenWidth or uScreenHeight, already in the pixels of the target.
+				// minSize and maxSize are pixels for every type.
+				const sizeScale = this.pointSizeScale(target);
+				const sizeIsPixels = material.pointSizeType === PointSizeType.FIXED ||
+					(material.pointSizeType === PointSizeType.ATTENUATED && camera instanceof OrthographicCamera);
+				shader.setUniform1f("size", sizeIsPixels ? material.size * sizeScale : material.size);
+				shader.setUniform1f("maxSize", material.uniforms.maxSize.value * sizeScale);
+				shader.setUniform1f("minSize", material.uniforms.minSize.value * sizeScale);
 
 
 				// uniform float uPCIndex
@@ -70554,7 +70575,8 @@ void main() {
 
 			const viewer = this.viewer;
 			let camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-			const {width, height} = this.viewer.renderer.getSize(new Vector2());
+			// The targets have the size of the drawing buffer (CSS size x pixel ratio, FR-XC-32), not the CSS size
+			const {width, height} = this.viewer.renderer.getDrawingBufferSize(new Vector2());
 
 
 			viewer.dispatchEvent({type: "render.pass.begin",viewer: viewer});
@@ -70806,7 +70828,10 @@ void main() {
 
 			const viewer = this.viewer;
 			const camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-			const {width, height} = this.viewer.renderer.getSize(new Vector2());
+			// The targets have the size of the drawing buffer (CSS size x pixel ratio, FR-XC-32), not the CSS size;
+			// a viewport (below) is in CSS px, three.js multiplies it by the pixel ratio
+			const {width, height} = this.viewer.renderer.getDrawingBufferSize(new Vector2());
+			const cssSize = this.viewer.renderer.getSize(new Vector2());
 
 			viewer.dispatchEvent({type: "render.pass.begin",viewer: viewer});
 
@@ -71012,11 +71037,11 @@ void main() {
 			viewer.renderer.render(viewer.clippingTool.sceneVolume, camera);
 			viewer.renderer.render(viewer.transformationTool.scene, camera);
 
-			viewer.renderer.setViewport(width - viewer.navigationCube.width,
-										height - viewer.navigationCube.width,
+			viewer.renderer.setViewport(cssSize.width - viewer.navigationCube.width,
+										cssSize.height - viewer.navigationCube.width,
 										viewer.navigationCube.width, viewer.navigationCube.width);
 			viewer.renderer.render(viewer.navigationCube, viewer.navigationCube.camera);
-			viewer.renderer.setViewport(0, 0, width, height);
+			viewer.renderer.setViewport(0, 0, cssSize.width, cssSize.height);
 
 			viewer.dispatchEvent({type: "render.pass.end",viewer: viewer});
 
@@ -90724,4 +90749,3 @@ ENDSEC
 	Object.defineProperty(exports, '__esModule', { value: true });
 
 })));
-//# sourceMappingURL=potree.js.map

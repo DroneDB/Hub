@@ -1,0 +1,370 @@
+/**
+ * Unit tests for libs/propertiesUtils.js.
+ * Run with: npx vitest run webapp/js/libs/propertiesUtils.spec.js
+ */
+import { describe, it, expect } from 'vitest';
+import ddb from 'ddb';
+import { formatCadCrs, tidyProperties, formatDimensions, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties, visibleMeta, formatModifiedDate, HIDDEN_META_KEYS } from './propertiesUtils';
+
+const entry = (crs, units = 'm') => ({ properties: { vector: { crs, units } } });
+
+describe('formatCadCrs', () => {
+    it('says when WGS84 was assumed', () => {
+        expect(formatCadCrs(entry({ source: 'lonlat', label: 'EPSG:4326' })))
+            .toMatch(/^WGS84 \(EPSG:4326\), assumed/);
+    });
+
+    it('names the origin of a real coordinate system', () => {
+        expect(formatCadCrs(entry({ source: 'geodata', label: 'EPSG:2193' }))).toBe('EPSG:2193 (stored in the drawing)');
+        expect(formatCadCrs(entry({ source: 'prj', label: 'EPSG:32632' }))).toBe('EPSG:32632 (from the .prj file)');
+    });
+
+    it('describes local drawings, with units', () => {
+        expect(formatCadCrs(entry({ source: 'none', label: '' }))).toMatch(/^None: local drawing coordinates, units: m\./);
+        expect(formatCadCrs(entry({ source: 'prj', label: 'local' }, 'mm')))
+            .toBe('None: local drawing coordinates, set by the .prj file, units: mm');
+    });
+
+    it('returns null without CAD CRS information', () => {
+        expect(formatCadCrs({ properties: { vector: { layers: [] } } })).toBeNull();
+        expect(formatCadCrs({ properties: {} })).toBeNull();
+        expect(formatCadCrs(null)).toBeNull();
+    });
+});
+
+describe('tidyProperties', () => {
+    it('turns the geotransform into a resolution in coordinate system units and merges width and height', () => {
+        const props = tidyProperties({ geotransform: [0, 0.126, 0, 0, 0, -0.126], width: 400, height: 300 });
+        expect(props).toEqual({ resolution: '0.126 per pixel, in coordinate system units', Dimensions: '400 x 300 ~ 0.1Mpx' });
+    });
+
+    it('keeps a ground resolution it is given and drops the geotransform', () => {
+        const props = tidyProperties({ geotransform: [0, 0.126, 0, 0, 0, -0.126], resolution: '5.0 cm/px' });
+        expect(props).toEqual({ resolution: '5.0 cm/px' });
+    });
+
+    it('drops internal fields and upper-cases the sensor', () => {
+        const props = tidyProperties({ projection: 'x', focalLength35: 24, orientation: 1, sensor: 'fc6310', make: 'DJI' });
+        expect(props).toEqual({ sensor: 'FC6310', make: 'DJI' });
+    });
+});
+
+describe('formatDimensions', () => {
+    it('adds the megapixels, rounded to one decimal', () => {
+        expect(formatDimensions(3581, 3854)).toBe('3581 x 3854 ~ 13.8Mpx');
+        expect(formatDimensions(8000, 6000)).toBe('8000 x 6000 ~ 48.0Mpx');
+    });
+
+    it('leaves the megapixels out when a side is not a positive number', () => {
+        expect(formatDimensions(0, 300)).toBe('0 x 300');
+        expect(formatDimensions('a', 300)).toBe('a x 300');
+    });
+});
+
+describe('beautifyKey', () => {
+    it('capitalises and splits camel case, and leaves non-strings alone', () => {
+        expect(beautifyKey('focalLength')).toBe('Focal Length');
+        expect(beautifyKey('band1')).toBe('Band 1');
+        expect(beautifyKey(3)).toBe(3);
+    });
+});
+
+describe('isUrl', () => {
+    it('accepts absolute http and https URLs only', () => {
+        expect(isUrl('https://example.com/a')).toBe(true);
+        expect(isUrl('http://example.com')).toBe(true);
+        expect(isUrl('ftp://example.com')).toBe(false);
+        expect(isUrl('not a url')).toBe(false);
+        expect(isUrl('')).toBe(false);
+    });
+});
+
+describe('linkCrsCodes', () => {
+    it('links EPSG and ESRI codes to their epsg.io page, by the bare code', () => {
+        expect(linkCrsCodes('EPSG:4326 11.2, 46.1')).toEqual([
+            { text: 'EPSG:4326', href: 'https://epsg.io/4326' },
+            { text: ' 11.2, 46.1' }
+        ]);
+        expect(linkCrsCodes('WGS84 (EPSG:4326), assumed')).toEqual([
+            { text: 'WGS84 (' },
+            { text: 'EPSG:4326', href: 'https://epsg.io/4326' },
+            { text: '), assumed' }
+        ]);
+        expect(linkCrsCodes('ESRI:102100 (from the .prj file)')[0]).toEqual({ text: 'ESRI:102100', href: 'https://epsg.io/102100' });
+        expect(linkCrsCodes('urn:ogc:def:crs:EPSG::32633')[1]).toEqual({ text: 'EPSG::32633', href: 'https://epsg.io/32633' });
+        expect(linkCrsCodes('epsg:2056')[0].href).toBe('https://epsg.io/2056');
+    });
+
+    it('links every code in a text', () => {
+        const links = linkCrsCodes('EPSG:32633 + EPSG:5773').filter(p => p.href).map(p => p.href);
+        expect(links).toEqual(['https://epsg.io/32633', 'https://epsg.io/5773']);
+    });
+
+    it('leaves text without a code, other authorities and non-strings as one plain part', () => {
+        expect(linkCrsCodes('DJI FC6310')).toEqual([{ text: 'DJI FC6310' }]);
+        expect(linkCrsCodes('IGNF:LAMB93')).toEqual([{ text: 'IGNF:LAMB93' }]);
+        expect(linkCrsCodes('NOTEPSG:4326x')).toEqual([{ text: 'NOTEPSG:4326x' }]);
+        expect(linkCrsCodes('')).toEqual([{ text: '' }]);
+    });
+});
+
+const pointEntry = (coordinates, extra = {}) => ({
+    entry: {
+        type: 3, path: 'a.jpg', hash: 'abc123', size: 10,
+        point_geom: {
+            crs: { type: 'name', properties: { name: 'EPSG:4326' } },
+            geometry: { type: 'Point', coordinates },
+            properties: {}, type: 'Feature'
+        },
+        ...extra
+    }
+});
+
+describe('resolution row', () => {
+    // A 5 cm/px georaster in a projection whose unit is not the metre: the row is
+    // measured on the WGS84 footprint, not read from the geotransform
+    const ring = [[-91.9944, 46.8430], [-91.9932, 46.8430], [-91.9932, 46.8422], [-91.9944, 46.8422], [-91.9944, 46.8430]];
+    const entry = {
+        type: ddb.entry.type.GEORASTER,
+        path: 'ortho.tif',
+        polygon_geom: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: {} },
+        properties: { geotransform: [0, 0.164, 0, 0, 0, -0.164], width: 1830, height: 1780 }
+    };
+
+    it('shows the ground resolution of a georaster', () => {
+        const props = tidyProperties(buildAllProperties({ entry }));
+        expect(props.resolution).toBe('5.0 cm/px\n91 x 89 m (8,119 m²)');
+        expect(props.geotransform).toBeUndefined();
+    });
+
+    it('follows the imperial units', () => {
+        const props = tidyProperties(buildAllProperties({ entry }, 'imperial'));
+        expect(props.resolution).toBe('2.0 in/px\n299 x 292 ft (2.01 acres)');
+    });
+
+    it('falls back to the geotransform without a footprint', () => {
+        const props = tidyProperties(buildAllProperties({ entry: { ...entry, polygon_geom: undefined } }));
+        expect(props.resolution).toBe('0.164 per pixel, in coordinate system units');
+    });
+});
+
+describe('speed and length rows', () => {
+    const entry = {
+        type: ddb.entry.type.GEOIMAGE,
+        path: 'DJI_0001.JPG',
+        properties: { flightSpeed: 5, flightSpeedZ: -0.5, gpsXYAccuracy: 1.5, gpsZAccuracy: 3, focalLength: 4.5 }
+    };
+
+    it('shows speeds and GPS accuracies in metric units', () => {
+        const props = buildAllProperties({ entry });
+        expect(props.flightSpeed).toBe('18.0 km/h');
+        expect(props.flightSpeedZ).toBe('-1.8 km/h');
+        expect(props.gpsXYAccuracy).toBe('1.50 m');
+        expect(props.focalLength).toBe(4.5);
+    });
+
+    it('shows them in imperial units', () => {
+        const props = buildAllProperties({ entry }, 'imperial');
+        expect(props.flightSpeed).toBe('11.2 mph');
+        expect(props.gpsZAccuracy).toBe('9.84 ft');
+    });
+});
+
+describe('coordinates row', () => {
+    it('shows the CRS, longitude first and the altitude in metres, and copies latitude first', () => {
+        const file = pointEntry([11.2, 46.1, 300.456]);
+        expect(buildAllProperties(file).coordinates).toBe('EPSG:4326 11.2, 46.1, 300.46m');
+        expect(pointCoordinatesText(file.entry.point_geom)).toBe('46.1, 11.2, 300.46');
+    });
+
+    it('shows the altitude in feet for imperial and still copies it in metres', () => {
+        const file = pointEntry([11.2, 46.1, 300.456]);
+        expect(buildAllProperties(file, 'imperial').coordinates).toBe('EPSG:4326 11.2, 46.1, 985.75ft');
+        expect(buildCopyableValues(file).coordinates.text).toBe('46.1, 11.2, 300.46');
+    });
+
+    it('writes every part in the browser locale, without group separators, "; " between them where the decimal sign is a comma', () => {
+        Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
+        try {
+            expect(buildAllProperties(pointEntry([9.1234, 45.678, 1234.5])).coordinates).toBe('EPSG:4326 9,1234; 45,678; 1234,50m');
+        } finally {
+            delete navigator.language;
+        }
+        expect(buildAllProperties(pointEntry([500000.123456789, 4500000.5, 1234.5])).coordinates)
+            .toBe('EPSG:4326 500000.12345679, 4500000.5, 1234.50m');
+    });
+
+    it('has no altitude part for a 2D point', () => {
+        const file = pointEntry([11.2, 46.1]);
+        expect(buildAllProperties(file).coordinates).toBe('EPSG:4326 11.2, 46.1');
+        expect(pointCoordinatesText(file.entry.point_geom)).toBe('46.1, 11.2');
+    });
+
+    it('is absent without a point geometry', () => {
+        expect(pointCoordinatesText(undefined)).toBeNull();
+        expect(pointCoordinatesText({ geometry: { coordinates: [] } })).toBeNull();
+    });
+});
+
+describe('buildRowNotes', () => {
+    it('shows how long ago the entry was modified under the modified row', () => {
+        const mtime = Math.floor(Date.now() / 1000) - 120;
+        expect(buildRowNotes({ entry: { type: 2, path: 'a.txt', mtime } })).toEqual({ modified: '2 minutes ago' });
+    });
+
+    it('has no notes without a modified time', () => {
+        expect(buildRowNotes({ entry: { type: 1, path: 'dir' } })).toEqual({});
+        expect(buildRowNotes(null)).toEqual({});
+    });
+});
+
+describe('buildCopyableValues', () => {
+    it('copies the hash from the size row and latitude, longitude, altitude from the coordinates row', () => {
+        expect(buildCopyableValues(pointEntry([11.2, 46.1, 300]))).toEqual({
+            size: { text: 'abc123', label: 'hash' },
+            coordinates: { text: '46.1, 11.2, 300.00', label: 'latitude, longitude, altitude' }
+        });
+        expect(buildCopyableValues(pointEntry([11.2, 46.1])).coordinates)
+            .toEqual({ text: '46.1, 11.2', label: 'latitude, longitude' });
+    });
+
+    it('has only what the entry has', () => {
+        expect(buildCopyableValues({ entry: { type: 1, path: 'dir' } })).toEqual({});
+        expect(buildCopyableValues(null)).toEqual({});
+    });
+});
+
+describe('raw metadata rows', () => {
+    const file = meta => ({ entry: { type: ddb.entry.type.GENERIC, path: 'a.txt', properties: { meta } } });
+
+    it('hides the saved views but keeps the other keys', () => {
+        const props = buildAllProperties(file({ name: { data: 'Site' }, views: [{ id: '1', data: '{}' }] }));
+        expect(props.metadata).toEqual({ name: { data: 'Site' } });
+    });
+
+    it('leaves no metadata row when only hidden keys exist', () => {
+        expect(buildAllProperties(file({ views: [] })).metadata).toBeUndefined();
+    });
+
+    it('visibleMeta drops every hidden key and tolerates no meta', () => {
+        expect(HIDDEN_META_KEYS).toContain('views');
+        expect(visibleMeta({ license: 1, views: 2 })).toEqual({ license: 1 });
+        expect(visibleMeta(undefined)).toEqual({});
+    });
+});
+
+describe('buildAllProperties of the dataset entry', () => {
+    it('shows neither the permissions nor the cover flag that the Registry adds to the dataset entry (FR-EXP-28)', () => {
+        const file = {
+            entry: {
+                path: 'ddb://h/o/d', type: ddb.entry.type.DRONEDB, size: 5, mtime: 1,
+                properties: { entries: 6, meta: {}, permissions: { canRead: true }, hasThumbnail: false }
+            }
+        };
+        const props = buildAllProperties(file);
+        expect(props.entries).toBe('6');
+        expect(props).not.toHaveProperty('permissions');
+        expect(props).not.toHaveProperty('hasThumbnail');
+    });
+});
+
+describe('the properties of the dataset root (FR-EXP-25)', () => {
+    const root = {
+        path: 'ddb://h/o/explorer-copy', type: ddb.entry.type.DRONEDB, size: 42050000, mtime: 1700000000,
+        properties: {
+            entries: 16, readme: 'README.md', permissions: { canRead: true }, hasThumbnail: true,
+            meta: {
+                id: { id: 'e3f1c2a0-5b7d-4c1e-9a64-0d2f8b1a77c3', data: 'f9d2', mtime: 1700000000 },
+                name: { id: '0b1d7a22-aaaa-4c5d-8e1f-9a3c5d7e9f10', data: 'T Explorer Copy', mtime: 1700000000 },
+                tagline: { id: '7c1d7a22-bbbb-4c5d-8e1f-9a3c5d7e9f11', data: 'Explorer audit copy', mtime: 1700000000 },
+                visibility: { id: '2c1d7a22-cccc-4c5d-8e1f-9a3c5d7e9f12', data: 1, mtime: 1700000000 },
+                license: { id: '3c1d7a22-dddd-4c5d-8e1f-9a3c5d7e9f13', data: 'CC-BY-4.0', mtime: 1700000000 }
+            }
+        }
+    };
+
+    it('reads the name, tagline, visibility, license, entries, size and date as words', () => {
+        const props = buildAllProperties({ entry: root });
+        expect(props.name).toBe('T Explorer Copy');
+        expect(props.tagline).toBe('Explorer audit copy');
+        expect(props.visibility).toBe('Unlisted');
+        expect(props.license).toBe('Creative Commons Attribution 4.0 International');
+        expect(props.entries).toBe('16');
+        expect(props.size).toBe('40.1 MB');
+        expect(props.modified).toBe(formatModifiedDate(1700000000));
+        expect(props.readme).toBe('README.md');
+    });
+
+    it('writes the entry count with the number format (grouped digits)', () => {
+        const big = { ...root, properties: { ...root.properties, entries: 12345 } };
+        expect(buildAllProperties({ entry: big }).entries).toBe('12,345');
+    });
+
+    it('has a Created row from the creation date of the Registry, written as every date is', () => {
+        const created = Date.UTC(2026, 2, 4, 10, 30, 15);
+        const expected = new Date(created).toLocaleString('en-US', {
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        expect(buildAllProperties({ entry: root }, 'metric', { created }).created).toBe(expected);
+        // an ISO text (the DTO as JSON) is the same moment
+        expect(buildAllProperties({ entry: root }, 'metric', { created: '2026-03-04T10:30:15Z' }).created).toBe(expected);
+        expect(Object.keys(buildAllProperties({ entry: root }, 'metric', { created }))).toContain('created');
+    });
+
+    it('has no Created row until the creation date is known, or when it is not a date', () => {
+        expect(buildAllProperties({ entry: root })).not.toHaveProperty('created');
+        expect(buildAllProperties({ entry: root }, 'metric', { created: 'soon' })).not.toHaveProperty('created');
+    });
+
+    it('shows no id, no epoch time and no number as the visibility by default', () => {
+        const text = JSON.stringify(buildAllProperties({ entry: root }));
+        expect(text).not.toContain('e3f1c2a0-5b7d-4c1e-9a64-0d2f8b1a77c3');
+        expect(text).not.toContain('0b1d7a22');
+        expect(text).not.toContain('1700000000');
+        expect(buildAllProperties({ entry: root })).not.toHaveProperty('metadata');
+        expect(buildAllProperties({ entry: root })).not.toHaveProperty('permissions');
+    });
+
+    it('gives the metadata as it is stored with raw, for the "Show raw metadata" toggle', () => {
+        const props = buildAllProperties({ entry: root }, 'metric', { raw: true });
+        expect(props.metadata.name).toEqual({ id: '0b1d7a22-aaaa-4c5d-8e1f-9a3c5d7e9f10', data: 'T Explorer Copy', mtime: 1700000000 });
+        expect(props.metadata.visibility.data).toBe(1);
+    });
+
+    it('names a dataset without a display name by its slug, and leaves out what it does not have', () => {
+        const bare = { path: 'ddb://h/o/survey-a', type: ddb.entry.type.DRONEDB, size: 0, properties: { entries: 0, meta: { visibility: { data: 0 } } } };
+        const props = buildAllProperties({ entry: bare });
+        expect(props.name).toBe('survey-a');
+        expect(props.visibility).toBe('Private');
+        expect(props).not.toHaveProperty('tagline');
+        expect(props).not.toHaveProperty('license');
+        expect(props).not.toHaveProperty('size');
+        expect(props).not.toHaveProperty('modified');
+    });
+
+    it('does not change the properties of a file', () => {
+        const photo = { path: 'a.jpg', type: ddb.entry.type.IMAGE, size: 1024, mtime: 1, properties: { meta: { x: { id: 'g', data: 'y' } } } };
+        expect(buildAllProperties({ entry: photo }).metadata).toEqual({ x: { id: 'g', data: 'y' } });
+    });
+});
+
+describe('a warning that libddb tags with a code (FR-EXP-18)', () => {
+    const dwg = properties => ({ entry: { path: 'plan.dwg', type: ddb.entry.type.VECTOR, size: 10, properties } });
+
+    it('says it in words for users, not as the setup message of the server, and shows no code row', () => {
+        const props = buildAllProperties(dwg({
+            warning: 'vector parse failed: DWG support needs dwg2dxf (LibreDWG); set DDB_DWG2DXF_PATH or install dwg2dxf next to ddb',
+            warningCode: 'dwg-converter-missing'
+        }));
+        expect(props.warning).toBe('DWG drawings cannot be read on this server; export the drawing as DXF and upload that.');
+        expect(props).not.toHaveProperty('warningCode');
+        expect(JSON.stringify(props)).not.toContain('DDB_DWG2DXF_PATH');
+    });
+
+    it('keeps the text of a warning without a code, or with a code it does not know', () => {
+        expect(buildAllProperties(dwg({ warning: 'footprint unavailable: no CRS' })).warning).toBe('footprint unavailable: no CRS');
+        const props = buildAllProperties(dwg({ warning: 'new reason', warningCode: 'from-a-newer-libddb' }));
+        expect(props.warning).toBe('new reason');
+        expect(props).not.toHaveProperty('warningCode');
+    });
+});

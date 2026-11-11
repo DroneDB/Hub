@@ -1,35 +1,40 @@
 <template>
-    <Dialog :visible="visible" @update:visible="$emit('update:visible', $event)" modal
-        :header="`Log - ${title}`" :style="{ width: '48rem' }" @show="onShow">
-        <pre ref="logContainer" class="task-log">{{ logText || 'No log output.' }}</pre>
+    <!-- The wide size of FR-XC-20: a log line fits without a break; the window can be maximized (FR-PRC-44) -->
+    <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position size-class="dialog-wide" maximizable
+            @update:visible="$emit('update:visible', $event)" @show="onShow">
+        <pre ref="logContainer" class="task-log" :class="{ 'no-wrap': !wrapLines }">{{ shownText || 'No log output.' }}</pre>
         <template #footer>
             <!-- Toggles on the left -->
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 me-auto">
                 <div v-if="isActive" class="d-flex align-items-center gap-2">
-                    <ToggleSwitch v-model="autoRefresh" />
-                    <span class="muted" style="font-size: 0.8rem;">Auto-refresh</span>
+                    <ToggleSwitch v-model="autoRefresh" input-id="task-log-auto-refresh" />
+                    <label for="task-log-auto-refresh" class="muted" style="font-size: 0.8rem;">Auto-refresh</label>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <ToggleSwitch v-model="autoScroll" />
-                    <span class="muted" style="font-size: 0.8rem;">Auto-scroll</span>
+                    <ToggleSwitch v-model="autoScroll" input-id="task-log-auto-scroll" />
+                    <label for="task-log-auto-scroll" class="muted" style="font-size: 0.8rem;">Auto-scroll</label>
+                </div>
+                <!-- Off: a line stays one line, and the log scrolls sideways -->
+                <div class="d-flex align-items-center gap-2">
+                    <ToggleSwitch v-model="wrapLines" input-id="task-log-wrap-lines" />
+                    <label for="task-log-wrap-lines" class="muted" style="font-size: 0.8rem;">Wrap lines</label>
                 </div>
             </div>
-            <!-- Spacer to push buttons to the right -->
-            <div style="flex-grow: 1;"></div>
-            <!-- Buttons on the right -->
-            <div class="d-flex align-items-center gap-2">
-                <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
+            <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
                     @click="$emit('refresh')" />
-                <Button label="Close" @click="$emit('update:visible', false)" />
-            </div>
+            <Button label="Close" data-autofocus @click="$emit('update:visible', false)" />
         </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
+import { utcClockToLocal } from '@/libs/format';
+
+// The "[HH:mm:ss]" the Registry writes at the start of a log line, in UTC (LogRingBuffer)
+const UTC_LINE_TIME = /^\[(\d{2}:\d{2}:\d{2})\]/gm;
 
 /**
  * Presentational task log viewer dialog with auto-refresh and auto-scroll.
@@ -40,11 +45,14 @@ import ToggleSwitch from 'primevue/toggleswitch';
  * Auto-refresh: polls every 2s for active tasks only (no polling for terminal).
  * Auto-scroll: scrolls to bottom on new content when user is near the bottom.
  * Both default to enabled and reset on each dialog open.
+ * Wrap lines: on (the default) a long line wraps; off it stays one line and the log scrolls sideways.
+ * The time at the start of each line, which the Registry writes in UTC, shows in local time, as
+ * the dates of the task table do (libs/format.js).
  */
 export default {
     name: 'TaskLogDialog',
 
-    components: { Dialog, Button, ToggleSwitch },
+    components: { Window, Button, ToggleSwitch },
 
     props: {
         visible: { type: Boolean, default: false },
@@ -60,9 +68,14 @@ export default {
         return {
             autoRefresh: true,
             autoScroll: true,
-            _refreshInterval: null,
-            _wasNearBottom: true  // Track whether user was near bottom before last change
+            wrapLines: true
         };
+    },
+
+    computed: {
+        shownText() {
+            return this.logText.replace(UTC_LINE_TIME, (_, clock) => `[${utcClockToLocal(clock)}]`);
+        }
     },
 
     watch: {
@@ -86,11 +99,22 @@ export default {
         }
     },
 
+    // Instance state, not reactive (Vue does not proxy data keys that start with "_")
+    created() {
+        this._refreshInterval = null;
+        this._wasNearBottom = true; // whether the user was near the bottom before the last change
+    },
+
+    beforeUnmount() {
+        this.clearRefreshInterval();
+    },
+
     methods: {
         onShow() {
             // Reset toggles to enabled on each open
             this.autoRefresh = true;
             this.autoScroll = true;
+            this.wrapLines = true;
             this._wasNearBottom = true;
 
             // Start auto-refresh only for active tasks
@@ -109,6 +133,7 @@ export default {
         attachScrollListener() {
             const el = this.$refs.logContainer;
             if (!el) return;
+            // lifetime: element (the dialog's own log container)
             el.addEventListener('scroll', this.onScroll, { passive: true });
         },
 
@@ -156,24 +181,32 @@ export default {
                 }
             });
         }
-    },
-
-    beforeUnmount() {
-        this.clearRefreshInterval();
     }
 };
 </script>
 
 <style scoped>
 .task-log {
-    max-height: 24rem;
+    /* As high as the screen permits: what the header, the footer and the margins of the window leave */
+    max-height: calc(90vh - 10rem);
     overflow: auto;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--ddb-console-bg);
+    color: var(--ddb-console-text);
     padding: 0.75rem;
     border-radius: 4px;
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* Wrap lines off: a line is one line, the log scrolls sideways */
+.task-log.no-wrap {
+    white-space: pre;
+    word-break: normal;
+}
+
+/* The window maximized: the log takes the screen */
+:global(.p-dialog-maximized .task-log) {
+    max-height: calc(100vh - 10rem);
 }
 </style>

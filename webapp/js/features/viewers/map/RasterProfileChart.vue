@@ -1,5 +1,5 @@
 <template>
-    <div class="raster-profile-chart" v-if="profile && hasSamples">
+    <div v-if="profile && hasSamples" class="raster-profile-chart" :class="{ expanded }">
         <!-- Summary stats -->
         <div class="profile-summary" :class="{ 'thermal': isThermal }">
             <span v-if="profile.min !== null && profile.min !== undefined">Min: {{ formatValue(profile.min) }}</span>
@@ -9,24 +9,29 @@
         </div>
 
         <!-- Inline SVG chart (no external dependencies) -->
-        <svg class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
-            @mousemove="onHover" @mouseleave="hoverIdx = null" @touchmove.prevent="onTouchHover">
+        <!-- A scrubber over the samples: the pointer or the arrow keys pick one -->
+        <svg :ref="observeWidth" class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
+             role="slider" tabindex="0" aria-label="Profile position"
+             :aria-valuemin="0" :aria-valuemax="samples.length - 1" :aria-valuenow="hoverIdx ?? 0"
+             :aria-valuetext="hoverText"
+             @mousemove="onHover" @mouseleave="setHover(null)" @touchmove.prevent="onTouchHover"
+             @focus="hoverIdx === null && setHover(0)" @blur="setHover(null)" @keydown="onKey">
             <!-- Axis grid lines (5 horizontal bands) -->
             <g class="grid">
                 <line v-for="i in 4" :key="'h' + i"
-                    :x1="padLeft" :x2="width - padRight"
-                    :y1="padTop + (i * chartHeight) / 5"
-                    :y2="padTop + (i * chartHeight) / 5" />
+                      :x1="padLeft" :x2="width - padRight"
+                      :y1="padTop + (i * chartHeight) / 5"
+                      :y2="padTop + (i * chartHeight) / 5" />
             </g>
 
             <!-- Profile polyline -->
             <polyline class="profile-line" :class="{ 'thermal': isThermal }"
-                :points="polyPoints" fill="none" stroke-width="1.5" />
+                      :points="polyPoints" fill="none" stroke-width="1.5" />
 
             <!-- Invalid-sample markers (null values, e.g. nodata) -->
             <g v-if="nullBands.length" class="null-bands">
                 <rect v-for="(band, i) in nullBands" :key="'n' + i"
-                    :x="band.x" :y="padTop" :width="band.w" :height="chartHeight" />
+                      :x="band.x" :y="padTop" :width="band.w" :height="chartHeight" />
             </g>
 
             <!-- Axes -->
@@ -46,26 +51,50 @@
             <g v-if="hoverIdx !== null && hoveredSample">
                 <line class="hover-line" :x1="hoverX" :x2="hoverX" :y1="padTop" :y2="height - padBottom" />
                 <circle v-if="hoveredSample.value !== null"
-                    class="hover-dot" :class="{ 'thermal': isThermal }"
-                    :cx="hoverX" :cy="hoverY" r="3" />
+                        class="hover-dot" :class="{ 'thermal': isThermal }"
+                        :cx="hoverX" :cy="hoverY" r="3" />
             </g>
         </svg>
 
         <!-- Tooltip + CSV export -->
         <div class="profile-actions">
-            <span class="hover-info" v-if="hoveredSample">
-                d: {{ formatLength(hoveredSample.distance) }} ·
-                v: {{ hoveredSample.value === null ? 'n/d' : formatValue(hoveredSample.value) }}
+            <span v-if="hoveredSample" class="hover-info">{{ hoverText }}</span>
+            <span v-else class="hover-info placeholder">Hover or focus the chart for details</span>
+            <span class="profile-buttons">
+                <button v-if="expandable" class="panel-btn" title="Show the chart larger" aria-label="Expand the chart" @click="expandedOpen = true">
+                    <i class="fas fa-expand" aria-hidden="true" />
+                </button>
+                <button class="panel-btn" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
+                    <i class="fas fa-file-csv" aria-hidden="true" />
+                </button>
             </span>
-            <span class="hover-info placeholder" v-else>Hover the chart for details</span>
-            <button class="btn btn-secondary btn-sm" @click="exportCsv" title="Export CSV">
-                <i class="fas fa-file-csv"></i>
-            </button>
         </div>
+
+        <!-- The same chart in a window of the wide size, 40vh high (FR-RAS-35); the panel's colours come with the
+             classes of the panel, the window is outside it -->
+        <Window v-if="expandedOpen" id="raster-profile-expanded" :title="title" modal size-class="dialog-wide" close-button
+                @close="expandedOpen = false">
+            <div class="profile-expanded analysis-panel analysis-panel--raster">
+                <RasterProfileChart :profile="profile" :unit="unit" :is-thermal="isThermal" :expandable="false" expanded
+                                    @active-sample="sample => $emit('activeSample', sample)" />
+            </div>
+        </Window>
     </div>
 </template>
 
 <script>
+import { downloadCsv, toCsv } from '@/libs/csv';
+import { formatLength } from '@/libs/format';
+import { rasterValueParts } from '@/libs/map/rasterUnit';
+import { usePreference } from '@/composables/usePreference';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import Window from '@/components/HubWindow.vue';
+
+// The y labels: the width of a character at the label font and the gap between a label and the axis
+const LABEL_CHAR_WIDTH = 6.5;
+const LABEL_GAP = 4;
+const MIN_PAD_LEFT = 32;
+
 /**
  * Elevation / value profile chart.
  *
@@ -75,28 +104,47 @@
  *   map can render a matching marker on the polyline.
  * - Null samples (nodata) are rendered as translucent vertical bands so users
  *   immediately see gaps instead of a misleading flat line.
+ * - Distances are in the user's units, as the map's measurements; values in the raster's unit.
  */
 export default {
     name: 'RasterProfileChart',
+    components: { Window },
     props: {
         profile: { type: Object, default: null },
         unit: { type: String, default: '' },
-        isThermal: { type: Boolean, default: false }
+        isThermal: { type: Boolean, default: false },
+        /** Show the Expand button, which opens the chart in a larger window */
+        expandable: { type: Boolean, default: true },
+        /** The chart of the larger window: 40vh high instead of 160 px */
+        expanded: { type: Boolean, default: false }
     },
-    emits: ['hover'],
+    emits: ['activeSample'],
+    setup() {
+        return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
+    },
     data() {
         return {
+            // The drawing's size: the chart's own, once measured (a phone's bottom sheet, the desktop panel and the
+            // larger window differ), so the text and the line keep their proportions. The paddings leave room for the
+            // axis text, 12px (FR-RAS-35)
             width: 320,
             height: 160,
-            padTop: 8,
-            padBottom: 14,
-            padLeft: 38,
-            padRight: 6,
-            hoverIdx: null
+            padTop: 12,
+            padBottom: 20,
+            padRight: 8,
+            hoverIdx: null,
+            expandedOpen: false
         };
     },
     computed: {
         viewBox() { return `0 0 ${this.width} ${this.height}`; },
+        title() { return this.isThermal ? 'Thermal Profile' : 'Value Profile'; },
+        // The room of the y labels: the longest of them at the label font (12px: about 6.5 px a character), so a value with its
+        // unit is never cut (FR-RAS-08)
+        padLeft() {
+            const chars = Math.max(...[this.yMin, this.yMax].map(v => this.formatValue(v).length));
+            return Math.max(MIN_PAD_LEFT, Math.ceil(chars * LABEL_CHAR_WIDTH) + LABEL_GAP + 4);
+        },
         chartWidth() { return this.width - this.padLeft - this.padRight; },
         chartHeight() { return this.height - this.padTop - this.padBottom; },
         samples() { return (this.profile && this.profile.samples) || []; },
@@ -153,6 +201,11 @@ export default {
             }
             return bands;
         },
+        hoverText() {
+            const h = this.hoveredSample;
+            if (!h) return '';
+            return `d: ${this.formatLength(h.distance)} · v: ${h.value === null ? 'n/d' : this.formatValue(h.value)}`;
+        },
         hoveredSample() {
             if (this.hoverIdx === null) return null;
             return this.samples[this.hoverIdx] || null;
@@ -165,7 +218,30 @@ export default {
             return this.yFor(this.hoveredSample.value);
         }
     },
+    watch: {
+        profile() { this.hoverIdx = null; }
+    },
+    beforeUnmount() {
+        this.observeWidth(null);
+        // A chart that goes (the expanded window closes) while it shows a hover: the map marker goes with it
+        if (this.hoverIdx !== null) this.$emit('activeSample', null);
+    },
     methods: {
+        // Ref of the chart: follows its size for as long as it is shown (called on every render)
+        observeWidth(el) {
+            if (el === this.observedEl) return;
+            if (this.resizeObserver) this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+            this.observedEl = el;
+            if (!el || typeof ResizeObserver === 'undefined') return;
+            this.resizeObserver = new ResizeObserver(([entry]) => {
+                const width = Math.round(entry.contentRect.width);
+                const height = Math.round(entry.contentRect.height);
+                if (width > 0) this.width = width;
+                if (height > 0) this.height = height;
+            });
+            this.resizeObserver.observe(el);
+        },
         xFor(i) {
             const n = this.samples.length;
             if (n <= 1) return this.padLeft + this.chartWidth / 2;
@@ -175,16 +251,13 @@ export default {
             const t = (v - this.yMin) / this.yRange;
             return this.padTop + (1 - t) * this.chartHeight;
         },
+        // The value with its unit, as every raster value is written (FR-RAS-28)
         formatValue(v) {
-            if (v === null || v === undefined || Number.isNaN(v)) return 'n/d';
-            const abs = Math.abs(v);
-            const digits = abs >= 100 ? 1 : (abs >= 10 ? 2 : 3);
-            return `${v.toFixed(digits)}${this.unit ? ' ' + this.unit : ''}`;
+            return rasterValueParts(v, this.unit, { placeholder: 'n/d' }).text;
         },
         formatLength(m) {
             if (m === null || m === undefined) return '';
-            if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
-            return `${m.toFixed(1)} m`;
+            return formatLength(m, this.measureUnit);
         },
         onHover(evt) {
             const svg = evt.currentTarget;
@@ -207,32 +280,31 @@ export default {
             const n = this.samples.length;
             const idx = n <= 1 ? 0 : Math.round((pxFromLeft / this.chartWidth) * (n - 1));
             const clamped = Math.max(0, Math.min(n - 1, idx));
-            if (clamped !== this.hoverIdx) {
-                this.hoverIdx = clamped;
-                this.$emit('hover', this.samples[clamped] || null);
-            }
+            this.setHover(clamped);
+        },
+        // The map marker follows the chart: null removes it
+        setHover(idx) {
+            if (idx === this.hoverIdx) return;
+            this.hoverIdx = idx;
+            this.$emit('activeSample', idx === null ? null : this.samples[idx] || null);
+        },
+        // Arrows step one sample (ten with Shift), Home/End go to the ends
+        onKey(e) {
+            const n = this.samples.length;
+            if (!n) return;
+            const cur = this.hoverIdx ?? 0;
+            const step = e.shiftKey ? 10 : 1;
+            const targets = { ArrowLeft: cur - step, ArrowDown: cur - step, ArrowRight: cur + step, ArrowUp: cur + step, Home: 0, End: n - 1 };
+            if (!(e.key in targets)) return;
+            e.preventDefault();
+            this.setHover(Math.max(0, Math.min(n - 1, targets[e.key])));
         },
         exportCsv() {
             if (!this.hasSamples) return;
-            const header = 'index,distance_m,value,unit,lon,lat\n';
             const unit = this.profile.unit || this.unit || '';
-            const escape = (v) => (v === null || v === undefined) ? '' : String(v);
-            const rows = this.samples.map((s, i) =>
-                `${i},${escape(s.distance)},${escape(s.value)},${unit},${escape(s.lon)},${escape(s.lat)}`);
-            const blob = new Blob([header + rows.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'raster-profile.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            // Revoke on next tick to avoid cancelling the download on slow browsers.
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            const rows = this.samples.map((s, i) => [i, s.distance, s.value, unit, s.lon, s.lat]);
+            downloadCsv(toCsv(['index', 'distance_m', 'value', 'unit', 'lon', 'lat'], rows), 'raster-profile.csv');
         }
-    },
-    watch: {
-        profile() { this.hoverIdx = null; }
     }
 };
 </script>
@@ -248,77 +320,102 @@ export default {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    font-size: 11px;
-    color: #ccc;
+    font-size: 0.75rem;
+    color: var(--panel-text-soft);
 }
 
 .profile-summary.thermal {
-    color: #ffab91;
+    color: var(--panel-thermal-soft);
 }
 
 .profile-svg {
     width: 100%;
     height: 160px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(var(--ddb-glass-rgb), 0.03);
     border-radius: 3px;
     cursor: crosshair;
     display: block;
 }
 
+.profile-svg:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: 1px;
+}
+
 .profile-svg .grid {
-    stroke: rgba(255, 255, 255, 0.08);
+    stroke: rgba(var(--ddb-glass-rgb), 0.08);
     stroke-width: 0.5;
 }
 
 .profile-svg .axis {
-    stroke: rgba(255, 255, 255, 0.25);
+    stroke: rgba(var(--ddb-glass-rgb), 0.25);
     stroke-width: 0.75;
 }
 
 .profile-svg .label {
-    font-size: 9px;
-    fill: #bbb;
+    font-size: 0.75rem;
+    fill: var(--panel-text-soft);
     font-family: inherit;
 }
 
 .profile-line {
-    stroke: #4fc3f7;
+    stroke: var(--panel-accent);
 }
 
 .profile-line.thermal {
-    stroke: #ff7043;
+    stroke: var(--panel-thermal-strong);
 }
 
 .null-bands rect {
-    fill: rgba(255, 82, 82, 0.15);
+    fill: rgba(var(--panel-danger-rgb), 0.15);
 }
 
 .hover-line {
-    stroke: rgba(255, 255, 255, 0.5);
+    stroke: rgba(var(--ddb-glass-rgb), 0.5);
     stroke-dasharray: 2 2;
     stroke-width: 0.75;
 }
 
 .hover-dot {
-    fill: #fff;
-    stroke: #4fc3f7;
+    fill: var(--ddb-text-on-dark);
+    stroke: var(--panel-accent);
     stroke-width: 1.5;
 }
 
 .hover-dot.thermal {
-    stroke: #ff7043;
+    stroke: var(--panel-thermal-strong);
+}
+
+.raster-profile-chart.expanded .profile-svg {
+    height: 40vh;
 }
 
 .profile-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 11px;
-    color: #ccc;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--panel-text-soft);
+}
+
+.profile-buttons {
+    display: inline-flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+/* The panel's colours in a window: the classes of the panel, without its place on the map */
+.profile-expanded {
+    position: static;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 0.75rem;
 }
 
 .hover-info.placeholder {
-    color: #888;
+    color: var(--panel-text-faint);
     font-style: italic;
 }
 </style>

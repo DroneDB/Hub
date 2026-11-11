@@ -1,5 +1,5 @@
 <template>
-    <Window v-if="show" :title="title" id="fileAvailabilityDialog" @onClose="handleClose" modal sizeClass="dialog-lg" fixedSize>
+    <Window v-if="show" id="fileAvailabilityDialog" :title="title" modal size-class="dialog-lg" fixed-size @close="handleClose">
         <div class="file-availability-dialog">
             <div class="content">
                 <div class="description">
@@ -9,10 +9,15 @@
 
                     <!-- Progress indicator for build in progress -->
                     <div v-if="status === 'building' && waitingForBuild" class="build-progress">
-                        <div class="ui active inline loader small"></div>
+                        <div class="ui active inline loader small" />
                         <span class="ms-2">Waiting for build completion...</span>
                         <div class="progress-timer">{{ formatWaitTime() }}</div>
                     </div>
+
+                    <!-- What the administrator of the server does, for a file the server cannot read (FR-EXP-18) -->
+                    <p v-if="hint && showDetails" class="admin-hint">
+                        <strong>For the administrator:</strong> {{ hint }}
+                    </p>
 
                     <!-- Build details if available -->
                     <div v-if="buildState && showDetails" class="build-details">
@@ -26,7 +31,7 @@
                                 <tr>
                                     <td><strong>Status:</strong></td>
                                     <td>
-                                        <Tag :value="buildState.currentState" :severity="getTagSeverity(buildState.currentState)" />
+                                        <Tag :value="buildState.currentState" :severity="tagSeverity(buildState.currentState)" />
                                     </td>
                                 </tr>
                                 <tr v-if="buildState.createdAt">
@@ -46,22 +51,22 @@
                     </div>
                 </div>
             </div>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button v-if="hasAction('close')" @click="handleClose" severity="secondary" label="Close" />
-                <Button v-if="hasAction('cancel')" @click="handleClose" severity="secondary" label="Cancel" />
-                <Button v-if="hasAction('details')" @click="toggleDetails"
-                    :label="showDetails ? 'Hide Details' : 'Show Details'" />
-                <Button v-if="hasAction('start-build')" severity="info"
-                        @click="handleStartBuild" :disabled="processing"
-                        icon="fa-solid fa-play" label="Start Processing" />
-                <Button v-if="hasAction('retry-build')" severity="warn"
-                        @click="handleRetryBuild" :disabled="processing"
-                        icon="fa-solid fa-rotate-right" label="Retry Processing" />
-                <Button v-if="hasAction('wait')" @click="handleClose" label="Wait" />
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
+                <Button v-if="hasAction('close')" severity="secondary" label="Close" @click="handleClose" />
+                <Button v-if="hasAction('cancel')" severity="secondary" label="Cancel" @click="handleClose" />
+                <Button v-if="hasAction('details')" :label="showDetails ? 'Hide Details' : 'Show Details'"
+                        @click="toggleDetails" />
+                <Button v-if="hasAction('start-build')"
+                        :disabled="processing" icon="fa-solid fa-play"
+                        label="Start Processing" @click="handleStartBuild" />
+                <Button v-if="hasAction('retry-build')"
+                        :disabled="processing" icon="fa-solid fa-rotate-right"
+                        label="Retry Processing" @click="handleRetryBuild" />
+                <Button v-if="hasAction('wait')" label="Wait" @click="handleClose" />
                 <Button v-if="hasAction('wait-and-open')" severity="success"
-                        @click="handleWaitAndOpen" :disabled="waitingForBuild"
-                        icon="fa-solid fa-hourglass-half"
-                        :label="waitingForBuild ? 'Waiting...' : 'Wait and Open'" />
+                        :disabled="waitingForBuild" icon="fa-solid fa-hourglass-half"
+                        :label="waitingForBuild ? 'Waiting...' : 'Wait and Open'"
+                        @click="handleWaitAndOpen" />
             </div>
         </div>
     </Window>
@@ -69,10 +74,12 @@
 
 <script>
 import BuildManager from '@/libs/build/buildManager';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Tag from 'primevue/tag';
+import { formatDateTime } from '@/libs/format';
+import { tagSeverity } from '@/libs/tasks/taskFormat';
 
 export default {
     components: {
@@ -110,8 +117,14 @@ export default {
         entry: {
             type: Object,
             required: true
+        },
+        // What the administrator does about a file the server cannot read, shown under Show Details
+        hint: {
+            type: String,
+            default: ''
         }
     },
+    emits: ['close', 'build-started', 'error', 'build-completed', 'build-failed', 'timeout'],
 
     data() {
         return {
@@ -226,10 +239,11 @@ export default {
         getMessageSeverity() {
             switch (this.status) {
                 case 'building':
-                    return 'warn';
+                    return 'info';
                 case 'failed':
                     return 'error';
                 case 'blocked':
+                case 'unsupported':
                     return 'warn';
                 case 'queued':
                     return 'info';
@@ -240,34 +254,10 @@ export default {
             }
         },
 
-        getTagSeverity(state) {
-            switch (state) {
-                case 'Succeeded':
-                    return 'success';
-                case 'Failed':
-                    return 'danger';
-                case 'Processing':
-                    return 'warn';
-                case 'Enqueued':
-                case 'Scheduled':
-                case 'Awaiting':
-                    return 'info';
-                default:
-                    return 'secondary';
-            }
-        },
+        tagSeverity,
 
-        formatDate(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
+        formatDate(value) {
+            return formatDateTime(value, { placeholder: '-', seconds: true });
         },
 
         formatWaitTime() {
@@ -284,6 +274,11 @@ export default {
 <style scoped>
 .file-availability-dialog {
     max-width: 37.5rem;
+}
+
+.admin-hint {
+    margin: var(--ddb-spacing-md) 0 0;
+    color: var(--ddb-text-secondary);
 }
 
 .build-progress {

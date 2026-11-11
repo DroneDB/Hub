@@ -21,7 +21,10 @@
 // Bootstrap grid + utilities are imported in main.js
 // Font Awesome 6 is imported in main.js
 
-@import 'variables';
+@use 'variables';
+@use 'analysis-panel';
+@use 'focus-ring' as *;
+@use 'breakpoints' as *;
 
 html {
     font-size: 16px;
@@ -41,6 +44,77 @@ body {
     line-height: 1.5;
 }
 
+// Native checkboxes, radios, ranges and progress bars take the brand blue, not the browser's.
+:root {
+    accent-color: var(--ddb-primary);
+}
+
+// The keyboard focus ring of the Hub: the focus-ring mixin of _focus-ring.scss
+//
+// The surfaces that are dark in both themes take the ring of the dark surfaces (the ring of the
+// light theme is about 2:1 on them): the viewers (3D, point cloud, splat, panorama, model), the
+// lightboxes and the overlays over the map. The map panels and the overlay buttons say so in
+// _analysis-panel.scss, ol-controls.css and _overlay-button.scss.
+.viewer-shell.dark,
+.video-lightbox-overlay,
+.lightbox-toolbar-extra,
+.split-overlay {
+    --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
+}
+
+
+// Every element the keyboard focuses takes it (native fields, sliders, links, the Hub's own
+// buttons); :where() gives the rule no specificity, so the PrimeVue components keep the focus
+// style of the theme, which is the same ring.
+:where(:focus-visible) {
+    @include focus-ring;
+}
+
+// Links: the brand blue, visited or not (the browser's blue and purple clash with the theme).
+// :where() gives these rules no specificity, so any component style or class wins over them.
+:where(a),
+:where(a:visited) {
+    color: var(--ddb-link);
+}
+
+:where(a:hover),
+:where(a:focus-visible) {
+    color: var(--ddb-link-hover);
+}
+
+// The tint of an info message is lighter than the page: its links need the darker shade
+.p-message-info a,
+.p-inline-message-info a,
+.p-toast-message-info a {
+    color: var(--ddb-link-on-tint);
+}
+
+// Toasts (NotifyToasts): the pages' toasts are top right and the viewers' top centre, below the 56 px header, where
+// the user looks after a click on a button of the page (FR-NAV-09). PrimeVue puts the container 20px from the top
+// of the window with an inline style: !important is the only way past it.
+.p-toast.p-toast-top-right,
+.p-toast.p-toast-top-center {
+    top: calc(56px + var(--ddb-spacing-sm)) !important;
+}
+
+// Headings: the page title (h1) is the one the Datasets and Organizations pages always used;
+// h2 to h4 step down from it. Phones (below the md breakpoint) take one step smaller titles.
+h1, h2, h3, h4, h5, h6 {
+    margin: 0 0 var(--ddb-spacing-sm);
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+h1 { font-size: var(--ddb-font-size-title); }
+h2 { font-size: var(--ddb-font-size-lg); }
+h3 { font-size: var(--ddb-font-size-md); }
+h4, h5, h6 { font-size: var(--ddb-font-size-base); }
+
+@media only screen and (max-width: 767.98px) {
+    h1 { font-size: var(--ddb-font-size-lg); }
+    h2 { font-size: var(--ddb-font-size-md); }
+}
+
 /*
  * GLOBAL USER-SELECT DISABLE
  *
@@ -50,9 +124,9 @@ body {
  * Disabling text selection globally prevents accidental text selection during:
  * - Map panning/zooming (OpenLayers, Leaflet)
  * - 3D model rotation/pan (Potree, Three.js)
- * - Window dragging (Window.vue)
- * - Panel resizing (Panel.vue)
- * - File selection in browsers (FileBrowser.vue, Explorer.vue)
+ * - Window dragging (HubWindow.vue)
+ * - Panel resizing (HubPanel.vue)
+ * - File selection in browsers (FileBrowser.vue, DatasetExplorer.vue)
  *
  * Use .text-selectable class on elements where text should be selectable.
  * Example: <div class="text-selectable">Copy me</div>
@@ -74,19 +148,33 @@ body {
     display: none !important;
 }
 
-.spin {
-    animation: rotation 2s infinite linear;
+// A <button> that looks like the element it replaces: clickable text, icons
+// and headers get keyboard focus and Enter/Space for free.
+.btn-reset {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
 }
 
 // ============================================================
 // Badge styles removed - use PrimeVue Tag component:
-// <Tag severity="warning" value="Owner" />
+// <Tag severity="secondary" value="Owner" />
 // ============================================================
 
 // ============================================================
 // Text helpers
 // ============================================================
-.text-success { color: var(--ddb-success) !important; }
+.text-success { color: var(--ddb-success-text) !important; }
 .text-danger { color: var(--ddb-danger) !important; }
 .text-warning { color: var(--ddb-warning-text) !important; }
 .text-muted { color: var(--ddb-text-muted) !important; }
@@ -124,6 +212,7 @@ body {
     td {
         padding: var(--ddb-spacing-sm);
         border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+        overflow-wrap: anywhere; // a long value wraps in a narrow window instead of widening the table
     }
 
     tfoot th {
@@ -136,6 +225,130 @@ body {
         th, td {
             border: var(--ddb-border-width) solid var(--ddb-border-light);
         }
+    }
+}
+
+// A cell that is the row's actions: its buttons keep their labels on one line and it takes no more
+// than its content (a label that broke into 'De/let/e' in a narrow cell)
+.ui.table td.cell-actions {
+    width: 1%;
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
+
+// A cell of a slug or another identifier: it wraps between words (after a hyphen, a <wbr>), never
+// inside one
+.ui.table td.cell-slug {
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+// --- Stacked cards (D-026, FR-XC-20) ---
+//
+// The one renderer of a table on a phone. Below `sm` (576 px, BREAKPOINT_PX.sm of
+// libs/responsiveColumns.js) every row of a table that has `stacked-table` (the class of a plain
+// <table class="ui table stacked-table">, or of a DataTable root) is a card: the header is hidden, the
+// cells are lines of the card, each with its `data-label` before the value, and every column is shown,
+// the ones that join the table later too (`.stack-col`, responsiveColumns.js stackedCell and
+// stackedColumn). From `sm` up the table is a table, and a `.stack-col-<breakpoint>` column is
+// hidden until that width.
+@each $name, $px in (md: 768px, lg: 992px, xl: 1200px, xxl: 1400px, wide: $wide, xwide: $xwide) {
+    @media only screen and (min-width: 576px) and (max-width: #{$px - 0.02px}) {
+        .stack-col-#{$name} { display: none; }
+    }
+}
+
+$stacked-table: '.ui.table.stacked-table, .stacked-table.p-datatable .p-datatable-table';
+
+@media only screen and (max-width: 575.98px) {
+    #{$stacked-table} {
+        display: block;
+        width: 100%;
+        margin: 0;
+        border: 0;
+        background: transparent;
+
+        // Hidden, not removed: a screen reader still has the column names
+        thead {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+        }
+
+        tbody {
+            display: block;
+        }
+
+        tbody > tr {
+            display: flex;
+            flex-direction: column;
+            gap: var(--ddb-spacing-xs);
+            margin-bottom: var(--ddb-spacing-sm);
+            padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+            border: var(--ddb-border-width) solid var(--ddb-border-light);
+            border-radius: var(--ddb-radius-md);
+            background: var(--ddb-bg-surface);
+        }
+
+        tbody > tr > td {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+            // A column's own width (a Column's style) belongs to the table
+            width: auto !important;
+            min-width: 0;
+            padding: 0;
+            border: 0;
+            text-align: left;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        tbody > tr > td > *:not(.p-button) {
+            min-width: 0;
+        }
+
+        // A labelled cell: label and value on a line; a long value wraps under its label
+        tbody > tr > td[data-label] {
+            flex-wrap: nowrap;
+            align-items: flex-start;
+
+            &::before {
+                content: attr(data-label);
+                flex: 0 0 6.5rem;
+                font-weight: 600;
+                color: var(--ddb-text-muted);
+            }
+
+            > *:not(.p-button):not(.p-chip) {
+                flex: 1 1 0;
+            }
+        }
+
+        // A select or a field in a card takes the width of the card
+        tbody > tr > td .p-select {
+            width: 100%;
+        }
+    }
+}
+
+// --- Select overlays (FR-XC-20) ---
+//
+// The one width rule of every Select's list. PrimeVue gives the list the width of its Select as a
+// minimum and lets it grow to the longest option, so a long organization name ran the list off the
+// screen. Here the list never exceeds the viewport, and an option wraps (a word that does not fit
+// breaks) instead of widening it. No Select sets its own overlay width.
+.p-select-overlay {
+    max-width: calc(100vw - 1rem);
+    box-sizing: border-box;
+
+    .p-select-option {
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 }
 
@@ -187,26 +400,66 @@ div.loading {
     }
 }
 
-@keyframes rotation {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 #app {
     display: flex;
     flex-direction: column;
     height: 100%;
 
-    // Content area fills remaining space below header
-    > :last-child {
+    // Content area (<main>, App.vue) fills remaining space below header, and the page fills it
+    > :last-child,
+    > main > * {
         flex: 1;
         overflow: hidden;
         min-height: 0;
+    }
+
+    // A routed page that scrolls itself: html, body and the content area clip, so a page taller
+    // than the screen (a phone, a long list) scrolls inside its own root element - put
+    // .page-scroll on it. The page keeps its own padding; border-box keeps that padding inside
+    // the height it is given. Written under #app, after the rule above, so it outranks the
+    // content area's overflow: hidden.
+    > main > .page-scroll {
+        height: 100%;
+        overflow-y: auto;
+        box-sizing: border-box;
+    }
+}
+
+// ============================================================
+// Maximum widths on a wide screen (FR-XC-33)
+// ============================================================
+//
+// A page does not spread its content over the whole width when the content does not need it. The widths are
+// the tokens of css/_variables.scss: a component puts one of these classes on the element that has to keep a
+// readable width and gives no width of its own. Each one centres the element in its parent.
+//   .page-column    a list, a table with few columns, a form or a settings page with more columns
+//   .form-column    a form with one column
+//   .prose-column   running text (Markdown, a description, a hint)
+//   .editor-column  a text editor
+@mixin width-column($max) {
+    width: 100%;
+    max-width: $max;
+    margin-inline: auto;
+    box-sizing: border-box;
+}
+
+.page-column   { @include width-column(var(--ddb-page-max-width)); }
+.form-column   { @include width-column(var(--ddb-form-max)); }
+.prose-column  { @include width-column(var(--ddb-prose-max)); }
+.editor-column { @include width-column(var(--ddb-editor-max)); }
+
+// A page (or a box) that scrolls itself (.page-scroll) keeps its scroll bar at the edge of the screen: its content is
+// centred by the side padding, which is at least --ddb-page-padding-x (or --page-column-pad, when the box sets it)
+// and grows when the box is wider than --ddb-page-max-width. The box sets no side padding of its own.
+.page-scroll-column {
+    padding-inline: max(var(--page-column-pad, var(--ddb-page-padding-x)), calc((100% - var(--ddb-page-max-width)) / 2));
+}
+
+// A column that shows from `wide` or `xwide` up (responsiveColumns.js showFrom, columnFrom): Bootstrap has
+// no such utility. The doubled class outranks `d-none` whatever the order of the style sheets.
+@each $name, $px in (wide: $wide, xwide: $xwide) {
+    @media only screen and (min-width: $px) {
+        .d-none.d-#{$name}-table-cell { display: table-cell !important; }
     }
 }
 
@@ -221,28 +474,159 @@ body:fullscreen {
 /* Responsive breakpoints (aligned with Bootstrap) */
 
 @media only screen and (max-width: 575.98px) {
-    body,
+    body {
+        font-size: 120%;
+    }
+
+    /* Form controls do not inherit the font size by default. They take the body's scaled size once:
+       a percentage here would scale it a second time (1.2 x 1.2), so tab headers and plain buttons
+       came out larger than the text around them. */
     button,
     input,
     optgroup,
     select,
     textarea {
-        font-size: 120%;
+        font-size: inherit;
+    }
+
+    // Toasts (NotifyToasts shows them top right): PrimeVue gives the container a fixed 25rem and puts
+    // it 20px from its corner with inline styles, wider than a phone. Here it spans the screen
+    // less a small margin; !important is the only way past the inline position.
+    .p-toast.p-toast-top-right,
+    .p-toast.p-toast-top-center {
+        width: calc(100vw - 2 * var(--ddb-spacing-sm));
+        left: var(--ddb-spacing-sm) !important;
+        right: auto !important;
+        transform: none !important;
     }
 }
 
 // ============================================================
-// Dialog / Window size classes
+// Windows (HubWindow)
 // ============================================================
-.dialog-xs  { max-width: 17.5rem;  }  // 280px
-.dialog-sm  { max-width: 25rem;    }  // 400px
-.dialog-md  { max-width: 31.25rem; }  // 500px
-.dialog-lg  { max-width: 37.5rem;  }  // 600px
-.dialog-xl  { max-width: 47rem;    }  // ~750px
+//
+// HubWindow passes the size it was asked for as --window-width, --window-height and
+// --window-max-width; the .dialog-* size classes set --window-width, a width that is stable (the
+// same whatever the content, FR-XC-20): min(<class width>, 100vw - 2rem). The rules below turn them
+// into sizes that never exceed the screen (also on a tablet or a narrow desktop window)
+// and give phones their own layout from a media query, so nothing has to override inline styles.
+// The widths of dialog-xl and dialog-wide are the tokens of css/_variables.scss (FR-XC-33).
+
+$window-margin: 1rem; // the space left around a window on a phone
+$window-margin-wide: 2rem; // and on a tablet or a desktop
+
+@mixin dialog-width($width) {
+    --window-max-width: #{$width};
+    --window-width: min(#{$width}, calc(100vw - #{$window-margin-wide}));
+}
+
+.dialog-xs   { @include dialog-width(17.5rem); }                    // 280px
+.dialog-sm   { @include dialog-width(25rem); }                      // 400px
+.dialog-md   { @include dialog-width(31.25rem); }                   // 500px
+.dialog-lg   { @include dialog-width(37.5rem); }                    // 600px
+.dialog-xl   { @include dialog-width(var(--ddb-dialog-form-max)); } // 47rem, a form
+.dialog-wide { @include dialog-width(var(--ddb-dialog-wide-max)); } // 120rem, a log, a chart, two columns
+
+.p-dialog.window-dialog {
+    // What the content of a window can use on the narrowest screens, for the minimum widths of
+    // forms: min-width: min(25rem, var(--window-content-width, 100%))
+    --window-content-width: calc(100vw - 4rem);
+    // The padding of the content of a window, below it too: the footer takes the space under the content (its
+    // negative margin), so the content's padding comes from it, not from the theme's dialog padding
+    --window-pad: 1.5rem;
+    --p-dialog-content-padding: 0 var(--window-pad) var(--window-pad) var(--window-pad);
+
+    width: var(--window-width, auto);
+    height: var(--window-height, auto);
+    max-width: min(var(--window-max-width, 100vw), calc(100vw - #{$window-margin}));
+
+    .p-dialog-title {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    // The buttons stay in view while the content scrolls (FR-UPL-08): the footer sticks to the
+    // bottom edge of the scrolling content. Its padding takes the space of the content's bottom
+    // padding (the negative margin), so the buttons do not move when the content ends.
+    // A sticky box sticks inside the scroll container's padding, not at its edge: bottom: 0 would
+    // hold the footer --window-pad above the edge, over the end of the content (a window that fits
+    // then covered its last row and could not scroll it into view). The negative offset puts it on
+    // the edge, where it ends with the content.
+    .window-footer {
+        flex-wrap: wrap;
+        position: sticky;
+        bottom: calc(-1 * var(--window-pad));
+        z-index: 1;
+        margin-bottom: calc(-1 * var(--window-pad));
+        padding-top: var(--ddb-spacing-md);
+        padding-bottom: var(--window-pad);
+        background: var(--p-dialog-background);
+    }
+}
+
+// A window the user maximized (HubWindow maximizable, FR-PRC-44) fills the screen: PrimeVue sets its size, the maximum
+// width of its size class must not stop it
+.p-dialog.window-dialog.p-dialog-maximized {
+    max-width: none;
+}
+
+@media only screen and (max-width: 575.98px) {
+    .p-dialog.window-dialog {
+        --p-dialog-header-padding: 1rem;
+        // and with it the content's padding (--p-dialog-content-padding above)
+        --window-pad: 1rem;
+
+        // The same width whatever the size class: the phone's screen
+        --window-width: calc(100vw - #{$window-margin});
+
+        width: calc(100vw - #{$window-margin});
+        max-width: none;
+        height: auto;
+        max-height: calc(100dvh - #{$window-margin});
+
+        // Windows made to fill the screen (editors, documents) keep all of it
+        &.window-tall {
+            height: calc(100dvh - #{$window-margin});
+        }
+    }
+}
+
+// A tab list that does not fit scrolls under its Previous and Next arrows, which lie over its
+// edges: a tab brought into view (chosen by a link, or with the keyboard) stops clear of them,
+// not cut under one
+.p-tablist-viewport {
+    scroll-padding-inline: var(--p-tabs-nav-button-width);
+}
+
+// Tabs inside a window: the size of the window's buttons (Lara sizes tabs for a page)
+.p-dialog .p-tab {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.p-dialog .p-tab .tab-label {
+    margin-inline-start: 0.375rem;
+}
+
+// On a phone tabs (in a window or on a page) show only their icon, except the active one, so
+// every tab fits: wrap the label in a .tab-label. The label stays in the accessibility tree
+// (visually hidden, not display: none).
+@media only screen and (max-width: 575.98px) {
+    .p-tab:not(.p-tab-active) .tab-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+}
 
 // ============================================================
-// Tooltip shared styles (replaces duplicated inline CSS in
-// Potree.vue, mapUtils.js, etc.)
+// Tooltip shared styles (used by the Potree viewer, mapUtils.js, etc.)
 // ============================================================
 .ddb-tooltip {
     position: absolute;
@@ -257,7 +641,7 @@ body:fullscreen {
 
     &--dark {
         background: var(--ddb-tooltip-bg);
-        color: var(--ddb-text-on-color);
+        color: var(--ddb-text-on-dark);
         border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.2);
     }
 
@@ -326,4 +710,25 @@ body:fullscreen {
 
 .p-button-icon {
     cursor: pointer;
+}
+
+// Character counter under a text field ("12/256"): right-aligned on its own line, so it stays
+// inside the field's block instead of floating over whatever follows
+.char-count {
+    display: block;
+    margin-top: var(--ddb-spacing-xs);
+    text-align: end;
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
+}
+
+// A page of the server that the user menu opens in a new tab is marked with an arrow (FR-NAV-08); the menu is
+// rendered in <body>, so the rule is global
+.p-menu-item.user-menu-external .p-menu-item-label::after {
+    content: '\f08e';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: 0.7em;
+    margin-inline-start: 0.4rem;
+    opacity: 0.7;
 }

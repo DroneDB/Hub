@@ -1,89 +1,74 @@
 <template>
-    <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
-            modal
-            header="Generate Contour Lines"
-            :style="{ width: '460px' }"
-            :draggable="false"
-            :closable="!loading"
-            :closeOnEscape="!loading">
-
-        <!-- Full-dialog loading overlay - teleported above the PrimeVue dialog z-index -->
-        <Teleport to="body">
-            <div v-if="loading && visible" class="contour-gen-overlay">
-                <div class="contour-gen-spinner">
-                    <i class="fas fa-spinner fa-spin fa-2x"></i>
-                    <span>Generating contour lines…</span>
-                </div>
-            </div>
-        </Teleport>
-
+    <Window id="contour-options" :visible="visible" title="Generate Contour Lines" modal fixed-position
+            width="460px" max-width="95vw" height="auto" :busy="loading"
+            confirm-label="Generate" confirm-icon="fas fa-check" :confirm-disabled="!!validationError"
+            @update:visible="$emit('update:visible', $event)" @close="$emit('cancel')" @confirm="onGenerate">
         <div class="contour-dialog-body">
             <p class="dialog-help">
-                Generate contour lines from this elevation raster. They will be added to the
+                Generate contour lines from this {{ elevation ? 'elevation raster' : 'raster' }}. They will be added to the
                 measurements layer; click <b>Save</b> on the measurement toolbar to persist them.
                 Generating again replaces the unsaved contours.
             </p>
 
             <!-- Mode toggle -->
             <div class="form-row">
-                <label class="form-label">Spacing</label>
-                <div class="mode-toggle">
+                <span id="contour-spacing-label" class="form-label">Spacing</span>
+                <div class="mode-toggle" role="radiogroup" aria-labelledby="contour-spacing-label">
                     <label>
-                        <input type="radio" value="interval" v-model="mode" />
+                        <input v-model="mode" type="radio" value="interval">
                         Fixed interval
                     </label>
                     <label>
-                        <input type="radio" value="count" v-model="mode" />
+                        <input v-model="mode" type="radio" value="count">
                         Target count
                     </label>
                 </div>
             </div>
 
             <!-- Interval -->
-            <div class="form-row" v-if="mode === 'interval'">
-                <label class="form-label">Interval ({{ unit || 'units' }})</label>
-                <InputNumber v-model="interval"
+            <div v-if="mode === 'interval'" class="form-row">
+                <label for="contour-options-dialog-interval" class="form-label">Interval ({{ unit || 'units' }})</label>
+                <InputNumber v-model="interval" input-id="contour-options-dialog-interval"
                              :min="0.0001"
                              :max-fraction-digits="4"
                              :min-fraction-digits="0"
-                             showButtons buttonLayout="horizontal" :step="1"
+                             show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
             </div>
 
             <!-- Count -->
-            <div class="form-row" v-else>
-                <label class="form-label">Number of levels</label>
-                <InputNumber v-model="count"
+            <div v-else class="form-row">
+                <label for="contour-options-dialog-number-of-levels" class="form-label">Number of levels</label>
+                <InputNumber v-model="count" input-id="contour-options-dialog-number-of-levels"
                              :min="2" :max="500"
-                             showButtons buttonLayout="horizontal" :step="1"
+                             show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
-                <small class="form-hint" v-if="rangeHint">
+                <small v-if="rangeHint" class="form-hint">
                     Spacing ≈ {{ rangeHint }} {{ unit || '' }}
                 </small>
             </div>
 
             <!-- Base offset -->
             <div class="form-row">
-                <label class="form-label">Base elevation</label>
-                <InputNumber v-model="baseOffset"
+                <label for="contour-options-dialog-base-elevation" class="form-label">Base {{ noun }}</label>
+                <InputNumber v-model="baseOffset" input-id="contour-options-dialog-base-elevation"
                              :max-fraction-digits="3"
-                             showButtons buttonLayout="horizontal" :step="1"
+                             show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
             </div>
 
             <!-- Min/max clipping -->
             <div class="form-row two-cols">
                 <div>
-                    <label class="form-label">Min elevation</label>
-                    <InputNumber v-model="minElev"
+                    <label for="contour-options-dialog-min-elevation" class="form-label">Min {{ noun }}</label>
+                    <InputNumber v-model="minElev" input-id="contour-options-dialog-min-elevation"
                                  :max-fraction-digits="3"
                                  :placeholder="rasterMin != null ? String(rasterMin) : ''"
                                  class="form-input" />
                 </div>
                 <div>
-                    <label class="form-label">Max elevation</label>
-                    <InputNumber v-model="maxElev"
+                    <label for="contour-options-dialog-max-elevation" class="form-label">Max {{ noun }}</label>
+                    <InputNumber v-model="maxElev" input-id="contour-options-dialog-max-elevation"
                                  :max-fraction-digits="3"
                                  :placeholder="rasterMax != null ? String(rasterMax) : ''"
                                  class="form-input" />
@@ -92,51 +77,81 @@
 
             <!-- Simplification -->
             <div class="form-row">
-                <label class="form-label">Simplification tolerance (raster CRS units)</label>
-                <InputNumber v-model="simplifyTolerance"
+                <label for="contour-options-dialog-simplification-tolerance" class="form-label">Simplification tolerance (raster CRS units)</label>
+                <InputNumber v-model="simplifyTolerance" input-id="contour-options-dialog-simplification-tolerance"
                              :min="0"
                              :max-fraction-digits="4"
-                             showButtons buttonLayout="horizontal" :step="0.5"
+                             show-buttons button-layout="horizontal" :step="0.5"
                              class="form-input" />
                 <small class="form-hint">0 disables simplification.</small>
             </div>
 
-            <!-- Validation error -->
-            <div class="form-error" v-if="validationError">
-                <i class="fas fa-exclamation-triangle"></i> {{ validationError }}
+            <!-- A long run: the levels it will draw (FR-RAS-11); Generate asks before it starts -->
+            <div v-if="levelsWarning" class="form-warning" role="status" data-testid="contour-levels-warning">
+                <i class="fas fa-exclamation-triangle" aria-hidden="true" /> {{ levelsWarning }}
             </div>
-        </div>
 
-        <template #footer>
-            <Button label="Cancel" icon="fas fa-times" severity="secondary" text
-                    :disabled="loading"
-                    @click="onCancel" />
-            <Button :label="loading ? 'Generating...' : 'Generate'"
-                    :icon="loading ? 'fas fa-spinner fa-spin' : 'fas fa-check'"
-                    :disabled="loading || !!validationError"
-                    @click="onGenerate" />
-        </template>
-    </Dialog>
+            <!-- Validation error -->
+            <div v-if="validationError" class="form-error">
+                <i class="fas fa-exclamation-triangle" /> {{ validationError }}
+            </div>
+
+            <!-- The request was refused, or its result could not be read: there is no task to say it -->
+            <div v-if="error" class="form-error" role="alert" data-testid="contour-error">
+                <i class="fas fa-exclamation-triangle" /> {{ error }}
+            </div>
+
+            <!-- The task: queued, running with its progress and a Cancel, failed with its reason, cancelled (FR-XC-15) -->
+            <HeavyTaskStatus :task="task" label="Contours" cancellable :cancelling="cancelling"
+                             @cancel="cancelHeavyTask($event, 'Contour lines')" />
+        </div>
+        <DialogHost :dialogs="dialogs" />
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
+import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import Window from '@/components/HubWindow.vue';
 import InputNumber from 'primevue/inputnumber';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
+import { contourLevelsWarning, estimateContourLevels } from '@/libs/map/contourTask';
 
+/**
+ * ContourOptionsDialog - the options of the contour lines. Generate starts the task `raster-contours` (the host runs it,
+ * useContourLines): the dialog shows the task with HeavyTaskStatus, its progress and its Cancel, and stays open until the
+ * lines are on the map. Before a run of more than 50 levels ((max - min) / interval, or the number of levels asked for) it
+ * shows the estimate and asks to confirm.
+ */
 export default {
     name: 'ContourOptionsDialog',
-    components: { Dialog, Button, InputNumber },
+    components: { Window, InputNumber, HeavyTaskStatus, DialogHost },
     props: {
         visible: { type: Boolean, default: false },
+        // A request is running (its task): the dialog cannot be closed, the task has its Cancel
         loading: { type: Boolean, default: false },
         unit: { type: String, default: '' },
         rasterMin: { type: Number, default: null },
         rasterMax: { type: Number, default: null },
         // Last-used parameters so the dialog re-opens with prior values.
-        initialOptions: { type: Object, default: null }
+        initialOptions: { type: Object, default: null },
+        // The dataset of the task, to cancel it
+        dataset: { type: Object, default: null },
+        // The live entry of the task of the latest request (useHeavyTask)
+        task: { type: Object, default: null },
+        // Why the latest request has no task: it was refused, or its result could not be read
+        error: { type: String, default: '' },
+        // The raster is an elevation model (isElevationRaster): any other raster (a thermal mosaic) has values, not elevations (FR-RAS-25)
+        elevation: { type: Boolean, default: true }
     },
     emits: ['update:visible', 'generate', 'cancel'],
+    setup(props) {
+        const dialogs = useDialogs();
+        const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => props.dataset, dialogs);
+        return { dialogs, confirm: useConfirm(dialogs), cancelHeavyTask, cancelling };
+    },
     data() {
         return {
             mode: 'interval',
@@ -145,10 +160,28 @@ export default {
             baseOffset: 0,
             minElev: null,
             maxElev: null,
-            simplifyTolerance: 0
+            simplifyTolerance: 0,
+            // The question before a long run is open
+            asking: false
         };
     },
     computed: {
+        // What the values of the raster are called
+        noun() {
+            return this.elevation ? 'elevation' : 'value';
+        },
+        // The levels the request draws (interval mode: the range of the raster over the interval)
+        levels() {
+            return estimateContourLevels({
+                interval: this.mode === 'interval' ? Number(this.interval) : null,
+                count: this.mode === 'count' ? Number(this.count) : null,
+                minElev: this.minElev, maxElev: this.maxElev
+            }, { min: this.rasterMin, max: this.rasterMax });
+        },
+        // A fixed interval and a target count alike ask above 50 levels (a count asks for its own number)
+        levelsWarning() {
+            return contourLevelsWarning(this.levels, this.mode === 'count' ? 'count' : 'interval', this.noun);
+        },
         rangeHint() {
             if (this.mode !== 'count') return null;
             if (this.rasterMin == null || this.rasterMax == null) return null;
@@ -165,7 +198,7 @@ export default {
             }
             if (this.minElev != null && this.maxElev != null
                 && Number(this.minElev) >= Number(this.maxElev)) {
-                return 'Min elevation must be less than max elevation.';
+                return `Min ${this.noun} must be less than max ${this.noun}.`;
             }
             if (this.simplifyTolerance != null && this.simplifyTolerance < 0) {
                 return 'Simplification tolerance must be >= 0.';
@@ -203,49 +236,23 @@ export default {
                 simplifyTolerance: Number(this.simplifyTolerance || 0)
             };
         },
-        onGenerate() {
-            if (this.validationError) return;
+        async onGenerate() {
+            if (this.validationError || this.loading || this.asking) return;
+            if (this.levelsWarning) {
+                this.asking = true;
+                const confirmed = await this.confirm({
+                    title: 'Generate many contour lines?',
+                    message: this.levelsWarning,
+                    confirmText: 'Generate',
+                    cancelText: 'Change settings'
+                }).finally(() => { this.asking = false; });
+                if (!confirmed) return;
+            }
             this.$emit('generate', this.buildPayload());
-        },
-        onCancel() {
-            this.$emit('cancel');
-            this.$emit('update:visible', false);
-        },
-        onVisibleChange(v) {
-            this.$emit('update:visible', v);
-            if (!v) this.$emit('cancel');
         }
     }
 };
 </script>
-
-<style>
-/* Global (not scoped) - the Teleport overlay renders outside this component's root */
-.contour-gen-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 10010; /* above PrimeVue Dialog z-index (~1000-3000) */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: all;
-    cursor: wait;
-}
-
-.contour-gen-spinner {
-    background: rgba(255, 255, 255, 0.96);
-    border-radius: 8px;
-    padding: 2rem 3rem;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    color: #444;
-    font-size: 0.95rem;
-    font-weight: 500;
-}
-</style>
 
 <style scoped>
 .contour-dialog-body {
@@ -257,7 +264,7 @@ export default {
 
 .dialog-help {
     margin: 0 0 8px 0;
-    color: #666;
+    color: var(--ddb-text-secondary);
     font-size: 0.85rem;
     line-height: 1.4;
 }
@@ -280,11 +287,11 @@ export default {
 .form-label {
     font-weight: 600;
     font-size: 0.82rem;
-    color: #444;
+    color: var(--ddb-text-secondary);
 }
 
 .form-hint {
-    color: #888;
+    color: var(--ddb-text-muted);
     font-size: 0.78rem;
 }
 
@@ -309,10 +316,18 @@ export default {
     cursor: pointer;
 }
 
-.form-error {
-    color: #c62828;
+.form-warning {
+    color: var(--ddb-warning-text);
     font-size: 0.82rem;
-    background: #ffebee;
+    background: var(--ddb-warning-bg);
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+.form-error {
+    color: var(--ddb-danger);
+    font-size: 0.82rem;
+    background: var(--ddb-danger-bg);
     padding: 6px 10px;
     border-radius: 4px;
 }

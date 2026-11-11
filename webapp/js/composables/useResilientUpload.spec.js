@@ -92,37 +92,43 @@ describe('computeRetryDelayMs', () => {
 });
 
 describe('createAimdConcurrency', () => {
-    it('halves concurrency on failure, floored at 2', () => {
-        const aimd = createAimdConcurrency(8);
-        expect(aimd.current).toBe(8);
+    it('halves concurrency on failure, floored at 4', () => {
+        const aimd = createAimdConcurrency(16);
+        expect(aimd.current).toBe(16);
+        expect(aimd.onFailure()).toBe(8);
         expect(aimd.onFailure()).toBe(4);
-        expect(aimd.onFailure()).toBe(2);
-        expect(aimd.onFailure()).toBe(2); // floor
+        expect(aimd.onFailure()).toBe(4); // floor
+    });
+
+    it('never goes above the configured value, even below the floor', () => {
+        const aimd = createAimdConcurrency(3);
+        expect(aimd.onFailure()).toBe(3);
+        expect(createAimdConcurrency(8, { floor: 2 }).onFailure()).toBe(4);
     });
 
     it('grows back by 1 after N consecutive successes, capped at configured', () => {
-        const aimd = createAimdConcurrency(8, { successesToGrow: 3 });
-        aimd.onFailure(); // -> 4
-        expect(aimd.current).toBe(4);
+        const aimd = createAimdConcurrency(16, { successesToGrow: 3 });
+        aimd.onFailure(); // -> 8
+        expect(aimd.current).toBe(8);
 
         aimd.onSuccess();
         aimd.onSuccess();
-        expect(aimd.current).toBe(4); // not yet grown
+        expect(aimd.current).toBe(8); // not yet grown
         aimd.onSuccess();
-        expect(aimd.current).toBe(5); // grown by 1
+        expect(aimd.current).toBe(9); // grown by 1
 
         // Growing further never exceeds the originally configured value
-        for (let i = 0; i < 20; i++) aimd.onSuccess();
-        expect(aimd.current).toBe(8);
+        for (let i = 0; i < 40; i++) aimd.onSuccess();
+        expect(aimd.current).toBe(16);
     });
 
     it('resets consecutive-success counter on a failure', () => {
-        const aimd = createAimdConcurrency(8, { successesToGrow: 2 });
-        aimd.onFailure(); // -> 4
+        const aimd = createAimdConcurrency(16, { successesToGrow: 2 });
+        aimd.onFailure(); // -> 8
         aimd.onSuccess();
-        aimd.onFailure(); // resets counter, -> 2
+        aimd.onFailure(); // resets counter, -> 4
         aimd.onSuccess();
-        expect(aimd.current).toBe(2); // needs 2 consecutive successes, only had 1
+        expect(aimd.current).toBe(4); // needs 2 consecutive successes, only had 1
     });
 
     it('reset() restores the configured value', () => {

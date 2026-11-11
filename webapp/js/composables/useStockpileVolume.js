@@ -7,31 +7,46 @@
  *  - this.rasterFilePath (shared with useRasterAnalysis)
  *  - this.map (OpenLayers Map instance) for interactive drawing/click flows.
  *  - optional: this.getMapCenterLatLon() → [lon, lat] for "detect at center" flow
+ *
+ * The materials are the user's (PREF.STOCKPILE_MATERIALS), priced in the user's currency
+ * (PREF.CURRENCY): the weight and the cost follow a change of the material, of the values typed
+ * for a custom one, of the user's materials or currency, and the pile on the map is updated
+ * with them.
+ *
+ * The base the volume is measured from is the one the user picks in the panel; until they pick
+ * one, a pile found by a click is measured on the best-fit plane and a drawn polygon on the
+ * lowest perimeter (libs/stockpileBase). The panel shows the base of the pile, and picking
+ * another one measures the pile again. The base is saved with the pile.
  */
-import Draw from 'ol/interaction/Draw';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Feature } from 'ol';
 import { Polygon } from 'ol/geom';
-import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
-import { unByKey } from 'ol/Observable';
-import { buildStockpileFeature, loadStockpile } from '@/libs/map/stockpileStorage';
+import { buildStockpileFeature, loadStockpile, STOCKPILE_PROPERTIES } from '@/libs/map/stockpileStorage';
 import {
-    STOCKPILE_MATERIALS,
-    CUSTOM_MATERIAL_SLUG as SHARED_CUSTOM_MATERIAL_SLUG,
-    findStockpileMaterialBySlug,
-    computeMaterialEstimate
+    CUSTOM_MATERIAL_SLUG,
+    computeMaterialEstimate,
+    isValidCost,
+    isValidDensity,
+    materialOfSavedPile,
+    normalizeStockpileSettings,
+    resolveStockpileCatalog,
+    samePricing
 } from '@/libs/stockpileMaterials';
-
-const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
-const STOCKPILE_STROKE = '#ff9800';
+import { usePreference } from '@/composables/usePreference';
+import { normalizeCurrency, stockpileLabel } from '@/libs/format';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { downloadText } from '@/libs/download';
+import { pathutils } from 'ddb';
+import { ANALYSIS_FILL, analysisStyles } from '@/libs/map/analysisStyles';
+import { EPSG } from '@/libs/constants';
+import { BASE_METHOD, PILE_OUTLINE, baseMethodFor, isBaseMethod } from '@/libs/stockpileBase';
+import { createFeatureScope } from '@/composables/featureScope';
+import { startDrawingSession } from '@/libs/map/drawingSession';
 
 function stockpileStyle() {
-    return new Style({
-        fill: new Fill({ color: STOCKPILE_FILL }),
-        stroke: new Stroke({ color: STOCKPILE_STROKE, width: 2 })
-    });
+    return analysisStyles({ width: 2, fill: ANALYSIS_FILL });
 }
 
 // Convert known technical/native error messages into something a user can act on.
@@ -59,45 +74,38 @@ function friendlyStockpileError(raw, fallback) {
     return fallback;
 }
 
-// Re-exported here so existing imports of `CUSTOM_MATERIAL_SLUG` from this
-// composable keep working. The single source of truth lives in
-// `@/libs/stockpileMaterials`.
-export const CUSTOM_MATERIAL_SLUG = SHARED_CUSTOM_MATERIAL_SLUG;
+// The material of a restored pile whose values are not those of any of the user's materials
+const SAVED_MATERIAL_SLUG = '__saved__';
 
-// Resolve the active material descriptor for the current panel state.
-// Returns null when no material is selected, or when the inline custom
-// entry has invalid density.
-function resolveSelectedMaterial(slug, customDensity, customCostPerTon) {
-    if (!slug) return null;
-    if (slug === CUSTOM_MATERIAL_SLUG) {
-        const d = Number(customDensity);
-        if (!isFinite(d) || d <= 0) return null;
-        return {
-            slug: CUSTOM_MATERIAL_SLUG,
-            densityTonPerM3: d,
-            costPerTon: Math.max(0, Number(customCostPerTon) || 0),
-            currency: 'USD'
-        };
-    }
-    return findStockpileMaterialBySlug(slug);
-}
+// What the draft feature takes from the panel when it changes (its id and save time stay)
+const DRAFT_PROPERTIES = ['name', 'description', 'tooltipText',
+    ...STOCKPILE_PROPERTIES.filter(k => k !== 'id' && k !== 'savedAt')];
 
-export default {
+const definition = {
     data() {
         return {
             stockpilePanelVisible: false,
-            stockpileBaseMethod: 'lowest_perimeter',
+            // The base of the pile shown (or of the next one); see chooseStockpileBaseMethod
+            stockpileBaseMethod: BASE_METHOD.LOWEST_PERIMETER,
+            // The base the user picked in the panel, null until they pick one
+            _chosenStockpileBaseMethod: null,
             stockpileSensitivity: 0.5,
             stockpileRadius: 50,
             stockpileMaterial: null,
-            // Materials catalog is bundled with the SPA; no network call.
-            stockpileMaterials: STOCKPILE_MATERIALS,
             stockpileCustomDensity: 1.5,    // t/m³
             stockpileCustomCostPerTon: 0,   // currency unit per ton
+            // A restored pile's material when it is not one of the user's (see _restoreStockpileMaterial)
+            _savedStockpileMaterial: null,
             stockpileLoading: false,
             stockpileError: null,
             stockpileResult: null,
             stockpileDetectedPolygon: null,
+            // Every pile of the raster found at once (FR-MAP-25): null before a search, else the piles, the biggest first
+            stockpilePiles: null,
+            stockpilePilesLoading: false,
+            stockpilePilesError: null,
+            // The id of the pile of the list that was adopted (it shows as chosen)
+            stockpileChosenPile: null,
             stockpileMode: null, // 'click' | 'draw' | null
             // User-editable identification of the saved pile.
             stockpileTitle: '',
@@ -105,34 +113,67 @@ export default {
             // Non-reactive OL refs (mutated directly).
             _stockpileLayer: null,
             _stockpileSource: null,
-            _stockpileDraw: null,
-            _stockpileClickKey: null,
-            _stockpileEscKey: null,
+            // The drawing session of the Click map or the Draw mode (libs/map/drawingSession): it owns
+            // the interaction, the keys, the crosshair and the measurement toolbar's lock
+            _stockpileSession: null,
             _stockpilePrevCursor: '',
             // Id of the current draft stockpile feature in the shared
             // measurement layer. Tracks the polygon that has been auto-adopted
             // as a regular measurement so it can be re-styled / replaced when
             // the user re-detects, and removed when leaving the panel without
             // ever saving via the toolbar.
-            _draftStockpileFeatureId: null
+            _draftStockpileFeatureId: null,
+            // Counts the opens and closes of the panel and the piles measured in it: a saved pile
+            // read for an earlier one is not shown (the panel may be open on another raster by
+            // the time it is read, or show a pile the user measured meanwhile)
+            _stockpileRestoreTurn: 0,
+            // The same for the search of every pile: the answer of a search that a later one, the closing of the
+            // panel or another raster overtook is not shown
+            _stockpilePilesTurn: 0,
+            // The id of the draft pile taken from that list (another pile of the list replaces it while it is not saved)
+            _listStockpileFeatureId: null
         };
+    },
+    computed: {
+        /** The currency of the user's prices (a general setting) */
+        stockpileCurrency() {
+            return normalizeCurrency(this.userCurrency);
+        },
+        /** The user's materials, hidden ones included */
+        stockpileCatalog() {
+            return resolveStockpileCatalog(normalizeStockpileSettings(this.stockpileSettings), this.stockpileCurrency);
+        },
+        /** The materials the panel offers: a restored pile's own one first, then the shown ones */
+        stockpileMaterials() {
+            const shown = this.stockpileCatalog.filter(m => !m.hidden);
+            return this._savedStockpileMaterial ? [this._savedStockpileMaterial, ...shown] : shown;
+        }
     },
     watch: {
         // Keep the in-memory draft feature's properties in sync with what the
         // user types in the panel so the toolbar Save button captures the
         // latest title / notes / material without an extra "Apply" click.
-        stockpileTitle() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileDescription() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileMaterial() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileCustomDensity() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); }
+        stockpileTitle() { this._patchDraftStockpileProps(); },
+        stockpileDescription() { this._patchDraftStockpileProps(); },
+        // The weight and the cost follow the material and its values
+        stockpileMaterial() { this._refreshStockpileEstimate(); },
+        stockpileCustomDensity() { this._refreshStockpileEstimate(); },
+        stockpileCustomCostPerTon() { this._refreshStockpileEstimate(); },
+        // The user's materials changed (here, in the Preferences, on another device)
+        stockpileMaterials(materials) {
+            const slug = this.stockpileMaterial;
+            if (slug && slug !== CUSTOM_MATERIAL_SLUG && !materials.some(m => m.slug === slug)) {
+                // Removed or hidden: nothing to weigh the pile with (the watcher above refreshes)
+                this.stockpileMaterial = null;
+            } else {
+                this._refreshStockpileEstimate();
+            }
+        }
     },
     methods: {
         async openStockpileVolume(file) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path || !this.dataset) return;
-            // Mutually-exclusive panels: ensure other analysis panels are closed.
-            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
-            if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
 
             this.rasterFilePath = path;
             this.stockpilePanelVisible = true;
@@ -141,18 +182,24 @@ export default {
             this.stockpileDetectedPolygon = null;
             this.stockpileTitle = '';
             this.stockpileDescription = '';
+            this._savedStockpileMaterial = null;
+            this._resetStockpilePiles();
+            // The pile drawn for the raster the panel was open on is not this raster's
+            this._clearStockpileOverlay();
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
             this._loadSavedStockpile();
         },
 
         async _loadSavedStockpile() {
             if (!this.rasterFilePath || !this.dataset) return;
+            const turn = ++this._stockpileRestoreTurn;
+            const path = this.rasterFilePath;
             try {
                 // Skip stockpiles the user has just removed via the Measurement
                 // List dialog (deletion is in-memory until the next save).
-                const saved = await loadStockpile(this.dataset, this.rasterFilePath,
-                    this.deletedMeasurementIds);
-                if (!saved) return;
+                const saved = await loadStockpile(this.dataset, path, this.deletedMeasurementIds);
+                // The panel closed, opened again (on another raster) or measured a pile while the file was read
+                if (!saved || turn !== this._stockpileRestoreTurn || path !== this.rasterFilePath) return;
                 this.stockpileDetectedPolygon = saved.polygon;
                 // The polygon may already be rendered by the regular measurements
                 // layer (when persisted with measurementType==='stockpile' it is
@@ -175,10 +222,14 @@ export default {
                         confidence: p.confidence,
                         weightEstimate: p.weightEstimate,
                         costEstimate: p.costEstimate,
+                        basePlaneMethod: p.basePlaneMethod,
                         _restored: true
                     };
                 }
-                if (p.material) this.stockpileMaterial = p.material;
+                // The panel shows the base the pile was measured from (piles saved before the
+                // base was saved with them leave the panel's as it is)
+                if (isBaseMethod(p.basePlaneMethod)) this.stockpileBaseMethod = p.basePlaneMethod;
+                this._restoreStockpileMaterial(p);
                 if (p.title) this.stockpileTitle = p.title;
                 // `description` is the canonical key; `notes` is read for
                 // backwards compatibility with stockpiles saved before the
@@ -194,6 +245,74 @@ export default {
         },
 
         /**
+         * Select the material a restored pile was weighed and priced with. When it is one of the
+         * user's materials with the same values it is selected as such; otherwise (another
+         * user's material, a hidden one, prices changed since) the panel offers it as it was
+         * saved, so the saved weight and cost stay what they were.
+         * @param {Record<string, any>} p  the saved feature's properties
+         */
+        _restoreStockpileMaterial(p) {
+            const slug = p.material;
+            if (!slug) return;
+            const saved = materialOfSavedPile(p);
+            if (slug === CUSTOM_MATERIAL_SLUG) {
+                if (saved) {
+                    this.stockpileCustomDensity = saved.densityTonPerM3;
+                    this.stockpileCustomCostPerTon = saved.costPerTon;
+                }
+                this.stockpileMaterial = slug;
+                return;
+            }
+            const current = this.stockpileCatalog.find(m => m.slug === slug && !m.hidden);
+            if (current && (!saved || samePricing(current, saved))) {
+                this.stockpileMaterial = slug;
+            } else if (saved) {
+                this._savedStockpileMaterial = {
+                    ...saved, slug: SAVED_MATERIAL_SLUG, sourceSlug: slug, category: '',
+                    builtIn: false, edited: false, hidden: false, saved: true
+                };
+                this.stockpileMaterial = SAVED_MATERIAL_SLUG;
+            } else {
+                this.stockpileMaterial = null;
+            }
+        },
+
+        /**
+         * The material the pile is weighed with: one of the offered materials, or the values
+         * typed for a custom one; null without a material or with an invalid custom density.
+         * `sourceSlug` is the slug saved with the pile when it differs from `slug`.
+         */
+        _selectedStockpileMaterial() {
+            const slug = this.stockpileMaterial;
+            if (!slug) return null;
+            if (slug === CUSTOM_MATERIAL_SLUG) {
+                const density = Number(this.stockpileCustomDensity);
+                if (!isValidDensity(density)) return null;
+                const cost = Number(this.stockpileCustomCostPerTon);
+                return {
+                    slug, name: 'Custom material', densityTonPerM3: density,
+                    costPerTon: isValidCost(cost) ? cost : 0, currency: this.stockpileCurrency
+                };
+            }
+            return this.stockpileMaterials.find(m => m.slug === slug) ?? null;
+        },
+
+        /** `result` with the weight and the cost of the selected material (none without one). */
+        _withStockpileEstimate(result) {
+            const rest = { ...result };
+            delete rest.weightEstimate;
+            delete rest.costEstimate;
+            const estimate = computeMaterialEstimate(rest, this._selectedStockpileMaterial());
+            return estimate ? { ...rest, ...estimate } : rest;
+        },
+
+        /** Weigh the current result again, and update the pile on the map with it. */
+        _refreshStockpileEstimate() {
+            if (this.stockpileResult) this.stockpileResult = this._withStockpileEstimate(this.stockpileResult);
+            this._patchDraftStockpileProps();
+        },
+
+        /**
          * Returns true if a feature with the given id is already present in the
          * shared measurements OL source - in which case our dedicated overlay
          * does not need to render the polygon a second time.
@@ -205,7 +324,7 @@ export default {
         },
 
         /**
-         * Hook invoked by olMeasure (via Map.vue / SingleMap.vue) whenever a
+         * Hook invoked by the measure control (through MapCore) whenever a
          * feature is removed from the shared measurement source. When the
          * removed feature is the current stockpile draft (eraser tool, edit
          * dialog Delete button, list-dialog delete, ...), reset the panel so
@@ -227,10 +346,13 @@ export default {
         },
 
         closeStockpileVolume() {
+            this._stockpileRestoreTurn++;
+            this._resetStockpilePiles();
             this.stockpilePanelVisible = false;
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
+            this._savedStockpileMaterial = null;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
             // Forget the draft id so the next session can adopt a fresh
@@ -243,6 +365,7 @@ export default {
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
+            this._resetStockpilePiles();
             // Reset the loading flag so an in-flight detection that is taking
             // too long no longer blocks the panel - the request itself will
             // still complete in the background but its result will be ignored
@@ -250,10 +373,35 @@ export default {
             this.stockpileLoading = false;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
-            // Also remove the draft polygon (and its floating label/tooltip)
-            // from the shared measurement layer if it was already adopted,
-            // otherwise the label stays orphaned on the map.
-            this._removeDraftStockpileFromMeasureSource();
+            // A pile not saved yet is removed from the shared measurement layer (with its floating
+            // label), otherwise the label stays orphaned on the map. A pile that is in the saved
+            // file stays: Clear resets the panel and the overlay only, and removing it from the
+            // map would delete it from the dataset with the next Save.
+            const id = this._draftStockpileFeatureId;
+            const mc = this.measureControls;
+            if (!id || !(mc && mc.isSaved(id))) {
+                this._removeDraftStockpileFromMeasureSource();
+            }
+            // The panel no longer tracks the pile, so a pile found next is a new one
+            this._draftStockpileFeatureId = null;
+        },
+
+        /**
+         * A new pile is measured (found by a click or drawn): an independent pile, so it is
+         * detached from the previous draft and the identification fields are reset, otherwise
+         * the previously-typed title/description would bleed into the next adopted feature (and
+         * the watcher would overwrite the previous pile). It takes the turn of a saved pile still
+         * being read, so that pile does not replace this one when it arrives. No pile of the list
+         * is the chosen one until adoptDetectedStockpile says so.
+         */
+        _startNewStockpile() {
+            this._stockpileRestoreTurn++;
+            this.stockpileLoading = true;
+            this.stockpileError = null;
+            this.stockpileChosenPile = null;
+            this._draftStockpileFeatureId = null;
+            this.stockpileTitle = '';
+            this.stockpileDescription = '';
         },
 
         /**
@@ -266,47 +414,99 @@ export default {
                 this.stockpileError = 'Invalid click coordinates';
                 return;
             }
-            this.stockpileLoading = true;
-            this.stockpileError = null;
-            // Each new detection is an independent pile - detach from the
-            // previous draft and reset the identification fields so the
-            // previously-typed title/description don't bleed into the next adopted
-            // feature (and the watcher doesn't overwrite the previous pile).
-            this._draftStockpileFeatureId = null;
-            this.stockpileTitle = '';
-            this.stockpileDescription = '';
+            this._startNewStockpile();
             try {
                 const detection = await this.dataset.detectStockpile(this.rasterFilePath, lat, lon, {
                     radius: this.stockpileRadius,
                     sensitivity: this.stockpileSensitivity
                 });
-                this.stockpileDetectedPolygon = detection.polygon;
-
-                const volume = await this.dataset.calculateStockpileVolume(
-                    this.rasterFilePath,
-                    detection.polygon,
-                    {
-                        baseMethod: this.stockpileBaseMethod,
-                        flatElevation: 0
-                    }
-                );
-                const material = resolveSelectedMaterial(
-                    this.stockpileMaterial,
-                    this.stockpileCustomDensity,
-                    this.stockpileCustomCostPerTon
-                );
-                const estimate = computeMaterialEstimate(volume, material);
-                this.stockpileResult = {
-                    ...volume,
-                    ...(estimate || {}),
-                    confidence: detection.confidence,
-                    estimatedFromDetection: detection.estimatedVolume
-                };
-                this._adoptDraftStockpile(detection.polygon);
+                await this._measureDetectedStockpile(detection);
             } catch (e) {
                 console.error('Stockpile detection/calculation failed:', e);
                 this.stockpileError = friendlyStockpileError(e && e.message,
                     'Stockpile detection failed. Please try a different point or adjust the parameters.');
+                this.stockpileResult = null;
+            } finally {
+                this.stockpileLoading = false;
+            }
+        },
+
+        /**
+         * Measure a pile the detection found (one `detect` answer, or one pile of `detect-all`: `polygon`, `confidence`,
+         * `estimatedVolume`) from the base of the panel, show it and adopt it as the draft pile on the map.
+         */
+        async _measureDetectedStockpile(detection) {
+            this.stockpileDetectedPolygon = detection.polygon;
+            this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
+            const volume = await this._measureStockpile(detection.polygon);
+            this.stockpileResult = this._withStockpileEstimate({
+                ...volume,
+                confidence: detection.confidence,
+                estimatedFromDetection: detection.estimatedVolume
+            });
+            this._adoptDraftStockpile(detection.polygon);
+        },
+
+        /** The list of the piles found at once is forgotten (a search in flight is overtaken). */
+        _resetStockpilePiles() {
+            this._stockpilePilesTurn++;
+            this.stockpilePiles = null;
+            this.stockpilePilesLoading = false;
+            this.stockpilePilesError = null;
+            this.stockpileChosenPile = null;
+        },
+
+        /**
+         * "Find all piles" (FR-MAP-25): one scan of the whole raster, with the sensitivity of the panel. The piles are
+         * listed (the biggest first); the user adopts one with adoptDetectedStockpile.
+         */
+        async findAllStockpiles() {
+            if (!this.rasterFilePath || !this.dataset) return;
+            const turn = ++this._stockpilePilesTurn;
+            const path = this.rasterFilePath;
+            this.stockpilePilesLoading = true;
+            this.stockpilePilesError = null;
+            this.stockpileChosenPile = null;
+            try {
+                const found = await this.dataset.detectAllStockpiles(path, { sensitivity: this.stockpileSensitivity });
+                if (turn !== this._stockpilePilesTurn) return;
+                this.stockpilePiles = Array.isArray(found?.stockpiles) ? found.stockpiles : [];
+            } catch (e) {
+                console.error('Finding all the piles failed:', e);
+                if (turn !== this._stockpilePilesTurn) return;
+                this.stockpilePiles = null;
+                this.stockpilePilesError = friendlyStockpileError(e && e.message,
+                    'Could not find the piles of this raster. Try again, or adjust the sensitivity.');
+            } finally {
+                if (turn === this._stockpilePilesTurn) this.stockpilePilesLoading = false;
+            }
+        },
+
+        /**
+         * The user chose a pile of the list: it is measured like a pile found by a click, shown in the panel and drawn on
+         * the map as the draft pile, which the toolbar's Save writes with the others (FR-XC-30). Going through the list
+         * replaces the pile taken from it while that one is not saved, so piles 1, 2, 1 leave one pile on the map (pile 1),
+         * not three; a pile saved, clicked or drawn stays. The chosen pile chosen again changes nothing.
+         * @param {{ id: number, polygon: object, confidence?: number, estimatedVolume?: number }} pile
+         */
+        async adoptDetectedStockpile(pile) {
+            if (!pile || !pile.polygon || !this.rasterFilePath || !this.dataset) return;
+            const listDraft = this._draftStockpileFeatureId && this._draftStockpileFeatureId === this._listStockpileFeatureId
+                ? this._draftStockpileFeatureId : null;
+            // The chosen pile is on the map, or being measured for it
+            if (pile.id === this.stockpileChosenPile && (listDraft || this.stockpileLoading)) return;
+            const mc = this.measureControls;
+            if (listDraft && !(mc && mc.isSaved(listDraft))) this._removeDraftStockpileFromMeasureSource();
+            this._startNewStockpile();
+            // The list stays: the user may look at another pile of it
+            this.stockpileChosenPile = pile.id;
+            try {
+                await this._measureDetectedStockpile(pile);
+                this._listStockpileFeatureId = this._draftStockpileFeatureId;
+            } catch (e) {
+                console.error('Stockpile calculation failed:', e);
+                this.stockpileError = friendlyStockpileError(e && e.message,
+                    'Cannot calculate the volume of this pile. Try another one.');
                 this.stockpileResult = null;
             } finally {
                 this.stockpileLoading = false;
@@ -322,31 +522,11 @@ export default {
                 this.stockpileError = 'A polygon is required';
                 return;
             }
-            this.stockpileLoading = true;
-            this.stockpileError = null;
-            // Each new polygon is an independent pile - detach from the
-            // previous draft and reset the identification fields so the
-            // previously-typed title/description don't bleed into the next adopted
-            // feature (and the watcher doesn't overwrite the previous pile).
-            this._draftStockpileFeatureId = null;
-            this.stockpileTitle = '';
-            this.stockpileDescription = '';
+            this._startNewStockpile();
             try {
-                const volume = await this.dataset.calculateStockpileVolume(
-                    this.rasterFilePath,
-                    polygonGeoJson,
-                    {
-                        baseMethod: this.stockpileBaseMethod,
-                        flatElevation: 0
-                    }
-                );
-                const material = resolveSelectedMaterial(
-                    this.stockpileMaterial,
-                    this.stockpileCustomDensity,
-                    this.stockpileCustomCostPerTon
-                );
-                const estimate = computeMaterialEstimate(volume, material);
-                this.stockpileResult = { ...volume, ...(estimate || {}) };
+                this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DRAWN, this._chosenStockpileBaseMethod);
+                const volume = await this._measureStockpile(polygonGeoJson);
+                this.stockpileResult = this._withStockpileEstimate(volume);
                 this.stockpileDetectedPolygon = polygonGeoJson;
                 this._adoptDraftStockpile(polygonGeoJson);
             } catch (e) {
@@ -356,6 +536,59 @@ export default {
                 this.stockpileResult = null;
             } finally {
                 this.stockpileLoading = false;
+            }
+        },
+
+        /**
+         * The volume of `polygon` above the base of the panel (stockpileBaseMethod), with the
+         * base it was measured from.
+         * @param {object} polygon  GeoJSON polygon, WGS84
+         */
+        async _measureStockpile(polygon) {
+            const baseMethod = this.stockpileBaseMethod;
+            const volume = await this.dataset.calculateStockpileVolume(this.rasterFilePath, polygon,
+                { baseMethod, flatElevation: 0 });
+            return { ...volume, basePlaneMethod: volume.basePlaneMethod ?? baseMethod };
+        },
+
+        /**
+         * The user picks the base in the panel: it is the base of every pile from now on, the
+         * detected ones included, and the pile just measured is measured again from it (a
+         * restored pile keeps the volumes it was saved with).
+         * @param {string} method
+         */
+        async chooseStockpileBaseMethod(method) {
+            if (!isBaseMethod(method)) return;
+            this._chosenStockpileBaseMethod = method;
+            if (method === this.stockpileBaseMethod) return;
+            this.stockpileBaseMethod = method;
+            await this._remeasureDraftStockpile();
+        },
+
+        /** Measure the pile just measured again, from the base of the panel. */
+        async _remeasureDraftStockpile() {
+            const id = this._draftStockpileFeatureId;
+            const previous = this.stockpileResult;
+            const polygon = this.stockpileDetectedPolygon;
+            if (!id || !previous || previous._restored || !polygon || this.stockpileLoading) return;
+            this.stockpileLoading = true;
+            this.stockpileError = null;
+            try {
+                const volume = await this._measureStockpile(polygon);
+                // Cleared, or another pile measured, meanwhile
+                if (this._draftStockpileFeatureId !== id) return;
+                const { confidence, estimatedFromDetection } = previous;
+                this.stockpileResult = this._withStockpileEstimate({ ...volume, confidence, estimatedFromDetection });
+                this._patchDraftStockpileProps();
+            } catch (e) {
+                console.error('Stockpile calculation failed:', e);
+                if (this._draftStockpileFeatureId !== id) return;
+                // The panel keeps the volumes of the pile, so it shows the base they are from
+                if (isBaseMethod(previous.basePlaneMethod)) this.stockpileBaseMethod = previous.basePlaneMethod;
+                this.stockpileError = friendlyStockpileError(e && e.message,
+                    'Cannot calculate the volume of this pile from the selected base.');
+            } finally {
+                if (this._draftStockpileFeatureId === id) this.stockpileLoading = false;
             }
         },
 
@@ -371,8 +604,8 @@ export default {
         },
 
         /**
-         * Engage "single click on map" capture: the next map click triggers
-         * `autoDetectAndCalculate` at the clicked coordinate.
+         * Engage "single click on map" capture: the next map click (or Space / Enter at the crosshair) triggers
+         * `autoDetectAndCalculate` at that coordinate. A drawing session of one point (FR-XC-17, D-027).
          * Acts as a toggle: a second invocation while already in click-mode cancels.
          */
         startStockpileClickMode() {
@@ -385,29 +618,24 @@ export default {
             this.stockpileMode = 'click';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
-            this._acquireStockpileToolLock();
             const mapProj = this.map.getView().getProjection();
-            this._stockpileClickKey = this.map.once('singleclick', (evt) => {
-                const [lon, lat] = transform(evt.coordinate, mapProj, 'EPSG:4326');
-                // Tear everything down (cursor, ESC handler, mode flag) BEFORE running
-                // detection so no interactions/listeners linger after the click.
-                this._stockpileClickKey = null;
-                this._stopStockpileInteractions();
-                this.stockpileError = null;
-                this.autoDetectAndCalculate(lon, lat);
-            });
-            this._stockpileEscKey = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    this._stopStockpileInteractions();
+            this._stockpileSession = this._startStockpileSession({
+                type: 'Point',
+                hintKind: 'pick',
+                onDrawEnd: (evt) => {
+                    const [lon, lat] = transform(evt.feature.getGeometry().getCoordinates(), mapProj, EPSG.WGS84);
+                    // The mode is over before the detection runs; the session leaves with this click
+                    this.stockpileMode = null;
                     this.stockpileError = null;
+                    this.autoDetectAndCalculate(lon, lat);
                 }
-            };
-            window.addEventListener('keydown', this._stockpileEscKey);
+            });
         },
 
         /**
-         * Activate an OpenLayers Polygon Draw interaction. On drawend the polygon
-         * is converted to WGS84 GeoJSON and passed to `calculateStockpileVolume`.
+         * Activate a Polygon drawing session (FR-XC-17, D-027): click (or Space at the crosshair) adds a corner, a
+         * double click, Enter or a right click finishes, Esc cancels. When the polygon is finished it is converted to
+         * WGS84 GeoJSON and passed to `calculateStockpileVolume`.
          */
         startStockpilePolygonDrawing() {
             if (!this.map) {
@@ -422,71 +650,53 @@ export default {
             this.stockpileMode = 'draw';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
-            this._acquireStockpileToolLock();
 
-            const mapProj = this.map.getView().getProjection();
-            const draw = new Draw({
-                source: this._stockpileSource,
+            this._stockpileSession = this._startStockpileSession({
                 type: 'Polygon',
-                style: stockpileStyle()
-            });
-            this._stockpileDraw = draw;
-            this.map.addInteraction(draw);
-
-            draw.on('drawend', (evt) => {
-                this.stockpileError = null;
-                // Update UI state synchronously so the panel button highlight
-                // and tool lock release immediately, but defer interaction
-                // removal: OL Draw is still in the middle of finalising the
-                // sketch when drawend fires, and removing the interaction
-                // synchronously can leave the next pointer event (e.g. the
-                // user clicking the "Click on map" button) routed back to a
-                // half-alive Draw that starts a new polygon.
-                this.stockpileMode = null;
-                const mapProjForEnd = this.map.getView().getProjection();
-                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, 'EPSG:4326');
-                const coords = geom.getCoordinates();
-                // Detach the live reference synchronously so a quick
-                // user re-click on Draw / Click does not get clobbered by
-                // the deferred teardown below, and capture the specific
-                // interaction locally so we only remove THIS one.
-                const finishedDraw = draw;
-                if (this._stockpileDraw === finishedDraw) {
-                    this._stockpileDraw = null;
-                }
-                if (this._stockpileDrawTeardownTimer) {
-                    clearTimeout(this._stockpileDrawTeardownTimer);
-                    this._stockpileDrawTeardownTimer = null;
-                }
-                this._stockpileDrawTeardownTimer = setTimeout(() => {
-                    this._stockpileDrawTeardownTimer = null;
-                    if (this.map) {
-                        try { finishedDraw.abortDrawing(); } catch (e) { /* noop */ }
-                        try { this.map.removeInteraction(finishedDraw); } catch (e) { /* noop */ }
-                    }
-                    if (this._stockpileEscKey) {
-                        window.removeEventListener('keydown', this._stockpileEscKey);
-                        this._stockpileEscKey = null;
-                    }
-                    this._setStockpileCursor('');
-                    this._releaseStockpileToolLock();
-                }, 0);
-                if (!coords || !coords[0] || coords[0].length < 3) {
-                    this.stockpileError = 'A polygon with at least 3 vertices is required.';
-                    return;
-                }
-                const polygonGeoJson = { type: 'Polygon', coordinates: coords };
-                this.calculateStockpileVolume(polygonGeoJson);
-            });
-
-            this._stockpileEscKey = (e) => {
-                if (e.key === 'Escape' || e.keyCode === 27) {
-                    this._stopStockpileInteractions();
-                    this._stockpileSource && this._stockpileSource.clear();
+                source: this._stockpileSource,
+                style: stockpileStyle(),
+                onDrawEnd: (evt) => {
                     this.stockpileError = null;
+                    // The panel button shows the mode is over at once; the session leaves with this shape
+                    this.stockpileMode = null;
+                    const mapProjForEnd = this.map.getView().getProjection();
+                    const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, EPSG.WGS84);
+                    const coords = geom.getCoordinates();
+                    if (!coords || !coords[0] || coords[0].length < 4) {
+                        this.stockpileError = 'A polygon with at least 3 vertices is required.';
+                        return;
+                    }
+                    this.calculateStockpileVolume({ type: 'Polygon', coordinates: coords });
                 }
-            };
-            window.addEventListener('keydown', this._stockpileEscKey);
+            });
+        },
+
+        /**
+         * The drawing session of a stockpile mode. It locks the measurement toolbar while it runs, so a regular
+         * measurement cannot start on top, and ends by itself with the first shape. Esc ends the mode; what the
+         * mode showed goes with it.
+         */
+        _startStockpileSession(options) {
+            let session = null;
+            session = startDrawingSession({
+                map: this.map,
+                toolbar: () => this.measureControls,
+                once: true,
+                ...options,
+                onEnd: (reason) => {
+                    // Stopped from here (_stopStockpileInteractions): nothing more to do
+                    if (this._stockpileSession !== session) return;
+                    this._stockpileSession = null;
+                    this.stockpileMode = null;
+                    this._setStockpileCursor('');
+                    if (reason === 'abort') {
+                        // Esc: the polygon being drawn and the earlier overlay go, and so does the message
+                        if (this._stockpileSource) this._stockpileSource.clear();
+                        this.stockpileError = null;
+                    }
+                }
+            });
+            return session;
         },
 
         _ensureStockpileLayer() {
@@ -507,7 +717,7 @@ export default {
             this._stockpileSource.clear();
             const mapProj = this.map.getView().getProjection();
             const coords = polygonGeoJson.coordinates.map(ring =>
-                ring.map(c => transform(c, 'EPSG:4326', mapProj))
+                ring.map(c => transform(c, EPSG.WGS84, mapProj))
             );
             const feature = new Feature({ geometry: new Polygon(coords) });
             feature.setStyle(stockpileStyle());
@@ -519,53 +729,12 @@ export default {
         },
 
         _stopStockpileInteractions() {
-            // Cancel any pending deferred Draw teardown so it cannot fire
-            // later and remove a freshly-installed interaction.
-            if (this._stockpileDrawTeardownTimer) {
-                clearTimeout(this._stockpileDrawTeardownTimer);
-                this._stockpileDrawTeardownTimer = null;
-            }
-            this._teardownStockpileDraw();
-            if (this._stockpileClickKey) {
-                try { unByKey(this._stockpileClickKey); } catch (e) { /* noop */ }
-                this._stockpileClickKey = null;
-            }
+            const session = this._stockpileSession;
+            this._stockpileSession = null;
+            // Drops the shape being drawn, the interaction, the keys, the crosshair and the toolbar lock
+            if (session) session.end('abort');
             this.stockpileMode = null;
             this._setStockpileCursor('');
-            this._releaseStockpileToolLock();
-        },
-
-        /**
-         * Acquire / release a single lock on the measurement toolbar so the
-         * user can't start a regular measurement while a stockpile click or
-         * polygon draw is active. The flag prevents accidental double-locking
-         * when the same panel triggers both click and draw modes back to back.
-         */
-        _acquireStockpileToolLock() {
-            if (this._stockpileToolLockHeld) return;
-            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(true); } catch (e) { /* noop */ }
-                this._stockpileToolLockHeld = true;
-            }
-        },
-        _releaseStockpileToolLock() {
-            if (!this._stockpileToolLockHeld) return;
-            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
-            }
-            this._stockpileToolLockHeld = false;
-        },
-
-        _teardownStockpileDraw() {
-            if (this._stockpileDraw && this.map) {
-                try { this._stockpileDraw.abortDrawing(); } catch (e) { /* noop */ }
-                try { this.map.removeInteraction(this._stockpileDraw); } catch (e) { /* noop */ }
-            }
-            this._stockpileDraw = null;
-            if (this._stockpileEscKey) {
-                window.removeEventListener('keydown', this._stockpileEscKey);
-                this._stockpileEscKey = null;
-            }
         },
 
         _setStockpileCursor(cursor) {
@@ -588,19 +757,18 @@ export default {
          * Save and Export so the two outputs stay consistent).
          */
         _buildStockpileProperties() {
-            const props = { material: this.stockpileMaterial || null };
+            const material = this._selectedStockpileMaterial();
+            const props = { material: material?.sourceSlug ?? (this.stockpileMaterial || null) };
             const title = (this.stockpileTitle || '').trim();
             const description = (this.stockpileDescription || '').trim();
             if (title) props.title = title;
             if (description) props.description = description;
-            // Resolve material density (preferred sources: predefined entry,
-            // custom inline density, or backend-supplied weightEstimate).
-            const mat = (this.stockpileMaterials || []).find(m => m && m.slug === this.stockpileMaterial);
-            if (mat && isFinite(mat.densityTonPerM3)) {
-                props.materialDensity = Number(mat.densityTonPerM3);
-            } else if (this.stockpileMaterial === CUSTOM_MATERIAL_SLUG
-                && isFinite(this.stockpileCustomDensity) && this.stockpileCustomDensity > 0) {
-                props.materialDensity = Number(this.stockpileCustomDensity);
+            // What the pile is weighed and priced with, so it reads the same for every user
+            if (material) {
+                props.materialName = material.name;
+                props.materialDensity = material.densityTonPerM3;
+                props.costPerTon = material.costPerTon;
+                props.currency = material.currency;
             }
             if (this.currentUnitPref) props.unitSystem = this.currentUnitPref;
             const r = this.stockpileResult;
@@ -612,25 +780,17 @@ export default {
                 if (typeof r.area3d === 'number') props.area3d = r.area3d;
                 if (typeof r.baseElevation === 'number') props.baseElevation = r.baseElevation;
                 if (typeof r.confidence === 'number') props.confidence = r.confidence;
+                if (isBaseMethod(r.basePlaneMethod)) props.basePlaneMethod = r.basePlaneMethod;
                 if (r.weightEstimate) props.weightEstimate = r.weightEstimate;
                 if (r.costEstimate) props.costEstimate = r.costEstimate;
             }
             // tooltipText is what the Measurement List dialog shows in the
             // "Value" column; build a compact human description here so the
             // saved feature looks meaningful when re-imported.
-            props.tooltipText = this._formatStockpileTooltip(props);
+            props.tooltipText = stockpileLabel(props, this.currentUnitPref);
             // The user-visible name in the list (preferred over a generic label).
             if (title) props.name = title;
             return props;
-        },
-
-        _formatStockpileTooltip(p) {
-            const parts = [];
-            if (p.title) parts.push(p.title);
-            if (typeof p.netVolume === 'number') parts.push(`${p.netVolume.toFixed(1)} m³`);
-            if (p.material && p.material !== CUSTOM_MATERIAL_SLUG) parts.push(p.material);
-            if (p.materialDensity) parts.push(`${p.materialDensity} t/m³`);
-            return parts.join(' - ') || 'Stockpile';
         },
 
         /**
@@ -662,11 +822,7 @@ export default {
                 // Drop our temporary draw overlay - the polygon now lives in
                 // the regular measurements layer.
                 this._clearStockpileOverlay();
-                if (typeof this.measureControls.updateButtonsVisibility === 'function') {
-                    this.measureControls.updateButtonsVisibility(
-                        this.measureControls.hasMeasurements(),
-                        !!this.hasSavedMeasurements);
-                }
+                this.measureControls.refreshButtons();
             } catch (e) {
                 console.warn('Could not adopt stockpile into measurement layer:', e);
             }
@@ -685,8 +841,8 @@ export default {
             if (!feature) return;
             try {
                 this.measureControls.deleteMeasurement(feature);
-            } catch (e) {
-                try { this.measureControls.source.removeFeature(feature); } catch (e) { /* noop */ }
+            } catch {
+                try { this.measureControls.source.removeFeature(feature); } catch { /* noop */ }
             }
             this._draftStockpileFeatureId = null;
         },
@@ -705,10 +861,7 @@ export default {
             if (!feature) return;
             const props = this._buildStockpileProperties();
             // Don't touch geometry/style props that were set at build time.
-            const updatable = ['name', 'title', 'description', 'material', 'materialDensity',
-                'tooltipText', 'unitSystem', 'netVolume', 'cutVolume', 'fillVolume',
-                'area2d', 'area3d', 'baseElevation', 'confidence', 'weightEstimate', 'costEstimate'];
-            updatable.forEach(k => {
+            DRAFT_PROPERTIES.forEach(k => {
                 if (props[k] !== undefined) feature.set(k, props[k]);
                 else feature.unset && feature.unset(k);
             });
@@ -719,6 +872,10 @@ export default {
          * Export the currently displayed pile contour as a GeoJSON Feature
          * (downloaded as a file). Only available when a polygon has been computed.
          */
+        // Public names for the map view (template and measure control)
+        stopStockpileInteractions() { this._stopStockpileInteractions(); },
+        onStockpileFeatureRemoved(feature) { this._onStockpileFeatureRemoved(feature); },
+
         exportStockpileGeoJson() {
             if (!this.stockpileDetectedPolygon) {
                 this.stockpileError = 'No polygon to export. Detect or draw a stockpile first.';
@@ -734,19 +891,19 @@ export default {
                     properties: props
                 }]
             };
-            const json = JSON.stringify(feature, null, 2);
-            const blob = new Blob([json], { type: 'application/geo+json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const baseName = (this.rasterFilePath || 'stockpile').split('/').pop().replace(/\.[^.]+$/, '');
-            a.href = url;
-            a.download = `${baseName}-stockpile.geojson`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 0);
+            const baseName = pathutils.stem(this.rasterFilePath || 'stockpile');
+            downloadText(JSON.stringify(feature, null, 2), `${baseName}-stockpile.geojson`, 'application/geo+json');
         }
     }
 };
+
+/**
+ * The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useStockpileVolume(externals) {
+    const stockpileSettings = usePreference(PREF.STOCKPILE_MATERIALS, PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]);
+    const userCurrency = usePreference(PREF.CURRENCY, PREF_DEFAULTS[PREF.CURRENCY]);
+    return createFeatureScope({ ...definition, externals: { ...externals, stockpileSettings, userCurrency } });
+}

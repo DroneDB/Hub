@@ -1,5 +1,12 @@
-import { entry } from 'ddb';
-import { isArchivePath } from '@/libs/entryTypes';
+import { entry, pathutils } from 'ddb';
+import { isArchivePath } from '@/libs/entryTypeCapabilities';
+
+/**
+ * One icon per meaning on the map and in the explorer (FR-MAP-24): a pile is a mountain (not the stacked layers of a
+ * raster layer or a merge), the saved views of a dataset are a bookmark (not the split of "Compare").
+ */
+export const STOCKPILE_ICON = 'fa-solid fa-mountain';
+export const VIEWS_ICON = 'fa-solid fa-bookmark';
 
 const typeIconMap = {
     [entry.type.DIRECTORY]: "fa-regular fa-folder",
@@ -26,10 +33,7 @@ const extensionIconMap = {
 };
 
 function getExtension(path) {
-    if (!path) return '';
-    const lastDot = path.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === 0) return '';
-    return path.substring(lastDot + 1).toLowerCase();
+    return path ? pathutils.extname(path).slice(1) : '';
 }
 
 export default {

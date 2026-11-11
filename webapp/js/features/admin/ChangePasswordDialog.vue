@@ -1,57 +1,53 @@
 <template>
-    <Window title="Change Password" id="changePasswordDialog" @onClose="close" modal maxWidth="50%" fixedSize>
+    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size confirm-label="Change Password" :busy="busy" @confirm="submitForm()" @close="$emit('close')">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
-
             <PrimeMessage severity="info" :closable="false" class="mb-3">
                 Changing password for user: <strong>{{ user.userName }}</strong>
             </PrimeMessage>
 
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Current Password</label>
-                    <Password ref="txtCurrentPassword" @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="currentPassword" placeholder="Enter current password" :feedback="false" toggleMask class="w-100" />
-                    <small>Leave empty if you don't know the current password (admin override)</small>
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="newPassword" placeholder="Enter new password" :feedback="false" toggleMask class="w-100" />
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="confirmPassword" placeholder="Confirm new password" :feedback="false" toggleMask class="w-100" />
-                </div>
-            </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="changing" label="Cancel" />
-                <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
-                    severity="primary" label="Change Password" />
-            </div>
+            <Form ref="formRef" :resolver="resolver" @submit="submit(change, $event)">
+                <template #default="$form">
+                    <PrimeMessage v-if="formError" severity="error" role="alert" class="mb-3 form-error">{{ formError }}</PrimeMessage>
+                    <div class="mb-3">
+                        <label for="change-password-dialog-current-password" class="d-block mb-1 fw-semibold">Current Password</label>
+                        <PasswordInput name="currentPassword" input-id="change-password-dialog-current-password" placeholder="Enter current password"
+                                       autocomplete="off" describedby="change-password-dialog-current-hint"
+                                       :error="errorOf($form, 'currentPassword')" :readonly="busy" />
+                        <small id="change-password-dialog-current-hint">Leave empty if you don't know the current password (admin override)</small>
+                    </div>
+                    <NewPasswordFields id-prefix="change-password-dialog" :policy="passwordPolicy" :new-password="$form.newPassword?.value ?? ''"
+                                       new-placeholder="Enter new password" confirm-placeholder="Confirm new password" autocomplete="off"
+                                       :errors="{ newPassword: errorOf($form, 'newPassword'), confirmPassword: errorOf($form, 'confirmPassword') }"
+                                       :readonly="busy" />
+                </template>
+            </Form>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
-import Button from 'primevue/button';
-import Password from 'primevue/password';
+import Form from '@primevue/forms/form';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
 import PrimeMessage from 'primevue/message';
+import PasswordInput from '@/components/PasswordInput.vue';
+import NewPasswordFields from '@/components/NewPasswordFields.vue';
 import reg from '@/libs/api/sharedRegistry';
+import { Features } from '@/libs/features';
+import { createResolver } from '@/libs/forms/resolver';
+import { currentPasswordProblem, newPasswordProblem, confirmPasswordProblem } from '@/libs/accountProblems';
+import { useHubForm } from '@/composables/useHubForm';
 
 export default {
-    // NOTE: This dialog is used by admins to change other users' passwords.
-    // Password policy validation is intentionally NOT applied here (admin override).
+    // Used by admins to change other users' passwords: the current password is optional (admin
+    // override), the new one follows the policy of the server like any other. The passwords are
+    // another user's: autocomplete off, so the browser does not fill in the admin's own (FR-ACC-07)
     components: {
-        Window, Message, Button, Password, PrimeMessage
+        LoadingSpinner,
+        Window, PrimeMessage, Form, PasswordInput, NewPasswordFields
     },
     props: {
         user: {
@@ -59,53 +55,36 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        const policy = reg.features?.value?.(Features.PASSWORD_POLICY) ?? null;
+        const resolver = createResolver({
+            currentPassword: v => currentPasswordProblem(v, { optional: true }),
+            newPassword: (v, values) => newPasswordProblem(v, { policy, current: values.currentPassword }),
+            confirmPassword: (v, values) => confirmPasswordProblem(v, { newPassword: values.newPassword })
+        });
+        const form = useHubForm({
+            fields: ['currentPassword', 'newPassword', 'confirmPassword'],
+            dependents: { currentPassword: ['newPassword'], newPassword: ['confirmPassword'] }
+        });
+        return { ...form, resolver, passwordPolicy: policy };
+    },
     data: function () {
         return {
-            changing: false,
-            loading: false,
-            error: "",
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: ""
+            loading: false
         };
     },
     methods: {
-        close: function () {
-            this.$emit('onClose');
-        },
-        clearError: function () {
-            this.error = "";
-        },
-        isValid: function () {
-            return this.newPassword !== "" &&
-                   this.newPassword === this.confirmPassword;
-        },
-        confirmChange: async function () {
-            if (!this.isValid()) return;
+        change: async function (values) {
+            await reg.admin.changeUserPassword(
+                this.user.userName,
+                values.currentPassword || null, // Pass null instead of empty string for admin override
+                values.newPassword
+            );
 
-            if (this.newPassword !== this.confirmPassword) {
-                this.error = "New passwords do not match";
-                return;
-            }
-
-            this.changing = true;
-            try {
-                await reg.changeUserPassword(
-                    this.user.userName,
-                    this.currentPassword || null, // Pass null instead of empty string for admin override
-                    this.newPassword
-                );
-
-                this.$toast.add({ severity: 'success', summary: 'Password Changed', detail: `Password changed successfully for "${this.user.userName}"`, life: 3000 });
-                this.changing = false;
-                this.$emit('onClose', 'updated');
-            } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to change password: ' + (e.message || 'Unknown error'), life: 5000 });
-                this.error = e.message || 'Failed to change password';
-                this.changing = false;
-            }
+            this.$notify.success(`Password changed successfully for "${this.user.userName}"`, { summary: 'Password Changed' });
+            this.$emit('close', 'updated');
         }
     }
 }
@@ -113,7 +92,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 </style>

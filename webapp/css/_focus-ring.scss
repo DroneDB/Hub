@@ -1,0 +1,23 @@
+// ============================================================
+// The keyboard focus ring of the Hub, not the browser's: the --ddb-focus-ring-* set of
+// _variables.scss, which the PrimeVue preset (theme.js) and ol-controls.css draw with too.
+// Emits no CSS by itself: `@use` it and `@include focus-ring` in a :focus-visible rule
+// (app.scss gives every focusable element the ring this way).
+//
+// `halo` adds the second ring in the gap between the control and the ring, for a control over
+// colours that are not known (the map). `inset` draws the ring inside the edge, for a box that
+// clips what lies outside it (a scrolling tree or list).
+// ============================================================
+@mixin focus-ring($halo: false, $inset: false) {
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+
+    @if $inset {
+        outline-offset: calc(-1 * var(--ddb-focus-ring-width));
+    } @else {
+        outline-offset: var(--ddb-focus-ring-offset);
+    }
+
+    @if $halo {
+        box-shadow: 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
+    }
+}

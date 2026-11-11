@@ -1,3 +1,5 @@
+import { formatBytes, formatTimeAgo } from './format';
+
 export function setTitle(title) {
     document.title = `${title} - ${HubOptions.appName || "DroneDB"}`;
 }
@@ -12,10 +14,6 @@ export function getCookie(key) {
             return acc;
         }, {});
     return cobj[key];
-}
-
-export function clearCookie(key) {
-    document.cookie = `${key}=;-1;path=/`;
 }
 
 export function queryParams(location) {
@@ -33,7 +31,7 @@ export function queryParams(location) {
 export function inIframe() {
     try {
         return window.self !== window.top;
-    } catch (e) {
+    } catch {
         return true;
     }
 }
@@ -49,53 +47,28 @@ export function clone(obj) {
 }
 
 /**
- * Format bytes to human-readable string using binary units (1 KB = 1024 bytes).
- * This is the single source of truth for file size formatting across the app.
+ * Format bytes to human-readable string using binary units (1 KB = 1024 bytes): formatBytes of
+ * libs/format.js, the one definition.
  * @param {number} bytes - The number of bytes
- * @param {number} [decimals=2] - Number of decimal places
- * @returns {string} Formatted size string (e.g., "1.50 MB")
+ * @param {number} [decimals=2] - At most this many decimals
+ * @returns {string} Formatted size string (e.g., "1.5 MB")
  */
 export function bytesToSize(bytes, decimals = 2) {
-    if (bytes == 0) return '0 B';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    return formatBytes(bytes, { decimals });
 }
 
+/** Relative time ("5 minutes ago"): formatTimeAgo of libs/format.js, the one definition. */
+export { formatTimeAgo };
+
 /**
- * Format a timestamp as a human-readable relative time string.
- * This is the single source of truth for "time ago" formatting across the app.
- * @param {number} ms - Millisecond timestamp (e.g., `Date.now()` or `new Date(str).getTime()`)
- * @returns {string} e.g. "just now", "5 minutes ago", "3 months ago", "2 years ago"
+ * The millisecond timestamp of a date the server sent (an ISO string).
+ * @param {unknown} value
+ * @returns {number|null} null when there is no date or it is not one (a date that is unknown, not 1970)
  */
-export function formatTimeAgo(ms) {
-    if (ms == null) return '';
-    const diff = Date.now() - ms;
-    const absDiff = Math.abs(diff);
-    const suffix = diff >= 0 ? 'ago' : 'from now';
-    const minutes = Math.floor(absDiff / 60000);
-    const hours = Math.floor(absDiff / 3600000);
-    const days = Math.floor(absDiff / 86400000);
-    const months = Math.floor(days / 30);
-    const years = Math.floor(days / 365);
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ${suffix}`;
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ${suffix}`;
-    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ${suffix}`;
-    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
-    return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
-}
-/**
- * ProgressBar mode for task progress values.
- * A task that reports no progress (null/undefined), 0 or a negative percent
- * renders as an animated indeterminate bar until a real percent arrives.
- * @param {number|null|undefined} percent Task progress percent (0-100, nullable)
- * @returns {'indeterminate'|'determinate'} ProgressBar mode
- */
-export function taskProgressMode(percent) {
-    return (percent == null || percent <= 0) ? 'indeterminate' : 'determinate';
+export function parseTimestamp(value) {
+    if (typeof value !== 'string' || !value) return null;
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? null : ms;
 }
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {
@@ -105,8 +78,17 @@ export function isFullScreenCurrently() {
     return fse !== null;
 }
 
+// The standard method first, then the prefixed ones of older browsers
+const REQUEST_FULLSCREEN = ['requestFullscreen', 'requestFullScreen', 'webkitRequestFullscreen', 'webkitRequestFullScreen', 'mozRequestFullScreen', 'msRequestFullscreen', 'msRequestFullScreen'];
+
+/** The element's method that makes it full screen, or null. @param {Element} element */
+function requestFullScreenMethod(element) {
+    const name = REQUEST_FULLSCREEN.find(n => typeof element[n] === 'function');
+    return name ? element[name] : null;
+}
+
 export function supportsFullScreen() {
-    return !!(document.body.requestFullScreen || document.body.webkitRequestFullScreen || document.body.mozRequestFullScreen || document.body.msRequestFullScreen);
+    return !!requestFullScreenMethod(document.body);
 }
 
 // https://stackoverflow.com/a/7525760
@@ -116,13 +98,16 @@ export function requestFullScreen(element) {
         element = document.body; // Make the body go full screen.
     }
 
-    // Supports most browsers and their versions.
-    const requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
+    const requestMethod = requestFullScreenMethod(element);
 
     if (requestMethod) { // Native full screen.
-        requestMethod.call(element);
+        const result = requestMethod.call(element);
+        // The standard method returns a promise, rejected when the browser refuses (no user gesture, a policy)
+        if (result && typeof result.catch === 'function') {
+            result.catch(e => console.warn('Full screen was refused:', e));
+        }
     } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
-        var wscript = new ActiveXObject("WScript.Shell");
+        var wscript = new window.ActiveXObject("WScript.Shell");
         if (wscript !== null) {
             wscript.SendKeys("{F11}");
         }

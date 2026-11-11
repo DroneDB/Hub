@@ -1,0 +1,21 @@
+// ============================================================
+// The breakpoints of the layout (FR-XC-33), the same widths as BREAKPOINT_PX of js/libs/responsiveColumns.js
+// (the spec of that file pins both). The Bootstrap ones (sm 576, md 768, lg 992, xl 1200, xxl 1400) come from
+// Bootstrap; these two are above them: a layout change on a wide screen uses `wide` or, for the 4K screens, `xwide`.
+// A component that changes its layout there does `@use '.../css/breakpoints' as *;` and `@include wide-up { ... }`.
+// ============================================================
+
+$wide: 1600px;
+$xwide: 2560px;
+
+@mixin wide-up {
+    @media only screen and (min-width: $wide) {
+        @content;
+    }
+}
+
+@mixin xwide-up {
+    @media only screen and (min-width: $xwide) {
+        @content;
+    }
+}

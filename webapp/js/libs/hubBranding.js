@@ -3,8 +3,7 @@
  *
  * The values are sourced from the backend `/sys/features` endpoint
  * (see `FeaturesDto.HubOptions` server-side) and surfaced as the
- * frozen global `window.HubOptions` for legacy components that
- * already read it directly.
+ * frozen global `window.HubOptions`, which components read directly.
  *
  * This module also injects favicon / manifest / theme-color tags
  * into <head> based on the optional `Favicon` block, so neither
@@ -28,7 +27,7 @@ const EMPTY_OPTIONS = Object.freeze({});
  *
  * @param {object|null|undefined} hubOptions The `hubOptions` block from /sys/features.
  */
-export function applyHubBranding(hubOptions) {
+function applyHubBranding(hubOptions) {
     const opts = hubOptions || EMPTY_OPTIONS;
 
     // Replace any prior frozen object (initial bootstrap may have a stub).
@@ -38,7 +37,7 @@ export function applyHubBranding(hubOptions) {
             writable: false,
             configurable: true
         });
-    } catch (e) {
+    } catch {
         // Fallback if the property is non-configurable for some reason.
         window.HubOptions = Object.freeze({ ...opts });
     }
@@ -89,4 +88,20 @@ function applyFavicon(favicon) {
         meta.dataset[FAVICON_LINK_REL_DATA_KEY] = '1';
         head.appendChild(meta);
     }
+}
+
+/**
+ * Loads the feature flags of `registry` and applies the branding they carry
+ * (window.HubOptions, title, favicons). The endpoint is anonymous, so this also
+ * works before sign-in. Never throws.
+ * @param {{ features: { load: () => Promise<Record<string, any>> } }} registry
+ */
+export async function loadFeaturesAndBranding(registry) {
+    const features = await registry.features.load();
+    try {
+        applyHubBranding(features ? features.hubOptions : null);
+    } catch (e) {
+        console.error('Failed to apply Hub branding:', e);
+    }
+    return features;
 }

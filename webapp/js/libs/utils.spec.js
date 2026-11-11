@@ -2,16 +2,18 @@
  * Unit tests for libs/utils.js
  * Run with: npx vitest run --reporter=verbose
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
     setTitle,
     getCookie,
-    clearCookie,
     queryParams,
     inIframe,
     clone,
     bytesToSize,
-    taskProgressMode
+    parseTimestamp,
+    supportsFullScreen,
+    requestFullScreen,
+    exitFullScreen
 } from './utils';
 
 describe('setTitle', () => {
@@ -47,15 +49,6 @@ describe('getCookie', () => {
 
     it('returns undefined for missing key', () => {
         expect(getCookie('nonexistent')).toBeUndefined();
-    });
-});
-
-describe('clearCookie', () => {
-    it('sets cookie with past expiration', () => {
-        window.document.cookie = '';
-        clearCookie('testKey');
-        // The cookie string is appended; check that testKey was written
-        expect(window.document.cookie).toContain('testKey');
     });
 });
 
@@ -153,23 +146,68 @@ describe('bytesToSize', () => {
     });
 });
 
-describe('taskProgressMode', () => {
-    it('returns indeterminate for null or undefined progress', () => {
-        expect(taskProgressMode(null)).toBe('indeterminate');
-        expect(taskProgressMode(undefined)).toBe('indeterminate');
+describe('parseTimestamp', () => {
+    it('reads an ISO date as milliseconds', () => {
+        expect(parseTimestamp('2026-03-04T05:06:07Z')).toBe(Date.UTC(2026, 2, 4, 5, 6, 7));
     });
 
-    it('returns indeterminate for zero progress', () => {
-        expect(taskProgressMode(0)).toBe('indeterminate');
+    it('is null for a missing or invalid date, never 1970 or NaN', () => {
+        for (const value of [null, undefined, '', 'yesterday', 0, 12345, {}]) expect(parseTimestamp(value)).toBeNull();
+    });
+});
+
+describe('full screen', () => {
+    afterEach(() => {
+        delete HTMLElement.prototype.requestFullscreen;
+        delete HTMLElement.prototype.webkitRequestFullScreen;
+        delete document.exitFullscreen;
+        vi.restoreAllMocks();
     });
 
-    it('returns indeterminate for negative progress', () => {
-        expect(taskProgressMode(-5)).toBe('indeterminate');
+    it('is supported by a browser with only the standard API, and asks the element for it', () => {
+        expect(supportsFullScreen()).toBe(false);
+        const request = vi.fn(() => Promise.resolve());
+        HTMLElement.prototype.requestFullscreen = request;
+        expect(supportsFullScreen()).toBe(true);
+        const el = document.createElement('div');
+        requestFullScreen(el);
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.mock.contexts[0]).toBe(el);
+        requestFullScreen();
+        expect(request.mock.contexts[1]).toBe(document.body);
     });
 
-    it('returns determinate for any positive progress', () => {
-        expect(taskProgressMode(1)).toBe('determinate');
-        expect(taskProgressMode(42)).toBe('determinate');
-        expect(taskProgressMode(100)).toBe('determinate');
+    it('prefers the standard method to a prefixed one', () => {
+        const standard = vi.fn(() => Promise.resolve());
+        const prefixed = vi.fn();
+        HTMLElement.prototype.requestFullscreen = standard;
+        HTMLElement.prototype.webkitRequestFullScreen = prefixed;
+        requestFullScreen(document.createElement('div'));
+        expect(standard).toHaveBeenCalledTimes(1);
+        expect(prefixed).not.toHaveBeenCalled();
+    });
+
+    it('still uses a prefixed method when the standard one is missing', () => {
+        const prefixed = vi.fn();
+        HTMLElement.prototype.webkitRequestFullScreen = prefixed;
+        expect(supportsFullScreen()).toBe(true);
+        requestFullScreen(document.createElement('div'));
+        expect(prefixed).toHaveBeenCalledTimes(1);
+    });
+
+    it('says when the browser refuses it', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        HTMLElement.prototype.requestFullscreen = vi.fn(() => Promise.reject(new TypeError('Permissions check failed')));
+        requestFullScreen(document.createElement('div'));
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(warn).toHaveBeenCalledWith('Full screen was refused:', expect.any(TypeError));
+    });
+
+    it('leaves it with the standard exit', () => {
+        const exit = vi.fn();
+        document.exitFullscreen = exit;
+        exitFullScreen();
+        expect(exit).toHaveBeenCalledTimes(1);
     });
 });

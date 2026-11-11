@@ -3,7 +3,7 @@
  * Verifies XSS protection in HTML sanitization.
  */
 import { describe, it, expect } from 'vitest';
-import { sanitizeHtml } from './sanitize';
+import { sanitizeHtml, isWebUrl } from './sanitize';
 
 describe('sanitizeHtml', () => {
     it('returns empty string for null/undefined/empty', () => {
@@ -133,5 +133,21 @@ describe('sanitizeHtml', () => {
     it('handles hr and div tags', () => {
         expect(sanitizeHtml('<hr>')).toBe('<hr>');
         expect(sanitizeHtml('<div>content</div>')).toBe('<div>content</div>');
+    });
+});
+
+describe('isWebUrl', () => {
+    it('accepts absolute http and https addresses', () => {
+        expect(isWebUrl('https://dronedb.app/request-license')).toBe(true);
+        expect(isWebUrl('http://example.com')).toBe(true);
+    });
+
+    it('refuses other schemes, relative addresses and non-strings', () => {
+        expect(isWebUrl('javascript:alert(1)')).toBe(false);
+        expect(isWebUrl('data:text/html,x')).toBe(false);
+        expect(isWebUrl('mailto:a@b.c')).toBe(false);
+        expect(isWebUrl('/relative/path')).toBe(false);
+        expect(isWebUrl(null)).toBe(false);
+        expect(isWebUrl(42)).toBe(false);
     });
 });
