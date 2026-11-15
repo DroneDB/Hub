@@ -105,7 +105,7 @@
 
             <ConfirmDialog v-if="removeMemberDialogOpen"
                            title="Remove Member"
-                           :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
+                           :message="removeMemberMessage"
                            confirm-text="Remove"
                            cancel-text="Cancel"
                            confirm-button-class="danger"
@@ -134,6 +134,7 @@ import { fieldErrorsOf } from '@/libs/forms/serverErrors';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { formatDate } from '@/libs/format';
+import { escapeHtml } from '@/libs/sanitize';
 import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
 
 const ADMIN = 3;
@@ -187,9 +188,14 @@ export default {
         canAdd() {
             return !!this.newMember.userName.trim() && !this.addingMember;
         },
+        // The messages are HTML: what the user typed or the server sent is escaped
+        removeMemberMessage() {
+            const name = this.memberToRemove ? this.memberToRemove.userName : '';
+            return `Are you sure you want to remove <strong>${escapeHtml(name)}</strong> from this organization?`;
+        },
         selfDemotionMessage() {
             const level = this.permissionsOptions.find(o => o.value === this.selfDemotion?.member.permissions)?.label ?? '';
-            return `<p>You are changing your own permissions in this organization to <strong>${level}</strong>.</p>`
+            return `<p>You are changing your own permissions in this organization to <strong>${escapeHtml(level)}</strong>.</p>`
                 + '<p>You will no longer be able to manage its members; only another admin can give you the rights back.</p>';
         }
     },

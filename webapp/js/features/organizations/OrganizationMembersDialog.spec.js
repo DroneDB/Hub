@@ -197,3 +197,20 @@ describe('OrganizationMembersDialog', () => {
         expect(wrapper.findAllComponents(Select)).toHaveLength(0);
     });
 });
+
+describe('the confirmations name a member as text', () => {
+    const MARKUP = '<img src=x onerror=alert(1)>';
+
+    it('asks to remove a member named like markup without making an element of the name', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve([{ userName: 'me', permissions: ADMIN }, { userName: MARKUP, permissions: 1 }]));
+        await render();
+
+        wrapper.vm.removeMember(member(MARKUP));
+        await flushPromises();
+
+        const message = confirmDialog();
+        expect(message.querySelector('img')).toBeNull();
+        expect(message.textContent).toContain(`remove ${MARKUP} from this organization`);
+    });
+});
+

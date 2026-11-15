@@ -95,7 +95,7 @@
 
         <ConfirmDialog v-if="removeOrgDialogOpen"
                        title="Remove from Organization"
-                       :message="`Are you sure you want to remove <strong>${user.userName}</strong> from organization <strong>${orgToRemove ? (orgToRemove.name || orgToRemove.slug) : ''}</strong>?`"
+                       :message="removeOrgMessage"
                        confirm-text="Remove"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
@@ -113,6 +113,7 @@ import Divider from 'primevue/divider';
 import Tag from 'primevue/tag';
 import reg from '@/libs/api/sharedRegistry';
 import { formatDate } from '@/libs/format';
+import { escapeHtml } from '@/libs/sanitize';
 import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
 
 export default {
@@ -154,6 +155,11 @@ export default {
     },
 
     computed: {
+        // The names come from the server and the user: the message is HTML, so they are escaped
+        removeOrgMessage() {
+            const org = this.orgToRemove ? (this.orgToRemove.name || this.orgToRemove.slug) : '';
+            return `Are you sure you want to remove <strong>${escapeHtml(this.user.userName)}</strong> from organization <strong>${escapeHtml(org)}</strong>?`;
+        },
         availableOrganizations() {
             const userOrgSlugs = this.userOrganizations.map(o => o.slug.toLowerCase());
             return this.allOrganizations
