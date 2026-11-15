@@ -848,3 +848,165 @@ describe('Find all piles (detect-all)', () => {
         expect(pile.stockpilePilesLoading.value).toBe(false);
     });
 });
+
+describe('an answer that comes after the panel moved on', () => {
+    const piles = () => source.getFeatures().filter(f => f.get('measurementType') === 'stockpile');
+    /** A call of the server that answers when the test says */
+    const deferred = () => {
+        let resolve;
+        const promise = new Promise(r => { resolve = r; });
+        return { promise, resolve };
+    };
+    const FOUND = { polygon: POLYGON, confidence: 0.8, estimatedVolume: 8.7 };
+
+    beforeEach(async () => {
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+    });
+
+    it('is dropped after Clear: no pile is drawn, there is no result, and the panel is not left loading', async () => {
+        const detection = deferred();
+        dataset.detectStockpile = vi.fn(() => detection.promise);
+        const detecting = pile.autoDetectAndCalculate(9, 45);
+        expect(pile.stockpileLoading.value).toBe(true);
+
+        pile.clearStockpileOverlay();
+        expect(pile.stockpileLoading.value).toBe(false);
+        detection.resolve(FOUND);
+        await detecting;
+        await flushPromises();
+
+        expect(piles()).toHaveLength(0);
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileDetectedPolygon.value).toBeNull();
+        expect(measuredBases).toEqual([]);
+        expect(pile.stockpileLoading.value).toBe(false);
+    });
+
+    it('does not end the loading of the pile that was asked for since', async () => {
+        const first = deferred();
+        const second = deferred();
+        dataset.detectStockpile = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const detecting = pile.autoDetectAndCalculate(9, 45);
+        pile.clearStockpileOverlay();
+        const next = pile.autoDetectAndCalculate(9.5, 45.5);
+
+        first.resolve(FOUND);
+        await detecting;
+        await flushPromises();
+        // The first answer is not the one the panel waits for
+        expect(pile.stockpileLoading.value).toBe(true);
+        expect(pile.stockpileResult.value).toBeNull();
+
+        second.resolve(FOUND);
+        await next;
+        await flushPromises();
+        expect(pile.stockpileLoading.value).toBe(false);
+        expect(pile.stockpileResult.value).toMatchObject({ netVolume: 100 });
+        expect(piles()).toHaveLength(1);
+    });
+
+    it('is dropped when the volume of a detected pile comes after Clear', async () => {
+        const volume = deferred();
+        dataset.calculateStockpileVolume = vi.fn(() => volume.promise);
+        const detecting = pile.autoDetectAndCalculate(9, 45);
+        await flushPromises();
+
+        pile.clearStockpileOverlay();
+        volume.resolve({ ...VOLUME, basePlaneMethod: 'best_fit' });
+        await detecting;
+        await flushPromises();
+
+        expect(piles()).toHaveLength(0);
+        expect(pile.stockpileResult.value).toBeNull();
+    });
+
+    it('is not adopted into another raster that was opened meanwhile, and the volume is asked for the raster it was found on', async () => {
+        const detection = deferred();
+        dataset.detectStockpile = vi.fn(() => detection.promise);
+        const calculated = [];
+        const calculate = dataset.calculateStockpileVolume;
+        dataset.calculateStockpileVolume = vi.fn((path, ...rest) => { calculated.push(path); return calculate(path, ...rest); });
+        const detecting = pile.autoDetectAndCalculate(9, 45);
+
+        pile.openStockpileVolume('other.tif');
+        await flushPromises();
+        detection.resolve(FOUND);
+        await detecting;
+        await flushPromises();
+
+        expect(piles()).toHaveLength(0);
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileDetectedPolygon.value).toBeNull();
+        expect(calculated).toEqual([]);
+    });
+
+    it('asks for the volume of a drawn polygon on the raster it was drawn on, and drops the answer after another raster opens', async () => {
+        const volume = deferred();
+        const calculated = [];
+        dataset.calculateStockpileVolume = vi.fn((path) => { calculated.push(path); return volume.promise; });
+        const calculating = pile.calculateStockpileVolume(POLYGON);
+
+        pile.openStockpileVolume('other.tif');
+        await flushPromises();
+        volume.resolve({ ...VOLUME, basePlaneMethod: 'lowest_perimeter' });
+        await calculating;
+        await flushPromises();
+
+        expect(calculated).toEqual(['dsm.tif']);
+        expect(piles()).toHaveLength(0);
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileLoading.value).toBe(false);
+    });
+
+    it('drops the failure of a call too, which says nothing of the panel now', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const detection = deferred();
+        dataset.detectStockpile = vi.fn(() => detection.promise);
+        const detecting = pile.autoDetectAndCalculate(9, 45);
+        pile.clearStockpileOverlay();
+
+        detection.resolve(Promise.reject(new Error('No stockpile found')));
+        await detecting;
+        await flushPromises();
+
+        expect(pile.stockpileError.value).toBeNull();
+        error.mockRestore();
+    });
+
+    it('is not adopted for a pile of the list after Clear', async () => {
+        dataset.detectAllStockpiles = vi.fn(async () => ({ stockpiles: [{ id: 0, polygon: POLYGON, estimatedVolume: 8, confidence: 0.9 }] }));
+        await pile.findAllStockpiles();
+        const volume = deferred();
+        dataset.calculateStockpileVolume = vi.fn(() => volume.promise);
+        const adopting = pile.adoptDetectedStockpile(pile.stockpilePiles.value[0]);
+        await flushPromises();
+
+        pile.clearStockpileOverlay();
+        volume.resolve({ ...VOLUME, basePlaneMethod: 'best_fit' });
+        await adopting;
+        await flushPromises();
+
+        expect(piles()).toHaveLength(0);
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileLoading.value).toBe(false);
+    });
+
+    it('is dropped after Close, and the panel opens again without a spinner', async () => {
+        const detection = deferred();
+        dataset.detectStockpile = vi.fn(() => detection.promise);
+        const detecting = pile.autoDetectAndCalculate(9, 45);
+
+        pile.closeStockpileVolume();
+        detection.resolve(FOUND);
+        await detecting;
+        await flushPromises();
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+
+        expect(piles()).toHaveLength(0);
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileLoading.value).toBe(false);
+    });
+});
+

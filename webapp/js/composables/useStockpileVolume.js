@@ -177,6 +177,8 @@ const definition = {
 
             this.rasterFilePath = path;
             this.stockpilePanelVisible = true;
+            // A measurement of the raster the panel was on is over for it (its answer is dropped)
+            this.stockpileLoading = false;
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
@@ -347,6 +349,7 @@ const definition = {
 
         closeStockpileVolume() {
             this._stockpileRestoreTurn++;
+            this.stockpileLoading = false;
             this._resetStockpilePiles();
             this.stockpilePanelVisible = false;
             this.stockpileError = null;
@@ -362,14 +365,16 @@ const definition = {
         },
 
         clearStockpileOverlay() {
+            // A measurement in flight is over for the panel: its answer is dropped (see _stockpileCall)
+            this._stockpileRestoreTurn++;
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
             this._resetStockpilePiles();
             // Reset the loading flag so an in-flight detection that is taking
-            // too long no longer blocks the panel - the request itself will
-            // still complete in the background but its result will be ignored
-            // because _draftStockpileFeatureId is cleared below.
+            // too long no longer blocks the panel: the request itself still
+            // completes in the background, and its answer is dropped because
+            // the turn moved on above.
             this.stockpileLoading = false;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
@@ -405,6 +410,21 @@ const definition = {
         },
 
         /**
+         * What a call that measures a pile holds on to while it waits for the server: the turn of the panel
+         * and the raster it was made for. Clear, Close, another raster, another pile or a saved pile read
+         * each move the turn on, and the answer of the call that waited is then not this panel's.
+         * @returns {{ turn: number, path: string }}
+         */
+        _stockpileCall() {
+            return { turn: this._stockpileRestoreTurn, path: this.rasterFilePath };
+        },
+
+        /** Whether the panel is still where the call (see _stockpileCall) left it. */
+        _isCurrentStockpileCall(call) {
+            return call.turn === this._stockpileRestoreTurn && call.path === this.rasterFilePath;
+        },
+
+        /**
          * Auto-detect the stockpile under a given WGS84 [lon,lat].
          * After detection, immediately run volume calculation on the detected polygon.
          */
@@ -415,30 +435,37 @@ const definition = {
                 return;
             }
             this._startNewStockpile();
+            const call = this._stockpileCall();
             try {
-                const detection = await this.dataset.detectStockpile(this.rasterFilePath, lat, lon, {
+                const detection = await this.dataset.detectStockpile(call.path, lat, lon, {
                     radius: this.stockpileRadius,
                     sensitivity: this.stockpileSensitivity
                 });
-                await this._measureDetectedStockpile(detection);
+                await this._measureDetectedStockpile(detection, call);
             } catch (e) {
                 console.error('Stockpile detection/calculation failed:', e);
+                if (!this._isCurrentStockpileCall(call)) return;
                 this.stockpileError = friendlyStockpileError(e && e.message,
                     'Stockpile detection failed. Please try a different point or adjust the parameters.');
                 this.stockpileResult = null;
             } finally {
-                this.stockpileLoading = false;
+                if (this._isCurrentStockpileCall(call)) this.stockpileLoading = false;
             }
         },
 
         /**
          * Measure a pile the detection found (one `detect` answer, or one pile of `detect-all`: `polygon`, `confidence`,
-         * `estimatedVolume`) from the base of the panel, show it and adopt it as the draft pile on the map.
+         * `estimatedVolume`) from the base of the panel, show it and adopt it as the draft pile on the map. Nothing is
+         * shown or adopted when the panel moved on (Clear, Close, another raster or pile) while it was measured.
+         * @param {object} detection
+         * @param {{ turn: number, path: string }} call  the call that asked (see _stockpileCall)
          */
-        async _measureDetectedStockpile(detection) {
+        async _measureDetectedStockpile(detection, call) {
+            if (!this._isCurrentStockpileCall(call)) return;
             this.stockpileDetectedPolygon = detection.polygon;
             this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
-            const volume = await this._measureStockpile(detection.polygon);
+            const volume = await this._measureStockpile(detection.polygon, call.path);
+            if (!this._isCurrentStockpileCall(call)) return;
             this.stockpileResult = this._withStockpileEstimate({
                 ...volume,
                 confidence: detection.confidence,
@@ -498,18 +525,20 @@ const definition = {
             const mc = this.measureControls;
             if (listDraft && !(mc && mc.isSaved(listDraft))) this._removeDraftStockpileFromMeasureSource();
             this._startNewStockpile();
+            const call = this._stockpileCall();
             // The list stays: the user may look at another pile of it
             this.stockpileChosenPile = pile.id;
             try {
-                await this._measureDetectedStockpile(pile);
-                this._listStockpileFeatureId = this._draftStockpileFeatureId;
+                await this._measureDetectedStockpile(pile, call);
+                if (this._isCurrentStockpileCall(call)) this._listStockpileFeatureId = this._draftStockpileFeatureId;
             } catch (e) {
                 console.error('Stockpile calculation failed:', e);
+                if (!this._isCurrentStockpileCall(call)) return;
                 this.stockpileError = friendlyStockpileError(e && e.message,
                     'Cannot calculate the volume of this pile. Try another one.');
                 this.stockpileResult = null;
             } finally {
-                this.stockpileLoading = false;
+                if (this._isCurrentStockpileCall(call)) this.stockpileLoading = false;
             }
         },
 
@@ -523,19 +552,22 @@ const definition = {
                 return;
             }
             this._startNewStockpile();
+            const call = this._stockpileCall();
             try {
                 this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DRAWN, this._chosenStockpileBaseMethod);
-                const volume = await this._measureStockpile(polygonGeoJson);
+                const volume = await this._measureStockpile(polygonGeoJson, call.path);
+                if (!this._isCurrentStockpileCall(call)) return;
                 this.stockpileResult = this._withStockpileEstimate(volume);
                 this.stockpileDetectedPolygon = polygonGeoJson;
                 this._adoptDraftStockpile(polygonGeoJson);
             } catch (e) {
                 console.error('Stockpile calculation failed:', e);
+                if (!this._isCurrentStockpileCall(call)) return;
                 this.stockpileError = friendlyStockpileError(e && e.message,
                     'Cannot calculate volume for this polygon. Make sure it covers a valid elevated area inside the raster.');
                 this.stockpileResult = null;
             } finally {
-                this.stockpileLoading = false;
+                if (this._isCurrentStockpileCall(call)) this.stockpileLoading = false;
             }
         },
 
@@ -543,10 +575,11 @@ const definition = {
          * The volume of `polygon` above the base of the panel (stockpileBaseMethod), with the
          * base it was measured from.
          * @param {object} polygon  GeoJSON polygon, WGS84
+         * @param {string} path  the raster the call was made for (the panel may be on another one by the answer)
          */
-        async _measureStockpile(polygon) {
+        async _measureStockpile(polygon, path) {
             const baseMethod = this.stockpileBaseMethod;
-            const volume = await this.dataset.calculateStockpileVolume(this.rasterFilePath, polygon,
+            const volume = await this.dataset.calculateStockpileVolume(path, polygon,
                 { baseMethod, flatElevation: 0 });
             return { ...volume, basePlaneMethod: volume.basePlaneMethod ?? baseMethod };
         },
@@ -573,22 +606,23 @@ const definition = {
             if (!id || !previous || previous._restored || !polygon || this.stockpileLoading) return;
             this.stockpileLoading = true;
             this.stockpileError = null;
+            const call = this._stockpileCall();
             try {
-                const volume = await this._measureStockpile(polygon);
-                // Cleared, or another pile measured, meanwhile
-                if (this._draftStockpileFeatureId !== id) return;
+                const volume = await this._measureStockpile(polygon, call.path);
+                // Cleared, or another pile or raster measured, meanwhile
+                if (this._draftStockpileFeatureId !== id || !this._isCurrentStockpileCall(call)) return;
                 const { confidence, estimatedFromDetection } = previous;
                 this.stockpileResult = this._withStockpileEstimate({ ...volume, confidence, estimatedFromDetection });
                 this._patchDraftStockpileProps();
             } catch (e) {
                 console.error('Stockpile calculation failed:', e);
-                if (this._draftStockpileFeatureId !== id) return;
+                if (this._draftStockpileFeatureId !== id || !this._isCurrentStockpileCall(call)) return;
                 // The panel keeps the volumes of the pile, so it shows the base they are from
                 if (isBaseMethod(previous.basePlaneMethod)) this.stockpileBaseMethod = previous.basePlaneMethod;
                 this.stockpileError = friendlyStockpileError(e && e.message,
                     'Cannot calculate the volume of this pile from the selected base.');
             } finally {
-                if (this._draftStockpileFeatureId === id) this.stockpileLoading = false;
+                if (this._draftStockpileFeatureId === id && this._isCurrentStockpileCall(call)) this.stockpileLoading = false;
             }
         },
 
