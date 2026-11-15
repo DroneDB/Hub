@@ -3,7 +3,7 @@
  * Verifies XSS protection in HTML sanitization.
  */
 import { describe, it, expect } from 'vitest';
-import { sanitizeHtml, isWebUrl } from './sanitize';
+import { sanitizeHtml, escapeHtml, unescapeHtml, isWebUrl } from './sanitize';
 
 describe('sanitizeHtml', () => {
     it('returns empty string for null/undefined/empty', () => {
@@ -149,5 +149,24 @@ describe('isWebUrl', () => {
         expect(isWebUrl('/relative/path')).toBe(false);
         expect(isWebUrl(null)).toBe(false);
         expect(isWebUrl(42)).toBe(false);
+    });
+});
+
+describe('unescapeHtml', () => {
+    it('gives back what escapeHtml made of any text', () => {
+        for (const text of ['plain', 'a & b < c > d', '"quoted" \'text\'', '<img src=x onerror=alert(1)>', '&amp; &lt;', '</textarea><b>x</b>', '']) {
+            expect(unescapeHtml(escapeHtml(text))).toBe(text);
+        }
+    });
+
+    it('decodes the entities of a browser without making an element of the markup', () => {
+        expect(unescapeHtml('caf&#233; &nbsp;&amp;&lt;b&gt;')).toBe('café \u00a0&<b>');
+        expect(unescapeHtml('<img src=x onerror=alert(1)>')).toBe('<img src=x onerror=alert(1)>');
+        expect(document.querySelector('img')).toBeNull();
+    });
+
+    it('gives an empty text for nothing', () => {
+        expect(unescapeHtml(null)).toBe('');
+        expect(unescapeHtml(undefined)).toBe('');
     });
 });

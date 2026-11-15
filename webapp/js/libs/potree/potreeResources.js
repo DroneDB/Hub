@@ -45,3 +45,12 @@ export function fixPotreePaths(potree, origin) {
     potree.scriptPath = origin + POTREE_BASE;
     potree.resourcePath = potree.scriptPath + '/resources';
 }
+
+/**
+ * The scene tree of Potree (a jsTree) shows the name of a measurement as text. Its default is to
+ * parse the name as HTML, which would make an element of a name like `<img src=x onerror=...>`
+ * that a saved file brings; it is set before the viewer builds its menu.
+ */
+export function showTreeNamesAsText(jquery) {
+    if (jquery?.jstree) jquery.jstree.defaults.core.force_text = true;
+}

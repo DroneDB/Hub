@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { exportMeasurements, importMeasurements } from './potreeMeasurementConverter';
 import { VIEW, sectionOf, read } from './measurementFormat';
+import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import { UTM_18N_WKT, COPC_SCALE, COPC_OFFSET, CLOUD, cloudCoordinateSystem } from './measurementFormat.fixtures';
 
 // 0.01 m is about 9e-8 degrees of latitude: 1e-7 degree is the tolerance
@@ -144,5 +145,64 @@ describe('importMeasurements', () => {
             expect(Math.abs(p.y - expected[1])).toBeLessThan(0.01);
             expect(p.z).toBeCloseTo(expected[2], 9);
         });
+    });
+});
+
+describe('the title and the description of an annotation', () => {
+    const MARKUP = '<img src=x onerror=alert(1)>';
+    const feature = (name, description) => ({
+        type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: { measurementType: 'annotation', name, description, localCoordinates: CLOUD.A.local }
+    });
+    const importAnnotation = (name, description) => {
+        const added = [];
+        const viewer = { scene: { addMeasurement: () => {}, annotations: { add: a => added.push(a) } } };
+        importMeasurements({ features: [feature(name, description)] }, viewer, coordinateSystem('EPSG:32618'));
+        return added[0];
+    };
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('is handed to Potree escaped, which keeps both as HTML', () => {
+        // Potree's own Annotation stands in: it records what it is given
+        class Annotation { constructor(options) { Object.assign(this, options); } }
+        vi.stubGlobal('Potree', { Annotation });
+
+        const annotation = importAnnotation(MARKUP, `${MARKUP} & more`);
+
+        expect(annotation.title).toBe('&lt;img src=x onerror=alert(1)&gt;');
+        expect(annotation.description).toBe('&lt;img src=x onerror=alert(1)&gt; &amp; more');
+    });
+
+    it('is saved as the text the user wrote', () => {
+        class Annotation {
+            constructor(options) { Object.assign(this, options); this.uuid = 'a1'; }
+        }
+        vi.stubGlobal('Potree', { Annotation });
+        const written = importAnnotation(MARKUP, `${MARKUP} & more`);
+
+        // Potree's panel hands back HTML: what it was given, as the browser serialises it
+        const doc = exportMeasurements(viewerWith([], [{ ...written, position: new Vec(...CLOUD.A.local) }]), 'cloud.laz', coordinateSystem('EPSG:32618'));
+
+        expect(doc.features[0].properties.name).toBe(MARKUP);
+        expect(doc.features[0].properties.description).toBe(`${MARKUP} & more`);
+    });
+
+    it('creates no element in the label and the panel text of the real Potree annotation', () => {
+        const Potree = loadPotree();
+        vi.stubGlobal('Potree', Potree);
+
+        const annotation = importAnnotation(MARKUP, MARKUP);
+
+        expect(annotation.domElement.find('img[src="x"]')).toHaveLength(0);
+        expect(annotation.domElement.find('.annotation-label').text()).toBe(MARKUP);
+        expect(annotation.domElement.find('.annotation-description-content').text()).toBe(MARKUP);
+        // The setters of the panel parse the value the same way
+        annotation.title = '&lt;img src=y onerror=1&gt;';
+        annotation.description = '&lt;img src=y onerror=1&gt;';
+        expect(annotation.domElement.find('img[src="y"]')).toHaveLength(0);
+        // and what the real annotation holds goes back to the file as it was written
+        const doc = exportMeasurements(viewerWith([], [annotation]), 'cloud.laz', coordinateSystem('EPSG:32618'));
+        expect(doc.features[0].properties.name).toBe('<img src=y onerror=1>');
     });
 });

@@ -40,7 +40,10 @@ vi.mock('@/composables/usePotreeMeasurements', () => ({
     })
 }));
 vi.mock('@/libs/lazy', () => ({ loadResources: async () => {} }));
-vi.mock('@/libs/potree/potreeResources', () => ({ POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {} }));
+const calls = vi.hoisted(() => []);
+vi.mock('@/libs/potree/potreeResources', () => ({
+    POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {}, showTreeNamesAsText: jquery => calls.push(['tree text', jquery])
+}));
 vi.mock('@/libs/potree/potreeSession', () => ({
     pointBudgetFor: () => 1000000,
     PotreeSession: class {
@@ -80,7 +83,7 @@ function stubPotree() {
         volumeTool: { startInsertion: vi.fn() },
         setTopView: vi.fn(), setFrontView: vi.fn(), setLeftView: vi.fn(), setRightView: vi.fn(),
         setLengthUnit: vi.fn(), setEDLEnabled() {}, setFOV() {}, setPointBudget() {}, fitToScreen() {}, setLanguage() {},
-        loadGUI: cb => cb(), lengthUnit: 'm', lengthUnitDisplay: {}
+        loadGUI: cb => { calls.push(['gui']); cb(); }, lengthUnit: 'm', lengthUnitDisplay: {}
     });
     globalThis.Potree = {
         PointSizeType: { FIXED: 0, ATTENUATED: 1, ADAPTIVE: 2 }, TextSprite: class {},
@@ -107,7 +110,7 @@ const mountViewer = async () => {
 };
 const button = id => wrapper.find(`[data-testid="${id}"]`);
 
-beforeEach(stubPotree);
+beforeEach(() => { calls.length = 0; stubPotree(); });
 afterEach(() => {
     wrapper?.unmount();
     delete globalThis.Potree;
@@ -252,5 +255,14 @@ describe('PotreeViewer fullscreen (FR-VWR-38)', () => {
         expect(scss).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*right: calc\(var\(--ddb-sidebar-width\) \+ var\(--ddb-spacing-md\)\);/);
         const phone = scss.slice(scss.indexOf('@media (max-width: 767.98px)'));
         expect(phone).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*visibility: hidden;/);
+    });
+});
+
+describe('PotreeViewer scene tree', () => {
+    it('is set to show names as text before the menu of Potree is built', async () => {
+        await mountViewer();
+
+        expect(calls.map(c => c[0])).toEqual(['tree text', 'gui']);
+        expect(calls[0][1]).toBe(globalThis.$);
     });
 });

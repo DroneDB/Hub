@@ -78,7 +78,7 @@ import { loadResources } from '@/libs/lazy';
 import { isMobile, deviceMemoryGb } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
-import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
+import { POTREE_RESOURCES, versioned, fixPotreePaths, showTreeNamesAsText } from '@/libs/potree/potreeResources';
 import { labelPotreeControls } from '@/libs/potree/potreeControls';
 import { attachPotreeScale } from '@/libs/potree/potreeScale';
 import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
@@ -247,6 +247,7 @@ onMounted(async () => {
         // One request wave: the files download in parallel, the scripts run in order
         await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
         fixPotreePaths(window.Potree, window.location.origin);
+        showTreeNamesAsText(window.$);
         await loadViewer();
     } catch (e) {
         error.value = e.message;

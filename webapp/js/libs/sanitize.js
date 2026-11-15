@@ -26,6 +26,17 @@ export function escapeHtml(text) {
 }
 
 /**
+ * The text an HTML string shows: the entities of `text` decoded (the reverse of escapeHtml). A
+ * <textarea> holds its content as text, and a `<` in `text` is escaped before it goes in, so no tag
+ * in `text` is ever parsed into an element and nothing runs; a literal `<` comes out as it went in.
+ */
+export function unescapeHtml(text) {
+    const holder = document.createElement('textarea');
+    holder.innerHTML = String(text ?? '').replace(/</g, '&lt;');
+    return holder.value;
+}
+
+/**
  * True for an absolute http(s) address, the only kind a page may link to when the address
  * comes from outside (a javascript: or data: URL is refused).
  * @param {unknown} value
