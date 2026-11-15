@@ -96,12 +96,23 @@ describe('annotation tooltip', () => {
         const tracked = [];
         const session = { adopt: n => n, track: (...a) => tracked.push(a), untrack: () => {} };
         const el = document.createElement('div');
-        const annotation = { domElement: el, description: '<img src=x onerror="alert(1)">' };
+        // Potree holds the description as HTML: the escaped text that the converter gives it
+        const annotation = { domElement: el, description: '&lt;img src=x onerror="alert(1)"&gt;' };
         updateAnnotationTooltip(annotation, { session });
         expect(annotation._descriptionTooltip.querySelector('img')).toBeNull();
         expect(annotation._descriptionTooltip.textContent).toBe('<img src=x onerror="alert(1)">');
         updateAnnotationTooltip(annotation, { session });
         expect(document.querySelectorAll('.potree-annotation-tooltip').length).toBe(1);
+        annotation._descriptionTooltip.remove();
+    });
+
+    it('is made from the text of the HTML description, so a tag in it is never an element', () => {
+        const session = { adopt: n => n, track: () => {}, untrack: () => {} };
+        const annotation = { domElement: document.createElement('div'), description: 'a<br>b <img src=x onerror="alert(1)">' };
+        updateAnnotationTooltip(annotation, { session });
+        expect(annotation._descriptionTooltip.querySelector('img')).toBeNull();
+        expect(annotation._descriptionTooltip.querySelectorAll('br')).toHaveLength(1);
+        expect(annotation._descriptionTooltip.textContent).toBe('ab ');
         annotation._descriptionTooltip.remove();
     });
 });
