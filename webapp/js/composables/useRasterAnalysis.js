@@ -1,3 +1,4 @@
+import { markRaw } from 'vue';
 import Overlay from 'ol/Overlay';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
@@ -434,9 +435,7 @@ const definition = {
             // can still be re-created via "Redraw"; if the user wants to
             // keep both, they can persist them via the measurements toolbar.
             this._removeCurrentProfileFeature();
-            this.rasterProfile = null;
-            this.rasterProfileError = null;
-            this._removeRasterProfileHoverMarker();
+            this._dropRasterProfileResult();
 
             // The dashed style is applied only to the in-progress
             // sketch by OL design: once `drawend` fires, the persisted
@@ -499,7 +498,8 @@ const definition = {
             feature.set('tooltipText', `Profile: ${lengthLabel}`);
             if (this.rasterFilePath) feature.set('rasterFilePath', this.rasterFilePath);
 
-            this._currentProfileFeature = feature;
+            // An OpenLayers feature is not made reactive: the removal watcher compares it with the feature of the event
+            this._currentProfileFeature = markRaw(feature);
             this._setupRasterProfileMeasurementWatcher();
 
             // Floating tooltip on the line (matches length/area). Hidden
@@ -586,9 +586,7 @@ const definition = {
                 (evt) => {
                     if (evt.feature && evt.feature === this._currentProfileFeature) {
                         this._currentProfileFeature = null;
-                        this.rasterProfile = null;
-                        this.rasterProfileError = null;
-                        this._removeRasterProfileHoverMarker();
+                        this._dropRasterProfileResult();
                     }
                 }
             );
@@ -619,8 +617,19 @@ const definition = {
             // the chart, error, and hover dot. We only need the side-effect
             // here for the case when no profile feature exists yet.
             this._removeCurrentProfileFeature();
+            this._dropRasterProfileResult();
+        },
+
+        /**
+         * The profile on show is gone (its line was erased, cleared or drawn again): the chart, the error and the
+         * hover dot go, and a question still in flight is over for the panel, so its answer shows nothing and
+         * the panel does not wait for it.
+         */
+        _dropRasterProfileResult() {
+            this._rasterProfileTurn++;
             this.rasterProfile = null;
             this.rasterProfileError = null;
+            this.rasterProfileLoading = false;
             this._removeRasterProfileHoverMarker();
         },
 

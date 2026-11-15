@@ -512,6 +512,57 @@ describe('an answer that comes after a newer question', () => {
         error.mockRestore();
     });
 
+    describe('a profile asked for a line that is then erased, cleared or drawn again', () => {
+        const slowProfile = () => {
+            const slow = deferred();
+            const ctx = setup();
+            ctx.dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise);
+            ctx.raster.startRasterProfileDrawing();
+            ctx.map.getView().setCenter([200, 100]);
+            key(' ');
+            ctx.map.getView().setCenter([300, 200]);
+            key(' ');
+            key('Enter');
+            expect(ctx.raster.rasterProfileLoading.value).toBe(true);
+            return { ...ctx, slow };
+        };
+        const settled = async ({ raster, slow }) => {
+            slow.resolve({ samples: ['late'] });
+            await vi.waitFor(() => expect(raster.rasterProfileLoading.value).toBe(false));
+            await Promise.resolve();
+            expect(raster.rasterProfile.value).toBeNull();
+            expect(raster.rasterProfileError.value).toBeNull();
+        };
+
+        it('shows nothing of the late answer and stops the spinner when the line is erased', async () => {
+            const ctx = slowProfile();
+            const [line] = ctx.measureControls.source.getFeatures();
+
+            ctx.measureControls.source.removeFeature(line);
+
+            expect(ctx.raster.rasterProfileLoading.value).toBe(false);
+            await settled(ctx);
+        });
+
+        it('shows nothing of the late answer and stops the spinner on Clear profile', async () => {
+            const ctx = slowProfile();
+
+            ctx.raster.handleClearProfile();
+
+            expect(ctx.raster.rasterProfileLoading.value).toBe(false);
+            await settled(ctx);
+        });
+
+        it('shows nothing of the late answer and stops the spinner when the line is drawn again', async () => {
+            const ctx = slowProfile();
+
+            ctx.raster.startRasterProfileDrawing();
+
+            expect(ctx.raster.rasterProfileLoading.value).toBe(false);
+            await settled(ctx);
+        });
+    });
+
     it('keeps the statistics of the newest rectangle when the slow answer of the first one comes last', async () => {
         const slow = deferred();
         const areaStats = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ min: 5, max: 6, pixelCount: 2 });
