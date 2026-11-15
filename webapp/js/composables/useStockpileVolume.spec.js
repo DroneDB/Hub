@@ -7,8 +7,8 @@
  * polygon from the lowest perimeter, until the user picks a base; a pick measures the pile again.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { effectScope, nextTick, ref, shallowRef } from 'vue';
-import { flushPromises } from '@vue/test-utils';
+import { effectScope, nextTick, ref, shallowRef, defineComponent, h } from 'vue';
+import { flushPromises, mount } from '@vue/test-utils';
 import Feature from 'ol/Feature';
 import { Vector as VectorSource } from 'ol/source';
 import { useStockpileVolume } from './useStockpileVolume';
@@ -1010,3 +1010,28 @@ describe('an answer that comes after the panel moved on', () => {
     });
 });
 
+describe('the drawing mode when the component goes away', () => {
+    it('Click map ends with the component that has the panel: no interaction and no lock is left', () => {
+        const map = new OlMap({ view: new View({ center: [1000000, 5600000], zoom: 10 }) });
+        let hosted;
+        const wrapper = mount(defineComponent({
+            setup() {
+                hosted = useStockpileVolume({
+                    dataset: () => dataset, map: ref(map), measureControls: shallowRef(toolbar), currentUnitPref: ref('metric'),
+                    deletedMeasurementIds: ref([]), rasterFilePath: ref(''), getMapCenterLatLon: () => () => null
+                });
+                return () => h('div');
+            }
+        }));
+        const drawn = () => map.getInteractions().getArray().some(i => i instanceof Draw);
+        toolbar.setToolsDisabled.mockClear();
+        hosted.startStockpileClickMode();
+        expect(drawn()).toBe(true);
+
+        wrapper.unmount();
+
+        expect(drawn()).toBe(false);
+        expect(hosted.stockpileMode.value).toBeNull();
+        expect(toolbar.setToolsDisabled.mock.calls).toEqual([[true], [false]]);
+    });
+});

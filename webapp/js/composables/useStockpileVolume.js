@@ -170,6 +170,10 @@ const definition = {
             }
         }
     },
+    // The drawing session of Click map and Draw ends with the map
+    beforeUnmount() {
+        this._stopStockpileInteractions();
+    },
     methods: {
         async openStockpileVolume(file) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);

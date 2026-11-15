@@ -140,3 +140,36 @@ describe('the tool lock and the other tools', () => {
         expect(control.selectedTool).toBeNull();
     });
 });
+
+describe('the control leaves its map', () => {
+    it('ends the tool in use with the shape being drawn: its interaction and its keys go', () => {
+        control.btnLength.click();
+        addPoints([0, 0], [100, 0]);
+        expect(drawOf()).toBeDefined();
+
+        control.setMap(null);
+
+        expect(control.selectedTool).toBeNull();
+        expect(control.session).toBeNull();
+        expect(drawOf()).toBeUndefined();
+        expect(control.source.getFeatures()).toHaveLength(0);
+        // The session listens for Space on the document: it no longer takes it
+        const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+        document.body.dispatchEvent(space);
+        expect(space.defaultPrevented).toBe(false);
+    });
+
+    it('leaves edit mode: its interactions go from the map and its Esc listener from the document', () => {
+        control.toggleEditMode();
+        expect(control.isEditMode).toBe(true);
+        expect(map.getInteractions().getArray().some(i => i.constructor.name === 'Modify')).toBe(true);
+
+        control.setMap(null);
+
+        expect(control.isEditMode).toBe(false);
+        expect(map.getInteractions().getArray().some(i => ['Modify', 'Translate'].includes(i.constructor.name))).toBe(false);
+        const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+        document.body.dispatchEvent(esc);
+        expect(esc.defaultPrevented).toBe(false);
+    });
+});

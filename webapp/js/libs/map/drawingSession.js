@@ -442,6 +442,15 @@ export class DrawingSession {
 }
 
 /**
+ * Ends the session that runs on a map, if any: its interaction, keys, crosshair and tool lock go. For the
+ * owner of the map when it goes away, which no tool outlives.
+ * @param {import('ol/Map').default | null | undefined} map
+ */
+export function endSessionOf(map) {
+    if (map) sessionsByMap.get(toRaw(map))?.end('abort');
+}
+
+/**
  * Starts a drawing session on a map (see the module comment).
  * @param {SessionOptions} options
  * @returns {DrawingSession}

@@ -6,7 +6,8 @@
  * longitude and latitude of the Web Mercator metres are the ones of the spherical formula, written as literals.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { effectScope, shallowRef } from 'vue';
+import { effectScope, shallowRef, defineComponent, h } from 'vue';
+import { mount } from '@vue/test-utils';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import { Tile as TileLayer } from 'ol/layer';
@@ -432,3 +433,44 @@ describe('useRasterAnalysis thermal units', () => {
         expect(dataset.getRasterPointValueAt).not.toHaveBeenCalled();
     });
 });
+
+describe('the drawing modes when the component goes away', () => {
+    const hosted = () => {
+        const map = new Map({ view: new View({ center: [0, 0], zoom: 1 }) });
+        const measureControls = { source: new VectorSource(), setToolsDisabled: vi.fn(), refreshButtons: vi.fn(), deleteMeasurement: vi.fn() };
+        const dataset = { getRasterValueInfo: vi.fn(async () => ({ width: 100, height: 50, unit: 'm' })), getRasterPointValueAt: vi.fn(async () => ({})) };
+        let raster;
+        const wrapper = mount(defineComponent({
+            setup() {
+                raster = useRasterAnalysis({
+                    dataset: () => dataset, map: shallowRef(map), measureControls: () => measureControls,
+                    rasterLayer: () => null, vizParamsByPath: shallowRef({}),
+                    refreshRasterLayers: () => () => undefined, onRasterProfileHover: () => undefined
+                });
+                return () => h('div');
+            }
+        }));
+        return { wrapper, raster, map, measureControls };
+    };
+
+    for (const [name, start, flag] of [
+        ['the statistics rectangle', r => r.toggleRasterAreaDrawing(), r => r.rasterAreaDrawing],
+        ['the profile line', r => r.startRasterProfileDrawing(), r => r.rasterProfileDrawing],
+        ['Inspect', r => r.toggleRasterInspect(), r => r.rasterInspectActive]
+    ]) {
+        it(`ends ${name} with the component: no interaction and no lock is left`, () => {
+            const { wrapper, raster, map, measureControls } = hosted();
+            raster.openRasterAnalysis(PATH);
+            start(raster);
+            expect(flag(raster).value).toBe(true);
+            expect(drawOf(map)).toBeDefined();
+
+            wrapper.unmount();
+
+            expect(flag(raster).value).toBe(false);
+            expect(drawOf(map)).toBeUndefined();
+            expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+        });
+    }
+});
+

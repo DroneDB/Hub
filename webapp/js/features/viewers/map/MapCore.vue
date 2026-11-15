@@ -143,6 +143,7 @@ import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fi
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
 import { ViewZoomCap } from '@/libs/map/rasterLayers';
 import { visibleBbox } from '@/libs/map/rasterExport';
+import { endSessionOf } from '@/libs/map/drawingSession';
 import { getVectorColor, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
 
 import { useListenerBag } from '@/composables/useEventListener';
@@ -391,6 +392,8 @@ export default {
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
         if (this.viewZoomCap) this.viewZoomCap.dispose();
+        // A tool that is armed on the map (its keys are on the document) ends with it
+        endSessionOf(this.map);
         if (this.map) {
             if (this.tooltipOverlay) this.map.removeOverlay(this.tooltipOverlay);
             // Releases the control's subscription to the unit preference

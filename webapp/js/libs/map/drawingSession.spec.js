@@ -9,7 +9,7 @@ import View from 'ol/View';
 import Draw from 'ol/interaction/Draw';
 import DragPan from 'ol/interaction/DragPan';
 import { Vector as VectorSource } from 'ol/source';
-import { createToolLock, startDrawingSession } from './drawingSession';
+import { createToolLock, startDrawingSession, endSessionOf } from './drawingSession';
 
 let map;
 let target;
@@ -520,3 +520,29 @@ describe('one session per map', () => {
         otherTarget.remove();
     });
 });
+
+describe('endSessionOf', () => {
+    it('ends the session that runs on the map, with the shape being drawn, its keys and its lock', () => {
+        const onEnd = vi.fn();
+        start({ onEnd });
+        addPoint(0, 0);
+        addPoint(100, 0);
+
+        endSessionOf(map);
+
+        expect(session.active).toBe(false);
+        expect(onEnd).toHaveBeenCalledWith('abort');
+        expect(drawOf()).toBeUndefined();
+        expect(geometries()).toEqual([]);
+        expect(toolbar.setToolsDisabled.mock.calls).toEqual([[true], [false]]);
+        const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+        document.body.dispatchEvent(space);
+        expect(space.defaultPrevented).toBe(false);
+    });
+
+    it('does nothing for a map with no session, or no map', () => {
+        expect(() => endSessionOf(map)).not.toThrow();
+        expect(() => endSessionOf(null)).not.toThrow();
+    });
+});
+

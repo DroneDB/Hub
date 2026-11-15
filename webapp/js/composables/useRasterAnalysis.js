@@ -88,6 +88,12 @@ const definition = {
             _rasterDimsCache: null
         };
     },
+    // The drawing sessions of the statistics box, the profile and Inspect end with the map
+    beforeUnmount() {
+        this._stopRasterAreaDrawing();
+        this._stopRasterProfileDrawing();
+        this._stopRasterInspect();
+    },
     methods: {
         openRasterAnalysis(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);

@@ -205,6 +205,11 @@ class MeasureControls extends Control {
      * Override setMap to initialize button visibility when control is added
      */
     setMap(map) {
+        // The tool in use and edit mode end with the map, and both need it to take their interactions and keys away
+        if (!map) {
+            this.deselectCurrent();
+            if (this.isEditMode) this.disableEditMode();
+        }
         super.setMap(map);
 
         // The unit follows the Preferences page, other tabs and the account while on a map

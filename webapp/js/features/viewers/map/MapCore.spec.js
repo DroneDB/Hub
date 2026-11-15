@@ -981,3 +981,50 @@ describe('the text tooltip', () => {
         expect(element.textContent).toBe('<img src=x onerror=alert(1)>.jpg');
     });
 });
+
+describe('the drawing tools when the map goes away', () => {
+    const space = () => {
+        const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+        document.body.dispatchEvent(event);
+        return event;
+    };
+
+    it('ends the measure tool in use: Space on the page is no longer taken', async () => {
+        await mountMap([file(MAIN)]);
+        wrapper.vm.measureControls.btnLength.click();
+        expect(space().defaultPrevented).toBe(true);
+
+        wrapper.unmount();
+        wrapper = null;
+
+        expect(space().defaultPrevented).toBe(false);
+    });
+
+    it('ends the stockpile and raster tools, whose sessions the measure control does not own', async () => {
+        await mountMap([file(MAIN)]);
+        wrapper.vm.startStockpileClickMode();
+        expect(space().defaultPrevented).toBe(true);
+
+        wrapper.unmount();
+        wrapper = null;
+
+        expect(space().defaultPrevented).toBe(false);
+    });
+
+    it('ends edit mode: its Esc listener is not left on the page', async () => {
+        await mountMap([file(MAIN)]);
+        wrapper.vm.measureControls.toggleEditMode();
+        const escape = () => {
+            const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+            document.body.dispatchEvent(event);
+            return event;
+        };
+        expect(wrapper.vm.measureControls.isEditMode).toBe(true);
+
+        wrapper.unmount();
+        wrapper = null;
+
+        expect(escape().defaultPrevented).toBe(false);
+    });
+});
+
