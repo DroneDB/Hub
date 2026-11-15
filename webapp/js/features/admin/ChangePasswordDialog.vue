@@ -83,8 +83,22 @@ export default {
                 values.newPassword
             );
 
+            await this.keepOwnSession(values.newPassword);
             this.$notify.success(`Password changed successfully for "${this.user.userName}"`, { summary: 'Password Changed' });
             this.$emit('close', 'updated');
+        },
+
+        // A password change ends the sessions of the user, the one that made it included (the server answers with
+        // no token): an admin who changed their own password signs in again with the new one, as the sign-in page does
+        async keepOwnSession(newPassword) {
+            const own = (reg.getUsername() || '').toLowerCase();
+            if (!own || own !== this.user.userName.toLowerCase()) return;
+            try {
+                await reg.login(this.user.userName, newPassword);
+            } catch (e) {
+                console.error('Sign-in with the new password failed:', e);
+                this.$notify.warn('Your password was changed. Sign in again with the new one.', { summary: 'Signed out' });
+            }
         }
     }
 }

@@ -9,9 +9,12 @@ import PrimeVue from 'primevue/config';
 
 const policy = { minLength: 6, requireDigit: true, requireUppercase: false, requireLowercase: false, requireNonAlphanumeric: false };
 const changeUserPassword = vi.fn();
+const session = vi.hoisted(() => ({ username: 'admin', login: vi.fn() }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
         admin: { changeUserPassword: (...args) => changeUserPassword(...args) },
+        getUsername: () => session.username,
+        login: (...args) => session.login(...args),
         features: { value: name => (name === 'passwordPolicy' ? policy : null) }
     }
 }));
@@ -24,12 +27,12 @@ const WindowStub = {
     emits: ['confirm', 'close'],
     template: '<div :data-busy="busy"><slot /><button type="button" data-confirm :disabled="busy" @click="$emit(\'confirm\')">{{ confirmLabel }}</button></div>'
 };
-const notify = { success: vi.fn(), error: vi.fn() };
+const notify = { success: vi.fn(), error: vi.fn(), warn: vi.fn() };
 
 let wrapper;
-async function render() {
+async function render(userName = 'bob') {
     wrapper = mount(ChangePasswordDialog, {
-        props: { user: { userName: 'bob' } },
+        props: { user: { userName } },
         attachTo: document.body,
         global: { plugins: [PrimeVue], stubs: { Window: WindowStub }, mocks: { $notify: notify } }
     });
@@ -37,7 +40,7 @@ async function render() {
 }
 const type = async (name, value) => { await wrapper.find(`input[name="${name}"]`).setValue(value); await flushPromises(); };
 const confirm = async () => { await wrapper.find('[data-confirm]').trigger('click'); await flushPromises(); };
-afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; changeUserPassword.mockReset(); notify.success.mockReset(); notify.error.mockReset(); });
+afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; changeUserPassword.mockReset(); session.login.mockReset(); session.username = 'admin'; notify.success.mockReset(); notify.error.mockReset(); notify.warn.mockReset(); });
 
 describe('admin ChangePasswordDialog', () => {
     it('lists the password requirements and the three fields fill the width, each with a toggle', async () => {
@@ -95,4 +98,47 @@ describe('admin ChangePasswordDialog', () => {
         expect(wrapper.find('.form-error').text()).toBe('Server Error');
         expect(notify.error).not.toHaveBeenCalled();
     });
+
+    it('leaves the session of another user alone: nobody signs in again', async () => {
+        await render('bob');
+        await type('newPassword', 'abc123');
+        await type('confirmPassword', 'abc123');
+        await confirm();
+        expect(session.login).not.toHaveBeenCalled();
+    });
+
+    it('signs the admin in again with the new password after changing their own, so the session keeps working', async () => {
+        session.username = 'Admin';
+        await render('admin');
+        await type('newPassword', 'abc123');
+        await type('confirmPassword', 'abc123');
+        await confirm();
+        expect(changeUserPassword).toHaveBeenCalledWith('admin', null, 'abc123');
+        expect(session.login).toHaveBeenCalledWith('admin', 'abc123');
+        expect(changeUserPassword.mock.invocationCallOrder[0]).toBeLessThan(session.login.mock.invocationCallOrder[0]);
+        expect(wrapper.emitted('close')[0]).toEqual(['updated']);
+    });
+
+    it('does not sign in again when the change was refused', async () => {
+        session.username = 'admin';
+        changeUserPassword.mockRejectedValue(new ApiError('Server Error', 500));
+        await render('admin');
+        await type('newPassword', 'abc123');
+        await type('confirmPassword', 'abc123');
+        await confirm();
+        expect(session.login).not.toHaveBeenCalled();
+    });
+
+    it('says so when the sign-in with the new password fails, the password being changed already', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        session.username = 'admin';
+        session.login.mockRejectedValue(new Error('Cannot login'));
+        await render('admin');
+        await type('newPassword', 'abc123');
+        await type('confirmPassword', 'abc123');
+        await confirm();
+        expect(notify.warn).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted('close')[0]).toEqual(['updated']);
+    });
 });
+
