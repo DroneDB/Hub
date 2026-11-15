@@ -565,6 +565,30 @@ describe('useSavedView save on a new view', () => {
         expect(held().identity).toBe(`view:${stored.uid}`);
     });
 
+    it('keeps a change made while the first save of a view goes on: the view is saved, the change is not', async () => {
+        const { view, dataset } = await open(fileUrl('f/a.tif'));
+        view.setState(addLayer(view.state.value, { path: 'f/b.tif', hash: 'old-b' }));
+        const written = dataset.metaAdd.getMockImplementation();
+        let release;
+        dataset.metaAdd.mockImplementationOnce(async (...args) => {
+            await new Promise(resolve => { release = resolve; });
+            return written(...args);
+        });
+        dialogs.open.mockResolvedValue('X');
+        const saving = view.save();
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+
+        const state = view.state.value;
+        view.setState({ ...state, layers: state.layers.map((l, i) => (i ? l : { ...l, opacity: 0.2 })) });
+        release();
+        await saving;
+
+        expect(view.saved.value.name).toBe('X');
+        expect(view.state.value.layers[0].opacity).toBe(0.2);
+        expect(dataset.items[0].data.layers[0].opacity).toBe(1);
+        expect(view.dirty.value).toBe(true);
+    });
+
     it('stores the hash of each file as it is now, and the hash of the state for a file it cannot see', async () => {
         const hashOf = shallowRef(null);
         const { view, dataset } = await open(fileUrl('f/a.tif'), { hashOf });
@@ -676,6 +700,29 @@ describe('useSavedView save on a saved view', () => {
         expect(view.identity.value).toBe('view:v_1');
         expect(router.replace).not.toHaveBeenCalled();
         expect(notify.success).toHaveBeenCalledWith('Saved "Ortho over DSM"', { summary: 'View saved' });
+        expect(held().savedId).toBe(dataset.items[0].id);
+    });
+
+    it('keeps a change made while the write goes on: it stays in the state, and stays unsaved', async () => {
+        const { view, dataset } = await openSaved();
+        const written = dataset.metaAdd.getMockImplementation();
+        let release;
+        dataset.metaAdd.mockImplementationOnce(async (...args) => {
+            await new Promise(resolve => { release = resolve; });
+            return written(...args);
+        });
+        const saving = view.save();
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+
+        // The user moves the opacity again while the first write is on its way
+        const state = view.state.value;
+        view.setState({ ...state, layers: state.layers.map((l, i) => (i ? l : { ...l, opacity: 0.2 })) });
+        release();
+        await saving;
+
+        expect(dataset.items[0].data.layers[0].opacity).toBe(0.5);
+        expect(view.state.value.layers[0].opacity).toBe(0.2);
+        expect(view.dirty.value).toBe(true);
         expect(held().savedId).toBe(dataset.items[0].id);
     });
 

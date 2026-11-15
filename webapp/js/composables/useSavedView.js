@@ -308,6 +308,16 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
         notify.error(e instanceof Error ? e.message : String(e), { summary: 'Cannot save the view' });
     }
 
+    /**
+     * After a write: the state takes the hashes it was saved with, so it is the saved data and not dirty,
+     * unless the user changed it while the write was going (`before` is the state that was saved): their
+     * change stays, and stays unsaved.
+     * @param {ViewState|null} before @param {ViewState} written
+     */
+    function keepWritten(before, written) {
+        if (state.value === before) state.value = written;
+    }
+
     /** @param {() => Promise<void>} action */
     async function run(action) {
         busy.value = true;
@@ -328,11 +338,12 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
         const chosen = await askViewName(dialogs, { title, initialValue });
         if (!chosen) return;
         await run(async () => {
+            const before = state.value;
             const toSave = stateToSave();
             const created = await saveNewView(dataset, toSave, { name: chosen, user: reg.getUsername() || '' });
             saved.value = created;
             loadedId.value = created.id;
-            state.value = toSave;
+            keepWritten(before, toSave);
             await moveTo(`view:${created.uid}`, savedViewUrl({ org: String(org), ds: String(ds) }, created.uid));
             notify.success(`Saved "${created.name}"`, { summary: 'View saved' });
         });
@@ -411,12 +422,12 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
         }
         const viewUid = saved.value.uid;
         await run(async () => {
+            const before = state.value;
             const toSave = stateToSave();
             const updated = await updateView(dataset, viewUid, { state: toSave, user: reg.getUsername() || '' });
             saved.value = updated;
             loadedId.value = updated.id;
-            // The state keeps the hashes it was saved with, so it is the saved data and not dirty
-            state.value = toSave;
+            keepWritten(before, toSave);
             persist();
             notify.success(`Saved "${updated.name}"`, { summary: 'View saved' });
         });
