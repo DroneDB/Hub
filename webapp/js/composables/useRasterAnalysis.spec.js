@@ -434,6 +434,112 @@ describe('useRasterAnalysis thermal units', () => {
     });
 });
 
+describe('an answer that comes after a newer question', () => {
+    /** A call of the server that answers when the test says */
+    const deferred = () => {
+        let resolve;
+        const promise = new Promise(r => { resolve = r; });
+        return { promise, resolve };
+    };
+    const LINE = [[0, 0], [1, 1]];
+
+    it('keeps the profile of the newest line when the slow answer of the first one comes last', async () => {
+        const slow = deferred();
+        const getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ samples: ['B'] });
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = getRasterProfile;
+
+        const first = raster.queryRasterProfile(LINE);
+        await raster.queryRasterProfile([[0, 0], [2, 2]]);
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        expect(raster.rasterProfileLoading.value).toBe(false);
+
+        slow.resolve({ samples: ['A'] });
+        await first;
+
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        expect(raster.rasterProfileLoading.value).toBe(false);
+    });
+
+    it('keeps the loading of the newest question while the answer of an older one comes', async () => {
+        const slow = deferred();
+        const newest = deferred();
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise).mockReturnValueOnce(newest.promise);
+
+        const first = raster.queryRasterProfile(LINE);
+        const second = raster.queryRasterProfile(LINE);
+        slow.resolve({ samples: ['A'] });
+        await first;
+
+        expect(raster.rasterProfile.value).toBeNull();
+        expect(raster.rasterProfileLoading.value).toBe(true);
+        newest.resolve({ samples: ['B'] });
+        await second;
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        expect(raster.rasterProfileLoading.value).toBe(false);
+    });
+
+    it('ignores the profile asked for the raster the panel left (the target changed to another one)', async () => {
+        const slow = deferred();
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise);
+
+        const first = raster.queryRasterProfile(LINE);
+        raster.openRasterAnalysis('odm_dem/dtm.tif');
+        slow.resolve({ samples: ['A'] });
+        await first;
+
+        expect(raster.rasterProfile.value).toBeNull();
+        expect(raster.rasterProfileLoading.value).toBe(false);
+        // The query asked of the first raster named its path
+        expect(dataset.getRasterProfile.mock.calls[0][0]).toBe(PATH);
+    });
+
+    it('does not show a profile that failed after a newer one answered', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const slow = deferred();
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ samples: ['B'] });
+
+        const first = raster.queryRasterProfile(LINE);
+        await raster.queryRasterProfile(LINE);
+        slow.resolve(Promise.reject(new Error('boom')));
+        await first;
+
+        expect(raster.rasterProfileError.value).toBeNull();
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        error.mockRestore();
+    });
+
+    it('keeps the statistics of the newest rectangle when the slow answer of the first one comes last', async () => {
+        const slow = deferred();
+        const areaStats = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ min: 5, max: 6, pixelCount: 2 });
+        const { raster } = setup({ areaStats });
+
+        const first = raster.queryRasterArea([0, 0, 1, 1]);
+        await raster.queryRasterArea([2, 2, 3, 3]);
+        slow.resolve({ min: 1, max: 2, pixelCount: 4 });
+        await first;
+
+        expect(raster.rasterAreaStats.value).toEqual({ min: 5, max: 6, pixelCount: 2 });
+        expect(raster.rasterAreaStatsLoading.value).toBe(false);
+    });
+
+    it('does not bring the statistics back after Clear', async () => {
+        const slow = deferred();
+        const { raster } = setup({ areaStats: vi.fn().mockReturnValueOnce(slow.promise) });
+
+        const asked = raster.queryRasterArea([0, 0, 1, 1]);
+        raster.handleClearAreaStats();
+        slow.resolve({ min: 1, max: 2, pixelCount: 4 });
+        await asked;
+
+        expect(raster.rasterAreaStats.value).toBeNull();
+        expect(raster.rasterAreaStatsLoading.value).toBe(false);
+    });
+});
+
 describe('the drawing modes when the component goes away', () => {
     const hosted = () => {
         const map = new Map({ view: new View({ center: [0, 0], zoom: 1 }) });

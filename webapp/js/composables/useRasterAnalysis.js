@@ -72,6 +72,9 @@ const definition = {
             // The statistics rectangle: its drawing session (which holds the measurement toolbar's
             // lock) and the layer that shows it until it is cleared or drawn again.
             _rasterAreaSession: null,
+            // The number of the last statistics and profile questions: only the newest answer is used
+            _rasterAreaTurn: 0,
+            _rasterProfileTurn: 0,
             _rasterAreaLayer: null,
             _rasterAreaSource: null,
             _rasterInspectMoveKey: null,
@@ -103,6 +106,9 @@ const definition = {
                 this._stopRasterAreaDrawing();
                 this.handleClearAreaStats();
                 this.rasterSpotInfo = null;
+                // A profile in flight was asked for the other raster: its answer is dropped, and the panel waits for no one
+                this._rasterProfileTurn++;
+                this.rasterProfileLoading = false;
             }
             this.rasterFilePath = path;
             this.rasterPanelVisible = true;
@@ -233,11 +239,14 @@ const definition = {
         /**
          * The statistics of the raster values under a rectangle of the map: its WGS 84 window
          * [minLon, minLat, maxLon, maxLat], the pixels of the file under it (D-021).
-         * An answer that comes after the panel moved to another raster is dropped.
+         * An answer that comes after the panel moved to another raster, or after a newer question
+         * or Clear, is dropped.
          */
         async queryRasterArea(bbox) {
             const path = this.rasterFilePath;
             if (!path || !this.dataset) return;
+            const turn = ++this._rasterAreaTurn;
+            const current = () => turn === this._rasterAreaTurn && path === this.rasterFilePath;
             this.rasterAreaStatsLoading = true;
             this.rasterAreaStatsError = null;
             this.rasterAreaStats = null;
@@ -245,14 +254,14 @@ const definition = {
             this._rasterAreaBbox = bbox;
             try {
                 const stats = await this.dataset.getRasterAreaStatsOfWindow(path, bbox, this._rasterValueOptions());
-                if (path === this.rasterFilePath) this.rasterAreaStats = stats;
+                if (current()) this.rasterAreaStats = stats;
             } catch (e) {
-                if (path !== this.rasterFilePath) return;
+                if (!current()) return;
                 console.warn('[RasterAnalysis] area statistics failed:', e);
                 const clientError = e && typeof e.status === 'number' && e.status >= 400 && e.status < 500;
                 this.rasterAreaStatsError = clientError && e.message ? e.message : AREA_NO_DATA_MESSAGE;
             } finally {
-                if (path === this.rasterFilePath) this.rasterAreaStatsLoading = false;
+                if (current()) this.rasterAreaStatsLoading = false;
             }
         },
 
@@ -307,6 +316,8 @@ const definition = {
 
         /** Removes the rectangle and its statistics. */
         handleClearAreaStats() {
+            // A question in flight is over for the panel: its answer is dropped
+            this._rasterAreaTurn++;
             if (this._rasterAreaSource) this._rasterAreaSource.clear();
             this.rasterAreaStats = null;
             this.rasterAreaStatsError = null;
@@ -367,18 +378,23 @@ const definition = {
                 this.rasterProfileError = 'A polyline with at least two vertices is required';
                 return;
             }
+            // Only the newest answer for the raster it was asked for is used (the line, the target or the unit may change meanwhile)
+            const path = this.rasterFilePath;
+            const turn = ++this._rasterProfileTurn;
+            const current = () => turn === this._rasterProfileTurn && path === this.rasterFilePath;
             this.rasterProfileLoading = true;
             this.rasterProfileError = null;
             try {
                 this._rasterProfileQuery = { line: lineGeoJson, samples };
-                this.rasterProfile = await this.dataset.getRasterProfile(
-                    this.rasterFilePath, lineGeoJson, samples, this._rasterValueOptions());
+                const profile = await this.dataset.getRasterProfile(path, lineGeoJson, samples, this._rasterValueOptions());
+                if (current()) this.rasterProfile = profile;
             } catch (e) {
                 console.error('Failed to query raster profile:', e);
+                if (!current()) return;
                 this.rasterProfileError = (e && e.message) ? e.message : 'Failed to compute profile';
                 this.rasterProfile = null;
             } finally {
-                this.rasterProfileLoading = false;
+                if (current()) this.rasterProfileLoading = false;
             }
         },
 
