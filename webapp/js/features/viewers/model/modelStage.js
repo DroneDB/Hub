@@ -205,6 +205,8 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         controls.dispose?.();
         material.dispose();
         renderer.dispose();
+        // The browser keeps a few WebGL contexts: the one of a viewer that is gone is let go now, not when it is collected
+        renderer.forceContextLoss?.();
     }
 
     return { scene, camera, renderer, material, controls, setMaterialColor, frameModel, resetView, start, dispose };

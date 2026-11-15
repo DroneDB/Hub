@@ -118,6 +118,8 @@ const fullscreenKeyFree = () => !viewer?.fpControls || viewer.getControls() !== 
 // measure it has no button for (the angle, circle or azimuth of the Potree menu) is 'other': the general hint, Done
 // and Cancel, with no button pressed.
 let gestures = null;
+// Set when the component goes away: what is still loading then is not built for a viewer that is gone
+let unmounted = false;
 const measureKind = ref(null);
 // Drawing a measure again while it is drawn cancels it
 function startMeasure(kind) {
@@ -174,6 +176,10 @@ async function addPointCloud(ddbEntry) {
     const coordinateSystem = await coordinateSystemOf(copcUrl);
     await new Promise((resolve, reject) => {
         Potree.loadPointCloud(copcUrl, ddb.pathutils.basename(ddbEntry.path), e => {
+            if (unmounted) {
+                resolve();
+                return;
+            }
             if (e.type === 'loading_failed') {
                 reject(new Error(`Unable to load ${ddbEntry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
                 return;
@@ -233,24 +239,27 @@ async function loadViewer() {
     loaded.value = true;
 
     const coordinateSystem = await addPointCloud(dataset.value.Entry(entry.value));
+    if (unmounted) return;
     toolsViewer.value = viewer;
     m.attach(viewer, session, coordinateSystem);
     viewer.fitToScreen();
     await m.load();
+    if (unmounted) return;
     window.viewer = viewer;
 }
 
 onMounted(async () => {
-    if (!await entryLoaded) return;
+    if (!await entryLoaded || unmounted) return;
     loading.value = true;
     try {
         // One request wave: the files download in parallel, the scripts run in order
         await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
+        if (unmounted) return;
         fixPotreePaths(window.Potree, window.location.origin);
         showTreeNamesAsText(window.$);
         await loadViewer();
     } catch (e) {
-        error.value = e.message;
+        if (!unmounted) error.value = e.message;
     } finally {
         loading.value = false;
     }
@@ -259,10 +268,12 @@ onMounted(async () => {
 // Everything the viewer created goes with it: listeners, render loop, WebGL context,
 // the jQuery UI sidebar, window.viewer
 onBeforeUnmount(() => {
+    unmounted = true;
     toolsViewer.value = null;
     stopScale();
     stopScale = () => {};
     session.dispose();
+    if (window.viewer === viewer) delete window.viewer;
     viewer = gestures = null;
 });
 </script>

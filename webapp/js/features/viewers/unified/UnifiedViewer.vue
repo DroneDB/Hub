@@ -123,6 +123,9 @@ const clearMeasurements = () => measureTool && measureTool.clear();
 const goHome = () => scene && scene.goHome();
 const toggleLayer = layer => scene && scene.toggleLayer(layer);
 
+// Set when the component goes away: what is still loading then is not built for a viewer that is gone
+let unmounted = false;
+
 function dispose() {
     ready.value = false;
     if (measureTool) measureTool.dispose();
@@ -138,6 +141,7 @@ async function load() {
         // empty scene (the dataset page checks before opening; a direct URL comes here)
         const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
         const availability = await FileAvailabilityChecker.check(dataset.value, viewable, 'unified', { current: true });
+        if (unmounted) return;
         if (!availability.available) {
             // Its build is running, on hold, failed or missing: the shell says so, the viewer opens when the build ends
             if (isBuildWait(availability)) {
@@ -148,15 +152,19 @@ async function load() {
         }
         setAvailability(null);
 
-        scene = new UnifiedScene(await loadGiro3dLibs(), viewEl.value, { settings, view, notify });
+        const libs = await loadGiro3dLibs();
+        if (unmounted) return;
+        scene = new UnifiedScene(libs, viewEl.value, { settings, view, notify });
         measureTool = new MeasureTool(scene, count => { measureCount.value = count; });
         await LOADERS[viewable.type](scene, viewable, dataset.value);
+        // The scene went with the component while its data loaded
+        if (unmounted) return;
         ready.value = true;
         showNavHintOnce(notify, navHintSeen);
     } catch (e) {
         // A loader can fail after the instance exists (an empty tileset): no render loop left behind
         dispose();
-        error.value = e.message;
+        if (!unmounted) error.value = e.message;
     } finally {
         loading.value = false;
         view.progress = null;
@@ -178,6 +186,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+    unmounted = true;
     dispose();
 });
 </script>

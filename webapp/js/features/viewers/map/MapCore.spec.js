@@ -10,6 +10,8 @@ import { defineComponent, h, nextTick } from 'vue';
 import { fromLonLat } from 'ol/proj';
 import ddb from 'ddb';
 import { ScaleLine } from 'ol/control';
+import { Vector as VectorLayer } from 'ol/layer';
+import { Vector as VectorSource } from 'ol/source';
 import { b64encode } from '@/libs/base64';
 import { PREF, setPref } from '@/libs/preferences';
 import { notify } from '@/libs/notify';
@@ -97,6 +99,12 @@ vi.mock('ol', async importOriginal => {
         render() {}
     }
     return { ...ol, Map: QuietMap };
+});
+// The layer of a vector file is made by the test when it says so (a slow answer of the server), else as it is
+const vectorLayer = vi.hoisted(() => ({ create: null }));
+vi.mock('@/libs/map/fileLayers', async importOriginal => {
+    const real = await importOriginal();
+    return { ...real, createVectorFileLayer: (...args) => (vectorLayer.create ?? real.createVectorFileLayer)(...args) };
 });
 vi.mock('@/libs/map/mapUtils', async importOriginal => {
     const utils = await importOriginal();
@@ -1025,6 +1033,43 @@ describe('the drawing tools when the map goes away', () => {
         wrapper = null;
 
         expect(escape().defaultPrevented).toBe(false);
+    });
+});
+
+describe('the vector layers of a folder that was left', () => {
+    afterEach(() => { vectorLayer.create = null; });
+    const vectorFile = path => file({ path, type: T.VECTOR, hash: `h-${path}`, polygon_geom: POLYGON, properties: {} });
+    const layerNamed = name => Object.assign(new VectorLayer({ source: new VectorSource() }), { name });
+    const namesOnMap = () => wrapper.vm.map.getLayers().getArray().map(l => l.name).filter(Boolean);
+
+    it('drops a slow layer of the previous files: it is not added to the map, and the new files keep theirs', async () => {
+        const slow = {};
+        vectorLayer.create = ({ file: f }) => (f.entry.path === 'old.geojson'
+            ? new Promise(resolve => { slow.resolve = () => resolve(layerNamed('old')); })
+            : Promise.resolve(layerNamed('new')));
+        await mountMap([vectorFile('old.geojson')]);
+
+        await wrapper.setProps({ files: [vectorFile('new.geojson')] });
+        await settle();
+        slow.resolve();
+        await settle();
+
+        expect(namesOnMap()).toEqual(['new']);
+        expect(wrapper.vm.vectorLayers.map(l => l.name)).toEqual(['new']);
+    });
+
+    it('does not add a layer that arrives after the map is unmounted', async () => {
+        const slow = {};
+        vectorLayer.create = () => new Promise(resolve => { slow.resolve = () => resolve(layerNamed('late')); });
+        await mountMap([vectorFile('old.geojson')]);
+        const map = wrapper.vm.map;
+
+        wrapper.unmount();
+        wrapper = null;
+        slow.resolve();
+        await settle();
+
+        expect(map.getLayers().getArray().map(l => l.name)).not.toContain('late');
     });
 });
 

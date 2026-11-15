@@ -36,10 +36,12 @@ vi.mock('@/composables/usePotreeMeasurements', () => ({
     usePotreeMeasurements: () => ({
         hasMeasurements: ref(false), hasSavedMeasurements: ref(false), savingMeasurements: ref(false), deleteDialogOpen: ref(false),
         deleteToolActive: ref(false), canUndo: ref(false), canRedo: ref(false), undo() {}, redo() {}, toggleDeleteTool() {},
-        save() {}, requestDelete() {}, onDeleteDialogClose() {}, discardMeasure() {}, attach() {}, load: async () => {}, onGuiLoaded() {}
+        save() {}, requestDelete() {}, onDeleteDialogClose() {}, discardMeasure() {}, attach() {}, load: async () => { calls.push(['load']); }, onGuiLoaded() {}
     })
 }));
-vi.mock('@/libs/lazy', () => ({ loadResources: async () => {} }));
+// The scripts of Potree load when the test lets them
+const lazy = vi.hoisted(() => ({ gate: null }));
+vi.mock('@/libs/lazy', () => ({ loadResources: () => lazy.gate ?? Promise.resolve() }));
 const calls = vi.hoisted(() => []);
 vi.mock('@/libs/potree/potreeResources', () => ({
     POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {}, showTreeNamesAsText: jquery => calls.push(['tree text', jquery])
@@ -110,7 +112,7 @@ const mountViewer = async () => {
 };
 const button = id => wrapper.find(`[data-testid="${id}"]`);
 
-beforeEach(() => { calls.length = 0; stubPotree(); });
+beforeEach(() => { calls.length = 0; lazy.gate = null; stubPotree(); });
 afterEach(() => {
     wrapper?.unmount();
     delete globalThis.Potree;
@@ -262,7 +264,53 @@ describe('PotreeViewer scene tree', () => {
     it('is set to show names as text before the menu of Potree is built', async () => {
         await mountViewer();
 
-        expect(calls.map(c => c[0])).toEqual(['tree text', 'gui']);
+        expect(calls.map(c => c[0]).filter(name => name !== 'load')).toEqual(['tree text', 'gui']);
         expect(calls[0][1]).toBe(globalThis.$);
     });
 });
+
+describe('PotreeViewer that is left while it loads', () => {
+    afterEach(() => { delete window.viewer; });
+
+    it('builds no viewer when the scripts of Potree arrive after the page was left', async () => {
+        let release;
+        lazy.gate = new Promise(resolve => { release = resolve; });
+        const Viewer = vi.spyOn(globalThis.Potree, 'Viewer');
+        wrapper = mount(PotreeViewer, { global: { stubs } });
+        await flushPromises();
+
+        wrapper.unmount();
+        wrapper = null;
+        release();
+        await flushPromises();
+
+        expect(Viewer).not.toHaveBeenCalled();
+        expect(window.viewer).toBeUndefined();
+    });
+
+    it('does not load the measurements or publish the viewer when the cloud arrives after the page was left', async () => {
+        let loaded;
+        globalThis.Potree.loadPointCloud = (_url, _name, cb) => { loaded = () => cb({ type: 'pointcloud_loaded', pointcloud: { material: { activeAttributeName: 'rgba' }, getAttribute: () => null } }); };
+        wrapper = mount(PotreeViewer, { global: { stubs } });
+        await vi.waitFor(() => expect(loaded).toBeTypeOf('function'));
+
+        wrapper.unmount();
+        wrapper = null;
+        loaded();
+        await flushPromises();
+
+        expect(calls.map(c => c[0])).not.toContain('load');
+        expect(window.viewer).toBeUndefined();
+    });
+
+    it('lets go of window.viewer with the component', async () => {
+        await mountViewer();
+        expect(window.viewer).toBe(viewer);
+
+        wrapper.unmount();
+        wrapper = null;
+
+        expect(window.viewer).toBeUndefined();
+    });
+});
+

@@ -312,6 +312,8 @@ export default {
             selectPolygon: false,
             initialExtent: null,
             vectorLayerColors: {},
+            // The number of the last build of the vector layers: a layer that finishes loading for an older one is dropped
+            vectorGeneration: 0,
             mapSettingsDialogOpen: false,
             linkPanelOpen: false,
             // The visible extent in WGS 84, for 'Export visible extent' of the raster panels (FR-RAS-16)
@@ -392,8 +394,10 @@ export default {
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
         if (this.viewZoomCap) this.viewZoomCap.dispose();
-        // A tool that is armed on the map (its keys are on the document) ends with it
+        // A tool that is armed on the map (its keys are on the document) ends with it, and a vector layer still
+        // loading is not added to it
         endSessionOf(this.map);
+        this.vectorGeneration++;
         if (this.map) {
             if (this.tooltipOverlay) this.map.removeOverlay(this.tooltipOverlay);
             // Releases the control's subscription to the unit preference
@@ -530,11 +534,13 @@ export default {
             if (this.$refs.filePopup && this.$refs.filePopup.closeUnlessIn(this.files)) this.fileLayers.clearFootprints();
             this.vectorLayers.forEach(layer => this.map.removeLayer(layer));
             this.vectorLayers = [];
+            const generation = ++this.vectorGeneration;
             const vectorFiles = this.fileLayers.build(this.files, { standalone: this.standalone, shotStyle: this.shotStyleKey() });
 
-            // Zoom once every vector file's metadata is in (resolves at once without vectors)
-            Promise.all(vectorFiles.map(f => this.addVectorLayer(f))).then(() => {
-                if (this.fitsToFiles()) this.zoomToFilesExtent();
+            // Zoom once every vector file's metadata is in (resolves at once without vectors). The layers of a build that
+            // another build replaced meanwhile (another folder) are not added, and do not fit the map
+            Promise.all(vectorFiles.map(f => this.addVectorLayer(f, generation))).then(() => {
+                if (generation === this.vectorGeneration && this.fitsToFiles()) this.zoomToFilesExtent();
             });
             // The dataset map keeps the order the user gave the layers; a view's order is its state's
             this.syncRasterLayers(this.fileLayers.rasterSlots, { keepOrder: !this.view });
@@ -580,7 +586,7 @@ export default {
             this.fileLayers.splats.loadInView(extent, this.dataset).catch(error => console.error('Error loading splat footprints:', error));
         },
 
-        addVectorLayer: async function (file) {
+        addVectorLayer: async function (file, generation) {
             try {
                 const layer = await createVectorFileLayer({
                     dataset: this.dataset,
@@ -588,6 +594,7 @@ export default {
                     color: getVectorColor(file.entry.path, this.vectorLayers.length, this.vectorLayerColors),
                     getZoom: () => (this.map ? this.map.getView().getZoom() : 0)
                 });
+                if (generation !== this.vectorGeneration) return;
                 this.map.addLayer(layer);
                 this.vectorLayers.push(layer);
             } catch (error) {

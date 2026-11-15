@@ -12,6 +12,7 @@ class FakeRenderer {
         this.setSize = vi.fn((w, h) => { canvas.width = Math.floor(w * this.ratio); canvas.height = Math.floor(h * this.ratio); });
         this.render = vi.fn();
         this.dispose = vi.fn();
+        this.forceContextLoss = vi.fn();
         this.setClearColor = vi.fn();
         this.setPixelRatio = vi.fn(r => { this.ratio = r; });
     }
@@ -289,6 +290,7 @@ describe('render loop', () => {
         expect(cancelAnimationFrame).toHaveBeenCalled();
         expect(stage.controls.dispose).toHaveBeenCalled();
         expect(stage.renderer.dispose).toHaveBeenCalled();
+        expect(stage.renderer.forceContextLoss).toHaveBeenCalledTimes(1);
         stage = null;
     });
 });
