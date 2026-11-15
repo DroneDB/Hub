@@ -51,4 +51,12 @@ describe('showFeatureTooltip', () => {
         expect(overlay.getElement().innerHTML).toBe('Union Army, 1862');
         expect(overlay.getPosition()).toEqual([300, 300]);
     });
+
+    it('shows a name that looks like markup as text and creates no element from it', () => {
+        const overlay = labelAt([300, 300], '<img src=x onerror=alert(1)>');
+        const element = overlay.getElement();
+        expect(element.querySelector('img')).toBeNull();
+        expect(element.children).toHaveLength(0);
+        expect(element.textContent).toBe('<img src=x onerror=alert(1)>');
+    });
 });

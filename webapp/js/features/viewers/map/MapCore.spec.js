@@ -969,3 +969,15 @@ describe('Zoom to layer (FR-MAP-08, FR-XC-23)', () => {
         info.mockRestore();
     });
 });
+
+describe('the text tooltip', () => {
+    it('shows a file name that looks like markup as text and creates no element from it', async () => {
+        await mountMap([file(MAIN)]);
+
+        wrapper.vm.showTextTooltip('<img src=x onerror=alert(1)>.jpg', [10, 10]);
+
+        const element = wrapper.vm.tooltipElement;
+        expect(element.querySelector('img')).toBeNull();
+        expect(element.textContent).toBe('<img src=x onerror=alert(1)>.jpg');
+    });
+});

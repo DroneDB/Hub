@@ -59,7 +59,7 @@ const definition = {
                 }
             }
 
-            this.tooltipElement.innerHTML = content;
+            this.tooltipElement.textContent = content;
             this.tooltipElement.style.display = 'block';
             this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
             // The label has its content and its place: it stays out of the toolbar rail and inside the map (FR-MAP-19)

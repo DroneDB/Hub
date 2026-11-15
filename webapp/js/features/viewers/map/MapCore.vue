@@ -136,7 +136,6 @@ import Keyboard from '@/libs/keyboard';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently } from '@/libs/utils';
 import { formatSpeed } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
-import { sanitizeHtml } from '@/libs/sanitize';
 import SelectionControl from '@/libs/map/controls/selectionControl';
 import SettingsControl from '@/libs/map/controls/settingsControl';
 import { createControlZones, moveToZone } from '@/libs/map/controlZones';
@@ -627,7 +626,7 @@ export default {
         },
 
         showTextTooltip: function (text, pixel) {
-            this.tooltipElement.innerHTML = sanitizeHtml(text);
+            this.tooltipElement.textContent = text;
             this.tooltipElement.style.display = 'block';
             this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
         },
