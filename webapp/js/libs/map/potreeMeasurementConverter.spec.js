@@ -188,6 +188,49 @@ describe('the title and the description of an annotation', () => {
         expect(doc.features[0].properties.description).toBe(`${MARKUP} & more`);
     });
 
+    it('shows the line breaks of a description, and reads back the lines the panel typed', () => {
+        const Potree = loadPotree();
+        vi.stubGlobal('Potree', Potree);
+        const annotation = importAnnotation('Gate', 'first\nsecond');
+
+        const content = annotation.domElement.find('.annotation-description-content');
+        expect(content.find('br')).toHaveLength(1);
+        expect(content.text()).toBe('firstsecond');
+
+        // What the contenteditable panel hands back for lines typed there
+        for (const typed of ['a<br>b', 'a<div>b</div>']) {
+            annotation.description = typed;
+            const doc = exportMeasurements(viewerWith([], [annotation]), 'cloud.laz', coordinateSystem('EPSG:32618'));
+            expect(doc.features[0].properties.description).toBe('a\nb');
+            const again = importAnnotation('Gate', doc.features[0].properties.description);
+            const shown = again.domElement.find('.annotation-description-content');
+            expect(shown.find('br')).toHaveLength(1);
+            expect(shown.find('img')).toHaveLength(0);
+        }
+    });
+
+    it('is the same text after the trip into Potree and back, with & < and newlines', () => {
+        const Potree = loadPotree();
+        vi.stubGlobal('Potree', Potree);
+        for (const text of ['a & b', 'x < y > z', '<img src=x onerror=alert(1)>\nline 2', 'one\n\nthree', '&amp; &lt;b&gt;']) {
+            const annotation = importAnnotation(text, text);
+            const doc = exportMeasurements(viewerWith([], [annotation]), 'cloud.laz', coordinateSystem('EPSG:32618'));
+            expect(doc.features[0].properties.name).toBe(text);
+            expect(doc.features[0].properties.description).toBe(text);
+            expect(annotation.domElement.find('.annotation-label img, .annotation-description-content img')).toHaveLength(0);
+        }
+    });
+
+    it('shows the literal <br> of a file saved before as text: nothing in it is a tag', () => {
+        const Potree = loadPotree();
+        vi.stubGlobal('Potree', Potree);
+        const annotation = importAnnotation('Old', 'first<br>second<img src=x onerror=alert(1)>');
+
+        const content = annotation.domElement.find('.annotation-description-content');
+        expect(content.find('br, img')).toHaveLength(0);
+        expect(content.text()).toBe('first<br>second<img src=x onerror=alert(1)>');
+    });
+
     it('creates no element in the label and the panel text of the real Potree annotation', () => {
         const Potree = loadPotree();
         vi.stubGlobal('Potree', Potree);

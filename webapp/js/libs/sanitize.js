@@ -26,14 +26,58 @@ export function escapeHtml(text) {
 }
 
 /**
- * The text an HTML string shows: the entities of `text` decoded (the reverse of escapeHtml). A
- * <textarea> holds its content as text, and a `<` in `text` is escaped before it goes in, so no tag
- * in `text` is ever parsed into an element and nothing runs; a literal `<` comes out as it went in.
+ * Plain text as the HTML that shows it: markup characters escaped, a newline a line break. For a widget that keeps
+ * its text as HTML (Potree's annotations); only `<br>` is ever made from the text.
+ * @param {unknown} text
+ * @returns {string}
  */
-export function unescapeHtml(text) {
-    const holder = document.createElement('textarea');
-    holder.innerHTML = String(text ?? '').replace(/</g, '&lt;');
-    return holder.value;
+export function textToHtml(text) {
+    return escapeHtml(text).replace(/\r?\n/g, '<br>');
+}
+
+// The elements that start and end a line of their own, as a contenteditable makes them with Enter
+const BLOCK_TAGS = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'TABLE', 'TR']);
+
+/**
+ * The text that an HTML string shows: the reverse of textToHtml, and for the HTML a contenteditable makes from
+ * what is typed (`a<div>b</div>`, `a<br>b`). The HTML is parsed by DOMParser, which runs no script and loads
+ * nothing; only the text of the document is taken, `<br>` and the start and end of a block are line breaks, and
+ * no tag is ever kept. A stored text that holds a literal `<br>` therefore comes back as text, not as a break.
+ * @param {unknown} html
+ * @returns {string}
+ */
+export function htmlToText(html) {
+    const body = new DOMParser().parseFromString(String(html ?? ''), 'text/html').body;
+    let out = '';
+    // A block asks for a line break before whatever comes next, unless the text already ends with one
+    let breakBefore = false;
+    const emit = (/** @type {string} */ text) => {
+        if (breakBefore && out && !out.endsWith('\n')) out += '\n';
+        breakBefore = false;
+        out += text;
+    };
+    const walk = (/** @type {Node} */ parent) => {
+        for (const node of Array.from(parent.childNodes)) {
+            if (node.nodeType === 3) {
+                if (node.nodeValue) emit(node.nodeValue);
+            } else if (node.nodeType === 1) {
+                const tag = /** @type {Element} */ (node).tagName;
+                if (tag === 'BR') {
+                    emit('\n');
+                } else if (tag === 'SCRIPT' || tag === 'STYLE') {
+                    continue;
+                } else if (BLOCK_TAGS.has(tag)) {
+                    if (out) breakBefore = true;
+                    walk(node);
+                    breakBefore = true;
+                } else {
+                    walk(node);
+                }
+            }
+        }
+    };
+    walk(body);
+    return out;
 }
 
 /**

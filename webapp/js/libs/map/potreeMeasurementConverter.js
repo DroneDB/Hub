@@ -10,7 +10,7 @@
 
 import { write, VIEW } from '@/libs/map/measurementFormat';
 import { projectorFor, geometryOf } from '@/libs/map/pointCloudGeometry';
-import { escapeHtml, unescapeHtml } from '@/libs/sanitize';
+import { textToHtml, htmlToText } from '@/libs/sanitize';
 
 /**
  * Convert a Potree measurement to a GeoJSON Feature
@@ -194,7 +194,7 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
 
 // Potree keeps the title and the description of an annotation as HTML (it parses them into its
 // label and its panel, which also writes them back as HTML): the file holds them as plain text, so
-// they are escaped on their way in and decoded on their way out.
+// they are made HTML (escaped, a newline a <br>) on their way in and read back as text on their way out.
 
 /**
  * Convert an annotation to GeoJSON Feature
@@ -220,8 +220,8 @@ function annotationToGeoJSON(annotation, projector) {
         },
         properties: {
             measurementType: 'annotation',
-            name: unescapeHtml(annotation.title) || 'Annotation',
-            description: unescapeHtml(annotation.description),
+            name: htmlToText(annotation.title) || 'Annotation',
+            description: htmlToText(annotation.description),
             localCoordinates: [annotation.position.x, annotation.position.y, annotation.position.z]
         }
     };
@@ -247,8 +247,8 @@ function geoJSONToAnnotation(feature, viewer, projector) {
 
     const annotation = new Potree.Annotation({
         position: position,
-        title: escapeHtml(props.name || 'Annotation'),
-        description: escapeHtml(props.description)
+        title: textToHtml(props.name || 'Annotation'),
+        description: textToHtml(props.description)
     });
 
     return annotation;
