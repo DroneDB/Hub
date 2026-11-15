@@ -24,9 +24,15 @@ describe('sendXhr', () => {
         const xhr = fakeXhr({ status: 503, text: '{"error":"busy"}', headers: { 'Retry-After': '7' } });
         const onProgress = vi.fn();
         const r = await sendXhr({ url: '/u', body: new Blob(['x']), headers: { 'X-Upload-Id': 'a', Authorization: null }, onProgress, createXhr: () => xhr });
-        expect(r).toEqual({ status: 503, body: { error: 'busy' }, retryAfter: 7, uploaded: true }); // seconds, as sent
+        expect(r).toEqual({ status: 503, body: { error: 'busy' }, contentType: null, retryAfter: 7, uploaded: true }); // seconds, as sent
         expect(xhr.headers).toEqual({ 'X-Upload-Id': 'a' });
         expect(onProgress).toHaveBeenCalledWith(5, 5);
+    });
+
+    it('hands on the content type of the response, which tells a message from a page', async () => {
+        const xhr = fakeXhr({ status: 413, text: '<html>too large</html>', headers: { 'Content-Type': 'text/html' } });
+        const r = await sendXhr({ url: '/u', body: new Blob(['x']), createXhr: () => xhr });
+        expect(r).toMatchObject({ status: 413, body: '<html>too large</html>', contentType: 'text/html' });
     });
 
     it('rejects with an AbortError when the signal aborts', async () => {

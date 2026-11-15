@@ -1,7 +1,7 @@
 /**
  * xhrTransport - one upload request with progress (fetch cannot report upload progress).
  *
- * Resolves with `{ status, body, retryAfter, uploaded }` for every HTTP outcome, including
+ * Resolves with `{ status, body, contentType, retryAfter, uploaded }` for every HTTP outcome, including
  * network failures (status 0): the caller decides what to retry. `uploaded` tells whether
  * the browser sent the whole body before the request ended, which is what separates
  * "the proxy gave up while the server was still adding the file" (504 after the last
@@ -50,13 +50,14 @@ export function sendXhr({ url, body, headers = {}, signal, onProgress, onUploade
             resolve({
                 status: xhr.status,
                 body: parseBody(xhr.responseText),
+                contentType: xhr.getResponseHeader('Content-Type'),
                 retryAfter: parseRetryAfter(xhr.getResponseHeader('Retry-After')),
                 uploaded: uploaded || (xhr.status >= 200 && xhr.status < 300)
             });
         };
         xhr.onerror = () => {
             cleanup();
-            resolve({ status: 0, body: null, retryAfter: null, uploaded });
+            resolve({ status: 0, body: null, contentType: null, retryAfter: null, uploaded });
         };
         xhr.onabort = () => {
             cleanup();

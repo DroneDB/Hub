@@ -99,6 +99,23 @@ describe('httpClient 404 messages', () => {
         expect(error.message).toBe('Not found');
     });
 
+    it('names the status for the HTML page of a proxy, whatever the status', async () => {
+        const page = '<html><body><h1>An error</h1></body></html>';
+        for (const [status, text] of [[413, 'Client Error'], [502, 'Bad Gateway'], [500, 'Internal Server Error']]) {
+            vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(page, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+            const error = await client().send('/x').catch(e => e);
+            vi.restoreAllMocks();
+            expect(error.status).toBe(status);
+            expect(error.message).toBe(text);
+        }
+    });
+
+    it('reads a plain text refusal of any status', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response('The folder is full', { status: 409, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }));
+        expect((await client().send('/x').catch(e => e)).message).toBe('The folder is full');
+    });
+
     it('reads a plain text 404', async () => {
         vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
             new Response("Cannot find 'a.geojson'", { status: 404, headers: { 'Content-Type': 'text/plain' } }));

@@ -376,3 +376,22 @@ describe('uploadRequests and the open uploads (FR-XC-10)', () => {
         expect(getJson.mock.calls.map(c => c[0])).toEqual([LIST_URL, expect.stringMatching(/\/obj\/chunk\/[0-9a-f]{64}$/)]);
     });
 });
+
+describe('uploadRequests failure messages', () => {
+    const failed = async response => {
+        const [result] = await requests(vi.fn(async () => ({ uploaded: true, ...response }))).send({ kind: 'single', items: [item('a')] }, hooks());
+        return result;
+    };
+
+    it('says the status of a refusal in HTML, such as the 413 or the 500 of a proxy, not the page', async () => {
+        const page = '<html><body><h1>413 Request Entity Too Large</h1></body></html>';
+        expect(await failed({ status: 413, body: page, contentType: 'text/html' })).toMatchObject({ ok: false, status: 413, error: 'Upload failed (HTTP 413)' });
+        expect(await failed({ status: 500, body: page, contentType: 'text/html; charset=utf-8' })).toMatchObject({ status: 500, error: 'Upload failed (HTTP 500)' });
+        expect(await failed({ status: 500, body: page, contentType: null })).toMatchObject({ error: 'Upload failed (HTTP 500)' });
+    });
+
+    it('shows the message the server wrote as plain text', async () => {
+        expect(await failed({ status: 507, body: 'The storage is full', contentType: 'text/plain; charset=utf-8' })).toMatchObject({ status: 507, error: 'The storage is full' });
+    });
+});
+

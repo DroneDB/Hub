@@ -105,6 +105,20 @@ async function parseBody(response, status, responseType) {
 }
 
 /**
+ * The message a failed response's body is, when it is one: the body of a `text/plain` response
+ * (the Registry writes its plain messages that way). Any other body is a page of a proxy or of
+ * the web server (a 413, a 502, a 404 in HTML), not a message to show, and `fallback` is used.
+ * @param {unknown} body
+ * @param {string|null|undefined} contentType
+ * @param {string} fallback  the text for the status
+ * @returns {string}
+ */
+export function bodyMessageOf(body, contentType, fallback) {
+    const plain = (contentType || '').toLowerCase().includes('text/plain');
+    return plain && typeof body === 'string' && body.trim() ? body : fallback;
+}
+
+/**
  * Throw the ApiError for a non-2xx response, with the server's message when it sent one.
  * @param {Response} response
  * @param {number} status
@@ -118,10 +132,9 @@ async function throwFor(response, status) {
             const json = await response.json();
             fail(failureMessageOf(json) || fallback, status, json);
         }
-        // A 404 page of a proxy or of the web server is HTML, not a message (FR-ORG-23: the Registry's 404 says what is missing)
-        if (status === 404 && !contentTypeOf(response).includes('text/plain')) fail(fallback, status);
+        // The page of a proxy or of the web server is HTML, not a message (the Registry's own 404 says what is missing)
         const text = await response.text();
-        fail(text || fallback, status);
+        fail(bodyMessageOf(text, contentTypeOf(response), fallback), status);
     } catch (error) {
         if (error.status) throw error;
         fail(fallback, status);

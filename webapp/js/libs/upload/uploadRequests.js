@@ -35,7 +35,7 @@
 import { sendXhr } from './xhrTransport';
 import { newId } from '@/libs/ids';
 import { sha256Hex } from '@/libs/sha256';
-import { bearer, failureMessageOf } from '@/libs/ddb/http/httpClient';
+import { bearer, failureMessageOf, bodyMessageOf } from '@/libs/ddb/http/httpClient';
 
 const CHUNK_BYTES = 64 * 1024 * 1024;
 const RECEIPT_POLL_MS = 2000;
@@ -327,7 +327,7 @@ function failure(item, res) {
         id: item.id,
         ok: false,
         status: res.status,
-        error: failureMessageOf(body) || (typeof res.body === 'string' && res.body) || statusText(res.status),
+        error: failureMessageOf(body) || bodyMessageOf(res.body, res.contentType, statusText(res.status)),
         noRetry: body?.noRetry === true,
         retryAfter: res.retryAfter
     };
