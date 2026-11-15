@@ -2,8 +2,7 @@
  * Unit tests for libs/potree/potreeResources.js
  */
 import { describe, it, expect } from 'vitest';
-import { POTREE_RESOURCES, POTREE_BASE, versioned, fixPotreePaths, showTreeNamesAsText } from './potreeResources';
-import { loadPotree } from './potreeLibs.fixtures';
+import { POTREE_RESOURCES, POTREE_BASE, versioned, fixPotreePaths } from './potreeResources';
 
 describe('potreeResources', () => {
     it('puts the Hub version in every URL, keeping the order', () => {
@@ -20,18 +19,5 @@ describe('potreeResources', () => {
         fixPotreePaths(potree, 'http://hub.test');
         expect(potree.scriptPath).toBe('http://hub.test' + POTREE_BASE);
         expect(potree.resourcePath).toBe('http://hub.test' + POTREE_BASE + '/resources');
-    });
-});
-
-describe('the scene tree of Potree', () => {
-    it('shows the name of a node as text and creates no element from it', () => {
-        loadPotree();
-        showTreeNamesAsText(window.$);
-        const host = window.$('<div></div>').appendTo(document.body);
-        host.jstree({ core: { data: [{ id: 'n1', text: '<img src=x onerror=alert(1)>' }] } });
-
-        expect(host.find('img')).toHaveLength(0);
-        expect(host.find('a.jstree-anchor').text()).toBe('<img src=x onerror=alert(1)>');
-        host.remove();
     });
 });

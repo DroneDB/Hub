@@ -35,7 +35,7 @@ function measureToGeoJSON(measure, projector) {
     // Build properties
     const properties = {
         measurementType: measurementType,
-        name: measure.name,
+        name: htmlToText(measure.name),
         description: measure.description || '',
         color: '#' + measure.color.getHexString(),
         'stroke-width': measure.strokeWidth || 2,
@@ -103,7 +103,7 @@ function geoJSONToMeasure(feature, viewer, projector) {
     const props = feature.properties;
 
     // Restore base properties
-    measure.name = props.name || 'Measure';
+    measure.name = textToHtml(props.name || 'Measure');
     measure.description = props.description || '';
     measure.showDistances = props.showDistances !== undefined ? props.showDistances : true;
     measure.showCoordinates = props.showCoordinates || false;
@@ -192,8 +192,8 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
     return write(null, VIEW.POINT_CLOUD, features, { pointCloudFile: pointCloudPath, coordinateSystem });
 }
 
-// Potree keeps the title and the description of an annotation as HTML (it parses them into its
-// label and its panel, which also writes them back as HTML): the file holds them as plain text, so
+// Potree keeps the title and the description of an annotation, and the name of a measure, as HTML (it parses them into
+// its labels, its panel and its scene tree, and the panel writes them back as HTML): the file holds them as plain text, so
 // they are made HTML (escaped, a newline a <br>) on their way in and read back as text on their way out.
 
 /**

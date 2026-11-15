@@ -78,7 +78,7 @@ import { loadResources } from '@/libs/lazy';
 import { isMobile, deviceMemoryGb } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
-import { POTREE_RESOURCES, versioned, fixPotreePaths, showTreeNamesAsText } from '@/libs/potree/potreeResources';
+import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { labelPotreeControls } from '@/libs/potree/potreeControls';
 import { attachPotreeScale } from '@/libs/potree/potreeScale';
 import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
@@ -256,7 +256,6 @@ onMounted(async () => {
         await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
         if (unmounted) return;
         fixPotreePaths(window.Potree, window.location.origin);
-        showTreeNamesAsText(window.$);
         await loadViewer();
     } catch (e) {
         if (!unmounted) error.value = e.message;

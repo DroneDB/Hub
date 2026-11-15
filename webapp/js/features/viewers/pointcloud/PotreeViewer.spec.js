@@ -43,9 +43,7 @@ vi.mock('@/composables/usePotreeMeasurements', () => ({
 const lazy = vi.hoisted(() => ({ gate: null }));
 vi.mock('@/libs/lazy', () => ({ loadResources: () => lazy.gate ?? Promise.resolve() }));
 const calls = vi.hoisted(() => []);
-vi.mock('@/libs/potree/potreeResources', () => ({
-    POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {}, showTreeNamesAsText: jquery => calls.push(['tree text', jquery])
-}));
+vi.mock('@/libs/potree/potreeResources', () => ({ POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {} }));
 vi.mock('@/libs/potree/potreeSession', () => ({
     pointBudgetFor: () => 1000000,
     PotreeSession: class {
@@ -257,15 +255,6 @@ describe('PotreeViewer fullscreen (FR-VWR-38)', () => {
         expect(scss).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*right: calc\(var\(--ddb-sidebar-width\) \+ var\(--ddb-spacing-md\)\);/);
         const phone = scss.slice(scss.indexOf('@media (max-width: 767.98px)'));
         expect(phone).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*visibility: hidden;/);
-    });
-});
-
-describe('PotreeViewer scene tree', () => {
-    it('is set to show names as text before the menu of Potree is built', async () => {
-        await mountViewer();
-
-        expect(calls.map(c => c[0]).filter(name => name !== 'load')).toEqual(['tree text', 'gui']);
-        expect(calls[0][1]).toBe(globalThis.$);
     });
 });
 

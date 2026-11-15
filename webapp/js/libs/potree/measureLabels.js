@@ -89,9 +89,11 @@ function clearNameLabel(measure, { viewer, session }) {
 export function updateNameLabel(measure, ctx) {
     const { viewer, session } = ctx;
     clearNameLabel(measure, ctx);
-    if (!measure.name || !measure.name.trim() || !measure.points || !measure.points.length) return;
+    // Potree holds the name as HTML: the label and the tooltip show its text
+    const name = htmlToText(measure.name);
+    if (!name.trim() || !measure.points || !measure.points.length) return;
 
-    const label = new Potree.TextSprite(measure.name);
+    const label = new Potree.TextSprite(name);
     label.setTextColor({ r: 255, g: 255, b: 255, a: 1.0 });
     label.setBorderColor({ r: 0, g: 0, b: 0, a: 1.0 });
     label.setBackgroundColor({ r: 0, g: 0, b: 0, a: 0.7 });
@@ -113,7 +115,7 @@ export function updateNameLabel(measure, ctx) {
 
     if (!measure.description || !measure.description.trim()) return;
     const tooltip = bodyTooltip(session, 'potree-measurement-tooltip',
-        `<strong>${escapeHtml(measure.name)}</strong><br>${escapeHtml(measure.description)}`);
+        `<strong>${escapeHtml(name)}</strong><br>${escapeHtml(measure.description)}`);
     measure._nameLabelTooltip = tooltip;
     const dom = viewer.renderer.domElement;
     measure._tooltipHoverHandler = event => {

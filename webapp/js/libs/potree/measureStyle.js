@@ -5,6 +5,7 @@
  * loaded from a file and for measures edited in the properties dialog.
  */
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { textToHtml, htmlToText } from '@/libs/sanitize';
 
 /** '#rrggbb' of a THREE.Color, or the fallback. */
 export const hexOf = (color, fallback = MEASURE_COLOR) => (color ? '#' + color.getHexString() : fallback);
@@ -53,7 +54,7 @@ function applyAreaFill(measure) {
  */
 export function measureAsFeature(measure) {
     const values = {
-        name: measure.name || '',
+        name: htmlToText(measure.name),
         description: measure.description || '',
         stroke: hexOf(measure.color),
         'stroke-width': measure.strokeWidth || 2,
@@ -70,7 +71,7 @@ export function measureAsFeature(measure) {
  * @param {Record<string, any>} p
  */
 export function assignMeasureProperties(measure, p) {
-    if (p.name !== undefined) measure.name = p.name;
+    if (p.name !== undefined) measure.name = textToHtml(p.name);
     if (p.description !== undefined) measure.description = p.description;
     if (p.stroke) measure.color = new THREE.Color(p.stroke);
     if (p['stroke-width'] !== undefined) measure.strokeWidth = p['stroke-width'];
