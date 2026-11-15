@@ -5,7 +5,7 @@
  * PotreeSession, so they are released with the viewer. Names and descriptions come from
  * saved files: they are escaped before they reach innerHTML.
  */
-import { escapeHtml } from '@/libs/sanitize';
+import { escapeHtml, textToHtml, htmlToText } from '@/libs/sanitize';
 
 /** A raycaster from the camera through the pointer. */
 function pointerRaycaster(viewer, event) {
@@ -140,9 +140,11 @@ export function updateAnnotationTooltip(annotation, { session }) {
     annotation._descriptionTooltip = null;
     annotation._tooltipHandlers = [];
     const el = annotationElement(annotation);
-    if (!el || !annotation.description || !annotation.description.trim()) return;
+    // Potree holds the description as HTML: the tooltip shows its text, escaped once, with its line breaks
+    const text = htmlToText(annotation.description);
+    if (!el || !text.trim()) return;
 
-    const tooltip = bodyTooltip(session, 'potree-annotation-tooltip', escapeHtml(annotation.description));
+    const tooltip = bodyTooltip(session, 'potree-annotation-tooltip', textToHtml(text));
     annotation._descriptionTooltip = tooltip;
     const handlers = [
         [el, 'mouseenter', e => { placeAt(tooltip, e.clientX, e.clientY); tooltip.style.display = 'block'; }],

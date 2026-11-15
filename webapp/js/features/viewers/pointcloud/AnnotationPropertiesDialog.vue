@@ -36,6 +36,7 @@
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import { useCopyText } from '@/composables/useCopyText';
+import { htmlToText } from '@/libs/sanitize';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
@@ -96,8 +97,9 @@ export default {
     mounted() {
         // Load annotation properties
         if (this.annotation) {
-            this.formData.name = this.annotation.title || '';
-            this.formData.description = this.annotation.description || '';
+            // Potree holds both as HTML: the form is plain text
+            this.formData.name = htmlToText(this.annotation.title);
+            this.formData.description = htmlToText(this.annotation.description);
         }
     },
     methods: {

@@ -21,6 +21,7 @@ import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/
 import { measureAt, annotationElement, updateNameLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { flash } from '@/composables/useMapAlerts';
+import { textToHtml } from '@/libs/sanitize';
 import { useTimerGroup } from '@/composables/useTimers';
 
 const isTyping = t => t instanceof Element && (t.closest('input, textarea, select') || t.isContentEditable);
@@ -111,8 +112,9 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             annotation,
             showDelete: true,
             onSave: properties => {
-                if (properties.name !== undefined) annotation.title = properties.name;
-                if (properties.description !== undefined) annotation.description = properties.description;
+                // Potree keeps both as HTML: the typed text is escaped on its way in
+                if (properties.name !== undefined) annotation.title = textToHtml(properties.name);
+                if (properties.description !== undefined) annotation.description = textToHtml(properties.description);
                 updateAnnotationTooltip(annotation, labelCtx());
             },
             onDelete: () => {
