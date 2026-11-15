@@ -13,6 +13,7 @@
  * showAlert, showFlash, onFileWritten(path), onFileRemoved(path), analysisTarget (the entry
  * of the analysis target, or null: the measurements follow it).
  */
+import { toRaw } from 'vue';
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
 import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
@@ -24,6 +25,10 @@ import { measurementsToCsv } from '@/libs/map/measurementCsv';
 import { downloadCsv } from '@/libs/csv';
 
 const definition = {
+    // The map is gone: the storage is let go, so an answer or a Reload notice that comes later finds it is not the map's
+    beforeUnmount() {
+        this.measurementStorage = null;
+    },
     data() {
         return {
             measuring: false,
@@ -126,6 +131,11 @@ const definition = {
             return this._measurementTargetEntry().path;
         },
 
+        // Whether the map still works on this storage (the state is reactive: its value is a proxy of the object)
+        _isCurrentStorage(storage) {
+            return toRaw(this.measurementStorage) === storage;
+        },
+
         _setSaved(saved) {
             this.hasSavedMeasurements = saved;
             this.measureControls.setSavedState(saved);
@@ -163,13 +173,13 @@ const definition = {
             } catch (e) {
                 // A file that cannot be read stays as it is: Save is refused until a read succeeds (Reload)
                 console.error('Error loading measurements:', e);
-                if (this._loadedMeasurementPath === storage.measurementPath) {
+                if (this._isCurrentStorage(storage)) {
                     this.showAlert('Error', `Could not load the saved measurements: ${e.message}`);
                 }
                 return;
             }
-            // Another target took over while the file was read
-            if (this._loadedMeasurementPath !== storage.measurementPath) return;
+            // Another read (another target, a Reload) or the end of the map took over while the file was read
+            if (!this._isCurrentStorage(storage)) return;
             if (geojson) {
                 const result = this.measureControls.importFromGeoJSON(geojson);
                 if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
@@ -241,11 +251,8 @@ const definition = {
             }
 
             // The map does not show what the file holds (the read failed or is still going)
-            const refusal = this.measurementStorage.saveRefusal;
-            if (refusal) {
-                notifySaveRefused(refusal, () => this.loadSavedMeasurements({ reload: true }));
-                return;
-            }
+            const storage = toRaw(this.measurementStorage);
+            if (notifySaveRefused(storage, () => this._isCurrentStorage(storage), () => this.loadSavedMeasurements({ reload: true }))) return;
 
             const geojson = this.measureControls.exportToGeoJSON(this.activeMeasurementEntry.path, this.measurementGroups);
             const count = geojson.features ? geojson.features.length : 0;

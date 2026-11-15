@@ -4,7 +4,7 @@
  * and the map's measurements in the same file are neither shown nor touched.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
-import { ref } from 'vue';
+import { ref, effectScope } from 'vue';
 import { notify } from '@/libs/notify';
 
 const flash = vi.fn();
@@ -206,6 +206,38 @@ describe('usePotreeMeasurements', () => {
 
             expect(inFile().sort()).toEqual(['m1', 'v1', 'v2']);
             expect(refused).toHaveBeenCalledTimes(1);
+        });
+
+        it('reads the file again once when two notices are clicked, and not at all after the viewer is gone', async () => {
+            const m = start();
+            await m.load();
+            await m.save();
+            await m.save();
+            expect(refused).toHaveBeenCalledTimes(2);
+            const [first, second] = refused.mock.calls.map(call => call[1].action.run);
+
+            first();
+            second();
+            await vi.waitFor(() => expect(viewer.scene.measurements.map(x => x.name)).toEqual(['v1']));
+            first();
+            await Promise.resolve();
+
+            expect(dataset.getFileContents).toHaveBeenCalledTimes(2);
+            expect(viewer.scene.measurements).toHaveLength(1);
+        });
+
+        it('does nothing when the notice is clicked after the viewer was left', async () => {
+            const scope = effectScope();
+            let m;
+            scope.run(() => { m = start(); });
+            await m.load();
+            await m.save();
+            scope.stop();
+
+            refused.mock.calls[0][1].action.run();
+            await Promise.resolve();
+
+            expect(dataset.getFileContents).toHaveBeenCalledTimes(1);
         });
 
         it('lets Delete saved through: the user chose to remove them', async () => {

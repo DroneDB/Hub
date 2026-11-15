@@ -52,17 +52,26 @@ export class MeasurementNotLoadedError extends Error {
 }
 
 /**
- * Tells the user that a save was refused (see MeasurementStorage.saveRefusal); after a failed read the notice
- * offers to read the file again.
- * @param {MeasurementNotLoadedError} refusal
- * @param {() => void} reload  reads the file again
+ * Tells the user that a save was refused, when it is (see MeasurementStorage.saveRefusal), and says whether it was.
+ * After a failed read the notice offers to read the file again; the action runs only while it still applies: the
+ * view still has this storage (`isCurrent`: not another target, another viewer, a page that was left) and the read
+ * is still failed (not already read again by an earlier click or another notice).
+ * @param {MeasurementStorage} storage
+ * @param {() => boolean} isCurrent  whether the view still works on `storage`
+ * @param {() => (void | Promise<void>)} reload  reads the file again
+ * @returns {boolean} true when the save is refused
  */
-export function notifySaveRefused(refusal, reload) {
+export function notifySaveRefused(storage, isCurrent, reload) {
+    const refusal = storage.saveRefusal;
+    if (!refusal) return false;
     notify.warn(refusal.message, {
         summary: 'Not saved',
         life: 'long',
-        action: refusal.loadState === 'failed' ? { label: 'Reload', run: reload } : undefined
+        action: refusal.loadState === 'failed'
+            ? { label: 'Reload', run: () => (isCurrent() && storage.loadState === 'failed' ? reload() : undefined) }
+            : undefined
     });
+    return true;
 }
 
 /**

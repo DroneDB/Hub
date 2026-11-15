@@ -4,7 +4,8 @@
  * tells the file list, and a new target replaces the measurements on the map.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, defineComponent, h } from 'vue';
+import { mount } from '@vue/test-utils';
 import ddb from 'ddb';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import * as csv from '@/libs/csv';
@@ -195,6 +196,66 @@ describe('useMapMeasurements', () => {
             expect(onMap()).toEqual(['m1', 'm2']);
         });
 
+        it('reads the file again once when two notices are clicked, whether one after the other or together', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            await m.saveMeasurements();
+            await m.saveMeasurements();
+            expect(refused).toHaveBeenCalledTimes(2);
+            const [first, second] = refused.mock.calls.map(call => call[1].action.run);
+
+            first();
+            second();
+            await vi.waitFor(() => expect(onMap()).toEqual(['m1', 'm2']));
+            // A notice clicked after the read worked does nothing either
+            first();
+            await Promise.resolve();
+
+            expect(dataset.getFileContents).toHaveBeenCalledTimes(2);
+            expect(onMap()).toEqual(['m1', 'm2']);
+        });
+
+        it('does nothing when the notice of an earlier target is clicked after the map moved to another one', async () => {
+            stored['b/measurements.geojson'] = fileOf('b1');
+            const m = start();
+            await m.loadSavedMeasurements();
+            await m.saveMeasurements();
+            files.value = [{ entry: { path: 'b/notes.txt', type: T.GENERIC } }];
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['b1']);
+            const reads = dataset.getFileContents.mock.calls.length;
+
+            refused.mock.calls[0][1].action.run();
+            await Promise.resolve();
+
+            expect(dataset.getFileContents).toHaveBeenCalledTimes(reads);
+            expect(onMap()).toEqual(['b1']);
+        });
+
+        it('does nothing when the notice is clicked after the map was left', async () => {
+            let m;
+            controls = new MeasureControls({});
+            const host = mount(defineComponent({
+                setup() {
+                    m = useMapMeasurements({
+                        measureControls: shallowRef(controls), files: () => files.value, dataset: () => dataset, canWrite: () => true, canDelete: () => true,
+                        currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, onFileWritten: () => () => {}, onFileRemoved: () => () => {},
+                        analysisTarget: () => null
+                    });
+                    return () => h('div');
+                }
+            }));
+            await m.loadSavedMeasurements();
+            await m.saveMeasurements();
+            host.unmount();
+
+            refused.mock.calls[0][1].action.run();
+            await Promise.resolve();
+
+            expect(dataset.getFileContents).toHaveBeenCalledTimes(1);
+        });
+
         it('lets Delete saved through: the user chose to remove the file', async () => {
             const m = start();
             await m.loadSavedMeasurements();
@@ -226,6 +287,23 @@ describe('useMapMeasurements', () => {
         await m.saveMeasurements();
         expect(dataset.writeObj).toHaveBeenCalledTimes(1);
         vi.restoreAllMocks();
+    });
+
+    it('drops the answer of a read that another read of the same file overtook (a Reload while it was going)', async () => {
+        const read = dataset.getFileContents;
+        let release;
+        dataset.getFileContents = vi.fn()
+            .mockImplementationOnce(() => new Promise(resolve => { release = () => resolve(JSON.stringify({ type: 'FeatureCollection', features: [lengthFeature('stale')] })); }))
+            .mockImplementation(read);
+        const m = start();
+        const first = m.loadSavedMeasurements();
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+
+        await m.loadSavedMeasurements({ reload: true });
+        release();
+        await first;
+
+        expect(onMap()).toEqual(['m1', 'm2']);
     });
 
     describe('with an analysis target', () => {

@@ -10,7 +10,7 @@
  *   m.attach(viewer, session, coordinateSystem);   // once the viewer exists
  *   await m.load();
  */
-import { ref, computed } from 'vue';
+import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
 import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
@@ -50,6 +50,10 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
      * @type {import('@/libs/undoStack').UndoStack<{ op: 'add' | 'remove', ref: { measure: any }, snapshot: any }>}
      */
     const history = createUndoStack({ limit: 50, onChange: h => { canUndo.value = h.canUndo(); canRedo.value = h.canRedo(); } });
+
+    // The viewer is gone with its component: a Reload notice that comes later does nothing
+    let alive = true;
+    if (getCurrentScope()) onScopeDispose(() => { alive = false; });
 
     // Set by attach (non-reactive: Potree objects)
     let viewer = null;
@@ -327,11 +331,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         }
         error.value = '';
         // The viewer does not show what the file holds (the read failed or is still going)
-        const refusal = storageFor().saveRefusal;
-        if (refusal) {
-            notifySaveRefused(refusal, load);
-            return;
-        }
+        const current = storageFor();
+        if (notifySaveRefused(current, () => alive && storage === current, load)) return;
         const geojson = exportMeasurements(viewer, entry.value.path, coordinateSystem);
         if (!(geojson.features || []).length && !hasSavedMeasurements.value) {
             error.value = 'No measurements to save';
