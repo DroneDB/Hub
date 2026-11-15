@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
-import { MeasurementStorage, MeasurementOwner, ownerOf, saveResultMessage } from './measurementStorage';
+import { MeasurementStorage, MeasurementOwner, MeasurementNotLoadedError, ownerOf, saveResultMessage } from './measurementStorage';
 import { exportMeasurements as exportMap, importMeasurements as importMap } from './olMeasurementConverter';
 import { exportMeasurements as exportCloud } from './potreeMeasurementConverter';
 import { sectionOf } from './measurementFormat';
@@ -354,6 +354,74 @@ describe('a file written before 2.0', () => {
         await storageFor(dataset, POINT_CLOUD).save(exportCloud(cloudViewer(), 'cloud.laz', cloudCoordinateSystem(null)));
         expect('crs' in file()).toBe(false);
         expect(JSON.stringify(file())).not.toContain('EPSG:4326');
+    });
+});
+
+describe('a save after a read that failed or is not over', () => {
+    const FILE = collection([feature('length', 'l1')]);
+    const failing = () => {
+        const { dataset, state } = memoryDataset(JSON.stringify(FILE));
+        const read = dataset.getFileContents;
+        dataset.getFileContents = vi.fn()
+            .mockRejectedValueOnce(Object.assign(new Error('Server Error'), { status: 500 }))
+            .mockImplementation(read);
+        return { dataset, state, storage: storageFor(dataset, MAP) };
+    };
+    beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}); });
+
+    it('throws and writes nothing after a load that failed', async () => {
+        const { dataset, state, storage } = failing();
+        await expect(storage.load()).rejects.toThrow();
+        expect(storage.loadState).toBe('failed');
+
+        await expect(storage.save(collection([feature('length', 'l9')]))).rejects.toBeInstanceOf(MeasurementNotLoadedError);
+
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+        expect(dataset.deleteObj).not.toHaveBeenCalled();
+        expect(state.content).toBe(JSON.stringify(FILE));
+    });
+
+    it('saves once a load succeeds, with the measurements of the file kept next to the new ones', async () => {
+        const { storage, state } = failing();
+        await expect(storage.load()).rejects.toThrow();
+        await storage.load();
+        expect(storage.loadState).toBe('loaded');
+
+        await storage.save(collection([feature('length', 'l1'), feature('length', 'l9')]));
+
+        expect(ids(JSON.parse(state.content))).toEqual(['l1', 'l9']);
+    });
+
+    it('throws while the load is in flight, and the load that ends last decides the state', async () => {
+        const { dataset, storage } = failing();
+        let release;
+        dataset.getFileContents = vi.fn(() => new Promise(resolve => { release = () => resolve(JSON.stringify(FILE)); }));
+        const loading = storage.load();
+        expect(storage.loadState).toBe('pending');
+
+        await expect(storage.save(collection([]))).rejects.toBeInstanceOf(MeasurementNotLoadedError);
+        release();
+        await loading;
+
+        expect(storage.loadState).toBe('loaded');
+        expect(storage.saveRefusal).toBeNull();
+    });
+
+    it('does not refuse a delete: the user chose to lose the measurements, and the file is read by it', async () => {
+        const { dataset, storage } = failing();
+        await expect(storage.load()).rejects.toThrow();
+
+        const result = await storage.deleteSaved();
+
+        expect(result.deleted).toBe(true);
+        expect(dataset.deleteObj).toHaveBeenCalled();
+        expect(storage.loadState).toBe('loaded');
+    });
+
+    it('a view that has not read the file yet is not refused (only a read that went wrong is)', async () => {
+        const { storage } = failing();
+        expect(storage.loadState).toBe('idle');
+        expect(storage.saveRefusal).toBeNull();
     });
 });
 

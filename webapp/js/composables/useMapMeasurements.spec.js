@@ -3,11 +3,12 @@
  * (a change of the file list does not add them again), Save makes the file match the map and
  * tells the file list, and a new target replaces the measurements on the map.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, shallowRef } from 'vue';
 import ddb from 'ddb';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import * as csv from '@/libs/csv';
+import { notify } from '@/libs/notify';
 import { PREF, removePref } from '@/libs/preferences';
 import { useMapMeasurements } from './useMapMeasurements';
 
@@ -124,6 +125,107 @@ describe('useMapMeasurements', () => {
         await m.loadSavedMeasurements();
         expect(onMap()).toEqual(['b1']);
         expect(flashes).toEqual([]);
+    });
+
+    describe('after a read of the file that failed', () => {
+        const FILE = 'a/ortho_measurements.geojson';
+        let refused;
+        beforeEach(() => {
+            refused = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            // The first read of the file fails (a 500), the next ones are the file
+            const read = dataset.getFileContents;
+            dataset.getFileContents = vi.fn()
+                .mockRejectedValueOnce(Object.assign(new Error('Server Error'), { status: 500 }))
+                .mockImplementation(read);
+        });
+        afterEach(() => vi.restoreAllMocks());
+
+        it('refuses a save, and writes nothing, until the file is read again', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+
+            await m.saveMeasurements();
+
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(JSON.parse(stored[FILE]).features).toHaveLength(2);
+            expect(refused).toHaveBeenCalledTimes(1);
+            expect(refused.mock.calls[0][1].action.label).toBe('Reload');
+            expect(events.written).toEqual([]);
+        });
+
+        it('refuses the save that follows a change of units too', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            m.changeUnitsTargetUnit = 'imperial';
+
+            await m.handleChangeUnitsDialogClose('confirm');
+
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(refused).toHaveBeenCalledTimes(1);
+        });
+
+        it('keeps what the file held with what is drawn after Reload, and saves both', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            await m.saveMeasurements();
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+
+            // The Reload of the notice: the file is read again, the map shows it
+            await refused.mock.calls[0][1].action.run();
+            expect(onMap()).toEqual(['m1', 'm2']);
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            await m.saveMeasurements();
+
+            expect(JSON.parse(stored[FILE]).features.map(f => f.properties.name).sort()).toEqual(['m1', 'm2', 'n1']);
+            expect(refused).toHaveBeenCalledTimes(1);
+        });
+
+        it('warns of what Reload discards', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            await m.saveMeasurements();
+
+            await refused.mock.calls[0][1].action.run();
+
+            expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
+            expect(onMap()).toEqual(['m1', 'm2']);
+        });
+
+        it('lets Delete saved through: the user chose to remove the file', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+
+            await m.deleteSavedMeasurements();
+
+            expect(stored).not.toHaveProperty(FILE);
+        });
+    });
+
+    it('refuses a save while the file is still being read', async () => {
+        const refused = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        let release;
+        const read = dataset.getFileContents;
+        dataset.getFileContents = vi.fn()
+            .mockImplementationOnce(path => new Promise(resolve => { release = () => resolve(read(path)); }))
+            .mockImplementation(read);
+        const m = start();
+        const loading = m.loadSavedMeasurements();
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+        controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+
+        await m.saveMeasurements();
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+        expect(refused.mock.calls[0][1].action).toBeUndefined();
+
+        release();
+        await loading;
+        await m.saveMeasurements();
+        expect(dataset.writeObj).toHaveBeenCalledTimes(1);
+        vi.restoreAllMocks();
     });
 
     describe('with an analysis target', () => {

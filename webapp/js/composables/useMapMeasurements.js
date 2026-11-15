@@ -15,7 +15,7 @@
  */
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
-import { MeasurementStorage, MeasurementOwner, saveResultMessage } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
@@ -134,14 +134,16 @@ const definition = {
         /**
          * Shows the saved measurements of the target on show. Runs on every change of the
          * files; the file is read only when the target changes, so the map never gets the
-         * same measurements twice and keeps its unsaved edits while the target stays.
+         * same measurements twice and keeps its unsaved edits while the target stays. After a
+         * read that failed, `reload` reads the file of the same target again (the map then shows
+         * the file, and the unsaved edits are dropped with a notice, as for another target).
          */
-        async loadSavedMeasurements() {
+        async loadSavedMeasurements({ reload = false } = {}) {
             if (!this.dataset || !this.measureControls) return;
             const entry = this._measurementTargetEntry();
             const storage = new MeasurementStorage(this.dataset, entry, MeasurementOwner.MAP);
             const previous = this._loadedMeasurementPath;
-            if (storage.measurementPath === previous) return;
+            if (storage.measurementPath === previous && !reload) return;
             this._loadedMeasurementPath = storage.measurementPath;
 
             if (previous && this.measureControls.isDirty()) {
@@ -159,7 +161,7 @@ const definition = {
             try {
                 geojson = await storage.load();
             } catch (e) {
-                // A file that cannot be read stays as it is: Save refuses to replace it too
+                // A file that cannot be read stays as it is: Save is refused until a read succeeds (Reload)
                 console.error('Error loading measurements:', e);
                 if (this._loadedMeasurementPath === storage.measurementPath) {
                     this.showAlert('Error', `Could not load the saved measurements: ${e.message}`);
@@ -235,6 +237,13 @@ const definition = {
 
             if (!this.measureControls || !this.measurementStorage) {
                 this.showAlert('Error', 'Cannot save: measurement controls not initialized');
+                return;
+            }
+
+            // The map does not show what the file holds (the read failed or is still going)
+            const refusal = this.measurementStorage.saveRefusal;
+            if (refusal) {
+                notifySaveRefused(refusal, () => this.loadSavedMeasurements({ reload: true }));
                 return;
             }
 

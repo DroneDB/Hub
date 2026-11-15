@@ -3,8 +3,9 @@
  * with nothing left), Delete saved removes the viewer's measurements from the file and the viewer,
  * and the map's measurements in the same file are neither shown nor touched.
  */
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { ref } from 'vue';
+import { notify } from '@/libs/notify';
 
 const flash = vi.fn();
 vi.mock('@/composables/useMapAlerts', () => ({ flash: (...args) => flash(...args) }));
@@ -90,10 +91,10 @@ function fakeViewer() {
 const removeAll = () => [...viewer.scene.measurements].forEach(x => viewer.scene.removeMeasurement(x));
 
 let dialogs;
-function start() {
+function start(error = ref('')) {
     dialogs = { open: vi.fn(() => ({ close: vi.fn() })) };
     const m = usePotreeMeasurements({
-        entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(true), error: ref(''), dialogs
+        entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(true), error, dialogs
     });
     viewer = fakeViewer();
     m.attach(viewer, session, {});
@@ -162,6 +163,82 @@ describe('usePotreeMeasurements', () => {
         await m.save();
         expect(inFile()).toEqual(['v1', 'v2', 'm1']);
         expect(flash).toHaveBeenLastCalledWith('Saved 2 measurements to "cloud_measurements.geojson"');
+    });
+
+    describe('after a read of the file that failed', () => {
+        let refused;
+        beforeEach(() => {
+            refused = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            // The first read of the file fails (a 500), the next ones are the file
+            const read = dataset.getFileContents;
+            dataset.getFileContents = vi.fn()
+                .mockRejectedValueOnce(Object.assign(new Error('Server Error'), { status: 500 }))
+                .mockImplementation(read);
+        });
+        afterEach(() => vi.restoreAllMocks());
+
+        it('refuses a save, and writes nothing, with a Reload that reads the file again', async () => {
+            const error = ref('');
+            const m = start(error);
+            await m.load();
+            expect(error.value).toMatch(/Could not load measurements/);
+            viewer.scene.addMeasurement({ name: 'v2' });
+
+            await m.save();
+
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(inFile()).toEqual(['m1', 'v1']);
+            expect(refused).toHaveBeenCalledTimes(1);
+            expect(refused.mock.calls[0][1].action.label).toBe('Reload');
+        });
+
+        it('keeps the measurements of the file with the new ones after Reload, and saves both', async () => {
+            const error = ref('');
+            const m = start(error);
+            await m.load();
+            viewer.scene.addMeasurement({ name: 'v2' });
+            await m.save();
+
+            await refused.mock.calls[0][1].action.run();
+            expect(error.value).toBe('');
+            await m.save();
+
+            expect(inFile().sort()).toEqual(['m1', 'v1', 'v2']);
+            expect(refused).toHaveBeenCalledTimes(1);
+        });
+
+        it('lets Delete saved through: the user chose to remove them', async () => {
+            const m = start();
+            await m.load();
+
+            await m.onDeleteDialogClose('confirm');
+
+            expect(inFile()).toEqual(['m1']);
+        });
+    });
+
+    it('refuses a save while the file is still being read', async () => {
+        const refused = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        let release;
+        const read = dataset.getFileContents;
+        dataset.getFileContents = vi.fn()
+            .mockImplementationOnce(path => new Promise(resolve => { release = () => resolve(read(path)); }))
+            .mockImplementation(read);
+        const m = start();
+        const loading = m.load();
+        await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+        viewer.scene.addMeasurement({ name: 'v2' });
+
+        await m.save();
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+        expect(refused.mock.calls[0][1].action).toBeUndefined();
+
+        release();
+        await loading;
+        await m.save();
+        expect(inFile().sort()).toEqual(['m1', 'v1', 'v2']);
+        vi.restoreAllMocks();
     });
 
     describe('undo and redo', () => {

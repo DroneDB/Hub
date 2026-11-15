@@ -13,7 +13,7 @@
 import { ref, computed } from 'vue';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
-import { MeasurementStorage, MeasurementOwner, saveResultMessage } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
@@ -287,9 +287,13 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         if (deleteTool) deleteTool.toggle();
     }
 
+    // The message of the failed read: it goes away when a read (Reload) succeeds
+    let loadErrorText = '';
+
     async function load() {
         try {
             const geojson = await storageFor().load();
+            if (error.value === loadErrorText) error.value = '';
             if (!geojson) return;
             const count = geojson.features.length;
             const imported = replay(() => importMeasurements(geojson, viewer, coordinateSystem)) || [];
@@ -305,7 +309,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             flash(`${count} measurement${count > 1 ? 's' : ''} loaded`);
         } catch (e) {
             console.error('Error loading measurements:', e);
-            error.value = `Could not load measurements: ${e.message}`;
+            loadErrorText = `Could not load measurements: ${e.message}`;
+            error.value = loadErrorText;
         }
     }
 
@@ -319,6 +324,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             return;
         }
         error.value = '';
+        // The viewer does not show what the file holds (the read failed or is still going)
+        const refusal = storageFor().saveRefusal;
+        if (refusal) {
+            notifySaveRefused(refusal, load);
+            return;
+        }
         const geojson = exportMeasurements(viewer, entry.value.path, coordinateSystem);
         if (!(geojson.features || []).length && !hasSavedMeasurements.value) {
             error.value = 'No measurements to save';

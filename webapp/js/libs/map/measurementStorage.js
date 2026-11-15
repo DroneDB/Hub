@@ -5,6 +5,7 @@
  */
 import { pathutils } from 'ddb';
 import { downloadText } from '@/libs/download';
+import { notify } from '@/libs/notify';
 import { isNotFound } from '@/libs/ddb/apiError';
 import { isListed } from '@/libs/optionalFile';
 import { VIEW, ownerOf, sectionOf, parse, write, MeasurementFileError } from '@/libs/map/measurementFormat';
@@ -36,6 +37,35 @@ export function saveResultMessage(result) {
 }
 
 /**
+ * A save that the view's last read of the file makes unsafe: while the file is being read, or after a read that
+ * failed, the view does not show what the file holds, and a save would replace it with what the view shows.
+ */
+export class MeasurementNotLoadedError extends Error {
+    /** @param {'pending'|'failed'} loadState */
+    constructor(loadState) {
+        super(loadState === 'failed'
+            ? 'The saved measurements could not be loaded, so saving now would replace them. Reload them first.'
+            : 'The saved measurements are still loading. Save again when they are shown.');
+        this.name = 'MeasurementNotLoadedError';
+        this.loadState = loadState;
+    }
+}
+
+/**
+ * Tells the user that a save was refused (see MeasurementStorage.saveRefusal); after a failed read the notice
+ * offers to read the file again.
+ * @param {MeasurementNotLoadedError} refusal
+ * @param {() => void} reload  reads the file again
+ */
+export function notifySaveRefused(refusal, reload) {
+    notify.warn(refusal.message, {
+        summary: 'Not saved',
+        life: 'long',
+        action: refusal.loadState === 'failed' ? { label: 'Reload', run: reload } : undefined
+    });
+}
+
+/**
  * The measurements file of an entry, as one view sees it. A view loads, saves and deletes its own
  * measurements only: those of the other view stay in the file as they are, and the file goes when
  * nothing is left in it.
@@ -54,6 +84,23 @@ export class MeasurementStorage {
         this.owner = owner;
         this.pointCloudCrs = options.pointCloudCrs ?? null;
         this.measurementPath = this.getMeasurementPath();
+        /**
+         * What the last read of the file did: 'idle' (none yet), 'pending' (in flight), 'loaded' or 'failed'. A
+         * save is refused while it is pending or failed (see saveRefusal).
+         * @type {'idle'|'pending'|'loaded'|'failed'}
+         */
+        this.loadState = 'idle';
+        this._loadTurn = 0;
+    }
+
+    /**
+     * Why a save would not be safe now, or null. A view saves what it shows into the file in place of its own
+     * measurements in it: when its read of the file is still in flight or failed, it shows less than the file
+     * holds, and the save would lose the rest.
+     * @returns {MeasurementNotLoadedError|null}
+     */
+    get saveRefusal() {
+        return this.loadState === 'pending' || this.loadState === 'failed' ? new MeasurementNotLoadedError(this.loadState) : null;
     }
 
     /**
@@ -108,9 +155,17 @@ export class MeasurementStorage {
      *   document: its features and its section in `metadata.views`)
      * @returns {Promise<{path: string, fileName: string, count: number, deleted: boolean, owner: string}>}
      *   `count` measurements of this view are in the file; `deleted` when the file was removed.
+     * @throws {MeasurementNotLoadedError} when the last read of the file is in flight or failed (nothing is written)
      * @throws when the file cannot be read or written
      */
     async save(geojsonData) {
+        const refusal = this.saveRefusal;
+        if (refusal) throw refusal;
+        return this._write(geojsonData);
+    }
+
+    /** Reads the file, merges the measurements of this view into it and writes it (or removes it). */
+    async _write(geojsonData) {
         try {
             const previous = await this._read();
             const own = geojsonData.features || [];
@@ -118,12 +173,14 @@ export class MeasurementStorage {
             const result = { path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner };
             if (!document.features.length) {
                 await this._deleteIfPresent();
+                this.loadState = 'loaded';
                 return { ...result, deleted: true };
             }
 
             const blob = new Blob([JSON.stringify(document, null, 2)], { type: 'application/geo+json' });
             // The measurement file of this view: merged above, replaced here
             await this.dataset.writeObj(this.measurementPath, blob, { overwrite: true });
+            this.loadState = 'loaded';
             return { ...result, deleted: false };
         } catch (error) {
             console.error('Failed to save measurements:', error);
@@ -132,11 +189,12 @@ export class MeasurementStorage {
     }
 
     /**
-     * Removes this view's measurements from the file (the file goes when nothing is left).
+     * Removes this view's measurements from the file (the file goes when nothing is left). A user who asks for
+     * this has chosen to lose them, so it is not refused after a failed read (it reads the file itself).
      * @returns {Promise<{path: string, fileName: string, count: number, deleted: boolean, owner: string}>}
      */
     deleteSaved() {
-        return this.save({ type: 'FeatureCollection', features: [] });
+        return this._write({ type: 'FeatureCollection', features: [] });
     }
 
     /** Deletes the file; a file that is already gone is not an error. */
@@ -156,10 +214,21 @@ export class MeasurementStorage {
     /**
      * This view's saved measurements (with the file's metadata, and the view's own section).
      * @returns {Promise<Object|null>} GeoJSON, or null when the file has none of this view's
-     * @throws {MeasurementFileError} when the file cannot be read or used
+     * @throws {MeasurementFileError} when the file cannot be read or used (`loadState` is then 'failed' until a
+     *   read succeeds: see saveRefusal)
      */
     async load() {
-        const document = await this._read({ onlyIfListed: true });
+        const turn = ++this._loadTurn;
+        this.loadState = 'pending';
+        let document;
+        try {
+            document = await this._read({ onlyIfListed: true });
+        } catch (e) {
+            // A newer read decides the state
+            if (turn === this._loadTurn) this.loadState = 'failed';
+            throw e;
+        }
+        if (turn === this._loadTurn) this.loadState = 'loaded';
         if (!document) return null;
         const features = document.features.filter(f => this._owns(f));
         if (!features.length) return null;
