@@ -18,9 +18,12 @@
  * - removes what Potree puts outside the container after the viewer is created: the profile
  *   window (with its own WebGL renderer) and the colour pickers it appends to document.body,
  *   and the jQuery handlers it binds on window (the profile window's resize handler keeps
- *   the whole viewer reachable).
+ *   the whole viewer reachable);
+ * - reads the COPC files of its viewer through the Hub's range transport (Potree.createCopcGetter,
+ *   libs/http/rangeRequests) and stops those reads, and their retries, when it is disposed.
  */
 import { ListenerBag } from '@/libs/listenerBag';
+import { createRangeGetter } from '@/libs/http/rangeRequests';
 import { DEFAULT_DEVICE_MEMORY_GB, reportsDeviceMemory } from '@/libs/responsive';
 
 // Nodes Potree 1.8 appends to document.body: the profile window (profile.html) and the
@@ -38,6 +41,8 @@ export class PotreeSession {
         this.viewer = null;
         this.containers = [];
         this.disposed = false;
+        this.reads = new AbortController();
+        this.createCopcGetter = url => createRangeGetter(url, { signal: this.reads.signal });
     }
 
     /**
@@ -75,6 +80,7 @@ export class PotreeSession {
         this.bodyBefore = new Set(this.win?.document?.body?.children ?? []);
         this.windowHandlersBefore = new Set(jqueryWindowHandlers(this.jquery(), this.win).map(h => h.handler));
         this.trackWorkers(this.win?.Potree?.workerPool);
+        if (this.win?.Potree) this.win.Potree.createCopcGetter = this.createCopcGetter;
         return viewer;
     }
 
@@ -124,6 +130,8 @@ export class PotreeSession {
         if (this.disposed) return;
         this.disposed = true;
 
+        this.reads.abort();
+        if (this.win?.Potree?.createCopcGetter === this.createCopcGetter) this.win.Potree.createCopcGetter = null;
         this.listeners.dispose();
 
         for (const node of this.nodes) node.parentNode?.removeChild(node);

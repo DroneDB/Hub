@@ -56989,19 +56989,45 @@
 			child.parent = this;
 		}
 
+		// A node loads in steps (its hierarchy page, its points, their decoding in a worker): when one fails, the node
+		// gives back its loading slot (failLoading) and is asked for again later, rather than staying "loading" for the
+		// rest of the session, which left a hole in the cloud and, after maxNodesLoading failures, stopped all loading
 		async load() {
 			if (this.loaded || this.loading) return;
+			if (this.isWaitingToRetry()) return;
 			if (Potree.numNodesLoading >= Potree.maxNodesLoading) return;
 
 			this.loading = true;
 			++Potree.numNodesLoading;
 
-			if (!this.nodeinfo) await this.loadHierarchy();
-			this.loadPoints();
+			try {
+				if (!this.nodeinfo) await this.loadHierarchy();
+				await this.loadPoints();
+			} catch (e) {
+				this.failLoading(e);
+			}
 		}
 
 		loadPoints(){
-			this.owner.loader.load(this);
+			return this.owner.loader.load(this);
+		}
+
+		// After a failed load the node waits before it is asked for again: 1 s, doubling with each failure in a row, up
+		// to 30 s; meanwhile the renderer gives its turn to the other nodes in view
+		isWaitingToRetry() {
+			return this.retryAt !== undefined && Date.now() < this.retryAt;
+		}
+
+		failLoading(error) {
+			if (!this.loading) return;
+			this.loading = false;
+			--Potree.numNodesLoading;
+			this.failures = (this.failures || 0) + 1;
+			const delay = Math.min(1000 * Math.pow(2, this.failures - 1), 30000);
+			this.retryAt = Date.now() + delay;
+			// Reads stopped on purpose (the viewer closed) are no failure to report
+			if (error && error.name === 'AbortError') return;
+			console.warn(`Point cloud node ${this.name} did not load, asked again in ${delay / 1000} s:`, error);
 		}
 
 		async loadHierarchy() {
@@ -57067,6 +57093,8 @@
 			this.mean = mean;
 			this.loaded = true;
 			this.loading = false;
+			this.failures = 0;
+			this.retryAt = undefined;
 			--Potree.numNodesLoading;
 		}
 
@@ -61647,7 +61675,8 @@ void main() {
 					node = pointcloud.toTreeNode(node, parent);
 					loadedToGPUThisFrame++;
 				} else {
-					unloadedGeometry.push(node);
+					// A node waiting to retry a failed load does not take one of the maxNodesLoading turns of this frame
+					if (!(node.isWaitingToRetry && node.isWaitingToRetry())) unloadedGeometry.push(node);
 					visibleGeometry.push(node);
 				}
 			}
@@ -66817,8 +66846,17 @@ void main() {
 			const { Copc, Getter } = window.Copc;
 
 			const url = file;
-			const getter = Getter.http(url);
-			const copc = await Copc.create(getter);
+			// The page may read the file through its own transport (Potree.createCopcGetter), else copc.js reads it
+			const getter = Potree.createCopcGetter ? Potree.createCopcGetter(url) : Getter.http(url);
+			let copc;
+			try {
+				copc = await Copc.create(getter);
+			} catch (e) {
+				// No header, no cloud: the caller is told (loading_failed) instead of waiting for ever
+				console.error(`Unable to read the COPC header of ${url}:`, e);
+				callback(null);
+				return;
+			}
 
 			let geometry = new Potree.PointCloudCopcGeometry(getter, copc);
 			let root = new Potree.PointCloudCopcGeometryNode(geometry);
@@ -67000,24 +67038,21 @@ void main() {
 			const compressed = await node.owner.getter(
 				pointDataOffset,
 				pointDataOffset + pointDataLength);
-			this.parse(node, compressed.buffer);
+			return this.parse(node, compressed.buffer);
 		}
 
+		// A failure here (and in the read before it) rejects the node's load, which gives back its loading slot
 		async parse(node, compressed) {
 			let handler = new EptLazBatcher(node);
 
-			try {
-				handler.push({
-					isFullFile: false,
-					compressed,
-					header: node.owner.copc.header,
-					eb: node.owner.copc.eb,
-					pointCount: node.nodeinfo.pointCount,
-					nodemin: node.bounds.slice(0, 3),
-				});
-			} catch (e) {
-				console.log('Failed:', e);
-			}
+			handler.push({
+				isFullFile: false,
+				compressed,
+				header: node.owner.copc.header,
+				eb: node.owner.copc.eb,
+				pointCount: node.nodeinfo.pointCount,
+				nodemin: node.bounds.slice(0, 3),
+			});
 		}
 	};
 
@@ -67032,7 +67067,26 @@ void main() {
 			let worker = Potree.workerPool.getWorker(workerPath);
 			const pointAttributes = this.node.owner.pointAttributes;
 
+			// A decoding that fails (in the worker, or on its answer here) gives the worker back to the pool and fails
+			// the node's load, which frees its loading slot
+			const fail = (error) => {
+				Potree.workerPool.returnWorker(workerPath, worker);
+				if (this.node.failLoading) this.node.failLoading(error);
+				else console.error('Point cloud node decoding failed:', error);
+			};
+			worker.onerror = (e) => {
+				e.preventDefault();
+				fail(e.error || new Error(e.message || 'decoder worker error'));
+			};
 			worker.onmessage = (e) => {
+				try {
+					onDecoded(e);
+				} catch (error) {
+					fail(error);
+				}
+			};
+
+			const onDecoded = (e) => {
 				let g = new BufferGeometry();
 
 				let positions = new Float32Array(e.data.position);
@@ -90486,6 +90540,7 @@ ENDSEC
 				CopcLoader.load(path, function(geometry) {
 					if (!geometry) {
 						console.error(new Error(`failed to load point cloud from URL: ${path}`));
+						resolve({type: 'loading_failed'});
 					}
 					else {
 						let pointcloud = new PointCloudOctree(geometry);
@@ -90553,8 +90608,9 @@ ENDSEC
 		});
 
 		if(callback){
-			promise.then(pointcloud => {
-				loaded(pointcloud);
+			promise.then(e => {
+				if (e.type === 'loading_failed') callback(e);
+				else loaded(e);
 			});
 		}else {
 			return promise;
@@ -90736,6 +90792,8 @@ ENDSEC
 	exports.loadProject = loadProject;
 	exports.lru = lru;
 	exports.maxNodesLoading = maxNodesLoading;
+	// (url) => (begin, end) => Promise<Uint8Array>: how a COPC file is read (CopcLoader); null reads it with copc.js
+	exports.createCopcGetter = null;
 	exports.numNodesLoading = numNodesLoading;
 	exports.pointBudget = pointBudget;
 	exports.resourcePath = resourcePath;

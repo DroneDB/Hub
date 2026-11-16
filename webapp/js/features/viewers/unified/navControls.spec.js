@@ -1235,7 +1235,9 @@ describe('the navigation strategy each loader picks for the scene it builds', ()
             }
             notifyChange() {}
         }
+        const built = {};
         class COPCSource {
+            constructor(options) { built.copcSource = options; }
             addEventListener() {}
             removeEventListener() {}
             async initialize() {}
@@ -1247,7 +1249,6 @@ describe('the navigation strategy each loader picks for the scene it builds', ()
             OlVectorSource: class { getExtent() { return [0, 0, 10, 10]; } }
         };
         const scene = new UnifiedScene(libs, null, { settings: {}, view: { layers: [] }, notify: { info() {} } });
-        const built = {};
         const STOP = new Error('scene built');
         scene.computeExtent = () => ({ extent: {}, bbox: [0, 0, 1, 1], centerLat: 0 });
         scene.attachControls = strategy => {
@@ -1279,6 +1280,21 @@ describe('the navigation strategy each loader picks for the scene it builds', ()
     ])('%s: a %s scene with the %s strategy', async (_, kind, strategy, entry, metadataCrs) => {
         const { scene, built, STOP } = stubScene(metadataCrs);
         await expect(LOADERS[entry.type](scene, entry, dataset)).rejects.toBe(STOP);
-        expect(built).toEqual({ scene: kind, strategy });
+        expect({ scene: built.scene, strategy: built.strategy }).toEqual({ scene: kind, strategy });
+    });
+
+    it('reads a point cloud through the Hub range transport, past the HTTP cache', async () => {
+        const fetch = vi.fn(async () => new Response(new Uint8Array(4), { status: 206, headers: { 'Content-Range': 'bytes 0-3/10' } }));
+        vi.stubGlobal('fetch', fetch);
+        try {
+            const { scene, built, STOP } = stubScene();
+            await expect(LOADERS[T.POINTCLOUD](scene, { type: T.POINTCLOUD, path: 'cloud.laz', point_geom: point }, dataset)).rejects.toBe(STOP);
+            // Giro3D takes a getter (begin, end) => bytes in place of a URL
+            expect(built.copcSource.url).toBeTypeOf('function');
+            expect((await built.copcSource.url(0, 4)).length).toBe(4);
+            expect(fetch).toHaveBeenCalledWith('/cloud.copc.laz', expect.objectContaining({ cache: 'no-store', headers: { Range: 'bytes=0-3' } }));
+        } finally {
+            vi.unstubAllGlobals();
+        }
     });
 });

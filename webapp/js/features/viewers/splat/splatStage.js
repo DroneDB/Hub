@@ -29,6 +29,7 @@ import { tokenHex } from '@/libs/colorScheme';
 import { appliedPixelRatio, watchPixelRatio, MAX_PIXEL_RATIO } from '@/libs/pixelRatio';
 import { deviceMemoryGb, isMobile, reportsDeviceMemory } from '@/libs/responsive';
 import { pagedSplatBudget } from './splatMemory';
+import { createSplatFetchSource } from '@/libs/http/rangeRequests';
 
 // Splat rendering is limited by fill rate: a phone at a ratio of 3 or more draws 2.25 times the
 // pixels of a ratio of 2 for a sharpness no one sees on soft splats (the cap lives in libs/pixelRatio.js)
@@ -81,7 +82,7 @@ export function progressFraction(event) {
  * @param {object} options
  * @param {any} options.THREE                       the three.js namespace
  * @param {any} options.OrbitControls               the OrbitControls class
- * @param {{ SparkRenderer: any, SplatMesh: any }} options.Spark
+ * @param {{ SparkRenderer: any, SplatMesh: any, PagedSplats: any, SplatFileType: { RAD: any } }} options.Spark
  * @param {HTMLCanvasElement} options.canvas
  * @param {boolean} options.streaming               a paged .rad: Spark spends its splat budget toward the view direction
  * @param {{ splatCount?: number, shDegree?: number, memoryGb?: number, mobile?: boolean }} [options.memory]
@@ -217,10 +218,14 @@ export function createSplatStage({
         if (!on && mesh) mesh.raycastIndices = undefined;
     }
 
+    // The paged splats of a .rad (the one paged format the Hub streams), read by the Hub's range transport
+    const pagedSplatsOf = url => new Spark.PagedSplats({ fetchSource: createSplatFetchSource(url), fileType: Spark.SplatFileType.RAD });
+
     /**
      * Creates the splat mesh, adds it to the scene and waits for it to load. Spark has no way to
      * cancel a download: when the stage is disposed meanwhile the mesh is already disposed, and
-     * this resolves null (the caller does nothing more).
+     * this resolves null (the caller does nothing more). A paged file (`paged: true`) is read
+     * through the Hub's range transport (libs/http/rangeRequests), not Spark's own fetch.
      * @param {object} meshOptions                  SplatMesh options (url, paged, lod...)
      * @param {(fraction: number | null) => void} [onProgress]
      * @returns {Promise<any | null>}
@@ -231,6 +236,7 @@ export function createSplatStage({
         const loading = new Spark.SplatMesh({
             raycastable: true,
             ...meshOptions,
+            ...(meshOptions.paged === true && { paged: pagedSplatsOf(meshOptions.url) }),
             onProgress: onProgress && (event => { if (!disposed) onProgress(progressFraction(event)); })
         });
         mesh = loading;

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { rangeFetch } from '@/libs/http/rangeRequests';
 
 const h = vi.hoisted(() => ({ models: [], stage: null, createStage: null }));
 vi.mock('bm3d-viewer', () => ({
@@ -53,6 +54,8 @@ describe('Bm3dViewer', () => {
         const model = await open();
         expect(model.url).toBe('/orgs/o/ds/d/build/h/bm3d/model.bm3d');
         expect(model.options.decoderPath).toBe('/wasm/bm3d/');
+        // Its ranges go past the HTTP cache, as every range the Hub reads
+        expect(model.options.fetch).toBe(rangeFetch);
         expect(model.renderer).toBe(h.stage.renderer);
         expect(h.stage.scene.add).toHaveBeenCalledWith(model);
         expect(h.stage.start).toHaveBeenCalled();

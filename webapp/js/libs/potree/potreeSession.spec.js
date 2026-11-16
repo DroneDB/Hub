@@ -308,6 +308,41 @@ describe('PotreeSession.create', () => {
     });
 });
 
+describe('PotreeSession, reading COPC files', () => {
+    it('gives Potree its range transport while the viewer lives, and stops its reads and retries with it', async () => {
+        const fetch = vi.fn(async () => new Response('busy', { status: 503 }));
+        vi.stubGlobal('fetch', fetch);
+        try {
+            const win = { Potree: { createCopcGetter: null } };
+            const session = new PotreeSession({ window: win });
+            session.attach(fakeViewer(), []);
+            expect(win.Potree.createCopcGetter).toBe(session.createCopcGetter);
+
+            const reading = win.Potree.createCopcGetter('/copc/cloud.copc.laz')(0, 4).then(() => null, e => e);
+            await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+            const [, init] = fetch.mock.calls[0];
+            expect(init).toMatchObject({ cache: 'no-store', headers: { Range: 'bytes=0-3' } });
+
+            session.dispose();
+            expect(init.signal.aborted).toBe(true);
+            expect((await reading).name).toBe('AbortError');
+            expect(win.Potree.createCopcGetter).toBeNull();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it('leaves the transport of a newer viewer in place when it is disposed', () => {
+        const win = { Potree: { createCopcGetter: null } };
+        const old = new PotreeSession({ window: win });
+        old.attach(fakeViewer(), []);
+        const current = new PotreeSession({ window: win });
+        current.attach(fakeViewer(), []);
+        old.dispose();
+        expect(win.Potree.createCopcGetter).toBe(current.createCopcGetter);
+    });
+});
+
 describe('pointBudgetFor', () => {
     it('keeps 10 M points on desktops with 8 GB or more, less on smaller devices and phones', () => {
         expect(pointBudgetFor(8, false, true)).toBe(10_000_000);

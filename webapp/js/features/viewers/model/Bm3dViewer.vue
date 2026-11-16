@@ -16,6 +16,7 @@ import ModelViewerShell from './ModelViewerShell.vue';
 import { createModelStage } from './modelStage';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { rangeFetch } from '@/libs/http/rangeRequests';
 
 defineOptions({ name: 'Bm3dViewer' });
 
@@ -74,6 +75,8 @@ async function loadBm3d() {
         loaded.value = true;
     }, () => {}, stage.renderer, undefined, {
         decoderPath: DECODER_PATH,
+        // Its ranges past the HTTP cache, as every range the Hub reads (libs/http/rangeRequests)
+        fetch: rangeFetch,
         // A model that cannot be opened is the viewer's error; a node that cannot be read (the
         // view lacks a piece, the rest still shows) is only logged
         onError: (e, node) => {

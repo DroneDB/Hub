@@ -41,6 +41,12 @@ class FakeSplatMesh extends THREE_BUILD.Object3D {
     }
 }
 
+/** Spark's paged splats: what they were made with. */
+class FakePagedSplats {
+    constructor(options) { this.options = options; }
+}
+const SplatFileType = { RAD: 'rad' };
+
 class FakeControls {
     constructor(camera, dom) {
         Object.assign(this, { camera, dom });
@@ -56,7 +62,8 @@ let stage;
 
 function makeStage(extra = {}) {
     stage = createSplatStage({
-        THREE, OrbitControls: FakeControls, Spark: { SparkRenderer: FakeSparkRenderer, SplatMesh: FakeSplatMesh },
+        THREE, OrbitControls: FakeControls,
+        Spark: { SparkRenderer: FakeSparkRenderer, SplatMesh: FakeSplatMesh, PagedSplats: FakePagedSplats, SplatFileType },
         canvas, streaming: false, ...extra
     });
     return stage;
@@ -428,6 +435,35 @@ describe('dispose', () => {
         stage.dispose();
         stage.start();
         expect(stage.renderer.setAnimationLoop).not.toHaveBeenCalledWith(expect.any(Function));
+    });
+});
+
+describe('reading a paged file', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('streams a paged .rad through the Hub range transport, past the HTTP cache', async () => {
+        const fetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4]), {
+            status: 206, headers: { 'Content-Range': 'bytes 0-3/10' }
+        }));
+        vi.stubGlobal('fetch', fetch);
+        makeStage();
+        stage.loadMesh({ url: '/build/h@v/splat/scene.rad', paged: true });
+
+        const { paged, url } = FakeSplatMesh.last.options;
+        expect(paged).toBeInstanceOf(FakePagedSplats);
+        expect(paged.options.fileType).toBe(SplatFileType.RAD);
+        // The mesh still has the url (Spark starts the same way), the reads are the transport's
+        expect(url).toBe('/build/h@v/splat/scene.rad');
+        const bytes = await paged.options.fetchSource.fetchRange(new AbortController().signal, 0, 4);
+        expect([...bytes]).toEqual([1, 2, 3, 4]);
+        expect(fetch).toHaveBeenCalledWith('/build/h@v/splat/scene.rad',
+            expect.objectContaining({ cache: 'no-store', headers: { Range: 'bytes=0-3' } }));
+    });
+
+    it('leaves a whole file to Spark', () => {
+        makeStage();
+        stage.loadMesh({ url: 'a.spz', lod: true });
+        expect(FakeSplatMesh.last.options.paged).toBeUndefined();
     });
 });
 

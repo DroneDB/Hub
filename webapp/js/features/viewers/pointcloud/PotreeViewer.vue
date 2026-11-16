@@ -147,23 +147,16 @@ function applyUnits() {
 }
 watch(unitPref, applyUnits);
 
-// Scale, offset, bounds and WKT from the COPC header (copc.js)
-async function coordinateSystemOf(copcUrl) {
-    try {
-        const { Copc, Getter } = window.Copc;
-        const copc = await Copc.create(Getter.http(copcUrl));
-        const header = copc.header || {};
-        const cube = (copc.info || {}).cube;
-        return {
-            srs: copc.wkt || null,
-            scale: header.scale ? [...header.scale.slice(0, 3)] : [1, 1, 1],
-            offset: header.offset ? [...header.offset.slice(0, 3)] : [0, 0, 0],
-            bounds: cube ? { minx: cube[0], miny: cube[1], minz: cube[2], maxx: cube[3], maxy: cube[4], maxz: cube[5] } : null
-        };
-    } catch (e) {
-        console.warn('Could not load coordinate system from COPC:', e);
-        return { srs: null, scale: [1, 1, 1], offset: [0, 0, 0], bounds: null };
-    }
+// Scale, offset, bounds and WKT from the COPC header the point cloud was read with (copc.js, kept by its geometry)
+function coordinateSystemOf(copc) {
+    const header = copc?.header || {};
+    const cube = copc?.info?.cube;
+    return {
+        srs: copc?.wkt || null,
+        scale: header.scale ? [...header.scale.slice(0, 3)] : [1, 1, 1],
+        offset: header.offset ? [...header.offset.slice(0, 3)] : [0, 0, 0],
+        bounds: cube ? { minx: cube[0], miny: cube[1], minz: cube[2], maxx: cube[3], maxy: cube[4], maxz: cube[5] } : null
+    };
 }
 
 async function addPointCloud(ddbEntry) {
@@ -173,8 +166,7 @@ async function addPointCloud(ddbEntry) {
     } catch (e) {
         throw new Error(`${ddbEntry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`, { cause: e });
     }
-    const coordinateSystem = await coordinateSystemOf(copcUrl);
-    await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         Potree.loadPointCloud(copcUrl, ddb.pathutils.basename(ddbEntry.path), e => {
             if (unmounted) {
                 resolve();
@@ -191,10 +183,9 @@ async function addPointCloud(ddbEntry) {
             material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
             material.size = 1;
             material.minSize = 2;
-            resolve();
+            resolve(coordinateSystemOf(e.pointcloud.pcoGeometry?.copc));
         });
     });
-    return coordinateSystem;
 }
 
 async function loadViewer() {

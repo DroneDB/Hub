@@ -24,11 +24,13 @@ vi.mock('ddb', () => ({
         pathutils: { basename: p => p.split('/').pop() }
     }
 }));
+// The error the viewer shows (its shell is a stand-in)
+const shown = vi.hoisted(() => ({ error: null }));
 vi.mock('@/composables/useViewerEntry', () => ({
     useViewerEntry: () => ({
         entry: ref({ path: 'cloud.laz' }),
         dataset: ref({ Entry: e => ({ path: e.path, getCopc: () => 'https://hub.test/cloud.copc.laz' }) }),
-        canWrite: ref(true), canDelete: ref(true), loading: ref(false), error: ref(''), loadError: ref(null),
+        canWrite: ref(true), canDelete: ref(true), loading: ref(false), error: (shown.error = ref('')), loadError: ref(null),
         entryLoaded: Promise.resolve(true)
     })
 }));
@@ -36,7 +38,7 @@ vi.mock('@/composables/usePotreeMeasurements', () => ({
     usePotreeMeasurements: () => ({
         hasMeasurements: ref(false), hasSavedMeasurements: ref(false), savingMeasurements: ref(false), deleteDialogOpen: ref(false),
         deleteToolActive: ref(false), canUndo: ref(false), canRedo: ref(false), undo() {}, redo() {}, toggleDeleteTool() {},
-        save() {}, requestDelete() {}, onDeleteDialogClose() {}, discardMeasure() {}, attach() {}, load: async () => { calls.push(['load']); }, onGuiLoaded() {}
+        save() {}, requestDelete() {}, onDeleteDialogClose() {}, discardMeasure() {}, attach: (_viewer, _session, coordinateSystem) => { calls.push(['attach', coordinateSystem]); }, load: async () => { calls.push(['load']); }, onGuiLoaded() {}
     })
 }));
 // The scripts of Potree load when the test lets them
@@ -64,7 +66,11 @@ function stubPotree() {
     const material = Object.assign(new Dispatcher(), { activeAttributeName: 'rgba' });
     const range = (min, max) => ({ range: [min, max] });
     const attributes = { rgba: range(0, 255), intensity: range(0, 65535) };
-    const cloud = { material, getAttribute: name => attributes[name] ?? null };
+    // The header copc.js read the cloud with, kept by its geometry
+    const copc = {
+        header: { scale: [0.01, 0.01, 0.001, 9], offset: [100, 200, 0, 9] }, info: { cube: [0, 1, 2, 10, 11, 12] }, wkt: 'PROJCS["x"]'
+    };
+    const cloud = { material, getAttribute: name => attributes[name] ?? null, pcoGeometry: { copc } };
     const scene = Object.assign(new Dispatcher(), {
         measurements: [], volumes: [], polygonClipVolumes: [], pointclouds: [],
         addPointCloud(c) { this.pointclouds.push(c); }, removeMeasurement() {}, removeAllClipVolumes() {},
@@ -92,9 +98,6 @@ function stubPotree() {
     };
     globalThis.THREE = { AmbientLight: class {}, DirectionalLight: class { constructor() { this.position = {}; } } };
     globalThis.$ = () => ({ next: () => ({ show() {} }), length: 0 });
-    globalThis.window.Copc = {
-        Copc: { create: async () => ({ header: {}, info: {} }) }, Getter: { http: u => u }
-    };
     cloud.material.size = 0;
 }
 
@@ -255,6 +258,28 @@ describe('PotreeViewer fullscreen (FR-VWR-38)', () => {
         expect(scss).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*right: calc\(var\(--ddb-sidebar-width\) \+ var\(--ddb-spacing-md\)\);/);
         const phone = scss.slice(scss.indexOf('@media (max-width: 767.98px)'));
         expect(phone).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*visibility: hidden;/);
+    });
+});
+
+describe('PotreeViewer reading the point cloud', () => {
+    it('takes the coordinate system from the header the cloud was read with, without reading the file again', async () => {
+        const loadPointCloud = vi.spyOn(globalThis.Potree, 'loadPointCloud');
+        await mountViewer();
+        expect(loadPointCloud).toHaveBeenCalledTimes(1);
+        expect(loadPointCloud.mock.calls[0][0]).toBe('https://hub.test/cloud.copc.laz');
+        // No copc.js here: the viewer reads nothing itself
+        expect(window.Copc).toBeUndefined();
+        expect(calls.find(c => c[0] === 'attach')[1]).toEqual({
+            srs: 'PROJCS["x"]', scale: [0.01, 0.01, 0.001], offset: [100, 200, 0],
+            bounds: { minx: 0, miny: 1, minz: 2, maxx: 10, maxy: 11, maxz: 12 }
+        });
+    });
+
+    it('shows an error when the cloud cannot be loaded', async () => {
+        globalThis.Potree.loadPointCloud = (_url, _name, cb) => cb({ type: 'loading_failed' });
+        await mountViewer();
+        expect(calls.map(c => c[0])).not.toContain('attach');
+        expect(shown.error.value).toContain('Unable to load cloud.laz');
     });
 });
 
