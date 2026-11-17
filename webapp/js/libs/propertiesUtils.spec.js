@@ -368,3 +368,31 @@ describe('a warning that libddb tags with a code (FR-EXP-18)', () => {
         expect(props).not.toHaveProperty('warningCode');
     });
 });
+
+describe('the coordinate system of a point cloud', () => {
+    const cloud = (properties, crs) => ({
+        entry: {
+            path: 'cloud.laz', type: ddb.entry.type.POINTCLOUD, size: 10, properties,
+            artifacts: [{ role: 'pointcloud.copc', url: '/b/copc/cloud.copc.laz', downloadName: 'cloud.copc.laz', ...(crs ? { crs } : {}) }]
+        }
+    });
+
+    it('says the CRS a COPC built in another CRS is streamed in', () => {
+        const props = buildAllProperties(cloud({ pointCount: 5, crsStatus: 'geographic' }, { name: 'WGS 84 / UTM zone 33N', epsg: 32633, transformed: true }));
+        expect(props['streamed in']).toBe('WGS 84 / UTM zone 33N (EPSG:32633) (the uploaded file is unchanged)');
+    });
+
+    it('has no such row without the crs of the build (an older build or server), or for a COPC in the CRS of its file', () => {
+        expect(buildAllProperties(cloud({ pointCount: 5 }))).not.toHaveProperty('streamed in');
+        expect(buildAllProperties(cloud({ pointCount: 5 }, { name: 'WGS 84 / UTM zone 33N', epsg: 32633, transformed: false }))).not.toHaveProperty('streamed in');
+    });
+
+    it('puts the warning of a coordinate system that was ignored first, and shows no CRS status row', () => {
+        const props = tidyProperties(buildAllProperties(cloud({
+            pointCount: 5, crsStatus: 'implausible', warning: 'coordinate system ignored: the coordinates do not fit WGS 84'
+        })));
+        expect(Object.keys(props)[0]).toBe('warning');
+        expect(props.warning).toBe('coordinate system ignored: the coordinates do not fit WGS 84');
+        expect(props).not.toHaveProperty('crsStatus');
+    });
+});

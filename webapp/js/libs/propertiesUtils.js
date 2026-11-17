@@ -10,6 +10,7 @@ import { visibilityLabel } from '@/libs/visibility';
 import { Licenses } from '@/libs/licenses';
 import { VIEWS_KEY } from '@/libs/views/viewStore';
 import { buildWarningOf } from '@/libs/build/buildWarnings';
+import { streamedInText } from '@/libs/build/pointCloudCrs';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
 // Meta keys that hold app data (saved map views are raw JSON), not something to show users.
@@ -327,8 +328,15 @@ export function buildAllProperties(file, units = 'metric', { raw = false, create
             if (resolution) props['resolution'] = resolution;
         }
     }
+    // A point cloud whose COPC is built in another CRS than the file says which (the viewers and the map show that one)
+    const streamedIn = streamedInText(entry);
+    if (streamedIn) props['streamed in'] = streamedIn;
 
-    return Object.keys(props).length > 0 ? props : null;
+    if (!Object.keys(props).length) return null;
+    // A warning is the first row: it says why the rest may not be what the user expects (a coordinate system that
+    // was ignored, a file that cannot be read)
+    const { warning, ...rest } = props;
+    return warning ? { warning, ...rest } : props;
 }
 
 // Image properties DroneDB stores in m/s and in metres
@@ -380,6 +388,9 @@ export function tidyProperties(props) {
         delete props.height;
     }
     delete props.projection;
+    // What libddb found of the coordinate system of a point cloud (projected, geographic, ...): the "Streamed in"
+    // row and the warning of a coordinate system that was ignored say what matters of it in words
+    delete props.crsStatus;
     delete props.focalLength35;
     delete props.orientation;
     if (props.sensor) {

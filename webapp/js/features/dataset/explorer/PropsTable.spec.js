@@ -11,6 +11,7 @@ vi.mock('@/composables/useCopyText', () => ({ copyText: vi.fn(() => Promise.reso
 import { copyText } from '@/composables/useCopyText';
 import PropsTable from './PropsTable.vue';
 import { formatModifiedDate } from '@/libs/propertiesUtils';
+import { readSource, ruleOf } from '@/specs/cssSource';
 
 const notify = { success: vi.fn() };
 const mountTable = (props) => mount(PropsTable, {
@@ -31,6 +32,24 @@ describe('PropsTable', () => {
         expect(link.attributes('target')).toBe('_blank');
         expect(link.attributes('rel')).toContain('noopener');
         expect(wrapper.text()).toContain('EPSG:4326 11.2, 46.1, 300.00m');
+    });
+
+    it('shows the warning of a file in the warning yellow with an icon, as a note, and nested warnings as text', () => {
+        const text = 'coordinate system ignored: the coordinates do not fit WGS 84';
+        const wrapper = mountTable({ obj: { warning: text, type: 'Point Cloud' } });
+        const warning = wrapper.find('.entry-warning');
+        expect(warning.exists()).toBe(true);
+        expect(warning.attributes('role')).toBe('note');
+        expect(warning.text()).toBe(text);
+        expect(warning.find('.fa-triangle-exclamation').exists()).toBe(true);
+        expect(mountTable({ obj: { info: { warning: text } } }).find('.entry-warning').exists()).toBe(false);
+    });
+
+    it('colours the warning with the warning tokens (yellow, dark text), never an orange', () => {
+        const rule = ruleOf(readSource(__dirname, 'PropsTable.vue'), '.entry-warning');
+        expect(rule).toContain('background-color: var(--ddb-warning)');
+        expect(rule).toContain('color: var(--ddb-text-on-warning)');
+        expect(rule).not.toMatch(/orange/i);
     });
 
     it('links codes in nested values too', () => {

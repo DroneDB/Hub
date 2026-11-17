@@ -26,6 +26,11 @@
                     </div>
                     <div v-else-if="typeof data.rawValue === 'boolean' && data.rawValue" class="bool-true" title="true">✓</div>
                     <div v-else-if="typeof data.rawValue === 'boolean'" class="bool-false" title="false">✗</div>
+                    <!-- A warning of the entry (a coordinate system that was ignored...) stands out from the other rows -->
+                    <div v-else-if="isWarningRow(data)" class="entry-warning" role="note">
+                        <i class="fa-solid fa-triangle-exclamation" />
+                        <span>{{ data.rawValue }}</span>
+                    </div>
                     <div v-else-if="isEntryTypeRow(data)" class="copyable-row">
                         <span>{{ data.rawValue }}</span>
                         <Button icon="fa-regular fa-circle-question"
@@ -257,6 +262,11 @@ export default {
 
         isUrl,
 
+        // The warning of the file (its top-level row), in the warning yellow
+        isWarningRow(data) {
+            return this.depth === 0 && data.key === 'warning' && typeof data.rawValue === 'string' && data.rawValue !== '';
+        },
+
         // As Modified is written (formatDateTime); a capture time that is not known (missing or 0) is "Unknown"
         formatCaptureTime(value) {
             return formatDateTime(value, { placeholder: UNKNOWN, seconds: true });
@@ -385,6 +395,18 @@ export default {
 
 .crs-info-btn :deep(*) {
     cursor: pointer;
+}
+
+/* The warning yellow with dark text, in both themes */
+.entry-warning {
+    display: flex;
+    align-items: baseline;
+    gap: var(--ddb-spacing-sm);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: var(--ddb-warning);
+    color: var(--ddb-text-on-warning);
+    overflow-wrap: anywhere;
 }
 
 .row-note {

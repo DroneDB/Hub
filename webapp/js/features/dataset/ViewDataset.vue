@@ -88,6 +88,7 @@ import { PREF } from '@/libs/preferences';
 import { permissionsOf } from '@/libs/datasetPermissions';
 import { loadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
+import { buildDownloadNote } from '@/libs/build/buildDownloads';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import emitter from '@/libs/eventBus';
@@ -372,6 +373,8 @@ async function downloadArtifact(file, role) {
         notify.warn('This file has not been built yet. Run Build first.', { summary: 'Not available' });
         return;
     }
+    const note = buildDownloadNote(file.entry, role);
+    if (note) notify.info(note, { summary: 'Download' });
     await downloadBuildArtifact(dataset, file.entry.path, role).catch(notifyDownloadError);
 }
 

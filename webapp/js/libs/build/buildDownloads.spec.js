@@ -3,7 +3,7 @@
  * whatever the type of the file.
  */
 import { describe, it, expect } from 'vitest';
-import { BUILD_DOWNLOADS, offersBuildDownload } from './buildDownloads';
+import { BUILD_DOWNLOADS, offersBuildDownload, buildDownloadNote } from './buildDownloads';
 import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 
 const row = role => BUILD_DOWNLOADS.find(d => d.role === role);
@@ -35,5 +35,21 @@ describe('downloads of built files', () => {
 
     it('leaves the splat roles to the downloads of a splat', () => {
         expect(BUILD_DOWNLOADS.some(d => d.role.startsWith('gsplat.'))).toBe(false);
+    });
+});
+
+describe('what a download says when it starts', () => {
+    const copc = crs => ({ artifacts: [{ role: ArtifactRole.POINTCLOUD_COPC, url: '/b/copc/cloud.copc.laz', downloadName: 'cloud.copc.laz', crs }] });
+
+    it('names the CRS of a COPC built in another CRS than its file', () => {
+        expect(buildDownloadNote(copc({ name: 'WGS 84 / UTM zone 33N', epsg: 32633, transformed: true }), ArtifactRole.POINTCLOUD_COPC))
+            .toContain('WGS 84 / UTM zone 33N (EPSG:32633)');
+    });
+
+    it('says nothing otherwise: a COPC in the CRS of its file, a build that does not say, another download', () => {
+        expect(buildDownloadNote(copc({ name: 'WGS 84 / UTM zone 33N', epsg: 32633, transformed: false }), ArtifactRole.POINTCLOUD_COPC)).toBeNull();
+        expect(buildDownloadNote(copc(undefined), ArtifactRole.POINTCLOUD_COPC)).toBeNull();
+        expect(buildDownloadNote(copc({ name: 'x', epsg: 1, transformed: true }), ArtifactRole.RASTER_COG)).toBeNull();
+        expect(buildDownloadNote(null, 'not.a.role')).toBeNull();
     });
 });
