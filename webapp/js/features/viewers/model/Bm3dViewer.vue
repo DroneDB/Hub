@@ -48,12 +48,11 @@ let shapeFramed = false;
 /**
  * A node has arrived. Once node 0 is there, its principal axes tell a flat model (one quad, a planar
  * drawing), which the stage then frames face-on: the camera of Home on +z sees a model in a plane
- * that holds the z axis along that plane, as a blank canvas. A viewer package without
- * computePrincipalAxes keeps the default view.
+ * that holds the z axis along that plane, as a blank canvas.
  */
 function onNodeArrived() {
     if (shapeFramed) return;
-    const shape = model?.computePrincipalAxes?.();
+    const shape = model?.computePrincipalAxes();
     if (!shape) return;
     shapeFramed = true;
     stage.frameShape(shape);
@@ -63,6 +62,9 @@ function onNodeArrived() {
  * Reads what the model has from the material the viewer made for it (a map for a texture, vertex
  * colours, a lit material for normals) and, for a model with normals but no texture, shades it
  * like the Nexus viewer does: with the material of the stage, which the lighting settings drive.
+ * The model is opened without a material of the Hub, so the viewer keeps drawing the cutouts of
+ * its textures (it sets the alpha test on the model's material once a texture with an alpha has
+ * arrived); the stage's material is only for a model without texture, which has nothing to cut out.
  */
 function chooseMaterial() {
     const made = model.material;

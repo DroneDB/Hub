@@ -9,6 +9,7 @@ vi.mock('bm3d-viewer', () => ({
             Object.assign(this, { url, onLoad, onUpdate, renderer, material, options });
             this.geometry = { boundingSphere: { center: { x: 1, y: 2, z: 3 }, radius: 4 } };
             this.dispose = vi.fn();
+            this.computePrincipalAxes = vi.fn(() => null);
             h.models.push(this);
         }
     }
@@ -61,6 +62,9 @@ describe('Bm3dViewer', () => {
         expect(h.stage.scene.add).toHaveBeenCalledWith(model);
         expect(h.stage.start).toHaveBeenCalled();
         expect(h.stage.options.canvas).toBeInstanceOf(HTMLCanvasElement);
+        // No material of the Hub: the viewer makes its own, double-sided, and sets the alpha test of
+        // the cutouts on the model's material once a texture that cuts texels out has arrived
+        expect(model.material).toBeUndefined();
     });
 
     it('frames the model on its sphere once the index is read', async () => {
@@ -70,10 +74,8 @@ describe('Bm3dViewer', () => {
         expect(h.stage.frameModel).toHaveBeenCalledWith(model, model.geometry.boundingSphere);
     });
 
-    it('frames the model on its shape once node 0 has arrived, once, and not with a viewer that cannot tell it', async () => {
+    it('frames the model on its shape once node 0 has arrived, and once', async () => {
         const model = await open();
-        model.onUpdate(model);   // a viewer package without computePrincipalAxes
-        expect(h.stage.frameShape).not.toHaveBeenCalled();
         let shape = null;
         model.computePrincipalAxes = vi.fn(() => shape);
         model.onUpdate(model);   // node 0 has not arrived
@@ -153,5 +155,16 @@ describe('Bm3dViewer', () => {
         await open({ entry, dataset: missing });
         expect(h.models).toHaveLength(0);
         expect(wrapper.vm.$.setupState.error).toContain('The 3D model is not available');
+    });
+});
+
+describe('the bm3d-viewer package the Hub is built with', () => {
+    it('gives the principal axes of a model and draws the cutouts of its textures', async () => {
+        const viewer = await vi.importActual('bm3d-viewer');
+        // The framing of a flat model asks for the principal axes once node 0 has arrived (null before)
+        expect(typeof viewer.Bm3dObject.prototype.computePrincipalAxes).toBe('function');
+        // The material the viewer makes cuts out the texels whose alpha is below half
+        expect(viewer.CUTOUT_ALPHA_TEST).toBe(0.5);
+        expect(Object.getOwnPropertyDescriptor(viewer.Bm3dObject.prototype, 'hasCutout')?.get).toBeTypeOf('function');
     });
 });
