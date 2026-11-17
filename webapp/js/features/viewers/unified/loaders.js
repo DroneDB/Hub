@@ -13,7 +13,8 @@ import ddb from 'ddb';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
-import { isFiniteBox, vectorStyle } from './sceneUtils';
+import { capVectorTileZoom, isFiniteBox, vectorStyle } from './sceneUtils';
+import { fetchMvtMetadata } from '@/composables/useMvtLayer';
 import { appliedPixelRatio } from '@/libs/pixelRatio';
 import { createRangeGetter } from '@/libs/http/rangeRequests';
 
@@ -66,12 +67,12 @@ async function loadVector(scene, entry, dataset) {
     if (!data) throw new Error('This vector layer has no geographic footprint');
     scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'constrained' });
     scene.addBasemap(data.extent);
-    const { ColorLayer, VectorTileSource, olStyle } = scene.libs;
-    const layer = new ColorLayer({
-        name: entry.path,
-        extent: data.extent,
-        source: new VectorTileSource({ url: `${dataset.baseApi}/mvt/${entry.hash}/{z}/{x}/{y}.pbf`, style: vectorStyle(olStyle) })
-    });
+    const { ColorLayer, VectorTileSource, olStyle, createXYZ } = scene.libs;
+    const tiles = dataset.Entry(entry);
+    const { maxZoom } = await fetchMvtMetadata(tiles);
+    const source = new VectorTileSource({ url: tiles.getMvtUrlTemplate(), style: vectorStyle(olStyle) });
+    capVectorTileZoom(source.source, maxZoom, createXYZ);
+    const layer = new ColorLayer({ name: entry.path, extent: data.extent, source });
     scene.map.addLayer(layer);
     scene.registerLayer(name(entry), 'fa-solid fa-bezier-curve', () => layer.visible, v => { layer.visible = v; });
     scene.frameExtent(data);

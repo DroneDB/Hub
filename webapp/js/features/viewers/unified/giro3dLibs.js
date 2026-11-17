@@ -9,7 +9,7 @@ export async function loadGiro3dLibs() {
         THREE, arcball, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
         TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
         XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe,
-        FeatureCollection, OlVectorSource, OlGeoJSON
+        FeatureCollection, OlVectorSource, OlGeoJSON, olTilegrid
     ] = await Promise.all([
         import(/* webpackChunkName: "giro3d" */ 'three'),
         // The navigation of every scene, the one of the bm3d viewer
@@ -35,7 +35,8 @@ export async function loadGiro3dLibs() {
         import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js'),
         import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/FeatureCollection.js'),
         import(/* webpackChunkName: "giro3d" */ 'ol/source/Vector.js'),
-        import(/* webpackChunkName: "giro3d" */ 'ol/format/GeoJSON.js')
+        import(/* webpackChunkName: "giro3d" */ 'ol/format/GeoJSON.js'),
+        import(/* webpackChunkName: "giro3d" */ 'ol/tilegrid.js')
     ]);
 
     // Offline-first: the laz-perf decoder from our own origin (webpack copies it to /wasm),
@@ -68,6 +69,7 @@ export async function loadGiro3dLibs() {
         Globe: Globe.default,
         FeatureCollection: FeatureCollection.default,
         OlVectorSource: OlVectorSource.default,
-        OlGeoJSON: OlGeoJSON.default
+        OlGeoJSON: OlGeoJSON.default,
+        createXYZ: olTilegrid.createXYZ
     };
 }

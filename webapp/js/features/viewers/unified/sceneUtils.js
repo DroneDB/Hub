@@ -170,6 +170,29 @@ export function measureFormatters(scale, unit = () => 'm', units = preferredUnit
 }
 
 /**
+ * Stops the OpenLayers source of a vector tile layer at the last zoom level of its pyramid (the
+ * maxzoom of its metadata.json): a closer view draws the tiles of that level enlarged (the overzoom
+ * of OpenLayers) instead of asking for tiles the pyramid does not have, which the server answers
+ * 404 and which leave the layer blank. Giro3D's VectorTileSource builds its OpenLayers source with
+ * the default 22 levels and takes no option for it. Only the grid of the tiles requested changes:
+ * the grid the layer is drawn on keeps every level.
+ *
+ * @param {any} olSource - an ol/source/VectorTile.
+ * @param {number} maxZoom
+ * @param {(options: object) => any} createXYZ - createXYZ of ol/tilegrid.
+ */
+export function capVectorTileZoom(olSource, maxZoom, createXYZ) {
+    const grid = olSource.getTileGrid();
+    if (!grid || !Number.isInteger(maxZoom) || maxZoom < grid.getMinZoom() || maxZoom >= grid.getMaxZoom()) return;
+    olSource.tileGrid = createXYZ({
+        extent: grid.getExtent(),
+        minZoom: grid.getMinZoom(),
+        maxZoom,
+        tileSize: grid.getTileSize(grid.getMinZoom())
+    });
+}
+
+/**
  * OpenLayers style function for MVT features (points, lines, polygons).
  * @param {any} olStyle  the ol/style module
  */
