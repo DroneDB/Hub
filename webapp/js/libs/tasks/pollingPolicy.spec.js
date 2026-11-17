@@ -35,6 +35,23 @@ describe('server-sent events', () => {
         ]);
     });
 
+    it('reads a CRLF split between two chunks as one line ending', () => {
+        const events = [];
+        const parser = createEventParser(e => events.push(e));
+        parser.push('event: tasks\r');
+        parser.push('\ndata: {}\r');
+        parser.push('');
+        parser.push('\n\r');
+        parser.push('\n');
+        // A lone CR still ends a line, and an LF after a CR that did not end a chunk is a line of its own
+        parser.push('data: a\r\rdata: b\r\n\n');
+        expect(events).toEqual([
+            { type: 'tasks', data: '{}', id: undefined },
+            { type: 'message', data: 'a', id: undefined },
+            { type: 'message', data: 'b', id: undefined }
+        ]);
+    });
+
     it('reads a stream, sends the token, and reports its end', async () => {
         const body = new ReadableStream({
             start(c) {

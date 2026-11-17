@@ -43,6 +43,8 @@ export function createEventParser(onEvent) {
     let type = '';
     let data = [];
     let id;
+    // The last chunk ended with a CR: an LF that starts the next one ends the same line (a CRLF split by the network)
+    let afterCr = false;
 
     const dispatch = () => {
         if (data.length > 0 || type) onEvent({ type: type || 'message', data: data.join('\n'), id });
@@ -52,10 +54,13 @@ export function createEventParser(onEvent) {
 
     return {
         push(text) {
-            buffer += text;
+            if (text === '') return;
+            buffer += afterCr && text.startsWith('\n') ? text.slice(1) : text;
+            afterCr = false;
             let newline;
             while ((newline = buffer.search(/\r\n|\r|\n/)) >= 0) {
                 const line = buffer.slice(0, newline);
+                if (buffer[newline] === '\r' && newline === buffer.length - 1) afterCr = true;
                 buffer = buffer.slice(newline + (buffer.startsWith('\r\n', newline) ? 2 : 1));
                 if (line === '') {
                     dispatch();
