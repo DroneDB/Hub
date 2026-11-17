@@ -14,7 +14,7 @@ import {
 } from './navControls';
 import { navigateByKey } from './navKeys';
 import { alignContentUpAxis, localizeGeocentricContent } from './contentOrientation';
-import { applyClayShading, createClayMatcap } from './tileShading';
+import { applyClayShading, createClayMatcap, ModelShading } from './tileShading';
 import { deviceMemoryGb } from '@/libs/responsive';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
@@ -417,17 +417,27 @@ export class UnifiedScene {
     }
 
     /**
-     * Tiles without a texture or vertex colours get the clay shading of tileShading as each one
-     * loads: under the lights of textured models their faces all come out the same grey.
+     * A model without a texture or vertex colours in any of its tiles gets the clay shading of
+     * tileShading: under the lights of textured models its faces all come out the same grey. A
+     * textured model keeps its materials, the untextured parts too (ModelShading decides once).
      */
     shadeUntexturedTiles(tileset) {
         const tiles = tileset.tiles;
         if (!tiles || typeof tiles.addEventListener !== 'function') return;
+        const shading = new ModelShading(() => tiles.root);
         // lifetime: owner (the renderer goes with the tileset, and the tileset with the instance)
         tiles.addEventListener('load-model', event => {
             if (!event || !event.scene || !this.instance) return;
+            const scenes = shading.tileLoaded(event.tile, event.scene);
+            if (!scenes.length) return;
             if (!this.clayMatcap) this.clayMatcap = createClayMatcap(this.libs);
-            if (applyClayShading(this.libs, event.scene, this.clayMatcap)) this.instance.notifyChange(tileset);
+            let changed = 0;
+            for (const scene of scenes) changed += applyClayShading(this.libs, scene, this.clayMatcap);
+            if (changed) this.instance.notifyChange(tileset);
+        });
+        // lifetime: owner (as above)
+        tiles.addEventListener('dispose-model', event => {
+            if (event) shading.tileDisposed(event.tile);
         });
     }
 

@@ -15,6 +15,10 @@
  * vertices of the tiles are welded, so the averaged vertex normals of a faceted part (a cube, a
  * CAD part) would round off its edges: a mesh whose faces mostly turn away from the averaged
  * normals of their corners gets one normal per face instead.
+ *
+ * The clay is for models with nothing else to show: a textured model whose door or window is a
+ * part without texture keeps the material and the lights of that part (ModelShading decides once
+ * per tileset, from the tiles that cover the whole model).
  */
 
 // Matcap of the clay material: a light from above-left and in front, a soft ambient floor, and
@@ -173,4 +177,107 @@ export function applyClayShading(libs, root, matcap) {
         changed++;
     });
     return changed;
+}
+
+/**
+ * Whether a loaded tile shows colours of its own: a texture or vertex colours on one of its meshes.
+ *
+ * @param {any} root - the scene of a loaded tile.
+ */
+export function showsOwnColours(root) {
+    let coloured = false;
+    root.traverse(object => {
+        if (coloured || !object.isMesh || !object.geometry) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        coloured = materials.some(material => material && material.map) || !!(object.geometry.attributes || {}).color;
+    });
+    return coloured;
+}
+
+/**
+ * The tiles with a model that no tile above them has: together they cover the whole model, at
+ * its coarsest level of detail (the root, or the children of a root without content as Obj2Tiles
+ * writes them). null while a tile that links an external tileset has not brought its tiles yet.
+ *
+ * @param {any} root - the root tile of a tileset (3d-tiles-renderer tiles: internal, children).
+ * @returns {any[] | null}
+ */
+export function topModelTiles(root) {
+    if (!root) return null;
+    const top = [];
+    const pending = [root];
+    while (pending.length) {
+        const tile = pending.pop();
+        const internal = tile.internal || {};
+        if (internal.hasRenderableContent) {
+            top.push(tile);
+            continue;
+        }
+        const children = tile.children || [];
+        if (internal.hasUnrenderableContent && !children.length) return null;
+        pending.push(...children);
+    }
+    return top;
+}
+
+// The verdicts of ModelShading
+const OWN_COLOURS_VERDICT = 'own';
+const CLAY_VERDICT = 'clay';
+
+/**
+ * Whether the tiles of one model get the clay material, decided once for the whole model: clay
+ * when none of the tiles that cover it (topModelTiles) shows a texture or vertex colours, its own
+ * materials as soon as one tile shows them. Tiles load in any order, so a tile without colours
+ * waits for the verdict before it gets the clay: a textured model whose first tile is its glass
+ * door never turns grey and back.
+ */
+export class ModelShading {
+    /**
+     * @param {() => any} rootTile - the root tile of the tileset, once it is loaded.
+     */
+    constructor(rootTile) {
+        this.rootTile = rootTile;
+        /** @type {string | null} */
+        this.verdict = null;
+        // Scenes of the tiles without colours that loaded before the verdict, by tile
+        this.waiting = new Map();
+    }
+
+    /** Whether the model gets the clay (false while it is not decided). */
+    get clay() {
+        return this.verdict === CLAY_VERDICT;
+    }
+
+    /**
+     * A tile of the model has loaded.
+     *
+     * @param {any} tile
+     * @param {any} scene - the scene of the tile.
+     * @returns {any[]} the scenes to shade in clay now: none, this one, or every one that waited.
+     */
+    tileLoaded(tile, scene) {
+        if (this.verdict === OWN_COLOURS_VERDICT) return [];
+        if (this.verdict === CLAY_VERDICT) return [scene];
+        if (showsOwnColours(scene)) {
+            this.verdict = OWN_COLOURS_VERDICT;
+            this.waiting.clear();
+            return [];
+        }
+        this.waiting.set(tile, scene);
+        const top = topModelTiles(this.rootTile());
+        if (!top || !top.length || !top.every(t => this.waiting.has(t))) return [];
+        this.verdict = CLAY_VERDICT;
+        const scenes = [...this.waiting.values()];
+        this.waiting.clear();
+        return scenes;
+    }
+
+    /**
+     * A tile of the model was unloaded: a tile still waiting for the verdict no longer counts.
+     *
+     * @param {any} tile
+     */
+    tileDisposed(tile) {
+        this.waiting.delete(tile);
+    }
 }
