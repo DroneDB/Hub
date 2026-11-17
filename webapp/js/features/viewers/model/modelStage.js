@@ -13,6 +13,7 @@
  *   stage.scene.add(model);
  *   stage.start();                 // ...and stage.dispose() when the viewer goes away
  *   stage.resetView();             // Home: the camera back to the framing of the model
+ *   stage.frameShape(shape);       // a flat model: Home looks at its plane, not along it
  */
 import { watch } from 'vue';
 import { fitDistance, canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
@@ -25,6 +26,9 @@ const FOV = 35;
 const FIT_MARGIN = 1.25;
 // The viewers are dark in both themes: --ddb-viewer-bg has one value
 const BACKGROUND = () => tokenHex('--ddb-viewer-bg');
+// A model is flat when its thinnest principal extent is less than this part of its longest: the
+// camera of Home then looks along the normal of its plane (frameShape)
+const FLAT_RATIO = 0.05;
 // From r165 three.js has only lights in physical units (a light of intensity 1 is 1/PI as bright as
 // one of the earlier releases, which scaled the light by PI)
 const PHYSICAL_LIGHTS_REVISION = 165;
@@ -52,7 +56,34 @@ export function legacyLook(THREE) {
 
 /**
  * @typedef {{ ambientIntensity: number, directionalIntensity: number, shininess: number }} Lighting
+ * @typedef {{ direction: number[], up: number[] }} HomeView  the camera of Home: where it stands from the
+ *   centre (a unit vector) and its up
  */
+
+/** The view of Home of a model that is not flat: from +z, with +y up. */
+export const DEFAULT_HOME_VIEW = Object.freeze({ direction: [0, 0, 1], up: [0, 1, 0] });
+
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const unit = v => { const l = Math.hypot(...v); return v.map(x => x / l); };
+
+/**
+ * The view of Home for a model of these principal axes (bm3d-viewer's computePrincipalAxes: unit
+ * axes from the longest extent to the shortest): the default one for a model with a thickness, and
+ * for a flat one the view along the normal of its plane, from the side of its largest component (from
+ * above for a terrain, Z up or Y up), with +y up, or -z when it looks along y (a top view of a Y-up
+ * model). A camera on +z sees a model in a plane that holds the z axis exactly edge-on: nothing.
+ * @param {{ axes: number[][], extents: number[] } | null} shape
+ * @returns {HomeView}
+ */
+export function homeViewOf(shape) {
+    if (!shape || !(shape.extents[2] < FLAT_RATIO * shape.extents[0])) return DEFAULT_HOME_VIEW;
+    const normal = unit(shape.axes[2]);
+    const largest = normal.reduce((k, x, i) => (Math.abs(x) > Math.abs(normal[k]) ? i : k), 0);
+    const direction = normal[largest] < 0 ? normal.map(x => -x) : normal;
+    const wanted = Math.abs(direction[1]) < 0.9 ? [0, 1, 0] : [0, 0, -1];
+    const along = dot(wanted, direction);
+    return { direction, up: unit(wanted.map((x, i) => x - along * direction[i])) };
+}
 
 /**
  * @param {object} options
@@ -95,11 +126,21 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     renderer.setPixelRatio(appliedPixelRatio());
     const stopPixelRatio = watchPixelRatio(() => renderer.setPixelRatio(appliedPixelRatio()));
 
-    // MeshLab-style shading for models without a texture
-    const material = new THREE.MeshPhongMaterial({ color: colour(0xaaaaaa), specular: colour(0x444444), shininess: settings.shininess });
+    // MeshLab-style shading for models without a texture, on both sides of the triangles: the winding
+    // of many meshes is not consistent (scans, terrain patches wound clockwise), and an open surface
+    // is seen from behind when the camera passes under it; a back face is lit with its normal turned
+    // to the camera
+    const material = new THREE.MeshPhongMaterial({
+        color: colour(0xaaaaaa), specular: colour(0x444444), shininess: settings.shininess, side: THREE.DoubleSide
+    });
 
     const controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.setGizmosVisible(false);
+    // The view of Home, and whether the user has moved the camera since the stage framed the model
+    let homeView = DEFAULT_HOME_VIEW;
+    let moved = false;
+    const onMoved = () => { moved = true; };
+    controls.addEventListener?.('start', onMoved);
 
     let frame = 0;
     let running = false;
@@ -134,10 +175,10 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     }
 
     /**
-     * Home: puts the camera back where the model is framed (the fitted distance on the +z axis, the
-     * field of view and the up the stage started with, the unit sphere in the middle) and drops the
-     * rotation, pan and zoom of the arcball controls. The controls restore a saved state, so the
-     * framing is saved first.
+     * Home: puts the camera back where the model is framed (the fitted distance along the direction of
+     * the view of Home, +z unless frameShape chose another, the field of view the stage started with,
+     * the unit sphere in the middle) and drops the rotation, pan and zoom of the arcball controls. The
+     * controls restore a saved state, so the framing is saved first.
      */
     function resetView() {
         // An inertia or a focus the controls still run on animation frames would move the camera again
@@ -148,9 +189,9 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         }
         camera.fov = FOV;
         fittedDistance = fitDistance(1, camera.fov, camera.aspect, FIT_MARGIN);
-        camera.position.set(0, 0, fittedDistance);
-        camera.up.set(0, 1, 0);
-        camera.quaternion.set(0, 0, 0, 1);
+        camera.position.fromArray(homeView.direction).multiplyScalar(fittedDistance);
+        camera.up.fromArray(homeView.up);
+        camera.lookAt(0, 0, 0);
         camera.zoom = 1;
         camera.updateMatrix();
         camera.updateProjectionMatrix();
@@ -163,6 +204,18 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         }
         controls.saveState?.();
         controls.reset?.();
+        moved = false;
+    }
+
+    /**
+     * Takes the view of Home from the shape of the model (homeViewOf), once its principal axes are
+     * known, and goes there unless the user has already moved the camera: a flat model is then seen
+     * face-on, not along its plane.
+     * @param {{ axes: number[][], extents: number[] } | null} shape
+     */
+    function frameShape(shape) {
+        homeView = homeViewOf(shape);
+        if (!moved) resetView();
     }
 
     function fitCanvas() {
@@ -202,6 +255,7 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         stopWatching();
         stopPixelRatio();
         cancelAnimationFrame(frame);
+        controls.removeEventListener?.('start', onMoved);
         controls.dispose?.();
         material.dispose();
         renderer.dispose();
@@ -209,5 +263,5 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         renderer.forceContextLoss?.();
     }
 
-    return { scene, camera, renderer, material, controls, setMaterialColor, frameModel, resetView, start, dispose };
+    return { scene, camera, renderer, material, controls, setMaterialColor, frameModel, frameShape, resetView, start, dispose };
 }

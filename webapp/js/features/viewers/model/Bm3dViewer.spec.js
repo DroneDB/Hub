@@ -22,6 +22,7 @@ vi.mock('./modelStage', () => ({
             setMaterialColor: vi.fn(),
             scene: { add: vi.fn() },
             frameModel: vi.fn(),
+            frameShape: vi.fn(),
             resetView: vi.fn(),
             start: vi.fn(),
             dispose: vi.fn()
@@ -67,6 +68,21 @@ describe('Bm3dViewer', () => {
         model.material = { map: null, vertexColors: false, isMeshLambertMaterial: true };
         model.onLoad(model);
         expect(h.stage.frameModel).toHaveBeenCalledWith(model, model.geometry.boundingSphere);
+    });
+
+    it('frames the model on its shape once node 0 has arrived, once, and not with a viewer that cannot tell it', async () => {
+        const model = await open();
+        model.onUpdate(model);   // a viewer package without computePrincipalAxes
+        expect(h.stage.frameShape).not.toHaveBeenCalled();
+        let shape = null;
+        model.computePrincipalAxes = vi.fn(() => shape);
+        model.onUpdate(model);   // node 0 has not arrived
+        expect(h.stage.frameShape).not.toHaveBeenCalled();
+        shape = { center: [0, 0, 0], axes: [[1, 0, 0], [0, 0, 1], [0, 1, 0]], extents: [1, 1, 0] };
+        model.onUpdate(model);
+        model.onUpdate(model);
+        expect(h.stage.frameShape).toHaveBeenCalledTimes(1);
+        expect(h.stage.frameShape).toHaveBeenCalledWith(shape);
     });
 
     it('asks for the navigation toolbar with the gestures of the arcball, and Home puts the camera back to the framing of the stage', async () => {
