@@ -43,6 +43,21 @@ const modelInfo = reactive({ hasTexture: false, hasColors: false, hasNormals: fa
 let stage = null;
 let model = null;
 let disposed = false;
+let shapeFramed = false;
+
+/**
+ * A node has arrived. Once node 0 is there, its principal axes tell a flat model (one quad, a planar
+ * drawing), which the stage then frames face-on: the camera of Home on +z sees a model in a plane
+ * that holds the z axis along that plane, as a blank canvas. A viewer package without
+ * computePrincipalAxes keeps the default view.
+ */
+function onNodeArrived() {
+    if (shapeFramed) return;
+    const shape = model?.computePrincipalAxes?.();
+    if (!shape) return;
+    shapeFramed = true;
+    stage.frameShape(shape);
+}
 
 /**
  * Reads what the model has from the material the viewer made for it (a map for a texture, vertex
@@ -73,7 +88,7 @@ async function loadBm3d() {
         stage.frameModel(object, object.geometry.boundingSphere);
         chooseMaterial();
         loaded.value = true;
-    }, () => {}, stage.renderer, undefined, {
+    }, onNodeArrived, stage.renderer, undefined, {
         decoderPath: DECODER_PATH,
         // Its ranges past the HTTP cache, as every range the Hub reads (libs/http/rangeRequests)
         fetch: rangeFetch,

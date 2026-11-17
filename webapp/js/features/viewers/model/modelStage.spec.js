@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { reactive, nextTick } from 'vue';
 import * as THREE_BUILD from 'three';
-import { createModelStage, legacyLook } from './modelStage';
+import { createModelStage, legacyLook, homeViewOf, DEFAULT_HOME_VIEW } from './modelStage';
 import { fitDistance } from '@/features/viewers/unified/sceneUtils';
 
 /** A WebGL context is not available: the renderer is a recording stand-in on the real three.js classes. */
@@ -20,8 +20,9 @@ class FakeRenderer {
 }
 const THREE = { ...THREE_BUILD, WebGLRenderer: FakeRenderer };
 
-class FakeControls {
+class FakeControls extends THREE_BUILD.EventDispatcher {
     constructor(camera, dom, scene) {
+        super();
         Object.assign(this, { camera, dom, scene });
         this.target = new THREE_BUILD.Vector3();
         this._gizmos = new THREE_BUILD.Group();
@@ -209,6 +210,64 @@ describe('resetView (Home)', () => {
         sizeCanvas(400, 800);
         runFrame();
         expect(stage.camera.position.z).toBeCloseTo(fitDistance(1, 35, 0.5, 1.25), 6);
+    });
+});
+
+describe('the view of Home and the shape of the model', () => {
+    const shape = (normal, thickness = 0) => {
+        // two axes in the plane, then its normal
+        const a = Math.abs(normal[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+        const n = new THREE_BUILD.Vector3(...normal).normalize();
+        const u = new THREE_BUILD.Vector3(...a).projectOnPlane(n).normalize();
+        const v = new THREE_BUILD.Vector3().crossVectors(n, u);
+        return { center: [0, 0, 0], axes: [u.toArray(), v.toArray(), n.toArray()], extents: [2, 1, thickness] };
+    };
+    const expectVector = (got, want) => got.forEach((x, i) => expect(x).toBeCloseTo(want[i], 6));
+
+    it('keeps the view from +z for a model with a thickness, or with no shape known', () => {
+        expect(homeViewOf(null)).toBe(DEFAULT_HOME_VIEW);
+        expect(homeViewOf(shape([0, 1, 0], 0.5))).toBe(DEFAULT_HOME_VIEW);
+    });
+
+    it('looks along the normal of a flat model from the side of its largest component: from above a Y-up quad, with -z up', () => {
+        const view = homeViewOf(shape([0, -1, 0]));
+        expectVector(view.direction, [0, 1, 0]);
+        expectVector(view.up, [0, 0, -1]);
+    });
+
+    it('looks at a plane that holds the z axis from its side, with +y up, and at a tilted terrain along its normal', () => {
+        const side = homeViewOf(shape([-1, 0, 0]));
+        expectVector(side.direction, [1, 0, 0]);
+        expectVector(side.up, [0, 1, 0]);
+        const normal = new THREE_BUILD.Vector3(0.008, -0.167, 0.986).normalize().toArray();
+        const terrain = homeViewOf(shape(normal, 0.01));
+        expectVector(terrain.direction, normal);
+        expect(terrain.up[0] * normal[0] + terrain.up[1] * normal[1] + terrain.up[2] * normal[2]).toBeCloseTo(0, 6);
+        expect(Math.hypot(...terrain.up)).toBeCloseTo(1, 6);
+    });
+
+    it('frameShape puts the camera on the normal of a flat model, looking at it, and Home goes back there', () => {
+        makeStage();
+        stage.start();
+        stage.frameShape(shape([0, 1, 0]));
+        const distance = fitDistance(1, 35, 2, 1.25);
+        expectVector(stage.camera.position.toArray(), [0, distance, 0]);
+        expectVector(stage.camera.getWorldDirection(new THREE_BUILD.Vector3()).toArray(), [0, -1, 0]);
+        expectVector(stage.camera.up.toArray(), [0, 0, -1]);
+        stage.camera.position.set(1, 2, 3);
+        stage.resetView();
+        expectVector(stage.camera.position.toArray(), [0, distance, 0]);
+    });
+
+    it('frameShape leaves the camera where the user moved it, and Home then takes the view of the shape', () => {
+        makeStage();
+        stage.start();
+        stage.controls.dispatchEvent({ type: 'start' });
+        stage.camera.position.set(1, 2, 3);
+        stage.frameShape(shape([1, 0, 0]));
+        expect(stage.camera.position.toArray()).toEqual([1, 2, 3]);
+        stage.resetView();
+        expectVector(stage.camera.position.toArray(), [fitDistance(1, 35, 2, 1.25), 0, 0]);
     });
 });
 
