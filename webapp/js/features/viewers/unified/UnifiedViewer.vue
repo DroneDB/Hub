@@ -52,6 +52,8 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import LoadProgress from '@/components/LoadProgress.vue';
 import { ref, reactive, toRefs, watch, onMounted, onBeforeUnmount } from 'vue';
+import ddb from 'ddb';
+import { viewerUrl } from '@/libs/views/viewLinks';
 import Button from 'primevue/button';
 import ViewerShell from '@/components/ViewerShell.vue';
 import RangeSetting from '@/components/RangeSetting.vue';
@@ -73,8 +75,12 @@ defineOptions({ name: 'UnifiedViewer' });
 // Type checks are the viewer's own (several types; .3tz indexed as generic)
 const { entry, dataset, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
 // A file that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends (FR-VWR-08)
+// A model whose 3D Tiles could not be generated is offered in the model viewer, which shows its bm3d output
 const { notice: buildNotice, setAvailability, build: startBuild } = useViewerBuild({
-    dataset, path: () => entry.value?.path, canWrite, reload: reloadAfterBuild
+    dataset, path: () => entry.value?.path, canWrite, reload: reloadAfterBuild,
+    alternative: () => (entry.value?.type === ddb.entry.type.MODEL && dataset.value
+        ? { label: 'Open in the model viewer', icon: 'fa-solid fa-cube', to: viewerUrl({ baseUrl: '', org: dataset.value.org, ds: dataset.value.ds, path: entry.value.path, view: 'model' }) }
+        : null)
 });
 const { settings, resetSettings } = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]);
 const notify = useNotify();

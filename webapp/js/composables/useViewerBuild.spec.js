@@ -13,7 +13,7 @@ vi.mock('@/libs/tasks/taskMonitor', () => ({
 }));
 const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
 const { default: BuildManager } = await import('@/libs/build/buildManager');
-const { useViewerBuild, isBuildWait } = await import('./useViewerBuild');
+const { useViewerBuild, isBuildWait, notGeneratedWords } = await import('./useViewerBuild');
 
 const PATH = 'model/OfficePlan.obj';
 const dataset = { baseApi: '/orgs/o/ds/d', org: 'o', ds: 'd' };
@@ -26,9 +26,9 @@ function listChanges(tasks) {
     handler({ dataset });
 }
 
-function setup({ canWrite = true, reload = vi.fn() } = {}) {
+function setup({ canWrite = true, reload = vi.fn(), alternative = undefined } = {}) {
     const scope = effectScope();
-    const wait = scope.run(() => useViewerBuild({ dataset, path: () => PATH, canWrite: ref(canWrite), reload }));
+    const wait = scope.run(() => useViewerBuild({ dataset, path: () => PATH, canWrite: ref(canWrite), reload, alternative }));
     return { wait, reload, scope };
 }
 
@@ -38,6 +38,30 @@ describe('useViewerBuild', () => {
         taskMonitor.on.mockClear();
         taskMonitor.getTasks.mockReturnValue([]);
         vi.restoreAllMocks();
+    });
+
+    it('says why the build could not make the output, offers no rebuild that fails the same way, and links another viewer', () => {
+        const link = { label: 'Open in the model viewer', icon: 'fa-solid fa-cube', to: { name: 'Model' } };
+        const { wait, scope } = setup({ alternative: () => link });
+        const result = availability('not-generated', { output: '3D Tiles', reason: 'Index was out of range' });
+        expect(isBuildWait(result)).toBe(true);
+        wait.setAvailability(result);
+        expect(wait.notice.value).toMatchObject({
+            status: 'not-generated', title: 'The 3D Tiles could not be generated', canBuild: false, link
+        });
+        expect(wait.notice.value.text).toBe('The build of this file could not make its 3D Tiles. The tool that makes it reported: Index was out of range. A rebuild fails the same way.');
+        scope.stop();
+    });
+
+    it('links no other viewer for the other states', () => {
+        const { wait, scope } = setup({ alternative: () => ({ label: 'x', icon: '', to: '/' }) });
+        wait.setAvailability(availability('rebuild'));
+        expect(wait.notice.value.link).toBeNull();
+        scope.stop();
+    });
+
+    it('words a skipped output without a reason', () => {
+        expect(notGeneratedWords({ output: '3D Tiles', reason: '' })[1]).toBe('The build of this file could not make its 3D Tiles. A rebuild fails the same way.');
     });
 
     it('has no notice while the file opens', () => {

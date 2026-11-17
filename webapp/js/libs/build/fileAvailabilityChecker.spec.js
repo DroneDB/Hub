@@ -113,6 +113,49 @@ describe('unified viewer gate', () => {
         expect(result).toMatchObject({ available: false, status: 'rebuild' });
     });
 
+    describe('a model whose 3D Tiles the build could not generate', () => {
+        const BM3D = { role: 'model.bm3d', url: '/orgs/o/ds/d/build/m/bm3d/model.bm3d' };
+        const SKIPPED = '[19:39:51] [ddb] 3D Tiles generation skipped for house.obj: Could not build 3D Tiles for /srv/house.obj: Obj2Tiles exited with code 1: \n !> Exception: Index was out of range.\n';
+        const buildTask = (state = 'Succeeded') => ({ taskId: 't9', toolId: 'build', path: 'house.obj', state, createdAt: '2026-11-17T19:39:15Z' });
+        const withLog = (lines, tasks = []) => ({
+            ...datasetListing(null),
+            getTasks: vi.fn(async () => tasks),
+            getTaskLog: vi.fn(async () => ({ cursor: lines.length, lines }))
+        });
+
+        it('says so, with the reason from the build log, instead of asking for a rebuild that fails the same way', async () => {
+            taskMonitor.getTasks.mockReturnValue([buildTask()]);
+            const dataset = withLog(['[19:39:51] model', SKIPPED, '[19:39:51] Done build']);
+            const result = await checker.check(dataset, model({ artifacts: [BM3D] }), 'unified', { current: true });
+            expect(result).toMatchObject({
+                available: false, status: 'not-generated', output: '3D Tiles', reason: 'Index was out of range.', actions: ['close']
+            });
+            expect(result.message).toBe("The 3D Tiles of 'house.obj' could not be generated: Index was out of range.");
+            expect(dataset.getTaskLog).toHaveBeenCalledWith('t9');
+        });
+
+        it('finds the build task in the task list of the dataset when the page has none', async () => {
+            const dataset = withLog([SKIPPED], [buildTask()]);
+            const result = await checker.check(dataset, model({ artifacts: [BM3D] }), 'unified', { current: true });
+            expect(result).toMatchObject({ status: 'not-generated' });
+            expect(dataset.getTasks).toHaveBeenCalledWith(expect.objectContaining({ toolId: 'build' }));
+        });
+
+        it('still asks for a rebuild when the log names no skipped output (a build older than 3D Tiles)', async () => {
+            taskMonitor.getTasks.mockReturnValue([buildTask()]);
+            const result = await checker.check(withLog(['[19:39:51] Done build']), model({ artifacts: [BM3D] }), 'unified', { current: true });
+            expect(result).toMatchObject({ status: 'rebuild' });
+        });
+
+        it('still asks for a rebuild when the log cannot be read', async () => {
+            taskMonitor.getTasks.mockReturnValue([buildTask()]);
+            const dataset = withLog([SKIPPED]);
+            dataset.getTaskLog.mockRejectedValue(new Error('403'));
+            const result = await checker.check(dataset, model({ artifacts: [BM3D] }), 'unified', { current: true });
+            expect(result).toMatchObject({ status: 'rebuild' });
+        });
+    });
+
     it('a failed listing is an error, not a missing artifact', async () => {
         const dataset = datasetListing(null);
         dataset.listOne.mockRejectedValue(new Error('network down'));

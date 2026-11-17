@@ -10,11 +10,15 @@ import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { buildWarningOf } from '@/libs/build/buildWarnings';
+import { skippedOutputOf } from '@/libs/build/skippedOutputs';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
 import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
 import { isActiveState, isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
+
+// The build tasks of a dataset looked through for the one of a file, when the task list of the page does not hold it
+const SKIPPED_TASKS_TAKE = 100;
 
 // Build artifact each viewer needs, by role (the entry DTO lists the artifacts that exist).
 // An array is an any-of match.
@@ -46,13 +50,16 @@ const VIEW_ARTIFACT_ROLES = {
  * @typedef {Object} AvailabilityResult
  * @property {boolean} available - Whether the file is available for visualization
  * @property {string} status - Status: 'ready', 'building', 'queued' (never built), 'rebuild' (built without the
- *   artifact the viewer needs), 'blocked', 'failed', 'unsupported' (the server cannot read this file: processing it
- *   again does not help), 'unknown', 'not-found', 'error'
+ *   artifact the viewer needs), 'not-generated' (the build tried to make that artifact and could not: a rebuild fails
+ *   the same way), 'blocked', 'failed', 'unsupported' (the server cannot read this file: processing it again does not
+ *   help), 'unknown', 'not-found', 'error'
  * @property {string} message - Descriptive message for the user
  * @property {string} title - Message title
  * @property {Object|null} buildState - Build state if available
  * @property {Array<string>} actions - Available actions for the user
  * @property {string} [hint] - What the administrator of the server does about it ('unsupported'), shown in the details
+ * @property {string} [output] - The output the build could not generate ('not-generated'), as libddb names it
+ * @property {string} [reason] - Why, in the words of the tool that failed ('not-generated'; '' when the log does not say)
  */
 
 class FileAvailabilityChecker {
@@ -187,9 +194,24 @@ class FileAvailabilityChecker {
             if (listed.buildStatus === 'failed')
                 return this.handleExistingBuildState({ path: entry.path, currentState: 'Failed' }, entry);
 
-            // 3. Built, but without the artifact this viewer needs (a model built before 3D Tiles has only its
-            // Nexus output): only a forced build makes it, libddb skips a build that is complete (FR-VWR-08)
+            // 3. Built, but without the artifact this viewer needs. The build may have tried to make it and failed
+            // (the tiler cannot read the file): a rebuild fails the same way, so the reason is shown instead
             if (roles && isBuilt(listed)) {
+                const skipped = await this.skippedOutput(dataset, entry.path);
+                if (skipped) {
+                    return {
+                        available: false,
+                        status: 'not-generated',
+                        message: `The ${skipped.output} of '${this.getFileName(entry.path)}' could not be generated${skipped.reason ? `: ${skipped.reason}` : '.'}`,
+                        title: `${skipped.output} not available`,
+                        buildState: null,
+                        actions: ['close'],
+                        output: skipped.output,
+                        reason: skipped.reason
+                    };
+                }
+                // A model built before 3D Tiles has only its Nexus output: only a forced build makes it, libddb skips a
+                // build that is complete (FR-VWR-08)
                 return {
                     available: false,
                     status: 'rebuild',
@@ -220,6 +242,24 @@ class FileAvailabilityChecker {
                 buildState: null,
                 actions: ['close']
             };
+        }
+    }
+
+    /**
+     * The output the last build of `path` could not generate, from its log (skippedOutputs), or null: no build task
+     * of it in the task list, a build that did not succeed, a log that names none or that cannot be read.
+     * @returns {Promise<import('@/libs/build/skippedOutputs').SkippedOutput | null>}
+     */
+    async skippedOutput(dataset, path) {
+        try {
+            const latest = tasks => (tasks || []).filter(t => t && t.toolId === 'build' && t.path === path && t.taskId)
+                .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+            const task = latest(taskMonitor.getTasks(dataset)) || latest(await dataset.getTasks({ toolId: 'build', take: SKIPPED_TASKS_TAKE }));
+            if (!task || task.state !== 'Succeeded') return null;
+            const log = await dataset.getTaskLog(task.taskId);
+            return skippedOutputOf(log && log.lines, path);
+        } catch {
+            return null;
         }
     }
 

@@ -44,6 +44,9 @@
                     <p v-if="build.error" class="viewer-build-error" role="alert">{{ build.error }}</p>
                     <Button v-if="build.canBuild" :label="build.actionLabel" icon="fa-solid fa-hammer" severity="primary" size="small"
                             @click="emit('build')" />
+                    <!-- Another viewer that shows the file, when this one cannot -->
+                    <Button v-if="build.link" as="router-link" :to="build.link.to" :label="build.link.label" :icon="build.link.icon"
+                            severity="secondary" size="small" class="viewer-build-link" />
                 </div>
                 <!-- Embedded there is no view bar: the same button stands over the view, in the corner the viewer leaves free -->
                 <button v-if="fullscreenOverlay" type="button" class="viewer-fullscreen-overlay" :class="fullscreenCorner"
@@ -177,7 +180,8 @@ const props = defineProps({
     gestures: { type: Array, default: () => [] },
     /**
      * The build state of a file that cannot open yet (useViewerBuild's `notice`: status, title, text, canBuild, actionLabel,
-     * error): shown over the view with the Build / Rebuild button when `canBuild`; null when the file opens
+     * error, link): shown over the view with the Build / Rebuild button when `canBuild` and a link to another viewer
+     * when `link`; null when the file opens
      */
     build: { type: Object, default: null }
 });
@@ -458,6 +462,11 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
 
 .viewer-build-error {
     font-weight: 600;
+}
+
+/* A link that looks like the button next to it */
+.viewer-build-link {
+    text-decoration: none;
 }
 
 /* Embedded: the fullscreen button over the view, in the corner the viewer leaves free (`fullscreen-corner`) */

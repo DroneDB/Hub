@@ -17,21 +17,41 @@ import { formatNumber } from '@/libs/format';
 import { useBuildCompletion } from '@/composables/useBuildCompletion';
 
 /** The statuses of the availability check that are a build state the viewer waits on (the others are errors). */
-export const BUILD_WAIT_STATUSES = Object.freeze(['building', 'queued', 'rebuild', 'blocked', 'failed', 'unknown']);
+export const BUILD_WAIT_STATUSES = Object.freeze(['building', 'queued', 'rebuild', 'not-generated', 'blocked', 'failed', 'unknown']);
 
 /** @param {{ status?: string } | null | undefined} availability */
 export const isBuildWait = availability => !!availability && BUILD_WAIT_STATUSES.includes(/** @type {string} */ (availability.status));
 
 /**
  * @typedef {object} ViewerBuildNotice
- * @property {'building' | 'queued' | 'rebuild' | 'blocked' | 'failed' | 'unknown'} status
+ * @property {'building' | 'queued' | 'rebuild' | 'not-generated' | 'blocked' | 'failed' | 'unknown'} status
  * @property {string} title
  * @property {string} text
  * @property {number | null} percent  how far a running build is (0-100), or null
  * @property {boolean} canBuild  the Build / Rebuild button is offered (the user can write, nothing is starting)
  * @property {string} actionLabel  'Build' for a file never built, 'Rebuild' otherwise
  * @property {string} error  why the build could not be started, or ''
+ * @property {ViewerAlternative | null} link  another viewer that shows the file (offered when this one cannot), or null
  */
+
+/**
+ * @typedef {object} ViewerAlternative
+ * @property {string} label
+ * @property {string} icon
+ * @property {any} to  the route of the other viewer
+ */
+
+/**
+ * The words of a build that could not generate the output a viewer needs: the output, and why in the words of the tool
+ * that failed (the availability check read them from the build log).
+ * @param {{ output?: string, reason?: string }} result
+ * @returns {[string, string]}
+ */
+export function notGeneratedWords({ output, reason } = {}) {
+    const what = output || 'output of this viewer';
+    const why = reason ? ` The tool that makes it reported: ${reason.replace(/\.?$/, '.')}` : '';
+    return [`The ${what} could not be generated`, `The build of this file could not make its ${what}.${why} A rebuild fails the same way.`];
+}
 
 /**
  * @param {object} options
@@ -39,8 +59,10 @@ export const isBuildWait = availability => !!availability && BUILD_WAIT_STATUSES
  * @param {() => string | null | undefined} options.path  the dataset path of the file
  * @param {boolean | import('vue').Ref<boolean> | (() => boolean)} [options.canWrite]
  * @param {() => Promise<void> | void} options.reload  loads the file again: lists it, checks it, opens it (called when the build ends)
+ * @param {() => ViewerAlternative | null} [options.alternative]  another viewer of the file, offered when the build could
+ *   not generate what this one needs
  */
-export function useViewerBuild({ dataset, path, canWrite = false, reload }) {
+export function useViewerBuild({ dataset, path, canWrite = false, reload, alternative = () => null }) {
     const currentDataset = () => toValue(dataset) ?? null;
     const mayWrite = () => !!toValue(canWrite);
 
@@ -115,6 +137,8 @@ export function useViewerBuild({ dataset, path, canWrite = false, reload }) {
             // Built before this viewer could show it (a model with only its Nexus output): only a rebuild makes what it needs
             rebuild: ['Rebuild needed', writer ? 'The build of this file has no output this viewer can show. Rebuild it to open it here.' : 'The build of this file has no output this viewer can show. Somebody who can write to the dataset can rebuild it.'],
             failed: ['The build failed', writer ? 'The build of this file failed. Rebuild it to try again.' : 'The build of this file failed. Somebody who can write to the dataset can rebuild it.'],
+            // The build tried to make the output and the tool failed on the file: a rebuild fails the same way
+            'not-generated': notGeneratedWords(/** @type {any} */ (result)),
             blocked: [/** @type {any} */ (result).title || 'The build is on hold', String(/** @type {any} */ (result).message || '').replace(/^The file '[^']*' cannot be opened yet\.\s*/, '')],
             unknown: ['The build is in an unexpected state', 'Rebuild the file to try again.']
         };
@@ -124,9 +148,10 @@ export function useViewerBuild({ dataset, path, canWrite = false, reload }) {
             title: status === 'building' && percent != null ? `${title} ${formatNumber(percent, 0)} %` : title,
             text,
             percent,
-            canBuild: writer && status !== 'building',
+            canBuild: writer && status !== 'building' && status !== 'not-generated',
             actionLabel: never ? 'Build' : 'Rebuild',
-            error: startError.value
+            error: startError.value,
+            link: status === 'not-generated' ? alternative() : null
         };
     });
 
