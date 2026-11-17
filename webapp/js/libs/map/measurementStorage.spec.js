@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
-import { MeasurementStorage, MeasurementOwner, MeasurementNotLoadedError, ownerOf, saveResultMessage } from './measurementStorage';
+import { MeasurementStorage, MeasurementOwner, MeasurementNotLoadedError, MeasurementNotPlacedError, ownerOf, saveResultMessage } from './measurementStorage';
 import { exportMeasurements as exportMap, importMeasurements as importMap } from './olMeasurementConverter';
 import { exportMeasurements as exportCloud } from './potreeMeasurementConverter';
 import { sectionOf } from './measurementFormat';
@@ -152,6 +152,27 @@ describe('MeasurementStorage.save', () => {
         const result = await storage.save(collection([]));
         expect(dataset.writeObj).not.toHaveBeenCalled();
         expect(result.deleted).toBe(true);
+    });
+});
+
+describe('measurements the view could not place (keepUnplaced)', () => {
+    it('refuse a save, which writes nothing, until the user deletes the saved measurements or a load shows them all', async () => {
+        const { dataset, storage } = storageWith([cloud('distance', 'old')], POINT_CLOUD);
+        await storage.load();
+        storage.keepUnplaced(1);
+        expect(storage.saveRefusal).toBeInstanceOf(MeasurementNotPlacedError);
+        expect(storage.saveRefusal.message).toContain('1 saved measurement is in another coordinate system');
+        await expect(storage.save(collection([cloud('distance', 'new')]))).rejects.toBeInstanceOf(MeasurementNotPlacedError);
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+        // A new load says again what it could not show
+        await storage.load();
+        expect(storage.saveRefusal).toBeNull();
+        storage.keepUnplaced(2);
+        expect(storage.saveRefusal.message).toContain('2 saved measurements are');
+        // The user chose to lose them
+        await storage.deleteSaved();
+        expect(dataset.deleteObj).toHaveBeenCalled();
+        expect(storage.saveRefusal).toBeNull();
     });
 });
 

@@ -22,7 +22,8 @@
 
                     <div class="unit-selector-toolbar">
                         <label for="potree-unit-select">Units:</label>
-                        <select id="potree-unit-select" v-model="unitPref" aria-label="Units">
+                        <select id="potree-unit-select" v-model="unitPref" aria-label="Units" :disabled="mixedUnits"
+                                :title="mixedUnits ? 'The heights of this cloud are in another unit than its other coordinates: lengths are not converted' : undefined">
                             <option value="metric">Metric (m)</option>
                             <option value="imperial">Imperial (ft)</option>
                         </select>
@@ -83,7 +84,9 @@ import { labelPotreeControls } from '@/libs/potree/potreeControls';
 import { attachPotreeScale } from '@/libs/potree/potreeScale';
 import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
-import { linearUnitOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
+import { cloudUnitsOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
+import { labelCircleRadii } from '@/libs/potree/circleRadiusLabel';
+import { notify } from '@/libs/notify';
 
 defineOptions({ name: 'PotreeViewer' });
 
@@ -133,17 +136,26 @@ const finishMeasure = () => gestures?.finish({ dropShort: false });
 const endMeasure = () => gestures?.finish({ dropShort: true });
 const cancelMeasure = () => gestures?.cancel();
 
-// The unit of length of the cloud's coordinates, from the CRS of its COPC (metres until it is loaded): a cloud in
-// feet measures in feet, and Potree turns it into the unit the user chose
-let cloudUnit = LINEAR_UNITS.METRE;
+// The units of the cloud's coordinates, from the CRS of its COPC (metres until it is loaded): a cloud in feet measures
+// in feet, and Potree turns it into the unit the user chose
+let cloudUnits = cloudUnitsOf(null);
+// Heights in another unit than x and y (UTM in metres with NAVD88 heights in US survey feet): Potree has one unit for
+// every axis, so its lengths and heights cannot be converted. Its labels then show the numbers of the coordinates with
+// no unit of length, and the unit selector has nothing to do; the saved measurements are worked out per axis in metres
+const mixedUnits = ref(false);
+const UNCONVERTED = Object.freeze({ code: 'units', unitspermeter: 1 });
+// A unit in words, plural: "US survey feet", "metres"
+const unitName = unit => ({ metre: 'metres', foot: 'feet', 'US survey foot': 'US survey feet' }[unit.name] ?? unit.name);
 // A unit as Potree has it: what its labels show, and how many of it make a metre
 const potreeUnit = unit => ({ code: unit.symbol, unitspermeter: 1 / unit.metresPerUnit });
 
 // Lengths in the chosen unit, for the viewer, the scene and every existing measure
 function applyUnits() {
     if (!viewer) return;
-    viewer.lengthUnit = potreeUnit(cloudUnit);
-    viewer.lengthUnitDisplay = potreeUnit(unitPref.value === 'metric' ? LINEAR_UNITS.METRE : LINEAR_UNITS.FOOT);
+    viewer.lengthUnit = cloudUnits.mixed ? UNCONVERTED : potreeUnit(cloudUnits.horizontal);
+    viewer.lengthUnitDisplay = cloudUnits.mixed
+        ? UNCONVERTED
+        : potreeUnit(unitPref.value === 'metric' ? LINEAR_UNITS.METRE : LINEAR_UNITS.FOOT);
     viewer.scene.lengthUnit = viewer.lengthUnit;
     viewer.scene.lengthUnitDisplay = viewer.lengthUnitDisplay;
     for (const measure of viewer.scene.measurements || []) {
@@ -202,7 +214,8 @@ async function loadViewer() {
     session.dispose();
     session = new PotreeSession();
     toolsViewer.value = null;
-    cloudUnit = LINEAR_UNITS.METRE;
+    cloudUnits = cloudUnitsOf(null);
+    mixedUnits.value = false;
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
     // The canvas, the points and the labels are drawn at the applied ratio of the screen (FR-XC-32)
     stopScale = attachPotreeScale(viewer, session);
@@ -240,8 +253,14 @@ async function loadViewer() {
 
     const coordinateSystem = await addPointCloud(dataset.value.Entry(entry.value));
     if (unmounted) return;
-    cloudUnit = linearUnitOf(coordinateSystem?.srs);
+    cloudUnits = cloudUnitsOf(coordinateSystem?.srs);
+    mixedUnits.value = cloudUnits.mixed;
     applyUnits();
+    if (cloudUnits.mixed) {
+        notify.warn(`The heights of this point cloud are in ${unitName(cloudUnits.vertical)} and its other coordinates in `
+            + `${unitName(cloudUnits.horizontal)}. This viewer measures every axis in one unit, so its labels show the numbers `
+            + 'of the coordinates, not metres or feet. Saved measurements have their lengths in metres.', { summary: 'Mixed units', life: 'long' });
+    }
     toolsViewer.value = viewer;
     m.attach(viewer, session, coordinateSystem);
     viewer.fitToScreen();
@@ -258,6 +277,7 @@ onMounted(async () => {
         await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
         if (unmounted) return;
         fixPotreePaths(window.Potree, window.location.origin);
+        labelCircleRadii(window.Potree);
         await loadViewer();
     } catch (e) {
         if (!unmounted) error.value = e.message;

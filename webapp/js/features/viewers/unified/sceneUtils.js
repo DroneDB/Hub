@@ -6,6 +6,7 @@ import { PRIMARY, primaryRgba } from '@/libs/palette';
 import { areaParts, lengthParts } from '@/libs/format';
 import { getPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { colorToken } from '@/libs/colorScheme';
+import { pathLength, surfaceArea } from '@/libs/map/scaledGeometry';
 
 /**
  * [minLon, minLat, maxLon, maxLat] of a GeoJSON Feature or geometry (DroneDB footprints are
@@ -129,27 +130,39 @@ function groundArea(squareMeters, units) {
     return formatIn(squareMeters, metric ? SMALL_METRIC_AREAS : SMALL_IMPERIAL_AREAS);
 }
 
+/** The scale of x, y and z, from one number for all three or one per axis. @param {number | number[]} scale @returns {number[]} */
+const axisScale = scale => (typeof scale === 'number' ? [scale, scale, scale] : scale);
+/** The scale of the axes as one number when they are all the same (a length is then its length times it), or null. @param {number[]} axes */
+const commonScale = axes => (axes[0] === axes[1] && axes[1] === axes[2] ? axes[0] : null);
+
 /**
- * Measurement labels. `scale` corrects Web Mercator lengths to ground lengths (cos latitude;
- * 1 in metric CRSs) and is read at call time. `unit` names what the lengths are in: metres, or
- * (a scene with no known scale) anything else, which is written as it is and never turned into
- * another unit. Lengths in metres are written in `units` ('metric' or 'imperial'; the user's
- * preference by default). Both are read at call time too.
- * @param {() => number} scale
+ * Measurement labels. `scale` turns a length of the scene into metres: one number (the Web Mercator correction, cos
+ * latitude, times the metres in a unit of the coordinates; 1 in a metric CRS), or the metres in a unit of x, y and z
+ * when they differ (a point cloud with its heights in feet and its x and y in metres): a length is then worked out from
+ * its two ends and an area from the points of its shape, each axis scaled first. `unit` names what the lengths are in:
+ * metres, or (a scene with no known scale) anything else, which is written as it is and never turned into another
+ * unit. Lengths in metres are written in `units` ('metric' or 'imperial'; the user's preference by default). All three
+ * are read at call time.
+ * @param {() => number | number[]} scale
  * @param {() => string} [unit]
  * @param {() => string} [units]
  */
 export function measureFormatters(scale, unit = () => 'm', units = preferredUnits) {
     return {
-        /** @param {{ length: number }} m */
-        length: ({ length }) => {
-            const v = length * scale();
+        /** @param {{ length: number, start?: any, end?: any }} m */
+        length: ({ length, start, end }) => {
+            const s = axisScale(scale());
+            const common = commonScale(s);
+            const v = common !== null || !start || !end ? length * s[0] : pathLength([start, end], s);
             const u = unit();
             return u === 'm' ? groundLength(v, units()) : `${v.toFixed(2)} ${u}`;
         },
-        /** @param {{ area: number }} m */
-        area: ({ area }) => {
-            const v = area * scale() * scale();
+        /** @param {{ area: number, shape?: { points?: any[] } }} m */
+        area: ({ area, shape }) => {
+            const s = axisScale(scale());
+            const common = commonScale(s);
+            const points = shape?.points;
+            const v = common !== null || !points?.length ? area * s[0] * s[1] : surfaceArea(points, s);
             const u = unit();
             return u === 'm' ? groundArea(v, units()) : `${v.toFixed(2)} ${u}²`;
         }

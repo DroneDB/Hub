@@ -197,11 +197,57 @@ export function linearUnitOf(crs) {
         const projection = /** @type {any} */ (proj4.Proj(definition));
         const factor = Number(projection.to_meter);
         if (projection.projName === 'longlat' || !Number.isFinite(factor) || factor <= 0) return LINEAR_UNITS.METRE;
-        const known = Object.values(LINEAR_UNITS).find(u => Math.abs(u.metresPerUnit - factor) < UNIT_TOLERANCE);
-        if (known) return known;
-        const name = typeof projection.units === 'string' && projection.units ? projection.units : `${factor} m`;
-        return Object.freeze({ code: name, symbol: name, name, metresPerUnit: factor });
+        return unitOfFactor(factor, projection.units);
     } catch {
         return LINEAR_UNITS.METRE;
     }
+}
+
+/**
+ * The unit of a factor to metres: a known one, or one named after what the CRS calls it.
+ * @param {number} factor
+ * @param {unknown} name
+ * @returns {Readonly<LinearUnit>}
+ */
+function unitOfFactor(factor, name) {
+    const known = Object.values(LINEAR_UNITS).find(u => Math.abs(u.metresPerUnit - factor) < UNIT_TOLERANCE);
+    if (known) return known;
+    const label = typeof name === 'string' && name ? name : `${factor} m`;
+    return Object.freeze({ code: label, symbol: label, name: label, metresPerUnit: factor });
+}
+
+// The WKT 1 and WKT 2 keywords of the vertical CRS of a compound one
+const VERTICAL_KEYWORDS = new Set(['VERT_CS', 'VERTCRS', 'VERTICALCRS']);
+
+/**
+ * The unit of the heights of a compound CRS, from its vertical CRS (the last UNIT or LENGTHUNIT in it: the one of
+ * its axis), or null for a CRS that is not compound or a vertical CRS that names no linear unit.
+ * @param {string} crs
+ * @returns {Readonly<LinearUnit> | null}
+ */
+function verticalUnitOf(crs) {
+    const node = wktNode(crs.trim());
+    if (!node || !COMPOUND_KEYWORDS.has(node.keyword)) return null;
+    const vertical = node.members.find(m => VERTICAL_KEYWORDS.has(wktNode(m)?.keyword ?? ''));
+    if (!vertical) return null;
+    const units = [...vertical.matchAll(/(?:LENGTHUNIT|UNIT)\s*\[\s*"([^"]*)"\s*,\s*([-+\d.eE]+)/gi)];
+    const last = units[units.length - 1];
+    const factor = last ? Number(last[2]) : NaN;
+    return Number.isFinite(factor) && factor > 0 ? unitOfFactor(factor, last[1]) : null;
+}
+
+/**
+ * The units of the coordinates of a point cloud: of x and y (linearUnitOf) and of z. The heights of a compound CRS are in
+ * the unit of its vertical CRS, which can differ from the horizontal one (UTM in metres with NAVD88 heights in US survey
+ * feet); without a vertical CRS they are in the horizontal unit, as the coordinates of a LAS file are. `mixed` when the
+ * two differ: a length along z is then not in the unit of a length along x, and `metresPerAxis` gives the metres in a
+ * unit of each axis (x, y, z) to measure in.
+ * @param {any} crs  an EPSG code, a proj string or WKT; anything else (null) is no CRS
+ * @returns {{ horizontal: Readonly<LinearUnit>, vertical: Readonly<LinearUnit>, mixed: boolean, metresPerAxis: number[] }}
+ */
+export function cloudUnitsOf(crs) {
+    const horizontal = linearUnitOf(crs);
+    const vertical = (typeof crs === 'string' && verticalUnitOf(crs)) || horizontal;
+    const mixed = Math.abs(horizontal.metresPerUnit - vertical.metresPerUnit) >= UNIT_TOLERANCE;
+    return { horizontal, vertical, mixed, metresPerAxis: [horizontal.metresPerUnit, horizontal.metresPerUnit, vertical.metresPerUnit] };
 }

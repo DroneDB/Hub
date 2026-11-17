@@ -261,17 +261,22 @@ const geometryHoldsEveryPoint = feature => !['circle', 'angle'].includes(feature
 
 /**
  * Where the 3D viewer's saved features go in a point cloud whose COPC is in `coordinateSystem` now: a
- * function from a feature to its points ([x, y, z] of the COPC), or null for a feature with neither
- * local coordinates nor a geometry of points.
+ * function from a feature to its points ([x, y, z] of the COPC), or null for a feature that cannot be
+ * placed there.
  *
  * The local coordinates of a feature are in the CRS the section of the file states. When that is the
- * CRS of the COPC (sameCrs: by meaning, not by text) they are used as they are. When it is another one
- * (the COPC was built again in another CRS), every point goes from the stated CRS to WGS84 and from
- * there into the COPC's (in 3-D for a geocentric CRS); when the file states no CRS proj4 can use but its
- * geometry is WGS84, the geometry is placed in the COPC's CRS instead (not for a circle or an angle, whose
- * geometry is one of their points). A feature with no local coordinates is placed from its geometry, as
- * before. When neither can be reprojected, the local coordinates are used as they are: nothing better is
- * known. The next save writes the positions and the CRS of the COPC.
+ * CRS of the COPC (sameCrs: by meaning, not by text) they are used as they are; a file that states no
+ * CRS has them in the coordinates of the COPC too (its migration gives it the CRS of the cloud when one
+ * is known). When the file states another CRS (the COPC was built again in another one), every point goes
+ * from that CRS to WGS84 and from there into the COPC's (in 3-D for a geocentric CRS). When the file's CRS
+ * cannot be read but its geometry is WGS84, the geometry is placed in the COPC's CRS instead, except for a
+ * circle or an angle, whose geometry is one of their points. A feature with no local coordinates is
+ * placed from its geometry.
+ *
+ * A feature in another CRS that cannot be reprojected into the COPC's (either CRS is one proj4 cannot
+ * use) cannot be placed: its coordinates are not in the COPC's, and shown there they would be in the
+ * wrong place, and saved there they would be labelled with a CRS they are not in. The caller leaves them
+ * out of the view and refuses saves, so the file keeps them (MeasurementStorage.keepUnplaced).
  * @param {any} doc  the document (`read` or the storage's `load`)
  * @param {any} coordinateSystem  the coordinate system (or SRS) of the COPC the viewer shows
  * @returns {(feature: any) => number[][] | null}
@@ -280,17 +285,23 @@ export function savedPositions(doc, coordinateSystem) {
     const saved = sectionOf(doc, VIEW.POINT_CLOUD).coordinateSystem;
     const current = projectorFor(coordinateSystem);
     const stated = projectorFor(saved);
+    const statesCrs = !!srsDefinitionOf(saved);
+    const wgs84 = isWgs84Document(doc);
     const features = Array.isArray(doc?.features) ? doc.features : [];
     const sample = features.map(localPointsOf).find(Boolean)?.[0] ?? null;
-    const unchanged = sameCrs(saved, coordinateSystem, sample);
+    // A WGS84 file that states no CRS is placed from its geometry when the COPC has a CRS to place it in
+    const unchanged = statesCrs ? sameCrs(saved, coordinateSystem, sample) : !(wgs84 && current.usable);
     const fromLocal = !unchanged && current.usable && stated.usable;
-    const fromGeometry = !unchanged && current.usable && !stated.usable && isWgs84Document(doc);
+    const fromGeometry = !unchanged && current.usable && wgs84;
     return feature => {
         const local = localPointsOf(feature);
-        if (local && fromLocal) return local.map(p => current.toLocal(stated.toGeographic(p)));
         const geometry = geometryPointsOf(feature);
-        if (geometry && (!local || (fromGeometry && geometryHoldsEveryPoint(feature)))) return geometry.map(p => current.toLocal(p));
-        return local;
+        if (unchanged) return local ?? (geometry ? geometry.map(p => current.toLocal(p)) : null);
+        if (local && fromLocal) return local.map(p => current.toLocal(stated.toGeographic(p)));
+        if (geometry && fromGeometry && (!local || geometryHoldsEveryPoint(feature))) return geometry.map(p => current.toLocal(p));
+        // The local coordinates of a file that states no CRS are the COPC's
+        if (local && !statesCrs) return local;
+        return null;
     };
 }
 

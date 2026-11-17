@@ -25,11 +25,16 @@ vi.mock('@/libs/map/potreeMeasurementConverter', () => ({
         features: viewer.scene.measurements.map(m => ({ type: 'Feature', geometry: null,
             properties: { name: m.name, measurementType: 'distance', localCoordinates: [[0, 0, 0]] } }))
     }),
-    importMeasurements: (geojson, viewer) => geojson.features.map(f => {
-        const measure = { name: f.properties.name, points: [{ position: { x: 0, y: 0, z: 0 } }] };
-        viewer.scene.addMeasurement(measure);
-        return measure;
-    })
+    // A feature marked `unplaced` stands for one in a CRS that cannot be converted to the cloud's: it is left out
+    importMeasurements: (geojson, viewer) => {
+        const placed = geojson.features.filter(f => !f.properties.unplaced);
+        const imported = placed.map(f => {
+            const measure = { name: f.properties.name, points: [{ position: { x: 0, y: 0, z: 0 } }] };
+            viewer.scene.addMeasurement(measure);
+            return measure;
+        });
+        return { imported, unplaced: geojson.features.length - placed.length };
+    }
 }));
 
 const { usePotreeMeasurements } = await import('./usePotreeMeasurements');
@@ -115,6 +120,44 @@ beforeEach(() => {
         writeObj: vi.fn(async (path, blob) => { stored[path] = await blob.text(); }),
         deleteObj: vi.fn(async path => { delete stored[path]; })
     };
+});
+
+describe('saved measurements the viewer cannot place in the cloud\'s coordinate system', () => {
+    const unplaced = name => ({ ...viewerFeature(name), properties: { ...viewerFeature(name).properties, unplaced: true } });
+
+    it('are not shown, the user is told, and a save is refused so that the file keeps them as they are', async () => {
+        stored[PATH] = JSON.stringify({ type: 'FeatureCollection', features: [mapFeature('m1'), viewerFeature('v1'), unplaced('old')] });
+        const before = stored[PATH];
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        try {
+            const m = start();
+            await m.load();
+            expect(viewer.scene.measurements.map(x => x.name)).toEqual(['v1']);
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain('1 saved measurement is in another coordinate system than this point cloud');
+            expect(flash).toHaveBeenLastCalledWith('1 measurement loaded');
+            await m.save();
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(stored[PATH]).toBe(before);
+            expect(warn).toHaveBeenCalledTimes(2);
+            expect(warn.mock.calls[1][0]).toContain('Saving is turned off so that the file keeps them');
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it('a file the viewer can place in full is saved as before', async () => {
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        try {
+            const m = start();
+            await m.load();
+            await m.save();
+            expect(warn).not.toHaveBeenCalled();
+            expect(dataset.writeObj).toHaveBeenCalledTimes(1);
+        } finally {
+            warn.mockRestore();
+        }
+    });
 });
 
 describe('usePotreeMeasurements', () => {

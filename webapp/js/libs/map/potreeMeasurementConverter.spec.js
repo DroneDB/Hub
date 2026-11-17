@@ -9,7 +9,10 @@ import { exportMeasurements, importMeasurements } from './potreeMeasurementConve
 import { VIEW, sectionOf, read } from './measurementFormat';
 import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import { UTM_18N_WKT, COPC_SCALE, COPC_OFFSET, CLOUD, cloudCoordinateSystem } from './measurementFormat.fixtures';
-import { WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, FOOT_WKT, US_FOOT_COMPOUND_WKT } from './crs.fixtures';
+import {
+    WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, FOOT_WKT, US_FOOT_COMPOUND_WKT, METRE_US_FOOT_HEIGHT_WKT, METRE_US_FOOT_HEIGHT_WKT2,
+    US_FOOT_METRE_HEIGHT_WKT
+} from './crs.fixtures';
 
 // 0.01 m is about 9e-8 degrees of latitude: 1e-7 degree is the tolerance
 const DEGREES = 1e-7;
@@ -246,11 +249,24 @@ describe('a COPC built again in another CRS than the one the measurements were s
         expect(second.added[0].points.map(xyz)).toEqual(resaved.features[0].properties.localCoordinates);
     });
 
-    it('keeps the local coordinates when the COPC now has no CRS proj4 can use (nothing better is known)', () => {
+    it('does not draw what it cannot place: the COPC now has no CRS, or one proj4 cannot use', () => {
+        const saved = exportMeasurements(viewerWith([measure({}, [P.A.geo, P.B.geo])], [annotation(P.A.geo)]), 'cloud.laz', coordinateSystem(WGS84_WKT));
+        for (const srs of [null, 'EPSG:2056']) {
+            const { viewer, added } = stubPotree();
+            // Degrees in a metric scene would be far from the cloud, and a save would label them with its CRS
+            expect(importMeasurements(onDisk(saved), viewer, coordinateSystem(srs))).toEqual({ imported: [], unplaced: 2 });
+            expect(added).toEqual([]);
+        }
+    });
+
+    it('does not draw what was saved in a CRS proj4 cannot use when the COPC is in another one', () => {
         const { viewer, added } = stubPotree();
-        const saved = exportMeasurements(viewerWith([measure({}, [P.A.geo, P.B.geo])]), 'cloud.laz', coordinateSystem(WGS84_WKT));
-        importMeasurements(onDisk(saved), viewer, coordinateSystem(null));
-        expect(added[0].points.map(xyz)).toEqual([P.A.geo, P.B.geo]);
+        const saved = exportMeasurements(viewerWith([measure({}, [P.A.utm, P.B.utm])]), 'cloud.laz', coordinateSystem('EPSG:2056'));
+        expect(importMeasurements(onDisk(saved), viewer, coordinateSystem(UTM_33N_WKT)).unplaced).toBe(1);
+        expect(added).toEqual([]);
+        // The same text is the same CRS: drawn as it was saved
+        expect(importMeasurements(onDisk(saved), viewer, coordinateSystem('EPSG:2056')).imported).toHaveLength(1);
+        expect(added[0].points.map(xyz)).toEqual([P.A.utm, P.B.utm]);
     });
 });
 
@@ -265,6 +281,48 @@ describe('the unit of the lengths of a saved measurement', () => {
         expect(units(FOOT_WKT)).toEqual([['ft', 50], ['ft²', 600]]);
         expect(units(US_FOOT_COMPOUND_WKT)).toEqual([['ftUS', 50], ['ftUS²', 600]]);
         expect(units(null)).toEqual([['m', 50], ['m²', 600]]);
+    });
+});
+
+describe('the lengths of a cloud whose heights are in another unit than its x and y', () => {
+    const FT_US = 1200 / 3937;
+    const props = (srs, overrides, local) => exportMeasurements(viewerWith([measure(overrides, local)]), 'cloud.laz', coordinateSystem(srs)).features[0].properties;
+
+    it('metres across and US survey feet up: every axis in metres, and the unit is m', () => {
+        // 3 m east, 4 m north, 10 ft up
+        const p = props(METRE_US_FOOT_HEIGHT_WKT, {}, [[0, 0, 0], [3, 4, 10]]);
+        expect(p.unit).toBe('m');
+        expect(p.distance).toBe(parseFloat(Math.hypot(3, 4, 10 * FT_US).toFixed(2)));
+        // A height of 100 ft is 30.48 m, not 100 m
+        expect(props(METRE_US_FOOT_HEIGHT_WKT2, { showHeight: true }, [[0, 0, 0], [0, 0, 100]]).distance).toBe(30.48);
+    });
+
+    it('US survey feet across and metres up: the same', () => {
+        const p = props(US_FOOT_METRE_HEIGHT_WKT, {}, [[0, 0, 0], [100, 0, 0]]);
+        expect(p).toMatchObject({ unit: 'm', distance: 30.48 });
+        expect(props(US_FOOT_METRE_HEIGHT_WKT, { showArea: true, closed: true }, [[0, 0, 0], [100, 0, 0], [100, 100, 0]]))
+            .toMatchObject({ unit: 'm²', area: parseFloat((100 * FT_US * 100 * FT_US / 2).toFixed(2)) });
+    });
+
+    it('feet across and up stay in feet', () => {
+        expect(props(US_FOOT_COMPOUND_WKT, { showHeight: true }, [[0, 0, 0], [0, 0, 100]])).toMatchObject({ unit: 'ftUS', distance: 100 });
+    });
+});
+
+describe('the radius of a circle', () => {
+    it('is the radius of the circle through its three points, the circle Potree draws', () => {
+        const p = exportMeasurements(viewerWith([measure({ showCircle: true }, [[5, 0, 0], [0, 5, 0], [-5, 0, 0]])]), 'cloud.laz', coordinateSystem(UTM_33N_WKT))
+            .features[0].properties;
+        expect(p.radius).toBe(5);
+        expect(p.circumference).toBeCloseTo(10 * Math.PI, 9);
+        expect(p.area).toBeCloseTo(25 * Math.PI, 9);
+        expect(p.unit).toBe('m');
+    });
+
+    it('has no radius before it has three points (Potree draws no circle)', () => {
+        const p = exportMeasurements(viewerWith([measure({ showCircle: true }, [[5, 0, 0], [0, 5, 0]])]), 'cloud.laz', coordinateSystem(UTM_33N_WKT))
+            .features[0].properties;
+        expect(p.radius).toBeUndefined();
     });
 });
 

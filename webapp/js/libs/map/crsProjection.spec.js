@@ -4,10 +4,10 @@
  * (`gdaltransform -s_srs EPSG:4326 -t_srs EPSG:32633`, `cs2cs EPSG:4979 EPSG:4978`), not computed by the code.
  */
 import { describe, it, expect } from 'vitest';
-import { horizontalDefinition, crsToWgs84, wgs84ToCrs, linearUnitOf, LINEAR_UNITS } from './crsProjection';
+import { horizontalDefinition, crsToWgs84, wgs84ToCrs, linearUnitOf, cloudUnitsOf, LINEAR_UNITS } from './crsProjection';
 import {
     WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, COMPOUND_WKT, COMPOUND_WKT2, FOOT_WKT, US_FOOT_WKT, US_FOOT_WKT2,
-    US_FOOT_COMPOUND_WKT, CUSTOM_TM_WKT
+    US_FOOT_COMPOUND_WKT, CUSTOM_TM_WKT, METRE_US_FOOT_HEIGHT_WKT, METRE_US_FOOT_HEIGHT_WKT2, US_FOOT_METRE_HEIGHT_WKT
 } from './crs.fixtures';
 
 // echo "13.8401234 46.6801234 600.5" | gdaltransform -s_srs EPSG:4326 -t_srs EPSG:32633
@@ -102,5 +102,26 @@ describe('linearUnitOf', () => {
         for (const crs of [null, undefined, '', 'EPSG:2056', WGS84_WKT, GEOCENTRIC_WKT, 'not a crs']) {
             expect(linearUnitOf(crs)).toBe(LINEAR_UNITS.METRE);
         }
+    });
+});
+
+describe('cloudUnitsOf', () => {
+    it('reads the unit of the heights from the vertical CRS of a compound CRS, in WKT 1 and WKT 2', () => {
+        for (const crs of [METRE_US_FOOT_HEIGHT_WKT, METRE_US_FOOT_HEIGHT_WKT2]) {
+            const units = cloudUnitsOf(crs);
+            expect(units.horizontal).toBe(LINEAR_UNITS.METRE);
+            expect(units.vertical).toBe(LINEAR_UNITS.US_FOOT);
+            expect(units.mixed).toBe(true);
+            expect(units.metresPerAxis).toEqual([1, 1, 1200 / 3937]);
+        }
+        const reverse = cloudUnitsOf(US_FOOT_METRE_HEIGHT_WKT);
+        expect([reverse.horizontal, reverse.vertical, reverse.mixed]).toEqual([LINEAR_UNITS.US_FOOT, LINEAR_UNITS.METRE, true]);
+    });
+
+    it('is one unit for a compound CRS with the same unit up and across, and for a CRS without a vertical part', () => {
+        expect(cloudUnitsOf(COMPOUND_WKT)).toMatchObject({ mixed: false, vertical: LINEAR_UNITS.METRE });
+        expect(cloudUnitsOf(US_FOOT_COMPOUND_WKT)).toMatchObject({ mixed: false, vertical: LINEAR_UNITS.US_FOOT });
+        expect(cloudUnitsOf(FOOT_WKT)).toMatchObject({ mixed: false, horizontal: LINEAR_UNITS.FOOT, vertical: LINEAR_UNITS.FOOT });
+        expect(cloudUnitsOf(null)).toMatchObject({ mixed: false, metresPerAxis: [1, 1, 1] });
     });
 });

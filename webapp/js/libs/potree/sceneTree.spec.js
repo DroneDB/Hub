@@ -84,7 +84,7 @@ describe('the scene tree of Potree', () => {
 describe('the name of a measure', () => {
     it('is the text of the file after the trip into Potree and back', () => {
         const { viewer } = sceneTree();
-        const [measure] = importMeasurements({ features: [feature({ measurementType: 'distance', name: NAME, localCoordinates: [[1, 2, 3], [4, 5, 6]] })] }, viewer, coordinateSystem);
+        const { imported: [measure] } = importMeasurements({ features: [feature({ measurementType: 'distance', name: NAME, localCoordinates: [[1, 2, 3], [4, 5, 6]] })] }, viewer, coordinateSystem);
 
         const doc = exportMeasurements({ scene: { measurements: [measure], annotations: { traverse: () => {} } } }, 'cloud.laz', coordinateSystem);
 

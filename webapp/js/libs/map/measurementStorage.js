@@ -52,6 +52,21 @@ export class MeasurementNotLoadedError extends Error {
 }
 
 /**
+ * A save that would lose saved measurements the view cannot show: they are in another coordinate system than the point
+ * cloud now has, which they cannot be converted to (measurementFormat's savedPositions). The view leaves them out; a
+ * save would write what it shows, and the file would lose them (or label them with a CRS they are not in).
+ */
+export class MeasurementNotPlacedError extends Error {
+    /** @param {number} count  the saved measurements that are not shown */
+    constructor(count) {
+        super(`${count === 1 ? '1 saved measurement is' : `${count} saved measurements are`} in another coordinate system than `
+            + 'this point cloud and cannot be converted to it, so they are not shown. Saving is turned off so that the file keeps them.');
+        this.name = 'MeasurementNotPlacedError';
+        this.count = count;
+    }
+}
+
+/**
  * Tells the user that a save was refused, when it is (see MeasurementStorage.saveRefusal), and says whether it was.
  * After a failed read the notice offers to read the file again; the action runs only while it still applies: the
  * view still has this storage (`isCurrent`: not another target, another viewer, a page that was left) and the read
@@ -100,6 +115,20 @@ export class MeasurementStorage {
          */
         this.loadState = 'idle';
         this._loadTurn = 0;
+        /**
+         * How many of this view's saved measurements the view could not show (keepUnplaced): a save is refused while
+         * there are any, so the file keeps them.
+         */
+        this.unplaced = 0;
+    }
+
+    /**
+     * Says that the view could not show `count` of the measurements it loaded (they are in a coordinate system it
+     * cannot convert): saves are refused until a load shows them all, or the user deletes the saved measurements.
+     * @param {number} count
+     */
+    keepUnplaced(count) {
+        this.unplaced = count > 0 ? count : 0;
     }
 
     /**
@@ -109,7 +138,8 @@ export class MeasurementStorage {
      * @returns {MeasurementNotLoadedError|null}
      */
     get saveRefusal() {
-        return this.loadState === 'pending' || this.loadState === 'failed' ? new MeasurementNotLoadedError(this.loadState) : null;
+        if (this.loadState === 'pending' || this.loadState === 'failed') return new MeasurementNotLoadedError(this.loadState);
+        return this.unplaced ? new MeasurementNotPlacedError(this.unplaced) : null;
     }
 
     /**
@@ -165,6 +195,7 @@ export class MeasurementStorage {
      * @returns {Promise<{path: string, fileName: string, count: number, deleted: boolean, owner: string}>}
      *   `count` measurements of this view are in the file; `deleted` when the file was removed.
      * @throws {MeasurementNotLoadedError} when the last read of the file is in flight or failed (nothing is written)
+     * @throws {MeasurementNotPlacedError} when the view could not show some of the saved measurements (nothing is written)
      * @throws when the file cannot be read or written
      */
     async save(geojsonData) {
@@ -183,6 +214,7 @@ export class MeasurementStorage {
             if (!document.features.length) {
                 await this._deleteIfPresent();
                 this.loadState = 'loaded';
+                this.unplaced = 0;
                 return { ...result, deleted: true };
             }
 
@@ -190,6 +222,8 @@ export class MeasurementStorage {
             // The measurement file of this view: merged above, replaced here
             await this.dataset.writeObj(this.measurementPath, blob, { overwrite: true });
             this.loadState = 'loaded';
+            // What the view did not show is gone from the file (a delete; a save is refused while there is any)
+            this.unplaced = 0;
             return { ...result, deleted: false };
         } catch (error) {
             console.error('Failed to save measurements:', error);
@@ -229,6 +263,8 @@ export class MeasurementStorage {
     async load() {
         const turn = ++this._loadTurn;
         this.loadState = 'pending';
+        // The view shows what this read gives: it says again what it could not show
+        this.unplaced = 0;
         let document;
         try {
             document = await this._read({ onlyIfListed: true });

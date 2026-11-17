@@ -9,22 +9,39 @@
  *
  * A saved file is placed in the CRS the cloud's COPC has now (measurementFormat's savedPositions), which
  * can differ from the one it was saved in. Lengths, areas and radii are in the unit of length of that
- * CRS (metres, feet or US survey feet: linearUnitOf), and `unit` names it.
+ * CRS (metres, feet or US survey feet), or in metres when its heights are in another unit than its x and y
+ * (cloudUnitsOf), and `unit` names it. A circle is the one through its three points, as Potree draws it.
  */
 
 import { write, VIEW, savedPositions } from '@/libs/map/measurementFormat';
-import { projectorFor, geometryOf } from '@/libs/map/pointCloudGeometry';
-import { linearUnitOf } from '@/libs/map/crsProjection';
+import { projectorFor, geometryOf, srsDefinitionOf } from '@/libs/map/pointCloudGeometry';
+import { cloudUnitsOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
+import { pathLength, groundArea, circumradius, angleAt, SAME_UNITS } from '@/libs/map/scaledGeometry';
 import { textToHtml, htmlToText } from '@/libs/sanitize';
+
+/** @param {number} value  to 2 decimals */
+const rounded = value => parseFloat(value.toFixed(2));
+
+/**
+ * What the saved lengths of a cloud are in: the unit of its coordinates when x, y and z share one, else metres (each axis
+ * scaled to metres first: a height in US survey feet and a distance in metres are not in one unit).
+ * @param {string | null} srs
+ * @returns {{ scale: ArrayLike<number>, unit: import('@/libs/map/crsProjection').LinearUnit }}
+ */
+function measurementFrame(srs) {
+    const units = cloudUnitsOf(srs);
+    return units.mixed ? { scale: units.metresPerAxis, unit: LINEAR_UNITS.METRE } : { scale: SAME_UNITS, unit: units.horizontal };
+}
 
 /**
  * Convert a Potree measurement to a GeoJSON Feature
  * @param {Potree.Measure} measure - Potree measurement
  * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
- * @param {import('@/libs/map/crsProjection').LinearUnit} unit - the unit of length of that CRS
+ * @param {{ scale: ArrayLike<number>, unit: import('@/libs/map/crsProjection').LinearUnit }} frame - what lengths are
+ *   measured in (measurementFrame)
  * @returns {Object} GeoJSON Feature
  */
-function measureToGeoJSON(measure, projector, unit) {
+function measureToGeoJSON(measure, projector, { scale, unit }) {
     const points = measure.points.map(point => projector.toGeographic(point.position));
 
     // The kind of measurement, from what the measure shows
@@ -63,28 +80,30 @@ function measureToGeoJSON(measure, projector, unit) {
         groupId: measure.groupId || null
     };
 
-    // Add calculated values if available
+    // Add calculated values if available (2 decimals, in the unit of the frame)
+    const positions = measure.points.map(p => p.position);
     if (measure.showArea && measure.closed) {
-        properties.area = calculateArea(measure.points);
-        properties.perimeter = calculatePerimeter(measure.points);
+        properties.area = rounded(groundArea(positions, scale));
+        properties.perimeter = rounded(pathLength([...positions, positions[0]], scale));
         properties.unit = `${unit.code}²`;
     }
 
     if (measurementType === 'distance' || measurementType === 'height') {
-        properties.distance = calculateDistance(measure.points);
+        properties.distance = rounded(pathLength(positions, scale));
         properties.unit = unit.code;
     }
 
-    if (measurementType === 'circle') {
-        const radius = calculateCircleRadius(measure.points);
+    // Potree draws the circle through the three points of the measure
+    if (measurementType === 'circle' && positions.length >= 3) {
+        const radius = rounded(circumradius(positions[0], positions[1], positions[2], scale));
         properties.radius = radius;
         properties.circumference = 2 * Math.PI * radius;
         properties.area = Math.PI * radius * radius;
         properties.unit = unit.code;
     }
 
-    if (measurementType === 'angle' && measure.points.length >= 3) {
-        properties.angle = calculateAngle(measure.points);
+    if (measurementType === 'angle' && positions.length >= 3) {
+        properties.angle = rounded(angleAt(positions[0], positions[1], positions[2], scale));
         properties.unit = 'degrees';
         properties.vertices = measure.points.map(p => [p.position.x, p.position.y, p.position.z]);
     }
@@ -157,10 +176,10 @@ function geoJSONToMeasure(feature, positions) {
 export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
     const measurements = viewer.scene.measurements || [];
     const projector = projectorFor(coordinateSystem);
-    const unit = linearUnitOf(projector.definition);
+    const frame = measurementFrame(srsDefinitionOf(coordinateSystem));
 
     // Collect all features from measurements
-    const features = measurements.map(m => measureToGeoJSON(m, projector, unit));
+    const features = measurements.map(m => measureToGeoJSON(m, projector, frame));
 
     // Also export annotations
     const annotations = [];
@@ -236,6 +255,8 @@ function geoJSONToAnnotation(feature, positions) {
  * @param {Object} geojson - GeoJSON FeatureCollection
  * @param {Potree.Viewer} viewer - Potree viewer
  * @param {Object} coordinateSystem - Coordinate system
+ * @returns {{ imported: any[], unplaced: number } | undefined}  what was added to the viewer, and how many saved
+ *   features could not be placed in the cloud's CRS (left out: see savedPositions)
  */
 export function importMeasurements(geojson, viewer, coordinateSystem) {
     if (!geojson || !geojson.features) {
@@ -244,6 +265,7 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
     }
 
     const imported = [];
+    let unplaced = 0;
     // In the CRS of the COPC the viewer has now, which may not be the one the file was saved in
     const positionsOf = savedPositions(geojson, coordinateSystem);
 
@@ -251,7 +273,11 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
         try {
             const props = feature.properties;
             const positions = positionsOf(feature);
-            if (!positions || !positions.length) throw new Error('The measurement has no position');
+            // In a CRS that cannot be converted to the cloud's: not shown where it is not
+            if (!positions || !positions.length) {
+                unplaced++;
+                return;
+            }
 
             if (props.measurementType === 'annotation') {
                 // Import as annotation
@@ -270,59 +296,5 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
     });
 
     console.log(`Imported ${imported.length} measurements/annotations`);
-    return imported;
-}
-
-// ============================================================================
-// Helper Functions for Geometric Calculations
-// ============================================================================
-
-function calculateDistance(points) {
-    let total = 0;
-    for (let i = 0; i < points.length - 1; i++) {
-        const p1 = points[i].position;
-        const p2 = points[i + 1].position;
-        total += p1.distanceTo(p2);
-    }
-    return parseFloat(total.toFixed(2));
-}
-
-function calculateArea(points) {
-    // Use Shoelace formula to calculate 2D area
-    // For 3D, project onto plane
-    let area = 0;
-    const n = points.length;
-
-    for (let i = 0; i < n; i++) {
-        const p1 = points[i].position;
-        const p2 = points[(i + 1) % n].position;
-        area += p1.x * p2.y - p2.x * p1.y;
-    }
-
-    return parseFloat(Math.abs(area / 2).toFixed(2));
-}
-
-function calculatePerimeter(points) {
-    return calculateDistance(points.concat([points[0]]));
-}
-
-function calculateCircleRadius(points) {
-    if (points.length < 2) return 0;
-    const center = points[0].position;
-    const edge = points[1].position;
-    return parseFloat(center.distanceTo(edge).toFixed(2));
-}
-
-function calculateAngle(points) {
-    if (points.length < 3) return 0;
-
-    const p1 = points[0].position;
-    const vertex = points[1].position;
-    const p2 = points[2].position;
-
-    const v1 = new THREE.Vector3().subVectors(p1, vertex);
-    const v2 = new THREE.Vector3().subVectors(p2, vertex);
-
-    const angle = v1.angleTo(v2) * (180 / Math.PI);
-    return parseFloat(angle.toFixed(2));
+    return { imported, unplaced };
 }

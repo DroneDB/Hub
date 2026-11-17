@@ -22,6 +22,7 @@ import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/
 import { measureAt, annotationElement, updateNameLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { flash } from '@/composables/useMapAlerts';
+import { notify } from '@/libs/notify';
 import { textToHtml } from '@/libs/sanitize';
 import { useTimerGroup } from '@/composables/useTimers';
 
@@ -304,8 +305,13 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             const geojson = await storageFor().load();
             if (error.value === loadErrorText) error.value = '';
             if (!geojson) return;
-            const count = geojson.features.length;
-            const imported = replay(() => importMeasurements(geojson, viewer, coordinateSystem)) || [];
+            const { imported, unplaced } = replay(() => importMeasurements(geojson, viewer, coordinateSystem)) || { imported: [], unplaced: 0 };
+            const count = geojson.features.length - unplaced;
+            // Measurements in a coordinate system the cloud's cannot be converted from are not shown, and saves are
+            // refused so that the file keeps them: the user is told now, not when a save is refused
+            const current = storageFor();
+            current.keepUnplaced(unplaced);
+            if (unplaced) notify.warn(current.saveRefusal.message, { summary: 'Measurements not shown', life: 'long' });
             // Potree builds the measure geometry asynchronously
             later(() => imported.forEach(item => {
                 if (item.edges) {
@@ -315,7 +321,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
                 }
             }), 500);
             hasSavedMeasurements.value = true;
-            flash(`${count} measurement${count > 1 ? 's' : ''} loaded`);
+            if (count) flash(`${count} measurement${count > 1 ? 's' : ''} loaded`);
         } catch (e) {
             console.error('Error loading measurements:', e);
             loadErrorText = `Could not load measurements: ${e.message}`;

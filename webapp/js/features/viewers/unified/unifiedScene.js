@@ -18,7 +18,7 @@ import { deviceMemoryGb } from '@/libs/responsive';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
-import { horizontalDefinition, isGeocentricDefinition, crsToWgs84, linearUnitOf } from '@/libs/map/crsProjection';
+import { horizontalDefinition, isGeocentricDefinition, crsToWgs84, cloudUnitsOf } from '@/libs/map/crsProjection';
 
 // How often the progress row follows the tiles while the scene waits for its first frame
 const PROGRESS_POLL_MS = 250;
@@ -80,8 +80,9 @@ export class UnifiedScene {
         this.userInteracted = false;
         // Web Mercator length correction (cos of the centre latitude); 1 in metric CRSs
         this.mercatorScale = 1;
-        // Metres in a unit of the scene's coordinates: a point cloud in feet has its coordinates in feet (setUnitsFrom)
-        this.metresPerUnit = 1;
+        // Metres in a unit of x, y and z of the scene's coordinates: a point cloud in feet has its coordinates in feet, and
+        // the heights of a compound CRS can be in another unit than its x and y (setUnitsFrom)
+        this.metresPerAxis = [1, 1, 1];
         // Giro3D renders on demand: every step of a flight asks for its frame
         this.tweener = createCameraTweener({
             onFrame: () => { if (this.instance) this.instance.notifyChange(this.instance.view.camera); }
@@ -324,18 +325,21 @@ export class UnifiedScene {
         return ddb.entry.hasGeometry(entry);
     }
 
-    /** Metres in a length of the scene: the measurements are written in the user's units from it. */
+    /**
+     * Metres in a unit of x, y and z of the scene (the Web Mercator correction times the unit of the coordinates): the
+     * measurements are written in the user's units from it (measureFormatters).
+     * @returns {number[]}
+     */
     get lengthScale() {
-        return this.mercatorScale * this.metresPerUnit;
+        return this.metresPerAxis.map(m => m * this.mercatorScale);
     }
 
     /**
-     * The unit of length of the scene's coordinates, from the CRS of what it shows (a WKT or proj string;
-     * metres without one).
+     * The units of the scene's coordinates, from the CRS of what it shows (a WKT or proj string; metres without one).
      * @param {string | undefined} definition
      */
     setUnitsFrom(definition) {
-        this.metresPerUnit = linearUnitOf(definition).metresPerUnit;
+        this.metresPerAxis = cloudUnitsOf(definition).metresPerAxis;
     }
 
     /**

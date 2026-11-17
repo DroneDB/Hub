@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import { readSource } from '@/specs/cssSource';
-import { US_FOOT_WKT, FOOT_WKT, UTM_33N_WKT } from '@/libs/map/crs.fixtures';
+import { US_FOOT_WKT, FOOT_WKT, UTM_33N_WKT, METRE_US_FOOT_HEIGHT_WKT } from '@/libs/map/crs.fixtures';
+import { notify } from '@/libs/notify';
 
 class Dispatcher {
     constructor() { this.listeners = {}; }
@@ -365,5 +366,37 @@ describe('PotreeViewer lengths in the unit of the cloud', () => {
         expect(viewer.lengthUnit).toEqual({ code: 'm', unitspermeter: 1 });
         // The preference is shared: back to the default for the other specs
         await wrapper.find('#potree-unit-select').setValue('metric');
+    });
+});
+
+describe('PotreeViewer with the heights in another unit than x and y', () => {
+    it('labels the numbers of the coordinates with no unit of length, says why, and turns the unit selector off', async () => {
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        try {
+            copcWkt.value = METRE_US_FOOT_HEIGHT_WKT;
+            stubPotree();
+            await mountViewer();
+            // Not metres, which the heights are not, nor feet, which x and y are not
+            expect(viewer.lengthUnit).toEqual({ code: 'units', unitspermeter: 1 });
+            expect(viewer.lengthUnitDisplay).toEqual({ code: 'units', unitspermeter: 1 });
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain('The heights of this point cloud are in US survey feet and its other coordinates in metres');
+            expect(wrapper.find('#potree-unit-select').attributes('disabled')).toBeDefined();
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
+    it('a cloud in one unit is not told anything', async () => {
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        try {
+            copcWkt.value = UTM_33N_WKT;
+            stubPotree();
+            await mountViewer();
+            expect(warn).not.toHaveBeenCalled();
+            expect(wrapper.find('#potree-unit-select').attributes('disabled')).toBeUndefined();
+        } finally {
+            warn.mockRestore();
+        }
     });
 });

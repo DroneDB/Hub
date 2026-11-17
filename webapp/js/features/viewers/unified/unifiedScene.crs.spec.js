@@ -12,7 +12,7 @@ import { UnifiedScene } from './unifiedScene';
 import { LOADERS } from './loaders';
 import { measureFormatters } from './sceneUtils';
 import {
-    COMPOUND_WKT, COMPOUND_WKT2, CUSTOM_TM_WKT, UTM_33N_WKT, US_FOOT_COMPOUND_WKT, FOOT_WKT, GEOCENTRIC_WKT
+    COMPOUND_WKT, COMPOUND_WKT2, CUSTOM_TM_WKT, UTM_33N_WKT, US_FOOT_COMPOUND_WKT, FOOT_WKT, GEOCENTRIC_WKT, METRE_US_FOOT_HEIGHT_WKT
 } from '@/libs/map/crs.fixtures';
 
 // Giro3D's modules include the code of its web workers, which sets the worker's onmessage
@@ -111,7 +111,7 @@ describe('the lengths of a scene in feet', () => {
     it('are metres times the unit of the coordinates: 100 ft of a cloud in feet is 30.5 m, or 100 ft', () => {
         const scene = sceneWith();
         scene.setUnitsFrom(FOOT_WKT);
-        expect(scene.lengthScale).toBeCloseTo(0.3048, 12);
+        expect(scene.lengthScale).toEqual([0.3048, 0.3048, 0.3048]);
         const metric = measureFormatters(() => scene.lengthScale, () => 'm', () => 'metric');
         const imperial = measureFormatters(() => scene.lengthScale, () => 'm', () => 'imperial');
         expect(metric.length({ length: 100 })).toBe('30.5 m');
@@ -122,10 +122,29 @@ describe('the lengths of a scene in feet', () => {
     it('a cloud in US survey feet, and one in metres or with no CRS', () => {
         const scene = sceneWith();
         scene.setUnitsFrom(US_FOOT_COMPOUND_WKT);
-        expect(scene.lengthScale).toBeCloseTo(1200 / 3937, 12);
+        expect(scene.lengthScale[2]).toBeCloseTo(1200 / 3937, 12);
         scene.setUnitsFrom(UTM_33N_WKT);
-        expect(scene.lengthScale).toBe(1);
+        expect(scene.lengthScale).toEqual([1, 1, 1]);
         scene.setUnitsFrom(undefined);
-        expect(scene.lengthScale).toBe(1);
+        expect(scene.lengthScale).toEqual([1, 1, 1]);
+    });
+});
+
+describe('the lengths of a scene with its heights in another unit (metres across, US survey feet up)', () => {
+    const v = (x, y, z) => ({ x, y, z });
+    const scene = sceneWith();
+    scene.setUnitsFrom(METRE_US_FOOT_HEIGHT_WKT);
+    const metric = measureFormatters(() => scene.lengthScale, () => 'm', () => 'metric');
+
+    it('measures a height of 100 ft as 30.5 m and a level line of 100 m as 100 m, from the ends of the segment', () => {
+        // Giro3D's length is in scene units: 100 for both
+        expect(metric.length({ length: 100, start: v(0, 0, 0), end: v(0, 0, 100) })).toBe('30.5 m');
+        expect(metric.length({ length: 100, start: v(0, 0, 0), end: v(100, 0, 0) })).toBe('100.0 m');
+    });
+
+    it('measures a sloped surface with its heights in metres', () => {
+        // 10 m by 10 m, rising 10 m (32.8 ft) across: 141.42 m², not the 341 Giro3D gives in scene units
+        const points = [v(0, 0, 0), v(10, 0, 0), v(10, 10, 10 * 3937 / 1200), v(0, 10, 10 * 3937 / 1200)];
+        expect(metric.area({ area: 341.4, shape: { points } })).toBe('141.42 m²');
     });
 });
