@@ -25,6 +25,19 @@ describe('tiltUp', () => {
 });
 
 describe('frame', () => {
+    it('keeps the far plane past every splat when it frames only the core of the scene', () => {
+        const { rig, camera } = makeRig();
+        const everything = new THREE.Box3(new THREE.Vector3(-800, -800, -800), new THREE.Vector3(800, 800, 800));
+        rig.frame(unitBox, identity, FRAMING.IMMERSIVE, everything);
+        const target = new THREE.Vector3(0, 0, 0);
+        // The camera looks at the core, close
+        expect(camera.position.distanceTo(target)).toBeLessThan(5);
+        // The farthest corner of all the splats is in front of the far plane
+        expect(camera.far).toBeGreaterThan(camera.position.distanceTo(everything.max) + 1);
+        // The navigation is scaled to the core, not to the floaters
+        expect(rig.boundsDiagonal).toBeCloseTo(unitBox.getSize(new THREE.Vector3()).length(), 6);
+    });
+
     it('stands back by the distance that fits the scene sphere to the narrower side of the view', () => {
         const { rig, camera } = makeRig({ aspect: 2 });
         rig.frame(unitBox, identity);

@@ -139,12 +139,14 @@ export class CameraRig {
     /**
      * Frames a box (the splat's local bounds, turned by the mesh orientation `q`) the way
      * `framing` says (FRAMING): close and level, or whole and from above.
-     * Sets the scene size, near/far planes, camera, target and look angles.
+     * Sets the scene size, near/far planes, camera, target and look angles. `extent`, the bounds
+     * of every splat when `box` is only the core of the scene, keeps the far plane past them all.
      * @param {any} box
      * @param {any} q
      * @param {string} [framing]
+     * @param {any} [extent]
      */
-    frame(box, q, framing = FRAMING.IMMERSIVE) {
+    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box) {
         const { THREE, camera, controls } = this;
         const { margin, elevationDeg } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
         const size = box.getSize(new THREE.Vector3());
@@ -155,7 +157,8 @@ export class CameraRig {
         const dist = fitDistance(radius, camera.fov, camera.aspect, margin);
         // A small near plane lets splats render when the camera flies in among them
         camera.near = Math.max(this.boundsDiagonal / 5000, 0.001);
-        camera.far = dist + this.boundsDiagonal * 10;
+        const extentDiagonal = extent && !extent.isEmpty() ? extent.getSize(new THREE.Vector3()).length() : 0;
+        camera.far = dist + Math.max(this.boundsDiagonal * 10, extentDiagonal * 2);
         camera.updateProjectionMatrix();
         camera.position.copy(center).addScaledVector(this.framingDirection(elevationDeg), dist);
         camera.up.copy(this.sceneUp);

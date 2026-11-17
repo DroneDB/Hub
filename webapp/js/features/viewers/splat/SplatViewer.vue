@@ -116,7 +116,7 @@ import { CameraRig, framingOf, tiltUp } from './cameraRig';
 import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
-import { createFrameRetry } from './framing';
+import { createFrameRetry, coreBox, residentSplatCenters, CORE_QUANTILES } from './framing';
 import { upChoiceQuaternion, resolvedAutoUp, openingUpChoice } from './upAxis';
 import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSettings';
 import { EarthControls } from './earthControls';
@@ -277,22 +277,27 @@ function applyOrientation() {
 const fileUp = () => rig.sceneUp.clone().applyQuaternion(stage.overlay.quaternion.clone().invert()).toArray();
 
 /**
- * Frames the splat: the build-time bounds when known (the only source for a paged .rad at
- * load), else the resident bounds of a plain .spz. Returns whether a real box was framed.
+ * Frames the splat on the core of its resident splats (CORE_QUANTILES: floaters and far background
+ * splats left out), with the far plane past all of them. Until splats are resident (a paged .rad
+ * at load) it frames the build-time bounds, else the resident bounds of a plain .spz. Returns
+ * whether the core was framed: the retry goes on until then.
  */
 function frameCamera() {
-    let box = null;
-    if (bounds && bounds.min && bounds.max) box = new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max));
-    if (!box || box.isEmpty()) box = splatMesh.getBoundingBox ? splatMesh.getBoundingBox(true) : null;
-    const real = !!box && !box.isEmpty();
-    if (!real) box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
+    let extent = null;
+    if (bounds && bounds.min && bounds.max) extent = new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max));
+    if (!extent || extent.isEmpty()) extent = splatMesh.getBoundingBox ? splatMesh.getBoundingBox(true) : null;
+    if (extent && extent.isEmpty()) extent = null;
+    const framing = framingOf({ georeferenced: georeferenced.value });
+    const core = coreBox(residentSplatCenters(splatMesh), CORE_QUANTILES[framing]);
+    let box = core ? new THREE.Box3(new THREE.Vector3(...core.min), new THREE.Vector3(...core.max)) : extent;
+    if (!box) box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
     // The mesh stays at the origin and unit scale: the point size is in the splats, not the mesh
     splatMesh.position.set(0, 0, 0);
-    rig.frame(box, splatMesh.quaternion, framingOf({ georeferenced: georeferenced.value }));
-    return real;
+    rig.frame(box, splatMesh.quaternion, framing, extent ?? box);
+    return !!core;
 }
 
-// A paged .rad has no bounds until its first chunks arrive: retried for ~10 s, until the user moves
+// A paged .rad has no resident splats until its first chunks arrive: retried for ~10 s, until the user moves
 const frameRetry = createFrameRetry({ frame: () => !!splatMesh && frameCamera(), userInteracted: () => userInteracted });
 
 function renderFrame(time) {
