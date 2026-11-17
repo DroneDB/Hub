@@ -11,7 +11,6 @@
 import { Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
 import { Vector as VectorSource, Cluster } from 'ol/source';
 import { createEmpty as createEmptyExtent, extend as extendExtent } from 'ol/extent';
-import { transformExtent } from 'ol/proj';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
@@ -21,6 +20,7 @@ import { pointLonLat } from '@/libs/ddb/pointGeom';
 import bbox from '@turf/bbox';
 import ddb from 'ddb';
 import { EPSG } from '@/libs/constants';
+import { bboxExtent } from '@/libs/map/mapUtils';
 import { createFileLayerStyles } from '@/libs/map/fileLayerStyles';
 import { orderFlightPath } from '@/libs/map/flightPath';
 import { createRasterTileLayer } from '@/libs/map/rasterLayers';
@@ -31,7 +31,7 @@ import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fe
 const T = ddb.entry.type;
 
 /** A WGS84 GeoJSON geometry's bounding box in Web Mercator. */
-export const mercatorExtent = geom => transformExtent(bbox(geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
+export const mercatorExtent = geom => bboxExtent(bbox(geom));
 
 export class FileLayers {
     constructor() {

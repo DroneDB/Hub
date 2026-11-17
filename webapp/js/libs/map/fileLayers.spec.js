@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
-import { FileLayers } from './fileLayers';
+import { FileLayers, mercatorExtent } from './fileLayers';
 
 const square = { type: 'Polygon', coordinates: [[[10, 45], [10.001, 45], [10.001, 45.001], [10, 45.001], [10, 45]]] };
 const raster = (path, hash = 'h') => ({
@@ -46,5 +46,17 @@ describe('FileLayers rasters', () => {
         build(fl, [raster('a.tif'), { path: 'x', entry: null, placeholder: { path: 'gone.tif', kind: 'missing', text: 'Missing' } }, raster('b.tif')]);
         expect(fl.rasterSlots.map(s => (s.olLayer ? s.file.entry.path : s.file.placeholder.path))).toEqual(['a.tif', 'gone.tif', 'b.tif']);
         expect(rasterLayers(fl)).toHaveLength(2);
+    });
+});
+
+describe('mercatorExtent', () => {
+    it('frames a polygon that reaches the South Pole on the world, not on hundreds of world heights south', () => {
+        const world = { type: 'Polygon', coordinates: [[[-180, -90], [180, -90], [180, 83.6], [-180, 83.6], [-180, -90]]] };
+        const [minX, minY, maxX, maxY] = mercatorExtent(world);
+        const half = 20037508.342789244;
+        expect([minX, minY, maxX, maxY].every(Number.isFinite)).toBe(true);
+        expect(minY).toBeGreaterThanOrEqual(-half - 1);
+        expect(maxY).toBeLessThanOrEqual(half + 1);
+        expect(maxX - minX).toBeCloseTo(2 * half, 0);
     });
 });

@@ -18,6 +18,7 @@ import { deviceMemoryGb } from '@/libs/responsive';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
+import { bboxExtent, MERCATOR_MAX_LAT } from '@/libs/map/mapUtils';
 import { horizontalDefinition, isGeocentricDefinition, crsToWgs84, cloudUnitsOf } from '@/libs/map/crsProjection';
 
 // How often the progress row follows the tiles while the scene waits for its first frame
@@ -305,16 +306,17 @@ export class UnifiedScene {
     computeExtent(entry) {
         const geom = entry.polygon_geom || entry.point_geom;
         if (!geom) return null;
-        const { Extent, CoordinateSystem, olProj } = this.libs;
+        const { Extent, CoordinateSystem } = this.libs;
         let [minx, miny, maxx, maxy] = geojsonBbox(geom);
         if (minx === maxx) { minx -= 0.0005; maxx += 0.0005; }
         if (miny === maxy) { miny -= 0.0005; maxy += 0.0005; }
-        const min = olProj.fromLonLat([minx, miny]);
-        const max = olProj.fromLonLat([maxx, maxy]);
+        // Held to the latitudes Web Mercator covers (a layer reaching a pole)
+        const [x0, y0, x1, y1] = bboxExtent([minx, miny, maxx, maxy]);
+        const lat = l => Math.min(MERCATOR_MAX_LAT, Math.max(-MERCATOR_MAX_LAT, l));
         return {
-            extent: new Extent(CoordinateSystem.epsg3857, min[0], max[0], min[1], max[1]),
-            bbox: [min[0], min[1], max[0], max[1]],
-            centerLat: (miny + maxy) / 2
+            extent: new Extent(CoordinateSystem.epsg3857, x0, x1, y0, y1),
+            bbox: [x0, y0, x1, y1],
+            centerLat: (lat(miny) + lat(maxy)) / 2
         };
     }
 

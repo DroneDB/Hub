@@ -9,25 +9,11 @@
  */
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
-import { transformExtent } from 'ol/proj';
 import { getCenter } from 'ol/extent';
-import { EPSG } from '@/libs/constants';
-import { getVectorColor } from '@/libs/map/mapUtils';
+import { getVectorColor, bboxExtent } from '@/libs/map/mapUtils';
 import { datasetName, groupName, isUsableBbox } from '@/libs/map/datasetPlaces';
 
 /** @typedef {import('./datasetPlaces').LocationGroup} LocationGroup */
-
-/**
- * A WGS84 box in Web Mercator (the map's projection). The poles have no Web Mercator: the
- * latitude is held to the range the projection covers.
- * @param {number[]} bbox  minLon, minLat, maxLon, maxLat
- * @returns {number[]} minX, minY, maxX, maxY
- */
-export function bboxExtent(bbox) {
-    const [minLon, minLat, maxLon, maxLat] = bbox;
-    const limit = 85.05112878;
-    return transformExtent([minLon, Math.max(minLat, -limit), maxLon, Math.min(maxLat, limit)], EPSG.WGS84, EPSG.WEB_MERCATOR);
-}
 
 /**
  * Where a dataset is pinned, in Web Mercator: its `point` ([lon, lat]) when the server gave a usable one inside its

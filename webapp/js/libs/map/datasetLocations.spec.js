@@ -1,21 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { transformExtent } from 'ol/proj';
-import { buildLocations, bboxExtent, organizationColours, pinCoordinate } from './datasetLocations';
+import { buildLocations, organizationColours, pinCoordinate } from './datasetLocations';
+import { bboxExtent } from './mapUtils';
 
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const dataset = (slug, bbox, name) => ({ slug, name, bbox });
-
-describe('bboxExtent', () => {
-    it('is the box in Web Mercator', () => {
-        const [a, b, c, d] = bboxExtent([10, 40, 12, 42]);
-        const expected = transformExtent([10, 40, 12, 42], 'EPSG:4326', 'EPSG:3857');
-        expect([a, b, c, d]).toEqual(expected);
-    });
-
-    it('stays finite at the poles', () => {
-        expect(bboxExtent([-180, -90, 180, 90]).every(Number.isFinite)).toBe(true);
-    });
-});
 
 describe('pinCoordinate (FR-ORG-09)', () => {
     // A dataset with data in New York and Rome: the centre of its box is in the Atlantic

@@ -60,7 +60,7 @@ vi.mock('vue-router', () => ({ useRouter: () => router }));
 
 const { default: DatasetLocationsMap } = await import('./DatasetLocationsMap.vue');
 const { FIT_OPTIONS } = await import('@/libs/map/mapUtils');
-const { bboxExtent } = await import('@/libs/map/datasetLocations');
+const { bboxExtent } = await import('@/libs/map/mapUtils');
 
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const ds = (slug, bbox, name) => ({ slug, name, bbox });

@@ -1,13 +1,31 @@
 /**
  * Shared utility functions of the maps of the Hub (the map viewer, the dataset Map tab, the measurement tools)
  */
+import { transformExtent } from 'ol/proj';
 import { PRIMARY, ANALYSIS_YELLOW } from '@/libs/palette';
+import { EPSG } from '@/libs/constants';
 
 /**
  * How a map fits its view to an extent (View.fit options): room around it, a short animation, and
  * no closer than half a metre per pixel.
  */
 export const FIT_OPTIONS = Object.freeze({ padding: [40, 40, 40, 40], duration: 500, minResolution: 0.5, maxZoom: 22 });
+
+/** The latitude (degrees) where Web Mercator ends: its square world is ±85.05° high. */
+export const MERCATOR_MAX_LAT = 85.05112878;
+
+/**
+ * A WGS84 box in Web Mercator (the map's projection). The poles have no Web Mercator: the
+ * latitude is held to the range the projection covers (a layer that reaches a pole, such as the
+ * countries of the world down to Antarctica, would else reach hundreds of world heights south and
+ * a fit to it would show the Southern Ocean).
+ * @param {number[]} bbox  minLon, minLat, maxLon, maxLat
+ * @returns {number[]} minX, minY, maxX, maxY
+ */
+export function bboxExtent(bbox) {
+    const [minLon, minLat, maxLon, maxLat] = bbox;
+    return transformExtent([minLon, Math.max(minLat, -MERCATOR_MAX_LAT), maxLon, Math.min(maxLat, MERCATOR_MAX_LAT)], EPSG.WGS84, EPSG.WEB_MERCATOR);
+}
 
 /** The share of the map size an overview map leaves free around the pins it fits (FR-ORG-09) */
 export const OVERVIEW_FIT_MARGIN = 0.1;
