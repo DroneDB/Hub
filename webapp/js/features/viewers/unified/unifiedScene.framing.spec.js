@@ -375,7 +375,8 @@ describe('the 3D Tiles loader (FR-VWR-20)', () => {
             view: { loadingText: '' },
             libs: { CoordinateSystem: { epsg3857: {} }, Tiles3D: class { constructor() { return tileset; } } },
             instance: { add: vi.fn() },
-            setupGlobe: vi.fn(), setupInstance: vi.fn(), configureTilesetStreaming: vi.fn(), registerLayer: vi.fn(),
+            setupGlobe: vi.fn(), setupInstance: vi.fn(), configureTilesetStreaming: vi.fn(), shadeUntexturedTiles: vi.fn(),
+            localizeTileset: vi.fn((_, box) => box), registerLayer: vi.fn(),
             frameGlobe: vi.fn(), frameBox: vi.fn(), groundGlobeTileset: vi.fn(box => box), uprightTileset: vi.fn(),
             waitForFirstRender: vi.fn(async () => true), afterFirstRender: vi.fn(), userInteracted: false
         };
@@ -429,6 +430,61 @@ describe('the 3D Tiles loader (FR-VWR-20)', () => {
         const [, timeout, progress] = scene.waitForFirstRender.mock.calls[0];
         expect(timeout).toBe(20000);
         expect(progress()).toBe(0.4);
+    });
+});
+
+describe('a model tileset in the flat scene of a model', () => {
+    // Local east-north-up to Earth-centred coordinates near 41 deg N (a georeferenced ODM mesh)
+    const ENU_TO_ECEF = [
+        0.9895365974240738, 0.144282092992812, 0, 0,
+        -0.09508711820781401, 0.6521404109026098, 0.7521112447096563, 0,
+        0.10851618455013821, -0.7442416019743783, 0.6590361716789842, 0,
+        693139.4980681655, -4753790.898311776, 4181366.8952291664, 1
+    ];
+
+    it('is brought back from the Earth to its local frame, with its box', () => {
+        const { scene } = makeScene({ strategy: 'free' });
+        const tileset = { object3d: new THREE.Group(), tiles: { root: { transform: ENU_TO_ECEF } } };
+        const local = new THREE.Box3(new THREE.Vector3(-7, -5, -1), new THREE.Vector3(7, 5, 2));
+        const placed = local.clone().applyMatrix4(new THREE.Matrix4().fromArray(ENU_TO_ECEF));
+
+        const box = scene.localizeTileset(tileset, placed);
+
+        expect(box.getCenter(new THREE.Vector3()).length()).toBeLessThan(10);
+        expect(box.containsBox(local)).toBe(true);
+    });
+
+    it('keeps the box of a tileset in local coordinates', () => {
+        const { scene } = makeScene({ strategy: 'free' });
+        const box = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 1, 1));
+        expect(scene.localizeTileset({ object3d: new THREE.Group(), tiles: { root: {} } }, box)).toBe(box);
+    });
+
+    it('is framed on the geometry drawn once it rendered, not on the looser box the tileset declares', () => {
+        const { scene } = makeScene({ strategy: 'free' });
+        const object3d = new THREE.Group();
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial());
+        mesh.position.set(10, 0, 0);
+        object3d.add(mesh);
+        object3d.updateMatrixWorld(true);
+        const frameBox = vi.spyOn(scene, 'frameBox');
+        const declared = new THREE.Box3(new THREE.Vector3(-50, -50, -50), new THREE.Vector3(50, 50, 50));
+
+        const framed = scene.uprightTileset({ object3d }, declared);
+
+        expect(frameBox).toHaveBeenCalledTimes(1);
+        expect(framed.getCenter(new THREE.Vector3()).distanceTo(new THREE.Vector3(10, 0, 0))).toBeLessThan(1e-6);
+        expect(framed.getSize(new THREE.Vector3()).x).toBeCloseTo(2, 6);
+    });
+
+    it('is not re-framed when the user moved', () => {
+        const { scene } = makeScene({ strategy: 'free' });
+        const object3d = new THREE.Group();
+        object3d.add(new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshBasicMaterial()));
+        scene.userInteracted = true;
+        const frameBox = vi.spyOn(scene, 'frameBox');
+        scene.uprightTileset({ object3d }, new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)));
+        expect(frameBox).not.toHaveBeenCalled();
     });
 });
 

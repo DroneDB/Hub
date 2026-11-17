@@ -13,7 +13,8 @@ import {
     applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV
 } from './navControls';
 import { navigateByKey } from './navKeys';
-import { alignContentUpAxis } from './contentOrientation';
+import { alignContentUpAxis, localizeGeocentricContent } from './contentOrientation';
+import { applyClayShading, createClayMatcap } from './tileShading';
 import { deviceMemoryGb } from '@/libs/responsive';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
@@ -94,6 +95,8 @@ export class UnifiedScene {
         this.firstRenderCancels = new Set();
         // Point clouds with the size of their points in CSS px (Giro3D draws in the pixels of the buffer: setPointSize)
         this.pointSizes = new Map();
+        // The matcap of the clay shading of untextured tiles, made at the first such tile
+        this.clayMatcap = null;
         this.stopPixelRatio = null;
     }
 
@@ -414,6 +417,21 @@ export class UnifiedScene {
     }
 
     /**
+     * Tiles without a texture or vertex colours get the clay shading of tileShading as each one
+     * loads: under the lights of textured models their faces all come out the same grey.
+     */
+    shadeUntexturedTiles(tileset) {
+        const tiles = tileset.tiles;
+        if (!tiles || typeof tiles.addEventListener !== 'function') return;
+        // lifetime: owner (the renderer goes with the tileset, and the tileset with the instance)
+        tiles.addEventListener('load-model', event => {
+            if (!event || !event.scene || !this.instance) return;
+            if (!this.clayMatcap) this.clayMatcap = createClayMatcap(this.libs);
+            if (applyClayShading(this.libs, event.scene, this.clayMatcap)) this.instance.notifyChange(tileset);
+        });
+    }
+
+    /**
      * Rests a georeferenced tileset on the ellipsoid (the globe has no elevation) once its
      * first tiles rendered: shifted by the 2nd-percentile vertex altitude (photogrammetry
      * meshes often close their bottom with a cap metres below the real ground), then clipped
@@ -453,15 +471,32 @@ export class UnifiedScene {
         return box.clone().translate(offset);
     }
 
-    /** Stands a flat-scene tileset up when its content is not Z-up (measured once it rendered). */
+    /**
+     * Brings a model tileset placed on the Earth (a root transform to ECEF, as a georeferenced ODM
+     * mesh has) back to its local east-north-up frame, the frame of the flat scene of a model.
+     * Returns its box in that frame (the box itself for a tileset in local coordinates).
+     */
+    localizeTileset(tileset, box) {
+        const root = tileset.tiles && tileset.tiles.root;
+        const placement = localizeGeocentricContent(this.libs, tileset.object3d, root && root.transform);
+        return placement ? box.clone().applyMatrix4(placement) : box;
+    }
+
+    /**
+     * Once a flat-scene tileset rendered: stands it up when its content is not Z-up, and frames
+     * it on the box of the geometry drawn (the bounding volume a tileset declares can be far
+     * looser, the one Obj2Tiles writes is in the axes of its glTF content), unless the user moved.
+     * Returns the box framed (`box` when nothing was drawn).
+     */
     uprightTileset(tileset, box) {
+        const { THREE } = this.libs;
         const camera = this.instance.view.camera;
         const rotation = alignContentUpAxis(this.libs, tileset.object3d, this.sceneUp);
-        if (!rotation) return box;
-        const upright = box.clone().applyMatrix4(rotation);
-        if (!this.userInteracted && isFiniteBox(upright)) this.frameBox(upright);
+        const drawn = new THREE.Box3().setFromObject(tileset.object3d);
+        const framed = !drawn.isEmpty() && isFiniteBox(drawn) ? drawn : (rotation ? box.clone().applyMatrix4(rotation) : box);
+        if (!this.userInteracted && isFiniteBox(framed)) this.frameBox(framed);
         this.instance.notifyChange(camera);
-        return upright;
+        return framed;
     }
 
     /**
@@ -707,6 +742,8 @@ export class UnifiedScene {
         if (this.instance) {
             try { this.instance.dispose(); } catch { /* already gone */ }
         }
+        if (this.clayMatcap) this.clayMatcap.dispose();
+        this.clayMatcap = null;
         this.dblClickDispose = this.keyDispose = this.controls = this.instance = this.map = this.globe = this.homePose = null;
         this.lights = {};
         this.layerSetters = {};

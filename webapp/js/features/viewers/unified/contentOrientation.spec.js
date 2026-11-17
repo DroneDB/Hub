@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { measureSurfaceNormal, alignContentUpAxis, ORIENT } from './contentOrientation';
+import { measureSurfaceNormal, alignContentUpAxis, geocentricPlacementInverse, localizeGeocentricContent, ORIENT } from './contentOrientation';
 
 const libs = { THREE };
 const UP = new THREE.Vector3(0, 0, 1);
@@ -156,5 +156,113 @@ describe('alignContentUpAxis', () => {
         expect(rotation).not.toBeNull();
         const worldNormal = UP.clone().applyQuaternion(root.quaternion);
         expect(worldNormal.distanceTo(globeUp)).toBeLessThan(1e-6);
+    });
+});
+
+/**
+ * A closed 2 m box with one extra panel facing `normal` (a refrigerator: a closed cabinet whose glass door is a
+ * second layer on its front): most of its normals cancel, the panel's do not.
+ */
+function boxWithPanel(normal, side = 1.4) {
+    const root = new THREE.Group();
+    root.add(closedBox());
+    const panel = sheet(normal, 1);
+    panel.scale.setScalar(side);
+    panel.position.copy(normal).multiplyScalar(1.01);
+    root.add(panel);
+    root.updateMatrixWorld(true);
+    return root;
+}
+
+describe('a closed object with one large panel', () => {
+    it('measures well below the coherence of an aerial mesh', () => {
+        const measured = measureSurfaceNormal(libs, boxWithPanel(new THREE.Vector3(0, -1, 0)));
+        // 1.96 m2 of panel over 24 m2 of box: about 0.075, as the refrigerator of the visual check
+        expect(measured.coherence).toBeGreaterThan(0.05);
+        expect(measured.coherence).toBeLessThan(ORIENT.minCoherence);
+    });
+
+    it('is not laid on its back: the panel is not taken for the ground', () => {
+        const root = boxWithPanel(new THREE.Vector3(0, -1, 0));
+        expect(alignContentUpAxis(libs, root, UP)).toBeNull();
+        expect(root.quaternion.angleTo(new THREE.Quaternion())).toBe(0);
+    });
+});
+
+// The root transform Obj2Tiles writes for the georeferenced ODM mesh of the visual check (EPSG:32617, near 41 deg N):
+// local east-north-up to Earth-centred coordinates, column-major
+const ENU_TO_ECEF = [
+    0.9895365974240738, 0.144282092992812, 0, 0,
+    -0.09508711820781401, 0.6521404109026098, 0.7521112447096563, 0,
+    0.10851618455013821, -0.7442416019743783, 0.6590361716789842, 0,
+    693139.4980681655, -4753790.898311776, 4181366.8952291664, 1
+];
+
+/** Terrain (a Z-up sheet in its local frame) placed on the Earth by the root transform, as the tile renderer does. */
+function placedTerrain() {
+    const root = new THREE.Group();
+    const group = new THREE.Group();
+    group.matrixAutoUpdate = false;
+    group.matrix.fromArray(ENU_TO_ECEF);
+    group.add(sheet(UP));
+    root.add(group);
+    root.updateMatrixWorld(true);
+    return root;
+}
+
+describe('geocentricPlacementInverse', () => {
+    it('undoes a root transform that places the content on the Earth', () => {
+        const inverse = geocentricPlacementInverse(libs, ENU_TO_ECEF);
+        const local = new THREE.Vector3(3, 4, 5);
+        const back = local.clone().applyMatrix4(new THREE.Matrix4().fromArray(ENU_TO_ECEF)).applyMatrix4(inverse);
+        expect(back.distanceTo(local)).toBeLessThan(1e-6);
+    });
+
+    it.each([
+        ['no transform', undefined],
+        ['the identity of a model in local coordinates', [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]],
+        ['a local offset of a few km', [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2500, -800, 30, 1]],
+        ['UTM coordinates (half a million metres east, millions north)', [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 500000, 4500000, 0, 1]],
+        ['a matrix that is not 16 numbers', [1, 2, 3]],
+        ['a matrix with NaN', [...ENU_TO_ECEF.slice(0, 12), NaN, 0, 0, 1]]
+    ])('leaves %s alone', (_, transform) => {
+        expect(geocentricPlacementInverse(libs, transform)).toBeNull();
+    });
+});
+
+describe('localizeGeocentricContent', () => {
+    it('brings georeferenced terrain back to its own frame, Z-up, where it is not tilted by its latitude', () => {
+        const root = placedTerrain();
+        // On the Earth the terrain faces the ellipsoid normal, about 49 deg off the scene up: too far from any axis
+        // for the up detection, so it showed edge-on
+        expect(measureSurfaceNormal(libs, root).normal.dot(UP)).toBeLessThan(0.8);
+
+        const applied = localizeGeocentricContent(libs, root, ENU_TO_ECEF);
+
+        expect(applied).not.toBeNull();
+        const world = new THREE.Vector3(0, 0, 1).transformDirection(root.children[0].children[0].matrixWorld);
+        expect(world.distanceTo(UP)).toBeLessThan(1e-6);
+        // Its corner (0, 0) is at the origin of the scene again, not millions of metres away
+        const corner = new THREE.Vector3().applyMatrix4(root.children[0].children[0].matrixWorld);
+        expect(corner.length()).toBeLessThan(1e-3);
+        // Upright already: the up detection has nothing left to turn
+        expect(alignContentUpAxis(libs, root, UP)).toBeNull();
+    });
+
+    it('does nothing to a tileset in local coordinates', () => {
+        const root = tileset(sheet(UP));
+        expect(localizeGeocentricContent(libs, root, undefined)).toBeNull();
+        expect(root.matrix.equals(new THREE.Matrix4())).toBe(true);
+    });
+
+    it('lets the up detection turn a localized model about the scene origin, its position with it', () => {
+        const root = tileset(sheet(new THREE.Vector3(0, -1, 0)));
+        root.position.set(0, 0, -10);
+        root.updateMatrixWorld(true);
+
+        const rotation = alignContentUpAxis(libs, root, UP);
+
+        expect(rotation).not.toBeNull();
+        expect(root.position.distanceTo(new THREE.Vector3(0, 0, -10).applyMatrix4(rotation))).toBeLessThan(1e-6);
     });
 });

@@ -35,6 +35,7 @@ async function addTileset(scene, url, errorTarget) {
     const tileset = new scene.libs.Tiles3D({ url, errorTarget, ktx2DecoderPath: '/wasm/basis/' });
     // The renderer's default, set because its docs say otherwise and this viewer once disabled it
     tileset.tiles.loadAncestors = true;
+    scene.shadeUntexturedTiles(tileset);
     await scene.instance.add(tileset);
     scene.configureTilesetStreaming(tileset);
     return tileset;
@@ -136,8 +137,10 @@ async function loadModel(scene, entry, dataset) {
     scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'free' });
     const tileset = await addTileset(scene, url, MODEL_TILES_ERROR_TARGET);
     // Obj2Tiles can emit an empty tileset (infinite volume): it "loads" and shows nothing
-    const box = tileset.getBoundingBox();
-    if (!box || !isFiniteBox(box)) throw new Error(`The 3D model '${name(entry)}' is not available in the 3D viewer.\n\nIts 3D Tiles output is empty or invalid and needs to be rebuilt.`);
+    const placed = tileset.getBoundingBox();
+    if (!placed || !isFiniteBox(placed)) throw new Error(`The 3D model '${name(entry)}' is not available in the 3D viewer.\n\nIts 3D Tiles output is empty or invalid and needs to be rebuilt.`);
+    // A georeferenced model is shown in its own local frame, not tilted as on the Earth
+    const box = scene.localizeTileset(tileset, placed);
     scene.registerLayer(name(entry), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
     scene.frameBox(box);
     await scene.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000, () => tileset.progress);

@@ -1,0 +1,133 @@
+/**
+ * tileShading: a model tile without texture or vertex colours gets the clay material, whose shading does not depend on
+ * the lights of the scene nor on the screen-space derivatives of the GPU, with the normals it needs computed on load:
+ * averaged for a smooth surface, one per face for a faceted part. three.js is the real thing.
+ */
+import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
+import { clayMatcapPixels, needsClayShading, hardCornerShare, withShadingNormals, applyClayShading, createClayMatcap } from './tileShading';
+
+const libs = { THREE };
+
+/** A welded geometry as the tiles carry it: indexed, positions only (no normals). */
+function welded(geometry) {
+    for (const name of Object.keys(geometry.attributes)) if (name !== 'position') geometry.deleteAttribute(name);
+    return geometry;
+}
+
+/** A unit cube of 8 shared corners (as a welded STL or an OBJ cube without normals). */
+function weldedCube() {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+        -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1,
+        -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1
+    ], 3));
+    geometry.setIndex([
+        0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
+        2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 3, 0, 4, 3, 4, 7
+    ]);
+    return geometry;
+}
+
+const value = (pixels, size, column, row) => pixels[(row * size + column) * 4];
+
+describe('clayMatcapPixels', () => {
+    it('is a grey sphere lit from above-left: brighter there than below-right, never black', () => {
+        const size = 32;
+        const pixels = clayMatcapPixels(size);
+        expect(pixels).toHaveLength(size * size * 4);
+        // Row 0 is the bottom of the texture
+        const upperLeft = value(pixels, size, 8, 24);
+        const lowerRight = value(pixels, size, 24, 8);
+        expect(upperLeft).toBeGreaterThan(lowerRight + 60);
+        expect(Math.min(...pixels.filter((_, i) => i % 4 === 0))).toBeGreaterThan(40);
+        // Grey: the three channels agree, opaque
+        expect(pixels[0]).toBe(pixels[1]);
+        expect(pixels[1]).toBe(pixels[2]);
+        expect(pixels[3]).toBe(255);
+    });
+});
+
+describe('needsClayShading', () => {
+    const mesh = (geometry, material) => new THREE.Mesh(geometry, material);
+    const plain = () => welded(new THREE.SphereGeometry(1, 8, 6));
+
+    it('is true for a mesh without texture or vertex colours', () => {
+        expect(needsClayShading(mesh(plain(), new THREE.MeshStandardMaterial()))).toBe(true);
+    });
+
+    it('is false for a textured mesh: photogrammetry keeps its texture and the lights of the scene', () => {
+        expect(needsClayShading(mesh(plain(), new THREE.MeshStandardMaterial({ map: new THREE.Texture() })))).toBe(false);
+    });
+
+    it('is false for a mesh with vertex colours', () => {
+        const geometry = plain();
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count * 3), 3));
+        expect(needsClayShading(mesh(geometry, new THREE.MeshStandardMaterial()))).toBe(false);
+    });
+
+    it('is false for points, lines and a mesh already in clay', () => {
+        expect(needsClayShading(new THREE.Points(plain(), new THREE.PointsMaterial()))).toBe(false);
+        expect(needsClayShading(new THREE.LineSegments(plain(), new THREE.LineBasicMaterial()))).toBe(false);
+        expect(needsClayShading(mesh(plain(), new THREE.MeshMatcapMaterial()))).toBe(false);
+    });
+});
+
+describe('withShadingNormals', () => {
+    it('gives a smooth surface averaged normals and keeps it indexed', () => {
+        const sphere = welded(new THREE.SphereGeometry(1, 32, 16));
+        const shaded = withShadingNormals(sphere);
+        expect(shaded).toBe(sphere);
+        expect(shaded.index).not.toBeNull();
+        expect(shaded.attributes.normal.count).toBe(shaded.attributes.position.count);
+        expect(hardCornerShare(shaded.attributes.position.array, shaded.attributes.normal.array, shaded.index.array)).toBeLessThan(0.05);
+    });
+
+    it('gives a welded cube one normal per face, so its edges stay sharp', () => {
+        const cube = weldedCube();
+        cube.computeVertexNormals();
+        // Most corners of a welded cube turn far from their faces (the averaged normal points along a diagonal)
+        expect(hardCornerShare(cube.attributes.position.array, cube.attributes.normal.array, cube.index.array)).toBeGreaterThan(0.5);
+        cube.deleteAttribute('normal');
+
+        const shaded = withShadingNormals(cube);
+
+        expect(shaded).not.toBe(cube);
+        expect(shaded.index).toBeNull();
+        const normals = shaded.attributes.normal;
+        // The three corners of each triangle share the normal of its face, an axis
+        for (let i = 0; i < normals.count; i++) {
+            const n = new THREE.Vector3().fromBufferAttribute(normals, i);
+            expect(Math.max(Math.abs(n.x), Math.abs(n.y), Math.abs(n.z))).toBeCloseTo(1, 6);
+        }
+    });
+
+    it('keeps the normals a tile has', () => {
+        const sphere = new THREE.SphereGeometry(1, 8, 6);
+        const normals = sphere.attributes.normal;
+        expect(withShadingNormals(sphere).attributes.normal).toBe(normals);
+    });
+});
+
+describe('applyClayShading', () => {
+    it('gives the untextured meshes of a tile the clay matcap with their colour and normals, and leaves the textured ones', () => {
+        const root = new THREE.Group();
+        const plain = new THREE.Mesh(welded(new THREE.SphereGeometry(1, 16, 8)), new THREE.MeshStandardMaterial({ color: 0x336699, side: THREE.DoubleSide }));
+        const textured = new THREE.Mesh(welded(new THREE.SphereGeometry(1, 16, 8)), new THREE.MeshStandardMaterial({ map: new THREE.Texture() }));
+        root.add(plain, textured);
+        const matcap = createClayMatcap(libs);
+
+        expect(applyClayShading(libs, root, matcap)).toBe(1);
+
+        expect(plain.material.isMeshMatcapMaterial).toBe(true);
+        expect(plain.material.matcap).toBe(matcap);
+        expect(plain.material.color.getHex()).toBe(0x336699);
+        expect(plain.material.side).toBe(THREE.DoubleSide);
+        // CPU normals, not the derivatives of flat shading
+        expect(plain.material.flatShading).toBe(false);
+        expect(plain.geometry.attributes.normal).toBeDefined();
+        expect(textured.material.isMeshStandardMaterial).toBe(true);
+        // A second pass (the tile shown again) changes nothing
+        expect(applyClayShading(libs, root, matcap)).toBe(0);
+    });
+});
