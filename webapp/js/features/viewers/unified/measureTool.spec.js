@@ -6,7 +6,7 @@ const p = (x, y = 0, z = 0) => ({ x, y, z });
 describe('3D viewer measure tool', () => {
     it('writes the labels of its shapes again when asked (a change of units)', () => {
         const instance = { notifyChange: vi.fn() };
-        const tool = new MeasureTool({ instance, mercatorScale: 1 }, () => {});
+        const tool = new MeasureTool({ instance, lengthScale: 1 }, () => {});
         const shapes = [{ rebuildLabels: vi.fn() }, { rebuildLabels: vi.fn() }];
         tool.shapes.push(...shapes);
         tool.relabel();
@@ -15,7 +15,7 @@ describe('3D viewer measure tool', () => {
     });
 
     it('does nothing without a scene', () => {
-        const tool = new MeasureTool({ instance: null, mercatorScale: 1 }, () => {});
+        const tool = new MeasureTool({ instance: null, lengthScale: 1 }, () => {});
         expect(() => tool.relabel()).not.toThrow();
     });
 });
@@ -98,7 +98,7 @@ beforeEach(() => {
     counts = [];
     instance = { domElement, notifyChange: vi.fn(), remove: vi.fn() };
     scene = {
-        instance, mercatorScale: 1, view: { activeTool: null }, setNavigationEnabled: vi.fn(),
+        instance, lengthScale: 1, view: { activeTool: null }, setNavigationEnabled: vi.fn(),
         libs: { DrawTool: FakeDrawTool }
     };
     tool = new MeasureTool(scene, n => counts.push(n));

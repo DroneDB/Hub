@@ -1222,7 +1222,8 @@ describe('the navigation strategy each loader picks for the scene it builds', ()
     // for is recorded when the controls are attached, and the load stops there (before any data)
     function stubScene(metadataCrs) {
         const CoordinateSystem = {
-            epsg3857: { id: 'EPSG:3857' }, epsg4978: { id: 'EPSG:4978' }, unknown: { id: 'unknown' }, register: vi.fn()
+            epsg3857: { id: 'EPSG:3857' }, epsg4978: { id: 'EPSG:4978' }, unknown: { id: 'unknown' },
+            fromWkt: () => ({ srid: 'EPSG:32633' }), register: vi.fn((id, definition) => ({ id, definition }))
         };
         const crs = metadataCrs ? metadataCrs(CoordinateSystem) : { id: 'EPSG:32633', definition: '+proj=utm +zone=33 +datum=WGS84' };
         class Instance {

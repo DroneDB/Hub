@@ -18,6 +18,7 @@ import { deviceMemoryGb } from '@/libs/responsive';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
+import { horizontalDefinition, isGeocentricDefinition, crsToWgs84, linearUnitOf } from '@/libs/map/crsProjection';
 
 // How often the progress row follows the tiles while the scene waits for its first frame
 const PROGRESS_POLL_MS = 250;
@@ -32,6 +33,17 @@ const THREE_QUARTER_VIEW = [1.2, -1.2, 0.9];
 function northOf(THREE, up) {
     const north = new THREE.Vector3(0, 0, 1).addScaledVector(up, -up.z);
     return north.lengthSq() > 1e-12 ? north.normalize() : new THREE.Vector3(0, 1, 0);
+}
+
+/**
+ * The code a CRS without an authority code is registered under: the same definition gets the same code.
+ * @param {string} definition
+ */
+function customCrsCode(definition) {
+    // FNV-1a over the text
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < definition.length; i++) hash = Math.imul(hash ^ definition.charCodeAt(i), 0x01000193) >>> 0;
+    return `DDB:CUSTOM-${hash.toString(16).padStart(8, '0')}`;
 }
 
 export class UnifiedScene {
@@ -68,6 +80,8 @@ export class UnifiedScene {
         this.userInteracted = false;
         // Web Mercator length correction (cos of the centre latitude); 1 in metric CRSs
         this.mercatorScale = 1;
+        // Metres in a unit of the scene's coordinates: a point cloud in feet has its coordinates in feet (setUnitsFrom)
+        this.metresPerUnit = 1;
         // Giro3D renders on demand: every step of a flight asks for its frame
         this.tweener = createCameraTweener({
             onFrame: () => { if (this.instance) this.instance.notifyChange(this.instance.view.camera); }
@@ -310,22 +324,45 @@ export class UnifiedScene {
         return ddb.entry.hasGeometry(entry);
     }
 
+    /** Metres in a length of the scene: the measurements are written in the user's units from it. */
+    get lengthScale() {
+        return this.mercatorScale * this.metresPerUnit;
+    }
+
     /**
-     * Registers a point cloud's CRS (from the COPC WKT) with proj4 / OpenLayers so the basemap
-     * can be reprojected into it. False when unusable: the caller then skips the basemap
-     * (reprojection errors would flood the render loop and freeze the controls).
+     * The unit of length of the scene's coordinates, from the CRS of what it shows (a WKT or proj string;
+     * metres without one).
+     * @param {string | undefined} definition
+     */
+    setUnitsFrom(definition) {
+        this.metresPerUnit = linearUnitOf(definition).metresPerUnit;
+    }
+
+    /**
+     * Registers a point cloud's CRS (from the COPC WKT) with proj4 / OpenLayers so the basemap can be
+     * reprojected into it, and gives the CRS to set the scene up in; null when proj4 cannot use it, or
+     * for a geocentric CRS, which has no flat ground: the caller then skips the basemap (reprojection errors
+     * would flood the render loop and freeze the controls).
+     *
+     * What is registered is the horizontal CRS (crsProjection's horizontalDefinition), the part the basemap
+     * needs: proj4 reads no compound CRS (a projected CRS with a vertical datum, as many LiDAR files have).
+     * It is registered under its authority code, or, without one (a custom transverse Mercator,
+     * PROJCS["unknown"]), under a code made from its definition: Giro3D names such a CRS after its name, and
+     * "unknown" is its CRS of no CRS, which has no definition. A definition proj4 cannot use is never given
+     * to it: proj4 would keep it, and OpenLayers would then fail to register every CRS after it.
      */
     registerCrs(crs) {
+        const CS = this.libs.CoordinateSystem;
+        if (!crs || crs === CS.epsg3857) return CS.epsg3857;
+        if (crs === CS.unknown || typeof crs.definition !== 'string') return null;
+        const definition = horizontalDefinition(crs.definition);
+        if (!definition || isGeocentricDefinition(definition) || !crsToWgs84(definition)) return null;
         try {
-            const CS = this.libs.CoordinateSystem;
-            if (!crs || crs === CS.epsg3857) return true;
-            if (crs === CS.unknown) return false;
-            const id = crs.id || (crs.srid && crs.srid.toString ? crs.srid.toString() : null);
-            if (!id || !crs.definition) return false;
-            CS.register(id, crs.definition, { throwIfFailedToRegisterWithProj: true });
-            return true;
+            const horizontal = CS.fromWkt(definition);
+            const id = horizontal.srid ? horizontal.srid.toString() : customCrsCode(definition);
+            return CS.register(id, definition, { throwIfFailedToRegisterWithProj: true });
         } catch {
-            return false;
+            return null;
         }
     }
 

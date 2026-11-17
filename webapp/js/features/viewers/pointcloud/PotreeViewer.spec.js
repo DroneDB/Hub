@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import { readSource } from '@/specs/cssSource';
+import { US_FOOT_WKT, FOOT_WKT, UTM_33N_WKT } from '@/libs/map/crs.fixtures';
 
 class Dispatcher {
     constructor() { this.listeners = {}; }
@@ -45,6 +46,8 @@ vi.mock('@/composables/usePotreeMeasurements', () => ({
 const lazy = vi.hoisted(() => ({ gate: null }));
 vi.mock('@/libs/lazy', () => ({ loadResources: () => lazy.gate ?? Promise.resolve() }));
 const calls = vi.hoisted(() => []);
+// The WKT of the COPC header
+const copcWkt = vi.hoisted(() => ({ value: 'PROJCS["x"]' }));
 vi.mock('@/libs/potree/potreeResources', () => ({ POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {} }));
 vi.mock('@/libs/potree/potreeSession', () => ({
     pointBudgetFor: () => 1000000,
@@ -68,7 +71,7 @@ function stubPotree() {
     const attributes = { rgba: range(0, 255), intensity: range(0, 65535) };
     // The header copc.js read the cloud with, kept by its geometry
     const copc = {
-        header: { scale: [0.01, 0.01, 0.001, 9], offset: [100, 200, 0, 9] }, info: { cube: [0, 1, 2, 10, 11, 12] }, wkt: 'PROJCS["x"]'
+        header: { scale: [0.01, 0.01, 0.001, 9], offset: [100, 200, 0, 9] }, info: { cube: [0, 1, 2, 10, 11, 12] }, wkt: copcWkt.value
     };
     const cloud = { material, getAttribute: name => attributes[name] ?? null, pcoGeometry: { copc } };
     const scene = Object.assign(new Dispatcher(), {
@@ -113,7 +116,7 @@ const mountViewer = async () => {
 };
 const button = id => wrapper.find(`[data-testid="${id}"]`);
 
-beforeEach(() => { calls.length = 0; lazy.gate = null; stubPotree(); });
+beforeEach(() => { calls.length = 0; lazy.gate = null; copcWkt.value = 'PROJCS["x"]'; stubPotree(); });
 afterEach(() => {
     wrapper?.unmount();
     delete globalThis.Potree;
@@ -328,3 +331,39 @@ describe('PotreeViewer that is left while it loads', () => {
     });
 });
 
+describe('PotreeViewer lengths in the unit of the cloud', () => {
+    it('a cloud in US survey feet measures in feet, shown in the unit the user chose (metres by default)', async () => {
+        copcWkt.value = US_FOOT_WKT;
+        stubPotree();
+        await mountViewer();
+        expect(viewer.lengthUnit.code).toBe('ft');
+        expect(viewer.lengthUnit.unitspermeter).toBeCloseTo(3937 / 1200, 9);
+        expect(viewer.lengthUnitDisplay).toEqual({ code: 'm', unitspermeter: 1 });
+        // Potree's label: 100 units of the cloud, in metres
+        expect(100 / viewer.lengthUnit.unitspermeter * viewer.lengthUnitDisplay.unitspermeter).toBeCloseTo(30.48006, 5);
+        expect(viewer.scene.lengthUnit).toBe(viewer.lengthUnit);
+    });
+
+    it('a cloud in international feet, and one in metres', async () => {
+        copcWkt.value = FOOT_WKT;
+        stubPotree();
+        await mountViewer();
+        expect(viewer.lengthUnit).toEqual({ code: 'ft', unitspermeter: 1 / 0.3048 });
+        wrapper.unmount();
+        copcWkt.value = UTM_33N_WKT;
+        stubPotree();
+        await mountViewer();
+        expect(viewer.lengthUnit).toEqual({ code: 'm', unitspermeter: 1 });
+    });
+
+    it('shows feet when the user chooses them, whatever the unit of the cloud', async () => {
+        copcWkt.value = UTM_33N_WKT;
+        stubPotree();
+        await mountViewer();
+        await wrapper.find('#potree-unit-select').setValue('imperial');
+        expect(viewer.lengthUnitDisplay).toEqual({ code: 'ft', unitspermeter: 1 / 0.3048 });
+        expect(viewer.lengthUnit).toEqual({ code: 'm', unitspermeter: 1 });
+        // The preference is shared: back to the default for the other specs
+        await wrapper.find('#potree-unit-select').setValue('metric');
+    });
+});

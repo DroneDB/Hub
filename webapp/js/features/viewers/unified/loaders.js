@@ -193,10 +193,14 @@ async function loadPointCloud(scene, entry, dataset) {
     source.addEventListener('progress', () => { scene.view.progress = source.progress; });
     await source.initialize();
     const crs = (await source.getMetadata()).crs || CoordinateSystem.epsg3857;
-    // On the ground of a map (a basemap, the constrained orbit) only with a CRS proj4 can use
-    const geo = scene.registerCrs(crs) && scene.isGeoreferenced(entry);
+    // On the ground of a map (a basemap, the constrained orbit) only with a CRS proj4 can use; the scene is in its
+    // horizontal CRS (the one of a compound CRS: the basemap is drawn in it)
+    const sceneCrs = scene.registerCrs(crs);
+    const geo = !!sceneCrs && scene.isGeoreferenced(entry);
     scene.view.isLocalPointCloud = crs === CoordinateSystem.unknown;
-    scene.setupInstance(crs, { nav: geo ? 'constrained' : 'free' });
+    scene.setupInstance(sceneCrs ?? crs, { nav: geo ? 'constrained' : 'free' });
+    // Lengths in the unit of the cloud's coordinates (feet for a cloud in feet)
+    scene.setUnitsFrom(crs.definition);
     if (scene.instance.renderingOptions) scene.instance.renderingOptions.enableEDL = true;
 
     const entity = new PointCloud({ source });
@@ -209,7 +213,7 @@ async function loadPointCloud(scene, entry, dataset) {
     const box = entity.getBoundingBox();
     if (box && geo) {
         const { Extent } = scene.libs;
-        scene.addBasemap(new Extent(crs, box.min.x, box.max.x, box.min.y, box.max.y), box.min.z);
+        scene.addBasemap(new Extent(sceneCrs, box.min.x, box.max.x, box.min.y, box.max.y), box.min.z);
     }
     if (box) scene.frameBox(box);
     await scene.waitForFirstRender(() => entity.displayedPointCount > 0, 30000);

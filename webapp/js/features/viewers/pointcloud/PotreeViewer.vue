@@ -83,6 +83,7 @@ import { labelPotreeControls } from '@/libs/potree/potreeControls';
 import { attachPotreeScale } from '@/libs/potree/potreeScale';
 import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
+import { linearUnitOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
 
 defineOptions({ name: 'PotreeViewer' });
 
@@ -132,10 +133,17 @@ const finishMeasure = () => gestures?.finish({ dropShort: false });
 const endMeasure = () => gestures?.finish({ dropShort: true });
 const cancelMeasure = () => gestures?.cancel();
 
+// The unit of length of the cloud's coordinates, from the CRS of its COPC (metres until it is loaded): a cloud in
+// feet measures in feet, and Potree turns it into the unit the user chose
+let cloudUnit = LINEAR_UNITS.METRE;
+// A unit as Potree has it: what its labels show, and how many of it make a metre
+const potreeUnit = unit => ({ code: unit.symbol, unitspermeter: 1 / unit.metresPerUnit });
+
 // Lengths in the chosen unit, for the viewer, the scene and every existing measure
 function applyUnits() {
     if (!viewer) return;
-    viewer.setLengthUnit(unitPref.value === 'metric' ? 'm' : 'ft');
+    viewer.lengthUnit = potreeUnit(cloudUnit);
+    viewer.lengthUnitDisplay = potreeUnit(unitPref.value === 'metric' ? LINEAR_UNITS.METRE : LINEAR_UNITS.FOOT);
     viewer.scene.lengthUnit = viewer.lengthUnit;
     viewer.scene.lengthUnitDisplay = viewer.lengthUnitDisplay;
     for (const measure of viewer.scene.measurements || []) {
@@ -194,6 +202,7 @@ async function loadViewer() {
     session.dispose();
     session = new PotreeSession();
     toolsViewer.value = null;
+    cloudUnit = LINEAR_UNITS.METRE;
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
     // The canvas, the points and the labels are drawn at the applied ratio of the screen (FR-XC-32)
     stopScale = attachPotreeScale(viewer, session);
@@ -231,6 +240,8 @@ async function loadViewer() {
 
     const coordinateSystem = await addPointCloud(dataset.value.Entry(entry.value));
     if (unmounted) return;
+    cloudUnit = linearUnitOf(coordinateSystem?.srs);
+    applyUnits();
     toolsViewer.value = viewer;
     m.attach(viewer, session, coordinateSystem);
     viewer.fitToScreen();

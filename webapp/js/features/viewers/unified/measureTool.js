@@ -54,7 +54,8 @@ export class MeasureTool {
         this.drawTool = null;
         this.abort = null;
         this.shapes = [];
-        this.format = measureFormatters(() => scene.mercatorScale);
+        // Metres in a length of the scene (the Web Mercator correction, the unit of a cloud in feet)
+        this.format = measureFormatters(() => scene.lengthScale);
         // The drawing in progress: which one it is (a newer one replaces it), the points clicked, and
         // whether a gesture (not the last click) ends it
         this.run = 0;
