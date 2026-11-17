@@ -6,7 +6,8 @@
  * that returns the fallback label for a layer (e.g. layer.file.name or layer.entry.name).
  */
 import Overlay from 'ol/Overlay';
-import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
+import ddb from 'ddb';
+import { extractFeatureDisplayName, unnamedFeatureLabel } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
 import { createFeatureScope } from '@/composables/featureScope';
@@ -54,9 +55,7 @@ const definition = {
 
             if (content === 'Unknown feature') {
                 const resolvedLayer = layer || findVectorLayerForFeature(feature, this.vectorLayers);
-                if (resolvedLayer) {
-                    content = this.getLayerDisplayName(resolvedLayer) || 'Unknown layer';
-                }
+                if (resolvedLayer || properties.Layer) content = unnamedFeatureLabel(properties, resolvedLayer ? this.getLayerDisplayName(resolvedLayer) : '');
             }
 
             this.tooltipElement.textContent = content;
@@ -115,8 +114,10 @@ const definition = {
          * @returns {string}
          */
         getLayerDisplayName(layer) {
-            if (layer.entry) return layer.entry.name || '';
-            if (layer.file) return layer.file.name || (layer.file.entry && layer.file.entry.name) || '';
+            // An entry as the server lists it has a path and no name: the name is the last part of the path
+            const nameOf = item => (item ? item.name || item.label || (item.path ? ddb.pathutils.basename(item.path) : '') : '');
+            if (layer.entry) return nameOf(layer.entry);
+            if (layer.file) return nameOf(layer.file) || nameOf(layer.file.entry);
             return '';
         }
     }

@@ -60,6 +60,20 @@ export function extractFeatureDisplayName(properties, defaultValue = 'Unknown fe
 }
 
 /**
+ * What a map tooltip says of a feature without a name: the CAD layer it is drawn on (the `Layer`
+ * field GDAL gives the entities of a DXF or DWG drawing) and the file it comes from, or what of the
+ * two is known.
+ * @param {Record<string, any> | null | undefined} properties  the properties of the feature
+ * @param {string} [fileName]  the name of the file of its map layer
+ * @returns {string}
+ */
+export function unnamedFeatureLabel(properties, fileName = '') {
+    const cadLayer = properties && typeof properties.Layer === 'string' ? properties.Layer.trim() : '';
+    if (cadLayer && fileName) return `${cadLayer} (${fileName})`;
+    return cadLayer || fileName || 'Unknown layer';
+}
+
+/**
  * Check if an entry is a directory
  * @param {Object} entry - The entry object
  * @returns {boolean}

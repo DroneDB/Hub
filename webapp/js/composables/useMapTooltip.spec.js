@@ -60,3 +60,26 @@ describe('showFeatureTooltip', () => {
         expect(element.textContent).toBe('<img src=x onerror=alert(1)>');
     });
 });
+
+describe('the label of a feature without a name', () => {
+    function labelOf(properties, layer) {
+        const tooltip = useMapTooltip({ map: ref(map), vectorLayers: () => [], dialogs: () => ({}) });
+        tooltip.setupTooltipOverlay();
+        tooltip.showFeatureTooltip(new Feature(properties), [300, 300], layer);
+        return tooltip.tooltipElement.value.textContent;
+    }
+    // The layer of a vector file on the map: the file as the dataset lists it (a path, no name)
+    const fileLayer = { file: { entry: { path: 'vectors/autocad/utm32n_site.dxf', type: 4 } } };
+
+    it('is the name of its file, from the path of the entry', () => {
+        expect(labelOf({ OBJECTID: 3 }, fileLayer)).toBe('utm32n_site.dxf');
+    });
+
+    it('is the CAD layer of a drawing entity, with its file', () => {
+        expect(labelOf({ Layer: 'BOUNDARY', SubClasses: 'AcDbEntity:AcDbPolyline' }, fileLayer)).toBe('BOUNDARY (utm32n_site.dxf)');
+    });
+
+    it('says the layer is unknown only when nothing names it', () => {
+        expect(labelOf({ OBJECTID: 3 }, {})).toBe('Unknown layer');
+    });
+});
