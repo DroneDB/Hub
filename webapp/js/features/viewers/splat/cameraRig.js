@@ -1,26 +1,40 @@
 import { fitDistance } from '@/features/viewers/unified/sceneUtils';
 
 /**
- * How a scene is framed. A scene captured around an object or a room is framed level and close,
- * from inside it, which reads as immersive. A georeferenced scene is a piece of the ground, framed
- * whole from above at an angle: a level view of it stands at the height of the middle of its box,
- * among the splats of a flat site, and the orbit about its centre keeps that height.
+ * How a scene is framed. A scene captured from inside (a room) is framed level and close, from
+ * inside it, which reads as immersive. A site (a georeferenced scene, or one the build found to be a
+ * piece of the ground) is framed whole from above at an angle: a level view of it stands at the
+ * height of the middle of its box, among the splats of a flat site, and the orbit about its centre
+ * keeps that height. An object the cameras went round is framed whole from outside, a little above
+ * it, and the orbit goes round it.
  */
-export const FRAMING = Object.freeze({ IMMERSIVE: 'immersive', OVERVIEW: 'overview' });
+export const FRAMING = Object.freeze({ IMMERSIVE: 'immersive', OVERVIEW: 'overview', OBJECT: 'object' });
+
+// The framing of each kind of capture the build tells apart (bounds.json framing.kind)
+const FRAMING_OF_KIND = Object.freeze({ object: FRAMING.OBJECT, scene: FRAMING.IMMERSIVE, site: FRAMING.OVERVIEW });
 
 /**
- * The framing of a scene: a georeferenced one is seen whole from above, any other from inside.
- * @param {{ georeferenced?: boolean }} scene
+ * The framing of a scene: the one of the kind of capture the build found, when it found one; else a
+ * georeferenced scene is seen whole from above, any other from inside.
+ * @param {{ georeferenced?: boolean, kind?: string }} scene
  */
-export const framingOf = ({ georeferenced }) => (georeferenced ? FRAMING.OVERVIEW : FRAMING.IMMERSIVE);
+export const framingOf = ({ georeferenced, kind }) =>
+    (kind && Object.hasOwn(FRAMING_OF_KIND, kind) ? FRAMING_OF_KIND[kind] : georeferenced ? FRAMING.OVERVIEW : FRAMING.IMMERSIVE);
 
-// How the scene sphere fits the view (fitDistance's margin) and how high above the horizon of the
-// scene up the camera looks at it from
+// How the scene sphere fits the view (fitDistance's margin), how high above the horizon of the
+// scene up the camera looks at it from and, when the camera faces the box (frame's `faceBox`), how
+// far round from the narrowest horizontal side of the box towards its longest one and, for a view
+// from inside, how far behind the centre the camera stands, as a share of half the longest side
 const FRAMINGS = Object.freeze({
-    // Well under 1: the sphere is larger than the view, so the camera starts inside the model
-    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0 },
-    // The whole sphere in view, seen from halfway between the horizon and straight down
-    [FRAMING.OVERVIEW]: { margin: 1.1, elevationDeg: 45 }
+    // Well under 1: the sphere is larger than the view, so the camera starts inside the model. Facing
+    // the box, it stands on its longest side behind the centre, looking along it: at the fitted
+    // distance it would stand at the end of a room, against what is on its wall
+    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0, azimuthDeg: 90, insideShare: 0.6 },
+    // The whole sphere in view, seen from halfway between the horizon and straight down, the long side
+    // of the site across the view
+    [FRAMING.OVERVIEW]: { margin: 1.1, elevationDeg: 45, azimuthDeg: 0 },
+    // The whole object in view, from a little above it, in three-quarter view: its long side and one end
+    [FRAMING.OBJECT]: { margin: 1.15, elevationDeg: 35, azimuthDeg: 35 }
 });
 
 /**
@@ -122,45 +136,94 @@ export class CameraRig {
     }
 
     /**
-     * The direction from the centre of the scene to a camera that frames it: on the +Z side of the
-     * scene, `elevationDeg` above its horizon (the plane across the scene up), so the scene up is
-     * never the direction the camera looks along.
-     * @param {number} elevationDeg
+     * The +Z side of the scene on its horizon (the plane across the scene up); X for a scene up along Z.
      */
-    framingDirection(elevationDeg) {
-        const { THREE, sceneUp } = this;
+    defaultAcross() {
+        const { sceneUp } = this;
         const across = this._zAxis.clone().projectOnPlane(sceneUp);
-        // A scene up along Z: its horizon holds X
         if (across.lengthSq() < 1e-12) across.copy(this._xAxis).projectOnPlane(sceneUp);
+        return across.normalize();
+    }
+
+    /**
+     * The narrowest and the longest horizontal side of a box (its sides turned by the mesh orientation
+     * `q`, on the horizon of the scene up), as unit vectors across the scene up. Each points to the side
+     * of the default direction (defaultAcross), so the same box always gives the same view; a box with no
+     * horizontal extent gives the default direction and the one at right angles to it. `length` is
+     * the length of the longest one on the horizon.
+     * @param {any} box
+     * @param {any} q
+     */
+    horizontalSides(box, q) {
+        const { THREE, sceneUp } = this;
+        const size = box.getSize(new THREE.Vector3());
+        const reference = this.defaultAcross();
+        let longest = null;
+        for (const [axis, length] of [[new THREE.Vector3(1, 0, 0), size.x], [new THREE.Vector3(0, 1, 0), size.y], [new THREE.Vector3(0, 0, 1), size.z]]) {
+            const side = axis.applyQuaternion(q).multiplyScalar(length).projectOnPlane(sceneUp);
+            if (!longest || side.lengthSq() > longest.lengthSq()) longest = side;
+        }
+        const length = longest.length();
+        if (length < 1e-9) longest = new THREE.Vector3().crossVectors(sceneUp, reference);
+        longest.normalize();
+        const narrowest = new THREE.Vector3().crossVectors(sceneUp, longest).normalize();
+        // A side at right angles to the default direction keeps the sign of the cross product
+        if (narrowest.dot(reference) < -1e-9) narrowest.negate();
+        if (longest.dot(reference) < -1e-9) longest.negate();
+        return { narrowest, longest, length };
+    }
+
+    /**
+     * The direction from the centre of the scene to a camera that frames it, `elevationDeg` above its
+     * horizon, so the scene up is never the direction the camera looks along. Across the horizon it is
+     * the +Z side of the scene, or, given the `sides` of the box it frames (horizontalSides), the
+     * narrowest side turned `azimuthDeg` towards the longest.
+     * @param {number} elevationDeg
+     * @param {{ azimuthDeg?: number, sides?: { narrowest: any, longest: any } }} [facing]
+     */
+    framingDirection(elevationDeg, { azimuthDeg = 0, sides } = {}) {
+        const { THREE, sceneUp } = this;
+        let across = this.defaultAcross();
+        if (sides) {
+            const azimuth = THREE.MathUtils.degToRad(azimuthDeg);
+            across = sides.narrowest.clone().multiplyScalar(Math.cos(azimuth)).addScaledVector(sides.longest, Math.sin(azimuth)).normalize();
+        }
         const elevation = THREE.MathUtils.degToRad(elevationDeg);
-        return across.normalize().multiplyScalar(Math.cos(elevation)).addScaledVector(sceneUp, Math.sin(elevation));
+        return across.multiplyScalar(Math.cos(elevation)).addScaledVector(sceneUp, Math.sin(elevation));
     }
 
     /**
      * Frames a box (the splat's local bounds, turned by the mesh orientation `q`) the way
-     * `framing` says (FRAMING): close and level, or whole and from above.
+     * `framing` says (FRAMING): close and level, whole and from above, or whole from beside it.
      * Sets the scene size, near/far planes, camera, target and look angles. `extent`, the bounds
      * of every splat when `box` is only the core of the scene, keeps the far plane past them all.
+     * With `faceBox` the camera faces the sides of the box (the core the build found: the long side of
+     * an object or a site across the view, the length of a room ahead); without, it looks from the +Z
+     * side of the scene, whatever the box.
      * @param {any} box
      * @param {any} q
      * @param {string} [framing]
      * @param {any} [extent]
+     * @param {{ faceBox?: boolean }} [options]
      */
-    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box) {
+    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box, { faceBox = false } = {}) {
         const { THREE, camera, controls } = this;
-        const { margin, elevationDeg } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
+        const { margin, elevationDeg, azimuthDeg, insideShare } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3()).applyQuaternion(q);
         this.boundsDiagonal = Math.max(size.length(), 1e-3);
         const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
         // The vertical field of view limits a landscape view, the horizontal one a portrait view
-        const dist = fitDistance(radius, camera.fov, camera.aspect, margin);
+        const sides = faceBox ? this.horizontalSides(box, q) : null;
+        const inside = sides && insideShare ? insideShare * sides.length / 2 : 0;
+        const dist = inside > 0 ? inside : fitDistance(radius, camera.fov, camera.aspect, margin);
         // A small near plane lets splats render when the camera flies in among them
         camera.near = Math.max(this.boundsDiagonal / 5000, 0.001);
         const extentDiagonal = extent && !extent.isEmpty() ? extent.getSize(new THREE.Vector3()).length() : 0;
         camera.far = dist + Math.max(this.boundsDiagonal * 10, extentDiagonal * 2);
         camera.updateProjectionMatrix();
-        camera.position.copy(center).addScaledVector(this.framingDirection(elevationDeg), dist);
+        const facing = sides ? { azimuthDeg, sides } : {};
+        camera.position.copy(center).addScaledVector(this.framingDirection(elevationDeg, facing), dist);
         camera.up.copy(this.sceneUp);
         camera.lookAt(center);
         controls.target.copy(center);

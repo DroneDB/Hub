@@ -125,6 +125,73 @@ describe('frame of a georeferenced scene', () => {
     });
 });
 
+describe('frame of the core the build found', () => {
+    // A core twice as long along X as along Z, 2 high, Y-up, about (10, 1, -5)
+    const core = new THREE.Box3(new THREE.Vector3(6, 0, -7), new THREE.Vector3(14, 2, -3));
+    const center = core.getCenter(new THREE.Vector3());
+    const forward = camera => new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    // The angle of a direction above the horizon of the scene up, and about it from +Z towards +X
+    const elevation = (rig, v) => THREE.MathUtils.radToDeg(Math.asin(v.clone().normalize().dot(rig.sceneUp)));
+    const azimuth = v => THREE.MathUtils.radToDeg(Math.atan2(v.x, v.z));
+
+    it('frames an object whole from outside, a little above it, in three-quarter view, orbiting its centre', () => {
+        expect(framingOf({ kind: 'object' })).toBe(FRAMING.OBJECT);
+        const { rig, camera, controls } = makeRig();
+        rig.frame(core, identity, FRAMING.OBJECT, core, { faceBox: true });
+        expect(controls.target.distanceTo(center)).toBeLessThan(1e-6);
+        const offset = camera.position.clone().sub(center);
+        // Outside the object, far enough for it all to be in view
+        expect(core.containsPoint(camera.position)).toBe(false);
+        expect(offset.length()).toBeCloseTo(1.15 * 4 / Math.sin(THREE.MathUtils.degToRad(30)), 6);
+        expect(elevation(rig, offset)).toBeCloseTo(35, 6);
+        // From its narrow side (+Z) turned 35 degrees towards its long side (+X)
+        expect(azimuth(offset)).toBeCloseTo(35, 6);
+        expect(forward(camera).dot(offset.clone().normalize())).toBeCloseTo(-1, 6);
+        // The orbit goes round the object
+        controls.autoRotate = true;
+        for (let i = 0; i < 30; i++) rig.updateControls(0.1);
+        expect(camera.position.distanceTo(center)).toBeCloseTo(offset.length(), 4);
+    });
+
+    it('frames a scene from inside its core, behind its centre, level, looking along its longest side', () => {
+        expect(framingOf({ kind: 'scene', georeferenced: false })).toBe(FRAMING.IMMERSIVE);
+        const { rig, camera, controls } = makeRig();
+        rig.frame(core, identity, FRAMING.IMMERSIVE, core, { faceBox: true });
+        expect(core.containsPoint(camera.position)).toBe(true);
+        // 60 % of the half length (4 m) behind the centre: not against the wall at the end of the room
+        expect(camera.position.distanceTo(center)).toBeCloseTo(2.4, 6);
+        expect(Math.abs(forward(camera).x)).toBeCloseTo(1, 6);
+        expect(controls.target.distanceTo(center)).toBeLessThan(1e-6);
+        expect(rig.pitch).toBeCloseTo(0, 9);
+    });
+
+    it('frames a site whole from above at 45 degrees, its long side across the view', () => {
+        expect(framingOf({ kind: 'site', georeferenced: false })).toBe(FRAMING.OVERVIEW);
+        const { rig, camera } = makeRig();
+        rig.frame(core, identity, FRAMING.OVERVIEW, core, { faceBox: true });
+        const offset = camera.position.clone().sub(center);
+        expect(elevation(rig, offset)).toBeCloseTo(45, 6);
+        expect(azimuth(offset)).toBeCloseTo(0, 6);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        expect(Math.abs(right.x)).toBeCloseTo(1, 6);
+    });
+
+    it('faces the sides of the core as the mesh orientation turns them', () => {
+        // The core of a Z-up file turned to Y-up: its long side is still X, its narrow one now Y
+        const zUp = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+        const file = new THREE.Box3(new THREE.Vector3(-4, -1, 0), new THREE.Vector3(4, 1, 1));
+        const { rig, camera, controls } = makeRig();
+        rig.frame(file, zUp, FRAMING.IMMERSIVE, file, { faceBox: true });
+        expect(Math.abs(forward(camera).x)).toBeCloseTo(1, 6);
+        expect(controls.target.distanceTo(file.getCenter(new THREE.Vector3()).applyQuaternion(zUp))).toBeLessThan(1e-6);
+    });
+
+    it('keeps the kind of the build over the guess from the georeference', () => {
+        expect(framingOf({ kind: 'object', georeferenced: true })).toBe(FRAMING.OBJECT);
+        expect(framingOf({ kind: 'unknown', georeferenced: true })).toBe(FRAMING.OVERVIEW);
+    });
+});
+
 describe('yaw and pitch', () => {
     it('round-trip through the camera orientation, upright and with a tilted scene up', () => {
         for (const [roll, pitch] of [[0, 0], [20, -35]]) {

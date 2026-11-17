@@ -112,11 +112,11 @@ import SplatCameraRail from './SplatCameraRail.vue';
 import MeasureToolbar from '@/components/MeasureToolbar.vue';
 import SplatNavPad from './SplatNavPad.vue';
 import SplatSettings from './SplatSettings.vue';
-import { CameraRig, framingOf, tiltUp } from './cameraRig';
+import { CameraRig, tiltUp } from './cameraRig';
 import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
-import { createFrameRetry, coreBox, residentSplatCenters, CORE_QUANTILES } from './framing';
+import { createFrameRetry, residentSplatCenters, chooseFraming } from './framing';
 import { upChoiceQuaternion, resolvedAutoUp, openingUpChoice } from './upAxis';
 import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSettings';
 import { EarthControls } from './earthControls';
@@ -277,23 +277,25 @@ function applyOrientation() {
 const fileUp = () => rig.sceneUp.clone().applyQuaternion(stage.overlay.quaternion.clone().invert()).toArray();
 
 /**
- * Frames the splat on the core of its resident splats (CORE_QUANTILES: floaters and far background
- * splats left out), with the far plane past all of them. Until splats are resident (a paged .rad
- * at load) it frames the build-time bounds, else the resident bounds of a plain .spz. Returns
- * whether the core was framed: the retry goes on until then.
+ * Frames the splat on its core, with the far plane past all of its splats. The core is the one the
+ * build found from every splat (bounds.json `framing`: an object seen from beside it, a room from
+ * inside, a site from above), facing its sides. A build made before that has none: the core is then
+ * the box between quantiles of the resident splats (CORE_QUANTILES: floaters and far background
+ * splats left out), and until splats are resident (a paged .rad at load) the build-time bounds stand
+ * in, else the resident bounds of a plain .spz. Returns whether the core was framed: the retry goes
+ * on until then.
  */
 function frameCamera() {
     let extent = null;
     if (bounds && bounds.min && bounds.max) extent = new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max));
     if (!extent || extent.isEmpty()) extent = splatMesh.getBoundingBox ? splatMesh.getBoundingBox(true) : null;
     if (extent && extent.isEmpty()) extent = null;
-    const framing = framingOf({ georeferenced: georeferenced.value });
-    const core = coreBox(residentSplatCenters(splatMesh), CORE_QUANTILES[framing]);
+    const { framing, core, faceBox } = chooseFraming({ bounds, georeferenced: georeferenced.value, residentCenters: () => residentSplatCenters(splatMesh) });
     let box = core ? new THREE.Box3(new THREE.Vector3(...core.min), new THREE.Vector3(...core.max)) : extent;
     if (!box) box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
     // The mesh stays at the origin and unit scale: the point size is in the splats, not the mesh
     splatMesh.position.set(0, 0, 0);
-    rig.frame(box, splatMesh.quaternion, framing, extent ?? box);
+    rig.frame(box, splatMesh.quaternion, framing, extent ?? box, { faceBox });
     return !!core;
 }
 

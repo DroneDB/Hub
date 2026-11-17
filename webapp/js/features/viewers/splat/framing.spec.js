@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createFrameRetry, FRAME_ATTEMPTS, FRAME_RETRY_MS, coreBox, residentSplatCenters, CORE_QUANTILES, MIN_CORE_SAMPLES } from './framing';
+import { createFrameRetry, FRAME_ATTEMPTS, FRAME_RETRY_MS, coreBox, residentSplatCenters, CORE_QUANTILES, MIN_CORE_SAMPLES, framingHint, chooseFraming } from './framing';
+import { FRAMING } from './cameraRig';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
@@ -124,5 +125,57 @@ describe('residentSplatCenters', () => {
     it('is empty before any splat is resident (a paged scene at load)', () => {
         expect(residentSplatCenters(mesh(0)).length).toBe(0);
         expect(residentSplatCenters(null).length).toBe(0);
+    });
+});
+
+describe('framingHint', () => {
+    const bounds = framing => ({ min: [-100, -100, -100], max: [100, 100, 100], framing });
+
+    it('reads the kind of capture and its core from bounds.json', () => {
+        for (const kind of ['object', 'scene', 'site']) {
+            expect(framingHint(bounds({ kind, core: [-4, -1, -3, 3.5, 1, 2.5] }))).toEqual({ kind, core: { min: [-4, -1, -3], max: [3.5, 1, 2.5] } });
+        }
+    });
+
+    it('is no hint for a build made before builds wrote one, or for one this version cannot read', () => {
+        expect(framingHint(null)).toBeNull();
+        expect(framingHint({ min: [0, 0, 0], max: [1, 1, 1] })).toBeNull();
+        expect(framingHint(bounds({ kind: 'cave', core: [0, 0, 0, 1, 1, 1] }))).toBeNull();
+        expect(framingHint(bounds({ kind: 'object' }))).toBeNull();
+        expect(framingHint(bounds({ kind: 'object', core: [0, 0, 0, 1, 1] }))).toBeNull();
+        expect(framingHint(bounds({ kind: 'object', core: [0, 0, 0, 1, '1', 1] }))).toBeNull();
+        expect(framingHint(bounds({ kind: 'object', core: [0, 0, 0, 1, NaN, 1] }))).toBeNull();
+        // Its minimum above its maximum
+        expect(framingHint(bounds({ kind: 'object', core: [0, 2, 0, 1, 1, 1] }))).toBeNull();
+        expect(framingHint(bounds('object'))).toBeNull();
+    });
+});
+
+describe('chooseFraming', () => {
+    const train = { min: [-62, -67, -109], max: [172, 21, 26], framing: { kind: 'object', core: [-3.95, -0.94, -3.02, 3.65, 0.98, 2.72] } };
+
+    it('frames the core the build found, as its kind says, facing its sides, without reading the resident splats', () => {
+        const residentCenters = vi.fn(() => capture());
+        expect(chooseFraming({ bounds: train, georeferenced: false, residentCenters })).toEqual({
+            framing: FRAMING.OBJECT, core: { min: [-3.95, -0.94, -3.02], max: [3.65, 0.98, 2.72] }, faceBox: true
+        });
+        expect(residentCenters).not.toHaveBeenCalled();
+        const room = { ...train, framing: { kind: 'scene', core: [-4, -1, -4, 4, 2, 4] } };
+        expect(chooseFraming({ bounds: room, residentCenters }).framing).toBe(FRAMING.IMMERSIVE);
+        const site = { ...train, framing: { kind: 'site', core: [-50, -50, 0, 50, 50, 10] } };
+        expect(chooseFraming({ bounds: site, residentCenters }).framing).toBe(FRAMING.OVERVIEW);
+    });
+
+    it('frames the core of the resident splats without a hint, from inside or, for a georeferenced scene, from above', () => {
+        const before = { min: [-500, -500, -500], max: [800, 800, 800] };
+        const scene = chooseFraming({ bounds: before, georeferenced: false, residentCenters: () => capture() });
+        expect(scene.framing).toBe(FRAMING.IMMERSIVE);
+        expect(scene.faceBox).toBe(false);
+        expect(scene.core).toEqual(coreBox(capture(), CORE_QUANTILES.immersive));
+        const site = chooseFraming({ bounds: null, georeferenced: true, residentCenters: () => capture() });
+        expect(site.framing).toBe(FRAMING.OVERVIEW);
+        expect(site.core).toEqual(coreBox(capture(), CORE_QUANTILES.overview));
+        // Nothing resident yet: no core, the retry goes on
+        expect(chooseFraming({ bounds: before, residentCenters: () => new Float32Array(0) }).core).toBeNull();
     });
 });

@@ -1,3 +1,5 @@
+import { framingOf } from './cameraRig';
+
 /**
  * Framing of a splat that is not ready to be framed yet. A paged .rad has no resident splats until
  * its first chunks arrive, so the framing is tried again until it can frame the core of the scene
@@ -117,4 +119,50 @@ export function residentSplatCenters(mesh, maxSamples = MAX_CORE_SAMPLES) {
         centers[n++] = center.z;
     });
     return centers.subarray(0, n);
+}
+
+/**
+ * The kinds of capture a build tells apart (bounds.json `framing.kind`): the cameras went round an
+ * object, were inside a scene (a room), or looked down on a site (from the air, or georeferenced).
+ */
+export const CAPTURE_KINDS = Object.freeze(['object', 'scene', 'site']);
+
+/** @param {unknown} v */
+const isFiniteNumber = v => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * The framing the build worked out from every splat of the scene (bounds.json `framing`): the kind of
+ * capture and the box of its core, in the frame of the splat file. A hint this version cannot read
+ * (an unknown kind, a core that is not six finite numbers with its minimum at or below its maximum),
+ * and the bounds.json of a build made before builds wrote one, are no hint: the viewer then frames the
+ * core of the resident splats (coreBox).
+ * @param {any} bounds  the parsed bounds.json, or null
+ * @returns {{ kind: 'object' | 'scene' | 'site', core: { min: number[], max: number[] } } | null}
+ */
+export function framingHint(bounds) {
+    const framing = bounds && typeof bounds === 'object' ? bounds.framing : null;
+    if (!framing || typeof framing !== 'object' || !CAPTURE_KINDS.includes(framing.kind)) return null;
+    const { core } = framing;
+    if (!Array.isArray(core) || core.length !== 6 || !core.every(isFiniteNumber)) return null;
+    const min = core.slice(0, 3), max = core.slice(3);
+    if (min.some((v, a) => v > max[a])) return null;
+    return { kind: framing.kind, core: { min, max } };
+}
+
+/**
+ * What the viewer frames. With the build's hint (framingHint), its core, framed as its kind of capture
+ * says and facing the sides of the core; without, the core of the resident splats (coreBox between the
+ * quantiles of the framing: a georeferenced scene seen whole from above, any other from inside), null
+ * while too few splats are resident. The resident splats are read only without a hint.
+ * @param {object} scene
+ * @param {any} scene.bounds  the parsed bounds.json, or null
+ * @param {boolean} [scene.georeferenced]
+ * @param {() => ArrayLike<number>} scene.residentCenters  x, y, z of the resident splats (residentSplatCenters)
+ * @returns {{ framing: string, core: { min: number[], max: number[] } | null, faceBox: boolean }}
+ */
+export function chooseFraming({ bounds, georeferenced, residentCenters }) {
+    const hint = framingHint(bounds);
+    const framing = framingOf({ georeferenced, kind: hint?.kind });
+    if (hint) return { framing, core: hint.core, faceBox: true };
+    return { framing, core: coreBox(residentCenters(), CORE_QUANTILES[framing]), faceBox: false };
 }
