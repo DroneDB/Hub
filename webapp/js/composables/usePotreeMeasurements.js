@@ -15,6 +15,7 @@ import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPr
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
 import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
+import { unstatedMeasurementCrs } from '@/libs/build/pointCloudCrs';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
 import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/measureSnapshot';
@@ -72,9 +73,11 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     };
 
     const labelCtx = () => ({ viewer, session });
-    // The file's migration needs the point cloud's SRS when the file states none
+    // The file's migration needs the CRS of the cloud's coordinates when the file states none: the COPC's when it was
+    // written, which is the file's for a COPC built since in another CRS
     const storageFor = () => storage
-        || (storage = new MeasurementStorage(dataset.value, entry.value, MeasurementOwner.POINT_CLOUD, { pointCloudCrs: coordinateSystem }));
+        || (storage = new MeasurementStorage(dataset.value, entry.value, MeasurementOwner.POINT_CLOUD,
+            { pointCloudCrs: unstatedMeasurementCrs(entry.value, coordinateSystem) }));
 
     // What Save writes: the measures and the annotations (profiles and volumes are not saved)
     function countMeasurements() {

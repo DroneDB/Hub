@@ -93,7 +93,7 @@ export function createGeorefFrame(properties) {
         const crsLabel = georef.crs.length > 40 ? 'Projected CRS' : georef.crs;
         return { kind: 'projected', crsLabel, toCrs, toWgs84: toWgs84 && (p => {
             const [x, y, z] = toCrs(p);
-            return [...toWgs84(x, y), z];
+            return toWgs84(x, y, z);
         }) };
     }
     return null;

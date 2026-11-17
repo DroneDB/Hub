@@ -11,6 +11,7 @@ import {
     mapFile10, mapFile11, pointCloudFile10, pointCloudFile11, pointCloudFileNoSrs, mixedFile,
     legacyStockpileFile, orthophotoStockpileFile, cloudCoordinateSystem, CLOUD, GROUPS, CREATED, MODIFIED, UTM_18N_WKT
 } from './measurementFormat.fixtures';
+import { WGS84_WKT } from './crs.fixtures';
 
 afterEach(() => vi.useRealTimers());
 
@@ -113,6 +114,18 @@ describe('read: the 3D viewer\'s files', () => {
     it('the CRS the file states wins over the point cloud\'s', () => {
         const doc = read(pointCloudFile10(), { pointCloudCrs: 'EPSG:32633' });
         expectClose(byId(doc, 'a-1').geometry.coordinates, CLOUD.D.geo);
+    });
+
+    it('never puts the point cloud\'s CRS on coordinates of the CRS the file states, even one proj4 cannot use', () => {
+        // The COPC is in UTM now; the file was saved when it was in another CRS
+        const unusable = read(pointCloudFile10({ srs: 'EPSG:2056' }), { pointCloudCrs: UTM_18N_WKT });
+        expect(sectionOf(unusable, VIEW.POINT_CLOUD).coordinateSystem.srs).toBe('EPSG:2056');
+        expect(sectionOf(unusable, VIEW.POINT_CLOUD)[LEGACY_GEOMETRY]).toBe(true);
+        expect('crs' in unusable).toBe(false);
+        // Coordinates in longitude and latitude stay so: their geometry is worked out with the stated CRS
+        const geographic = read(pointCloudFile10({ srs: WGS84_WKT }), { pointCloudCrs: UTM_18N_WKT });
+        expect(sectionOf(geographic, VIEW.POINT_CLOUD).coordinateSystem.srs).toBe(WGS84_WKT);
+        expectClose(byId(geographic, 'a-1').geometry.coordinates, CLOUD.D.local);
     });
 
     it('a feature with no local coordinates keeps its geometry', () => {

@@ -7,7 +7,8 @@
  * The positions of a Potree point cloud (COPC) are in the CRS of the cloud: the decoder applies the
  * scale and offset of the file when it reads the points, so a measured point is already an x, y, z of
  * that CRS and nothing is added or removed here. x and y are reprojected to longitude and latitude
- * with proj4 (crsProjection); z stays as it is.
+ * with proj4 (crsProjection); z stays as it is, except in a geocentric CRS, where it becomes the
+ * height above the ellipsoid.
  */
 import { crsToWgs84, wgs84ToCrs } from '@/libs/map/crsProjection';
 
@@ -33,8 +34,8 @@ export function srsDefinitionOf(source) {
  * @property {string | null} definition  the SRS in use, null when there is none or proj4 cannot use it
  * @property {boolean} usable            whether positions can be reprojected
  * @property {(position: ArrayLike<number> | { x: number, y: number, z: number }) => number[]} toGeographic
- *   a position of the cloud -> [longitude, latitude, z]; the position itself ([x, y, z]) when not usable
- * @property {(coordinates: number[]) => number[]} toLocal  [longitude, latitude, z] -> a position of the cloud
+ *   a position of the cloud -> [longitude, latitude, height]; the position itself ([x, y, z]) when not usable
+ * @property {(coordinates: number[]) => number[]} toLocal  [longitude, latitude, height] -> a position of the cloud
  */
 
 /**
@@ -53,17 +54,50 @@ export function projectorFor(source) {
         usable,
         toGeographic(position) {
             const [x, y, z] = triple(position);
-            if (!forward) return [x, y, z];
-            const [lon, lat] = forward(x, y);
-            return [lon, lat, z];
+            return forward ? forward(x, y, z) : [x, y, z];
         },
         toLocal(coordinates) {
             const [x, y, z] = coordinates;
-            if (!inverse) return [x, y, z];
-            const [px, py] = inverse(x, y);
-            return [px, py, z];
+            return inverse ? inverse(x, y, z) : [x, y, z];
         }
     };
+}
+
+// Two positions closer than this (in the units of the CRS, or in degrees: 1e-8 degree is about 1 mm)
+// are the same point
+const SAME_POSITION = 1e-3;
+const SAME_ANGLE = 1e-8;
+
+/** @param {number[]} a @param {number[]} b @param {number} horizontal  the tolerance of x and y (z: SAME_POSITION) */
+const near = (a, b, horizontal) => a.length >= 3 && b.length >= 3
+    && Math.abs(a[0] - b[0]) <= horizontal && Math.abs(a[1] - b[1]) <= horizontal && Math.abs(a[2] - b[2]) <= SAME_POSITION;
+
+/**
+ * Whether two CRSs (each an SRS, or a coordinate system that has one) are the same CRS, by meaning: the
+ * same text is (the fast path); else a sample point of the first goes to WGS84 through each of them and
+ * back through the second, and both ways must give the same point. The same CRS is written as different
+ * WKT by different writers (WKT 1 and WKT 2, with or without its authority), so the text alone is not
+ * enough; two CRSs that place the sample within a millimetre of each other are the same where the
+ * cloud is. No CRS is the same as no CRS only; a CRS that proj4 cannot use is the same only as its text.
+ * @param {any} first
+ * @param {any} second
+ * @param {number[] | null} sample  a position in the first CRS (where the cloud is)
+ * @returns {boolean}
+ */
+export function sameCrs(first, second, sample) {
+    const a = srsDefinitionOf(first);
+    const b = srsDefinitionOf(second);
+    if (!a || !b) return !a && !b;
+    if (a.trim() === b.trim()) return true;
+    const from = projectorFor(a);
+    const to = projectorFor(b);
+    if (!from.usable || !to.usable || !sample || !sample.slice(0, 3).every(Number.isFinite)) return false;
+    try {
+        const geographic = from.toGeographic(sample);
+        return near(to.toGeographic(sample), geographic, SAME_ANGLE) && near(to.toLocal(geographic), sample, SAME_POSITION);
+    } catch {
+        return false;
+    }
 }
 
 /**

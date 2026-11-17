@@ -18,17 +18,23 @@
  *    `views.map`; the groups only when the key is there, as a save of an older Hub over a 2.0 file
  *    writes them again), `pointCloudFile` and `coordinateSystem` the 3D viewer's (`views.pointCloud`);
  *  - the geometry of the 3D viewer's features is worked out again from their `localCoordinates` (the
- *    version before 2.0 added the scale and offset of the cloud twice), with the CRS the file states or
- *    else the one of the point cloud the caller passes (`ctx.pointCloudCrs`). Without a CRS proj4 can
- *    use (the 2D map does not know the cloud's), those features stay as they were, the file has no
- *    `crs` member and `views.pointCloud.legacyGeometry` says that their geometry is still to be worked
- *    out: a later read with a CRS (the 3D viewer's) does it, in a 2.0 file too, and drops the mark.
+ *    version before 2.0 added the scale and offset of the cloud twice), with the CRS the file states or,
+ *    when it states none, the one the caller passes (`ctx.pointCloudCrs`: the CRS the coordinates of the
+ *    cloud were in when the file was written). A CRS the file states is never replaced by another one:
+ *    its coordinates are in it. Without a CRS proj4 can use (the 2D map does not know the cloud's), those
+ *    features stay as they were, the file has no `crs` member and `views.pointCloud.legacyGeometry` says
+ *    that their geometry is still to be worked out: a later read with a CRS (the 3D viewer's) does it, in
+ *    a 2.0 file too, and drops the mark.
  * A migration changes nothing in a 2.0 file without that mark, so the second one of a file is the same
  * as the first.
  * Older Hubs read `features` and ignore `metadata.views`.
+ *
+ * The CRS of a point cloud's COPC can change after its measurements were saved (a cloud in longitude and
+ * latitude gets its COPC built again in UTM): savedPositions puts every saved feature where it belongs in
+ * the CRS of the COPC the viewer has now.
  */
 import { EPSG } from '@/libs/constants';
-import { projectorFor, geometryOf, localPointsOf } from '@/libs/map/pointCloudGeometry';
+import { projectorFor, geometryOf, localPointsOf, srsDefinitionOf, sameCrs } from '@/libs/map/pointCloudGeometry';
 
 export const FORMAT_VERSION = '2.0';
 /** The application id of every file the Hub writes. */
@@ -107,15 +113,6 @@ function versionOf(value) {
     return match ? [Number(match[1]), Number(match[2] || 0)] : [1, 0];
 }
 
-/** The first of the candidates (each an SRS or a coordinate system) that proj4 can use. @param {any[]} candidates */
-function usableProjector(candidates) {
-    for (const candidate of candidates) {
-        const projector = projectorFor(candidate);
-        if (projector.usable) return projector;
-    }
-    return projectorFor(null);
-}
-
 /** @param {any} feature */
 const isLocated = feature => ownerOf(feature) === VIEW.POINT_CLOUD && !!localPointsOf(feature);
 
@@ -163,8 +160,10 @@ export function read(json, ctx = {}) {
 
 /**
  * The 3D viewer's features with their geometry worked out again from their local coordinates, and
- * the section of the 3D viewer that says where it came from. With no CRS proj4 can use (from the
- * section or `ctx`), the features stay as they are and the section is marked LEGACY_GEOMETRY.
+ * the section of the 3D viewer that says where it came from. The CRS is the one the section states;
+ * `ctx.pointCloudCrs` only when it states none (a stated CRS proj4 cannot use is not replaced: the
+ * coordinates are in it, not in the cloud's). With no CRS proj4 can use, the features stay as they are
+ * and the section is marked LEGACY_GEOMETRY.
  * @param {any[]} features  all the features of the file (the map's are kept as they are)
  * @param {Record<string, any>} cloud  the section of the 3D viewer
  * @param {{ pointCloudCrs?: any }} ctx
@@ -173,9 +172,10 @@ export function read(json, ctx = {}) {
 function correctedGeometry(features, cloud, ctx) {
     const section = without(cloud, [LEGACY_GEOMETRY]);
     if (!features.some(isLocated)) return { features, section };
-    const projector = usableProjector([cloud.coordinateSystem, ctx.pointCloudCrs]);
+    const stated = srsDefinitionOf(cloud.coordinateSystem);
+    const projector = projectorFor(stated ?? ctx.pointCloudCrs);
     if (!projector.usable) return { features, section: { ...section, [LEGACY_GEOMETRY]: true } };
-    if (!projectorFor(cloud.coordinateSystem).usable) {
+    if (!stated) {
         // Where the corrected geometry comes from stays in the file
         section.coordinateSystem = { ...(isObject(cloud.coordinateSystem) ? cloud.coordinateSystem : {}), srs: projector.definition };
     }
@@ -238,6 +238,60 @@ function migrate(json, metadata, ctx) {
         metadata: { version: FORMAT_VERSION, application: APPLICATION_ID, ...others, views },
         features
     });
+}
+
+/** Whether every geometry of a document is in WGS84 (its `crs` member says so: see withCrs). @param {any} doc */
+const isWgs84Document = doc => doc?.crs?.properties?.name === EPSG.WGS84;
+
+/**
+ * The points of a feature's geometry ([longitude, latitude, height] in a WGS84 file), or null when it has none.
+ * @param {any} feature
+ * @returns {number[][] | null}
+ */
+function geometryPointsOf(feature) {
+    const geometry = feature?.geometry;
+    if (geometry?.type === 'Point') return [geometry.coordinates];
+    if (geometry?.type === 'LineString') return geometry.coordinates;
+    if (geometry?.type === 'Polygon') return geometry.coordinates[0].slice(0, -1);
+    return null;
+}
+
+/** A circle (its centre) and an angle (its vertex) have one of their points in their geometry, the other kinds all of them. @param {any} feature */
+const geometryHoldsEveryPoint = feature => !['circle', 'angle'].includes(feature?.properties?.measurementType);
+
+/**
+ * Where the 3D viewer's saved features go in a point cloud whose COPC is in `coordinateSystem` now: a
+ * function from a feature to its points ([x, y, z] of the COPC), or null for a feature with neither
+ * local coordinates nor a geometry of points.
+ *
+ * The local coordinates of a feature are in the CRS the section of the file states. When that is the
+ * CRS of the COPC (sameCrs: by meaning, not by text) they are used as they are. When it is another one
+ * (the COPC was built again in another CRS), every point goes from the stated CRS to WGS84 and from
+ * there into the COPC's (in 3-D for a geocentric CRS); when the file states no CRS proj4 can use but its
+ * geometry is WGS84, the geometry is placed in the COPC's CRS instead (not for a circle or an angle, whose
+ * geometry is one of their points). A feature with no local coordinates is placed from its geometry, as
+ * before. When neither can be reprojected, the local coordinates are used as they are: nothing better is
+ * known. The next save writes the positions and the CRS of the COPC.
+ * @param {any} doc  the document (`read` or the storage's `load`)
+ * @param {any} coordinateSystem  the coordinate system (or SRS) of the COPC the viewer shows
+ * @returns {(feature: any) => number[][] | null}
+ */
+export function savedPositions(doc, coordinateSystem) {
+    const saved = sectionOf(doc, VIEW.POINT_CLOUD).coordinateSystem;
+    const current = projectorFor(coordinateSystem);
+    const stated = projectorFor(saved);
+    const features = Array.isArray(doc?.features) ? doc.features : [];
+    const sample = features.map(localPointsOf).find(Boolean)?.[0] ?? null;
+    const unchanged = sameCrs(saved, coordinateSystem, sample);
+    const fromLocal = !unchanged && current.usable && stated.usable;
+    const fromGeometry = !unchanged && current.usable && !stated.usable && isWgs84Document(doc);
+    return feature => {
+        const local = localPointsOf(feature);
+        if (local && fromLocal) return local.map(p => current.toLocal(stated.toGeographic(p)));
+        const geometry = geometryPointsOf(feature);
+        if (geometry && (!local || (fromGeometry && geometryHoldsEveryPoint(feature)))) return geometry.map(p => current.toLocal(p));
+        return local;
+    };
 }
 
 /** @param {Record<string, any>} section the section without what has no value */

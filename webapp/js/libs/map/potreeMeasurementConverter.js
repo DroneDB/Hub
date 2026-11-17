@@ -6,19 +6,25 @@
  * that position reprojected to longitude and latitude (pointCloudGeometry). A cloud with no SRS that
  * proj4 can use has no geometry in WGS84: the geometry then holds the local coordinates, and the file
  * has no `crs` member (measurementFormat), so they are never labelled as WGS84.
+ *
+ * A saved file is placed in the CRS the cloud's COPC has now (measurementFormat's savedPositions), which
+ * can differ from the one it was saved in. Lengths, areas and radii are in the unit of length of that
+ * CRS (metres, feet or US survey feet: linearUnitOf), and `unit` names it.
  */
 
-import { write, VIEW } from '@/libs/map/measurementFormat';
+import { write, VIEW, savedPositions } from '@/libs/map/measurementFormat';
 import { projectorFor, geometryOf } from '@/libs/map/pointCloudGeometry';
+import { linearUnitOf } from '@/libs/map/crsProjection';
 import { textToHtml, htmlToText } from '@/libs/sanitize';
 
 /**
  * Convert a Potree measurement to a GeoJSON Feature
  * @param {Potree.Measure} measure - Potree measurement
  * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
+ * @param {import('@/libs/map/crsProjection').LinearUnit} unit - the unit of length of that CRS
  * @returns {Object} GeoJSON Feature
  */
-function measureToGeoJSON(measure, projector) {
+function measureToGeoJSON(measure, projector, unit) {
     const points = measure.points.map(point => projector.toGeographic(point.position));
 
     // The kind of measurement, from what the measure shows
@@ -61,12 +67,12 @@ function measureToGeoJSON(measure, projector) {
     if (measure.showArea && measure.closed) {
         properties.area = calculateArea(measure.points);
         properties.perimeter = calculatePerimeter(measure.points);
-        properties.unit = 'm²';
+        properties.unit = `${unit.code}²`;
     }
 
     if (measurementType === 'distance' || measurementType === 'height') {
         properties.distance = calculateDistance(measure.points);
-        properties.unit = 'm';
+        properties.unit = unit.code;
     }
 
     if (measurementType === 'circle') {
@@ -74,7 +80,7 @@ function measureToGeoJSON(measure, projector) {
         properties.radius = radius;
         properties.circumference = 2 * Math.PI * radius;
         properties.area = Math.PI * radius * radius;
-        properties.unit = 'm';
+        properties.unit = unit.code;
     }
 
     if (measurementType === 'angle' && measure.points.length >= 3) {
@@ -94,11 +100,10 @@ function measureToGeoJSON(measure, projector) {
 /**
  * Convert a GeoJSON Feature to a Potree measurement
  * @param {Object} feature - GeoJSON Feature
- * @param {Potree.Viewer} viewer - Potree viewer
- * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
+ * @param {number[][]} positions - its points in the CRS of the point cloud (savedPositions)
  * @returns {Potree.Measure} Potree measurement
  */
-function geoJSONToMeasure(feature, viewer, projector) {
+function geoJSONToMeasure(feature, positions) {
     const measure = new Potree.Measure();
     const props = feature.properties;
 
@@ -132,28 +137,8 @@ function geoJSONToMeasure(feature, viewer, projector) {
         measure.fillColor = new THREE.Color(props.fill);
     }
 
-    // Convert coordinates to points
-    let coordinates;
-
-    if (feature.geometry.type === 'Point') {
-        coordinates = [feature.geometry.coordinates];
-    } else if (feature.geometry.type === 'LineString') {
-        coordinates = feature.geometry.coordinates;
-    } else if (feature.geometry.type === 'Polygon') {
-        // Remove the last point (duplicate for closure)
-        coordinates = feature.geometry.coordinates[0].slice(0, -1);
-    }
-
-    // If we have saved local coordinates, use them (more accurate)
-    if (props.localCoordinates && props.localCoordinates.length > 0) {
-        coordinates = props.localCoordinates;
-    } else {
-        // Otherwise convert from geographic to local
-        coordinates = coordinates.map(coord => projector.toLocal(coord));
-    }
-
     // Add points to measurement
-    coordinates.forEach(coord => {
+    positions.forEach(coord => {
         const position = new THREE.Vector3(coord[0], coord[1], coord[2]);
         measure.addMarker({ position: position });
     });
@@ -172,9 +157,10 @@ function geoJSONToMeasure(feature, viewer, projector) {
 export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
     const measurements = viewer.scene.measurements || [];
     const projector = projectorFor(coordinateSystem);
+    const unit = linearUnitOf(projector.definition);
 
     // Collect all features from measurements
-    const features = measurements.map(m => measureToGeoJSON(m, projector));
+    const features = measurements.map(m => measureToGeoJSON(m, projector, unit));
 
     // Also export annotations
     const annotations = [];
@@ -230,23 +216,14 @@ function annotationToGeoJSON(annotation, projector) {
 /**
  * Convert a GeoJSON Feature to an annotation
  * @param {Object} feature - GeoJSON Feature
- * @param {Potree.Viewer} viewer - Potree viewer
- * @param {import('@/libs/map/pointCloudGeometry').Projector} projector - the CRS of the point cloud
+ * @param {number[][]} positions - its point in the CRS of the point cloud (savedPositions)
  * @returns {Potree.Annotation} Potree annotation
  */
-function geoJSONToAnnotation(feature, viewer, projector) {
+function geoJSONToAnnotation(feature, positions) {
     const props = feature.properties;
 
-    // Get position from local coordinates if available, otherwise convert from geographic
-    let position;
-    if (props.localCoordinates && props.localCoordinates.length >= 3) {
-        position = props.localCoordinates;
-    } else {
-        position = projector.toLocal(feature.geometry.coordinates);
-    }
-
     const annotation = new Potree.Annotation({
-        position: position,
+        position: positions[0],
         title: textToHtml(props.name || 'Annotation'),
         description: textToHtml(props.description)
     });
@@ -267,20 +244,23 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
     }
 
     const imported = [];
-    const projector = projectorFor(coordinateSystem);
+    // In the CRS of the COPC the viewer has now, which may not be the one the file was saved in
+    const positionsOf = savedPositions(geojson, coordinateSystem);
 
     geojson.features.forEach(feature => {
         try {
             const props = feature.properties;
+            const positions = positionsOf(feature);
+            if (!positions || !positions.length) throw new Error('The measurement has no position');
 
             if (props.measurementType === 'annotation') {
                 // Import as annotation
-                const annotation = geoJSONToAnnotation(feature, viewer, projector);
+                const annotation = geoJSONToAnnotation(feature, positions);
                 viewer.scene.annotations.add(annotation);
                 imported.push(annotation);
             } else {
                 // Import as measurement
-                const measure = geoJSONToMeasure(feature, viewer, projector);
+                const measure = geoJSONToMeasure(feature, positions);
                 viewer.scene.addMeasurement(measure);
                 imported.push(measure);
             }

@@ -9,6 +9,7 @@ import { exportMeasurements, importMeasurements } from './potreeMeasurementConve
 import { VIEW, sectionOf, read } from './measurementFormat';
 import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import { UTM_18N_WKT, COPC_SCALE, COPC_OFFSET, CLOUD, cloudCoordinateSystem } from './measurementFormat.fixtures';
+import { WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, FOOT_WKT, US_FOOT_COMPOUND_WKT } from './crs.fixtures';
 
 // 0.01 m is about 9e-8 degrees of latitude: 1e-7 degree is the tolerance
 const DEGREES = 1e-7;
@@ -33,6 +34,9 @@ function viewerWith(measurements, annotations = []) {
 }
 
 const coordinateSystem = srs => ({ ...cloudCoordinateSystem(srs), scale: COPC_SCALE, offset: COPC_OFFSET });
+const annotation = (local, uuid = 'ann') => ({ uuid, title: 'Crack', description: '', position: new Vec(...local) });
+// What a save puts in the file and a load reads back (through the format, as the storage does)
+const onDisk = doc => read(JSON.parse(JSON.stringify(doc)));
 
 describe('exportMeasurements: a UTM 18N point', () => {
     for (const [label, srs] of [['EPSG:32618', 'EPSG:32618'], ['the same CRS as WKT', UTM_18N_WKT]]) {
@@ -127,11 +131,20 @@ describe('importMeasurements', () => {
         return { viewer, added };
     }
 
-    it('puts a measurement back at its local coordinates', () => {
+    it('puts a measurement back at its local coordinates when the COPC is in the CRS the file was saved in', () => {
         const { viewer, added } = stubPotree();
         const doc = exportMeasurements(viewerWith([measure({}, [CLOUD.A.local, CLOUD.B.local])]), 'cloud.laz', coordinateSystem('EPSG:32618'));
         importMeasurements(doc, viewer, coordinateSystem('EPSG:32618'));
         expect(added[0].points.map(p => [p.x, p.y, p.z])).toEqual([CLOUD.A.local, CLOUD.B.local]);
+    });
+
+    it('keeps the local coordinates exactly when the same CRS is written another way (WKT 1 saved, WKT 2 now)', () => {
+        const { viewer, added } = stubPotree();
+        const local = [[411295.168, 5170271.646, 600.5], [411381.959, 5170393.859, 610.25]];
+        const doc = exportMeasurements(viewerWith([measure({}, local)], [annotation(local[0])]), 'cloud.laz', coordinateSystem(UTM_33N_WKT));
+        importMeasurements(onDisk(doc), viewer, coordinateSystem(UTM_33N_WKT2));
+        expect(added[0].points.map(p => [p.x, p.y, p.z])).toEqual(local);
+        expect(added[1].position).toEqual(local[0]);
     });
 
     it('without local coordinates a position is worked back from the geometry through the CRS, with no scale or offset', () => {
@@ -145,6 +158,113 @@ describe('importMeasurements', () => {
             expect(Math.abs(p.y - expected[1])).toBeLessThan(0.01);
             expect(p.z).toBeCloseTo(expected[2], 9);
         });
+    });
+});
+
+describe('a COPC built again in another CRS than the one the measurements were saved in', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    function stubPotree() {
+        const added = [];
+        class Measure {
+            constructor() { this.points = []; }
+            addMarker({ position }) { this.points.push(position); }
+        }
+        class Annotation { constructor(options) { Object.assign(this, options); } }
+        vi.stubGlobal('Potree', { Measure, Annotation });
+        vi.stubGlobal('THREE', { Vector3: Vec, Color: class { constructor(c) { this.c = c; } } });
+        const viewer = { scene: { addMeasurement: m => added.push(m), annotations: { add: a => added.push(a) } } };
+        return { viewer, added };
+    }
+
+    // Two points of a cloud in longitude and latitude (EPSG:4326, heights in metres), where they are in its COPC built
+    // again in UTM 33N, and where they are in geocentric coordinates:
+    // echo "lon lat h" | gdaltransform -s_srs EPSG:4326 -t_srs EPSG:32633; echo "lat lon h" | cs2cs EPSG:4979 EPSG:4978
+    const P = {
+        A: { geo: [13.8401234, 46.6801234, 600.5], utm: [411295.168136401, 5170271.64613447, 600.5], ecef: [4256756.969533, 1048721.126765, 4617877.373960] },
+        B: { geo: [13.8412345, 46.6812345, 610.25], utm: [411381.958876673, 5170393.85921773, 610.25], ecef: [4256655.865261, 1048783.775353, 4617969.214704] }
+    };
+    const xyz = p => [p.x, p.y, p.z];
+    // Within 1 cm of the UTM point GDAL gives
+    const expectUtm = (actual, expected) => {
+        expect(Math.hypot(actual[0] - expected[0], actual[1] - expected[1])).toBeLessThan(0.01);
+        expect(Math.abs(actual[2] - expected[2])).toBeLessThan(0.01);
+    };
+
+    it('places a measure and an annotation saved in EPSG:4326 at their UTM points, within 1 cm', () => {
+        const { viewer, added } = stubPotree();
+        const saved = exportMeasurements(viewerWith([measure({}, [P.A.geo, P.B.geo])], [annotation(P.B.geo)]), 'cloud.laz', coordinateSystem(WGS84_WKT));
+        importMeasurements(onDisk(saved), viewer, coordinateSystem(UTM_33N_WKT));
+        const [restored, note] = added;
+        expectUtm(xyz(restored.points[0]), P.A.utm);
+        expectUtm(xyz(restored.points[1]), P.B.utm);
+        expectUtm(note.position, P.B.utm);
+    });
+
+    it('places every point of a circle too (its geometry is its centre, its local coordinates are all its points)', () => {
+        const { viewer, added } = stubPotree();
+        const saved = exportMeasurements(viewerWith([measure({ uuid: 'circle', showCircle: true }, [P.A.geo, P.B.geo])]), 'cloud.laz', coordinateSystem(WGS84_WKT));
+        importMeasurements(onDisk(saved), viewer, coordinateSystem(UTM_33N_WKT2));
+        expect(added[0].points).toHaveLength(2);
+        expectUtm(xyz(added[0].points[0]), P.A.utm);
+        expectUtm(xyz(added[0].points[1]), P.B.utm);
+    });
+
+    it('a file saved on a geocentric COPC is placed in 3-D: the height above the ellipsoid becomes z', () => {
+        const { viewer, added } = stubPotree();
+        const saved = exportMeasurements(viewerWith([measure({}, [P.A.ecef, P.B.ecef])], [annotation(P.A.ecef)]), 'cloud.laz', coordinateSystem(GEOCENTRIC_WKT));
+        importMeasurements(onDisk(saved), viewer, coordinateSystem(UTM_33N_WKT));
+        expectUtm(xyz(added[0].points[0]), P.A.utm);
+        expectUtm(xyz(added[0].points[1]), P.B.utm);
+        expectUtm(added[1].position, P.A.utm);
+    });
+
+    it('a WGS84 file whose section states no CRS is placed from its geometry', () => {
+        const { viewer, added } = stubPotree();
+        const saved = onDisk(exportMeasurements(viewerWith([measure({}, [P.A.geo, P.B.geo])]), 'cloud.laz', coordinateSystem(WGS84_WKT)));
+        delete sectionOf(saved, VIEW.POINT_CLOUD).coordinateSystem.srs;
+        expect(saved.crs.properties.name).toBe('EPSG:4326');
+        importMeasurements(saved, viewer, coordinateSystem(UTM_33N_WKT));
+        expectUtm(xyz(added[0].points[0]), P.A.utm);
+        expectUtm(xyz(added[0].points[1]), P.B.utm);
+    });
+
+    it('the next save writes the UTM positions and the CRS of the COPC, and the next load keeps them', () => {
+        const { viewer, added } = stubPotree();
+        const saved = exportMeasurements(viewerWith([measure({}, [P.A.geo, P.B.geo])]), 'cloud.laz', coordinateSystem(WGS84_WKT));
+        importMeasurements(onDisk(saved), viewer, coordinateSystem(UTM_33N_WKT));
+        const resaved = exportMeasurements(viewerWith([measure({}, added[0].points.map(xyz))]), 'cloud.laz', coordinateSystem(UTM_33N_WKT));
+        expect(sectionOf(resaved, VIEW.POINT_CLOUD).coordinateSystem.srs).toBe(UTM_33N_WKT);
+        expectUtm(resaved.features[0].properties.localCoordinates[0], P.A.utm);
+        // Its geometry is where the first file's was: 1e-7 degree is about 1 cm
+        const [lon, lat] = resaved.features[0].geometry.coordinates[0];
+        expect(Math.abs(lon - P.A.geo[0])).toBeLessThan(1e-7);
+        expect(Math.abs(lat - P.A.geo[1])).toBeLessThan(1e-7);
+        // Loaded again on the same COPC: the local coordinates, as they are
+        const second = stubPotree();
+        importMeasurements(onDisk(resaved), second.viewer, coordinateSystem(UTM_33N_WKT2));
+        expect(second.added[0].points.map(xyz)).toEqual(resaved.features[0].properties.localCoordinates);
+    });
+
+    it('keeps the local coordinates when the COPC now has no CRS proj4 can use (nothing better is known)', () => {
+        const { viewer, added } = stubPotree();
+        const saved = exportMeasurements(viewerWith([measure({}, [P.A.geo, P.B.geo])]), 'cloud.laz', coordinateSystem(WGS84_WKT));
+        importMeasurements(onDisk(saved), viewer, coordinateSystem(null));
+        expect(added[0].points.map(xyz)).toEqual([P.A.geo, P.B.geo]);
+    });
+});
+
+describe('the unit of the lengths of a saved measurement', () => {
+    it('is the unit of the CRS of the cloud: metres, feet or US survey feet', () => {
+        const local = [[1000, 2000, 10], [1030, 2040, 10], [1030, 2000, 10]];
+        const units = srs => {
+            const doc = exportMeasurements(viewerWith([measure({ uuid: 'd' }, local.slice(0, 2)), measure({ uuid: 'a', showArea: true, closed: true }, local)]), 'cloud.laz', coordinateSystem(srs));
+            return doc.features.map(f => [f.properties.unit, f.properties.distance ?? f.properties.area]);
+        };
+        expect(units(UTM_33N_WKT)).toEqual([['m', 50], ['m²', 600]]);
+        expect(units(FOOT_WKT)).toEqual([['ft', 50], ['ft²', 600]]);
+        expect(units(US_FOOT_COMPOUND_WKT)).toEqual([['ftUS', 50], ['ftUS²', 600]]);
+        expect(units(null)).toEqual([['m', 50], ['m²', 600]]);
     });
 });
 
