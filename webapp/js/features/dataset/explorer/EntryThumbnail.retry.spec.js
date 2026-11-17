@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { thumbs, entry as ddbEntry } from 'ddb';
+import { createThumbnailQueue } from '@/libs/thumbnailQueue';
 
 const THUMB = '/orgs/acme/ds/site/thumb?path=cloud.laz&size=256';
 
@@ -63,6 +64,36 @@ describe('EntryThumbnail retries', () => {
 
         await vi.advanceTimersByTimeAsync(5000);
         expect(w.find('img').attributes('src')).toBe(`${THUMB}&retry=1`);
+        w.unmount();
+    });
+
+    // In the Explorer every request takes a slot of the loader's queue: a retry too, so failing thumbnails never load
+    // more images at once than its limit
+    it('asks again only when the loader gives it a slot', async () => {
+        const queue = createThumbnailQueue({ concurrency: 1 });
+        const file = {
+            label: 'a.jpg', path: 'ddb://hub.test/acme/site/a.jpg', icon: 'fa-solid fa-image', selected: false,
+            entry: { path: 'a.jpg', type: ddbEntry.type.IMAGE }
+        };
+        const w = mount(EntryThumbnail, {
+            props: { file, dataset: { org: 'acme', ds: 'site', getTasks: async () => [] } },
+            global: { provide: { thumbnailLoader: { queue, visibility: null } } }
+        });
+        await flushPromises();
+        expect(w.find('img').attributes('src')).toBe(THUMB);
+        expect(queue.running).toBe(1);
+
+        await w.find('img').trigger('error');
+        expect(queue.running).toBe(0);
+        const other = queue.enqueue(() => {}); // another tile takes the slot meanwhile
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(w.find('img').attributes('src')).toBe(THUMB);
+        expect(queue.running).toBe(1);
+
+        other.release();
+        await flushPromises();
+        expect(w.find('img').attributes('src')).toBe(`${THUMB}&retry=1`);
+        expect(queue.running).toBe(1);
         w.unmount();
     });
 });

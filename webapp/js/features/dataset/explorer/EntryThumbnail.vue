@@ -222,9 +222,11 @@ export default {
         if (this.loadTimeout) clearTimeout(this.loadTimeout);
     },
     methods: {
-        // The thumbnail URL at the size the tile has now: the tile's size times the pixel ratio, not a fixed 256 px
+        // The thumbnail URL at the size the tile has now: the tile's size times the pixel ratio, not a fixed 256 px. A
+        // retry names its number (&retry=N), which busts the browser cache of the failed response (the server ignores it).
         thumbnailUrl: function () {
-            return thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
+            const url = thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
+            return this.retryNumber > 0 ? `${stripRetryParam(url)}&retry=${this.retryNumber}` : url;
         },
         // Shows the thumbnail once the loader grants a slot (at once without a loader). The URL is built then, not
         // before: the size may change while the tile waits for its turn (FR-EXP-43).
@@ -307,10 +309,11 @@ export default {
                 }
                 const nextRetry = this.retryNumber + 1;
                 this.loadTimeout = setTimeout(() => {
-                    // Cache-buster: stripRetryParam + fresh &retry=N busts the
-                    // browser cache of the failed response (server ignores it).
-                    this.thumbnail = `${stripRetryParam(this.thumbnail)}&retry=${nextRetry}`;
+                    this.loadTimeout = null;
+                    // The retry waits for a slot of the loader like any request, so failing thumbnails stay within
+                    // its limit of requests at once
                     this.retryNumber = nextRetry;
+                    this.showImage();
                 }, retryDelayMs(this.retryNumber));
                 return;
             }
