@@ -52,6 +52,20 @@ describe('PropsTable', () => {
         expect(rule).not.toMatch(/orange/i);
     });
 
+    it('stacks the keys of a nested table over their values, which break at spaces, not letter by letter', () => {
+        const wrapper = mountTable({ obj: { vector: { crs: { label: 'EPSG:4326', source: 'lonlat' }, driver: 'DXF' } } });
+        const nested = wrapper.findAll('.props-table-wrapper').slice(1);
+        expect(nested.length).toBe(2);
+        expect(nested.every(table => table.classes('props-nested'))).toBe(true);
+        expect(wrapper.find('.props-table-wrapper').classes('props-nested')).toBe(false);
+        const source = readSource(__dirname, 'PropsTable.vue');
+        // The rows of a nested table are blocks: the key over the value, both on the whole width of the cell
+        expect(ruleOf(source, '.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td)')).toContain('display: block');
+        const key = ruleOf(source, '.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td:first-child)');
+        expect(key).toContain('width: 100%');
+        expect(key).toContain('overflow-wrap: normal');
+    });
+
     it('links codes in nested values too', () => {
         const wrapper = mountTable({ obj: { vector: { crs: 'EPSG:32633 (from the .prj file)' } } });
         expect(wrapper.find('a[href="https://epsg.io/32633"]').exists()).toBe(true);

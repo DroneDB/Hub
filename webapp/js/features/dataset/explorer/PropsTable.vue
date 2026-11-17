@@ -1,5 +1,5 @@
 <template>
-    <div class="props-table-wrapper">
+    <div class="props-table-wrapper" :class="{ 'props-nested': depth > 0 }">
         <!-- Array at root level: render each item as a sub-table -->
         <div v-if="Array.isArray(tObj)" class="props-array-list">
             <div v-for="(item, index) in tObj" :key="index">
@@ -456,5 +456,27 @@ export default {
 /* Nested PropsTable inside a cell */
 .props-datatable :deep(.p-datatable-tbody > tr > td .props-datatable) {
     margin: 0;
+}
+
+/* A table in a cell stacks each key over its value: side by side, each level had 60 % of the width of its parent, so
+   two levels down ("Vector > Crs") the keys broke one letter per line and the values were cut. Keys break at spaces */
+.props-nested > .props-datatable :deep(table),
+.props-nested > .props-datatable :deep(.p-datatable-tbody),
+.props-nested > .props-datatable :deep(.p-datatable-tbody > tr),
+.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td) {
+    display: block;
+    width: 100%;
+}
+
+.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td:first-child) {
+    width: 100%;
+    overflow-wrap: normal;
+    word-break: normal;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td:last-child) {
+    padding-left: var(--ddb-spacing-sm);
 }
 </style>
