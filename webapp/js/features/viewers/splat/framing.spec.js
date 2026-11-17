@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createFrameRetry, FRAME_ATTEMPTS, FRAME_RETRY_MS, coreBox, residentSplatCenters, CORE_QUANTILES, MIN_CORE_SAMPLES, framingHint, chooseFraming } from './framing';
+import { createFrameRetry, FRAME_ATTEMPTS, FRAME_RETRY_MS, coreBox, residentSplatCenters, CORE_QUANTILES, MIN_CORE_SAMPLES, MIN_ROOM_SAMPLES, framingHint, chooseFraming, crowdingOf } from './framing';
 import { FRAMING } from './cameraRig';
 
 beforeEach(() => { vi.useFakeTimers(); });
@@ -154,16 +154,26 @@ describe('framingHint', () => {
 describe('chooseFraming', () => {
     const train = { min: [-62, -67, -109], max: [172, 21, 26], framing: { kind: 'object', core: [-3.95, -0.94, -3.02, 3.65, 0.98, 2.72] } };
 
-    it('frames the core the build found, as its kind says, facing its sides, without reading the resident splats', () => {
+    it('frames the core the build found, as its kind says, facing its sides; an object or a site without reading the resident splats', () => {
         const residentCenters = vi.fn(() => capture());
         expect(chooseFraming({ bounds: train, georeferenced: false, residentCenters })).toEqual({
-            framing: FRAMING.OBJECT, core: { min: [-3.95, -0.94, -3.02], max: [3.65, 0.98, 2.72] }, faceBox: true
+            framing: FRAMING.OBJECT, core: { min: [-3.95, -0.94, -3.02], max: [3.65, 0.98, 2.72] }, faceBox: true, crowding: null, settled: true
         });
-        expect(residentCenters).not.toHaveBeenCalled();
-        const room = { ...train, framing: { kind: 'scene', core: [-4, -1, -4, 4, 2, 4] } };
-        expect(chooseFraming({ bounds: room, residentCenters }).framing).toBe(FRAMING.IMMERSIVE);
         const site = { ...train, framing: { kind: 'site', core: [-50, -50, 0, 50, 50, 10] } };
-        expect(chooseFraming({ bounds: site, residentCenters }).framing).toBe(FRAMING.OVERVIEW);
+        expect(chooseFraming({ bounds: site, residentCenters })).toMatchObject({ framing: FRAMING.OVERVIEW, settled: true });
+        expect(residentCenters).not.toHaveBeenCalled();
+    });
+
+    it('keeps a room clear of its resident splats, and frames it again until enough of them arrived', () => {
+        const room = { min: [-100, -100, -100], max: [100, 100, 100], framing: { kind: 'scene', core: [8, -1, -7, 12, 1, -3] } };
+        const early = chooseFraming({ bounds: room, residentCenters: () => new Float32Array(0) });
+        expect(early).toMatchObject({ framing: FRAMING.IMMERSIVE, faceBox: true, crowding: null, settled: false });
+        expect(early.core).toEqual({ min: [8, -1, -7], max: [12, 1, -3] });
+        // The first coarse pages of a paged scene are too few; once enough have arrived the framing is settled
+        expect(chooseFraming({ bounds: room, residentCenters: () => capture() }).settled).toBe(false);
+        const loaded = chooseFraming({ bounds: room, residentCenters: () => capture({ subject: MIN_ROOM_SAMPLES }) });
+        expect(loaded.settled).toBe(true);
+        expect(typeof loaded.crowding).toBe('function');
     });
 
     it('frames the core of the resident splats without a hint, from inside or, for a georeferenced scene, from above', () => {
@@ -177,5 +187,26 @@ describe('chooseFraming', () => {
         expect(site.core).toEqual(coreBox(capture(), CORE_QUANTILES.overview));
         // Nothing resident yet: no core, the retry goes on
         expect(chooseFraming({ bounds: before, residentCenters: () => new Float32Array(0) }).core).toBeNull();
+    });
+});
+
+describe('crowdingOf', () => {
+    // The subject of the capture fills a 4 x 2 x 4 box about (10, 0, -5) evenly
+    const box = { min: [8, -1, -7], max: [12, 1, -3] };
+
+    it('is about 1 among splats spread as evenly as in the core, 0 in the air, more in a wall', () => {
+        const crowding = crowdingOf(capture({ subject: 20000, floaters: 0 }), box);
+        expect(crowding([10, 0, -5], 0.5)).toBeGreaterThan(0.7);
+        expect(crowding([10, 0, -5], 0.5)).toBeLessThan(1.3);
+        expect(crowding([10, 5, -5], 0.5)).toBe(0);
+        // A wall: as many splats again in a slab 0.1 thick at x = 20, 2 high and 4 wide
+        const wall = Array.from(capture({ subject: 20000, floaters: 0 }));
+        for (let i = 0; i < 20000; i++) wall.push(20 + (i % 10) * 0.01, (i % 137) / 68.5 - 1, -7 + (i % 151) / 37.75);
+        expect(crowdingOf(new Float32Array(wall), box)([20, 0, -5], 0.5)).toBeGreaterThan(2);
+    });
+
+    it('says nothing with too few splats in the core', () => {
+        expect(crowdingOf(capture({ subject: MIN_ROOM_SAMPLES - 1, floaters: 100 }), box)).toBeNull();
+        expect(crowdingOf(capture({ subject: MIN_ROOM_SAMPLES, floaters: 0 }), box)).not.toBeNull();
     });
 });

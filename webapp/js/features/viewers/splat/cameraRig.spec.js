@@ -153,36 +153,77 @@ describe('frame of the core the build found', () => {
         expect(camera.position.distanceTo(center)).toBeCloseTo(offset.length(), 4);
     });
 
-    it('frames a scene from inside its core, behind its centre, level, looking along its longest side', () => {
+    it('frames a room from high in a corner of its core, looking across it at its centre, a little down', () => {
         expect(framingOf({ kind: 'scene', georeferenced: false })).toBe(FRAMING.IMMERSIVE);
         const { rig, camera, controls } = makeRig();
         rig.frame(core, identity, FRAMING.IMMERSIVE, core, { faceBox: true });
+        // 80 % of the way out to a corner of the core (8 x 4 on the horizon), at 75 % of its height (2)
+        expect(Math.abs(camera.position.x - center.x)).toBeCloseTo(0.8 * 4, 6);
+        expect(Math.abs(camera.position.z - center.z)).toBeCloseTo(0.8 * 2, 6);
+        expect(camera.position.y).toBeCloseTo(1.5, 6);
         expect(core.containsPoint(camera.position)).toBe(true);
-        // 60 % of the half length (4 m) behind the centre: not against the wall at the end of the room
-        expect(camera.position.distanceTo(center)).toBeCloseTo(2.4, 6);
-        expect(Math.abs(forward(camera).x)).toBeCloseTo(1, 6);
-        expect(controls.target.distanceTo(center)).toBeLessThan(1e-6);
-        expect(rig.pitch).toBeCloseTo(0, 9);
+        // It looks at a point 10 % of the height below the centre: down into the room, level about the up
+        const target = center.clone().addScaledVector(rig.sceneUp, -0.2);
+        expect(controls.target.distanceTo(target)).toBeLessThan(1e-6);
+        expect(forward(camera).dot(target.clone().sub(camera.position).normalize())).toBeCloseTo(1, 6);
+        expect(rig.pitch).toBeLessThan(0);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        expect(Math.abs(right.dot(rig.sceneUp))).toBeLessThan(1e-9);
     });
 
-    it('frames a site whole from above at 45 degrees, its long side across the view', () => {
-        expect(framingOf({ kind: 'site', georeferenced: false })).toBe(FRAMING.OVERVIEW);
+    it('stands in the least crowded corner of a room', () => {
         const { rig, camera } = makeRig();
-        rig.frame(core, identity, FRAMING.OVERVIEW, core, { faceBox: true });
-        const offset = camera.position.clone().sub(center);
-        expect(elevation(rig, offset)).toBeCloseTo(45, 6);
-        expect(azimuth(offset)).toBeCloseTo(0, 6);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-        expect(Math.abs(right.x)).toBeCloseTo(1, 6);
+        // The corners on the -X side are full of splats (a wall of shelves)
+        const crowding = ([x]) => (x < 10 ? 5 : 0);
+        rig.frame(core, identity, FRAMING.IMMERSIVE, core, { faceBox: true, crowding });
+        expect(camera.position.x).toBeGreaterThan(center.x + 3);
+    });
+
+    it('stands in the corner with a clear view when the camera is clear in every corner', () => {
+        const { rig, camera } = makeRig();
+        // Shelves stand in front of the corners on the -Z side, between them and the centre
+        const crowding = ([x, , z]) => (z < -5.5 && z > -6.5 && Math.abs(x - 10) < 3 ? 5 : 0);
+        rig.frame(core, identity, FRAMING.IMMERSIVE, core, { faceBox: true, crowding });
+        expect(camera.position.z).toBeGreaterThan(center.z + 1);
+    });
+
+    it('steps out of the splats towards the middle of the room when every corner is crowded', () => {
+        const { rig, camera } = makeRig();
+        // Crowded farther than 1 from the middle of the core on the horizon
+        const crowding = ([x, , z]) => (Math.hypot(x - 10, z + 5) > 1 ? 1 : 0);
+        rig.frame(core, identity, FRAMING.IMMERSIVE, core, { faceBox: true, crowding });
+        expect(Math.hypot(camera.position.x - 10, camera.position.z + 5)).toBeLessThanOrEqual(1);
+        expect(camera.position.y).toBeCloseTo(1.5, 6);
+        // It gives up after its steps rather than end in the middle when nothing is clear
+        const { rig: stuck, camera: stuckCamera } = makeRig();
+        stuck.frame(core, identity, FRAMING.IMMERSIVE, core, { faceBox: true, crowding: () => 9 });
+        const left = Math.hypot(stuckCamera.position.x - 10, stuckCamera.position.z + 5);
+        expect(left).toBeCloseTo(Math.hypot(3.2, 1.6) * 0.85 ** 8, 6);
+    });
+
+    it('asks how crowded a corner is in the frame of the splat file', () => {
+        // The core of a Z-up file turned to Y-up: the file point of each corner is the world point turned back
+        const zUp = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+        const file = new THREE.Box3(new THREE.Vector3(-4, -1, 0), new THREE.Vector3(4, 1, 1));
+        const asked = [];
+        const { rig, camera } = makeRig();
+        rig.frame(file, zUp, FRAMING.IMMERSIVE, file, { faceBox: true, crowding: point => { asked.push(point); return 0; } });
+        // Each corner, then the points of its line of sight
+        const corners = asked.filter((_, i) => i % 4 === 0).slice(0, 4);
+        expect(corners.length).toBe(4);
+        // At 75 % of the height of the core in the file: z = 0.75
+        corners.forEach(point => expect(point[2]).toBeCloseTo(0.75, 6));
+        expect(camera.position.toArray().every(Number.isFinite)).toBe(true);
     });
 
     it('faces the sides of the core as the mesh orientation turns them', () => {
-        // The core of a Z-up file turned to Y-up: its long side is still X, its narrow one now Y
+        // The core of a Z-up file turned to Y-up: its long side is still X, across the view of a site
         const zUp = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
         const file = new THREE.Box3(new THREE.Vector3(-4, -1, 0), new THREE.Vector3(4, 1, 1));
         const { rig, camera, controls } = makeRig();
-        rig.frame(file, zUp, FRAMING.IMMERSIVE, file, { faceBox: true });
-        expect(Math.abs(forward(camera).x)).toBeCloseTo(1, 6);
+        rig.frame(file, zUp, FRAMING.OVERVIEW, file, { faceBox: true });
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        expect(Math.abs(right.x)).toBeCloseTo(1, 6);
         expect(controls.target.distanceTo(file.getCenter(new THREE.Vector3()).applyQuaternion(zUp))).toBeLessThan(1e-6);
     });
 

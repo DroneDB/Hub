@@ -23,19 +23,31 @@ export const framingOf = ({ georeferenced, kind }) =>
 
 // How the scene sphere fits the view (fitDistance's margin), how high above the horizon of the
 // scene up the camera looks at it from and, when the camera faces the box (frame's `faceBox`), how
-// far round from the narrowest horizontal side of the box towards its longest one and, for a view
-// from inside, how far behind the centre the camera stands, as a share of half the longest side
+// far round from the narrowest horizontal side of the box towards its longest one. A scene seen
+// from inside that faces its box is framed as a room is photographed instead (ROOM_SHOT).
 const FRAMINGS = Object.freeze({
-    // Well under 1: the sphere is larger than the view, so the camera starts inside the model. Facing
-    // the box, it stands on its longest side behind the centre, looking along it: at the fitted
-    // distance it would stand at the end of a room, against what is on its wall
-    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0, azimuthDeg: 90, insideShare: 0.6 },
+    // Well under 1: the sphere is larger than the view, so the camera starts inside the model
+    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0, azimuthDeg: 0 },
     // The whole sphere in view, seen from halfway between the horizon and straight down, the long side
     // of the site across the view
     [FRAMING.OVERVIEW]: { margin: 1.1, elevationDeg: 45, azimuthDeg: 0 },
     // The whole object in view, from a little above it, in three-quarter view: its long side and one end
     [FRAMING.OBJECT]: { margin: 1.15, elevationDeg: 35, azimuthDeg: 35 }
 });
+
+/**
+ * The establishing shot of a room (a scene seen from inside, facing the core the build found): the
+ * camera stands high in a corner of the core and looks across it at its centre, a little down, so the
+ * floor, the furniture and the far walls are all in view. `corner` is how far out towards the corner
+ * it stands (a share of the half sides of the core on the horizon), `height` how high (a share of the
+ * height of the core from its bottom), `lookBelow` how far below the centre it looks (a share of that
+ * height). The corner is the least crowded of the four (fewest resident splats within `clearance` of
+ * the diagonal of the core, against the mean density of the core, there and at the `sight` shares of
+ * the way to what it looks at: a shelf right in front of the camera hides the room); while it is more crowded than
+ * `crowded` (the camera would stand in a wall, a shelf or a lamp), the camera steps `step` of the way
+ * towards the middle of the core at its height, `steps` times at most.
+ */
+export const ROOM_SHOT = Object.freeze({ corner: 0.8, height: 0.75, lookBelow: 0.1, clearance: 0.08, crowded: 0.25, step: 0.15, steps: 8, sight: [0.15, 0.3, 0.45] });
 
 /**
  * Scene up from the calibration angles (degrees): pitch about world X, roll about world Z.
@@ -204,32 +216,83 @@ export class CameraRig {
      * @param {any} q
      * @param {string} [framing]
      * @param {any} [extent]
-     * @param {{ faceBox?: boolean }} [options]
+     * A room (FRAMING.IMMERSIVE facing its box) gets its establishing shot (ROOM_SHOT); `crowding`
+     * (crowdingOf, over the resident splats, in the frame of the splat file) keeps the camera out of
+     * its walls and furniture, and without it the first corner is taken as it is.
+     * @param {{ faceBox?: boolean, crowding?: ((point: number[], radius: number) => number) | null }} [options]
      */
-    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box, { faceBox = false } = {}) {
+    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box, { faceBox = false, crowding = null } = {}) {
         const { THREE, camera, controls } = this;
-        const { margin, elevationDeg, azimuthDeg, insideShare } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
+        const { margin, elevationDeg, azimuthDeg } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3()).applyQuaternion(q);
         this.boundsDiagonal = Math.max(size.length(), 1e-3);
-        const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
-        // The vertical field of view limits a landscape view, the horizontal one a portrait view
-        const sides = faceBox ? this.horizontalSides(box, q) : null;
-        const inside = sides && insideShare ? insideShare * sides.length / 2 : 0;
-        const dist = inside > 0 ? inside : fitDistance(radius, camera.fov, camera.aspect, margin);
+        let position, target = center;
+        if (faceBox && framing === FRAMING.IMMERSIVE) {
+            ({ position, target } = this.roomShot(box, q, crowding));
+        } else {
+            const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
+            // The vertical field of view limits a landscape view, the horizontal one a portrait view
+            const fitted = fitDistance(radius, camera.fov, camera.aspect, margin);
+            const facing = faceBox ? { azimuthDeg, sides: this.horizontalSides(box, q) } : {};
+            position = center.clone().addScaledVector(this.framingDirection(elevationDeg, facing), fitted);
+        }
+        const dist = position.distanceTo(target);
         // A small near plane lets splats render when the camera flies in among them
         camera.near = Math.max(this.boundsDiagonal / 5000, 0.001);
         const extentDiagonal = extent && !extent.isEmpty() ? extent.getSize(new THREE.Vector3()).length() : 0;
         camera.far = dist + Math.max(this.boundsDiagonal * 10, extentDiagonal * 2);
         camera.updateProjectionMatrix();
-        const facing = sides ? { azimuthDeg, sides } : {};
-        camera.position.copy(center).addScaledVector(this.framingDirection(elevationDeg, facing), dist);
+        camera.position.copy(position);
         camera.up.copy(this.sceneUp);
-        camera.lookAt(center);
-        controls.target.copy(center);
+        camera.lookAt(target);
+        controls.target.copy(target);
         this.updateControls();
         this.lookDist = Math.max(dist, 0.01);
         this.syncYawPitch();
+    }
+
+    /**
+     * Where the camera stands and what it looks at for the establishing shot of a room (ROOM_SHOT).
+     * @param {any} box  the core, in the frame of the splat file
+     * @param {any} q  the mesh orientation
+     * @param {((point: number[], radius: number) => number) | null} crowding
+     * @returns {{ position: any, target: any }}
+     */
+    roomShot(box, q, crowding) {
+        const { THREE, sceneUp } = this;
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3()).applyQuaternion(q);
+        const { narrowest, longest } = this.horizontalSides(box, q);
+        // The extent of the turned box along a direction
+        const edges = [new THREE.Vector3(size.x, 0, 0), new THREE.Vector3(0, size.y, 0), new THREE.Vector3(0, 0, size.z)].map(e => e.applyQuaternion(q));
+        const along = dir => edges.reduce((sum, e) => sum + Math.abs(e.dot(dir)), 0);
+        const height = along(sceneUp);
+        const eye = center.clone().addScaledVector(sceneUp, (ROOM_SHOT.height - 0.5) * height);
+        const target = center.clone().addScaledVector(sceneUp, -ROOM_SHOT.lookBelow * height);
+
+        const inverse = q.clone().invert();
+        const radius = ROOM_SHOT.clearance * Math.max(size.length(), 1e-3);
+        const crowdingAt = p => (crowding ? crowding(p.clone().applyQuaternion(inverse).toArray(), radius) : 0);
+        // A corner is as crowded as the camera there, plus the mean of the points of its line of sight
+        const sightCrowding = corner => ROOM_SHOT.sight.reduce((sum, t) => sum + crowdingAt(corner.clone().lerp(target, t)), 0) / ROOM_SHOT.sight.length;
+        let position = null, least = Infinity;
+        for (const [l, n] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+            const corner = eye.clone()
+                .addScaledVector(longest, l * ROOM_SHOT.corner * along(longest) / 2)
+                .addScaledVector(narrowest, n * ROOM_SHOT.corner * along(narrowest) / 2);
+            const score = crowdingAt(corner) + sightCrowding(corner);
+            if (score < least) {
+                position = corner;
+                least = score;
+            }
+        }
+        let crowded = crowdingAt(position);
+        for (let i = 0; i < ROOM_SHOT.steps && crowded > ROOM_SHOT.crowded; i++) {
+            position.lerp(eye, ROOM_SHOT.step);
+            crowded = crowdingAt(position);
+        }
+        return { position, target };
     }
 
     /** Field of view in degrees (the projection follows). */
