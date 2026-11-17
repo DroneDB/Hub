@@ -9,7 +9,7 @@ import { fixedLengthParts, formatBytes, formatDateTime, formatNumber, formatSpee
 import { visibilityLabel } from '@/libs/visibility';
 import { Licenses } from '@/libs/licenses';
 import { VIEWS_KEY } from '@/libs/views/viewStore';
-import { buildWarningOf } from '@/libs/build/buildWarnings';
+import { warningWordsOf } from '@/libs/build/buildWarnings';
 import { streamedInText } from '@/libs/build/pointCloudCrs';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
@@ -331,11 +331,12 @@ export function buildAllProperties(file, units = 'metric', { raw = false, create
             }
         }
         formatMeasuredProperties(props, units);
-        // A warning libddb tagged with a code is said in words for users, not as the server's setup message; the
-        // code itself is not a row (FR-EXP-18)
+        // A warning libddb tagged with a code is said in words for users, not as the server's setup message (the
+        // lines a build wrote are such words: the reason a tool gave, the files it left out); the code itself is not a
+        // row (FR-EXP-18)
         delete props.warningCode;
-        const coded = buildWarningOf(entry);
-        if (coded) props.warning = coded.text;
+        const words = warningWordsOf(entry);
+        if (words) props.warning = words;
         // A georaster's resolution in ground units; tidyProperties falls back to its geotransform
         if (entry.properties.geotransform) {
             const resolution = formatGroundResolution(entry.polygon_geom, entry.properties.width, entry.properties.height, units);

@@ -407,6 +407,8 @@ export default {
     background-color: var(--ddb-warning);
     color: var(--ddb-text-on-warning);
     overflow-wrap: anywhere;
+    /* A build writes one line for each thing it could not do */
+    white-space: pre-line;
 }
 
 .row-note {

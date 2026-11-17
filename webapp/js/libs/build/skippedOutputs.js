@@ -4,7 +4,9 @@
  * output and then its 3D Tiles; when the tiler fails on the file (an OBJ whose vertex colours do
  * not cover every vertex), libddb keeps the build, logs "<output> generation skipped for <path>:
  * <why>" and lists no 3D Tiles. The entry then looks like one built before 3D Tiles existed, which a
- * rebuild fixes, while here a rebuild fails the same way: the build log is what tells them apart.
+ * rebuild fixes, while here a rebuild fails the same way. libddb 2.8 records it on the entry
+ * (buildWarnings, notGeneratedOutputOf); for an entry built by an older libddb, the build log is what
+ * tells them apart.
  *
  * A leaf module (no other build/* imports).
  */

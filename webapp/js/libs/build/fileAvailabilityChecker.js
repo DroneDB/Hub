@@ -9,7 +9,7 @@ import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
-import { buildWarningOf } from '@/libs/build/buildWarnings';
+import { buildWarningOf, notGeneratedOutputOf } from '@/libs/build/buildWarnings';
 import { skippedOutputOf } from '@/libs/build/skippedOutputs';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
@@ -59,7 +59,7 @@ const VIEW_ARTIFACT_ROLES = {
  * @property {Array<string>} actions - Available actions for the user
  * @property {string} [hint] - What the administrator of the server does about it ('unsupported'), shown in the details
  * @property {string} [output] - The output the build could not generate ('not-generated'), as libddb names it
- * @property {string} [reason] - Why, in the words of the tool that failed ('not-generated'; '' when the log does not say)
+ * @property {string} [reason] - Why, in the words of the tool that failed ('not-generated'; '' when libddb does not say)
  */
 
 class FileAvailabilityChecker {
@@ -157,7 +157,7 @@ class FileAvailabilityChecker {
             // The server cannot read this kind of file, as libddb tags it (a DWG on a server without its converter): the
             // user is told so, and no build is offered, because processing the file again cannot help (FR-EXP-18)
             const unsupported = buildWarningOf(listed);
-            if (unsupported && !unsupported.retry) {
+            if (unsupported?.kind === 'unsupported') {
                 return {
                     available: false,
                     status: 'unsupported',
@@ -195,9 +195,10 @@ class FileAvailabilityChecker {
                 return this.handleExistingBuildState({ path: entry.path, currentState: 'Failed' }, entry);
 
             // 3. Built, but without the artifact this viewer needs. The build may have tried to make it and failed
-            // (the tiler cannot read the file): a rebuild fails the same way, so the reason is shown instead
+            // (the tiler cannot read the file): a rebuild fails the same way, so the reason is shown instead. libddb
+            // records it on the entry; the build log says it for an entry built before it did
             if (roles && isBuilt(listed)) {
-                const skipped = await this.skippedOutput(dataset, entry.path);
+                const skipped = notGeneratedOutputOf(listed, roles) || await this.skippedOutput(dataset, entry.path);
                 if (skipped) {
                     return {
                         available: false,
@@ -246,7 +247,8 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * The output the last build of `path` could not generate, from its log (skippedOutputs), or null: no build task
+     * The output the last build of `path` could not generate, from its log (skippedOutputs), for an entry built by a
+     * libddb that did not record it on the entry (notGeneratedOutputOf), or null: no build task
      * of it in the task list, a build that did not succeed, a log that names none or that cannot be read.
      * @returns {Promise<import('@/libs/build/skippedOutputs').SkippedOutput | null>}
      */

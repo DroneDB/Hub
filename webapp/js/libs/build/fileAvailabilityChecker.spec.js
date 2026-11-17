@@ -147,6 +147,37 @@ describe('unified viewer gate', () => {
             expect(result).toMatchObject({ status: 'rebuild' });
         });
 
+        // libddb 2.8 records the failure on the entry: no task log is read, and the reason is the tiler's
+        const recorded = (warning, code = '3dtiles-not-generated') => model({ artifacts: [BM3D], properties: { warning, warningCode: code } });
+
+        it('says so from the warning of the entry, without reading the build log', async () => {
+            taskMonitor.getTasks.mockReturnValue([buildTask()]);
+            const dataset = withLog(['[19:39:51] Done build']);
+            const entry = recorded('3D Tiles not generated: Vertex color count (40) does not match vertex count (48).\nTextures outside the dataset left out: ../t.png');
+            const result = await checker.check(dataset, entry, 'unified', { current: true });
+            expect(result).toMatchObject({
+                available: false, status: 'not-generated', output: '3D Tiles',
+                reason: 'Vertex color count (40) does not match vertex count (48).', actions: ['close']
+            });
+            expect(dataset.getTaskLog).not.toHaveBeenCalled();
+            expect(dataset.getTasks).not.toHaveBeenCalled();
+        });
+
+        it('opens the model viewer of a model whose 3D Tiles were not generated: its bm3d output is there', async () => {
+            const entry = recorded('3D Tiles not generated: Obj2Tiles failed on this model');
+            const result = await checker.check(datasetListing(null), entry, 'model', { current: true });
+            expect(result).toMatchObject({ available: true, status: 'ready' });
+        });
+
+        it('reads the build log when the warning of the entry is not about the 3D Tiles', async () => {
+            taskMonitor.getTasks.mockReturnValue([buildTask()]);
+            const dataset = withLog([SKIPPED]);
+            const entry = recorded('Textures outside the dataset left out: ../t.png', 'textures-outside-dataset');
+            const result = await checker.check(dataset, entry, 'unified', { current: true });
+            expect(result).toMatchObject({ status: 'not-generated', reason: 'Index was out of range.' });
+            expect(dataset.getTaskLog).toHaveBeenCalledWith('t9');
+        });
+
         it('still asks for a rebuild when the log cannot be read', async () => {
             taskMonitor.getTasks.mockReturnValue([buildTask()]);
             const dataset = withLog([SKIPPED]);

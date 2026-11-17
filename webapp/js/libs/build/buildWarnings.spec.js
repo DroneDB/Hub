@@ -3,7 +3,7 @@
  * processing the file again can help.
  */
 import { describe, it, expect } from 'vitest';
-import { BUILD_WARNINGS, buildWarningOf } from './buildWarnings';
+import { BUILD_WARNINGS, buildWarningOf, notGeneratedOutputOf, warningWordsOf } from './buildWarnings';
 
 describe('buildWarningOf', () => {
     it('gives the words of a DWG on a server without its converter: for users, and no retry', () => {
@@ -29,5 +29,59 @@ describe('buildWarningOf', () => {
 
     it('has one row per code, with its own code in it', () => {
         for (const [code, row] of Object.entries(BUILD_WARNINGS)) expect(row.code).toBe(code);
+    });
+
+    it('tells a file the server cannot read from what a build could not make or left out', () => {
+        expect(buildWarningOf({ properties: { warningCode: 'dwg-converter-missing' } }).kind).toBe('unsupported');
+        expect(buildWarningOf({ properties: { warningCode: '3dtiles-not-generated' } }).kind).toBe('not-generated');
+        expect(buildWarningOf({ properties: { warningCode: 'textures-outside-dataset' } }).kind).toBe('left-out');
+    });
+});
+
+describe('warningWordsOf', () => {
+    const entry = (warning, warningCode) => ({ properties: { warning, warningCode } });
+    const lines = '3D Tiles not generated: Obj2Tiles failed on this model\nTextures outside the dataset left out: ../a.png, C:/b.png';
+
+    it('gives the lines a build wrote as they are: they are for users', () => {
+        expect(warningWordsOf(entry(lines, '3dtiles-not-generated'))).toBe(lines);
+        expect(warningWordsOf(entry('Textures outside the dataset left out: ../a.png', 'textures-outside-dataset')))
+            .toBe('Textures outside the dataset left out: ../a.png');
+    });
+
+    it('gives the words of the table for a file the server cannot read, and when a build gives no text', () => {
+        expect(warningWordsOf(entry('vector parse failed: DWG support needs dwg2dxf', 'dwg-converter-missing')))
+            .toBe('DWG drawings cannot be read on this server; export the drawing as DXF and upload that.');
+        expect(warningWordsOf(entry('', 'textures-outside-dataset'))).toBe(BUILD_WARNINGS['textures-outside-dataset'].text);
+    });
+
+    it('gives the text of a warning without a code or with one it does not know, and nothing without a warning', () => {
+        expect(warningWordsOf(entry('footprint unavailable: x'))).toBe('footprint unavailable: x');
+        expect(warningWordsOf(entry('new reason', 'from-a-newer-libddb'))).toBe('new reason');
+        expect(warningWordsOf({})).toBe('');
+        expect(warningWordsOf(null)).toBe('');
+    });
+});
+
+describe('notGeneratedOutputOf', () => {
+    const TILES = '3D Tiles not generated: Vertex color count (40) does not match vertex count (48).';
+    const entry = (warning, warningCode = '3dtiles-not-generated') => ({ properties: { warning, warningCode } });
+
+    it('gives the output and the reason of the tiler, from the first line of the warning', () => {
+        expect(notGeneratedOutputOf(entry(`${TILES}\nTextures outside the dataset left out: ../a.png`), 'model.3dtiles'))
+            .toEqual({ output: '3D Tiles', reason: 'Vertex color count (40) does not match vertex count (48).' });
+        expect(notGeneratedOutputOf(entry(TILES), ['model.bm3d', 'model.3dtiles'])).toMatchObject({ output: '3D Tiles' });
+    });
+
+    it('keeps a first line that does not start as libddb writes it whole, and gives no reason without text', () => {
+        expect(notGeneratedOutputOf(entry('the tiler failed'), 'model.3dtiles')).toEqual({ output: '3D Tiles', reason: 'the tiler failed' });
+        expect(notGeneratedOutputOf(entry(undefined), 'model.3dtiles')).toEqual({ output: '3D Tiles', reason: '' });
+    });
+
+    it('is null for another output, another warning, or no warning', () => {
+        expect(notGeneratedOutputOf(entry(TILES), ['model.bm3d', 'model.nexus'])).toBeNull();
+        expect(notGeneratedOutputOf(entry('Textures outside the dataset left out: ../a.png', 'textures-outside-dataset'), 'model.3dtiles')).toBeNull();
+        expect(notGeneratedOutputOf(entry('vector parse failed', 'dwg-converter-missing'), 'vector.mvt')).toBeNull();
+        expect(notGeneratedOutputOf({}, 'model.3dtiles')).toBeNull();
+        expect(notGeneratedOutputOf(null, null)).toBeNull();
     });
 });

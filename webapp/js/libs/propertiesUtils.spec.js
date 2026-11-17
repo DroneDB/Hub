@@ -367,6 +367,16 @@ describe('a warning that libddb tags with a code (FR-EXP-18)', () => {
         expect(props.warning).toBe('new reason');
         expect(props).not.toHaveProperty('warningCode');
     });
+
+    it('shows the lines of a model build as libddb wrote them, first: what it could not make, the textures it left out', () => {
+        const lines = '3D Tiles not generated: Obj2Tiles failed on this model\nTextures outside the dataset left out: ../tex/a.png';
+        const props = buildAllProperties({
+            entry: { path: 'house.obj', type: ddb.entry.type.MODEL, size: 10, properties: { georeferenced: false, warning: lines, warningCode: '3dtiles-not-generated' } }
+        });
+        expect(Object.keys(props)[0]).toBe('warning');
+        expect(props.warning).toBe(lines);
+        expect(props).not.toHaveProperty('warningCode');
+    });
 });
 
 describe('the coordinate system of a point cloud', () => {
