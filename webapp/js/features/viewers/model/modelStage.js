@@ -95,8 +95,13 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     renderer.setPixelRatio(appliedPixelRatio());
     const stopPixelRatio = watchPixelRatio(() => renderer.setPixelRatio(appliedPixelRatio()));
 
-    // MeshLab-style shading for models without a texture
-    const material = new THREE.MeshPhongMaterial({ color: colour(0xaaaaaa), specular: colour(0x444444), shininess: settings.shininess });
+    // MeshLab-style shading for models without a texture, on both sides of the triangles: the winding
+    // of many meshes is not consistent (scans, terrain patches wound clockwise), and an open surface
+    // is seen from behind when the camera passes under it; a back face is lit with its normal turned
+    // to the camera
+    const material = new THREE.MeshPhongMaterial({
+        color: colour(0xaaaaaa), specular: colour(0x444444), shininess: settings.shininess, side: THREE.DoubleSide
+    });
 
     const controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.setGizmosVisible(false);

@@ -148,6 +148,13 @@ describe('the legacy three.js (r124)', () => {
     });
 });
 
+describe('the shaded material', () => {
+    it('draws both sides of the triangles: meshes wound clockwise or of mixed winding, and surfaces seen from below', () => {
+        makeStage();
+        expect(stage.material.side).toBe(THREE_BUILD.DoubleSide);
+    });
+});
+
 describe('frameModel', () => {
     it('scales the model to the unit sphere and moves the centre of its sphere to the origin', () => {
         makeStage();
