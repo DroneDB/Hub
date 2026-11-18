@@ -1,5 +1,14 @@
 <template>
     <div class="props-table-wrapper" :class="{ 'props-nested': depth > 0 }">
+        <!-- The warning of the file (a coordinate system that was ignored, the files a build left out) stands out above
+             its properties, on the whole width: one item for each thing it says -->
+        <div v-if="warnings.length" class="entry-warning" role="note" aria-label="Warning">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true" />
+            <ul class="entry-warning-lines" :class="{ several: warnings.length > 1 }">
+                <li v-for="(line, i) in warnings" :key="i">{{ line }}</li>
+            </ul>
+        </div>
+
         <!-- Array at root level: render each item as a sub-table -->
         <div v-if="Array.isArray(tObj)" class="props-array-list">
             <div v-for="(item, index) in tObj" :key="index">
@@ -26,11 +35,6 @@
                     </div>
                     <div v-else-if="typeof data.rawValue === 'boolean' && data.rawValue" class="bool-true" title="true">✓</div>
                     <div v-else-if="typeof data.rawValue === 'boolean'" class="bool-false" title="false">✗</div>
-                    <!-- A warning of the entry (a coordinate system that was ignored...) stands out from the other rows -->
-                    <div v-else-if="isWarningRow(data)" class="entry-warning" role="note">
-                        <i class="fa-solid fa-triangle-exclamation" />
-                        <span>{{ data.rawValue }}</span>
-                    </div>
                     <div v-else-if="isEntryTypeRow(data)" class="copyable-row">
                         <span>{{ data.rawValue }}</span>
                         <Button icon="fa-regular fa-circle-question"
@@ -121,6 +125,7 @@
 import { clone, sortObjectKeys } from '@/libs/utils';
 import { tidyProperties, beautifyKey, isUrl, linkCrsCodes } from '@/libs/propertiesUtils';
 import { getEntryTypeInfo } from '@/libs/entryTypeInfo';
+import { warningLines } from '@/libs/build/buildWarnings';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -149,6 +154,9 @@ import { formatDateTime, formatNumber, UNKNOWN } from '@/libs/format';
  * EPSG and ESRI codes in string values stay plain text, followed by an info
  * button that opens their epsg.io page in a new tab.
  */
+// The property that holds the warning of the file (buildAllProperties puts it first)
+const WARNING_KEY = 'warning';
+
 export default {
     name: 'PropsTable',
     components: {
@@ -215,11 +223,17 @@ export default {
     computed: {
         rows() {
             if (!this.tObj || typeof this.tObj !== 'object' || Array.isArray(this.tObj)) return [];
-            return Object.entries(this.tObj).map(([key, val]) => ({
+            // The warning of the file is shown above the table (warnings)
+            return Object.entries(this.tObj).filter(([key]) => !(this.warnings.length && key === WARNING_KEY)).map(([key, val]) => ({
                 key,
                 displayKey: this.beautify(key),
                 rawValue: val
             }));
+        },
+        // The lines of the warning of the file (its top-level row); a nested "warning" is a property like the others
+        warnings() {
+            const isObject = this.depth === 0 && this.tObj !== null && typeof this.tObj === 'object' && !Array.isArray(this.tObj);
+            return isObject ? warningLines(this.tObj[WARNING_KEY]) : [];
         }
     },
     watch: {
@@ -261,11 +275,6 @@ export default {
         beautify: beautifyKey,
 
         isUrl,
-
-        // The warning of the file (its top-level row), in the warning yellow
-        isWarningRow(data) {
-            return this.depth === 0 && data.key === 'warning' && typeof data.rawValue === 'string' && data.rawValue !== '';
-        },
 
         // As Modified is written (formatDateTime); a capture time that is not known (missing or 0) is "Unknown"
         formatCaptureTime(value) {
@@ -397,18 +406,37 @@ export default {
     cursor: pointer;
 }
 
-/* The warning yellow with dark text, in both themes */
+/* The warning yellow with dark text, in both themes, as wide as the panel and in the size of the rows under it */
 .entry-warning {
     display: flex;
     align-items: baseline;
     gap: var(--ddb-spacing-sm);
-    padding: 2px 6px;
+    margin-bottom: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
     border-radius: 4px;
     background-color: var(--ddb-warning);
     color: var(--ddb-text-on-warning);
+    font-size: 0.85rem;
     overflow-wrap: anywhere;
-    /* A build writes one line for each thing it could not do */
-    white-space: pre-line;
+}
+
+/* A build writes one line for each thing it could not do: each is an item of its own, with a bullet and a gap when
+   there are several, so the second does not read as the end of the first */
+.entry-warning-lines {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.entry-warning-lines.several {
+    padding-left: 1.1em;
+    list-style: disc;
+}
+
+.entry-warning-lines > li + li {
+    margin-top: var(--ddb-spacing-xs);
 }
 
 .row-note {

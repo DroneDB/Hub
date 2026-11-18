@@ -3,7 +3,7 @@
  * processing the file again can help.
  */
 import { describe, it, expect } from 'vitest';
-import { BUILD_WARNINGS, buildWarningOf, notGeneratedOutputOf, warningWordsOf } from './buildWarnings';
+import { BUILD_WARNINGS, buildWarningOf, notGeneratedOutputOf, warningLines, warningWordsOf } from './buildWarnings';
 
 describe('buildWarningOf', () => {
     it('gives the words of a DWG on a server without its converter: for users, and no retry', () => {
@@ -83,5 +83,17 @@ describe('notGeneratedOutputOf', () => {
         expect(notGeneratedOutputOf(entry('vector parse failed', 'dwg-converter-missing'), 'vector.mvt')).toBeNull();
         expect(notGeneratedOutputOf({}, 'model.3dtiles')).toBeNull();
         expect(notGeneratedOutputOf(null, null)).toBeNull();
+    });
+});
+
+describe('warningLines', () => {
+    it('gives one line for each thing a warning says, without blank ones or the spaces around them', () => {
+        expect(warningLines('3D Tiles not generated: x\r\n\n  Textures outside the dataset left out: ../a.png \n')).toEqual([
+            '3D Tiles not generated: x', 'Textures outside the dataset left out: ../a.png'
+        ]);
+        expect(warningLines('one')).toEqual(['one']);
+        expect(warningLines('  ')).toEqual([]);
+        expect(warningLines(undefined)).toEqual([]);
+        expect(warningLines({ text: 'x' })).toEqual([]);
     });
 });

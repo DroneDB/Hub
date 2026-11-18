@@ -97,6 +97,16 @@ export function warningWordsOf(entry) {
 }
 
 /**
+ * The lines of the words of a warning, one for each thing it says (a build writes a line for each thing it could not
+ * do), without blank ones.
+ * @param {unknown} words  the words of a warning (warningWordsOf); anything but a string has no lines
+ * @returns {string[]}
+ */
+export function warningLines(words) {
+    return typeof words === 'string' ? words.split('\n').map(line => line.trim()).filter(Boolean) : [];
+}
+
+/**
  * The output a viewer needs that the build of an entry could not make, as libddb recorded it: the output and the
  * reason the tool gave (the first line of the warning, without the words that start it), or null when the warning of
  * the entry is not about one of `roles`. An entry built by a libddb before 2.8 has no such warning: its build log
@@ -109,7 +119,7 @@ export function notGeneratedOutputOf(entry, roles) {
     const coded = buildWarningOf(entry);
     const wanted = Array.isArray(roles) ? roles : [roles];
     if (coded?.kind !== 'not-generated' || !coded.output || !wanted.includes(coded.role)) return null;
-    const line = warningTextOf(entry).split('\n')[0].trim();
+    const line = warningLines(warningTextOf(entry))[0] ?? '';
     const reason = coded.prefix && line.startsWith(coded.prefix) ? line.slice(coded.prefix.length).trim() : line;
     return { output: coded.output, reason };
 }

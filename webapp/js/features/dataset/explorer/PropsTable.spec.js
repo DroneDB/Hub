@@ -45,6 +45,26 @@ describe('PropsTable', () => {
         expect(mountTable({ obj: { info: { warning: text } } }).find('.entry-warning').exists()).toBe(false);
     });
 
+    it('shows each line of a warning as an item of its own, with a bullet and a gap when there are several', () => {
+        const lines = ['3D Tiles not generated: Element not supported: \'cstype bspline\'', 'Textures outside the dataset left out: ../outside/checker.png'];
+        const wrapper = mountTable({ obj: { warning: `${lines[0]}\n${lines[1]}\n`, type: '3D Model' } });
+        const items = wrapper.findAll('.entry-warning li');
+        expect(items.map(li => li.text())).toEqual(lines);
+        expect(wrapper.find('.entry-warning-lines').classes()).toContain('several');
+        expect(mountTable({ obj: { warning: lines[1] } }).find('.entry-warning-lines').classes()).not.toContain('several');
+        const source = readSource(__dirname, 'PropsTable.vue');
+        expect(ruleOf(source, '.entry-warning-lines.several')).toContain('list-style: disc');
+        expect(ruleOf(source, '.entry-warning-lines > li + li')).toContain('margin-top: var(--ddb-spacing-xs)');
+    });
+
+    it('puts the warning above the table, on the whole width, not in the narrow value column', () => {
+        const wrapper = mountTable({ obj: { warning: 'Textures outside the dataset left out: ../a/b.png', type: '3D Model' } });
+        const warning = wrapper.find('.entry-warning');
+        expect(warning.element.closest('table')).toBeNull();
+        expect(warning.element.parentElement.classList.contains('props-table-wrapper')).toBe(true);
+        expect(wrapper.findAll('tbody tr').map(r => r.text())).toEqual(['Type3D Model']);
+    });
+
     it('colours the warning with the warning tokens (yellow, dark text), never an orange', () => {
         const rule = ruleOf(readSource(__dirname, 'PropsTable.vue'), '.entry-warning');
         expect(rule).toContain('background-color: var(--ddb-warning)');
