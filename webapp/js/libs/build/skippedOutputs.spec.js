@@ -34,6 +34,12 @@ describe('skippedOutputOf', () => {
             .toEqual({ output: '3D Tiles', reason: '' });
     });
 
+    it('gives only an output that is wanted, the last mention of one', () => {
+        const other = `[19:39:52] [ddb] Splat generation skipped for ${PATH}: no splat`;
+        expect(skippedOutputOf([...LOG, other], PATH, output => output === '3D Tiles')).toMatchObject({ output: '3D Tiles' });
+        expect(skippedOutputOf(LOG, PATH, output => output !== '3D Tiles')).toBeNull();
+    });
+
     it('is null for a build that skipped nothing, another file, or no log', () => {
         expect(skippedOutputOf(LOG.filter(line => !line.includes('skipped')), PATH)).toBeNull();
         expect(skippedOutputOf(LOG, 'other.obj')).toBeNull();

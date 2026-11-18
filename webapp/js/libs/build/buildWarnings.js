@@ -107,6 +107,26 @@ export function warningLines(words) {
 }
 
 /**
+ * Whether a warning says that the build could not make an output of one of `roles`.
+ * @param {Readonly<BuildWarning> | null | undefined} warning
+ * @param {string | readonly string[] | null | undefined} roles  the artifact role (or any of the roles) the viewer needs
+ */
+function isNotGeneratedFor(warning, roles) {
+    const wanted = Array.isArray(roles) ? roles : [roles];
+    return warning?.kind === 'not-generated' && !!warning.output && wanted.includes(warning.role);
+}
+
+/**
+ * Whether an output a build could not make, as libddb names it in a build log ('3D Tiles'), is one a viewer needs (one
+ * of `roles`): the log names the output, this table gives its role. An output the table does not know is not.
+ * @param {string} output
+ * @param {string | readonly string[] | null | undefined} roles  the artifact role (or any of the roles) the viewer needs
+ */
+export function isNeededOutput(output, roles) {
+    return Object.values(BUILD_WARNINGS).some(warning => warning.output === output && isNotGeneratedFor(warning, roles));
+}
+
+/**
  * The output a viewer needs that the build of an entry could not make, as libddb recorded it: the output and the
  * reason the tool gave (the first line of the warning, without the words that start it), or null when the warning of
  * the entry is not about one of `roles`. An entry built by a libddb before 2.8 has no such warning: its build log
@@ -117,8 +137,7 @@ export function warningLines(words) {
  */
 export function notGeneratedOutputOf(entry, roles) {
     const coded = buildWarningOf(entry);
-    const wanted = Array.isArray(roles) ? roles : [roles];
-    if (coded?.kind !== 'not-generated' || !coded.output || !wanted.includes(coded.role)) return null;
+    if (!coded || !isNotGeneratedFor(coded, roles)) return null;
     const line = warningLines(warningTextOf(entry))[0] ?? '';
     const reason = coded.prefix && line.startsWith(coded.prefix) ? line.slice(coded.prefix.length).trim() : line;
     return { output: coded.output, reason };

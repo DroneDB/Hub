@@ -3,7 +3,7 @@
  * processing the file again can help.
  */
 import { describe, it, expect } from 'vitest';
-import { BUILD_WARNINGS, buildWarningOf, notGeneratedOutputOf, warningLines, warningWordsOf } from './buildWarnings';
+import { BUILD_WARNINGS, buildWarningOf, isNeededOutput, notGeneratedOutputOf, warningLines, warningWordsOf } from './buildWarnings';
 
 describe('buildWarningOf', () => {
     it('gives the words of a DWG on a server without its converter: for users, and no retry', () => {
@@ -83,6 +83,19 @@ describe('notGeneratedOutputOf', () => {
         expect(notGeneratedOutputOf(entry('vector parse failed', 'dwg-converter-missing'), 'vector.mvt')).toBeNull();
         expect(notGeneratedOutputOf({}, 'model.3dtiles')).toBeNull();
         expect(notGeneratedOutputOf(null, null)).toBeNull();
+    });
+});
+
+describe('isNeededOutput: an output a build log names, matched to the roles a viewer needs as a warning code is', () => {
+    it('is true for the 3D Tiles and a viewer of 3D Tiles', () => {
+        expect(isNeededOutput('3D Tiles', 'model.3dtiles')).toBe(true);
+        expect(isNeededOutput('3D Tiles', ['model.bm3d', 'model.3dtiles'])).toBe(true);
+    });
+
+    it('is false for the 3D Tiles and the model viewer, and for an output the table does not know', () => {
+        expect(isNeededOutput('3D Tiles', ['model.bm3d', 'model.nexus'])).toBe(false);
+        expect(isNeededOutput('Point cloud', 'pointcloud.copc')).toBe(false);
+        expect(isNeededOutput('', null)).toBe(false);
     });
 });
 

@@ -40,9 +40,11 @@ function reasonOf(text) {
  * wins), or null when the log names none.
  * @param {unknown} lines  the `lines` of the task log
  * @param {string} path  the dataset path of the file
+ * @param {(output: string) => boolean} [wanted]  the outputs looked for (a viewer cares only about
+ *   the one it needs: a model viewer is not stopped by 3D Tiles it does not read); all by default
  * @returns {SkippedOutput | null}
  */
-export function skippedOutputOf(lines, path) {
+export function skippedOutputOf(lines, path, wanted = () => true) {
     if (!Array.isArray(lines) || !path) return null;
     for (let i = lines.length - 1; i >= 0; i--) {
         const line = typeof lines[i] === 'string' ? lines[i] : '';
@@ -52,6 +54,7 @@ export function skippedOutputOf(lines, path) {
         const rest = line.slice(mark + MARK.length + path.length);
         if (rest && !rest.startsWith(':') && !rest.startsWith(' (')) continue; // another file whose path starts with this one
         const output = line.slice(tool + TOOL.length, mark).trim();
+        if (!wanted(output)) continue;
         return { output, reason: rest.startsWith(':') ? reasonOf(rest.slice(1)) : '' };
     }
     return null;

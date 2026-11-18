@@ -178,6 +178,23 @@ describe('unified viewer gate', () => {
             expect(dataset.getTaskLog).toHaveBeenCalledWith('t9');
         });
 
+        it('does not name the 3D Tiles of the log to a viewer that needs the bm3d output: it is a rebuild', async () => {
+            taskMonitor.getTasks.mockReturnValue([buildTask()]);
+            const dataset = withLog([SKIPPED]);
+            // Built (its 3D Tiles are listed) but without the bm3d output the model viewer reads
+            const result = await checker.check(dataset, model({ artifacts: [TILES] }), 'model', { current: true });
+            expect(result).toMatchObject({ available: false, status: 'rebuild', actions: ['cancel', 'retry-build'] });
+            expect(result.message).not.toContain('3D Tiles');
+        });
+
+        it('reads the log of the newest build of the file, whatever order the task lists are in', async () => {
+            const older = { ...buildTask('Succeeded'), taskId: 't1', createdAt: '2026-11-16T10:00:00Z' };
+            taskMonitor.getTasks.mockReturnValue([buildTask(), older]);
+            const dataset = withLog([SKIPPED]);
+            await checker.check(dataset, model({ artifacts: [BM3D] }), 'unified', { current: true });
+            expect(dataset.getTaskLog).toHaveBeenCalledWith('t9');
+        });
+
         it('still asks for a rebuild when the log cannot be read', async () => {
             taskMonitor.getTasks.mockReturnValue([buildTask()]);
             const dataset = withLog([SKIPPED]);

@@ -9,12 +9,12 @@ import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
-import { buildWarningOf, notGeneratedOutputOf } from '@/libs/build/buildWarnings';
+import { buildWarningOf, isNeededOutput, notGeneratedOutputOf } from '@/libs/build/buildWarnings';
 import { skippedOutputOf } from '@/libs/build/skippedOutputs';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
 import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
-import { isActiveState, isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
+import { isActiveState, isWaitingBackgroundTask, latestTaskByPath } from '@/libs/tasks/taskStates';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
 // The build tasks of a dataset looked through for the one of a file, when the task list of the page does not hold it
@@ -198,7 +198,7 @@ class FileAvailabilityChecker {
             // (the tiler cannot read the file): a rebuild fails the same way, so the reason is shown instead. libddb
             // records it on the entry; the build log says it for an entry built before it did
             if (roles && isBuilt(listed)) {
-                const skipped = notGeneratedOutputOf(listed, roles) || await this.skippedOutput(dataset, entry.path);
+                const skipped = notGeneratedOutputOf(listed, roles) || await this.skippedOutput(dataset, entry.path, roles);
                 if (skipped) {
                     return {
                         available: false,
@@ -247,19 +247,22 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * The output the last build of `path` could not generate, from its log (skippedOutputs), for an entry built by a
-     * libddb that did not record it on the entry (notGeneratedOutputOf), or null: no build task
-     * of it in the task list, a build that did not succeed, a log that names none or that cannot be read.
+     * The output of `roles` (the viewer's) the last build of `path` could not generate, from its log (skippedOutputs),
+     * for an entry built by a libddb that did not record it on the entry (notGeneratedOutputOf), or null: no build task
+     * of it in the task list, a build that did not succeed, a log that names none of the outputs the viewer needs (the
+     * 3D Tiles a model viewer does not read are not why it cannot open) or that cannot be read.
+     * @param {any} dataset
+     * @param {string} path
+     * @param {string | readonly string[]} roles  the artifact role (or any of the roles) the viewer needs
      * @returns {Promise<import('@/libs/build/skippedOutputs').SkippedOutput | null>}
      */
-    async skippedOutput(dataset, path) {
+    async skippedOutput(dataset, path, roles) {
         try {
-            const latest = tasks => (tasks || []).filter(t => t && t.toolId === 'build' && t.path === path && t.taskId)
-                .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+            const latest = tasks => latestTaskByPath((tasks || []).filter(t => t && t.toolId === 'build' && t.path === path && t.taskId)).get(path) || null;
             const task = latest(taskMonitor.getTasks(dataset)) || latest(await dataset.getTasks({ toolId: 'build', take: SKIPPED_TASKS_TAKE }));
             if (!task || task.state !== 'Succeeded') return null;
             const log = await dataset.getTaskLog(task.taskId);
-            return skippedOutputOf(log && log.lines, path);
+            return skippedOutputOf(log && log.lines, path, output => isNeededOutput(output, roles));
         } catch {
             return null;
         }
