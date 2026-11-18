@@ -1,3 +1,6 @@
+import { FRAMING, framingOf } from './cameraRig';
+import { estimatedUp } from './upAxis';
+
 /**
  * Framing of a splat that is not ready to be framed yet. A paged .rad has no resident splats until
  * its first chunks arrive, so the framing is tried again until it can frame the core of the scene
@@ -117,4 +120,103 @@ export function residentSplatCenters(mesh, maxSamples = MAX_CORE_SAMPLES) {
         centers[n++] = center.z;
     });
     return centers.subarray(0, n);
+}
+
+/**
+ * The kinds of capture a build tells apart (bounds.json `framing.kind`): the cameras went round an
+ * object, were inside a scene (a room), or looked down on a site (from the air, or georeferenced).
+ */
+export const CAPTURE_KINDS = Object.freeze(['object', 'scene', 'site']);
+
+/** @param {unknown} v */
+const isFiniteNumber = v => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * The framing the build worked out from every splat of the scene (bounds.json `framing`): the kind of
+ * capture and the box of its core, in the frame of the splat file. A hint this version cannot read
+ * (an unknown kind, a core that is not six finite numbers with its minimum at or below its maximum),
+ * and the bounds.json of a build made before builds wrote one, are no hint: the viewer then frames the
+ * core of the resident splats (coreBox).
+ * @param {any} bounds  the parsed bounds.json, or null
+ * @returns {{ kind: 'object' | 'scene' | 'site', core: { min: number[], max: number[] } } | null}
+ */
+export function framingHint(bounds) {
+    const framing = bounds && typeof bounds === 'object' ? bounds.framing : null;
+    if (!framing || typeof framing !== 'object' || !CAPTURE_KINDS.includes(framing.kind)) return null;
+    const { core } = framing;
+    if (!Array.isArray(core) || core.length !== 6 || !core.every(isFiniteNumber)) return null;
+    const min = core.slice(0, 3), max = core.slice(3);
+    if (min.some((v, a) => v > max[a])) return null;
+    return { kind: framing.kind, core: { min, max } };
+}
+
+/**
+ * What the viewer frames. With the build's hint (framingHint), its core, framed as its kind of capture
+ * says and facing the sides of the core; without, the core of the resident splats (coreBox between the
+ * quantiles of the framing: a georeferenced scene seen whole from above, any other from inside), null
+ * while too few splats are resident. A room whose up the build is sure of gets its establishing shot
+ * (`roomShot`). The resident splats are read without a hint, and for that shot (to keep its camera out
+ * of the walls, crowdingOf). `settled` is false while the framing waits for
+ * resident splats: the viewer frames again when more have arrived.
+ * @param {object} scene
+ * @param {any} scene.bounds  the parsed bounds.json, or null
+ * @param {boolean} [scene.georeferenced]
+ * @param {() => ArrayLike<number>} scene.residentCenters  x, y, z of the resident splats (residentSplatCenters)
+ * @returns {{ framing: string, core: { min: number[], max: number[] } | null, faceBox: boolean, roomShot: boolean, crowding: ((point: number[], radius: number) => number) | null, settled: boolean }}
+ */
+export function chooseFraming({ bounds, georeferenced, residentCenters }) {
+    const hint = framingHint(bounds);
+    const framing = framingOf({ georeferenced, kind: hint?.kind });
+    if (!hint) {
+        const core = coreBox(residentCenters(), CORE_QUANTILES[framing]);
+        return { framing, core, faceBox: false, roomShot: false, crowding: null, settled: !!core };
+    }
+    // The establishing shot of a room stands high in a corner: with an up the build is not sure of
+    // (estimatedUp: below MIN_UP_CONFIDENCE) high may be beside the floor, and the room is seen along
+    // its longest side, level, instead
+    const roomShot = framing === FRAMING.IMMERSIVE && estimatedUp(bounds) !== null;
+    // A room is framed clear of its walls and furniture once enough of its splats are resident
+    const crowding = roomShot ? crowdingOf(residentCenters(), hint.core) : null;
+    return { framing, core: hint.core, faceBox: true, roomShot, crowding, settled: !roomShot || !!crowding };
+}
+
+// The resident splats in the core a room is kept clear of its walls with: the coarse first pages of a
+// paged scene are too few and too large to show where its walls are
+export const MIN_ROOM_SAMPLES = 5000;
+
+/**
+ * How crowded a point is, from the resident splats (`centers`, in the frame of the splat file): the
+ * number of their centres within `radius` of it, per volume, against their mean density in the
+ * `core`. 0 in the air of a room, about 1 among its contents on average, more in a wall it cuts.
+ * Null with fewer than MIN_ROOM_SAMPLES centres in the core: too few to tell.
+ * @param {ArrayLike<number>} centers
+ * @param {{ min: number[], max: number[] }} core
+ * @returns {((point: number[], radius: number) => number) | null}
+ */
+export function crowdingOf(centers, core) {
+    const count = Math.floor(centers.length / 3);
+    let inCore = 0;
+    for (let i = 0; i < count; i++) {
+        let inside = true;
+        for (let a = 0; a < 3 && inside; a++) {
+            const v = centers[i * 3 + a];
+            inside = v >= core.min[a] && v <= core.max[a];
+        }
+        if (inside) inCore++;
+    }
+    if (inCore < MIN_ROOM_SAMPLES) return null;
+    const sides = core.max.map((max, a) => max - core.min[a]);
+    // A flat core has no volume: its thinnest side is taken as a thousandth of its widest
+    const widest = Math.max(...sides);
+    const volume = sides.reduce((v, side) => v * Math.max(side, widest / 1000), 1);
+    const mean = inCore / volume;
+    return ([x, y, z], radius) => {
+        const r2 = radius * radius;
+        let near = 0;
+        for (let i = 0; i < count; i++) {
+            const dx = centers[i * 3] - x, dy = centers[i * 3 + 1] - y, dz = centers[i * 3 + 2] - z;
+            if (dx * dx + dy * dy + dz * dz <= r2) near++;
+        }
+        return near / ((4 / 3) * Math.PI * radius ** 3) / mean;
+    };
 }
