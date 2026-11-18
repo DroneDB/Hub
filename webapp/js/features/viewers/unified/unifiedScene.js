@@ -428,11 +428,12 @@ export class UnifiedScene {
         // lifetime: owner (the renderer goes with the tileset, and the tileset with the instance)
         tiles.addEventListener('load-model', event => {
             if (!event || !event.scene || !this.instance) return;
-            const scenes = shading.tileLoaded(event.tile, event.scene);
-            if (!scenes.length) return;
+            const shaded = shading.tileLoaded(event.tile, event.scene);
+            if (!shaded.length) return;
+            // One matcap for every tile, disposed with the scene (dispose), never with a tile
             if (!this.clayMatcap) this.clayMatcap = createClayMatcap(this.libs);
             let changed = 0;
-            for (const scene of scenes) changed += applyClayShading(this.libs, scene, this.clayMatcap);
+            for (const { tile, scene } of shaded) changed += applyClayShading(this.libs, scene, this.clayMatcap, tile);
             if (changed) this.instance.notifyChange(tileset);
         });
         // lifetime: owner (as above)

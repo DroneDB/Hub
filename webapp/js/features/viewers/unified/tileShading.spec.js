@@ -3,13 +3,14 @@
  * the lights of the scene nor on the screen-space derivatives of the GPU, with the normals it needs computed on load:
  * averaged for a smooth surface, one per face for a faceted part. three.js is the real thing.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import {
     clayMatcapPixels, needsClayShading, hardCornerShare, withShadingNormals, applyClayShading, createClayMatcap,
     showsOwnColours, topModelTiles, ModelShading
 } from './tileShading';
 import { UnifiedScene } from './unifiedScene';
+import { TilesRenderer } from '3d-tiles-renderer';
 
 const libs = { THREE };
 
@@ -210,10 +211,14 @@ describe('ModelShading: clay only for a model with no texture and no vertex colo
         const early = tileScene();
         expect(shading.tileLoaded(finer[0], early)).toEqual([]);
         for (let i = 0; i < 3; i++) expect(shading.tileLoaded(quarters[i], scenes[i])).toEqual([]);
-        expect(new Set(shading.tileLoaded(quarters[3], scenes[3]))).toEqual(new Set([...scenes, early]));
+        const shaded = shading.tileLoaded(quarters[3], scenes[3]);
+        expect(new Set(shaded.map(s => s.scene))).toEqual(new Set([...scenes, early]));
+        // Each scene comes with its own tile (the clay it gets is freed with that tile)
+        expect(new Set(shaded.map(s => s.tile))).toEqual(new Set([...quarters, finer[0]]));
+        expect(shaded.find(s => s.scene === early).tile).toBe(finer[0]);
         expect(shading.clay).toBe(true);
         const later = tileScene();
-        expect(shading.tileLoaded(finer[1], later)).toEqual([later]);
+        expect(shading.tileLoaded(finer[1], later)).toEqual([{ tile: finer[1], scene: later }]);
     });
 
     it('keeps a model with vertex colours as it is', () => {
@@ -231,7 +236,7 @@ describe('ModelShading: clay only for a model with no texture and no vertex colo
         shading.tileDisposed(quarters[0]);
         expect(shading.tileLoaded(quarters[3], tileScene())).toEqual([]);
         const reloaded = tileScene();
-        expect(shading.tileLoaded(quarters[0], reloaded)).toContain(reloaded);
+        expect(shading.tileLoaded(quarters[0], reloaded).map(s => s.scene)).toContain(reloaded);
         expect(shading.clay).toBe(true);
     });
 });
@@ -245,7 +250,24 @@ describe('UnifiedScene.shadeUntexturedTiles', () => {
         const scene = { libs, instance: { notifyChange: () => {} }, clayMatcap: null };
         UnifiedScene.prototype.shadeUntexturedTiles.call(scene, tileset);
         const load = (t, s) => tiles.dispatchEvent({ type: 'load-model', tile: t, scene: s });
-        return { load };
+        // Unloads a tile as the renderer does: its own disposeTile, which frees the lists of the tile
+        const unload = t => TilesRenderer.prototype.disposeTile.call(Object.assign(tiles, { invokeOnePlugin: () => {} }), t);
+        return { load, unload, scene };
+    }
+
+    /**
+     * Gives a tile the engine data 3d-tiles-renderer gives it when it parses the tile, before
+     * load-model: the scene and the geometries, materials and textures it holds at that time.
+     */
+    function parsed(t, scene) {
+        const engineData = { scene, geometry: [], materials: [], textures: [], metadata: null };
+        scene.traverse(c => {
+            if (c.geometry) engineData.geometry.push(c.geometry);
+            if (c.material) engineData.materials.push(c.material);
+        });
+        t.engineData = engineData;
+        t.traversal = { visible: false, active: false };
+        return scene;
     }
 
     it('leaves the untextured part of a textured model in its own material, whatever tile comes first', () => {
@@ -267,5 +289,42 @@ describe('UnifiedScene.shadeUntexturedTiles', () => {
         const later = tileScene();
         load(finer[2], later);
         expect([...scenes, later].every(isClay)).toBe(true);
+    });
+
+    it('frees the clay material and the faceted geometry of a tile when the renderer unloads it, and keeps the shared matcap', () => {
+        const { root, quarters } = obj2TilesTree();
+        const { load, unload, scene } = shadedTileset(root);
+        // A faceted part gets a new geometry (one normal per face) as well as the clay material
+        const scenes = quarters.map(quarter => {
+            const group = new THREE.Group();
+            group.add(new THREE.Mesh(weldedCube(), new THREE.MeshStandardMaterial({ color: 0xffffff })));
+            return parsed(quarter, group);
+        });
+        // The first three wait for the verdict, the last one decides it: all four are shaded at once
+        quarters.forEach((quarter, i) => load(quarter, scenes[i]));
+        const meshes = scenes.map(group => group.children[0]);
+        expect(meshes.every(mesh => mesh.material.isMeshMatcapMaterial && !mesh.geometry.index)).toBe(true);
+        const matcap = scene.clayMatcap;
+        const matcapDisposed = vi.spyOn(matcap, 'dispose');
+        const freed = meshes.map(mesh => ({ geometry: vi.spyOn(mesh.geometry, 'dispose'), material: vi.spyOn(mesh.material, 'dispose') }));
+
+        quarters.forEach(unload);
+
+        for (const { geometry, material } of freed) {
+            expect(geometry).toHaveBeenCalled();
+            expect(material).toHaveBeenCalled();
+        }
+        expect(matcapDisposed).not.toHaveBeenCalled();
+    });
+
+    it('gives the clay to a tile whose lists the renderer has not filled, and frees it with the tile', () => {
+        const { root, quarters } = obj2TilesTree();
+        const { load, unload } = shadedTileset(root);
+        const scenes = quarters.map(quarter => parsed(quarter, tileScene()));
+        quarters[0].engineData.materials = null;
+        quarters.forEach((quarter, i) => load(quarter, scenes[i]));
+        const clay = vi.spyOn(scenes[0].children[0].material, 'dispose');
+        unload(quarters[0]);
+        expect(clay).toHaveBeenCalled();
     });
 });

@@ -144,15 +144,35 @@ export function createClayMatcap(libs) {
 }
 
 /**
+ * Hands a geometry or material made for a loaded tile to the tile, so that it is freed with the
+ * tile. 3d-tiles-renderer lists what a tile's scene holds (engineData.geometry, .materials,
+ * .textures) when it parses the tile, before load-model, and frees only what is in those lists
+ * when it unloads the tile (disposeTile): what replaces them later stays on the GPU otherwise.
+ *
+ * @param {any} tile - the tile that owns the scene (a 3d-tiles-renderer tile), or nothing.
+ * @param {'geometry' | 'materials'} list
+ * @param {any} resource
+ */
+function ownedByTile(tile, list, resource) {
+    const engineData = tile && tile.engineData;
+    if (!engineData) return;
+    if (!Array.isArray(engineData[list])) engineData[list] = [];
+    engineData[list].push(resource);
+}
+
+/**
  * Gives every mesh of a loaded tile that needs it (needsClayShading) the clay material, with the
  * base colour, opacity and sides of its own material, and the normals it needs (withShadingNormals).
+ * The new materials and geometries go to the tile (ownedByTile), so they are freed when the tile
+ * is unloaded; the matcap is shared by the tiles of the scene and is not.
  *
  * @param {{ THREE: any }} libs
  * @param {any} root - the scene of a loaded tile.
  * @param {any} matcap - the texture of createClayMatcap.
+ * @param {any} [tile] - the tile whose scene `root` is.
  * @returns {number} the meshes changed.
  */
-export function applyClayShading(libs, root, matcap) {
+export function applyClayShading(libs, root, matcap, tile) {
     const { THREE } = libs;
     let changed = 0;
     root.traverse(object => {
@@ -162,6 +182,7 @@ export function applyClayShading(libs, root, matcap) {
         if (geometry !== object.geometry) {
             object.geometry.dispose();
             object.geometry = geometry;
+            ownedByTile(tile, 'geometry', geometry);
         }
         const clay = new THREE.MeshMatcapMaterial({
             name: source.name,
@@ -173,6 +194,7 @@ export function applyClayShading(libs, root, matcap) {
             alphaTest: source.alphaTest
         });
         object.material = clay;
+        ownedByTile(tile, 'materials', clay);
         source.dispose();
         changed++;
     });
@@ -253,11 +275,12 @@ export class ModelShading {
      *
      * @param {any} tile
      * @param {any} scene - the scene of the tile.
-     * @returns {any[]} the scenes to shade in clay now: none, this one, or every one that waited.
+     * @returns {{ tile: any, scene: any }[]} the scenes to shade in clay now, each with its tile
+     *   (the resources the clay makes belong to it): none, this one, or every one that waited.
      */
     tileLoaded(tile, scene) {
         if (this.verdict === OWN_COLOURS_VERDICT) return [];
-        if (this.verdict === CLAY_VERDICT) return [scene];
+        if (this.verdict === CLAY_VERDICT) return [{ tile, scene }];
         if (showsOwnColours(scene)) {
             this.verdict = OWN_COLOURS_VERDICT;
             this.waiting.clear();
@@ -267,9 +290,9 @@ export class ModelShading {
         const top = topModelTiles(this.rootTile());
         if (!top || !top.length || !top.every(t => this.waiting.has(t))) return [];
         this.verdict = CLAY_VERDICT;
-        const scenes = [...this.waiting.values()];
+        const shaded = [...this.waiting].map(([waitingTile, waitingScene]) => ({ tile: waitingTile, scene: waitingScene }));
         this.waiting.clear();
-        return scenes;
+        return shaded;
     }
 
     /**
