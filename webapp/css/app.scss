@@ -82,6 +82,13 @@ body {
     color: var(--ddb-link-hover);
 }
 
+// A notice (PrimeVue Message) wraps a long word, such as the path of a file, inside its box instead of running out of
+// it: the same wrap as the rows of a table (a word that does not fit breaks anywhere)
+.p-message-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 // The tint of an info message is lighter than the page: its links need the darker shade
 .p-message-info a,
 .p-inline-message-info a,

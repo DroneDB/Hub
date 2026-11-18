@@ -86,3 +86,13 @@ describe('the Select overlay width rule', () => {
         expect(offenders).toEqual([]);
     });
 });
+
+describe('the notice wrap rule', () => {
+    it('wraps a long word (a path) inside every notice, as the rows of a table do', () => {
+        const at = scss.indexOf('.p-message-text {');
+        expect(at).toBeGreaterThan(0);
+        const rule = blockAt(scss, at);
+        expect(rule).toContain('min-width: 0;');
+        expect(rule).toContain('overflow-wrap: anywhere;');
+    });
+});
