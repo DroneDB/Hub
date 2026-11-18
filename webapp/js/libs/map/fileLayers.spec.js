@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
 import { FileLayers, mercatorExtent } from './fileLayers';
+import { POINT_CLOUD_EXTENT_PAD } from './rasterLayers';
+import { INITIAL_RESOLUTION, SOURCE_MIN_ZOOM } from './rasterZoom';
 
 const square = { type: 'Polygon', coordinates: [[[10, 45], [10.001, 45], [10.001, 45.001], [10, 45.001], [10, 45]]] };
 const raster = (path, hash = 'h') => ({
@@ -46,6 +48,57 @@ describe('FileLayers rasters', () => {
         build(fl, [raster('a.tif'), { path: 'x', entry: null, placeholder: { path: 'gone.tif', kind: 'missing', text: 'Missing' } }, raster('b.tif')]);
         expect(fl.rasterSlots.map(s => (s.olLayer ? s.file.entry.path : s.file.placeholder.path))).toEqual(['a.tif', 'gone.tif', 'b.tif']);
         expect(rasterLayers(fl)).toHaveLength(2);
+    });
+});
+
+describe('FileLayers point clouds', () => {
+    // The footprint libddb gives a cloud of one point: five times the same corner
+    const onePoint = { type: 'Polygon', coordinates: [[[10, 45], [10, 45], [10, 45], [10, 45], [10, 45]]] };
+    const cloud = (path, polygon) => ({
+        path: `ddb://hub.example.com/o/d/${path}`,
+        entry: { path, hash: path, type: ddb.entry.type.POINTCLOUD, polygon_geom: polygon, properties: {} }
+    });
+    // A point at the edge of the footprint is drawn up to 3 px past it, in the pixels of the coarsest (z14, 256 px) tiles
+    const reachAtCoarsestTiles = 3 * INITIAL_RESOLUTION / 2 ** SOURCE_MIN_ZOOM;
+
+    it('draws a cloud of one point: its layer extent has an area around the point', () => {
+        const fl = new FileLayers();
+        build(fl, [cloud('one.laz', onePoint)]);
+        const [layer] = rasterLayers(fl);
+        const [x, y] = mercatorExtent(onePoint);
+        const [minX, minY, maxX, maxY] = layer.getExtent();
+        expect(maxX - minX).toBeGreaterThan(0);
+        expect(maxY - minY).toBeGreaterThan(0);
+        expect(minX).toBeLessThanOrEqual(x - reachAtCoarsestTiles);
+        expect(maxX).toBeGreaterThanOrEqual(x + reachAtCoarsestTiles);
+        expect(minY).toBeLessThanOrEqual(y - reachAtCoarsestTiles);
+        expect(maxY).toBeGreaterThanOrEqual(y + reachAtCoarsestTiles);
+    });
+
+    it('keeps the discs on the edge of a cloud, and no more: the footprint plus the disc reach of the coarsest tiles', () => {
+        const fl = new FileLayers();
+        build(fl, [cloud('c.laz', square)]);
+        const footprint = mercatorExtent(square);
+        const extent = rasterLayers(fl)[0].getExtent();
+        expect(POINT_CLOUD_EXTENT_PAD).toBeCloseTo(reachAtCoarsestTiles, 6);
+        expect(POINT_CLOUD_EXTENT_PAD).toBeLessThan(30);
+        extent.forEach((v, i) => expect(v).toBeCloseTo(footprint[i] + (i < 2 ? -1 : 1) * POINT_CLOUD_EXTENT_PAD, 6));
+    });
+
+    it('lets a click on the drawn discs select the cloud, and fits the map to its footprint (a point: no size)', () => {
+        const fl = new FileLayers();
+        build(fl, [cloud('one.laz', onePoint)]);
+        const layerExtent = rasterLayers(fl)[0].getExtent();
+        expect(fl.extentFeatures.getFeatures()[0].getGeometry().getExtent()).toEqual(layerExtent);
+        // The fit of a map stops at a set scale for an extent with no size (MapCore's fileFitOptions)
+        const [x, y] = mercatorExtent(onePoint);
+        expect(fl.extent()).toEqual([x, y, x, y]);
+    });
+
+    it('clips a georaster to its footprint, as before', () => {
+        const fl = new FileLayers();
+        build(fl, [raster('a.tif')]);
+        expect(rasterLayers(fl)[0].getExtent()).toEqual(mercatorExtent(square));
     });
 });
 

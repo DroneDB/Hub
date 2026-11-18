@@ -334,6 +334,21 @@ describe('the fit to the files (FR-MAP-28)', () => {
         expect(wrapper.vm.map.getView().getResolution()).toBeGreaterThanOrEqual(0.5);
     });
 
+    it('fits a point cloud of one point on the dataset map at the scale of a point, not as close as the map goes', async () => {
+        const cloud = { path: 'one.laz', type: T.POINTCLOUD, hash: 'h-one', polygon_geom: POINT, properties: {} };
+        await mountMap([file(cloud)], { standalone: false });
+        const fit = fitSpy();
+        wrapper.vm.resetToInitialView();
+        await settle();
+        expect(fit.mock.calls[0][1].minResolution).toBe(0.5);
+        expect(wrapper.vm.map.getView().getResolution()).toBeGreaterThanOrEqual(0.5);
+        expect(near(wrapper.vm.map.getView().getCenter(), fromLonLat([10, 45]))).toBe(true);
+        // "Zoom to layer" fits it the same way
+        fit.mockClear();
+        expect(wrapper.vm.zoomToLayer('one.laz')).toBe(true);
+        expect(fit.mock.calls[0][1].minResolution).toBe(0.5);
+    });
+
     it('fits two photos a few metres apart closer than 0.5 m per pixel, and no closer than zoom 22', async () => {
         // About 3 m apart on the ground at 45 degrees (0.00004 degrees of longitude), 4.45 m in Web Mercator
         const photo = (path, lon) => ({ path, type: T.GEOIMAGE, hash: `h-${path}`, point_geom: { type: 'Point', coordinates: [lon, 45, 100] }, properties: {} });

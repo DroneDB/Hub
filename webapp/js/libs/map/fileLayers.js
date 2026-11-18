@@ -23,7 +23,7 @@ import { EPSG } from '@/libs/constants';
 import { bboxExtent } from '@/libs/map/mapUtils';
 import { createFileLayerStyles } from '@/libs/map/fileLayerStyles';
 import { orderFlightPath } from '@/libs/map/flightPath';
-import { createRasterTileLayer } from '@/libs/map/rasterLayers';
+import { createRasterTileLayer, rasterFootprint } from '@/libs/map/rasterLayers';
 import { SplatFootprints } from '@/libs/map/splatFootprints';
 import { isMeasurementFile } from '@/libs/map/measurementStorage';
 import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
@@ -112,7 +112,8 @@ export class FileLayers {
                 olLayer.file = f;
                 rasterCache.set(key, olLayer);
                 slots.push({ file: f, olLayer });
-                const extentFeat = new Feature(fromExtent(extent));
+                // The layer's extent: where it draws (a point cloud draws a little past its footprint)
+                const extentFeat = new Feature(fromExtent(olLayer.getExtent()));
                 extentFeat.file = f;
                 this.extentFeatures.addFeature(extentFeat);
             } else if (type === T.VECTOR && !isMeasurementFile(f.entry.path)) {
@@ -193,12 +194,12 @@ export class FileLayers {
         this.footprints.getLayers().clear();
     }
 
-    /** Extent of the shots, rasters and splats (EPSG:3857), empty when there are none. */
+    /** Extent of the shots, raster footprints and splats (EPSG:3857), empty when there are none. */
     extent() {
         const ext = createEmptyExtent();
         if (this.shotFeatures.getFeatures().length) extendExtent(ext, this.shotFeatures.getExtent());
         if (this.splats.features.size) extendExtent(ext, this.splats.extent());
-        this.rasters.getLayers().forEach(layer => extendExtent(ext, layer.getExtent()));
+        this.rasters.getLayers().forEach(layer => extendExtent(ext, rasterFootprint(layer)));
         return ext;
     }
 }

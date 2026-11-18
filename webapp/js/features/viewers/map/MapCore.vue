@@ -141,7 +141,7 @@ import SettingsControl from '@/libs/map/controls/settingsControl';
 import { createControlZones, moveToZone } from '@/libs/map/controlZones';
 import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fileLayers';
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
-import { ViewZoomCap } from '@/libs/map/rasterLayers';
+import { ViewZoomCap, rasterFootprint } from '@/libs/map/rasterLayers';
 import { visibleBbox } from '@/libs/map/rasterExport';
 import { endSessionOf } from '@/libs/map/drawingSession';
 import { getVectorColor, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
@@ -758,12 +758,12 @@ export default {
             }
         },
 
-        // The extent (EPSG:3857) of the raster layer of `path`; null while it is not drawn yet (or has no size to fit).
+        // The footprint (EPSG:3857) of the file of the raster layer of `path` (rasterFootprint); null while it is not drawn yet.
         // A raster that is building is not drawn: its footprint stands in for the layer
         layerExtent: function (path) {
             const row = this.rasterLayerList.find(r => r.path === path);
             const footprint = row?.placeholder?.footprint;
-            const extent = row?.olLayer?.getExtent() ?? (footprint ? mercatorExtent(footprint) : null);
+            const extent = row?.olLayer ? rasterFootprint(row.olLayer) : (footprint ? mercatorExtent(footprint) : null);
             return extent && !isEmptyExtent(extent) ? extent : null;
         },
 
