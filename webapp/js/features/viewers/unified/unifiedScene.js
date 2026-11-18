@@ -16,6 +16,7 @@ import { navigateByKey } from './navKeys';
 import { alignContentUpAxis, localizeGeocentricContent } from './contentOrientation';
 import { applyClayShading, createClayMatcap, ModelShading } from './tileShading';
 import { deviceMemoryGb } from '@/libs/responsive';
+import { createRangeGetter } from '@/libs/http/rangeRequests';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import { tokenHex } from '@/libs/colorScheme';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
@@ -97,6 +98,8 @@ export class UnifiedScene {
         this.pointSizes = new Map();
         // The matcap of the clay shading of untextured tiles, made at the first such tile
         this.clayMatcap = null;
+        // Stops the range reads of the scene's files (and their retries) when the viewer closes (dispose)
+        this.reads = new AbortController();
         this.stopPixelRatio = null;
     }
 
@@ -738,8 +741,18 @@ export class UnifiedScene {
         if (this.controls) this.controls.enabled = enabled;
     }
 
+    /**
+     * The getter a COPC source reads `url` with, through the Hub's range transport (past the HTTP cache, checked,
+     * retried: libs/http/rangeRequests), stopped with its retries when the scene is disposed.
+     * @param {string} url
+     */
+    rangeGetter(url) {
+        return createRangeGetter(url, { signal: this.reads.signal });
+    }
+
     /** Releases everything: Giro3D disposes its renderer, scene, entities and canvas. */
     dispose() {
+        this.reads.abort();
         this.tweener.stop();
         if (this.stopPixelRatio) this.stopPixelRatio();
         this.stopPixelRatio = null;

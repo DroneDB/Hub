@@ -16,7 +16,6 @@ import { EPSG } from '@/libs/constants';
 import { capVectorTileZoom, isFiniteBox, vectorStyle } from './sceneUtils';
 import { fetchMvtMetadata } from '@/composables/useMvtLayer';
 import { appliedPixelRatio } from '@/libs/pixelRatio';
-import { createRangeGetter } from '@/libs/http/rangeRequests';
 
 // Screen-space error target (px) of DroneDB-built model tiles. Obj2Tiles >= 1.8 writes a
 // geometricError from the mesh edge length: at 6 close-ups match the finest LOD while the
@@ -191,8 +190,8 @@ async function loadTiles3D(scene, entry, dataset) {
 async function loadPointCloud(scene, entry, dataset) {
     scene.view.loadingText = 'Loading point cloud...';
     const { COPCSource, PointCloud, CoordinateSystem } = scene.libs;
-    // Read through the Hub's range transport (past the HTTP cache, checked, retried): see libs/http/rangeRequests
-    const source = new COPCSource({ url: createRangeGetter(dataset.Entry(entry).getCopc()) });
+    // Read through the Hub's range transport, stopped when the viewer closes (UnifiedScene.rangeGetter)
+    const source = new COPCSource({ url: scene.rangeGetter(dataset.Entry(entry).getCopc()) });
     // lifetime: owner (the source goes with the scene)
     source.addEventListener('progress', () => { scene.view.progress = source.progress; });
     await source.initialize();
