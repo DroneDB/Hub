@@ -43,3 +43,25 @@ describe('FileAvailabilityDialog of a file the server cannot read', () => {
             'For the administrator: The server needs the dwg2dxf converter (LibreDWG): install dwg2dxf next to ddb, or set DDB_DWG2DXF_PATH.');
     });
 });
+
+describe('FileAvailabilityDialog of a model whose 3D Tiles could not be generated', () => {
+    const alternative = { label: 'Open in the model viewer', icon: 'fa-solid fa-cube', view: 'model', to: '/r/o/d/view/aG91c2Uub2Jq/model' };
+    const notGenerated = {
+        title: '3D Tiles not available', status: 'not-generated', actions: ['close'], hint: '', entry: { path: 'house.obj' },
+        message: "The 3D Tiles of 'house.obj' could not be generated: Index was out of range."
+    };
+
+    it('is a warning (yellow with dark text), as a file on hold is', async () => {
+        await render(notGenerated);
+        expect(wrapper.find('.p-message').classes()).toContain('p-message-warn');
+    });
+
+    it('offers the model viewer next to Close, and asks for it when it is chosen', async () => {
+        await render({ ...notGenerated, alternative });
+        const labels = wrapper.findAll('button').map(b => b.text());
+        expect(labels).toEqual(['Close', 'Open in the model viewer']);
+        expect(wrapper.text()).not.toContain('Retry Processing');
+        await wrapper.findAll('button').find(b => b.text() === 'Open in the model viewer').trigger('click');
+        expect(wrapper.emitted('open-alternative')).toEqual([[alternative]]);
+    });
+});

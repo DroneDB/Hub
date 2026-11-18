@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { b64encode, b64urlEncode } from '@/libs/base64';
-import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, VIEWER_ONLY_HELP } from './viewLinks';
+import ddb from 'ddb';
+import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, notGeneratedAlternative, VIEWER_ONLY_HELP } from './viewLinks';
 
 const ds = { org: 'acme', ds: 'site' };
 const filePath = `/r/acme/site/view/${b64encode('flights/ortho.tif')}/map`;
@@ -65,6 +66,23 @@ describe('viewerUrl', () => {
         const url = viewerUrl({ ...base, viewerOnly: true });
         expect(url).toBe(`${prefix}?embed=1`);
         expect(url.match(/embed=1/g)).toHaveLength(1);
+    });
+});
+
+describe('notGeneratedAlternative', () => {
+    const dataset = { org: 'o', ds: 'd' };
+    const model = { path: 'parts/house.obj', type: ddb.entry.type.MODEL };
+
+    it('offers the model viewer of a model, as Viewer only when asked', () => {
+        const to = `/r/o/d/view/${b64encode(model.path)}/model`;
+        expect(notGeneratedAlternative(dataset, model)).toEqual({ label: 'Open in the model viewer', icon: 'fa-solid fa-cube', view: 'model', to });
+        expect(notGeneratedAlternative(dataset, model, { viewerOnly: true }).to).toBe(`${to}?embed=1`);
+    });
+
+    it('offers nothing for another file, or without a dataset or an entry', () => {
+        expect(notGeneratedAlternative(dataset, { path: 'cloud.laz', type: ddb.entry.type.POINTCLOUD })).toBeNull();
+        expect(notGeneratedAlternative(null, model)).toBeNull();
+        expect(notGeneratedAlternative(dataset, null)).toBeNull();
     });
 });
 

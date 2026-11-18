@@ -6,12 +6,12 @@
  */
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
-import { b64encode } from '@/libs/base64';
 import { openInBrowser } from '@/libs/openInBrowser';
 import { defaultViewFor } from '@/libs/openItemDefaults';
 import { isArchiveFile } from '@/libs/entryTypes';
 import { shouldOpenAsText, isPdfFile } from '@/libs/textFileUtils';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
+import { notGeneratedAlternative, viewerUrl } from '@/libs/views/viewLinks';
 import { useNotify } from '@/composables/useNotify';
 import FileAvailabilityDialog from '@/features/dataset/dialogs/FileAvailabilityDialog.vue';
 
@@ -33,7 +33,7 @@ export function useOpenItem({ dataset, route, canWrite, dialogs, actions, showIn
     /** The viewer route of an entry in a new tab (one tab per file and viewer). */
     function openViewer(entryPath, view) {
         const [, path] = ddb.utils.datasetPathFromUri(entryPath);
-        window.open(`/r/${route.org}/${route.ds}/view/${b64encode(path)}/${view}`, `${path}-${view}`);
+        window.open(viewerUrl({ baseUrl: '', org: route.org, ds: route.ds, path, view }), `${path}-${view}`);
     }
 
     function explainUnavailable(availability, node) {
@@ -41,6 +41,12 @@ export function useOpenItem({ dataset, route, canWrite, dialogs, actions, showIn
             show: true, dataset, entry: node.entry,
             title: availability.title, message: availability.message, status: availability.status,
             actions: availability.actions, buildState: availability.buildState, hint: availability.hint,
+            // The build could not make what this viewer needs: the viewer that shows the file anyway (a model's model viewer)
+            alternative: availability.status === 'not-generated' ? notGeneratedAlternative(route, node.entry) : null,
+            onOpenAlternative: alternative => {
+                dialog.close();
+                openViewer(node.path, alternative.view);
+            },
             onBuildStarted: entry => notify.info(`Build started for ${pathutils.basename(entry.path)}`, { summary: 'Build Started' }),
             // The job has ended: the viewer opens when the entry lists what it needs (a job that
             // succeeded can leave the build on hold), else the dialog says what is missing

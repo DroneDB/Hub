@@ -10,6 +10,7 @@
  * A link opens in a new tab, like the other viewers, so the dataset page stays where it was.
  * Every link can ask for Viewer only (`embed=1`), always as the last query key.
  */
+import ddb from 'ddb';
 import { b64encode, b64urlEncode } from '@/libs/base64';
 
 // Shown next to the "viewer only" option, wherever it is offered
@@ -65,6 +66,27 @@ export function savedViewUrl(dataset, uid, { viewerOnly = false, baseUrl = '' } 
  */
 export function viewerUrl({ baseUrl, org, ds, path, view, viewerOnly = false }) {
     return withQuery(`${baseUrl}${datasetRoot({ org, ds })}/view/${b64encode(path)}/${view}`, embedQuery(viewerOnly));
+}
+
+/**
+ * The viewer offered instead of the one asked for when the build of a file could not make the output that one needs
+ * (the 'not-generated' state of the availability check): the model viewer of a model whose 3D Tiles could not be made,
+ * which shows its bm3d output; null for any other file. The 3D viewer offers it in its build notice, the dataset page
+ * in the dialog about a file that cannot open.
+ * @param {{ org: string, ds: string } | null | undefined} dataset
+ * @param {{ type?: number, path?: string } | null | undefined} entry
+ * @param {{ viewerOnly?: boolean }} [options]  viewerOnly: from a viewer opened as Viewer only, so it stays one
+ * @returns {{ label: string, icon: string, view: string, to: string } | null}
+ */
+export function notGeneratedAlternative(dataset, entry, { viewerOnly = false } = {}) {
+    if (!dataset || !entry?.path || entry.type !== ddb.entry.type.MODEL) return null;
+    const view = 'model';
+    return {
+        label: 'Open in the model viewer',
+        icon: 'fa-solid fa-cube',
+        view,
+        to: viewerUrl({ baseUrl: '', org: dataset.org, ds: dataset.ds, path: entry.path, view, viewerOnly })
+    };
 }
 
 /** The absolute URL of a link (to copy). @param {string} url */

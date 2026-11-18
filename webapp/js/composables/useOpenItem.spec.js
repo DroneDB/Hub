@@ -72,3 +72,36 @@ describe('when the build job ends', () => {
         expect(ctx.actions.showError).toHaveBeenCalledWith('offline', 'Error');
     });
 });
+
+describe('a model whose 3D Tiles could not be generated', () => {
+    const model = { path: 'parts/house.obj', hash: 'm', type: ddb.entry.type.MODEL };
+    const modelNode = { path: 'ddb://x/o/d/parts/house.obj', entry: model };
+    const notGenerated = {
+        available: false, status: 'not-generated', title: '3D Tiles not available', output: '3D Tiles', reason: 'Index was out of range.',
+        message: "The 3D Tiles of 'house.obj' could not be generated: Index was out of range.", actions: ['close'], buildState: null
+    };
+
+    it('offers the model viewer in the dialog, and opens it in a tab of its own when it is chosen', async () => {
+        const ctx = setup();
+        checker.check.mockResolvedValueOnce(notGenerated);
+        await ctx.openItem(modelNode, 'unified');
+        const props = ctx.dialogs.open.mock.calls.at(-1)[1];
+        expect(props.alternative).toMatchObject({ label: 'Open in the model viewer', view: 'model' });
+        const dialog = ctx.dialogs.open.mock.results.at(-1).value;
+
+        props.onOpenAlternative(props.alternative);
+
+        expect(dialog.close).toHaveBeenCalled();
+        expect(window.open).toHaveBeenCalledTimes(1);
+        const [url, name] = window.open.mock.calls[0];
+        expect(url).toBe(props.alternative.to);
+        expect(url).toMatch(/^\/r\/o\/d\/view\/.+\/model$/);
+        expect(name).toBe('parts/house.obj-model');
+    });
+
+    it('offers no other viewer for a file that is not built yet', async () => {
+        const ctx = setup();
+        const props = await openUnavailable(ctx);
+        expect(props.alternative).toBeNull();
+    });
+});

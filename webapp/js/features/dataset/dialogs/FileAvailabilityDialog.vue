@@ -63,6 +63,9 @@
                         :disabled="processing" icon="fa-solid fa-rotate-right"
                         label="Retry Processing" @click="handleRetryBuild" />
                 <Button v-if="hasAction('wait')" label="Wait" @click="handleClose" />
+                <!-- Another viewer that shows the file, when its build could not make what this one needs -->
+                <Button v-if="alternative" :label="alternative.label" :icon="alternative.icon"
+                        class="file-availability-alternative" @click="$emit('open-alternative', alternative)" />
                 <Button v-if="hasAction('wait-and-open')" severity="success"
                         :disabled="waitingForBuild" icon="fa-solid fa-hourglass-half"
                         :label="waitingForBuild ? 'Waiting...' : 'Wait and Open'"
@@ -122,9 +125,14 @@ export default {
         hint: {
             type: String,
             default: ''
+        },
+        // Another viewer that shows the file ({ label, icon, view, to }: notGeneratedAlternative), offered as a button
+        alternative: {
+            type: Object,
+            default: null
         }
     },
-    emits: ['close', 'build-started', 'error', 'build-completed', 'build-failed', 'timeout'],
+    emits: ['close', 'build-started', 'error', 'build-completed', 'build-failed', 'timeout', 'open-alternative'],
 
     data() {
         return {
@@ -242,8 +250,10 @@ export default {
                     return 'info';
                 case 'failed':
                     return 'error';
+                // On hold, unreadable by the server, or an output its build could not make (a rebuild fails the same way)
                 case 'blocked':
                 case 'unsupported':
+                case 'not-generated':
                     return 'warn';
                 case 'queued':
                     return 'info';
