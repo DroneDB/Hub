@@ -23,11 +23,13 @@ export const framingOf = ({ georeferenced, kind }) =>
 
 // How the scene sphere fits the view (fitDistance's margin), how high above the horizon of the
 // scene up the camera looks at it from and, when the camera faces the box (frame's `faceBox`), how
-// far round from the narrowest horizontal side of the box towards its longest one. A scene seen
-// from inside that faces its box is framed as a room is photographed instead (ROOM_SHOT).
+// far round from the narrowest horizontal side of the box towards its longest one and, for a view
+// from inside, how far behind the centre the camera stands, as a share of half the longest side. A
+// scene seen from inside whose up is known is framed as a room is photographed instead (ROOM_SHOT).
 const FRAMINGS = Object.freeze({
-    // Well under 1: the sphere is larger than the view, so the camera starts inside the model
-    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0, azimuthDeg: 0 },
+    // Well under 1: the sphere is larger than the view, so the camera starts inside the model. Facing
+    // the box, it stands on its longest side behind the centre, looking along it, level
+    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0, azimuthDeg: 90, insideShare: 0.6 },
     // The whole sphere in view, seen from halfway between the horizon and straight down, the long side
     // of the site across the view
     [FRAMING.OVERVIEW]: { margin: 1.1, elevationDeg: 45, azimuthDeg: 0 },
@@ -216,26 +218,31 @@ export class CameraRig {
      * @param {any} q
      * @param {string} [framing]
      * @param {any} [extent]
-     * A room (FRAMING.IMMERSIVE facing its box) gets its establishing shot (ROOM_SHOT); `crowding`
+     * A room (FRAMING.IMMERSIVE facing its box) with `roomShot` gets its establishing shot
+     * (ROOM_SHOT), which stands high in a corner and so needs the scene up to be right; `crowding`
      * (crowdingOf, over the resident splats, in the frame of the splat file) keeps the camera out of
-     * its walls and furniture, and without it the first corner is taken as it is.
-     * @param {{ faceBox?: boolean, crowding?: ((point: number[], radius: number) => number) | null }} [options]
+     * its walls and furniture, and without it the first corner is taken as it is. Without `roomShot`
+     * the camera stands on the longest side of the room, behind its centre, level.
+     * @param {{ faceBox?: boolean, roomShot?: boolean, crowding?: ((point: number[], radius: number) => number) | null }} [options]
      */
-    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box, { faceBox = false, crowding = null } = {}) {
+    frame(box, q, framing = FRAMING.IMMERSIVE, extent = box, { faceBox = false, roomShot = false, crowding = null } = {}) {
         const { THREE, camera, controls } = this;
-        const { margin, elevationDeg, azimuthDeg } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
+        const { margin, elevationDeg, azimuthDeg, insideShare } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3()).applyQuaternion(q);
         this.boundsDiagonal = Math.max(size.length(), 1e-3);
         let position, target = center;
-        if (faceBox && framing === FRAMING.IMMERSIVE) {
+        if (faceBox && roomShot && framing === FRAMING.IMMERSIVE) {
             ({ position, target } = this.roomShot(box, q, crowding));
         } else {
+            const sides = faceBox ? this.horizontalSides(box, q) : null;
             const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
-            // The vertical field of view limits a landscape view, the horizontal one a portrait view
-            const fitted = fitDistance(radius, camera.fov, camera.aspect, margin);
-            const facing = faceBox ? { azimuthDeg, sides: this.horizontalSides(box, q) } : {};
-            position = center.clone().addScaledVector(this.framingDirection(elevationDeg, facing), fitted);
+            // Inside a room, behind its centre on its longest side; else at the distance that fits the
+            // scene sphere: the vertical field of view limits a landscape view, the horizontal one a portrait view
+            const inside = sides && insideShare ? insideShare * sides.length / 2 : 0;
+            const dist = inside > 0 ? inside : fitDistance(radius, camera.fov, camera.aspect, margin);
+            const facing = sides ? { azimuthDeg, sides } : {};
+            position = center.clone().addScaledVector(this.framingDirection(elevationDeg, facing), dist);
         }
         const dist = position.distanceTo(target);
         // A small near plane lets splats render when the camera flies in among them

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createFrameRetry, FRAME_ATTEMPTS, FRAME_RETRY_MS, coreBox, residentSplatCenters, CORE_QUANTILES, MIN_CORE_SAMPLES, MIN_ROOM_SAMPLES, framingHint, chooseFraming, crowdingOf } from './framing';
 import { FRAMING } from './cameraRig';
+import { MIN_UP_CONFIDENCE } from './upAxis';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
@@ -157,17 +158,28 @@ describe('chooseFraming', () => {
     it('frames the core the build found, as its kind says, facing its sides; an object or a site without reading the resident splats', () => {
         const residentCenters = vi.fn(() => capture());
         expect(chooseFraming({ bounds: train, georeferenced: false, residentCenters })).toEqual({
-            framing: FRAMING.OBJECT, core: { min: [-3.95, -0.94, -3.02], max: [3.65, 0.98, 2.72] }, faceBox: true, crowding: null, settled: true
+            framing: FRAMING.OBJECT, core: { min: [-3.95, -0.94, -3.02], max: [3.65, 0.98, 2.72] }, faceBox: true, roomShot: false, crowding: null, settled: true
         });
         const site = { ...train, framing: { kind: 'site', core: [-50, -50, 0, 50, 50, 10] } };
         expect(chooseFraming({ bounds: site, residentCenters })).toMatchObject({ framing: FRAMING.OVERVIEW, settled: true });
         expect(residentCenters).not.toHaveBeenCalled();
     });
 
+    it('frames a room whose up the build is not sure of along its longest side, without reading the resident splats', () => {
+        const residentCenters = vi.fn(() => capture({ subject: MIN_ROOM_SAMPLES }));
+        const unsure = { min: [-100, -100, -100], max: [100, 100, 100], up: [0.84, -0.01, -0.54], upConfidence: MIN_UP_CONFIDENCE - 0.01, framing: { kind: 'scene', core: [8, -1, -7, 12, 1, -3] } };
+        expect(chooseFraming({ bounds: unsure, residentCenters })).toMatchObject({ framing: FRAMING.IMMERSIVE, faceBox: true, roomShot: false, crowding: null, settled: true });
+        const none = { ...unsure, up: undefined, upConfidence: undefined };
+        expect(chooseFraming({ bounds: none, residentCenters }).roomShot).toBe(false);
+        expect(residentCenters).not.toHaveBeenCalled();
+        const sure = { ...unsure, up: [0, -1, 0], upConfidence: MIN_UP_CONFIDENCE };
+        expect(chooseFraming({ bounds: sure, residentCenters })).toMatchObject({ roomShot: true, settled: true });
+    });
+
     it('keeps a room clear of its resident splats, and frames it again until enough of them arrived', () => {
-        const room = { min: [-100, -100, -100], max: [100, 100, 100], framing: { kind: 'scene', core: [8, -1, -7, 12, 1, -3] } };
+        const room = { min: [-100, -100, -100], max: [100, 100, 100], up: [0, -1, 0], upConfidence: 0.9, framing: { kind: 'scene', core: [8, -1, -7, 12, 1, -3] } };
         const early = chooseFraming({ bounds: room, residentCenters: () => new Float32Array(0) });
-        expect(early).toMatchObject({ framing: FRAMING.IMMERSIVE, faceBox: true, crowding: null, settled: false });
+        expect(early).toMatchObject({ framing: FRAMING.IMMERSIVE, faceBox: true, roomShot: true, crowding: null, settled: false });
         expect(early.core).toEqual({ min: [8, -1, -7], max: [12, 1, -3] });
         // The first coarse pages of a paged scene are too few; once enough have arrived the framing is settled
         expect(chooseFraming({ bounds: room, residentCenters: () => capture() }).settled).toBe(false);

@@ -1,4 +1,5 @@
 import { FRAMING, framingOf } from './cameraRig';
+import { estimatedUp } from './upAxis';
 
 /**
  * Framing of a splat that is not ready to be framed yet. A paged .rad has no resident splats until
@@ -153,25 +154,30 @@ export function framingHint(bounds) {
  * What the viewer frames. With the build's hint (framingHint), its core, framed as its kind of capture
  * says and facing the sides of the core; without, the core of the resident splats (coreBox between the
  * quantiles of the framing: a georeferenced scene seen whole from above, any other from inside), null
- * while too few splats are resident. The resident splats are read without a hint, and for a room (to
- * keep its camera out of its walls, crowdingOf). `settled` is false while the framing waits for
+ * while too few splats are resident. A room whose up the build is sure of gets its establishing shot
+ * (`roomShot`). The resident splats are read without a hint, and for that shot (to keep its camera out
+ * of the walls, crowdingOf). `settled` is false while the framing waits for
  * resident splats: the viewer frames again when more have arrived.
  * @param {object} scene
  * @param {any} scene.bounds  the parsed bounds.json, or null
  * @param {boolean} [scene.georeferenced]
  * @param {() => ArrayLike<number>} scene.residentCenters  x, y, z of the resident splats (residentSplatCenters)
- * @returns {{ framing: string, core: { min: number[], max: number[] } | null, faceBox: boolean, crowding: ((point: number[], radius: number) => number) | null, settled: boolean }}
+ * @returns {{ framing: string, core: { min: number[], max: number[] } | null, faceBox: boolean, roomShot: boolean, crowding: ((point: number[], radius: number) => number) | null, settled: boolean }}
  */
 export function chooseFraming({ bounds, georeferenced, residentCenters }) {
     const hint = framingHint(bounds);
     const framing = framingOf({ georeferenced, kind: hint?.kind });
     if (!hint) {
         const core = coreBox(residentCenters(), CORE_QUANTILES[framing]);
-        return { framing, core, faceBox: false, crowding: null, settled: !!core };
+        return { framing, core, faceBox: false, roomShot: false, crowding: null, settled: !!core };
     }
+    // The establishing shot of a room stands high in a corner: with an up the build is not sure of
+    // (estimatedUp: below MIN_UP_CONFIDENCE) high may be beside the floor, and the room is seen along
+    // its longest side, level, instead
+    const roomShot = framing === FRAMING.IMMERSIVE && estimatedUp(bounds) !== null;
     // A room is framed clear of its walls and furniture once enough of its splats are resident
-    const crowding = framing === FRAMING.IMMERSIVE ? crowdingOf(residentCenters(), hint.core) : null;
-    return { framing, core: hint.core, faceBox: true, crowding, settled: framing !== FRAMING.IMMERSIVE || !!crowding };
+    const crowding = roomShot ? crowdingOf(residentCenters(), hint.core) : null;
+    return { framing, core: hint.core, faceBox: true, roomShot, crowding, settled: !roomShot || !!crowding };
 }
 
 // The resident splats in the core a room is kept clear of its walls with: the coarse first pages of a

@@ -279,7 +279,8 @@ const fileUp = () => rig.sceneUp.clone().applyQuaternion(stage.overlay.quaternio
 /**
  * Frames the splat on its core, with the far plane past all of its splats. The core is the one the
  * build found from every splat (bounds.json `framing`: an object seen from beside it, a room from a
- * high corner, clear of the resident splats of its walls, a site from above), facing its sides. A build
+ * high corner clear of the resident splats of its walls when its up is sure, else along its longest
+ * side, a site from above), facing its sides. A build
  * made before that has none: the core is then the box between quantiles of the resident splats
  * (CORE_QUANTILES: floaters and far background splats left out), and until splats are resident (a
  * paged .rad at load) the build-time bounds stand in, else the resident bounds of a plain .spz.
@@ -290,12 +291,12 @@ function frameCamera() {
     if (bounds && bounds.min && bounds.max) extent = new THREE.Box3(new THREE.Vector3(...bounds.min), new THREE.Vector3(...bounds.max));
     if (!extent || extent.isEmpty()) extent = splatMesh.getBoundingBox ? splatMesh.getBoundingBox(true) : null;
     if (extent && extent.isEmpty()) extent = null;
-    const { framing, core, faceBox, crowding, settled } = chooseFraming({ bounds, georeferenced: georeferenced.value, residentCenters: () => residentSplatCenters(splatMesh) });
+    const { framing, core, faceBox, roomShot, crowding, settled } = chooseFraming({ bounds, georeferenced: georeferenced.value, residentCenters: () => residentSplatCenters(splatMesh) });
     let box = core ? new THREE.Box3(new THREE.Vector3(...core.min), new THREE.Vector3(...core.max)) : extent;
     if (!box) box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
     // The mesh stays at the origin and unit scale: the point size is in the splats, not the mesh
     splatMesh.position.set(0, 0, 0);
-    rig.frame(box, splatMesh.quaternion, framing, extent ?? box, { faceBox, crowding });
+    rig.frame(box, splatMesh.quaternion, framing, extent ?? box, { faceBox, roomShot, crowding });
     return settled;
 }
 
