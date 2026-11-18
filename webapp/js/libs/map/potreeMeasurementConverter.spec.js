@@ -11,7 +11,7 @@ import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import { UTM_18N_WKT, COPC_SCALE, COPC_OFFSET, CLOUD, cloudCoordinateSystem } from './measurementFormat.fixtures';
 import {
     WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, FOOT_WKT, US_FOOT_COMPOUND_WKT, METRE_US_FOOT_HEIGHT_WKT, METRE_US_FOOT_HEIGHT_WKT2,
-    US_FOOT_METRE_HEIGHT_WKT
+    US_FOOT_METRE_HEIGHT_WKT, EASE_GRID_WKT, EASE_GRID_WKT2
 } from './crs.fixtures';
 
 // 0.01 m is about 9e-8 degrees of latitude: 1e-7 degree is the tolerance
@@ -267,6 +267,17 @@ describe('a COPC built again in another CRS than the one the measurements were s
         // The same text is the same CRS: drawn as it was saved
         expect(importMeasurements(onDisk(saved), viewer, coordinateSystem('EPSG:2056')).imported).toHaveLength(1);
         expect(added[0].points.map(xyz)).toEqual([P.A.utm, P.B.utm]);
+    });
+
+    it('draws what was saved in a CRS proj4 cannot use on a COPC that states it in other words (WKT 1 saved, WKT 2 now)', () => {
+        // Neither text can be compared with the other through proj4, and no build reprojects into such a CRS
+        const local = [[1000, 2000, 10], [1030, 2040, 12]];
+        const saved = exportMeasurements(viewerWith([measure({}, local)], [annotation(local[1])]), 'cloud.laz', coordinateSystem(EASE_GRID_WKT));
+        const { viewer, added } = stubPotree();
+        expect(importMeasurements(onDisk(saved), viewer, coordinateSystem(EASE_GRID_WKT2)).unplaced).toBe(0);
+        expect(added).toHaveLength(2);
+        expect(added[0].points.map(xyz)).toEqual(local);
+        expect(added[1].position).toEqual(local[1]);
     });
 });
 

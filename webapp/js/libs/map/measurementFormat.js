@@ -273,10 +273,15 @@ const geometryHoldsEveryPoint = feature => !['circle', 'angle'].includes(feature
  * circle or an angle, whose geometry is one of their points. A feature with no local coordinates is
  * placed from its geometry.
  *
- * A feature in another CRS that cannot be reprojected into the COPC's (either CRS is one proj4 cannot
- * use) cannot be placed: its coordinates are not in the COPC's, and shown there they would be in the
- * wrong place, and saved there they would be labelled with a CRS they are not in. The caller leaves them
- * out of the view and refuses saves, so the file keeps them (MeasurementStorage.keepUnplaced).
+ * A feature in another CRS that cannot be reprojected into the COPC's (one of the two CRSs is one proj4
+ * cannot use) cannot be placed: its coordinates are not in the COPC's, and shown there they would be in
+ * the wrong place, and saved there they would be labelled with a CRS they are not in. The caller leaves
+ * them out of the view and refuses saves, so the file keeps them (MeasurementStorage.keepUnplaced).
+ *
+ * When neither the file's CRS nor the COPC's is one proj4 can use, they cannot be compared (the same CRS
+ * is written as WKT 1 by one writer and WKT 2 by another) and nothing could have been reprojected: a COPC
+ * is built again only in a CRS proj4 can use (the UTM zone of a cloud in longitude and latitude). The
+ * local coordinates are then the COPC's, as they were saved.
  * @param {any} doc  the document (`read` or the storage's `load`)
  * @param {any} coordinateSystem  the coordinate system (or SRS) of the COPC the viewer shows
  * @returns {(feature: any) => number[][] | null}
@@ -289,8 +294,10 @@ export function savedPositions(doc, coordinateSystem) {
     const wgs84 = isWgs84Document(doc);
     const features = Array.isArray(doc?.features) ? doc.features : [];
     const sample = features.map(localPointsOf).find(Boolean)?.[0] ?? null;
+    // Two CRSs proj4 cannot use cannot be compared, and no build reprojects into one: the coordinates are the COPC's
+    const comparable = stated.usable || current.usable;
     // A WGS84 file that states no CRS is placed from its geometry when the COPC has a CRS to place it in
-    const unchanged = statesCrs ? sameCrs(saved, coordinateSystem, sample) : !(wgs84 && current.usable);
+    const unchanged = statesCrs ? !comparable || sameCrs(saved, coordinateSystem, sample) : !(wgs84 && current.usable);
     const fromLocal = !unchanged && current.usable && stated.usable;
     const fromGeometry = !unchanged && current.usable && wgs84;
     return feature => {
