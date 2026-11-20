@@ -83,7 +83,7 @@ const onMapUpdate = next => setState(JSON.parse(JSON.stringify(next)));
 // The layers of the saved view: the map keeps the style it records for them, none included (FR-RAS-01)
 const savedLayers = computed(() => (saved.value ? saved.value.data.layers.map(l => l.path) : []));
 
-// "Compare to...": the picker opens once, as soon as the map shows
+// "Compare to": the picker opens once, as soon as the map shows
 function pickOnMount() {
     if (!pickOnLoad.value) return;
     pickOnLoad.value = false;

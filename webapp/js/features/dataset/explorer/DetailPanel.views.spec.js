@@ -1,6 +1,6 @@
 /**
  * The details panel of a georaster and the saved views: "Used in views" links to the views that
- * show the file, and "Compare to..." opens the map of the file with its file picker.
+ * show the file, and "Compare to" opens the map of the file with its file picker.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -72,18 +72,18 @@ describe('the details panel and saved views', () => {
         expect(w.find('.views-section').exists()).toBe(false);
     });
 
-    it('opens the map of the file with the file picker, in a new tab, on "Compare to..."', async () => {
+    it('opens the map of the file with the file picker, in a new tab, on "Compare to"', async () => {
         const w = mountPanel({ file: ortho, views: [] });
         await flushPromises();
-        const compare = buttonByLabel(w, 'Compare to...');
+        const compare = buttonByLabel(w, 'Compare to');
         expect(compare.attributes('title')).toBe('Compare this georaster with others of the dataset');
         await compare.trigger('click');
         expect(window.open).toHaveBeenCalledWith('/r/org/ds/view/ZmxpZ2h0cy9vcnRoby50aWY=/map?pick=1', '_blank', 'noopener');
     });
 
-    it('does not offer "Compare to..." for a file that is not a georaster', async () => {
+    it('does not offer "Compare to" for a file that is not a georaster', async () => {
         const w = mountPanel({ file: photo, views: [] });
         await flushPromises();
-        expect(buttonByLabel(w, 'Compare to...')).toBeUndefined();
+        expect(buttonByLabel(w, 'Compare to')).toBeUndefined();
     });
 });

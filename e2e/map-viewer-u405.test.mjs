@@ -108,7 +108,7 @@ test('FR-MAP-10: the Map tab at a root with no photos names the subfolder that h
     await appReady(page);
     await page.getByRole('tab', { name: 'Map' }).click();
     await chip.waitFor({ timeout: 20000 });
-    assert.match(await chip.innerText(), /Photos are in images\//);
+    assert.match(await chip.innerText(), /Photos are in images(?!\/)/);
 
     await page.locator('[data-testid="geo-subfolder-show"]').click();
     await chip.waitFor({ state: 'detached', timeout: 20000 });

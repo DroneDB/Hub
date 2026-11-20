@@ -16,19 +16,19 @@ const folder = path => ({ path, type: T.DIRECTORY });
 const item = entry => ({ entry });
 
 describe('geoSubfolderOf', () => {
-    it('names the subfolder of 18 photos: "Photos are in images/"', () => {
+    it('names the subfolder of 18 photos: "Photos are in images"', () => {
         const found = Array.from({ length: 18 }, (_, i) => photo(`images/DJI_${i}.JPG`));
         expect(geoSubfolderOf([...found, plain('images/readme.txt')], null))
-            .toEqual({ folder: 'images', path: 'images', text: 'Photos are in images/' });
+            .toEqual({ folder: 'images', path: 'images', text: 'Photos are in images' });
     });
 
     it('says "Map files" when what the subfolder holds is not only photos', () => {
-        expect(geoSubfolderOf([photo('data/a.jpg'), raster('data/dsm.tif')], null).text).toBe('Map files are in data/');
+        expect(geoSubfolderOf([photo('data/a.jpg'), raster('data/dsm.tif')], null).text).toBe('Map files are in data');
     });
 
     it('takes the first subfolder by name, with the path from the dataset root, below a folder', () => {
         const found = [photo('site/zeta/z.jpg'), photo('site/alpha/deep/a.jpg'), photo('site/beta/b.jpg')];
-        expect(geoSubfolderOf(found, 'site')).toEqual({ folder: 'alpha', path: 'site/alpha', text: 'Photos are in alpha/' });
+        expect(geoSubfolderOf(found, 'site')).toEqual({ folder: 'alpha', path: 'site/alpha', text: 'Photos are in alpha' });
     });
 
     it('is null without a geo entry in a subfolder: files with no place, folders, entries of the folder itself, other folders', () => {
@@ -75,7 +75,7 @@ describe('useGeoSubfolder', () => {
 
     it('searches the dataset once for the entries under a folder with only a subfolder, and names it', async () => {
         start();
-        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images/' }));
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images' }));
         expect(dataset.search).toHaveBeenCalledTimes(1);
         // The geotagged photos only (the server's EntryType GeoImage), not every entry of the dataset
         expect(dataset.search).toHaveBeenCalledWith('*', expect.objectContaining({ path: undefined, recursive: true, type: 3 }));
@@ -193,7 +193,7 @@ describe('useGeoSubfolder', () => {
         expect(hint.value).toBeNull();
         active.value = true;
         await nextTick();
-        expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images/' });
+        expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images' });
         expect(dataset.search).toHaveBeenCalledTimes(1);
 
         let signal;
@@ -213,7 +213,7 @@ describe('useGeoSubfolder', () => {
             return type === T.GEORASTER ? [raster('data/dsm.tif')] : [];
         });
         start();
-        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'data', path: 'data', text: 'Map files are in data/' }));
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'data', path: 'data', text: 'Map files are in data' }));
         // GeoImage (3), then GeoRaster (4): no point cloud, vector or other type is asked for
         expect(types).toEqual([3, 4]);
     });
@@ -240,7 +240,7 @@ describe('useGeoSubfolder', () => {
         currentPath.value = null;
         files.value = [item(folder('images'))];
         await nextTick();
-        expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images/' });
+        expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images' });
         expect(dataset.search).toHaveBeenCalledTimes(1);
     });
 

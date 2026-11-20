@@ -2,12 +2,12 @@
 /**
  * useGeoSubfolder - the Map tab of a folder that has nothing to put on the map, while a subfolder has (FR-MAP-10): the
  * photos of a dataset are in `images/`, its root has none. A search of the dataset for one entry type under the folder
- * finds them; the first subfolder that holds some is the hint ("Photos are in images/ - Show"). No recursive listing
+ * finds them; the first subfolder that holds some is the hint ("Photos are in images - Show"). No recursive listing
  * and no toggle: the user opens the subfolder, the map then shows its entries.
  *
  *   const { hint } = useGeoSubfolder({ dataset, files: () => props.files, currentPath: () => props.currentPath,
  *                                      loading: () => props.loading, active: () => props.active });
- *   hint.value   // null, or { folder: 'images', path: 'site/images', text: 'Photos are in images/' }
+ *   hint.value   // null, or { folder: 'images', path: 'site/images', text: 'Photos are in images' }
  *
  * It asks only while the map is on show, for a folder that has a subfolder and no geo entry of its own: the geotagged
  * photos first, then the other types of the map one at a time, up to the first that some subfolder holds (the server
@@ -47,7 +47,7 @@ export function geoSubfolderOf(entries, folder) {
     const first = [...byFolder.keys()].sort((a, b) => a.localeCompare(b))[0];
     if (first === undefined) return null;
     const photos = /** @type {any[]} */ (byFolder.get(first)).every(e => e.type === ddb.entry.type.GEOIMAGE);
-    return { folder: first, path: `${prefix}${first}`, text: `${photos ? 'Photos' : 'Map files'} are in ${first}/` };
+    return { folder: first, path: `${prefix}${first}`, text: `${photos ? 'Photos' : 'Map files'} are in ${first}` };
 }
 
 const T = ddb.entry.type;

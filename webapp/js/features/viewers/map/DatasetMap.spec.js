@@ -22,13 +22,13 @@ const mountMap = (props, search) => {
 afterEach(() => wrapper?.unmount());
 
 describe('DatasetMap geo subfolder hint (FR-MAP-10)', () => {
-    it('shows "Photos are in images/ - Show" at a root that has only the folder, and Show gives the subfolder', async () => {
+    it('shows "Photos are in images - Show" at a root that has only the folder, and Show gives the subfolder', async () => {
         const search = vi.fn(async () => Array.from({ length: 18 }, (_, i) => photo(`images/p${i}.jpg`)));
         mountMap({ files: [{ entry: { path: 'images', type: T.DIRECTORY } }] }, search);
         await flushPromises();
 
         const chip = wrapper.find('[data-testid="geo-subfolder-chip"]');
-        expect(chip.text()).toContain('Photos are in images/');
+        expect(chip.text()).toContain('Photos are in images');
         // In the map (MapCore's overlay slot), where the reserves of its controls are defined
         expect(chip.element.parentElement.classList.contains('map-container')).toBe(true);
         await wrapper.find('[data-testid="geo-subfolder-show"]').trigger('click');

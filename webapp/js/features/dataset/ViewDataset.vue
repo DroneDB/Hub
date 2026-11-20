@@ -242,7 +242,7 @@ const refresh = () => {
     const tree = activeTree();
     if (tree) tree.refreshAndNavigate(listing.currentPath.value);
 };
-// The Map tab's "Photos are in images/ - Show" (FR-MAP-10): the tree opens that subfolder, and the map shows what it holds
+// The Map tab's "Photos are in images - Show" (FR-MAP-10): the tree opens that subfolder, and the map shows what it holds
 const showFolder = path => { activeTree()?.refreshAndNavigate(path); };
 const actions = useDatasetActions({
     dataset, listing, dialogs, busy, canWrite, route: params, refresh, showFolder, rootChanged: reloadRoot, openItem: node => openItem(node)

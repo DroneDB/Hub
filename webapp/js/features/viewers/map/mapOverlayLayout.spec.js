@@ -85,7 +85,7 @@ describe('the panels over the bottom of the map', () => {
     });
 });
 
-// FR-MAP-10: the hint "Photos are in images/ - Show" at the bottom centre of the map. A narrow or compact map (U-411) brings
+// FR-MAP-10: the hint "Photos are in images - Show" at the bottom centre of the map. A narrow or compact map (U-411) brings
 // the bottom-left controls under the middle: the scale bar (FR-MAP-30) stands 0.5rem up and about 3rem high
 describe('the hint of a folder whose subfolder has the map entries', () => {
     const chipSource = readSource(__dirname, './GeoSubfolderChip.vue');

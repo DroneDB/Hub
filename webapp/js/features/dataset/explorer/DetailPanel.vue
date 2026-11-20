@@ -78,7 +78,7 @@
                     <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
                     <Button v-if="canBuild" severity="secondary"
                             icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
-                    <Button v-if="isGeoraster" severity="secondary" icon="fa-solid fa-table-columns" label="Compare to..."
+                    <Button v-if="isGeoraster" severity="secondary" icon="fa-solid fa-table-columns" label="Compare to"
                             title="Compare this georaster with others of the dataset" @click="handleCompareTo" />
                 </div>
             </div>

@@ -11,10 +11,10 @@
 <script setup>
 /**
  * GeoSubfolderChip - over the empty map of a folder whose subfolder has the geo entries (FR-MAP-10):
- * "Photos are in images/ - Show". Show opens that subfolder (`show`); the page navigates its tree there.
+ * "Photos are in images - Show". Show opens that subfolder (`show`); the page navigates its tree there.
  */
 defineProps({
-    /** The hint's sentence ("Photos are in images/") */
+    /** The hint's sentence ("Photos are in images") */
     text: { type: String, required: true },
     /** The subfolder it names */
     folder: { type: String, required: true }

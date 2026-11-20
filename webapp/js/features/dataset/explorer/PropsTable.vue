@@ -58,8 +58,8 @@
                                     size="small"
                                     text
                                     class="row-action-btn crs-info-btn"
-                                    :title="`What is ${part.text}? (opens epsg.io)`"
-                                    :aria-label="`What is ${part.text}? (opens epsg.io)`" /></span>
+                                    :title="`What is ${part.text}?`"
+                                    :aria-label="`What is ${part.text}?`" /></span>
                                 <template v-else>{{ part.text }}</template>
                             </template>
                         </span>

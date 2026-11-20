@@ -187,7 +187,7 @@ function experimentalMenuItems(ctx) {
 // One georaster: the map opens on it with the file picker, for the other rasters
 function compareToItem(ctx) {
     return {
-        label: 'Compare to...',
+        label: 'Compare to',
         icon: 'fa-solid fa-table-columns',
         group: 'open',
         isVisible: () => {

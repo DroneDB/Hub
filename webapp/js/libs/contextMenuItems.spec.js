@@ -92,7 +92,7 @@ describe('the map entries of the context menu', () => {
         const selected = paths.map(raster);
         const items = buildStandardContextMenu({ getSelectedEntries: () => selected, canWrite: true, dataset: ds, emit: vi.fn() });
         const byLabel = label => items.find(i => i.label === label);
-        return { compareTo: byLabel('Compare to...'), compareInMap: byLabel('Compare in Map') };
+        return { compareTo: byLabel('Compare to'), compareInMap: byLabel('Compare in Map') };
     }
 
     beforeEach(() => {
@@ -101,7 +101,7 @@ describe('the map entries of the context menu', () => {
     });
     afterEach(() => vi.restoreAllMocks());
 
-    it('"Compare to..." opens the map of the georaster with the file picker, in a new tab', () => {
+    it('"Compare to" opens the map of the georaster with the file picker, in a new tab', () => {
         const { compareTo, compareInMap } = mapMenu(['flights/ortho.tif']);
         expect(visible(compareTo)).toBe(true);
         expect(visible(compareInMap)).toBe(false);

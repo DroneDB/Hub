@@ -284,7 +284,7 @@ describe('MapViewer in Viewer only', () => {
     });
 });
 
-// ---- Compare to... -----------------------------------------------------------------------------
+// ---- Compare to -----------------------------------------------------------------------------
 
 describe('MapViewer with pick=1', () => {
     it('opens the picker once the map shows, and turns the split on with the first layer picked', async () => {
