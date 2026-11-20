@@ -392,3 +392,34 @@ describe('layout', () => {
         expect(content).not.toContain('padding');
     });
 });
+
+// The photogrammetry window is sized for the list of the node's options only when it shows that list
+describe('the options of the processing node', () => {
+    const shown = (preset, options) => TaskHistory.computed.optionsListShown.call({ photogrammetryForm: { preset }, availableOdmOptions: options });
+
+    it('shows the list for a profile when the node gave its options', () => {
+        expect(shown('default', [{ name: 'dsm' }])).toBe(true);
+    });
+
+    it('shows no list for the Custom profile or a node that gave none', () => {
+        expect(shown('custom', [{ name: 'dsm' }])).toBe(false);
+        expect(shown('default', [])).toBe(false);
+    });
+
+    it('says so when the node did not answer, and forgets it when another node answers', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const options = vi.fn(() => Promise.reject(new Error('Internal server error')));
+        const vm = { photogrammetryForm: { nodeId: 'n1' }, availableOdmOptions: [{ name: 'old' }], optionsLoadFailed: false,
+            dataset: { registry: { sys: { processingNodeOptions: options } } } };
+
+        await TaskHistory.methods.loadOdmOptions.call(vm);
+        expect(vm.availableOdmOptions).toEqual([]);
+        expect(vm.optionsLoadFailed).toBe(true);
+
+        options.mockImplementation(() => Promise.resolve([{ name: 'dsm' }]));
+        await TaskHistory.methods.loadOdmOptions.call(vm);
+        expect(vm.availableOdmOptions).toEqual([{ name: 'dsm' }]);
+        expect(vm.optionsLoadFailed).toBe(false);
+        warn.mockRestore();
+    });
+});

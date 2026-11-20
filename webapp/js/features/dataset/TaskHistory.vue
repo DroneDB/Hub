@@ -42,8 +42,9 @@
         <!-- The form dialog size below the wide breakpoint; from it the wide size, the fields and the options side by side
              (FR-PRC-45, FR-XC-33). The window is 90vh high from sm up (css below): the options list takes the free height -->
         <Window id="photogrammetry" v-model:visible="photogrammetryDialogOpen" modal title="Run Photogrammetry (NodeODX)"
-                fixed-position :size-class="wideScreen ? 'dialog-wide' : 'dialog-xl'">
-            <div class="pg-layout">
+                fixed-position :size-class="wideScreen && optionsListShown ? 'dialog-wide' : 'dialog-xl'">
+            <!-- The window is high (and, on a wide screen, two columns) only for the list of the node's options -->
+            <div class="pg-layout" :class="{ 'with-options': optionsListShown }">
                 <div class="pg-fields">
                     <div class="mb-3">
                         <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
@@ -124,6 +125,9 @@
                         <Textarea id="task-history-options" v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
                                   placeholder="[{&quot;name&quot;:&quot;fast-orthophoto&quot;,&quot;value&quot;:true},{&quot;name&quot;:&quot;dsm&quot;,&quot;value&quot;:true}]" />
                     </div>
+                    <small v-if="photogrammetryForm.preset !== 'custom' && optionsLoadFailed" class="muted d-block mb-3 pg-options-unavailable">
+                        The options of this node could not be loaded, so the options of the profile cannot be changed.
+                    </small>
                     <small v-if="optionsError" class="error-text">{{ optionsError }}</small>
                 </div>
 
@@ -346,6 +350,8 @@ export default {
                 newDatasetVisibility: DEFAULT_VISIBILITY
             },
             optionsError: '',
+            // The node did not answer the list of its options: the window says so in place of the list
+            optionsLoadFailed: false,
             // The refusal of the name of the new dataset, under its field (FR-PRC-34)
             newDatasetNameError: '',
             folderPathError: '',
@@ -404,6 +410,11 @@ export default {
         // The slug rule of the Registry, as the new dataset name field shows it
         slugRuleText() {
             return slugDescription();
+        },
+
+        /** The list of the node's options is shown: the window has the height (and the width) for it. */
+        optionsListShown() {
+            return this.photogrammetryForm.preset !== 'custom' && this.availableOdmOptions.length > 0;
         },
 
         selectedPreset() {
@@ -603,12 +614,14 @@ export default {
         },
 
         async loadOdmOptions() {
+            this.optionsLoadFailed = false;
             try {
                 const nodeId = this.photogrammetryForm.nodeId || 'default';
                 this.availableOdmOptions = await this.dataset.registry.sys.processingNodeOptions(nodeId) || [];
             } catch (e) {
                 console.warn('Failed to load ODM options:', e);
                 this.availableOdmOptions = [];
+                this.optionsLoadFailed = true;
             }
         },
 
@@ -985,10 +998,11 @@ export default {
     background-color: var(--ddb-primary-hover);
 }
 
-/* The photogrammetry window (FR-PRC-45). From sm the window is 90vh high and its content a column: the form fields do
-   not grow, the options list takes the free height (at least 12rem), so the only scroll area is the list. When the
-   screen is too small for the fields and 12rem of list, the window scrolls as a whole, and nothing overlaps.
-   Below sm (a phone) the window is as high as its content, and the list keeps its own height. */
+/* The photogrammetry window (FR-PRC-45). With the list of the node's options, from sm the window is 90vh high and its
+   content a column: the form fields do not grow, the options list takes the free height (at least 12rem), so the
+   only scroll area is the list. When the screen is too small for the fields and 12rem of list, the window scrolls as
+   a whole, and nothing overlaps. Below sm (a phone) the window is as high as its content, and the list keeps its own
+   height. Without the list (a Custom profile, a node that did not answer) the window is as high as its fields. */
 .pg-layout {
     display: flex;
     flex-direction: column;
@@ -1011,7 +1025,7 @@ export default {
 }
 
 @media (min-width: 576px) {
-    :global(#photogrammetry.p-dialog.window-dialog) {
+    :global(#photogrammetry.p-dialog.window-dialog:has(.pg-layout.with-options)) {
         height: 90vh;
     }
 
@@ -1024,23 +1038,23 @@ export default {
         flex: none;
     }
 
-    .pg-layout {
+    .pg-layout.with-options {
         flex: 1 1 auto;
     }
 
-    .pg-fields,
-    .pg-output {
+    .with-options .pg-fields,
+    .with-options .pg-output {
         flex: none;
     }
 
-    .pg-options {
+    .with-options .pg-options {
         flex: 1 1 0px;
     }
 }
 
 /* From the wide breakpoint (FR-XC-33) the fields are on the left and the options on the right, twice as wide */
 @include wide-up {
-    .pg-layout {
+    .pg-layout.with-options {
         display: grid;
         grid-template-columns: 1fr 2fr;
         grid-template-rows: auto 1fr;

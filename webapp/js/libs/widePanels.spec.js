@@ -110,8 +110,9 @@ describe('FR-PRC-45: the Run Photogrammetry window', () => {
     const file = 'js/features/dataset/TaskHistory.vue';
     const style = styleOf(file);
 
-    it('is the wide window from the wide breakpoint and the form window below it', () => {
-        expect(templateOf(file)).toContain(`:size-class="wideScreen ? 'dialog-wide' : 'dialog-xl'"`);
+    it('is the wide window from the wide breakpoint, with the list of the options, and the form window otherwise', () => {
+        expect(templateOf(file)).toContain(`:size-class="wideScreen && optionsListShown ? 'dialog-wide' : 'dialog-xl'"`);
+        expect(templateOf(file)).toContain(`<div class="pg-layout" :class="{ 'with-options': optionsListShown }">`);
         expect(read(file)).toContain('wideScreen: useMediaMatch(WIDE_MEDIA_QUERY)');
     });
 
@@ -123,19 +124,20 @@ describe('FR-PRC-45: the Run Photogrammetry window', () => {
         expect(template.indexOf('<OdxOptionsEditor')).toBeLessThan(template.indexOf('class="pg-output"'));
     });
 
-    it('from sm it is 90vh high with a column for content: the fields do not grow, the options take the free height', () => {
+    it('from sm, with the list of the options, it is 90vh high with a column for content: the fields do not grow, the options take the free height', () => {
         const at = style.indexOf('@media (min-width: 576px)');
         const media = blockAt(style, at);
-        expect(rule(media, ':global(#photogrammetry.p-dialog.window-dialog)')).toContain('height: 90vh;');
+        expect(rule(media, ':global(#photogrammetry.p-dialog.window-dialog:has(.pg-layout.with-options))')).toContain('height: 90vh;');
+        expect(media).not.toContain(':global(#photogrammetry.p-dialog.window-dialog) {');
         expect(rule(media, ':global(#photogrammetry .p-dialog-content)')).toMatch(/display: flex;\s*flex-direction: column;/);
-        expect(rule(media, '.pg-fields,\n    .pg-output')).toContain('flex: none;');
-        expect(rule(media, '.pg-options')).toContain('flex: 1 1 0px;');
+        expect(rule(media, '.with-options .pg-fields,\n    .with-options .pg-output')).toContain('flex: none;');
+        expect(rule(media, '.with-options .pg-options')).toContain('flex: 1 1 0px;');
     });
 
     it('from the wide breakpoint the fields and the options are side by side, 1fr 2fr', () => {
         expect(style).toContain("@use '../../../css/breakpoints' as *;");
         const wide = blockAt(style, style.indexOf('@include wide-up'));
-        expect(rule(wide, '.pg-layout')).toMatch(/display: grid;\s*grid-template-columns: 1fr 2fr;/);
+        expect(rule(wide, '.pg-layout.with-options')).toMatch(/display: grid;\s*grid-template-columns: 1fr 2fr;/);
         expect(rule(wide, '.pg-options')).toMatch(/grid-column: 2;\s*grid-row: 1 \/ span 2;/);
     });
 
