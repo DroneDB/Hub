@@ -41,6 +41,7 @@ describe('the width tokens (FR-XC-33)', () => {
         '--ddb-panel-analysis-width': 'clamp(16rem, 18vw, 28rem)',
         '--ddb-popup-width': 'clamp(20rem, 22vw, 40rem)',
         '--ddb-dialog-form-max': '47rem',
+        '--ddb-dialog-log-max': '80rem',
         '--ddb-dialog-wide-max': '120rem'
     };
 

@@ -22,7 +22,7 @@ const show = async (props, slots = {}) => {
 };
 
 describe('HubWindow size-class', () => {
-    it.each(['dialog-lg', 'dialog-xl', 'dialog-wide'])('puts %s on the dialog and sets no width inline', async cls => {
+    it.each(['dialog-lg', 'dialog-xl', 'dialog-log', 'dialog-wide'])('puts %s on the dialog and sets no width inline', async cls => {
         const dialog = await show({ sizeClass: cls, fixedSize: true });
         expect(dialog.classList.contains(cls)).toBe(true);
         expect(dialog.getAttribute('style') || '').not.toContain('--window-width');
@@ -51,12 +51,15 @@ describe('HubWindow maximizable (FR-PRC-44)', () => {
     it('has no maximize button by default', async () => {
         const dialog = await show({ sizeClass: 'dialog-wide', fixedSize: true });
         expect(dialog.querySelector('.p-dialog-maximize-button')).toBeNull();
+        expect(dialog.classList.contains('window-maximizable')).toBe(false);
     });
 
     it('has the maximize button of the Dialog, which makes the window fill the screen and back', async () => {
         const dialog = await show({ sizeClass: 'dialog-wide', fixedSize: true, maximizable: true });
         const button = dialog.querySelector('.p-dialog-maximize-button');
         expect(button).not.toBeNull();
+        // the class the stylesheet lays its content out by: a column with the footer at the bottom
+        expect(dialog.classList.contains('window-maximizable')).toBe(true);
         button.click();
         await wrapper.vm.$nextTick();
         expect(dialog.classList.contains('p-dialog-maximized')).toBe(true);

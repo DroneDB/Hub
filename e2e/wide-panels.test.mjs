@@ -96,7 +96,7 @@ for (const viewport of VIEWPORTS) {
         assert.ok(r.list >= r.dialog * 0.6, `the list is ${r.list} px of ${r.dialog}`);
     });
 
-    test(`${at}: the task log is wide and high, and scrolls sideways with Wrap lines off (FR-PRC-44)`, async (t) => {
+    test(`${at}: the task log is 80rem wide and high, fills the screen when maximized and scrolls sideways with Wrap lines off (FR-PRC-44)`, async (t) => {
         const page = await newPage(viewport);
         await page.goto(`${URL_}/r/${DATASET}`);
         await appReady(page);
@@ -127,10 +127,56 @@ for (const viewport of VIEWPORTS) {
             const inner = log.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
             return { width: log.getBoundingClientRect().width, lines: inner / lineHeight };
         });
-        if (viewport.width >= 3840) {
-            assert.ok(m.width >= 1800, `the log is ${m.width} px wide`); // 1900 px for the window, less the padding
-            assert.ok(m.lines >= 60, `the log holds ${m.lines} lines`);
-        }
+        // The window of a log is 80rem (1280 px) at both widths, not the whole screen; the log is that less the padding
+        assert.equal(await widthOf(page, '#task-log'), 1280);
+        assert.ok(m.width >= 1200 && m.width < 1280, `the log is ${m.width} px wide`);
+        if (viewport.width >= 3840) assert.ok(m.lines >= 60, `the log holds ${m.lines} lines`);
+        // The long log scrolls in its box: the window is as high as it may be (90% of the screen), its content does
+        // not scroll, and the footer is under the log, not over its last lines
+        const fit = await page.evaluate(() => {
+            const dialog = document.querySelector('#task-log');
+            const content = dialog.querySelector('.p-dialog-content');
+            const log = dialog.querySelector('.task-log');
+            return {
+                dialog: dialog.getBoundingClientRect().height,
+                contentScrolls: content.scrollHeight > content.clientHeight,
+                logScrolls: log.scrollHeight > log.clientHeight,
+                gap: dialog.querySelector('.window-footer').getBoundingClientRect().top - log.getBoundingClientRect().bottom
+            };
+        });
+        assert.ok(Math.abs(fit.dialog - viewport.height * 0.9) <= 1, `the window is ${fit.dialog} px high`);
+        assert.equal(fit.contentScrolls, false, 'the content of the window scrolls');
+        assert.equal(fit.logScrolls, true);
+        assert.ok(fit.gap >= 0, `the footer covers ${-fit.gap} px of the log`);
+
+        // Maximized with a log of three lines: the window is the screen, the footer is at its bottom and the log
+        // takes the height between the header and the footer
+        await page.evaluate(() => { document.querySelector('#task-log .task-log').textContent = 'one\ntwo\nthree'; });
+        await page.click('#task-log .p-dialog-maximize-button');
+        const box = selector => page.evaluate(sel => { const r = document.querySelector(sel).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, width: r.width, height: r.height }; }, selector);
+        await page.waitForFunction(w => document.querySelector('#task-log').getBoundingClientRect().width === w, viewport.width);
+        const [dialog, header, log, footer] = [await box('#task-log'), await box('#task-log .p-dialog-header'), await box('#task-log .task-log'), await box('#task-log .window-footer')];
+        assert.equal(dialog.height, viewport.height);
+        // (the border of the window is between its footer and the edge of the screen)
+        const atBottom = f => viewport.height - f.bottom >= 0 && viewport.height - f.bottom <= 2;
+        assert.ok(atBottom(footer), `the footer ends at ${footer.bottom} px of ${viewport.height}`);
+        // (the margin of the log, 1em, is above and below it)
+        assert.ok(log.top - header.bottom >= 0 && log.top - header.bottom <= 20, `the log starts ${log.top - header.bottom} px under the header`);
+        assert.ok(footer.top - log.bottom >= 0 && footer.top - log.bottom <= 20, `the log ends ${footer.top - log.bottom} px above the footer`);
+        assert.ok(log.height >= viewport.height - 200, `the log is ${log.height} px high`);
+        // A long log scrolls inside the log, and the footer stays where it is
+        await page.evaluate(() => {
+            document.querySelector('#task-log .task-log').textContent = Array.from({ length: 2000 }, (_, i) => `line ${i}`).join('\n');
+        });
+        const long = await page.evaluate(() => {
+            const l = document.querySelector('#task-log .task-log');
+            const c = document.querySelector('#task-log .p-dialog-content');
+            return { logScrolls: l.scrollHeight > l.clientHeight, contentScrolls: c.scrollHeight > c.clientHeight, height: l.getBoundingClientRect().height };
+        });
+        assert.deepEqual(long, { logScrolls: true, contentScrolls: false, height: log.height });
+        assert.ok(atBottom(await box('#task-log .window-footer')), 'the footer has moved');
+        await page.click('#task-log .p-dialog-maximize-button');
+        await page.waitForFunction(() => document.querySelector('#task-log').getBoundingClientRect().width === 1280);
         await page.evaluate(() => { document.querySelector('#task-log .task-log').textContent = 'x'.repeat(1000); });
         await page.click('#task-log label:has-text("Wrap lines")');
         const scrolls = await page.evaluate(() => { const l = document.querySelector('#task-log .task-log'); return l.scrollWidth > l.clientWidth; });

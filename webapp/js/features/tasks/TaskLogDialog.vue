@@ -1,6 +1,7 @@
 <template>
-    <!-- The wide size of FR-XC-20: a log line fits without a break; the window can be maximized (FR-PRC-44) -->
-    <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position size-class="dialog-wide" maximizable
+    <!-- The size of a log (FR-XC-20): a line of about 140 characters fits without a break; the log takes the height
+         the window has, all of the screen when the window is maximized (FR-PRC-44) -->
+    <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position size-class="dialog-log" maximizable
             @update:visible="$emit('update:visible', $event)" @show="onShow">
         <pre ref="logContainer" class="task-log" :class="{ 'no-wrap': !wrapLines }">{{ shownText || 'No log output.' }}</pre>
         <template #footer>
@@ -187,8 +188,11 @@ export default {
 
 <style scoped>
 .task-log {
-    /* As high as the screen permits: what the header, the footer and the margins of the window leave */
-    max-height: calc(90vh - 10rem);
+    /* As high as the window permits: the log grows and shrinks in the column of the window's content (a maximizable
+       window, css/app.scss), so a long log scrolls here and the window around it does not, and a maximized window
+       gives it the screen. Below a few lines it does not shrink: the window scrolls then (a very low screen) */
+    flex: 1 1 auto;
+    min-height: 5rem;
     overflow: auto;
     background: var(--ddb-console-bg);
     color: var(--ddb-console-text);
@@ -203,10 +207,5 @@ export default {
 .task-log.no-wrap {
     white-space: pre;
     word-break: normal;
-}
-
-/* The window maximized: the log takes the screen */
-:global(.p-dialog-maximized .task-log) {
-    max-height: calc(100vh - 10rem);
 }
 </style>

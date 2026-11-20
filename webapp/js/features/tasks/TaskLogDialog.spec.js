@@ -43,10 +43,10 @@ describe('TaskLogDialog', () => {
 });
 
 describe('TaskLogDialog window (FR-PRC-44)', () => {
-    it('is the wide window with a maximize button', async () => {
+    it('is the window of a log with a maximize button', async () => {
         await show('line');
         const dialog = document.querySelector('#task-log');
-        expect(dialog.classList.contains('dialog-wide')).toBe(true);
+        expect(dialog.classList.contains('dialog-log')).toBe(true);
         expect(dialog.getAttribute('style') || '').not.toContain('--window-width');
         expect(dialog.querySelector('.p-dialog-maximize-button')).not.toBeNull();
     });

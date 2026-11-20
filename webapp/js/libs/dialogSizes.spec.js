@@ -1,8 +1,8 @@
 /**
  * The size classes of the windows (FR-XC-20, FR-XC-33) read from css/app.scss and css/_variables.scss: a class gives a
  * stable width, min(<class width>, 100vw - 2rem), not only a maximum, so a dialog keeps its width while its content
- * changes (FR-ORG-19, FR-SHR-06, FR-UPL-08). dialog-xl and dialog-wide read the width tokens of FR-XC-33. A browser
- * measures the result (the Playwright pass of AC-031).
+ * changes (FR-ORG-19, FR-SHR-06, FR-UPL-08). dialog-xl, dialog-log and dialog-wide read the width tokens of FR-XC-33. A
+ * browser measures the result (the Playwright pass of AC-031).
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -24,8 +24,9 @@ function blockAt(text, start) {
 }
 
 describe('the dialog width tokens (FR-XC-33)', () => {
-    it('--ddb-dialog-form-max is 47rem and --ddb-dialog-wide-max is 120rem, once, in :root', () => {
+    it('--ddb-dialog-form-max is 47rem, --ddb-dialog-log-max 80rem and --ddb-dialog-wide-max 120rem, once, in :root', () => {
         expect(variables.match(/--ddb-dialog-form-max: 47rem;/g)).toHaveLength(1);
+        expect(variables.match(/--ddb-dialog-log-max: 80rem;/g)).toHaveLength(1);
         expect(variables.match(/--ddb-dialog-wide-max: 120rem;/g)).toHaveLength(1);
         // not in the dark theme block: a width is not a colour
         const dark = variables.slice(variables.lastIndexOf(':root.app-dark'));
@@ -40,6 +41,7 @@ describe('the size classes', () => {
         'dialog-md': '31.25rem',
         'dialog-lg': '37.5rem',
         'dialog-xl': 'var(--ddb-dialog-form-max)',
+        'dialog-log': 'var(--ddb-dialog-log-max)',
         'dialog-wide': 'var(--ddb-dialog-wide-max)'
     };
 

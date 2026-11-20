@@ -173,7 +173,8 @@
 
     // The width of a dialog comes from its size class (HubWindow size-class, FR-XC-20), not from its content.
     --ddb-dialog-form-max: 47rem;      // 752px - a form dialog (dialog-xl)
-    --ddb-dialog-wide-max: 120rem;     // 1920px - a log, a chart or a form in two columns (dialog-wide)
+    --ddb-dialog-log-max: 80rem;       // 1280px - a log, about 140 characters of its text in a line (dialog-log)
+    --ddb-dialog-wide-max: 120rem;     // 1920px - a chart or a form in two columns (dialog-wide)
 
     // The maximum widths of the content on a wide screen (FR-XC-33). A page, a text or a panel takes its width from
     // one of these, never from a value of its own: css/app.scss has the classes (.page-column, .prose-column,

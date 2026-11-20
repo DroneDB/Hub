@@ -26,9 +26,11 @@
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
  *   something else; never with `enterConfirms` false or `confirmDisabled`).
  * - `busy` disables closing and the footer buttons.
- * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-wide) gives the window a stable width, the same
- *   whatever its content; a form dialog uses `dialog-xl`, a log or a two-column form `dialog-wide`.
- * - `maximizable`: the header has a button that makes the window fill the screen.
+ * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-log, dialog-wide) gives the window a stable width, the same
+ *   whatever its content; a form dialog uses `dialog-xl`, a log `dialog-log`, a chart or a two-column form `dialog-wide`.
+ * - `maximizable`: the header has a button that makes the window fill the screen. The content of such a window is
+ *   a column: the footer is at its bottom, and a part of the content with `flex: 1 1 auto` and a small `min-height`
+ *   (a log) takes the height the window has above it, maximized or not, and scrolls there.
  * - A footer, which stays in view while the content scrolls: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
  *   just the Cancel (`cancelLabel`) button with `closeButton`. A footer of its own marks its
  *   buttons [data-cancel] and [data-confirm].
@@ -64,8 +66,8 @@ const props = defineProps({
     maxWidth: { type: String, default: 'auto' },
     width: { type: String, default: '30%' },
     height: { type: String, default: '40%' },
-    /** CSS size class (dialog-xs ... dialog-xl, dialog-wide): a stable width, min(<class width>, 100vw - 2rem), not
-     * only a maximum (FR-XC-20); dialog-xl and dialog-wide read the width tokens of FR-XC-33. No inline size. */
+    /** CSS size class (dialog-xs ... dialog-xl, dialog-log, dialog-wide): a stable width, min(<class width>, 100vw - 2rem),
+     * not only a maximum (FR-XC-20); dialog-xl, dialog-log and dialog-wide read the width tokens of FR-XC-33. No inline size. */
     sizeClass: { type: String, default: null },
     /** A button in the header makes the window fill the screen (and brings it back): the PrimeVue Dialog option, for a log or a chart */
     maximizable: { type: Boolean, default: false },
@@ -142,7 +144,7 @@ const contentStyle = computed(() => (props.fixedSize ? {} : { overflow: 'auto', 
 const TALL_FROM_PERCENT = 60;
 const isTall = computed(() => !props.sizeClass && !props.fixedSize && /^\d+(\.\d+)?%$/.test(props.height) && parseFloat(props.height) >= TALL_FROM_PERCENT);
 const dialogPt = computed(() => ({
-    root: { id: props.id || generatedId, class: ['window-dialog', props.sizeClass, isTall.value && 'window-tall'].filter(Boolean).join(' ') }
+    root: { id: props.id || generatedId, class: ['window-dialog', props.sizeClass, isTall.value && 'window-tall', props.maximizable && 'window-maximizable'].filter(Boolean).join(' ') }
 }));
 
 // PrimeVue's Dialog keeps the element focused when it shows (the opener) and focuses it again

@@ -6,7 +6,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { compileStyle } from '@vue/compiler-sfc';
 
 const root = path.resolve(__dirname, '../..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -78,28 +77,32 @@ describe('FR-PRC-44: the task log window', () => {
     const file = 'js/features/tasks/TaskLogDialog.vue';
     const style = styleOf(file);
 
-    it('is the wide window, which the user can maximize', () => {
-        expect(templateOf(file)).toMatch(/<Window id="task-log"[^>]*size-class="dialog-wide" maximizable/);
+    it('is the window of a log (80rem, not the 120rem of a chart), which the user can maximize', () => {
+        expect(templateOf(file)).toMatch(/<Window id="task-log"[^>]*size-class="dialog-log" maximizable/);
         expect(templateOf(file)).not.toContain('width="48rem"');
     });
 
-    it('the log is 90vh - 10rem high at most, 0.875rem, and does not wrap with Wrap lines off', () => {
+    it('the log takes the height the window has, 0.875rem, and does not wrap with Wrap lines off', () => {
         const log = rule(style, '.task-log');
-        expect(log).toContain('max-height: calc(90vh - 10rem);');
+        // it grows and shrinks in the column of the window's content, and scrolls: no height worked out from the screen
+        expect(log).toMatch(/flex: 1 1 auto;\s*min-height: 5rem;\s*overflow: auto;/);
+        expect(log).not.toContain('max-height');
+        expect(style).not.toContain('vh');
         expect(log).toContain('font-size: 0.875rem;');
         expect(log).toContain('white-space: pre-wrap;');
         expect(rule(style, '.task-log.no-wrap')).toContain('white-space: pre;');
     });
 
-    it('a maximized window gives the log the screen', () => {
-        // What the browser gets: the selector the Vue compiler writes, not the source text
-        const { code } = compileStyle({ source: style.split('</style>')[0], filename: 'TaskLogDialog.vue', id: 'data-v-test', scoped: true });
-        // (:global keeps the whole selector out of the scoping; the rule comes after the scoped one of the same weight)
-        expect(rule(code, '.p-dialog-maximized .task-log')).toContain('max-height: calc(100vh - 10rem);');
-        expect(code.indexOf('.p-dialog-maximized .task-log {')).toBeGreaterThan(code.indexOf('.task-log[data-v-test] {'));
-        expect(code).not.toMatch(/\.p-dialog-maximized\s*\{/);
+    it('the content of a maximizable window is a column with the footer at its end, maximized or not', () => {
+        // the log has no rule of its own for the maximized window: the column gives it the screen
+        expect(style).not.toContain('p-dialog-maximized');
         const scss = read('css/app.scss');
-        expect(rule(scss, '.p-dialog.window-dialog.p-dialog-maximized')).toContain('max-width: none;');
+        const maximizable = rule(scss, '.p-dialog.window-dialog.window-maximizable');
+        expect(rule(maximizable, '.p-dialog-content')).toMatch(/display: flex;\s*flex-direction: column;/);
+        expect(rule(maximizable, '.window-footer')).toContain('margin-top: auto;');
+        // maximized, the width of the size class does not stop it
+        expect(rule(maximizable, '&.p-dialog-maximized')).toContain('max-width: none;');
+        expect(read('js/components/HubWindow.vue')).toContain("props.maximizable && 'window-maximizable'");
     });
 });
 
