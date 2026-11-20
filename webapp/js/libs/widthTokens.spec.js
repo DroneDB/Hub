@@ -168,24 +168,26 @@ describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name
         expect(media).toMatch(/\.col-fit \{\s*width: 1%;\s*white-space: nowrap;\s*\}/);
     });
 
-    it('every task column but Progress fits its content, and Progress has the rest of the width', () => {
+    it('every task column but Tool and Progress fits its content, Progress has the width of a bar and Tool the rest', () => {
         const file = 'js/features/tasks/TasksTable.vue';
         const style = styleOf(file);
         const template = templateOf(file);
         const columns = template.slice(template.indexOf('<!-- Task table -->')).match(/<Column [^>]*>/g);
         expect(columns).toHaveLength(8);
         for (const column of columns) {
-            if (column.includes('header="Progress"')) expect(column).not.toContain('col-fit');
+            if (column.includes('header="Progress"')) expect(column).toContain('class="col-progress"');
+            else if (column.includes('header="Tool"')) expect(column).toContain('class="col-tool"');
             else expect(column).toMatch(/class="col-fit[ "]/);
             expect(column).not.toMatch(/style="width/);
         }
         expect(blockAt(style, style.indexOf('.tasks-table :deep(.p-datatable-table) {'))).toContain('table-layout: auto;');
-        // the content of Progress asks for a short bar only, so the other columns keep their width
-        expect(style).toMatch(/td\.col-progress > \*\) \{\s*contain: inline-size;\s*min-width: 5rem;/);
-        expect(blockAt(style, style.indexOf('.task-progress {'))).not.toContain('max-width');
-        // the text columns stop at a cap taken from the width of the table
+        // Progress: a share of the room, between 5rem and 20rem, whatever its content
         expect(style).toContain('--tasks-text-room: calc(100cqi - var(--tasks-other-width));');
-        expect(style).toMatch(/\.tool-cell \{\s*max-width: var\(--tasks-tool-max\);/);
+        expect(style).toContain('--tasks-progress-width: clamp(5rem, 5rem + var(--tasks-text-room) * 0.3, 20rem);');
+        expect(style).toMatch(/\.tasks-table :deep\(\.col-progress\) \{\s*width: var\(--tasks-progress-width\);/);
+        expect(style).toMatch(/td\.col-progress > \*\) \{\s*contain: inline-size;/);
+        // Tool: the rest of the width, its text on one line and cut, never narrower than a few words
+        expect(style).toMatch(/td\.col-tool > \.tool-cell\) \{\s*contain: inline-size;\s*min-width: 6rem;\s*white-space: nowrap;/);
         expect(style).toMatch(/\.owner-cell \{\s*max-width: var\(--tasks-name-max\);/);
         // the table takes the whole width of its page (the dataset's task history)
         expect(template).toContain('<div class="tasks-table"');

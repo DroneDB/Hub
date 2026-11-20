@@ -17,14 +17,10 @@ const { progressKind, progressValue, barMode } = TasksTable.methods;
 const render = (task) => ({ kind: progressKind(task), value: progressValue(task), mode: barMode(task) });
 
 describe('progress rendering rules', () => {
-    it('Succeeded renders a determinate 100% bar', () => {
-        expect(render({ state: 'Succeeded', progressPercent: 100 })).toEqual({
-            kind: 'bar', value: 100, mode: 'determinate'
-        });
+    it('Succeeded renders no bar: Done (a full bar adds nothing)', () => {
+        expect(progressKind({ state: 'Succeeded', progressPercent: 100 })).toBe('done');
         // even if the tool never reported a percent before finishing
-        expect(render({ state: 'Succeeded', progressPercent: null })).toEqual({
-            kind: 'bar', value: 100, mode: 'determinate'
-        });
+        expect(progressKind({ state: 'Succeeded', progressPercent: null })).toBe('done');
     });
 
     it('Failed renders no bar: a Failed tag and the error instead (TasksTable.failed.spec)', () => {
@@ -109,6 +105,22 @@ describe('the Progress column of a row', () => {
         expect(progress.find('.p-progressbar-label').exists()).toBe(false);
         expect(progress.find('.p-progressbar-value').attributes('style')).toContain('width: 5%');
         expect(progress.text()).toContain('opensfm');
+    });
+
+    it('shows Done for a succeeded task, with no bar and no phase message', () => {
+        const progress = progressOf({ state: 'Succeeded', progressPercent: 100, phaseMessage: 'done' });
+
+        expect(progress.find('.task-done').text()).toBe('Done');
+        expect(progress.find('.p-progressbar').exists()).toBe(false);
+        expect(progress.find('.task-percent').exists()).toBe(false);
+        expect(progress.text()).toBe('Done');
+    });
+
+    it('shows a bar at 100% for a task still running at 100%', () => {
+        const progress = progressOf({ state: 'Processing', progressPercent: 100, phaseMessage: 'finishing' });
+
+        expect(progress.find('.task-percent').text()).toBe('100%');
+        expect(progress.find('.task-done').exists()).toBe(false);
     });
 
     it('shows no percent text for a bar that has none (indeterminate)', () => {

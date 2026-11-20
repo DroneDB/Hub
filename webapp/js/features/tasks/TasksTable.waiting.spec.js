@@ -47,13 +47,13 @@ describe('TasksTable, a build that waits for files', () => {
         expect(progress.find('.p-progressbar').exists()).toBe(false);
     });
 
-    it('keeps a build that completed green with its full bar', () => {
+    it('keeps a build that completed green and Done', () => {
         const row = rowOf('22');
         const [state, progress] = [row.findAll('td')[0], row.findAll('td')[2]];
 
         expect(state.find('.p-tag').classes()).toContain('p-tag-success');
         expect(state.find('.p-tag').attributes('title')).toBe('Succeeded');
-        expect(progress.find('.p-progressbar').exists()).toBe(true);
+        expect(progress.find('.task-done').text()).toBe('Done');
         expect(progress.text()).not.toContain('Waiting for files');
     });
 });

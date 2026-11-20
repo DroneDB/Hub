@@ -3,7 +3,7 @@
         <!-- Skeleton while first load is in flight -->
         <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows :class="STACKED_TABLE_CLASS">
             <Column header="State" class="col-fit" v-bind="stackedColumn('State')"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
-            <Column header="Tool" class="col-fit col-tool" v-bind="stackedColumn()"><template #body><Skeleton width="12rem" /></template></Column>
+            <Column header="Tool" class="col-tool" v-bind="stackedColumn()"><template #body><Skeleton width="12rem" /></template></Column>
             <Column v-if="showDataset" header="Dataset" class="col-fit" v-bind="stackedColumn('Dataset', 'md')"><template #body><Skeleton width="8rem" /></template></Column>
             <Column v-if="showOwner" header="Owner" class="col-fit" v-bind="stackedColumn('Owner', 'xl')"><template #body><Skeleton width="5rem" /></template></Column>
             <Column header="Progress" class="col-progress" v-bind="stackedColumn('Progress', 'md')"><template #body><Skeleton width="100%" /></template></Column>
@@ -38,7 +38,7 @@
                     </Tag>
                 </template>
             </Column>
-            <Column field="toolId" header="Tool" sortable class="col-fit col-tool" v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
+            <Column field="toolId" header="Tool" sortable class="col-tool" v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
                     <div class="tool-cell" :title="taskTarget(slotProps.data)">
                         <strong>{{ toolTitle(slotProps.data.toolId, tools) }}</strong>
@@ -87,6 +87,8 @@
                         <Tag severity="info" icon="fa-regular fa-clock" :value="stateTag(slotProps.data).label" />
                         <small v-if="slotProps.data.phaseMessage" class="muted queued-reason">{{ slotProps.data.phaseMessage }}</small>
                     </div>
+                    <!-- A task that is done says so: a full bar adds nothing -->
+                    <div v-else-if="progressKind(slotProps.data) === 'done'" class="task-done">Done</div>
                     <div v-else-if="progressKind(slotProps.data) === 'bar'" class="task-progress">
                         <!-- The percent is text of its own: the bar's own label is clipped at 1-9 % (FR-PRC-39) -->
                         <div class="task-bar">
@@ -244,7 +246,8 @@ export default {
             if (task.state === 'Failed') return 'failed';
             if (isCancelled(task)) return 'cancelled';
             if (isWaitingForNode(task)) return 'node';
-            if (task.state === 'Processing' || task.state === 'Succeeded') return 'bar';
+            if (task.state === 'Succeeded') return 'done';
+            if (task.state === 'Processing') return 'bar';
             if (isActiveState(task.state)) return 'queued';
             return 'none';
         },
@@ -277,18 +280,14 @@ export default {
             return task.error || task.errorType || 'The task failed';
         },
 
-        /** Bar fill: reported percent while Processing, full once it succeeded. */
+        /** Bar fill: the percent a running task reported. */
         progressValue(task) {
-            if (task.state === 'Processing') return task.progressPercent || 0;
-            return 100; // Succeeded
+            return task.progressPercent || 0;
         },
 
-        /** A succeeded task shows a full determinate bar; Processing shows one only with a real percent. */
+        /** The bar of a running task is determinate only with a real percent. */
         barMode(task) {
-            const ended = task.state === 'Succeeded';
-            const percent = task.progressPercent;
-            const determinate = ended || (task.state === 'Processing' && percent != null && percent > 0);
-            return determinate ? 'determinate' : 'indeterminate';
+            return task.progressPercent > 0 ? 'determinate' : 'indeterminate';
         },
 
         /**
@@ -351,57 +350,42 @@ export default {
     flex-direction: column;
 }
 
-/* Every column but Progress has the width of its content (col-fit), and Progress has the rest of the width: a
-   tool, a path, a dataset or an owner longer than its cap is cut with an ellipsis, so a cell never grows the
-   table past its page */
+/* Every column but Tool and Progress has the width of its content (col-fit); Progress has the width of a bar
+   (--tasks-progress-width) and Tool the rest. A tool, a path, a dataset or an owner too long for its column is cut
+   with an ellipsis, so a cell never grows the table past its page */
 .tasks-table :deep(.p-datatable-table) {
     table-layout: auto;
 }
 
-/* The caps of the text columns come from the width the other columns leave (state, dates, buttons and a short
-   bar: --tasks-other-width): Tool has all of it, or its share when Dataset and Owner are shown; never less than a
-   few words, never more than a long path */
+/* The widths come from the room the other columns leave (state, dates, buttons, the shortest bar and the shortest
+   tool: --tasks-other-width): the bar takes a share of it up to 20rem, and Dataset and Owner theirs up to 16rem */
 .tasks-table {
-    --tasks-other-width: 52rem;
-    --tasks-tool-share: 1;
+    --tasks-other-width: 58rem;
     --tasks-name-share: 0;
     --tasks-text-room: calc(100cqi - var(--tasks-other-width));
-    --tasks-tool-max: clamp(6rem, var(--tasks-text-room) * var(--tasks-tool-share), 28rem);
+    --tasks-progress-width: clamp(5rem, 5rem + var(--tasks-text-room) * 0.3, 20rem);
     --tasks-name-max: clamp(5rem, var(--tasks-text-room) * var(--tasks-name-share), 16rem);
 }
 
 /* Owner joins the table at xl: until then Dataset is the only other text column, and Duration and Created
    join it at lg */
 .tasks-table.with-names {
-    --tasks-tool-share: 0.5;
-    --tasks-name-share: 0.25;
+    --tasks-name-share: 0.2;
 }
 
 @media only screen and (max-width: 1199.98px) {
     .tasks-table {
-        --tasks-other-width: 50rem;
+        --tasks-other-width: 56rem;
     }
 
     .tasks-table.with-names {
-        --tasks-tool-share: 0.67;
-        --tasks-name-share: 0.33;
+        --tasks-name-share: 0.3;
     }
 }
 
 @media only screen and (max-width: 991.98px) {
     .tasks-table {
-        --tasks-other-width: 36rem;
-    }
-}
-
-/* Progress joins the table at md: until then Tool has the rest of the width */
-@media only screen and (min-width: 576px) and (max-width: 767.98px) {
-    .tasks-table :deep(.col-tool) {
-        width: auto;
-    }
-
-    .tasks-table {
-        --tasks-tool-max: none;
+        --tasks-other-width: 38rem;
     }
 }
 
@@ -410,11 +394,13 @@ export default {
     text-overflow: ellipsis;
 }
 
-/* In a table (not a phone card) the text columns stop at their caps, and the content of Progress takes the width
-   the other columns leave and asks for no more than a short bar */
+/* In a table (not a phone card) the text columns stop at their widths, on one line, and Progress has the width of
+   its bar whatever its content */
 @media only screen and (min-width: 576px) {
-    .tool-cell {
-        max-width: var(--tasks-tool-max);
+    .tasks-table :deep(td.col-tool > .tool-cell) {
+        contain: inline-size;
+        min-width: 6rem;
+        white-space: nowrap;
     }
 
     .dataset-cell,
@@ -422,9 +408,12 @@ export default {
         max-width: var(--tasks-name-max);
     }
 
+    .tasks-table :deep(.col-progress) {
+        width: var(--tasks-progress-width);
+    }
+
     .tasks-table :deep(td.col-progress > *) {
         contain: inline-size;
-        min-width: 5rem;
     }
 }
 

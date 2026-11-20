@@ -51,10 +51,10 @@ describe('TasksTable, a failed task', () => {
         expect(progress.find('.p-progressbar').exists()).toBe(false);
     });
 
-    it('keeps the full bar of a task that succeeded', () => {
+    it('shows Done for a task that succeeded', () => {
         const progress = progressCellOf('ortho.tif');
 
-        expect(progress.find('.p-progressbar').exists()).toBe(true);
+        expect(progress.find('.task-done').text()).toBe('Done');
         expect(progress.find('.error-text').exists()).toBe(false);
     });
 });
