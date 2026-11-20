@@ -17,8 +17,7 @@ import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import { isMobile, isTablet } from '@/libs/responsive';
 import { useStackedLayout } from '@/composables/useStackedLayout';
-import { PREF, getPref, setPref } from '@/libs/preferences';
-import { resolveLengthPx, pxToPercent, percentToPx, capPaneWidth } from '@/libs/panelSize';
+import { resolveLengthPx, pxToPercent, percentToPx, capPaneWidth, readPanelSize, writePanelSize } from '@/libs/panelSize';
 
 /** The smallest size of a pane, in percent (SplitterPanel min-size). */
 const MIN_PANE = 2;
@@ -212,14 +211,12 @@ export default {
         storedPx: function () {
             const key = this.sizeKey();
             if (!key) return null;
-            const px = getPref(PREF.PANEL_SIZES, {})?.[`${key}.px`];
-            return Number.isFinite(px) && px > 0 ? px : null;
+            const px = readPanelSize(`${key}.px`);
+            return px !== null && px > 0 ? px : null;
         },
         storePx: function (px) {
             const key = this.sizeKey();
-            if (!key || !Number.isFinite(px)) return;
-            const sizes = getPref(PREF.PANEL_SIZES, {});
-            setPref(PREF.PANEL_SIZES, { ...(sizes && typeof sizes === 'object' ? sizes : {}), [`${key}.px`]: Math.round(px) });
+            if (key && Number.isFinite(px)) writePanelSize(`${key}.px`, Math.round(px));
         },
 
         /** Where the size is kept for this screen class; null: not kept (no storageKey, or a phone). */
@@ -231,14 +228,12 @@ export default {
         storedSize: function () {
             const key = this.sizeKey();
             if (!key) return null;
-            const size = getPref(PREF.PANEL_SIZES, {})?.[key];
-            return Number.isFinite(size) && size >= MIN_PANE && size <= 100 - MIN_PANE ? size : null;
+            const size = readPanelSize(key);
+            return size !== null && size >= MIN_PANE && size <= 100 - MIN_PANE ? size : null;
         },
         storeSize: function (size) {
             const key = this.sizeKey();
-            if (!key || !Number.isFinite(size)) return;
-            const sizes = getPref(PREF.PANEL_SIZES, {});
-            setPref(PREF.PANEL_SIZES, { ...(sizes && typeof sizes === 'object' ? sizes : {}), [key]: Math.round(size * 100) / 100 });
+            if (key && Number.isFinite(size)) writePanelSize(key, Math.round(size * 100) / 100);
         },
 
         registerChild(component) {

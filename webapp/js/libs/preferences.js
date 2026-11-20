@@ -42,6 +42,7 @@ export const PREF = Object.freeze({
     TASK_NOTIFICATIONS: 'taskNotifications', // 'none' | 'all' | 'failed': which ended tasks (photogrammetry, imports, exports) the server e-mails
     STOCKPILE_MATERIALS: 'stockpileMaterials', // { overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
+    README_OPEN: 'datasetReadmeOpen', // false once the user folded the README panel of the dataset page, true when they opened it again; device only, for every dataset (as its height)
     // 'system' | 'light' | 'dark': the colour scheme (libs/colorScheme.js); device only (D-044). The
     // inline script of public/index.html reads it too, before the app mounts
     APPEARANCE: 'ddb.appearance',
@@ -233,7 +234,9 @@ export const PREF_DEFAULTS = frozen({
  */
 export const DEVICE_PREF_DEFAULTS = frozen({
     // The system's scheme, until the user picks one (D-044)
-    [PREF.APPEARANCE]: 'system'
+    [PREF.APPEARANCE]: 'system',
+    // The README of a dataset shows until the user folds the panel
+    [PREF.README_OPEN]: true
 });
 
 /**

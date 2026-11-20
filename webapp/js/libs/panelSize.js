@@ -1,9 +1,11 @@
 // @ts-check
 /**
- * The size of a split pane in CSS px (FR-EXP-40). A pane is asked for in px or rem, or as a CSS length that only the
- * browser can resolve (`var(--ddb-panel-tree-width)`, a clamp of vw units): the Splitter of PrimeVue takes percents,
- * so a size is resolved to px, kept in px and converted to the percent of the container it has now.
+ * The size of a pane that the user resizes, in CSS px (FR-EXP-40). A pane is asked for in px or rem, or as a CSS length
+ * that only the browser can resolve (`var(--ddb-panel-tree-width)`, a clamp of vw units): the Splitter of PrimeVue takes
+ * percents, so a size is resolved to px, kept in px and converted to the percent of the container it has now. The sizes
+ * the user chose are kept on this device (PREF.PANEL_SIZES), one value per key.
  */
+import { PREF, getPref, setPref } from '@/libs/preferences';
 
 /** The size of the root font when none can be read (the browser default) */
 const DEFAULT_ROOT_FONT_PX = 16;
@@ -73,4 +75,40 @@ export function capPaneWidth(px, containerPx, reservePx, minPercent) {
  */
 export function percentToPx(percent, containerPx) {
     return (percent / 100) * containerPx;
+}
+
+/**
+ * A height in px kept between the smallest and the largest a pane may have; the smallest wins when the container has
+ * less room than that.
+ * @param {number} px
+ * @param {number} minPx
+ * @param {number} maxPx  Infinity when the container is not measured (hidden)
+ * @returns {number}
+ */
+export function fitPaneHeight(px, minPx, maxPx) {
+    return Math.max(minPx, Math.min(px, maxPx));
+}
+
+/**
+ * The size kept under `key` in PREF.PANEL_SIZES.
+ * @param {string} key
+ * @returns {number|null} null when none is kept or the value is not a number
+ */
+export function readPanelSize(key) {
+    const value = getPref(PREF.PANEL_SIZES, {})?.[key];
+    return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Keeps a size under `key` in PREF.PANEL_SIZES, next to the sizes of the other panes; null removes it.
+ * @param {string} key
+ * @param {number|null} value
+ */
+export function writePanelSize(key, value) {
+    const kept = getPref(PREF.PANEL_SIZES, {});
+    const sizes = { ...(kept && typeof kept === 'object' ? kept : {}) };
+    if (value === null) delete sizes[key];
+    else if (Number.isFinite(value)) sizes[key] = value;
+    else return;
+    setPref(PREF.PANEL_SIZES, sizes);
 }

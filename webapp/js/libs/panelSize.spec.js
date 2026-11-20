@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { resolveLengthPx, pxToPercent, percentToPx, capPaneWidth } from './panelSize';
+import { resolveLengthPx, pxToPercent, percentToPx, capPaneWidth, fitPaneHeight, readPanelSize, writePanelSize } from './panelSize';
+import { PREF, getPref, setPref, removePref } from '@/libs/preferences';
 
 afterEach(() => {
     document.body.innerHTML = '';
@@ -58,5 +59,44 @@ describe('capPaneWidth', () => {
         expect(capPaneWidth(1000, 960, 320, 2)).toBe(640);
         expect(capPaneWidth(1000, 300, 320, 2)).toBe(6); // 2% of 300
         expect(capPaneWidth(1000, 0, 320, 2)).toBe(1000); // not measured yet
+    });
+});
+
+describe('fitPaneHeight', () => {
+    it('keeps a height between the smallest and the largest, the smallest when there is no room for it', () => {
+        expect(fitPaneHeight(300, 48, 760)).toBe(300);
+        expect(fitPaneHeight(2000, 48, 760)).toBe(760);
+        expect(fitPaneHeight(10, 48, 760)).toBe(48);
+        expect(fitPaneHeight(300, 48, 20)).toBe(48);
+        expect(fitPaneHeight(5000, 48, Infinity)).toBe(5000); // a tab that is not laid out does not limit it
+    });
+});
+
+describe('readPanelSize and writePanelSize', () => {
+    afterEach(() => removePref(PREF.PANEL_SIZES));
+
+    it('keeps each size under its key, next to the others, and removes one with null', () => {
+        writePanelSize('a.px', 320);
+        writePanelSize('b', 23.5);
+        expect(readPanelSize('a.px')).toBe(320);
+        expect(readPanelSize('b')).toBe(23.5);
+        writePanelSize('a.px', null);
+        expect(readPanelSize('a.px')).toBeNull();
+        expect(getPref(PREF.PANEL_SIZES, {})).toEqual({ b: 23.5 });
+    });
+
+    it('reads null for a value that is not a number and ignores one that is not a number', () => {
+        setPref(PREF.PANEL_SIZES, { a: 'wide', b: 5 });
+        expect(readPanelSize('a')).toBeNull();
+        expect(readPanelSize('missing')).toBeNull();
+        writePanelSize('b', NaN);
+        expect(readPanelSize('b')).toBe(5);
+    });
+
+    it('starts again from an empty set when what is kept is not an object', () => {
+        setPref(PREF.PANEL_SIZES, 'broken');
+        expect(readPanelSize('a')).toBeNull();
+        writePanelSize('a', 7);
+        expect(getPref(PREF.PANEL_SIZES, {})).toEqual({ a: 7 });
     });
 });

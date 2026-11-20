@@ -160,7 +160,7 @@ describe('catalog', () => {
     it('ACCOUNT_SECTIONS keys are PREF values, and the device-only keys are not mapped', () => {
         const known = new Set(Object.values(PREF));
         for (const key of Object.keys(ACCOUNT_SECTIONS)) expect(known.has(key)).toBe(true);
-        for (const local of [PREF.PANEL_SIZES, PREF.ORG_PAGE_POSITION, PREF.HUB_UPDATE_NOTICE, PREF.CLIPBOARD, PREF.HUB_UPDATE_ATTEMPTED, PREF.SPLAT_VIEW_SETTINGS, PREF.APPEARANCE, PREF.TILE_SIZE]) {
+        for (const local of [PREF.PANEL_SIZES, PREF.ORG_PAGE_POSITION, PREF.HUB_UPDATE_NOTICE, PREF.CLIPBOARD, PREF.HUB_UPDATE_ATTEMPTED, PREF.SPLAT_VIEW_SETTINGS, PREF.APPEARANCE, PREF.TILE_SIZE, PREF.README_OPEN]) {
             expect(ACCOUNT_SECTIONS).not.toHaveProperty(local);
         }
     });
