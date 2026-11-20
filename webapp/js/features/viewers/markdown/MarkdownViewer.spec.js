@@ -93,28 +93,32 @@ const away = { path: '/r/o/d', fullPath: '/r/o/d' };
 const here = { path: '/r/o/d/view/x/markdown', fullPath: '/r/o/d/view/x/markdown' };
 
 describe('MarkdownViewer', () => {
-    // FR-EXP-39, FR-XC-33: the text and the editor are centred columns of the shared width tokens, the toolbar is in the column
-    it('puts the text in the prose column and Edit in a toolbar row of the same column', async () => {
+    // FR-EXP-39: the text, the editor and their toolbars take the whole width of the viewer, Edit is in a toolbar row
+    // above the text
+    const NARROW = ['prose-column', 'editor-column', 'page-column', 'form-column'];
+    const isFullWidth = el => NARROW.forEach(c => expect(el.classes()).not.toContain(c));
+
+    it('shows the text across the whole width with Edit in a toolbar row above it', async () => {
         source.canWrite = true;
         const content = await render('# Title\n\nA paragraph.');
-        expect(content.classes()).toContain('prose-column');
+        isFullWidth(content);
         const toolbar = wrapper.find('.view-toolbar');
-        expect(toolbar.classes()).toContain('prose-column');
+        isFullWidth(toolbar);
         expect(toolbar.find('button[aria-label="Edit"]').exists()).toBe(true);
-        // before the text, so it is the first row of the column
+        // before the text, so it is the first row
         expect(toolbar.element.nextElementSibling).toBe(content.element);
     });
 
     it('has no toolbar row for a user who cannot write', async () => {
         const content = await render('# Title');
         expect(wrapper.find('.view-toolbar').exists()).toBe(false);
-        expect(content.classes()).toContain('prose-column');
+        isFullWidth(content);
     });
 
-    it('puts the editor and its Cancel and Save toolbar in the editor column', async () => {
+    it('shows the editor and its Cancel and Save toolbar across the whole width', async () => {
         await editAndType('# Old');
-        expect(wrapper.find('textarea').classes()).toContain('editor-column');
-        expect(wrapper.find('.edit-toolbar').classes()).toContain('editor-column');
+        isFullWidth(wrapper.find('textarea'));
+        isFullWidth(wrapper.find('.edit-toolbar'));
         expect(wrapper.find('.content').exists()).toBe(false);
     });
 

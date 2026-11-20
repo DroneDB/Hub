@@ -10,6 +10,8 @@ import { setActivePinia, createPinia } from 'pinia';
 import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import TaskHistory from './TaskHistory.vue';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // The tab refreshes the shared task store: the store is not under test
 vi.mock('@/libs/tasks/taskMonitor', () => ({
@@ -379,5 +381,14 @@ describe('applyFilters - the builds of a task', () => {
         applyFilters.call(vm);
 
         expect(vm.filteredTasks).toHaveLength(9);
+    });
+});
+
+describe('layout', () => {
+    it('the task table has no padding around it', () => {
+        const style = fs.readFileSync(path.join(__dirname, 'TaskHistory.vue'), 'utf8').split(/<style[^>]*>/)[1];
+        const content = style.slice(style.indexOf('.content {')).split('}')[0];
+        expect(content).toContain('overflow: auto;');
+        expect(content).not.toContain('padding');
     });
 });

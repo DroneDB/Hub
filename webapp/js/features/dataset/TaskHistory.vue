@@ -929,10 +929,10 @@ export default {
     background: var(--ddb-bg-hover);
 }
 
+/* The table runs edge to edge under the filters, with no padding of its own */
 .content {
     flex: 1;
     overflow: auto;
-    padding: var(--ddb-spacing-lg);
 }
 
 .paginator-wrapper {

@@ -5,8 +5,9 @@
  *
  *   HUB_URL=http://localhost:5100 node --test e2e/wide-layout.test.mjs
  *
- * At 1920x1080 and 3840x2160 (device scale factor 1) no page scrolls horizontally and the list, table and form
- * pages keep the width of --ddb-page-max-width (100rem, 1600 px). HUB_USER must be an administrator.
+ * At 1920x1080 and 3840x2160 (device scale factor 1) no page scrolls horizontally, the organization and dataset
+ * lists take the whole width and the admin table and form pages keep the width of --ddb-page-max-width (100rem,
+ * 1600 px). HUB_USER must be an administrator.
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ const URL_ = process.env.HUB_URL || 'http://localhost:5100';
 const USER = process.env.HUB_USER || 'admin';
 const PASS = process.env.HUB_PASS || 'password123';
 const VIEWPORTS = [{ width: 1920, height: 1080 }, { width: 3840, height: 2160 }];
-// The widest a row may be, from the left of its name to the right of its buttons (FR-ORG-24, FR-ADM-27)
+// The widest a row of an admin table may be (FR-ADM-27)
 const ROW_MAX_PX = 1700;
 
 function chromeExecutable() {
@@ -71,9 +72,22 @@ after(async () => { for (const c of contexts) await c.close(); await browser?.cl
 for (const viewport of VIEWPORTS) {
     const at = `${viewport.width}x${viewport.height}`;
 
-    test(`${at}: the pages do not scroll horizontally and the lists keep one column (FR-ORG-24, FR-ADM-27, FR-ADM-28)`, async () => {
+    test(`${at}: the organization and dataset lists take the whole width and do not scroll horizontally (FR-ORG-24)`, async () => {
         const page = await newPage(viewport);
-        for (const [route, selector] of [['/r', '#organizations'], [`/r/${USER}`, '#datasets'], ['/admin/users', '#users table'], ['/admin/tasks', '.admin-tasks-page table'], ['/admin/config', '.config-scroll-container']]) {
+        for (const [route, selector] of [['/r', '#organizations'], [`/r/${USER}`, '#datasets']]) {
+            await page.goto(`${URL_}${route}`);
+            await appReady(page);
+            await page.waitForSelector(selector, { timeout: 30000 });
+            const m = await measure(page, selector);
+            assert.equal(m.hScroll, false, `${route} scrolls horizontally`);
+            // the page's own side padding (0.75rem each side) and a scroll bar are all that is left of the screen
+            assert.ok(m.content >= viewport.width - 2 * 12 - 20, `${route}: ${selector} is ${m.content} px wide of ${viewport.width}`);
+        }
+    });
+
+    test(`${at}: the admin pages do not scroll horizontally and keep one column (FR-ADM-27, FR-ADM-28)`, async () => {
+        const page = await newPage(viewport);
+        for (const [route, selector] of [['/admin/users', '#users table'], ['/admin/tasks', '.admin-tasks-page table'], ['/admin/config', '.config-scroll-container']]) {
             await page.goto(`${URL_}${route}`);
             await appReady(page);
             await page.waitForSelector(selector, { timeout: 30000 });

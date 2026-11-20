@@ -1,5 +1,5 @@
 <template>
-    <div class="tasks-table page-column">
+    <div class="tasks-table">
         <!-- Skeleton while first load is in flight -->
         <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows :class="STACKED_TABLE_CLASS">
             <Column header="State" v-bind="stackedColumn('State')" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
@@ -336,7 +336,9 @@ export default {
 <style scoped lang="scss">
 @use '../../../css/breakpoints' as *;
 
+/* The table takes the whole width of its page: the admin task page keeps it to --ddb-page-max-width itself */
 .tasks-table {
+    width: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;

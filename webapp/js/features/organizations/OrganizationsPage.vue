@@ -1,6 +1,6 @@
 <template>
-    <div id="organizations" ref="page" :class="{ 'page-column': view !== 'map' }">
-        <!-- A list keeps the width of --ddb-page-max-width, centred (FR-XC-33, FR-ORG-24); the map takes the whole screen -->
+    <div id="organizations" ref="page">
+        <!-- The list and the map take the whole width of the screen -->
 
         <div v-if="!loadKind" class="org-page-header">
             <div class="org-header-layout">
@@ -661,7 +661,7 @@ export default {
 @use '../../../css/breakpoints' as *;
 
 #organizations {
-    /* The space around the page is its padding, so the column of .page-column keeps it on a narrow screen */
+    /* The space around the page is its padding */
     padding: 0.75rem;
     box-sizing: border-box;
     height: 100%;
@@ -729,10 +729,11 @@ export default {
         min-height: 0;
         padding: var(--ddb-focus-ring-reach) var(--ddb-focus-ring-reach) 0;
 
-        /* A 4K screen shows two columns of cards, not one card with its name and its buttons far apart (FR-ORG-24) */
+        /* A 4K screen shows two columns of cards, not one card with its name and its buttons far apart; always two,
+           because the page size counts the cards of two columns */
         @include xwide-up {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(40rem, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             column-gap: var(--ddb-spacing-md);
             align-content: start;
 

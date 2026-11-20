@@ -1,6 +1,6 @@
 <template>
-    <div id="datasets" ref="page" :class="{ 'page-column': view !== 'map' }">
-        <!-- A list keeps the width of --ddb-page-max-width, centred (FR-XC-33, FR-ORG-24); the map takes the whole screen -->
+    <div id="datasets" ref="page">
+        <!-- The list and the map take the whole width of the screen -->
         <Message v-model="error" />
 
         <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table.
@@ -1128,7 +1128,7 @@ export default {
 
 <style scoped>
 #datasets {
-    /* The space around the page is its padding, so the column of .page-column keeps it on a narrow screen */
+    /* The space around the page is its padding */
     padding: 0.75rem;
     box-sizing: border-box;
     height: 100%;

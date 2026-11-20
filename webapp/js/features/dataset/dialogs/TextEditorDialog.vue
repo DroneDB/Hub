@@ -380,7 +380,6 @@ export default {
     overflow: hidden;
     border: var(--ddb-border-width) solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
-    margin: var(--ddb-spacing-sm);
 }
 
 

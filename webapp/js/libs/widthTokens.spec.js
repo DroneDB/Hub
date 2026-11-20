@@ -91,24 +91,25 @@ describe('the column classes of app.scss', () => {
     });
 });
 
-describe('FR-ORG-24: the organization and dataset lists keep one column', () => {
-    it.each(['OrganizationsPage', 'DatasetsPage'])('%s is a page column in its list view, and not in its map view', file => {
+describe('FR-ORG-24: the organization and dataset lists take the whole width', () => {
+    it.each(['OrganizationsPage', 'DatasetsPage'])('%s takes the whole width in its list and its map view', file => {
         const id = file === 'OrganizationsPage' ? 'organizations' : 'datasets';
         const dir = file === 'OrganizationsPage' ? 'organizations' : 'datasets';
         const template = templateOf(`js/features/${dir}/${file}.vue`);
-        expect(template).toMatch(new RegExp(`<div id="${id}"(?: ref="page")? :class="\\{ 'page-column': view !== 'map' \\}">`));
+        expect(template).toMatch(new RegExp(`<div id="${id}"(?: ref="page")?>`));
+        expect(template).not.toContain('page-column');
         const style = styleOf(`js/features/${dir}/${file}.vue`);
-        // the space around the page is a padding: a margin would outrank the centring of the class
+        // the space around the page is a padding, inside its height of 100%
         expect(blockAt(style, style.indexOf(`#${id} {`))).toMatch(/^\s*(\/\*[^*]*\*\/\s*)?padding: 0\.75rem;\s*box-sizing: border-box;/);
         expect(blockAt(style, style.indexOf(`#${id} {`))).not.toMatch(/margin: 0\.75rem/);
     });
 
-    it('the organization cards are 2 columns from xwide (40rem minimum)', () => {
+    it('the organization cards are 2 columns from xwide', () => {
         const style = styleOf('js/features/organizations/OrganizationsPage.vue');
         expect(style).toContain("@use '../../../css/breakpoints' as *;");
         const grid = blockAt(style, style.indexOf('@include xwide-up'));
         expect(grid).toContain('display: grid;');
-        expect(grid).toContain('grid-template-columns: repeat(auto-fill, minmax(40rem, 1fr));');
+        expect(grid).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
         // the empty state spans the row
         expect(grid).toMatch(/> :not\(\.org-card\) \{\s*grid-column: 1 \/ -1;/);
     });
@@ -165,8 +166,9 @@ describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name
         expect(blockAt(style, style.indexOf('.task-progress {'))).toContain('max-width: 20rem;');
         const template = templateOf(file);
         for (const cls of ['col-progress', 'col-created', 'col-dataset', 'col-owner']) expect(template).toContain(`class="${cls}"`);
-        // the table itself is one column of the list width
-        expect(template).toContain('<div class="tasks-table page-column">');
+        // the table takes the whole width of its page (the dataset's task history)
+        expect(template).toContain('<div class="tasks-table">');
+        expect(blockAt(style, style.indexOf('.tasks-table {'))).toContain('width: 100%;');
     });
 
     it('the files table has the width of its content from xwide, its Name column at most 40rem', () => {
