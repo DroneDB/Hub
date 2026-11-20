@@ -332,6 +332,16 @@
     --panel-actions-reserve: 4.75rem; // one row of actions
 }
 
+// A map that shows a colour legend keeps its bottom row for it: the legend stands there, left of the attribution button,
+// and a panel as tall as the map would cover it while its colours are chosen. So the panel ends on the line the bottom
+// panels stand on. Not on a narrow map, whose legend is at the top, nor on a phone, where the panel is a sheet above
+// that row already
+@media (min-width: 768px) {
+    .map-container:not(.is-narrow):has(> .raster-legend) > .analysis-panel {
+        max-height: calc(100% - 0.5rem - var(--map-bottom-reserve));
+    }
+}
+
 // Bottom sheet on phones (the Hub's phone breakpoint): it floats over the bottom of the map, between
 // its left edge and the toolbar rail and above the map settings button (so that stays in reach),
 // opaque so the layers do not show through, and folds to its header

@@ -8,6 +8,8 @@ const scss = readSource(__dirname, '../../../../css/_analysis-panel.scss');
 const layerPanel = readSource(__dirname, './RasterLayerOpacityPanel.vue');
 const layerPanelStyle = layerPanel.slice(layerPanel.indexOf('<style'));
 const PHONE = 'max-width: 767.98px';
+/** The number of rem a pattern captures in a rule. @param {string} source @param {RegExp} pattern */
+const rem = (source, pattern) => Number(pattern.exec(source)[1]);
 
 describe('the panels over the bottom of the map', () => {
     it('define the width of the toolbar rail once, on the map', () => {
@@ -92,7 +94,6 @@ describe('the hint of a folder whose subfolder has the map entries', () => {
     const chip = ruleOf(chipSource.slice(chipSource.indexOf('<style')), '.geo-subfolder-chip');
     const mapCore = readSource(__dirname, './MapCore.vue');
     const datasetMap = readSource(__dirname, './DatasetMap.vue');
-    const rem = (source, pattern) => Number(pattern.exec(source)[1]);
 
     it('is in the map, where its reserves are defined: MapCore\'s overlay slot in .map-container, which DatasetMap fills', () => {
         const container = mapCore.indexOf('class="map-container"');
@@ -227,5 +228,85 @@ describe('the layer names of a map with several layers (FR-RAS-12)', () => {
     it('centres the label of the last band in what the toolbar rail leaves of it, never wider', () => {
         expect(split).toMatch(/left: `calc\(\(\$\{left\} \+ 100% - var\(--map-rail-reserve\)\) \/ 2\)`/);
         expect(split).toMatch(/maxWidth: `calc\(100% - var\(--map-rail-reserve\) - \$\{left\}\)`/);
+    });
+});
+
+// The colour legend of the styled rasters stands in the row of the bottom controls, at the bottom right: it was at the top
+// left, on the selection tools of the dataset map
+describe('the colour legend of the styled rasters', () => {
+    const source = readSource(__dirname, './RasterLegend.vue');
+    const style = source.slice(source.indexOf('<style'));
+    const legend = ruleOf(style, '.raster-legend');
+    const narrow = ruleOf(style, '.map-container.is-narrow .raster-legend');
+    const map = ruleOf(css, '.map-container');
+    const mapCore = readSource(__dirname, './MapCore.vue');
+
+    it('stands at the bottom right, left of the attribution button and out of the top left, where the selection tools are', () => {
+        expect(legend).toMatch(/right:\s*var\(--map-rail-reserve\)/);
+        expect(legend).toMatch(/bottom:\s*0\.5rem/);
+        expect(legend).not.toMatch(/\b(top|left):/);
+        // The attribution button of OpenLayers stands 0.5em from the corner, a control of 3rem: inside the rail
+        expect(rem(map, /--map-rail-reserve:\s*([\d.]+)rem/)).toBeGreaterThanOrEqual(0.5 + 3);
+    });
+
+    it('starts after the settings button and the scale bar, with the width of the map', () => {
+        expect(css.match(/--map-scale-reserve:/g)).toHaveLength(1);
+        expect(legend).toMatch(/max-width:\s*calc\(100% - var\(--map-rail-reserve\) - var\(--map-scale-reserve\)\)/);
+        // The bar of the scale is at most 2.5 times its least length (the round lengths go 1, 2, 5), and its last label
+        // hangs about 1rem over its end
+        const least = Number(/new ScaleLine\(\{[^}]*minWidth:\s*(\d+)/.exec(mapCore)[1]);
+        const scaleBarLeft = rem(ruleOf(css, '.map-container .ol-scale-bar'), /left:\s*([\d.]+)rem/);
+        expect(rem(map, /--map-scale-reserve:\s*([\d.]+)rem/)).toBeGreaterThanOrEqual(scaleBarLeft + 2.5 * least / 16 + 1);
+    });
+
+    it('is one row of legends under the bottom panels, however many layers have one: the legends that do not fit are cut off', () => {
+        expect(legend).toMatch(/flex-flow:\s*row wrap-reverse/);
+        expect(legend).toMatch(/justify-content:\s*flex-end/);
+        expect(legend).toMatch(/overflow:\s*hidden/);
+        const top = rem(legend, /bottom:\s*([\d.]+)rem/) + rem(legend, /max-height:\s*([\d.]+)rem/);
+        expect(top).toBeLessThan(rem(map, /--map-bottom-reserve:\s*([\d.]+)rem/));
+        // The height of that row: the name and the ends (0.75rem of text at 1.2), the bar, the two gaps and the padding
+        const item = ruleOf(style, '.legend-item');
+        const text = rem(legend, /font-size:\s*([\d.]+)rem/) * Number(/line-height:\s*([\d.]+)/.exec(legend)[1]);
+        const row = 2 * text + rem(ruleOf(style, '.legend-bar'), /height:\s*([\d.]+)rem/) + 2 * rem(item, /gap:\s*([\d.]+)rem/)
+            + 2 * rem(legend, /padding:\s*([\d.]+)rem/);
+        expect(rem(legend, /max-height:\s*([\d.]+)rem/)).toBeCloseTo(row, 5);
+    });
+
+    it('narrows its legends before one leaves the row', () => {
+        const item = ruleOf(style, '.legend-item');
+        expect(item).toMatch(/flex:\s*1 1 8rem/);
+        expect(item).toMatch(/min-width:\s*8rem/);
+        expect(item).toMatch(/width:\s*11rem/);
+    });
+
+    it('stands at the top of a narrow map, right of the left column of controls and below the buttons at the top centre', () => {
+        expect(css.match(/--map-left-reserve:/g)).toHaveLength(1);
+        // The zoom and the selection tools: 0.5rem from the edge, a control of 3rem
+        expect(rem(map, /--map-left-reserve:\s*([\d.]+)rem/)).toBeGreaterThanOrEqual(rem(ruleOf(css, '.ol-zone-top-left'), /left:\s*([\d.]+)rem/) + 3);
+        expect(narrow).toMatch(/top:\s*var\(--map-top-reserve\)/);
+        expect(narrow).toMatch(/left:\s*var\(--map-left-reserve\)/);
+        expect(narrow).toMatch(/right:\s*auto/);
+        expect(narrow).toMatch(/bottom:\s*auto/);
+        expect(narrow).toMatch(/flex-flow:\s*column/);
+        expect(narrow).toMatch(/max-height:\s*none/);
+        expect(narrow).toMatch(/max-width:\s*calc\(100% - var\(--map-left-reserve\) - var\(--map-rail-reserve\)\)/);
+        expect(ruleOf(style, '.map-container.is-narrow .legend-item')).toMatch(/flex:\s*none/);
+        // Beside an analysis panel that is not a sheet, it ends before the panel
+        expect(ruleOf(mediaBlock(style, 'min-width: 768px'), '.map-container.is-narrow:has(> .analysis-panel) .raster-legend'))
+            .toMatch(/max-width:\s*calc\(100% - var\(--map-left-reserve\) - var\(--map-rail-reserve\) - var\(--ddb-panel-analysis-width\) - 0\.5rem\)/);
+    });
+
+    it('keeps its row from the analysis panels, which end on the line of the bottom panels while a legend shows', () => {
+        const desktop = mediaBlock(scss, 'min-width: 768px');
+        expect(ruleOf(desktop, '.map-container:not(.is-narrow):has(> .raster-legend) > .analysis-panel'))
+            .toMatch(/max-height:\s*calc\(100% - 0\.5rem - var\(--map-bottom-reserve\)\)/);
+        // The legend is a child of the map, as the panels are (MapCore.spec.js checks the rendered map)
+        expect(mapCore).toMatch(/<div ref="map-container" class="map-container"[\s\S]*<RasterLegend [\s\S]*<slot name="overlay" \/>\s*<\/div>/);
+    });
+
+    it('leaves the row to the attribution while it is open', () => {
+        expect(ruleOf(style, '.map-container:not(.is-narrow):has(.ol-attribution:not(.ol-collapsed)) .raster-legend'))
+            .toMatch(/visibility:\s*hidden/);
     });
 });

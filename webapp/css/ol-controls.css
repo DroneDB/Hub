@@ -85,6 +85,13 @@
     /* The default zoom control of OpenLayers at the top left: 0.5rem (inset) + 0.25rem (padding) + two buttons of
        2rem with 0.25rem of margin around each + 0.25rem (padding); the labels of the split go below it */
     --map-zoom-reserve: 6.25rem;
+    /* The column of controls at the left (zoom, selection): 0.5rem (inset) + 3rem (a control) + 0.5rem of air, as the
+       rail on the right */
+    --map-left-reserve: 4rem;
+    /* The bottom-left controls along the bottom row: the settings button, then the scale bar from 4rem, whose bar is
+       100px to 250px long (ScaleLine minWidth 100: the next round length is at most 2.5 times the one before) and
+       whose last label hangs over its end; what shares that row (the colour legend) starts after it */
+    --map-scale-reserve: 21rem;
     --map-sheet-peek: 3rem;
     --map-layer-bottom-panel: 1;
     --map-layer-split: 2;
