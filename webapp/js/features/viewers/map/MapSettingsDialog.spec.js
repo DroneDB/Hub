@@ -70,11 +70,46 @@ describe('MapSettingsDialog', () => {
         expect(wrapper.emitted('basemapChanged')).toEqual([['custom']]);
     });
 
-    it('a changed unit is emitted with the previous one', async () => {
+    // The two units as buttons of a group named by its label, the current one pressed
+    const unitsGroup = () => document.getElementById('map-settings-dialog-measurement-units');
+    const unitButton = label => [...unitsGroup().querySelectorAll('button')].find(b => b.textContent.trim() === label);
+
+    it('shows both units at once, in a group named by its label, the current one pressed', async () => {
         await render();
-        wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'map-settings-dialog-measurement-units').vm.$emit('update:modelValue', 'imperial');
+        const group = unitsGroup();
+        expect(group.getAttribute('role')).toBe('group');
+        expect(document.getElementById(group.getAttribute('aria-labelledby')).textContent.trim()).toBe('Measurement units');
+        expect(unitButton('Metric').getAttribute('aria-pressed')).toBe('true');
+        expect(unitButton('Imperial').getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('a click on the other unit emits it with the previous one', async () => {
+        await render();
+        unitButton('Imperial').click();
         await flushPromises();
         expect(wrapper.emitted('unitsChanged')).toEqual([['imperial', 'metric']]);
+    });
+
+    it('a click on the current unit changes nothing', async () => {
+        await render();
+        unitButton('Metric').click();
+        await flushPromises();
+        expect(wrapper.emitted('unitsChanged')).toBeUndefined();
+        expect(unitButton('Metric').getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('each setting is its label above its control; the custom basemap editor is under the basemap', async () => {
+        await render();
+        const fields = [...document.querySelectorAll('.map-settings-content > .setting-field')];
+        expect(fields.map(f => [...f.children].map(el => el.classList[0]))).toEqual([['setting-label', 'p-select'], ['setting-label', 'p-selectbutton']]);
+        await chooseBasemap('custom');
+        expect(fields[0].lastElementChild.classList).toContain('custom-basemap-editor');
+    });
+
+    it('Close in the footer closes the window', async () => {
+        await render();
+        [...document.querySelectorAll('.window-footer button')].find(b => b.textContent.includes('Close')).click();
+        expect(wrapper.emitted('close')).toHaveLength(1);
     });
 });
 

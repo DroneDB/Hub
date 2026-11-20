@@ -1,41 +1,40 @@
 <template>
-    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @close="$emit('close')">
+    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size close-button cancel-label="Close"
+            @close="$emit('close')">
         <div class="map-settings-content">
-            <div class="setting-row">
-                <label id="map-settings-dialog-basemap-label" for="map-settings-dialog-basemap" class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-map" /> Basemap
+            <div class="setting-field">
+                <label id="map-settings-dialog-basemap-label" for="map-settings-dialog-basemap" class="setting-label">
+                    <i class="fa-solid fa-map fa-fw" aria-hidden="true" /> Basemap
                 </label>
                 <Select v-model="choice" input-id="map-settings-dialog-basemap" aria-labelledby="map-settings-dialog-basemap-label"
                         :options="basemapOptions" option-label="label" option-value="value" class="setting-select" />
+                <CustomBasemapEditor v-if="editingCustom" id-prefix="map-settings-dialog-custom" class="custom-basemap-editor"
+                                     @applied="onApplied" @cleared="onCleared" />
             </div>
 
-            <CustomBasemapEditor v-if="editingCustom" id-prefix="map-settings-dialog-custom" class="custom-basemap-editor"
-                                 @applied="onApplied" @cleared="onCleared" />
-
-            <div class="setting-row">
-                <label id="map-settings-dialog-measurement-units-label" for="map-settings-dialog-measurement-units" class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-ruler" /> Measurement Units
-                </label>
-                <Select input-id="map-settings-dialog-measurement-units" aria-labelledby="map-settings-dialog-measurement-units-label" :model-value="unitPref"
-                        :options="UNIT_OPTIONS" option-label="label" option-value="value" class="setting-select" @update:model-value="onUnitsChange" />
+            <div class="setting-field">
+                <span id="map-settings-dialog-measurement-units-label" class="setting-label">
+                    <i class="fa-solid fa-ruler fa-fw" aria-hidden="true" /> Measurement units
+                </span>
+                <SelectButton id="map-settings-dialog-measurement-units" aria-labelledby="map-settings-dialog-measurement-units-label"
+                              :model-value="unitPref" :options="UNIT_OPTIONS" option-label="label" option-value="value"
+                              :allow-empty="false" class="setting-units" @update:model-value="onUnitsChange" />
             </div>
-        </div>
-        <div class="d-flex justify-content-end mt-3" style="padding: 0 0.75rem;">
-            <Button severity="secondary" label="Close" @click="$emit('close')" />
         </div>
     </Window>
 </template>
 
 <script setup>
 /**
- * MapSettingsDialog - the basemap and the measurement units of a map. "Custom" opens the editor of
- * the custom basemap; the map switches to it once a source is saved. The basemap is emitted, not
+ * MapSettingsDialog - the basemap and the measurement units of a map. The units are a switch that
+ * shows both choices, one click apart. "Custom" opens the editor of the custom basemap; the map
+ * switches to it once a source is saved. The basemap is emitted, not
  * stored here: the map draws it and saves it as the user's preference (useMapBasemap), which also
  * draws the basemap of a saved view without saving it.
  */
 import { computed } from 'vue';
-import Button from 'primevue/button';
 import Select from 'primevue/select';
+import SelectButton from 'primevue/selectbutton';
 import Window from '@/components/HubWindow.vue';
 import { useBasemapChoice } from '@/composables/useBasemapChoice';
 import CustomBasemapEditor from './CustomBasemapEditor.vue';
@@ -64,35 +63,43 @@ function onUnitsChange(value) {
 </script>
 
 <style scoped>
+/* Each setting is its label above its control, the controls the whole width of the window: they
+   line up whatever the length of their label, in the small window and on a phone alike */
 .map-settings-content {
-    padding: 0.5rem 0;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--ddb-spacing-lg);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
 }
 
-.setting-row {
+.setting-field {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 0.75rem;
+    flex-direction: column;
+    gap: var(--ddb-spacing-sm);
 }
 
-/* The labels and the selects of the custom basemap editor below (CustomBasemapEditor.vue): one
-   label size and one select, of one width (17rem when there is room), in the whole window */
 .setting-label {
     color: var(--ddb-text);
+    font-weight: 500;
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.setting-select {
-    flex: 0 1 17rem;
-    min-width: 0;
+.setting-label i {
+    color: var(--ddb-text-secondary);
 }
 
-.custom-basemap-editor {
-    margin: 0 var(--ddb-spacing-md);
+.setting-select {
+    width: 100%;
+}
+
+/* The two units share the width */
+.setting-units {
+    display: flex;
+}
+
+.setting-units :deep(.p-togglebutton) {
+    flex: 1 1 0;
 }
 </style>
