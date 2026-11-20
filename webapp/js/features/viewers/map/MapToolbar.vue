@@ -7,8 +7,9 @@
             <button title="Reset View (H)" aria-label="Reset View" @click="emit('reset')">
                 <i :class="RESET_VIEW_ICON" />
             </button>
-            <button v-if="canFullscreen" title="Fullscreen (F11)" aria-label="Fullscreen" @click="emit('fullscreen')">
-                <i :class="FULLSCREEN_ICON" />
+            <button v-if="canFullscreen" :title="fullscreen.label.value" :aria-label="fullscreen.label.value"
+                    :aria-pressed="fullscreen.isFullscreen.value" @click="emit('fullscreen')">
+                <i :class="fullscreen.icon.value" />
             </button>
             <!-- data-map-link-toggle: the map link panel leaves a press on this button to the button -->
             <button v-if="copyLink && !embed" title="Copy link" aria-label="Copy link" data-map-link-toggle
@@ -58,8 +59,9 @@
  */
 import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
+import { useFullscreen } from '@/composables/useFullscreen';
 import {
-    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, FULLSCREEN_ICON, RASTER_ANALYSIS_ICON, RESET_VIEW_ICON, STOCKPILE_ICON
+    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, RASTER_ANALYSIS_ICON, RESET_VIEW_ICON, STOCKPILE_ICON
 } from '@/libs/glyphs';
 
 const props = defineProps({
@@ -90,6 +92,8 @@ const props = defineProps({
 const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
 
 const canFullscreen = supportsFullScreen();
+// The button says what it does next: Fullscreen, then Exit fullscreen (Esc and the browser's controls leave it too)
+const fullscreen = useFullscreen();
 // Provided by the app: true on a map embedded in another page
 const embed = inject('embed', false);
 // The size class of the map (MapCore provides it): a map narrower than `sm` leaves its Back button out of the rail,

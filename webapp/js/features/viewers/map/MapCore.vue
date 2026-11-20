@@ -133,7 +133,7 @@ import { inject, provide, shallowRef } from 'vue';
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
 import Keyboard from '@/libs/keyboard';
-import { requestFullScreen, exitFullScreen, isFullScreenCurrently } from '@/libs/utils';
+import { isFullScreenCurrently, toggleFullScreen } from '@/libs/utils';
 import { formatSpeed } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import SelectionControl from '@/libs/map/controls/selectionControl';
@@ -841,13 +841,10 @@ export default {
         },
 
         toggleFullscreen: function () {
-            if (isFullScreenCurrently()) {
-                exitFullScreen();
-            } else {
-                // The root by its ref: the comments before it make $el a text node in a development build
-                requestFullScreen(this.$refs['map-root']);
-                this.later(() => this.updateSize(), 500);
-            }
+            const entering = !isFullScreenCurrently();
+            // The root by its ref: the comments before it make $el a text node in a development build
+            toggleFullScreen(this.$refs['map-root']);
+            if (entering) this.later(() => this.updateSize(), 500);
         },
 
         handleKeyDown: function (e) {

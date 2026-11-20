@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import MapToolbar from './MapToolbar.vue';
 
 const COMPARE = 'button[aria-label^="Compare"]';
@@ -209,5 +209,31 @@ describe('MapToolbar glyphs', () => {
             'Show drone flight path': icons.FLIGHT_PATH_ICON,
             'Compare georasters side by side': icons.COMPARE_ICON
         });
+    });
+});
+
+describe('MapToolbar fullscreen button', () => {
+    afterEach(() => {
+        delete HTMLElement.prototype.requestFullScreen;
+        delete document.fullscreenElement;
+    });
+
+    it('says what it does next, as the button of the viewers does: Fullscreen, then Exit fullscreen', async () => {
+        // The browser can show an element in full screen (supportsFullScreen asks the body)
+        HTMLElement.prototype.requestFullScreen = () => {};
+        const icons = await import('@/libs/glyphs');
+        wrapper = mount(MapToolbar, { props: { zones } });
+        const button = () => zones.topRight.querySelector('button[aria-pressed]');
+        expect([button().getAttribute('aria-label'), button().title, button().getAttribute('aria-pressed')]).toEqual(['Fullscreen', 'Fullscreen', 'false']);
+        expect(button().querySelector('i').className).toBe(icons.FULLSCREEN_ICON);
+
+        Object.defineProperty(document, 'fullscreenElement', { value: document.body, configurable: true });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        await flushPromises();
+        expect([button().getAttribute('aria-label'), button().title, button().getAttribute('aria-pressed')]).toEqual(['Exit fullscreen', 'Exit fullscreen', 'true']);
+        expect(button().querySelector('i').className).toBe(icons.EXIT_FULLSCREEN_ICON);
+        // The map does the switch (it fits its size after it)
+        button().click();
+        expect(wrapper.emitted('fullscreen')).toHaveLength(1);
     });
 });

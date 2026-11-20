@@ -127,6 +127,15 @@ export function exitFullScreen() {
     }
 }
 
+/**
+ * Shows `element` in full screen, or leaves full screen when the page already shows an element in it.
+ * @param {Element} [element] the body when none is given
+ */
+export function toggleFullScreen(element) {
+    if (isFullScreenCurrently()) exitFullScreen();
+    else requestFullScreen(element);
+}
+
 // https://stackoverflow.com/a/53486112
 export function debounce(fn, delay) {
     var timeoutID = null;

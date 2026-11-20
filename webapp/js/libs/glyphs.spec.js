@@ -97,13 +97,15 @@ describe('the glyphs drawn for the Hub', () => {
 describe('the files that show a meaning', () => {
     it.each([
         ['the map toolbar', '../features/viewers/map/MapToolbar.vue',
-            ['BACK_ICON', 'RESET_VIEW_ICON', 'FULLSCREEN_ICON', 'COPY_LINK_ICON', 'RASTER_ANALYSIS_ICON', 'STOCKPILE_ICON', 'DIRECTION_ICON',
+            ['BACK_ICON', 'RESET_VIEW_ICON', 'useFullscreen', 'COPY_LINK_ICON', 'RASTER_ANALYSIS_ICON', 'STOCKPILE_ICON', 'DIRECTION_ICON',
                 'FLIGHT_PATH_ICON', 'COMPARE_ICON']],
         ['the measure tools of the map', './map/controls/measureControl.js',
             ['POINT_ICON', 'LENGTH_ICON', 'AREA_ICON', 'ERASE_ICON', 'EDIT_VERTICES_ICON', 'STOP_ICON', 'MEASUREMENT_LIST_ICON', 'CALLOUTS_ICON',
                 'SAVE_ICON', 'CLEAR_ALL_ICON', 'EXPORT_GEOJSON_ICON', 'EXPORT_CSV_ICON', 'DELETE_ICON', 'MEASURE_ICON']],
         ['the selection tools of the map', './map/controls/selectionControl.js', ['SELECT_RECTANGLE_ICON', 'SELECT_POLYGON_ICON', 'CLEAR_SELECTION_ICON']],
         ['the settings button of the map', './map/controls/settingsControl.js', ['SETTINGS_ICON']],
+        ['the fullscreen buttons of the map and the viewers', '../composables/useFullscreen.js', ['FULLSCREEN_ICON', 'EXIT_FULLSCREEN_ICON']],
+        ['the bar and the toolbar of the viewers', '../components/ViewerShell.vue', ['useFullscreen']],
         ['the zoom, north and attribution buttons', './map/controls/defaultControls.js',
             ['ZOOM_IN_ICON', 'ZOOM_OUT_ICON', 'NORTH_ICON', 'ATTRIBUTION_ICON', 'COLLAPSE_ICON']],
         ['the measure toolbar of the 3D viewers', '../components/MeasureToolbar.vue', ['POINT_ICON', 'LENGTH_ICON', 'HEIGHT_ICON', 'AREA_ICON', 'CLEAR_ALL_ICON']],
@@ -147,6 +149,13 @@ describe('the files that show a meaning', () => {
         '../features/dataset/explorer/SavedViews.vue'
     ])('%s does not show a pile or the saved views as stacked layers', file => {
         expect(source(file)).not.toMatch(/fa-layer-group/);
+    });
+
+    it.each([
+        '../features/viewers/map/MapToolbar.vue',
+        '../components/ViewerShell.vue'
+    ])('%s takes the glyph of its fullscreen button from the state of the page, not a glyph of its own', file => {
+        expect(source(file)).not.toMatch(/fa-(compress|expand)\b/);
     });
 
     it.each([

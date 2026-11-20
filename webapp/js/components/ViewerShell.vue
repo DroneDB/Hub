@@ -11,7 +11,7 @@
             <!-- A viewer without the navigation toolbar (the point cloud and the splat) has its fullscreen button here -->
             <button v-if="fullscreenButton && canFullscreen" type="button" class="viewer-fullscreen" :title="fullscreenTitle"
                     :aria-label="fullscreenLabel" :aria-pressed="isFullscreen" @click="toggleFullscreen">
-                <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'" />
+                <i :class="fullscreenIcon" />
             </button>
         </div>
 
@@ -51,7 +51,7 @@
                 <!-- Embedded there is no view bar: the same button stands over the view, in the corner the viewer leaves free -->
                 <button v-if="fullscreenOverlay" type="button" class="viewer-fullscreen-overlay" :class="fullscreenCorner"
                         :title="fullscreenTitle" :aria-label="fullscreenLabel" :aria-pressed="isFullscreen" @click="toggleFullscreen">
-                    <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'" />
+                    <i :class="fullscreenIcon" />
                 </button>
                 <button v-if="settingsButton && ready" class="btn-settings" :class="settingsButton" :title="settingsTitle"
                         :aria-label="settingsTitle" :aria-expanded="settingsOpen" :aria-controls="panelId" @click="settingsOpen = !settingsOpen">
@@ -67,7 +67,7 @@
                     <button v-if="canFullscreen" type="button" class="viewer-nav-button"
                             :title="fullscreenTitle" :aria-label="fullscreenLabel"
                             :aria-pressed="isFullscreen" @click="toggleFullscreen">
-                        <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'" />
+                        <i :class="fullscreenIcon" />
                     </button>
                     <slot name="nav" />
                     <button ref="helpButton" type="button" class="viewer-nav-button" title="Controls" aria-label="Controls"
@@ -145,7 +145,8 @@ import { useOverlay } from '@/composables/useOverlay';
 import { b64decode } from '@/libs/base64';
 import { LoadErrorKind, loadErrorKind } from '@/libs/ddb/apiError';
 import keyboard from '@/libs/keyboard';
-import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
+import { supportsFullScreen } from '@/libs/utils';
+import { useFullscreen } from '@/composables/useFullscreen';
 
 const error = defineModel('error', { type: String, default: '' });
 const settingsOpen = defineModel('settingsOpen', { type: Boolean, default: false });
@@ -219,7 +220,7 @@ const panelEl = ref(null);
 const helpEl = ref(null);
 const helpButton = ref(null);
 const helpOpen = ref(false);
-const isFullscreen = ref(false);
+const { isFullscreen, label: fullscreenLabel, icon: fullscreenIcon, toggle: toggleFullScreenOf } = useFullscreen();
 const panelId = computed(() => props.settingsId || `${uid}-settings`);
 const helpId = `${uid}-help`;
 
@@ -232,7 +233,6 @@ const panelPlace = computed(() => {
 const navSide = computed(() => (props.settingsButton === 'bottom-left' ? 'bottom-right' : 'bottom-left'));
 const helpRows = computed(() => [...props.gestures, { input: 'Home, H or 0', action: 'Back to the framed view' }]);
 const canFullscreen = supportsFullScreen();
-const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Fullscreen'));
 const fullscreenTitle = computed(() => `${fullscreenLabel.value} (F)`);
 // Embedded, the fullscreen button of the view bar has no bar: it stands over the view (the frame of ShareEmbed allows fullscreen)
 const fullscreenOverlay = computed(() => !!embed && props.fullscreenButton && canFullscreen);
@@ -256,10 +256,8 @@ function goHome() {
 }
 
 function toggleFullscreen() {
-    if (isFullScreenCurrently()) exitFullScreen();
-    else requestFullScreen(shellEl.value ?? undefined);
+    toggleFullScreenOf(shellEl.value ?? undefined);
 }
-const syncFullscreen = () => { isFullscreen.value = isFullScreenCurrently(); };
 
 /** Typing in a field: the keys belong to it (a slider's Home goes to its start) */
 function isTyping(target) {
@@ -303,13 +301,9 @@ watch(helpOpen, open => {
 
 onMounted(() => {
     keyboard.onKeyDown(onNavKey);
-    document.addEventListener('fullscreenchange', syncFullscreen);
-    document.addEventListener('webkitfullscreenchange', syncFullscreen);
 });
 onBeforeUnmount(() => {
     keyboard.offKeyDown(onNavKey);
-    document.removeEventListener('fullscreenchange', syncFullscreen);
-    document.removeEventListener('webkitfullscreenchange', syncFullscreen);
     document.removeEventListener('pointerdown', onPointerDown, true);
 });
 

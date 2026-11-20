@@ -24,6 +24,7 @@ const drawn = name => `ddb-icon ddb-icon-${name}`;
 export const BACK_ICON = 'fa-solid fa-arrow-left';
 export const RESET_VIEW_ICON = 'fa-solid fa-house';
 export const FULLSCREEN_ICON = 'fa-solid fa-expand';
+export const EXIT_FULLSCREEN_ICON = 'fa-solid fa-compress';
 export const COPY_LINK_ICON = 'fa-solid fa-link';
 export const ZOOM_IN_ICON = 'fa-solid fa-plus';
 export const ZOOM_OUT_ICON = 'fa-solid fa-minus';

@@ -102,7 +102,10 @@ describe('the viewers of the Hub and their fullscreen control (FR-VWR-38)', () =
         expect(scss).toMatch(/#splat\.has-fullscreen-overlay \.top-right-stack \{\s*right: calc\(2 \* var\(--ddb-spacing-md\) \+ 2\.25rem\);/);
     });
 
-    it('the map has its own Fullscreen button in its toolbar', () => {
-        expect(readSource(__dirname, '../features/viewers/map/MapToolbar.vue')).toContain('aria-label="Fullscreen"');
+    it('the map has its own Fullscreen button in its toolbar, named by the same state as the button of the viewers', () => {
+        const toolbar = readSource(__dirname, '../features/viewers/map/MapToolbar.vue');
+        expect(toolbar).toContain(':aria-label="fullscreen.label.value"');
+        expect(toolbar).toContain('useFullscreen()');
+        expect(readSource(__dirname, 'ViewerShell.vue')).toContain('useFullscreen()');
     });
 });
