@@ -72,7 +72,9 @@ export const isJsonType = (/** @type {string} */ contentType) =>
 async function parseBody(response, status, responseType) {
     const contentType = contentTypeOf(response);
     try {
+        // A forced type wins over the content type: a task result asked for as a Blob may be GeoJSON
         if (responseType === 'text') return await response.text();
+        if (responseType === 'blob') return await response.blob();
 
         if (isJsonType(contentType)) {
             return await response.json();
@@ -93,7 +95,7 @@ async function parseBody(response, status, responseType) {
             return text;
         }
 
-        if (contentType.includes('image/') || contentType.includes('application/octet-stream') || responseType === 'blob') {
+        if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
             return await response.blob();
         }
 

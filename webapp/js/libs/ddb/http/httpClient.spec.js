@@ -77,6 +77,26 @@ describe('httpClient error messages', () => {
 
 // FR-XC-05: a request the user did not start can opt out of the global 401 handler
 // FR-ORG-23: the Registry's 404 says what is missing ("No user named x"); callers test the status, never the text
+describe('httpClient forced response types', () => {
+    it('returns a Blob when asked for one, even for a JSON body (the GeoJSON result of a contour task)', async () => {
+        const geojson = { type: 'FeatureCollection', features: [] };
+        respondWith(200, geojson, 'application/geo+json');
+        const body = await client().send('/orgs/x/ds/y/tasks/t/result', { responseType: 'blob' });
+        expect(body).toBeInstanceOf(Blob);
+        expect(JSON.parse(await body.text())).toEqual(geojson);
+    });
+
+    it('returns text when asked for it, even for a JSON body', async () => {
+        respondWith(200, { a: 1 }, 'application/json');
+        expect(await client().send('/x', { responseType: 'text' })).toBe('{"a":1}');
+    });
+
+    it('still parses a JSON body when no type is asked for', async () => {
+        respondWith(200, { a: 1 }, 'application/json');
+        expect(await client().send('/x')).toEqual({ a: 1 });
+    });
+});
+
 describe('httpClient 404 messages', () => {
     it('reads the detail of a ProblemDetails 404 as the message, and keeps the errors member', async () => {
         respondWith(404, { title: 'Not Found', status: 404, detail: 'No user named nosuchuser123', errors: { userName: ['No user named nosuchuser123'] } },
