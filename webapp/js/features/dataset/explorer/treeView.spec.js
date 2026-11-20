@@ -1,13 +1,16 @@
 /**
  * Unit tests for the dataset tree behaviour:
  * - selecting a folder loads its children without expanding it
+ * - a file (or several nodes) picked in the tree is the selection of the file list
+ * - a right click selects the node under the pointer, and keeps a selection that holds it
  * - copy/cut/delete act on the tree selection (context menu and keyboard)
  * - clipboard sources record the selected items' own parent folder
  * - paste conflicts are detected against the destination listing
  * - deleted nodes leave the tree selection
+ * - a folder to open that the tree does not have (a search) opens the nearest folder above it
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { isPathRemoved, liveSelectionEntries, selectionBasePath } from './treeSelection';
+import { isPathRemoved, liveSelectionEntries, selectionBasePath, nearestKnownChain } from './treeSelection';
 import { setActivePinia, createPinia } from 'pinia';
 import { useClipboardStore } from '@/stores/clipboard';
 import { ref, computed } from 'vue';
@@ -95,6 +98,91 @@ describe('FileBrowser.handleSelectionChanged', () => {
         expect(vm.$emit).toHaveBeenCalledWith('currentUriChanged', folder.node.path);
         expect(vm.$emit).toHaveBeenCalledWith('selectionChanged', children);
     });
+
+    it('gives a file picked in the tree as the selection of the list, in the folder that holds it', async () => {
+        const file = treeNode('folder/a.jpg');
+        const vm = fakeBrowser([file]);
+
+        await vm.handleSelectionChanged([file]);
+
+        expect(vm.$emit.mock.calls).toEqual([
+            ['currentUriChanged', 'ddb://host/org/ds/folder'],
+            ['selectionChanged', [file.node], { selected: true }]
+        ]);
+    });
+
+    it('gives several picked nodes as the selection of the list, a folder among them as an item', async () => {
+        const file = treeNode('folder/a.jpg');
+        const folder = { ...treeNode('folder/sub', DIR), isExpandable: true, loadChildren: vi.fn() };
+        const vm = fakeBrowser([file, folder]);
+
+        await vm.handleSelectionChanged([file, folder]);
+
+        expect(folder.loadChildren).not.toHaveBeenCalled();
+        expect(vm.$emit).toHaveBeenCalledWith('selectionChanged', [file.node, folder.node], { selected: true });
+    });
+});
+
+describe('TreeView.handleSelection', () => {
+    let TreeView, Mouse;
+    beforeAll(async () => {
+        TreeView = (await import('./TreeView.vue')).default;
+        Mouse = (await import('@/libs/mouse')).default;
+    });
+
+    // The tree as its click handler sees it: the selected node components and what it emits
+    function fakeTree(selectedNodes) {
+        const vm = { selectedNodes, rangeStartNode: selectedNodes[0] ?? null, focusedNode: null, $refs: {}, $emit: vi.fn() };
+        vm.handleSelection = (node, button) => TreeView.methods.handleSelection.call(vm, node, button);
+        return vm;
+    }
+    const component = path => ({ ...treeNode(path), selected: false });
+    const select = nodes => nodes.map(n => Object.assign(n, { selected: true }));
+
+    it('a right click on a node that is not selected selects it alone, as a click does', async () => {
+        const [a, b, other] = [component('f/a.jpg'), component('f/b.jpg'), component('f/c.jpg')];
+        const vm = fakeTree(select([a, b]));
+
+        await vm.handleSelection(other, Mouse.RIGHT);
+
+        expect(vm.selectedNodes).toEqual([other]);
+        expect([a.selected, b.selected, other.selected]).toEqual([false, false, true]);
+        expect(vm.focusedNode).toBe(other);
+        expect(vm.$emit).toHaveBeenCalledWith('selectionChanged', [other], 'f');
+    });
+
+    it('a right click on a selected node keeps the selection (the menu acts on all of it) and announces it again', async () => {
+        const [a, b] = [component('f/a.jpg'), component('f/b.jpg')];
+        const vm = fakeTree(select([a, b]));
+
+        await vm.handleSelection(b, Mouse.RIGHT);
+
+        expect(vm.selectedNodes).toEqual([a, b]);
+        expect([a.selected, b.selected]).toEqual([true, true]);
+        // The page shows the selection of the tree again: the list may show something else by now
+        expect(vm.$emit).toHaveBeenCalledExactlyOnceWith('selectionChanged', [a, b], 'f');
+    });
+
+    it('a right click on the one selected node keeps it selected and announces it again', async () => {
+        const a = component('f/a.jpg');
+        const vm = fakeTree(select([a]));
+
+        await vm.handleSelection(a, Mouse.RIGHT);
+
+        expect(vm.selectedNodes).toEqual([a]);
+        expect(a.selected).toBe(true);
+        expect(vm.$emit).toHaveBeenCalledExactlyOnceWith('selectionChanged', [a], 'f');
+    });
+
+    it('a right click with nothing selected selects the node', async () => {
+        const a = component('f/a.jpg');
+        const vm = fakeTree([]);
+
+        await vm.handleSelection(a, Mouse.RIGHT);
+
+        expect(vm.selectedNodes).toEqual([a]);
+        expect(a.selected).toBe(true);
+    });
 });
 
 describe('FileBrowser.emitTreeAction', () => {
@@ -111,15 +199,15 @@ describe('FileBrowser.emitTreeAction', () => {
         expect(vm.$emit).not.toHaveBeenCalledWith('selectionChanged', expect.anything());
     });
 
-    it('syncs the selection before actions that read the file list', () => {
-        const a = treeNode('f/a.jpg');
-        const vm = fakeBrowser([a]);
+    it('emits the other actions as they are and leaves the file list alone: the page runs them on the tree selection', () => {
+        const folder = treeNode('f', DIR);
+        const vm = fakeBrowser([folder]);
 
-        vm.emitTreeAction('deleteSelecteditems');
+        for (const event of ['deleteSelecteditems', 'moveSelectedItems', 'openProperties', 'transferSelectedItems']) vm.emitTreeAction(event);
+        vm.emitTreeAction('setAsCover', folder.node);
 
         expect(vm.$emit.mock.calls).toEqual([
-            ['selectionChanged', [a.node]],
-            ['deleteSelecteditems']
+            ['deleteSelecteditems'], ['moveSelectedItems'], ['openProperties'], ['transferSelectedItems'], ['setAsCover', folder.node]
         ]);
     });
 });
@@ -275,6 +363,60 @@ describe('paste conflict detection', () => {
     });
 });
 
+describe('a folder to open that the tree does not have', () => {
+    const has = (...paths) => path => paths.includes(path);
+
+    it('nearestKnownChain keeps the chain of a folder that the tree has', () => {
+        expect(nearestKnownChain(['a', 'a/b'], has('a', 'a/b'))).toEqual(['a', 'a/b']);
+        expect(nearestKnownChain(['', '/'], has('/'))).toEqual(['', '/']);
+        // The folders above it need no node of their own (a search result nested in folders it did not find)
+        expect(nearestKnownChain(['a', 'a/b'], has('a/b'))).toEqual(['a', 'a/b']);
+    });
+
+    it('nearestKnownChain stops at the nearest folder above it that the tree has', () => {
+        expect(nearestKnownChain(['a', 'a/b', 'a/b/c'], has('a'))).toEqual(['a']);
+        expect(nearestKnownChain(['a', 'a/b', 'a/b/c'], has('a', 'a/b'))).toEqual(['a', 'a/b']);
+    });
+
+    it('nearestKnownChain is the chain of the root when the tree has none of the folders', () => {
+        expect(nearestKnownChain(['a', 'a/b'], has('/'))).toEqual(['', '/']);
+        expect(nearestKnownChain([], has('/'))).toEqual(['', '/']);
+    });
+
+    it('TreeView opens the root when a search does not list the folder to open, and the folder itself when it does', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const TreeView = (await import('./TreeView.vue')).default;
+        const TreeNode = (await import('./TreeNode.vue')).default;
+        const vm = {};
+        TreeView.created.call(vm);
+        TreeView.mounted.call(vm);
+        // Real nodes, as far as the event goes: what they are at, and what they do with a chain
+        const node = (path, { root = false } = {}) => {
+            const n = { node: { root, entry: { path, type: DIR } }, expand: vi.fn(async () => {}), $emit: vi.fn() };
+            n.isAt = p => TreeNode.methods.isAt.call(n, p);
+            n.openFromTree = chain => TreeNode.methods.openFromTree.call(n, chain);
+            return n;
+        };
+        // A search for "sub": the root of the tree and the folder it found
+        const root = node('', { root: true });
+        const found = node('out/sub');
+        [root, found].forEach(n => vm._nodes.add(n));
+        const opened = n => n.$emit.mock.calls.filter(c => c[0] === 'opened').length;
+
+        // "out" is not in the tree: the root (the results) opens
+        emitter.emit('folderOpened', ['out']);
+        await Promise.resolve();
+        expect([opened(root), opened(found)]).toEqual([1, 0]);
+
+        // The folder it found opens as itself
+        emitter.emit('folderOpened', ['out', 'out/sub']);
+        await Promise.resolve();
+        expect([opened(root), opened(found)]).toEqual([1, 1]);
+        expect(found.$emit).toHaveBeenCalledWith('opened', found, 'explorer');
+        TreeView.beforeUnmount.call(vm);
+    });
+});
+
 describe('selection cleanup on deleteEntries', () => {
     it('TreeView drops deleted nodes and their descendants', async () => {
         const emitter = (await import('@/libs/eventBus')).default;
@@ -303,8 +445,8 @@ describe('selection cleanup on deleteEntries', () => {
         TreeView.created.call(vm);
         TreeView.mounted.call(vm);
         vm.moveSelected = (dest, primary) => TreeView.methods.moveSelected.call(vm, dest, primary);
-        const node = path => ({ selected: false, node: { entry: { path } }, removeChildren: vi.fn(), addItems: vi.fn(), openFromTree: vi.fn() });
-        const a = node('a.jpg'), b = node('b.jpg'), c = node('c.jpg');
+        const node = path => ({ selected: false, node: { entry: { path } }, removeChildren: vi.fn(), addItems: vi.fn(), openFromTree: vi.fn(), isAt: p => p === path });
+        const a = node('a.jpg'), b = node('b.jpg'), c = node('f');
         [a, b, c].forEach(n => vm._nodes.add(n));
 
         const items = [{ entry: { path: 'x.jpg' } }];

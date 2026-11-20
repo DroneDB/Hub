@@ -21,7 +21,7 @@ import Mouse from '@/libs/mouse';
 import { requestMove } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import ddb from 'ddb';
-import { isPathRemoved } from './treeSelection';
+import { isPathRemoved, nearestKnownChain } from './treeSelection';
 import { useDragDrop } from '@/composables/useDragDrop';
 const { pathutils } = ddb;
 
@@ -90,8 +90,12 @@ export default {
         this._onAddItems = items => {
             for (const node of this._nodes) node.addItems(items);
         };
+        // The folder to open is the last of the chain. The tree does not have every folder (a search lists only what
+        // it found): then the nearest folder above it that the tree has opens, the root at the least
         this._onFolderOpened = tree => {
-            for (const node of this._nodes) node.openFromTree(tree);
+            const nodes = [...this._nodes];
+            const chain = nearestKnownChain(tree, path => nodes.some(n => n.isAt(path)));
+            for (const node of nodes) node.openFromTree(chain);
         };
         emitter.on('deleteEntries', this._onDeleteEntries);
         emitter.on('addItems', this._onAddItems);
@@ -126,10 +130,13 @@ export default {
             if (!node) return; // Top
 
             if (node.node.unselectable) return; // Not selectable
-            if (mouseBtn === Mouse.RIGHT && this.selectedNodes.length > 1) return; // Prevent accidental deselection
-
-            // Multiple selection
-            if (Keyboard.isToggleSelectPressed()) {
+            // A right click keeps a selection that holds the node (its menu acts on all of it); on another node it
+            // selects that node, as a click does: the menu that opens is the menu of the node under the pointer.
+            // Either way the selection is announced, so the page shows it again (the list may have moved on)
+            if (mouseBtn === Mouse.RIGHT && this.selectedNodes.includes(node)) {
+                // Kept as it is
+            } else if (Keyboard.isToggleSelectPressed()) {
+                // Multiple selection
                 const id = this.selectedNodes.indexOf(node);
                 if (id !== -1) {
                     node.selected = false;

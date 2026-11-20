@@ -86,6 +86,7 @@ import { lazyComponent } from '@/libs/lazyComponent';
 import { Features } from '@/libs/features';
 import { PREF } from '@/libs/preferences';
 import { permissionsOf } from '@/libs/datasetPermissions';
+import { isDroneDB } from '@/libs/entryTypes';
 import { loadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { buildDownloadNote } from '@/libs/build/buildDownloads';
@@ -324,8 +325,10 @@ provide('datasetDrop', { upload: files => actions.upload(files), move: actions.m
 
 // ---- Downloads -------------------------------------------------------------------------
 
-async function downloadItems(files) {
-    if (!files || !files.length) return;
+async function downloadItems(picked) {
+    if (!picked || !picked.length) return;
+    // The dataset itself (the root of the tree) is the whole dataset, as the header's Download with nothing selected
+    const files = picked.some(f => isDroneDB(f.entry?.type)) ? [] : picked;
     // One archive at a time per dataset
     if (session.activeBulkDownload) {
         notify.warn('A download archive is already being prepared. Please wait for it to complete.', { summary: 'Download in progress' });
@@ -333,7 +336,7 @@ async function downloadItems(files) {
     }
     // A single file downloads at once, like the header's Download; several items or a folder ask (FR-EXP-27)
     if (needsConfirm(files) && !await askDownload(files)) return;
-    const paths = files.map(f => (f.entry && f.entry.path !== undefined ? f.entry.path : ddb.utils.parseUri(f.path).path));
+    const paths = files.length ? files.map(f => (f.entry && f.entry.path !== undefined ? f.entry.path : ddb.utils.parseUri(f.path).path)) : undefined;
     try {
         await downloadFromDataset({
             dataset, paths, files, signedIn: reg.isLoggedIn(), runTask: runHeavyTask,
@@ -345,9 +348,9 @@ async function downloadItems(files) {
 }
 
 /**
- * The question before an archive download, with the count and the total size. A folder's size is
- * read from the server meanwhile ("Calculating size…"), as the delete question does; the user can
- * answer before it arrives.
+ * The question before an archive download, with the count and the total size (the dataset's, from its root entry,
+ * for the whole dataset: no files). A folder's size is read from the server meanwhile ("Calculating size…"), as the
+ * delete question does; the user can answer before it arrives.
  */
 async function askDownload(files) {
     const size = ref(null);
@@ -360,7 +363,8 @@ async function askDownload(files) {
     }
     const answer = await dialogs.open(ConfirmDialog, () => ({
         title: 'Download', confirmText: 'Download', cancelText: 'Cancel', confirmButtonClass: 'primary',
-        message: confirmMessage(describeSelection(files), {}, { size: size.value, failed: failed.value })
+        message: confirmMessage(describeSelection(files), { count: rootEntry.value?.properties?.entries, size: rootEntry.value?.size },
+            { size: size.value, failed: failed.value })
     }));
     reading.abort();
     return answer === 'confirm';
@@ -434,9 +438,11 @@ function onOpenItem(node, view, options) {
     openItem(node, view, options);
 }
 
-// The tree shows another folder (or a single file)
-function onTreeSelection(files) {
+// The tree shows another folder (what it holds, nothing selected) or the items picked in it (a file, several nodes):
+// those are listed as the selection, so the header's Download and Share/Embed, the toolbar and the keys act on them
+function onTreeSelection(files, { selected = false } = {}) {
     listing.files.value.forEach(f => { f.selected = false; });
+    files.forEach(f => { f.selected = selected; });
     listing.files.value = files;
     listing.isLoading.value = false;
     detailFile.value = files.length === 1 && files[0].entry && !ddb.entry.isDirectory(files[0].entry) ? files[0] : null;
@@ -608,9 +614,10 @@ const commonEvents = items => ({
     buildStarted: handleBuildStarted,
     buildError: handleBuildError
 });
-// The tree's operations act on the folder or file it selected (listing.files)
+// The tree's operations act on what is selected in it, whatever the list shows (a folder of the tree is listed by what
+// it holds)
 const treeEvents = {
-    ...commonEvents(() => listing.files.value),
+    ...commonEvents(() => activeTree()?.getTreeSelectionEntries() ?? []),
     selectionChanged: onTreeSelection,
     currentUriChanged: onCurrentUriChanged,
     selectAll: () => selectAll(true),

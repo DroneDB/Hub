@@ -66,6 +66,14 @@ describe('Undo of a drag move', () => {
         expect(notify.success.mock.calls[1]).toEqual(['The move was undone', { summary: 'Moved' }]);
     });
 
+    it('brings the item to its new path before it leaves the old one, so a list that shows it alone is never empty', async () => {
+        await actions.move(item('notes.txt', T.GENERIC), item('x', T.DIRECTORY));
+
+        expect(listing.added.mock.calls[0][0][0].entry.path).toBe('x/notes.txt');
+        expect(listing.removed).toHaveBeenCalledWith(['notes.txt']);
+        expect(listing.added.mock.invocationCallOrder[0]).toBeLessThan(listing.removed.mock.invocationCallOrder[0]);
+    });
+
     it('names the failure of an Undo that the server refuses, and leaves the item where it is', async () => {
         await actions.move(item('notes.txt', T.GENERIC), item('x', T.DIRECTORY));
         const { action } = notify.success.mock.calls[0][1];

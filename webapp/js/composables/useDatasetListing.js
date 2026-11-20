@@ -13,6 +13,7 @@ import BuildManager from '@/libs/build/buildManager';
 import { applyBuildFields } from '@/libs/build/entryBuild';
 import { isTerminalState } from '@/libs/tasks/taskStates';
 import { itemFor, sortItems, isInFolder, entriesInView } from '@/libs/dataset/explorerItems';
+import { isPathRemoved } from '@/features/dataset/explorer/treeSelection';
 
 /** @param {any} dataset */
 export function useDatasetListing(dataset) {
@@ -56,9 +57,25 @@ export function useDatasetListing(dataset) {
         announce(items);
     }
 
+    /** Opens `folder` (null or '' is the root) as a click on its crumb does: the tree shows it, and the list follows. */
+    const open = folder => emitter.emit('folderOpened', ddb.pathutils.getTree(folder || '/'));
+
+    /**
+     * Entries that left the dataset paths they had (deleted, renamed, moved): the list drops them and the tree hears of
+     * it. The list never shows a folder that is not there, nor an empty list for a folder that has files:
+     *  - the folder on show left with them (the tree acts on a folder while the list shows what it holds): the folder
+     *    that held the outermost of them opens instead (the tree opens the nearest folder it has);
+     *  - the list showed only what left (items picked in the tree are listed on their own, without the rest of their
+     *    folder): the folder on show opens.
+     */
     function removed(paths) {
+        const shown = files.value.length;
         drop(paths);
-        if (paths.length) emitter.emit('deleteEntries', paths);
+        if (!paths.length) return;
+        emitter.emit('deleteEntries', paths);
+        const holders = paths.filter(path => isPathRemoved(currentPath.value, [path]));
+        if (holders.length) open(ddb.pathutils.getParentFolder(holders.reduce((a, b) => (b.length < a.length ? b : a))));
+        else if (shown > 0 && files.value.length === 0) open(currentPath.value);
     }
 
     /**

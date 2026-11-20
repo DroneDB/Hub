@@ -95,8 +95,8 @@ export default {
             component: self
         };
 
-        // The same menu as the file list; with nothing selected in the tree, the folder's
-        // (Select all selects the files of the list)
+        // The same menu as the file list, for the selection of the tree (a right click selects the node under the
+        // pointer first); with nothing selected in the tree, the folder's (Select all selects the files of the list)
         const contextMenu = buildStandardContextMenu(ctx);
 
         return {
@@ -154,21 +154,14 @@ export default {
             return liveSelectionEntries(tree ? tree.selectedNodes : null);
         },
 
-        // Emits an action (context menu or keyboard) for the current tree selection.
+        // Emits an action (context menu or keyboard) for the current tree selection: the page runs it on
+        // getTreeSelectionEntries(), whatever the file list shows (a folder of the tree is listed by what it holds).
         emitTreeAction: function (event, ...args) {
-            const entries = this.getTreeSelectionEntries();
-
             // Copy/cut carry the tree selection explicitly: the clipboard handlers
-            // otherwise read the explorer selection, which the tree never sets.
+            // otherwise read the selection of the file list.
             if (event === 'copySelectedItems' || event === 'cutSelectedItems') {
-                this.$emit(event, entries);
+                this.$emit(event, this.getTreeSelectionEntries());
                 return;
-            }
-
-            // For FileBrowser, some actions need to emit selectionChanged first
-            const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
-            if (needsSelectionSync.includes(event) && entries.length > 0) {
-                this.$emit('selectionChanged', entries);
             }
             this.$emit(event, ...args);
         },
@@ -387,8 +380,6 @@ export default {
                         await n.loadChildren();
                     }
 
-                    n.children.forEach(c => c.selected = false);
-
                     this.$emit('currentUriChanged', n.node.path);
                     this.$emit('selectionChanged', n.children);
                     return;
@@ -400,7 +391,9 @@ export default {
             } else {
                 this.$emit('currentUriChanged', null);
             }
-            this.$emit('selectionChanged', selectedNodes.map(n => n.node));
+            // The items picked in the tree (a file, several nodes) are listed on their own, as the selection of the
+            // list: the actions of the page (its header, the toolbar, the keys) act on them
+            this.$emit('selectionChanged', selectedNodes.map(n => n.node), { selected: true });
 
         },
         handleOpen: function (component, sender) {

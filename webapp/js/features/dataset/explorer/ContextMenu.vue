@@ -28,6 +28,12 @@ let contextMenus = [];
  * an item with an `accelerator` shows its key on the right, and a `danger` item is drawn red.
  * Closes on Escape via the Keyboard utility.
  *
+ * The items are read each time the menu opens: what an item shows (isVisible, isEnabled, its
+ * label) can come from state that Vue does not track (the selection of the tree, the state of a
+ * build), so a model cached between two openings would be the menu of an earlier selection. The
+ * host selects the item under the pointer in a contextmenu listener of its own, on an element
+ * inside its root: it has run when the event reaches the root, where the menu opens.
+ *
  * Props:
  *   items - Array of PrimeVue MenuItem descriptors for the menu model.
  */
@@ -42,24 +48,10 @@ export default {
         }
     },
     data: function () {
-        return {};
-    },
-
-    computed: {
-        menuModel: function () {
-            const model = [];
-            let group;
-            for (const item of this.items) {
-                // Sub-menu: visible if at least one child is visible
-                if (item.items ? !item.items.some(isShown) : !isShown(item)) continue;
-                const mapped = this.mapItem(item);
-                if (!mapped) continue;
-                if (model.length && item.group !== group && !mapped.separator) model.push({ separator: true });
-                group = item.group;
-                model.push(mapped);
-            }
-            return model;
-        }
+        return {
+            // What the menu shows: the items as they were when it opened
+            menuModel: []
+        };
     },
 
     mounted: function () {
@@ -77,13 +69,29 @@ export default {
     },
 
     methods: {
+        // The model of the items as they are now: the visible ones, a separator between two groups
+        buildModel: function () {
+            const model = [];
+            let group;
+            for (const item of this.items) {
+                // Sub-menu: visible if at least one child is visible
+                if (item.items ? !item.items.some(isShown) : !isShown(item)) continue;
+                const mapped = this.mapItem(item);
+                if (!mapped) continue;
+                if (model.length && item.group !== group && !mapped.separator) model.push({ separator: true });
+                group = item.group;
+                model.push(mapped);
+            }
+            return model;
+        },
+
         mapItem: function (item) {
             if (item.type === 'separator') {
                 return { separator: true };
             }
             if (item.items) {
                 const children = item.items
-                    .filter(child => typeof child.isVisible === 'undefined' || child.isVisible())
+                    .filter(isShown)
                     .map(child => this.mapItem(child))
                     .filter(Boolean);
                 if (children.length === 0) return null;
@@ -115,6 +123,7 @@ export default {
                 if (cm !== this && cm.$refs.ctxMenu) cm.$refs.ctxMenu.hide();
             });
 
+            this.menuModel = this.buildModel();
             if (this.$refs.ctxMenu) {
                 this.$refs.ctxMenu.show(e);
             }

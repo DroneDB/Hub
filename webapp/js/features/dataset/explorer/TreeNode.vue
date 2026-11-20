@@ -97,12 +97,16 @@ export default {
             this.children = this.children.filter(item => !deleted.includes(item.entry.path));
         },
 
+        // Whether this node is at `path`, a path of a 'folderOpened' chain ("/" is the root of the tree)
+        isAt: function (path) {
+            return path === this.node.entry.path || (path === "/" && !!this.node.root);
+        },
+
         // `tree` lists the folders from the root to the one just opened (pathutils.getTree)
         openFromTree: async function (tree) {
-            const ourPath = this.node.entry.path;
             if (tree.length === 0) return;
-            if (tree.includes(ourPath)) await this.expand();
-            if (tree[tree.length - 1] === ourPath || (tree[tree.length - 1] === "/" && this.node.root)) {
+            if (tree.includes(this.node.entry.path)) await this.expand();
+            if (this.isAt(tree[tree.length - 1])) {
                 this.$emit('opened', this, "explorer");
             }
         },

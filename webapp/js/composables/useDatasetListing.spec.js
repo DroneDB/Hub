@@ -162,3 +162,109 @@ describe('the tree hears of entries outside the folder on show (FR-EXP-36)', () 
         expect(listing.files.value.map(f => f.entry.path).sort()).toEqual(['a', 'ortho.tif']);
     });
 });
+
+describe('the folder on show leaves the dataset path it had (deleted, renamed or moved from the tree)', () => {
+    const opened = emitter => emitter.emit.mock.calls.filter(c => c[0] === 'folderOpened').map(c => c[1]);
+
+    async function showing(folder) {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const { listing } = setup(entry);
+        listing.currentPath.value = folder;
+        emitter.emit.mockClear();
+        return { emitter, listing };
+    }
+
+    it('opens the folder that held it, after the tree heard of the removal', async () => {
+        const { emitter, listing } = await showing('a/b');
+        listing.removed(['a/b']);
+        expect(emitter.emit.mock.calls).toEqual([['deleteEntries', ['a/b']], ['folderOpened', ['a']]]);
+    });
+
+    it('opens the root for a folder of the root, as the root crumb of the path does', async () => {
+        const { default: pathutils } = await import('@/libs/ddb/pathutils');
+        const { emitter, listing } = await showing('out');
+        listing.removed(['out']);
+        expect(opened(emitter)).toEqual([pathutils.getTree('/')]);
+        expect(opened(emitter)[0].at(-1)).toBe('/');
+    });
+
+    it('opens the folder that held the outermost removed folder when the one on show was inside it', async () => {
+        const { emitter, listing } = await showing('a/b/c');
+        listing.removed(['a/b/c', 'a/b', 'x.jpg']);
+        expect(opened(emitter)).toEqual([['a']]);
+    });
+
+    it('stays where it is when what was removed is in the folder, next to it, or a folder whose name only starts the same', async () => {
+        const { emitter, listing } = await showing('a/b');
+        listing.removed(['a/b/photo.jpg', 'a/c', 'a/bc', 'a/b2']);
+        expect(opened(emitter)).toEqual([]);
+        expect(emitter.emit).toHaveBeenCalledWith('deleteEntries', ['a/b/photo.jpg', 'a/c', 'a/bc', 'a/b2']);
+    });
+
+    it('stays at the root, which nothing removes', async () => {
+        for (const root of [null, '']) {
+            const { emitter, listing } = await showing(root);
+            listing.removed(['a', 'b.jpg']);
+            expect(opened(emitter)).toEqual([]);
+            expect(listing.files.value.map(f => f.entry.path)).toEqual(['ortho.tif']);
+        }
+    });
+
+    it('says nothing when nothing was removed', async () => {
+        const { emitter, listing } = await showing('a');
+        listing.removed([]);
+        expect(emitter.emit).not.toHaveBeenCalled();
+    });
+});
+
+describe('the list showed only what was removed (items picked in the tree are listed without the rest of their folder)', () => {
+    const opened = emitter => emitter.emit.mock.calls.filter(c => c[0] === 'folderOpened').map(c => c[1]);
+
+    // A file of `folder` picked in the tree: the list shows it alone
+    async function picked(folder, path) {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const { dataset, listing } = setup(entry);
+        listing.currentPath.value = folder;
+        listing.files.value = [itemFor(dataset, { ...entry, path })];
+        emitter.emit.mockClear();
+        return { emitter, listing, dataset };
+    }
+
+    it('opens the folder on show, which may hold other files, after the tree heard of the removal', async () => {
+        const { emitter, listing } = await picked('out', 'out/ortho.tif');
+        listing.removed(['out/ortho.tif']);
+        expect(listing.files.value).toEqual([]);
+        expect(emitter.emit.mock.calls).toEqual([['deleteEntries', ['out/ortho.tif']], ['folderOpened', ['out']]]);
+    });
+
+    it('opens the root for a file of the root', async () => {
+        const { default: pathutils } = await import('@/libs/ddb/pathutils');
+        for (const root of [null, '']) {
+            const { emitter, listing } = await picked(root, 'ortho.tif');
+            listing.removed(['ortho.tif']);
+            expect(opened(emitter)).toEqual([pathutils.getTree('/')]);
+        }
+    });
+
+    it('keeps showing a picked file that is renamed: it comes to its new path before it leaves the old one', async () => {
+        const { emitter, listing, dataset } = await picked('out', 'out/ortho.tif');
+        listing.added([itemFor(dataset, { ...entry, path: 'out/ortho-2026.tif' })]);
+        listing.removed(['out/ortho.tif']);
+        expect(listing.files.value.map(f => f.entry.path)).toEqual(['out/ortho-2026.tif']);
+        expect(opened(emitter)).toEqual([]);
+    });
+
+    it('opens nothing while the list still shows something, or showed nothing', async () => {
+        const { emitter, listing, dataset } = await picked('out', 'out/ortho.tif');
+        listing.put([itemFor(dataset, { ...entry, path: 'out/dsm.tif' })]);
+        emitter.emit.mockClear();
+        listing.removed(['out/ortho.tif']);
+        expect(opened(emitter)).toEqual([]);
+
+        // An empty list that loses nothing: a file of another folder
+        listing.removed(['out/dsm.tif']);
+        emitter.emit.mockClear();
+        listing.removed(['elsewhere/x.tif']);
+        expect(opened(emitter)).toEqual([]);
+    });
+});

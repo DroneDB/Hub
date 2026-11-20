@@ -195,8 +195,10 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             else item.entry.path = newPath;
             // The path was free on the server (a name that exists is refused): an item the views still show there is stale
             listing.drop([newPath]);
-            listing.removed([oldPath]);
+            // The item comes to its new path before it leaves the old one: a list that shows only this item (a file
+            // picked in the tree) keeps showing it, and is not taken for a list that lost all it showed
             listing.added([item]);
+            listing.removed([oldPath]);
             if (action === 'rename' && !isBuildableType(file.entry.type) && isBuildableType(item.entry.type)) {
                 BuildManager.onFilesAdded(dataset, [item.entry]);
             }
