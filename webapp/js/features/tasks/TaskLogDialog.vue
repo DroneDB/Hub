@@ -3,7 +3,7 @@
          the window has, all of the screen when the window is maximized (FR-PRC-44) -->
     <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position size-class="dialog-log" maximizable
             @update:visible="$emit('update:visible', $event)" @show="onShow">
-        <pre ref="logContainer" class="task-log" :class="{ 'no-wrap': !wrapLines }">{{ shownText || 'No log output.' }}</pre>
+        <pre ref="logContainer" class="task-log" :class="{ 'no-wrap': !wrapLines }" @scroll.passive="onScroll">{{ shownText || 'No log output.' }}</pre>
         <template #footer>
             <!-- Toggles on the left -->
             <div class="d-flex align-items-center gap-3 me-auto">
@@ -33,6 +33,7 @@ import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
 import { utcClockToLocal } from '@/libs/format';
+import { droppedHeadLines, lineOffset } from './logTail';
 
 // The "[HH:mm:ss]" the Registry writes at the start of a log line, in UTC (LogRingBuffer)
 const UTC_LINE_TIME = /^\[(\d{2}:\d{2}:\d{2})\]/gm;
@@ -44,7 +45,10 @@ const UTC_LINE_TIME = /^\[(\d{2}:\d{2}:\d{2})\]/gm;
  * only renders, manages the refresh interval, and re-emits refresh/close.
  *
  * Auto-refresh: polls every 2s for active tasks only (no polling for terminal).
- * Auto-scroll: scrolls to bottom on new content when user is near the bottom.
+ * Auto-scroll: scrolls to bottom on new content when user is near the bottom; turned on, it goes to the bottom.
+ * Not following the end (Auto-scroll off, or the user scrolled up), the lines in view stay in view: the log is the
+ * last lines of the task only (logTail.js), so a refresh drops lines at its head, and the view moves up by their
+ * height instead of showing the lines that came up into its place.
  * Both default to enabled and reset on each dialog open.
  * Wrap lines: on (the default) a long line wraps; off it stays one line and the log scrolls sideways.
  * The time at the start of each line, which the Registry writes in UTC, shows in local time, as
@@ -95,8 +99,14 @@ export default {
         isActive(val) {
             if (!val) this.clearRefreshInterval();
         },
-        logText() {
-            this.handleLogTextChange();
+        autoScroll(val) {
+            if (!val) return;
+            this._wasNearBottom = true;
+            this.$nextTick(() => this.scrollToBottom());
+        },
+        // A "pre" watcher: it runs before the log shows the new text, so it can measure the lines the text dropped
+        shownText(text, oldText) {
+            this.handleLogTextChange(text, oldText);
         }
     },
 
@@ -123,19 +133,8 @@ export default {
                 this.startRefreshInterval();
             }
 
-            // Scroll to bottom on initial open, then attach scroll listener
-            this.$nextTick(() => {
-                this.scrollToBottom();
-                this.attachScrollListener();
-            });
-        },
-
-        /** Attach scroll listener to track user position relative to bottom. */
-        attachScrollListener() {
-            const el = this.$refs.logContainer;
-            if (!el) return;
-            // lifetime: element (the dialog's own log container)
-            el.addEventListener('scroll', this.onScroll, { passive: true });
+            // Scroll to bottom on initial open
+            this.$nextTick(() => this.scrollToBottom());
         },
 
         /** Update _wasNearBottom on user scroll. */
@@ -173,14 +172,45 @@ export default {
             el.scrollTop = el.scrollHeight;
         },
 
-        handleLogTextChange() {
-            if (!this.autoScroll) return;
+        handleLogTextChange(text, oldText) {
+            if (this.autoScroll && this._wasNearBottom) {
+                this.$nextTick(() => this.scrollToBottom());
+                return;
+            }
 
+            // Not following the end: the lines in view keep their place on the screen
+            const shift = this.droppedHeight(oldText, text);
+            if (!shift) return;
+            const el = this.$refs.logContainer;
+            const top = el.scrollTop;
             this.$nextTick(() => {
-                if (this._wasNearBottom) {
-                    this.scrollToBottom();
-                }
+                el.scrollTop = Math.max(0, top - shift);
             });
+        },
+
+        /**
+         * The height of the lines at the head of the shown log that the new text no longer has, measured in the log
+         * that still shows the old text (wrapped lines included). 0 when none was dropped or it cannot be measured.
+         */
+        droppedHeight(oldText, text) {
+            if (!oldText || !text) return 0;
+            const oldLines = oldText.split('\n');
+            const dropped = droppedHeadLines(oldLines, text.split('\n'));
+            if (!dropped) return 0;
+            const first = this.charTop(0);
+            const kept = this.charTop(lineOffset(oldLines, dropped));
+            return first === null || kept === null ? 0 : kept - first;
+        },
+
+        /** The top, on the screen, of the character at `offset` of the shown log; null when it cannot be measured. */
+        charTop(offset) {
+            const node = this.$refs.logContainer?.firstChild;
+            if (!node || node.nodeType !== Node.TEXT_NODE || offset >= node.length) return null;
+            const range = document.createRange();
+            range.setStart(node, offset);
+            range.setEnd(node, offset + 1);
+            const rect = range.getClientRects?.()[0];
+            return rect ? rect.top : null;
         }
     }
 };

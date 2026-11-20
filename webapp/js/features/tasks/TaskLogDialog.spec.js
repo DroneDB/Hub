@@ -66,3 +66,97 @@ describe('TaskLogDialog window (FR-PRC-44)', () => {
         expect(log.classList.contains('no-wrap')).toBe(false);
     });
 });
+
+/**
+ * The log is the last lines of a task (the Registry keeps a ring of them): once full, a refresh drops lines at its
+ * head as it adds lines at its end, and the text keeps its length. jsdom has no layout: each line is LINE px high,
+ * and the log VIEW px.
+ */
+describe('TaskLogDialog auto-scroll', () => {
+    const LINE = 20;
+    const VIEW = 200;
+    const lines = (from, to) => Array.from({ length: to - from }, (_, i) => `line ${from + i}`).join('\n');
+
+    function stubLayout(log) {
+        let top = 0;
+        Object.defineProperty(log, 'scrollTop', { configurable: true, get: () => top, set: v => { top = Math.max(0, Math.min(v, log.scrollHeight - VIEW)); } });
+        Object.defineProperty(log, 'scrollHeight', { configurable: true, get: () => log.textContent.split('\n').length * LINE });
+        Object.defineProperty(log, 'clientHeight', { configurable: true, get: () => VIEW });
+    }
+
+    async function open(logText) {
+        // The top of a character: the line it is on (the text before it, its "\n"s)
+        vi.spyOn(Range.prototype, 'getClientRects').mockImplementation(function () {
+            const before = this.startContainer.textContent.slice(0, this.startOffset);
+            return [{ top: before.split('\n').length * LINE - LINE }];
+        });
+        wrapper = mount(TaskLogDialog, {
+            props: { visible: true, title: 'Build', logText, isActive: true },
+            attachTo: document.body,
+            global: { plugins: [PrimeVue] }
+        });
+        await flushPromises();
+        const log = document.querySelector('.task-log');
+        stubLayout(log);
+        return log;
+    }
+
+    async function scrollTo(log, top) {
+        log.scrollTop = top;
+        log.dispatchEvent(new Event('scroll'));
+        await flushPromises();
+    }
+
+    function toggle(name) {
+        const label = [...document.querySelectorAll('label')].find(l => l.textContent === name);
+        document.getElementById(label.getAttribute('for')).click();
+        return flushPromises();
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('follows the end of a full log', async () => {
+        const log = await open(lines(0, 100));
+        await scrollTo(log, log.scrollHeight);
+        await wrapper.setProps({ logText: lines(10, 110) });
+        await flushPromises();
+        expect(log.scrollTop).toBe(100 * LINE - VIEW);
+    });
+
+    it('keeps the lines in view when Auto-scroll is off, though the full log drops lines', async () => {
+        const log = await open(lines(0, 100));
+        await scrollTo(log, log.scrollHeight);
+        await toggle('Auto-scroll');
+        const top = log.scrollTop; // line 90 at the top
+        await wrapper.setProps({ logText: lines(10, 110) });
+        await flushPromises();
+        expect(log.scrollTop).toBe(top - 10 * LINE); // line 90 still at the top
+    });
+
+    it('keeps the lines in view when the user scrolled up', async () => {
+        const log = await open(lines(0, 100));
+        await scrollTo(log, 40 * LINE);
+        await wrapper.setProps({ logText: lines(5, 105) });
+        await flushPromises();
+        expect(log.scrollTop).toBe(35 * LINE);
+    });
+
+    it('does not move a log that only grows when it does not follow', async () => {
+        const log = await open(lines(0, 50));
+        await scrollTo(log, 10 * LINE);
+        await wrapper.setProps({ logText: lines(0, 60) });
+        await flushPromises();
+        expect(log.scrollTop).toBe(10 * LINE);
+    });
+
+    it('goes to the end when Auto-scroll is turned on, and follows it again', async () => {
+        const log = await open(lines(0, 100));
+        await toggle('Auto-scroll');
+        await scrollTo(log, 0);
+        await toggle('Auto-scroll');
+        expect(log.scrollTop).toBe(100 * LINE - VIEW);
+        await wrapper.setProps({ logText: lines(0, 120) });
+        await flushPromises();
+        expect(log.scrollTop).toBe(120 * LINE - VIEW);
+    });
+});
