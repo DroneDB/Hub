@@ -73,9 +73,6 @@
                             {{ counts.error === 1 ? 'The failed file was refused' : 'The failed files were refused' }}:
                             sending {{ counts.error === 1 ? 'it' : 'them' }} again would fail the same way. The reason is on each file.
                         </p>
-                        <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
-                            <i class="fa-solid fa-stethoscope" /> Uploads slower than expected? Test the connection
-                        </router-link>
                     </div>
 
                     <div class="upload-actions">
