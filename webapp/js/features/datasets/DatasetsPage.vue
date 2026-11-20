@@ -170,7 +170,7 @@
                         <VisibilityTag :visibility="slotProps.data.visibility" />
                     </template>
                 </Column>
-                <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center; white-space: nowrap' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 9.5rem;">
+                <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center; white-space: nowrap' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7rem;">
                     <template #body="slotProps">
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
                                 severity="secondary" outlined size="small" :loading="slotProps.data.editing"
@@ -181,15 +181,13 @@
                                 severity="danger" text size="small" :loading="slotProps.data.deleting"
                                 :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
                                 class="ms-1" aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
-                        <Button severity="secondary" text size="small" icon="fa-solid fa-ellipsis-vertical" class="ms-1 ds-row-menu"
-                                aria-haspopup="menu" :aria-expanded="rowMenuOpen && contextMenuDataset === slotProps.data ? 'true' : 'false'"
-                                :aria-label="`Actions for ${slotProps.data.name || slotProps.data.slug}`"
-                                @click.stop="openRowMenu($event, slotProps.data)" />
                     </template>
                 </Column>
             </DataTable>
 
-            <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" @show="rowMenuOpen = true" @hide="onRowMenuHide" />
+            <!-- The row menu of the right click and of Shift+F10 / the Menu key on the name. No button opens it: its items
+                 are the name link and the buttons of the Actions column -->
+            <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" @hide="onRowMenuHide" />
 
             <!-- Pagination; while the first page loads the bar is there, hidden, so that the page size counts it -->
             <div v-if="view === 'list' && (loading || totalPages > 0)" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2"
@@ -279,7 +277,7 @@ import { columnFrom } from '@/libs/responsiveColumns';
 import { hasOpenOverlay } from '@/composables/useOverlay';
 
 // The width each secondary column appears from, shared by the table and its loading skeleton.
-// Every column with the actions takes about 790 px, more than a 768 px screen holds: the creation
+// Every column with the actions takes about 750 px, more than a 768 px screen holds inside the padding of the page: the creation
 // date, the widest, waits for 992 px so the actions stay on screen, and the date of the last
 // change, as wide, for 1200 px.
 const COLUMNS_FROM = Object.freeze({ creationDate: 'lg', lastModified: 'xl', entries: 'md', size: 'sm', visibility: 'sm' });
@@ -366,8 +364,6 @@ export default {
             membersDialogOpen: false,
 
             contextMenuDataset: null,
-            // The row menu is shown (the kebab's aria-expanded)
-            rowMenuOpen: false,
 
             orgName: "",
             orgInfo: null,
@@ -858,7 +854,7 @@ export default {
         },
 
         /**
-         * The row menu under an element (the kebab, the name): the focus comes back to it when
+         * The row menu under an element (the name): the focus comes back to it when
          * the menu closes without opening anything.
          * @param {Event} event
          * @param {object} ds
@@ -891,7 +887,6 @@ export default {
         // A menu closed with Escape (or a click elsewhere) gives the focus back to its opener,
         // unless one of its items opened a dialog, which has the focus now
         onRowMenuHide() {
-            this.rowMenuOpen = false;
             const opener = this._rowMenuOpener;
             this._rowMenuOpener = null;
             const active = document.activeElement;
@@ -1318,6 +1313,7 @@ export default {
         height: 2rem;
     }
 
+    /* No underline, also on hover (the hover rule of app.scss is :where(), so this one wins) */
     .ds-name {
         font-weight: bold;
         color: inherit;
@@ -1334,10 +1330,6 @@ export default {
         display: inline-flex;
         align-items: baseline;
         gap: var(--ddb-spacing-xs);
-    }
-
-    .ds-name:hover {
-        text-decoration: underline;
     }
 
     .ds-tagline {

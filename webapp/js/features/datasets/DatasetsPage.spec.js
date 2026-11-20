@@ -722,7 +722,7 @@ describe('DatasetsPage keyboard (ORG-01)', () => {
         _resetPrefListenersForTests();
     });
 
-    async function render() {
+    async function render(permissions = { canRead: true, canWrite: true }) {
         const { createRouter, createMemoryHistory } = await import('vue-router');
         const router = createRouter({
             history: createMemoryHistory(),
@@ -734,7 +734,7 @@ describe('DatasetsPage keyboard (ORG-01)', () => {
         await router.push('/r/org');
         reg.Organization = vi.fn(() => ({
             info: () => Promise.resolve({ name: 'Org', slug: 'org', permissions: { canRead: true, canWrite: true } }),
-            datasetsPage: () => Promise.resolve({ items: [serverDataset({ slug: 'site', permissions: { canRead: true, canWrite: true } })], total: 1 }),
+            datasetsPage: () => Promise.resolve({ items: [serverDataset({ slug: 'site', permissions })], total: 1 }),
             datasets: () => Promise.resolve([])
         }));
         wrapper = mount(DatasetsPage, {
@@ -774,17 +774,12 @@ describe('DatasetsPage keyboard (ORG-01)', () => {
         expect(router.currentRoute.value.name).toBe('ViewDataset');
     });
 
-    it('has a row menu button in the Actions column, which opens the row menu', async () => {
-        await render();
-        const kebab = wrapper.find('button.ds-row-menu');
-        expect(kebab.attributes('aria-haspopup')).toBe('menu');
-        expect(kebab.attributes('aria-expanded')).toBe('false');
-        await kebab.trigger('click');
-        await settle();
-        expect(menu()).not.toBeNull();
-        expect(menu().textContent).toContain('Open');
-        expect(wrapper.vm.contextMenuDataset.slug).toBe('site');
-        expect(wrapper.find('button.ds-row-menu').attributes('aria-expanded')).toBe('true');
+    it('offers each row action once in the Actions column: Edit and Delete, with no menu button that repeats them', async () => {
+        await render({ canRead: true, canWrite: true, canDelete: true });
+        const cells = wrapper.findAll('tbody tr td');
+        const actions = cells[cells.length - 1].findAll('button');
+        expect(actions.map(b => b.attributes('aria-label'))).toEqual(['Edit dataset', 'Delete dataset']);
+        expect(wrapper.find('button[aria-haspopup="menu"]').exists()).toBe(false);
     });
 
     it('opens the row menu with Shift+F10 or the Menu key on the name', async () => {
