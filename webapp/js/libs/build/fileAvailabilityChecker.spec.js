@@ -270,6 +270,16 @@ describe('buildable file: the artifacts decide, the job explains', () => {
         expect(result.message).toContain('Upload the missing file to this dataset and processing starts by itself.');
     });
 
+    // The server defers the build of a file that waits for files again: its build starts when the files arrive
+    it('offers no retry for a build that waits for files, and one for a build on hold for another reason', async () => {
+        const waiting = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'], buildAwaitingFiles: true }));
+        expect(await checker.check(waiting, raster(), 'map')).toMatchObject({ status: 'blocked', awaitingFiles: true, actions: ['close'] });
+
+        const held = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: [], buildAwaitingFiles: false }));
+        expect(await checker.check(held, raster(), 'map'))
+            .toMatchObject({ status: 'blocked', awaitingFiles: false, actions: ['cancel', 'retry-build'] });
+    });
+
     it('says a build on hold without missing files will be retried automatically', async () => {
         const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: [], buildAwaitingFiles: false }));
         const result = await checker.check(dataset, raster(), 'map');

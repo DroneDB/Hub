@@ -5,7 +5,7 @@ import { isCadDrawing } from '@/libs/cadCrs';
 import { isDroneDB, isGeoraster, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { hasThumbnail, isBuildableType } from '@/libs/entryTypeCapabilities';
 import { canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
+import { canBuildFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -104,10 +104,7 @@ function buildItem(ctx) {
         icon: 'fa-solid fa-gear',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return ctx.canWrite &&
-                sel.length === 1 &&
-                isBuildableFile(ctx.dataset, sel[0]) &&
-                !hasActiveBuild(ctx.dataset, sel[0]);
+            return ctx.canWrite && sel.length === 1 && canBuildFile(ctx.dataset, sel[0]);
         },
         click: async () => {
             const sel = ctx.getSelectedEntries();

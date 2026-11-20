@@ -76,7 +76,7 @@
                 <div class="action-buttons">
                     <Button severity="secondary" :icon="openAction.icon" :label="openAction.label" @click="handleOpen" />
                     <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
-                    <Button v-if="isBuildableFile && !hasActiveBuild" severity="secondary"
+                    <Button v-if="canBuild" severity="secondary"
                             icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
                     <Button v-if="isGeoraster" severity="secondary" icon="fa-solid fa-table-columns" label="Compare to..."
                             title="Compare this georaster with others of the dataset" @click="handleCompareTo" />
@@ -112,7 +112,7 @@ import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { isGeoraster as isGeorasterEntry } from '@/libs/entryTypes';
 import { openPresentation, resolveAction } from '@/libs/dataset/explorerActions';
 import { describeSelection } from '@/libs/dataset/selection';
-import { isFileBuilt } from '@/libs/build/buildHelpers';
+import { canBuildFile, isFileBuilt } from '@/libs/build/buildHelpers';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
 import ddb from 'ddb';
@@ -212,9 +212,11 @@ export default {
             if (!this.file || !this.dataset) return false;
             return isBuildableType(this.file.entry.type);
         },
-        hasActiveBuild() {
+        // Build is offered for a buildable file that is not being built and does not wait for files (the notice says
+        // which to upload: its build starts by itself then)
+        canBuild() {
             if (!this.file || !this.dataset) return false;
-            return BuildManager.hasActiveBuild(this.dataset, this.file.entry.path);
+            return canBuildFile(this.dataset, this.file);
         },
         // Effective badge status: the job gives progress and failure, the entry says whether the
         // build exists. "ready" (built) is the default and never produces a badge - only

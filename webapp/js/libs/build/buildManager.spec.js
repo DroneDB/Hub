@@ -136,6 +136,34 @@ describe('the build state of a file follows the task list', async () => {
         expect(events.map(e => e.newState)).toEqual(['Processing', 'Succeeded']);
     });
 
+    // The server defers the build of a file that waits for files again, and only adds a task for it
+    it('starts no build of a file that waits for files, forced or not, and says what it waits for', async () => {
+        const { ds, state } = setup([succeeded]);
+        ds.listOne.mockResolvedValue({
+            path: PATH, type: T.MODEL, buildStatus: 'pending', buildMissingDependencies: ['odm_texturing/model.mtl'], buildAwaitingFiles: true
+        });
+        const errors = [];
+        manager.on('buildError', e => errors.push(e.error));
+
+        for (const force of [false, true]) {
+            await expect(manager.startBuild(ds, PATH, force)).rejects.toThrow(
+                'Waiting for files: odm_texturing/model.mtl. Upload the missing file to this dataset and processing starts by itself.');
+        }
+
+        expect(ds.build).not.toHaveBeenCalled();
+        expect(errors).toHaveLength(2);
+        expect(state()).toBe('Succeeded');
+    });
+
+    it('starts the build of a file on hold for another reason (the server retries it; the user may too)', async () => {
+        const { ds } = setup([succeeded]);
+        ds.listOne.mockResolvedValue({ path: PATH, type: T.MODEL, buildStatus: 'pending', buildMissingDependencies: [], buildAwaitingFiles: false });
+
+        await manager.startBuild(ds, PATH, true);
+
+        expect(ds.build).toHaveBeenCalledWith(PATH, true);
+    });
+
     describe('a background rebuild (the rebuilds queue serves them one at a time)', () => {
         const rebuild = (state, createdAt = '2026-10-27T00:00:00Z') => ({ ...task('9001', state, createdAt), background: true });
 

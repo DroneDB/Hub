@@ -116,6 +116,17 @@ describe('useViewerBuild', () => {
         scope.stop();
     });
 
+    // The server defers the build of a file that waits for files again: its build starts when the files arrive
+    it('offers no build of a file that waits for files, and one of a file on hold for another reason', () => {
+        const { wait, scope } = setup();
+        wait.setAvailability(availability('blocked', { title: 'Waiting for Files', message: 'Waiting for files: OfficePlan.mtl.', awaitingFiles: true }));
+        expect(wait.notice.value).toMatchObject({ status: 'blocked', canBuild: false });
+
+        wait.setAvailability(availability('blocked', { title: 'Processing On Hold', message: 'Processing is on hold.', awaitingFiles: false }));
+        expect(wait.notice.value).toMatchObject({ status: 'blocked', canBuild: true });
+        scope.stop();
+    });
+
     it('shows Building… with how far it is, and no button, while the build runs', () => {
         const { wait, scope } = setup();
         wait.setAvailability(availability('building'));

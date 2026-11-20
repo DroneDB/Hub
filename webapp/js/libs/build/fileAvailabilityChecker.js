@@ -57,6 +57,7 @@ const VIEW_ARTIFACT_ROLES = {
  * @property {string} title - Message title
  * @property {Object|null} buildState - Build state if available
  * @property {Array<string>} actions - Available actions for the user
+ * @property {boolean} [awaitingFiles] - 'blocked' because the build waits for files the dataset lacks: no build is offered
  * @property {string} [hint] - What the administrator of the server does about it ('unsupported'), shown in the details
  * @property {string} [output] - The output the build could not generate ('not-generated'), as libddb names it
  * @property {string} [reason] - Why, in the words of the tool that failed ('not-generated'; '' when libddb does not say)
@@ -180,7 +181,9 @@ class FileAvailabilityChecker {
                     message: `The file '${this.getFileName(entry.path)}' cannot be opened yet.\n\n${pending.text}`,
                     title: pending.title,
                     buildState: null,
-                    actions: ['cancel', 'retry-build']
+                    // A build that waits for files starts by itself when they arrive: one started now builds nothing
+                    awaitingFiles: pending.awaitingFiles,
+                    actions: pending.awaitingFiles ? ['close'] : ['cancel', 'retry-build']
                 };
             }
 

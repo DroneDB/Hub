@@ -3,7 +3,7 @@
  * them (no timer retries it); one on hold for another reason says it is retried automatically.
  */
 import { describe, it, expect } from 'vitest';
-import { describePendingBuild, describeEntryPendingBuild } from './pendingBuild';
+import { describePendingBuild, describeEntryPendingBuild, entryAwaitsFiles } from './pendingBuild';
 
 describe('describePendingBuild', () => {
     it('names the missing files and says that uploading them starts the build', () => {
@@ -36,6 +36,23 @@ describe('describePendingBuild', () => {
         const waiting = describePendingBuild([], true);
         expect(waiting).toMatchObject({ awaitingFiles: true, label: 'Waiting for files' });
         expect(waiting.text).toBe('Waiting for files. Upload the missing files to this dataset and processing starts by itself.');
+    });
+});
+
+describe('entryAwaitsFiles', () => {
+    it('is true only for a pending build the server says waits for files', () => {
+        expect(entryAwaitsFiles({ buildStatus: 'pending', buildMissingDependencies: ['a.mtl'], buildAwaitingFiles: true })).toBe(true);
+        expect(entryAwaitsFiles({ buildStatus: 'pending', buildAwaitingFiles: true })).toBe(true);
+    });
+
+    it('is false for a build on hold for another reason, whatever names it lists, and for every other state', () => {
+        expect(entryAwaitsFiles({ buildStatus: 'pending', buildMissingDependencies: ['a.mtl'], buildAwaitingFiles: false })).toBe(false);
+        expect(entryAwaitsFiles({ buildStatus: 'pending', buildMissingDependencies: ['a.mtl'] })).toBe(false);
+        for (const buildStatus of ['queued', 'building', 'failed', undefined]) {
+            expect(entryAwaitsFiles({ buildStatus, buildAwaitingFiles: true })).toBe(false);
+        }
+        expect(entryAwaitsFiles(null)).toBe(false);
+        expect(entryAwaitsFiles(undefined)).toBe(false);
     });
 });
 

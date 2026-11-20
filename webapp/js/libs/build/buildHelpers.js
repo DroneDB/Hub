@@ -1,5 +1,5 @@
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
-import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
+import { describeEntryPendingBuild, entryAwaitsFiles } from '@/libs/build/pendingBuild';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isBuilt, currentEntry, shownBuildStatus } from '@/libs/build/entryBuild';
 
@@ -11,6 +11,14 @@ function isBuildableFile(dataset, file) {
 function hasActiveBuild(dataset, file) {
     if (!dataset) return false;
     return BuildManager.hasActiveBuild(dataset, file.entry.path);
+}
+
+/**
+ * Whether a build of the file can be offered: it is buildable, no build of it runs, and it does not wait for files
+ * the dataset lacks (its build starts by itself when they are added; one started before then builds nothing).
+ */
+function canBuildFile(dataset, file) {
+    return isBuildableFile(dataset, file) && !hasActiveBuild(dataset, file) && !entryAwaitsFiles(file.entry);
 }
 
 function isBuildLoading(dataset, file) {
@@ -93,6 +101,7 @@ async function isFileBuilt(dataset, file) {
 export {
     isBuildableFile,
     hasActiveBuild,
+    canBuildFile,
     isBuildLoading,
     getBuildBadge,
     getBuildBadgeTooltip,

@@ -3,6 +3,7 @@
  * progress and failures only.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import ddb from 'ddb';
 
 const buildManager = vi.hoisted(() => ({ getBuildState: vi.fn(), hasActiveBuild: vi.fn() }));
 vi.mock('@/libs/build/buildManager', () => ({
@@ -10,7 +11,7 @@ vi.mock('@/libs/build/buildManager', () => ({
     BUILD_STATES: { AWAITING: 'Awaiting', CREATED: 'Created', ENQUEUED: 'Enqueued', FAILED: 'Failed', PROCESSING: 'Processing', SCHEDULED: 'Scheduled', SUCCEEDED: 'Succeeded' }
 }));
 
-const { getBuildBadge, getBuildBadgeTooltip, isBuildComplete, isFileBuilt } = await import('./buildHelpers');
+const { canBuildFile, getBuildBadge, getBuildBadgeTooltip, isBuildComplete, isFileBuilt } = await import('./buildHelpers');
 
 const COG = { role: 'raster.cog', url: '/orgs/o/ds/d/build/h/cog/cog.tif' };
 const file = entry => ({ entry: { path: 'ortho.tif', hash: 'h', ...entry } });
@@ -49,6 +50,30 @@ describe('build badge', () => {
             .toBe('Waiting for files: model.mtl, wall.png. Upload the missing files to this dataset and processing starts by itself.');
         expect(getBuildBadgeTooltip({}, file({ buildStatus: 'pending', buildMissingDependencies: [], buildAwaitingFiles: false })))
             .toBe('Processing is on hold and will be retried automatically.');
+    });
+});
+
+describe('canBuildFile (the Build button and menu item)', () => {
+    const model = entry => file({ path: 'site/model.obj', type: ddb.entry.type.MODEL, ...entry });
+
+    it('offers a build of a buildable file, built or not, failed or on hold for a retry', () => {
+        for (const entry of [{}, { artifacts: [COG] }, { buildStatus: 'queued' }, { buildStatus: 'failed' },
+            { buildStatus: 'pending', buildMissingDependencies: [], buildAwaitingFiles: false }]) {
+            expect(canBuildFile({}, model(entry))).toBe(true);
+        }
+    });
+
+    it('offers none while the file waits for files: its build starts by itself when they are added', () => {
+        expect(canBuildFile({}, model({ buildStatus: 'pending', buildMissingDependencies: ['site/model.mtl'], buildAwaitingFiles: true })))
+            .toBe(false);
+    });
+
+    it('offers none while a build of the file runs, for a file that is not buildable, or without a dataset', () => {
+        buildManager.hasActiveBuild.mockReturnValue(true);
+        expect(canBuildFile({}, model({}))).toBe(false);
+        buildManager.hasActiveBuild.mockReturnValue(false);
+        expect(canBuildFile({}, file({ path: 'a.jpg', type: ddb.entry.type.IMAGE }))).toBe(false);
+        expect(canBuildFile(null, model({}))).toBe(false);
     });
 });
 

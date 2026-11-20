@@ -13,6 +13,7 @@ import { shallowReactive } from 'vue';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { datasetKey, isActiveState, isWaitingBackgroundTask, latestTaskByPath } from '@/libs/tasks/taskStates';
 import { isBuilt } from '@/libs/build/entryBuild';
+import { describeEntryPendingBuild, entryAwaitsFiles } from '@/libs/build/pendingBuild';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
 // Build job states according to Hangfire / JobIndex states (progress and failures, not availability)
@@ -192,6 +193,10 @@ class BuildManager {
             }
             if (this.hasActiveBuild(dataset, filePath) && !force) {
                 throw new Error(`Build already in progress for ${filePath}`);
+            }
+            // The server defers the build again and only adds a task: the build starts by itself when the files arrive
+            if (entryAwaitsFiles(entry)) {
+                throw new Error(describeEntryPendingBuild(entry).text);
             }
             await dataset.build(filePath, force);
 

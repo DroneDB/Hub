@@ -13,7 +13,7 @@ vi.mock('@/libs/build/buildManager', () => ({
     BUILD_STATES: {}
 }));
 vi.mock('@/libs/build/buildHelpers', () => ({
-    isBuildableFile: () => false, hasActiveBuild: () => false, isFileBuilt: vi.fn(), buildFile: vi.fn(), isBuildComplete: () => false,
+    isBuildableFile: () => false, hasActiveBuild: () => false, canBuildFile: () => false, isFileBuilt: vi.fn(), buildFile: vi.fn(), isBuildComplete: () => false,
     isBuildLoading: () => false, getBuildBadge: () => null, getBuildBadgeTooltip: () => ''
 }));
 

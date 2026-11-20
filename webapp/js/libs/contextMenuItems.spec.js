@@ -10,8 +10,9 @@ import { buildStandardContextMenu } from './contextMenuItems';
 vi.mock('@/libs/build/buildManager', () => ({ default: { getBuildState: () => null }, BUILD_STATES: {} }));
 vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {} }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { isLoggedIn: () => true, features: { get: () => false, value: () => null } } }));
+const canBuildFile = vi.hoisted(() => vi.fn(() => false));
 vi.mock('@/libs/build/buildHelpers', () => ({
-    isBuildableFile: () => false, hasActiveBuild: () => false, buildFile: vi.fn(), isFileBuilt: vi.fn(), isBuildComplete: () => false
+    isBuildableFile: () => false, hasActiveBuild: () => false, canBuildFile, buildFile: vi.fn(), isFileBuilt: vi.fn(), isBuildComplete: () => false
 }));
 
 const raster = path => ({ path: `ddb://h/org/ds/${path}`, entry: { path, type: ddb.entry.type.GEORASTER } });
@@ -51,6 +52,17 @@ describe('the context menu of a dataset the user can only read', () => {
 
 describe('the context menu of a dataset the user can write', () => {
     beforeEach(() => setActivePinia(createPinia()));
+
+    // canBuildFile says no for a file that is being built, that is not buildable, or that waits for files
+    it('offers Build for one file a build can be offered for, to a writer only', () => {
+        canBuildFile.mockReturnValue(true);
+        expect(visible(menu(true).byLabel('Build'))).toBe(true);
+        expect(canBuildFile).toHaveBeenLastCalledWith(null, selection[0]);
+        expect(visible(menu(false).byLabel('Build'))).toBe(false);
+
+        canBuildFile.mockReturnValue(false);
+        expect(visible(menu(true).byLabel('Build'))).toBe(false);
+    });
 
     it('offers the transfer, which moves the files, and Cut', () => {
         const { byLabel } = menu(true);

@@ -20,7 +20,7 @@ vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {} }));
 const flags = vi.hoisted(() => new Set());
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { isLoggedIn: () => true, features: { get: name => flags.has(name), value: () => null } } }));
 vi.mock('@/libs/build/buildHelpers', () => ({
-    isBuildableFile: () => false, hasActiveBuild: () => false, buildFile: vi.fn(), isFileBuilt: vi.fn(), isBuildComplete: () => false
+    isBuildableFile: () => false, hasActiveBuild: () => false, canBuildFile: () => false, buildFile: vi.fn(), isFileBuilt: vi.fn(), isBuildComplete: () => false
 }));
 
 const T = ddb.entry.type;

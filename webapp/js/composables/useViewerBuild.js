@@ -148,7 +148,9 @@ export function useViewerBuild({ dataset, path, canWrite = false, reload, altern
             title: status === 'building' && percent != null ? `${title} ${formatNumber(percent, 0)} %` : title,
             text,
             percent,
-            canBuild: writer && status !== 'building' && status !== 'not-generated',
+            // A build that waits for files starts by itself when they arrive: one started now builds nothing
+            canBuild: writer && status !== 'building' && status !== 'not-generated' &&
+                /** @type {any} */ (result).awaitingFiles !== true,
             actionLabel: never ? 'Build' : 'Rebuild',
             error: startError.value,
             link: status === 'not-generated' ? alternative() : null

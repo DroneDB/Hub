@@ -59,6 +59,17 @@ export function describePendingBuild(missingDependencies, awaitingFiles) {
 }
 
 /**
+ * Whether the build of an entry waits for files the dataset lacks. A build started now builds nothing (the server
+ * defers it again) and adds a task: it starts by itself when a file of one of those names is added, so no view offers
+ * to build such an entry.
+ * @param {{ buildStatus?: string, buildAwaitingFiles?: boolean } | null | undefined} entry
+ * @returns {boolean}
+ */
+export function entryAwaitsFiles(entry) {
+    return entry?.buildStatus === 'pending' && entry.buildAwaitingFiles === true;
+}
+
+/**
  * The words of the deferred build of an entry (see describePendingBuild).
  * @param {{ buildMissingDependencies?: string[], buildAwaitingFiles?: boolean } | null | undefined} entry
  * @returns {PendingBuildText}
