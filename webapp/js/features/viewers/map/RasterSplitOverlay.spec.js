@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import RasterSplitOverlay from './RasterSplitOverlay.vue';
 
@@ -137,5 +137,45 @@ describe('RasterSplitOverlay labels (FR-RAS-12)', () => {
             maxWidth: 'calc(100% - var(--map-rail-reserve) - 40%)',
             transform: 'translateX(-50%)'
         });
+    });
+});
+
+describe('RasterSplitOverlay wheel', () => {
+    let map;
+    let elementsFromPoint;
+    const mountOverMap = () => {
+        map = document.createElement('div');
+        document.body.appendChild(map);
+        wrapper = mount(RasterSplitOverlay, { props: { bands: [band('a.tif'), band('b.tif')], positions: [0.5] }, attachTo: document.body });
+        // What the browser finds at the point of the wheel: the divider, then the map under the overlay
+        elementsFromPoint = document.elementsFromPoint;
+        document.elementsFromPoint = vi.fn(() => [wrapper.find('.split-handle').element, map]);
+    };
+    afterEach(() => {
+        document.elementsFromPoint = elementsFromPoint;
+        map?.remove();
+    });
+    const wheelOnHandle = () => {
+        const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: -100, deltaMode: 1 });
+        // happy-dom's WheelEvent has no point: the one of a browser's
+        Object.defineProperties(event, { clientX: { value: 120 }, clientY: { value: 80 } });
+        wrapper.find('.split-handle').element.dispatchEvent(event);
+        return event;
+    };
+
+    it('a wheel over a divider goes on to the map under its point, with the same delta', () => {
+        mountOverMap();
+        const got = [];
+        map.addEventListener('wheel', e => got.push({ deltaY: e.deltaY, deltaMode: e.deltaMode }));
+        wheelOnHandle();
+        expect(document.elementsFromPoint).toHaveBeenCalledWith(120, 80);
+        expect(got).toEqual([{ deltaY: -100, deltaMode: 1 }]);
+    });
+
+    it('the page does not scroll when the map took the wheel, and does when nothing under the overlay did', () => {
+        mountOverMap();
+        expect(wheelOnHandle().defaultPrevented).toBe(false);
+        map.addEventListener('wheel', e => e.preventDefault());
+        expect(wheelOnHandle().defaultPrevented).toBe(true);
     });
 });

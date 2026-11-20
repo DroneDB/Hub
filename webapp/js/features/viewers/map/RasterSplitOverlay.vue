@@ -1,5 +1,6 @@
 <template>
-    <div ref="overlay" class="split-overlay">
+    <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- the wheel is passed on to the map under the overlay, not handled here -->
+    <div ref="overlay" class="split-overlay" @wheel="forwardWheel">
         <!-- Per-band top label, with the controls of its layer -->
         <div
             v-for="(band, i) in bands"
@@ -58,6 +59,7 @@
  * only) it also removes it, and a missing layer's label picks another file. A divider is a
  * separator that a pointer drags and the keyboard moves: ArrowLeft and ArrowRight by 5 % (Shift:
  * 1 %), Home and End to the end of its range; it never comes closer than 5 % to its neighbours.
+ * A mouse wheel over a divider or a band button zooms the map under it, as it does elsewhere on the map.
  */
 import { distinctLabels } from '@/libs/format';
 
@@ -159,6 +161,26 @@ export default {
             else return;
             event.preventDefault();
             this.move(index, target);
+        },
+
+        /**
+         * A wheel over a divider or a band button is the map's: the overlay is not inside the map's viewport,
+         * so the wheel is sent on to what is under the overlay at that point (the map zooms there). The page
+         * does not scroll when what is under it took the wheel.
+         * @param {WheelEvent} event
+         */
+        forwardWheel(event) {
+            const overlay = this.$refs.overlay;
+            const beneath = document.elementsFromPoint?.(event.clientX, event.clientY).find(el => !overlay.contains(el));
+            if (!beneath) return;
+            const forwarded = new WheelEvent('wheel', {
+                bubbles: true, cancelable: true, composed: true,
+                clientX: event.clientX, clientY: event.clientY, screenX: event.screenX, screenY: event.screenY,
+                deltaX: event.deltaX, deltaY: event.deltaY, deltaZ: event.deltaZ, deltaMode: event.deltaMode,
+                ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
+                buttons: event.buttons
+            });
+            if (!beneath.dispatchEvent(forwarded)) event.preventDefault();
         },
 
         startDrag(event, index) {
