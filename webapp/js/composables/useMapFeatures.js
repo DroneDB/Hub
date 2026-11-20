@@ -137,7 +137,11 @@ export function useMapFeatures(props, fileEvents = {}) {
         analysisTargetPath: analysisTarget.targetPath,
         analysisCandidates: computed(() => analysisTarget.candidates.value.map(({ path, label }) => ({ path, label }))),
         analysisEntry: analysisTarget.toolbarEntry,
-        toggleAnalysisPanel: analysisTarget.requestToggle,
+        // Split compare draws every raster opaque, which the tools cannot work with: a tool asked for there leaves it first
+        toggleAnalysisPanel: kind => {
+            if (split.splitMode.value) split.exitSplitMode();
+            return analysisTarget.requestToggle(kind);
+        },
         selectAnalysisTarget: analysisTarget.requestSwitch,
         // What a view records: the model the tools pick when none was chosen, and a saved choice put back without a question
         defaultAnalysisTarget: analysisTarget.defaultTarget,

@@ -84,12 +84,12 @@ describe('MapToolbar analysis buttons', () => {
         }
     });
 
-    it('are disabled in split compare, and the title says how to use them', () => {
+    it('can be pressed in split compare, and the title says that it turns split compare off', () => {
         mountWith({ rasterCount: 2, canCompare: true, splitMode: true });
-        expect(button('stockpile-toolbar-btn').disabled).toBe(true);
-        expect(button('stockpile-toolbar-btn').title).toBe('Stockpile Volume - Turn off split compare to use this tool');
-        expect(button('raster-analysis-toolbar-btn').disabled).toBe(true);
-        expect(button('raster-analysis-toolbar-btn').title).toMatch(/Turn off split compare/);
+        expect(button('stockpile-toolbar-btn').disabled).toBe(false);
+        expect(button('stockpile-toolbar-btn').title).toBe('Stockpile Volume (turns off split compare)');
+        expect(button('raster-analysis-toolbar-btn').disabled).toBe(false);
+        expect(button('raster-analysis-toolbar-btn').title).toBe('Raster Analysis (turns off split compare)');
     });
 
     // FR-MAP-24: the pile is a heap, not the stack of layers, the split of Compare or the hills Raster Analysis had too

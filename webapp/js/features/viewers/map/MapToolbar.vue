@@ -17,11 +17,11 @@
                 <i :class="COPY_LINK_ICON" />
             </button>
             <template v-if="analysisEntry">
-                <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis" :disabled="splitMode"
+                <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis"
                         data-testid="raster-analysis-toolbar-btn" @click="emit('analysis', 'rasterAnalysis')">
                     <i :class="RASTER_ANALYSIS_ICON" />
                 </button>
-                <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume" :disabled="splitMode"
+                <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume"
                         data-testid="stockpile-toolbar-btn" @click="emit('analysis', 'stockpile')">
                     <i :class="STOCKPILE_ICON" />
                 </button>
@@ -103,6 +103,6 @@ const mapSize = inject('mapSize', { narrow: false });
 // it splits the georasters it has, but does not pick another one to compare to.
 const showCompare = computed(() => props.splitToggle && props.rasterCount > 0 && (props.canCompare || (props.pickToCompare && !embed)));
 const compareLabel = computed(() => (props.canCompare ? 'Compare georasters side by side' : 'Compare to another georaster'));
-// Split compare draws every raster opaque, which the tools cannot work with
-const analysisTitle = name => (props.splitMode ? `${name} - Turn off split compare to use this tool` : name);
+// Split compare draws every raster opaque, which the tools cannot work with: a tool turns it off and opens
+const analysisTitle = name => (props.splitMode ? `${name} (turns off split compare)` : name);
 </script>

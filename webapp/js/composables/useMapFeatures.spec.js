@@ -282,17 +282,27 @@ describe('a target that leaves the map', () => {
 });
 
 describe('split compare', () => {
-    it('closes an open tool when it turns on, and does not let a tool open while it is on', async () => {
+    it('closes an open tool when it turns on', async () => {
         start([DSM, DTM]);
         await stockpileButton();
         features.toggleSplit();
         await nextTick();
         expect(features.splitMode.value).toBe(true);
         expect(features.stockpilePanelVisible.value).toBe(false);
-        await stockpileButton();
-        expect(features.stockpilePanelVisible.value).toBe(false);
+    });
+
+    it('is turned off by a tool asked for while it is on, and the tool opens', async () => {
+        start([DSM, DTM]);
         features.toggleSplit();
+        await nextTick();
         await stockpileButton();
+        expect(features.splitMode.value).toBe(false);
         expect(features.stockpilePanelVisible.value).toBe(true);
+
+        features.toggleSplit();
+        await nextTick();
+        await features.toggleAnalysisPanel('rasterAnalysis');
+        expect(features.splitMode.value).toBe(false);
+        expect(features.rasterPanelVisible.value).toBe(true);
     });
 });
