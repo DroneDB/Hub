@@ -2,7 +2,7 @@
     <header v-if="entry" class="dataset-header">
         <div class="title-row">
             <h1 class="dataset-title text-selectable">{{ name }}</h1>
-            <VisibilityTag rounded :visibility="visibility" />
+            <VisibilityTag rounded class="dataset-visibility" :visibility="visibility" />
         </div>
         <p v-if="tagline" class="dataset-tagline text-selectable">{{ tagline }}</p>
     </header>
@@ -39,14 +39,20 @@ const tagline = computed(() => String(meta.value.tagline?.data ?? '').trim());
     background: var(--ddb-bg-surface);
 }
 
+/* The name takes the row and breaks inside it; the visibility stays at the right edge, on the name's first line */
 .title-row {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: var(--ddb-spacing-sm);
 }
 
+.dataset-visibility {
+    flex: none;
+    margin-inline-start: auto;
+}
+
 .dataset-title {
+    flex: 1 1 auto;
     margin: 0;
     min-width: 0;
     font-size: var(--ddb-font-size-xl);
