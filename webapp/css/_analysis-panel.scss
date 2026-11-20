@@ -32,6 +32,8 @@
     --panel-thermal-strong-rgb: 255, 112, 67; // --panel-thermal-strong as a triplet
     // A value out of range, the fill under a profile
     --panel-danger-rgb: 255, 82, 82;
+    // The tint of a task that ended well
+    --panel-success-rgb: 76, 175, 80;
     // The labels of the red, green and blue channels of a band mapping
     --panel-channel-r: #ff6b6b;
     --panel-channel-g: #69db7c;
@@ -42,6 +44,15 @@
     --panel-primary-text: #fff;
     // The panels are dark in both themes: the focus ring of the dark surfaces
     --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
+    // The status of a task a tool of the panel runs (HeavyTaskStatus, drawn on the page's dialogs too): on the panel it
+    // takes the panel's text and dark tints, in both themes
+    --heavy-task-text: var(--panel-text);
+    --heavy-task-text-soft: var(--panel-text-soft);
+    --heavy-task-ink-rgb: var(--ddb-glass-rgb);
+    --heavy-task-done-bg: rgba(var(--panel-success-rgb), 0.22);
+    --heavy-task-failed-bg: rgba(var(--panel-danger-rgb), 0.22);
+    --heavy-task-running-bg: rgba(var(--ddb-primary-rgb), 0.3);
+    --heavy-task-bar: var(--ddb-primary-300);
 
     position: absolute;
     top: 0.5rem;

@@ -77,16 +77,28 @@ const canCancel = computed(() => props.cancellable && !!props.task && serverAllo
 </script>
 
 <style scoped>
+/* The box draws every colour it shows, never the text colour of what is around it, so it reads on any surface and in
+   both themes: the status tints of the theme, the text that goes on them, and PrimeVue's Cancel button and bar in the
+   same colours. A surface that is dark in both themes (a map panel, css/_analysis-panel.scss) gives the box its own
+   colours through the --heavy-task-* properties */
 .heavy-task-status {
+    /* The triplet the neutral tints are made of: dark on a light surface, light on a dark one */
+    --heavy-task-tint-rgb: var(--heavy-task-ink-rgb, var(--ddb-ink-rgb));
+    --p-button-text-secondary-color: var(--heavy-task-text-soft, var(--ddb-text-secondary));
+    --p-button-text-secondary-hover-background: rgba(var(--heavy-task-tint-rgb), 0.08);
+    --p-button-text-secondary-active-background: rgba(var(--heavy-task-tint-rgb), 0.16);
+    --p-progressbar-background: rgba(var(--heavy-task-tint-rgb), 0.15);
+    --p-progressbar-value-background: var(--heavy-task-bar, var(--ddb-primary));
     margin: 0.3rem 0;
     padding: 0.4rem 0.6rem;
     border-radius: 0.375rem;
     font-size: 0.88rem;
-    background: var(--p-surface-100);
+    background: rgba(var(--heavy-task-tint-rgb), 0.06);
+    color: var(--heavy-task-text, var(--ddb-text));
 }
-.heavy-task-done { background: var(--p-green-50); }
-.heavy-task-failed { background: var(--p-red-50); }
-.heavy-task-running { background: var(--ddb-primary-50); }
+.heavy-task-done { background: var(--heavy-task-done-bg, var(--ddb-success-bg)); }
+.heavy-task-failed { background: var(--heavy-task-failed-bg, var(--ddb-danger-bg)); }
+.heavy-task-running { background: var(--heavy-task-running-bg, var(--ddb-info-bg)); }
 
 .heavy-task-line {
     display: flex;
@@ -100,12 +112,12 @@ const canCancel = computed(() => props.cancellable && !!props.task && serverAllo
     gap: 0.6rem;
 }
 .heavy-task-label { font-weight: 600; }
-.heavy-task-text { flex: 1; color: var(--p-text-muted-color); }
+.heavy-task-text { flex: 1; color: var(--heavy-task-text-soft, var(--ddb-text-secondary)); }
 .heavy-task-percent { font-variant-numeric: tabular-nums; }
 .heavy-task-bar { height: 0.35rem; margin-top: 0.35rem; }
+/* The reason of a failure is the text of the box: the tint and the icon say it failed */
 .heavy-task-error {
     margin: 0.35rem 0 0;
-    color: var(--p-red-900);
     overflow-wrap: anywhere;
 }
 </style>

@@ -166,6 +166,8 @@ const PAIRS = [
     ['--ddb-success-text', '--ddb-bg', TEXT],
     ['--ddb-success-text', '--ddb-bg-surface', TEXT],
     ['--ddb-success-text', '--ddb-success-bg', TEXT],
+    // The status of a task (HeavyTaskStatus): its text and its softer text on the tint of each state
+    ...['--ddb-success-bg', '--ddb-danger-bg', '--ddb-info-bg'].flatMap(bg => [['--ddb-text', bg, TEXT], ['--ddb-text-secondary', bg, TEXT]]),
     // The syntax colours of the text editor, on its dialog
     ...['meta', 'keyword', 'atom', 'literal', 'string', 'escape', 'property', 'variable', 'type', 'comment']
         .map(kind => [`--ddb-code-${kind}`, '--ddb-bg-surface', TEXT])
@@ -321,6 +323,60 @@ describe('the findings drawn with the tokens', () => {
         expect(bands).toMatch(/<select [^>]*class="panel-select"/);
         expect(bands).not.toMatch(/channel-select|outline:\s*none/);
     });
+});
+
+// ---- The status of a task draws its own colours ----
+
+describe('the status of a task (HeavyTaskStatus)', () => {
+    const JS = path.resolve(__dirname, '..');
+    const CSS = path.resolve(__dirname, '../../css');
+    const source = readSource(JS, 'components/HeavyTaskStatus.vue');
+    const style = source.slice(source.indexOf('<style'));
+    const box = ruleOf(style, '.heavy-task-status');
+
+    it('names the colour of its text and of its softer text, so it never shows the text colour of its surface on its tint', () => {
+        expect(box).toMatch(/[^-]color:\s*var\(--heavy-task-text, var\(--ddb-text\)\)/);
+        expect(ruleOf(style, '.heavy-task-text')).toMatch(/color:\s*var\(--heavy-task-text-soft, var\(--ddb-text-secondary\)\)/);
+        // The tints follow the theme: a shade of PrimeVue's palette (--p-green-50) is the same in both
+        expect(ruleOf(style, '.heavy-task-done')).toMatch(/background:\s*var\(--heavy-task-done-bg, var\(--ddb-success-bg\)\)/);
+        expect(ruleOf(style, '.heavy-task-failed')).toMatch(/background:\s*var\(--heavy-task-failed-bg, var\(--ddb-danger-bg\)\)/);
+        expect(ruleOf(style, '.heavy-task-running')).toMatch(/background:\s*var\(--heavy-task-running-bg, var\(--ddb-info-bg\)\)/);
+        expect(style).not.toMatch(/var\(--p-/);
+    });
+
+    it('gives PrimeVue\'s Cancel button and bar the colours of the box', () => {
+        expect(box).toMatch(/--p-button-text-secondary-color:\s*var\(--heavy-task-text-soft, var\(--ddb-text-secondary\)\)/);
+        expect(box).toMatch(/--p-button-text-secondary-hover-background:/);
+        expect(box).toMatch(/--p-progressbar-background:/);
+        expect(box).toMatch(/--p-progressbar-value-background:\s*var\(--heavy-task-bar, var\(--ddb-primary\)\)/);
+    });
+
+    // The map panels are dark in both themes: they give the box the panel's text and dark tints
+    const panels = readSource(CSS, '_analysis-panel.scss');
+    const panel = new Map([...ruleOf(panels, '.analysis-panel').matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map(([, name, value]) => [name, value.trim()]));
+    /** A colour of the panel, its tokens and triplets resolved. @param {string} value @param {Map<string, string>} tokens @param {'light'|'dark'} scheme */
+    const panelColour = (value, tokens, scheme) => {
+        let v = value;
+        for (let i = 0; i < 8 && /var\(/.test(v); i++) v = v.replace(/var\((--[\w-]+)\)/g, (_m, name) => panel.get(name) ?? tokens.get(name));
+        return colour(v, tokens, scheme);
+    };
+
+    it.each(['--heavy-task-done-bg', '--heavy-task-failed-bg', '--heavy-task-running-bg', 'rgba(var(--heavy-task-ink-rgb), 0.06)'])(
+        'on a map panel its text passes 4.5:1 on %s, in both themes and over any map', tint => {
+            expect(panel.get('--heavy-task-text')).toBe('var(--panel-text)');
+            expect(panel.get('--heavy-task-text-soft')).toBe('var(--panel-text-soft)');
+            for (const [scheme, tokens] of THEMES) {
+                for (const map of ['#ffffff', '#000000']) {
+                    const surface = over(panelColour('var(--panel-bg)', tokens, scheme), fromHex(map));
+                    const back = over(panelColour(tint.startsWith('--') ? `var(${tint})` : tint, tokens, scheme), surface);
+                    for (const text of ['--heavy-task-text', '--heavy-task-text-soft']) {
+                        expect(ratio(panelColour(`var(${text})`, tokens, scheme), back), `${text} ${scheme} ${map}`).toBeGreaterThanOrEqual(TEXT);
+                    }
+                    // The bar on the tint
+                    expect(ratio(panelColour('var(--heavy-task-bar)', tokens, scheme), back), `bar ${scheme} ${map}`).toBeGreaterThanOrEqual(UI);
+                }
+            }
+        });
 });
 
 // ---- No colour of its own (FR-XC-21: the colours of scoped styles and viewers are tokens) ----
