@@ -602,10 +602,20 @@ export default {
     margin-bottom: 1rem;
 }
 
+/* The actions stand two to a row, each half of it. An action never gets narrower than its label on one line (but
+   for a panel narrower than the label, where the label wraps): one that does not fit beside its neighbour takes a
+   row of its own, as does the one left over by an odd number, so a narrow panel shows them in one column */
 .action-buttons {
+    --action-gap: 0.5rem;
+
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: var(--action-gap);
+}
+
+.action-buttons > * {
+    flex: 1 1 calc(50% - var(--action-gap) / 2);
+    min-width: fit-content;
 }
 
 .views-section {
