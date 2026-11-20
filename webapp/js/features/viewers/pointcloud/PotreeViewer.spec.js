@@ -1,7 +1,8 @@
 /**
- * The point-cloud viewer's tool panel (FR-VWR-26, D-027): the one MeasureToolbar with labelled measuring tools that start
- * what the icons of the Potree menu start, and the point cloud's own tools (clip volume, views, colour by) in its extra
- * slot once the cloud is loaded. Potree is a stand-in that records what it is asked.
+ * The point-cloud viewer's controls (FR-VWR-26, D-027), in two bars of one look. Top left, what the user does to the
+ * cloud: the one MeasureToolbar with labelled measuring tools that start what the icons of the Potree menu start, then
+ * the clip volume once the cloud is loaded, and undo and Save once there are measurements. Bottom left, how the cloud
+ * is shown: the views, Colour by and the unit. Potree is a stand-in that records what it is asked.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -28,19 +29,22 @@ vi.mock('ddb', () => ({
 }));
 // The error the viewer shows (its shell is a stand-in)
 const shown = vi.hoisted(() => ({ error: null }));
+// What the user may do in the dataset, and the measurements of the viewer: refs the tests change
+const access = vi.hoisted(() => ({}));
+const measurements = vi.hoisted(() => ({}));
 vi.mock('@/composables/useViewerEntry', () => ({
     useViewerEntry: () => ({
         entry: ref({ path: 'cloud.laz' }),
         dataset: ref({ Entry: e => ({ path: e.path, getCopc: () => 'https://hub.test/cloud.copc.laz' }) }),
-        canWrite: ref(true), canDelete: ref(true), loading: ref(false), error: (shown.error = ref('')), loadError: ref(null),
+        canWrite: (access.canWrite = ref(true)), canDelete: (access.canDelete = ref(true)), loading: ref(false), error: (shown.error = ref('')), loadError: ref(null),
         entryLoaded: Promise.resolve(true)
     })
 }));
 vi.mock('@/composables/usePotreeMeasurements', () => ({
-    usePotreeMeasurements: () => ({
+    usePotreeMeasurements: () => Object.assign(measurements, {
         hasMeasurements: ref(false), hasSavedMeasurements: ref(false), savingMeasurements: ref(false), deleteDialogOpen: ref(false),
-        deleteToolActive: ref(false), canUndo: ref(false), canRedo: ref(false), undo() {}, redo() {}, toggleDeleteTool() {},
-        save() {}, requestDelete() {}, onDeleteDialogClose() {}, discardMeasure() {}, attach: (_viewer, _session, coordinateSystem) => { calls.push(['attach', coordinateSystem]); }, load: async () => { calls.push(['load']); }, onGuiLoaded() {}
+        deleteToolActive: ref(false), canUndo: ref(false), canRedo: ref(false), undo: vi.fn(), redo: vi.fn(), toggleDeleteTool: vi.fn(),
+        save: vi.fn(), requestDelete: vi.fn(), onDeleteDialogClose() {}, discardMeasure() {}, attach: (_viewer, _session, coordinateSystem) => { calls.push(['attach', coordinateSystem]); }, load: async () => { calls.push(['load']); }, onGuiLoaded() {}
     })
 }));
 // The scripts of Potree load when the test lets them
@@ -116,6 +120,9 @@ const mountViewer = async () => {
     await flushPromises();
 };
 const button = id => wrapper.find(`[data-testid="${id}"]`);
+// The two bars: the tools (top left) and the display of the cloud (bottom left)
+const tools = () => wrapper.find('[role="toolbar"][aria-label="Measure"]');
+const display = () => wrapper.find('[role="toolbar"][aria-label="Display"]');
 
 beforeEach(() => { calls.length = 0; lazy.gate = null; copcWkt.value = 'PROJCS["x"]'; stubPotree(); });
 afterEach(() => {
@@ -175,20 +182,19 @@ describe('PotreeViewer tool panel', () => {
         expect(button('measure-cancel').exists()).toBe(true);
     });
 
-    it('has the clip volume, the views and Colour by in the toolbar once the cloud is loaded', async () => {
+    it('has the clip volume in the measuring toolbar once the cloud is loaded', async () => {
         await mountViewer();
-        const toolbar = wrapper.find('[role="toolbar"]');
-        expect(toolbar.find('[data-testid="clip-volume"]').text()).toBe('Clip volume');
-        expect(['top', 'front', 'left', 'right'].map(v => toolbar.find(`[data-testid="view-${v}"]`).text())).toEqual(['Top', 'Front', 'Left', 'Right']);
-        expect(toolbar.find('[data-testid="color-by"]').exists()).toBe(true);
+        expect(tools().find('[data-testid="clip-volume"]').text()).toBe('Clip volume');
+        expect(tools().find('[data-testid="clip-remove"]').exists()).toBe(true);
     });
 
-    it('does not have them while the cloud loads', async () => {
+    it('has neither the clip volume nor the display bar while the cloud loads', async () => {
         globalThis.Potree.loadPointCloud = () => {};
         wrapper = mount(PotreeViewer, { global: { stubs } });
         await flushPromises();
         expect(wrapper.find('[data-testid="measure-toolbar"]').exists()).toBe(true);
-        expect(wrapper.find('[data-testid="potree-tools"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="potree-clip-tools"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="potree-display-bar"]').exists()).toBe(false);
     });
 
     it('the Top button looks at the cloud from above', async () => {
@@ -204,6 +210,159 @@ describe('PotreeViewer tool panel', () => {
         await button('clip-volume').trigger('click');
         expect(viewer.volumeTool.startInsertion).toHaveBeenCalledWith({ clip: true });
         expect(button('measure-hint').exists()).toBe(false);
+    });
+});
+
+describe('PotreeViewer bars: what is done to the cloud at the top, how it is shown at the bottom', () => {
+    it('has two toolbars: Measure, then Display', async () => {
+        await mountViewer();
+        expect(wrapper.findAll('[role="toolbar"]').map(t => t.attributes('aria-label'))).toEqual(['Measure', 'Display']);
+        expect(tools().element.closest('.tools-top')).not.toBeNull();
+        expect(display().classes()).toContain('tools-bottom');
+    });
+
+    it('has the views, Colour by and the unit in the display bar, and none of them among the tools', async () => {
+        await mountViewer();
+        expect(['top', 'front', 'left', 'right'].map(v => display().find(`[data-testid="view-${v}"]`).text())).toEqual(['Top', 'Front', 'Left', 'Right']);
+        expect(display().find('[data-testid="color-by"]').exists()).toBe(true);
+        expect(display().find('#potree-unit-select').exists()).toBe(true);
+        for (const id of ['view-top', 'color-by', 'unit-select']) expect(tools().find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+    });
+
+    it('has no tool in the display bar: the measures, the clip volume, undo and Save are at the top', async () => {
+        await mountViewer();
+        measurements.hasMeasurements.value = true;
+        await flushPromises();
+        for (const id of ['measure-distance', 'clip-volume', 'measure-undo', 'measure-save']) {
+            expect(tools().find(`[data-testid="${id}"]`).exists(), id).toBe(true);
+            expect(display().find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+        }
+    });
+
+    it('places the two bars at the left, at one distance from the edges, clear of the right edge and of the open menu', () => {
+        const scss = readSource(__dirname, 'PotreeViewer.scss');
+        expect(scss).toMatch(/\.tools-top,\s*\.tools-bottom \{[^}]*position: absolute;\s*left: var\(--ddb-spacing-sm\);\s*max-width: calc\(100% - var\(--ddb-spacing-sm\) - var\(--tools-room-right\)\);/);
+        expect(scss).toMatch(/\.tools-top \{\s*top: var\(--ddb-spacing-sm\);/);
+        expect(scss).toMatch(/\.tools-bottom \{\s*bottom: var\(--ddb-spacing-sm\);/);
+        expect(scss).toMatch(/\.potree-container\.sidebar-open \{\s*\.tools-top,\s*\.tools-bottom \{\s*--tools-room-right: calc\(var\(--ddb-sidebar-width\) \+ 4\.5rem\);/);
+        const phone = scss.slice(scss.indexOf('@media (max-width: 767.98px)'));
+        expect(phone).toMatch(/\.potree-container\.sidebar-open \{\s*\.tools-top,\s*\.tools-bottom \{\s*visibility: hidden;/);
+    });
+
+    it('has no look of its own for a bar or a button: the bars are OverlayToolbars', () => {
+        const scss = readSource(__dirname, 'PotreeViewer.scss');
+        expect(scss).not.toMatch(/btn-undo-redo|btn-measurement|unit-selector-toolbar|measurements-toolbar|--ddb-viewer-btn-/);
+    });
+});
+
+describe('PotreeViewer undo and Save, in the measuring toolbar once there are measurements', () => {
+    const history = () => tools().find('[data-testid="measure-history"]');
+    const saved = () => tools().find('[data-testid="measure-saved"]');
+    const more = () => saved().find('[data-testid="overlay-menu-button"]');
+
+    it('has neither with nothing measured and nothing saved', async () => {
+        await mountViewer();
+        expect(history().exists()).toBe(false);
+        expect(saved().exists()).toBe(false);
+    });
+
+    it('has Undo, Redo and the delete tool as tools of the bar, after the clip volume', async () => {
+        await mountViewer();
+        measurements.hasMeasurements.value = true;
+        measurements.canUndo.value = true;
+        await flushPromises();
+        expect(history().classes()).toContain('tool-group');
+        expect(history().findAll('button').map(b => b.attributes('aria-label'))).toEqual(['Undo', 'Redo', 'Delete measurement tool']);
+        const order = tools().findAll('button').map(b => b.attributes('data-testid'));
+        expect(order.indexOf('measure-undo')).toBeGreaterThan(order.indexOf('clip-remove'));
+        expect(button('measure-undo').attributes('disabled')).toBeUndefined();
+        expect(button('measure-redo').attributes('disabled')).toBeDefined();
+        await button('measure-undo').trigger('click');
+        expect(measurements.undo).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the delete tool as on, in the danger colour, while it is', async () => {
+        await mountViewer();
+        measurements.hasMeasurements.value = true;
+        await flushPromises();
+        expect(button('measure-delete-tool').classes()).toEqual(['danger']);
+        expect(button('measure-delete-tool').attributes('aria-pressed')).toBe('false');
+        await button('measure-delete-tool').trigger('click');
+        expect(measurements.toggleDeleteTool).toHaveBeenCalledTimes(1);
+        measurements.deleteToolActive.value = true;
+        await flushPromises();
+        expect(button('measure-delete-tool').classes()).toEqual(['danger', 'active']);
+        expect(button('measure-delete-tool').attributes('aria-pressed')).toBe('true');
+    });
+
+    it('has Save as the one filled button of the bar, named Save', async () => {
+        await mountViewer();
+        measurements.hasMeasurements.value = true;
+        await flushPromises();
+        expect(button('measure-save').text()).toBe('Save');
+        expect(button('measure-save').attributes('aria-label')).toBe('Save measurements');
+        expect(tools().findAll('button.primary').map(b => b.attributes('data-testid'))).toEqual(['measure-save']);
+        await button('measure-save').trigger('click');
+        expect(measurements.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('Save is off while a save runs, and is not there for a user who cannot write', async () => {
+        await mountViewer();
+        measurements.hasMeasurements.value = true;
+        measurements.savingMeasurements.value = true;
+        await flushPromises();
+        expect(button('measure-save').attributes('disabled')).toBeDefined();
+        access.canWrite.value = false;
+        await flushPromises();
+        expect(button('measure-save').exists()).toBe(false);
+    });
+
+    it('keeps Save with nothing left in the view while a file is saved: saving then empties the file', async () => {
+        await mountViewer();
+        measurements.hasSavedMeasurements.value = true;
+        await flushPromises();
+        expect(button('measure-save').exists()).toBe(true);
+    });
+
+    it('has no button that deletes what was saved: it is in the menu beside Save, once something is saved', async () => {
+        await mountViewer();
+        measurements.hasMeasurements.value = true;
+        await flushPromises();
+        expect(more().exists()).toBe(false);
+        measurements.hasSavedMeasurements.value = true;
+        await flushPromises();
+        expect(tools().findAll('button').map(b => b.text())).not.toContain('Delete Saved');
+        await more().trigger('click');
+        await flushPromises();
+        const item = saved().find('[data-testid="overlay-menu-delete-saved"]');
+        expect(item.text()).toBe('Delete saved measurements');
+        expect(item.classes()).toContain('danger');
+        await item.trigger('click');
+        expect(measurements.requestDelete).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not offer it to a user who cannot delete in the dataset', async () => {
+        await mountViewer();
+        measurements.hasSavedMeasurements.value = true;
+        access.canDelete.value = false;
+        await flushPromises();
+        expect(button('measure-save').exists()).toBe(true);
+        expect(more().exists()).toBe(false);
+    });
+
+    it('shows Save as its icon on a phone (below sm), with its accessible name', async () => {
+        const media = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+            matches: query === '(max-width: 575.98px)', media: query, addEventListener: vi.fn(), removeEventListener: vi.fn()
+        }));
+        try {
+            await mountViewer();
+            measurements.hasMeasurements.value = true;
+            await flushPromises();
+            expect(button('measure-save').text()).toBe('');
+            expect(button('measure-save').attributes('aria-label')).toBe('Save measurements');
+        } finally {
+            media.mockRestore();
+        }
     });
 });
 

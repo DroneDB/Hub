@@ -1,6 +1,6 @@
 <template>
     <div class="measure-toolbar" :class="{ labelled: showLabels }" data-testid="measure-toolbar">
-        <div class="toolbar-buttons" role="toolbar" aria-label="Measure">
+        <OverlayToolbar label="Measure">
             <button v-for="tool in shownTools" :key="tool.kind" type="button" :class="{ active: activeKind === tool.kind }" :title="tool.title"
                     :aria-label="tool.title" :aria-pressed="activeKind === tool.kind" :data-testid="`measure-${tool.kind}`" @click="emit('measure', tool.kind)">
                 <i :class="tool.icon" />
@@ -17,11 +17,11 @@
             </button>
             <button v-if="coordinateMode" type="button" class="coordinate-mode" :title="`Coordinates are shown in ${coordinateMode}: click to change`"
                     :aria-label="`Coordinates are shown in ${coordinateMode}: click to change`" @click="emit('toggle-coordinates')">
-                {{ coordinateMode }}
+                <span class="tool-label">{{ coordinateMode }}</span>
             </button>
-            <!-- What a viewer adds to the tools: the point cloud's clip volume, views, colours -->
+            <!-- What a viewer adds to the tools: the point cloud's clip volume, its undo and Save -->
             <slot name="extra" />
-        </div>
+        </OverlayToolbar>
         <div v-if="activeKind" class="measure-hint" role="status" data-testid="measure-hint">
             <span>{{ hint }}</span>
             <button type="button" class="hint-action" data-testid="measure-done" @click="emit('finish')">Done</button>
@@ -40,11 +40,13 @@
  * setting the scale. A georeferenced scene also has a button for the coordinates of a point: in its CRS or in
  * WGS84. While a shape is drawn it says how to end it (the one hint text of libs/measureHints), with Done and
  * Cancel for a screen that has no right click, Enter or Escape. Clear is on while a shape is drawn, and
- * cancels it. A viewer puts its own tools in the `extra` slot, after the measuring ones. With `labelled` the tools
- * show their name beside the icon (a button keeps its aria-label either way); below sm (useStackedLayout, a phone)
- * they are icons again, so the toolbar does not cover the view.
+ * cancels it. A viewer puts its own tools in the `extra` slot, after the measuring ones: the bar is an
+ * OverlayToolbar, which says what such a tool looks like. With `labelled` the tools show their name beside the
+ * icon (a button keeps its aria-label either way); below sm (useStackedLayout, a phone) they are icons again, so
+ * the toolbar does not cover the view.
  */
 import { computed } from 'vue';
+import OverlayToolbar from '@/components/OverlayToolbar.vue';
 import { drawingHint } from '@/libs/measureHints';
 import { useStackedLayout } from '@/composables/useStackedLayout';
 
@@ -107,43 +109,10 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
     pointer-events: none;
 }
 
-.toolbar-buttons,
 .measure-hint {
+    @include overlay-surface;
+
     pointer-events: auto;
-    background: var(--ddb-overlay-bg);
-    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25);
-    border-radius: var(--ddb-border-radius, 4px);
-    color: var(--ddb-text-on-dark);
-}
-
-.toolbar-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    padding: 0.25rem;
-}
-
-.toolbar-buttons :deep(button) {
-    @include toolbar-button;
-}
-
-// Tools with their name: as wide as the name, with the icon before it
-.labelled .toolbar-buttons :deep(button) {
-    width: auto;
-    padding: 0 0.6rem;
-    gap: 0.4rem;
-    white-space: nowrap;
-    font-size: var(--ddb-font-size-sm, 0.8rem);
-}
-
-.toolbar-buttons .coordinate-mode {
-    width: auto;
-    padding: 0 0.5rem;
-    font-size: var(--ddb-font-size-sm, 0.8rem);
-    white-space: nowrap;
-}
-
-.measure-hint {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
@@ -154,15 +123,6 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 }
 
 .hint-action {
-    border: 1px solid rgba(var(--ddb-glass-rgb), 0.35);
-    border-radius: var(--ddb-border-radius, 4px);
-    background: transparent;
-    color: inherit;
-    padding: 0.1rem 0.5rem;
-    cursor: pointer;
-}
-
-.hint-action:hover {
-    background: rgba(var(--ddb-glass-rgb), 0.15);
+    @include overlay-text-action;
 }
 </style>

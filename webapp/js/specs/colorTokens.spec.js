@@ -211,7 +211,7 @@ describe('the surfaces that are dark in both themes', () => {
     it.each([
         ['the viewer background', 'var(--ddb-viewer-bg)'],
         ['the viewer sidebar', 'var(--ddb-viewer-sidebar-bg)'],
-        ['a toolbar', 'var(--ddb-viewer-toolbar-bg)'],
+        ['a toolbar', 'var(--ddb-overlay-bg)'],
         ['an overlay button', 'rgba(var(--ddb-shade-rgb), 0.55)'],
         ['the map bottom panel', 'rgba(var(--ddb-shade-rgb), 0.6)']
     ])('take a ring of 3:1 or more on %s, in both themes, where the theme ring does not', (_label, surface) => {
@@ -221,7 +221,7 @@ describe('the surfaces that are dark in both themes', () => {
             expect(ratio(colour('var(--ddb-focus-ring-on-dark)', tokens, scheme), back), scheme).toBeGreaterThanOrEqual(UI);
         }
         // The light theme's ring would not do there
-        const back = over(colour('var(--ddb-viewer-toolbar-bg)', LIGHT, 'light'), colour('var(--ddb-viewer-bg)', LIGHT, 'light'));
+        const back = over(colour('var(--ddb-overlay-bg)', LIGHT, 'light'), colour('var(--ddb-viewer-bg)', LIGHT, 'light'));
         expect(ratio(colour('var(--ddb-focus-ring-color)', LIGHT, 'light'), back)).toBeLessThan(UI);
     });
 });

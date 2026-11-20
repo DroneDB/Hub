@@ -4,53 +4,39 @@
         <DialogHost :dialogs="dialogs" />
 
         <div class="potree-container" :class="{ loading, 'sidebar-open': sidebarOpen }">
-            <div v-if="loaded" class="top-left-column">
-                <div class="top-left-toolbar">
-                    <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
-                        <button :disabled="!canUndo" class="btn-undo-redo" title="Undo (Ctrl+Z)" aria-label="Undo" @click="undo">
-                            <i class="fa-solid fa-rotate-left" />
-                        </button>
-                        <button :disabled="!canRedo" class="btn-undo-redo" title="Redo (Ctrl+Y)" aria-label="Redo" @click="redo">
-                            <i class="fa-solid fa-rotate-right" />
-                        </button>
-                        <button :class="{ active: deleteToolActive }" class="btn-undo-redo btn-delete-tool"
-                                title="Delete measurement tool (click on measurement to delete)" aria-label="Delete measurement tool"
-                                @click="toggleDeleteTool">
-                            <i class="fa-solid fa-trash" />
-                        </button>
-                    </div>
-
-                    <div class="unit-selector-toolbar">
-                        <label for="potree-unit-select">Units:</label>
-                        <select id="potree-unit-select" v-model="unitPref" aria-label="Units" :disabled="mixedUnits"
-                                :title="mixedUnits ? 'The heights of this cloud are in another unit than its other coordinates: lengths are not converted' : undefined">
-                            <option value="metric">Metric (m)</option>
-                            <option value="imperial">Imperial (ft)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- The one MeasureToolbar of the 3D, splat and point-cloud viewers: the tools start the measures of Potree's own icons;
-                     the clip volume, the views and the colour of the points are its extra tools, once the cloud is there -->
+            <!-- What the user does to the cloud, top left: the one MeasureToolbar of the 3D, splat and point-cloud viewers, whose
+                 tools start the measures of Potree's own icons; after them, once the cloud is there, its clip volume, and once
+                 there are measurements, their undo and Save -->
+            <div v-if="loaded" class="tools-top">
                 <MeasureToolbar :active-kind="measureKind" :show-clear="false" labelled @measure="startMeasure" @finish="finishMeasure" @cancel="cancelMeasure">
                     <template #extra>
-                        <PotreeTools v-if="toolsViewer" :viewer="toolsViewer" @before-clip="endMeasure" />
+                        <PotreeClipTools v-if="toolsViewer" :viewer="toolsViewer" @before-clip="endMeasure" />
+                        <div v-if="hasMeasurements || hasSavedMeasurements" class="tool-group" role="group" aria-label="History" data-testid="measure-history">
+                            <button type="button" :disabled="!canUndo" title="Undo (Ctrl+Z)" aria-label="Undo" data-testid="measure-undo" @click="undo">
+                                <i class="fa-solid fa-rotate-left" />
+                            </button>
+                            <button type="button" :disabled="!canRedo" title="Redo (Ctrl+Y)" aria-label="Redo" data-testid="measure-redo" @click="redo">
+                                <i class="fa-solid fa-rotate-right" />
+                            </button>
+                            <button type="button" class="danger" :class="{ active: deleteToolActive }" title="Delete a measurement: click it in the view"
+                                    aria-label="Delete measurement tool" :aria-pressed="deleteToolActive" data-testid="measure-delete-tool" @click="toggleDeleteTool">
+                                <i class="fa-solid fa-trash" />
+                            </button>
+                        </div>
+                        <div v-if="canSave || canDeleteSaved" class="tool-group" role="group" aria-label="Saved measurements" data-testid="measure-saved">
+                            <button v-if="canSave" type="button" class="primary" :disabled="savingMeasurements" title="Save the measurements in the dataset"
+                                    aria-label="Save measurements" data-testid="measure-save" @click="saveMeasurements">
+                                <i class="fa-solid fa-floppy-disk" />
+                                <span v-if="!compact" class="tool-label">Save</span>
+                            </button>
+                            <OverlayMenu v-if="canDeleteSaved" label="More measurement actions" :items="SAVED_ACTIONS" @select="requestDelete()" />
+                        </div>
                     </template>
                 </MeasureToolbar>
-
-                <div v-if="hasMeasurements || hasSavedMeasurements" class="measurements-toolbar">
-                    <button v-if="(hasMeasurements || hasSavedMeasurements) && canWrite" :disabled="savingMeasurements" class="btn-measurement"
-                            title="Save measurements" @click="saveMeasurements">
-                        <i class="fa-solid fa-floppy-disk" />
-                        Save Measurements
-                    </button>
-                    <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-measurement--danger"
-                            title="Delete the saved measurements" @click="requestDelete">
-                        <i class="fa-solid fa-trash" />
-                        Delete Saved
-                    </button>
-                </div>
             </div>
+
+            <!-- How the cloud is shown, bottom left: the views, the colour of the points and the unit -->
+            <PotreeDisplayBar v-if="toolsViewer" v-model:unit="unitPref" class="tools-bottom" :viewer="toolsViewer" :units-locked-reason="unitsLockedReason" />
 
             <div id="potree_sidebar_container" ref="sidebar" />
             <div id="potree_render_area" ref="container" />
@@ -62,19 +48,23 @@
 <script setup>
 /**
  * PotreeViewer - a point cloud (COPC) in Potree 1.8 with its measuring tools (the measurements live in usePotreeMeasurements and libs/potree/*; the viewer and everything it creates belong to a PotreeSession, released on leave).
+ * Its controls are two bars of one look (OverlayToolbar): what the user does to the cloud at the top left, how the cloud is shown at the bottom left.
  */
-import { ref, shallowRef, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import DeleteSavedMeasurementsDialog from '@/components/measurements/DeleteSavedMeasurementsDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import MeasureToolbar from '@/components/MeasureToolbar.vue';
-import PotreeTools from './PotreeTools.vue';
+import OverlayMenu from '@/components/OverlayMenu.vue';
+import PotreeClipTools from './PotreeClipTools.vue';
+import PotreeDisplayBar from './PotreeDisplayBar.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useDialogs } from '@/composables/useDialogs';
 import { usePreference } from '@/composables/usePreference';
 import { usePotreeMeasurements } from '@/composables/usePotreeMeasurements';
 import { useTimerGroup } from '@/composables/useTimers';
+import { useStackedLayout } from '@/composables/useStackedLayout';
 import { loadResources } from '@/libs/lazy';
 import { isMobile, deviceMemoryGb } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
@@ -102,12 +92,19 @@ const {
 const later = useTimerGroup();
 // Shared with the map's measure control
 const unitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
+// On a phone (below sm) Save is its icon, as the tools beside it
+const compact = useStackedLayout();
+// Save makes the file the same as the view (also with nothing left in the view); deleting what was saved is seldom
+// wanted and cannot be undone, so it is not a button: it is in the menu beside Save
+const canSave = computed(() => (hasMeasurements.value || hasSavedMeasurements.value) && canWrite.value);
+const canDeleteSaved = computed(() => hasSavedMeasurements.value && canDelete.value);
+const SAVED_ACTIONS = Object.freeze([{ key: 'delete-saved', label: 'Delete saved measurements', icon: 'fa-solid fa-trash', danger: true }]);
 
 const container = ref(null);
 const sidebar = ref(null);
 const loaded = ref(false);
 const sidebarOpen = ref(false);
-// The viewer once its point cloud is loaded: the tools of the point cloud (clip volume, views, colours) need it
+// The viewer once its point cloud is loaded: the clip volume and the display bar (views, colours, unit) need it
 const toolsViewer = shallowRef(null);
 // Owns the viewer and everything it creates (released on leave)
 let session = new PotreeSession();
@@ -143,6 +140,8 @@ let cloudUnits = cloudUnitsOf(null);
 // every axis, so its lengths and heights cannot be converted. Its labels then show the numbers of the coordinates with
 // no unit of length, and the unit selector has nothing to do; the saved measurements are worked out per axis in metres
 const mixedUnits = ref(false);
+const unitsLockedReason = computed(() => (mixedUnits.value
+    ? 'The heights of this cloud are in another unit than its other coordinates: lengths are not converted' : ''));
 const UNCONVERTED = Object.freeze({ code: 'units', unitspermeter: 1 });
 // A unit in words, plural: "US survey feet", "metres"
 const unitName = unit => ({ metre: 'metres', foot: 'feet', 'US survey foot': 'US survey feet' }[unit.name] ?? unit.name);

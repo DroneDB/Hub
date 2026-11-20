@@ -205,153 +205,34 @@
         z-index: 999999999999 !important;
     }
 
-    /* Top-left toolbar container */
-    // The tools at the top left, one under the other: undo and units, the measuring tools, Save and Delete saved
-    .top-left-column {
+    // The two bars of the viewer, of one look (OverlayToolbar) and at one distance from the edges. Top left, what the
+    // user does to the cloud: the measuring tools, the clip volume, undo and Save. Bottom left, how the cloud is shown:
+    // the views, the colour of the points and the unit. Neither reaches the right edge of the view, where Potree has
+    // its menu button (top) and the shell its fullscreen button (bottom), nor lies over the open menu beside the view.
+    .tools-top,
+    .tools-bottom {
+        // The room of a button at the right edge of the view
+        --tools-room-right: 4.5rem;
+
         position: absolute;
-        top: var(--ddb-spacing-sm);
         left: var(--ddb-spacing-sm);
-        // Leaves the menu button at the right edge free
-        max-width: calc(100% - 4.5rem);
+        max-width: calc(100% - var(--ddb-spacing-sm) - var(--tools-room-right));
         z-index: 1001;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
     }
 
-    .top-left-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        align-items: center;
+    .tools-top {
+        top: var(--ddb-spacing-sm);
     }
 
-    /* Undo/Redo toolbar */
-    .undo-redo-toolbar {
-        background: var(--ddb-viewer-toolbar-bg);
-        padding: var(--ddb-spacing-xs);
-        border-radius: var(--ddb-radius-sm);
-        display: flex;
-        gap: 0.25rem;
-        align-items: center;
+    .tools-bottom {
+        bottom: var(--ddb-spacing-sm);
     }
 
-    .btn-undo-redo {
-        background: var(--ddb-viewer-btn-bg);
-        color: var(--ddb-text-on-dark);
-        border: none;
-        padding: var(--ddb-spacing-sm) var(--ddb-spacing-sm);
-        border-radius: var(--ddb-radius-sm);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        transition: background 0.2s;
-        min-width: 2.25rem;
-        min-height: 2.25rem;
-    }
-
-    .btn-undo-redo:hover:not(:disabled) {
-        background: var(--ddb-viewer-btn-hover);
-    }
-
-    .btn-undo-redo:disabled {
-        background: var(--ddb-viewer-btn-disabled-bg);
-        color: var(--ddb-viewer-btn-disabled-color);
-        cursor: not-allowed;
-    }
-
-    .btn-undo-redo.btn-delete-tool {
-        background: var(--ddb-viewer-btn-active-bg);
-        margin-left: var(--ddb-spacing-sm);
-    }
-
-    .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
-        background: var(--ddb-viewer-btn-danger);
-    }
-
-    .btn-undo-redo.btn-delete-tool.active {
-        background: var(--ddb-viewer-btn-danger);
-        box-shadow: var(--ddb-shadow-sm);
-    }
-
-    /* Toolbar for measurements */
-    .measurements-toolbar {
-        background: var(--ddb-viewer-toolbar-bg);
-        padding: var(--ddb-spacing-sm);
-        border-radius: var(--ddb-radius-sm);
-        display: flex;
-        gap: var(--ddb-spacing-sm);
-        align-items: center;
-    }
-
-    .btn-measurement {
-        background: var(--ddb-viewer-btn-primary);
-        color: var(--ddb-text-on-dark);
-        border: none;
-        padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
-        border-radius: var(--ddb-radius-sm);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: var(--ddb-spacing-xs);
-        font-size: var(--ddb-font-size-base);
-        transition: background 0.3s;
-    }
-
-    .btn-measurement:hover {
-        background: var(--ddb-viewer-btn-primary-hover);
-    }
-
-    .btn-measurement:disabled {
-        background: var(--ddb-viewer-btn-active-bg);
-        cursor: not-allowed;
-    }
-
-    .btn-measurement--danger {
-        background: var(--ddb-viewer-btn-danger);
-    }
-
-    .btn-measurement--danger:hover {
-        background: var(--ddb-viewer-btn-danger-hover);
-    }
-
-    /* Unit selector toolbar */
-    .unit-selector-toolbar {
-        background: var(--ddb-viewer-toolbar-bg);
-        padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
-        border-radius: var(--ddb-radius-sm);
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        color: var(--ddb-text-on-dark);
-        font-size: var(--ddb-font-size-base);
-    }
-
-    .unit-selector-toolbar label {
-        margin: 0;
-        font-weight: 500;
-    }
-
-    .unit-selector-toolbar select {
-        background: var(--ddb-viewer-select-bg);
-        color: var(--ddb-text-on-dark);
-        border: var(--ddb-border-width) solid var(--ddb-viewer-select-border);
-        padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
-        border-radius: var(--ddb-radius-sm);
-        cursor: pointer;
-        font-size: var(--ddb-font-size-base);
-        outline: none;
-    }
-
-    .unit-selector-toolbar select:hover {
-        background: var(--ddb-viewer-btn-active-bg);
-    }
-
-    .unit-selector-toolbar select:focus {
-        border-color: var(--ddb-viewer-btn-primary);
+    .potree-container.sidebar-open {
+        .tools-top,
+        .tools-bottom {
+            --tools-room-right: calc(var(--ddb-sidebar-width) + 4.5rem);
+        }
     }
 
     /* Phones: the menu covers the view (below the menu button) instead of squeezing it to a strip */
@@ -380,21 +261,12 @@
             }
         }
 
-        .unit-selector-toolbar label {
-            display: none;
-        }
-
-        .unit-selector-toolbar select {
-            min-height: 2.25rem;
-        }
-
-        // Out of the way of the toolbar above
-        .measurements-toolbar {
-            position: absolute;
-            left: var(--ddb-spacing-sm);
-            bottom: var(--ddb-spacing-sm);
-            flex-wrap: wrap;
-            max-width: calc(100% - 2 * var(--ddb-spacing-sm));
+        // The menu covers the view: the bars, which would lie over it, wait for it to close as the fullscreen button does
+        .potree-container.sidebar-open {
+            .tools-top,
+            .tools-bottom {
+                visibility: hidden;
+            }
         }
     }
 }
