@@ -14,7 +14,7 @@
 
             <div class="setting-row">
                 <label id="map-settings-dialog-measurement-units-label" for="map-settings-dialog-measurement-units" class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-pencil" /> Measurement Units
+                    <i class="fa-solid fa-ruler" /> Measurement Units
                 </label>
                 <Select input-id="map-settings-dialog-measurement-units" aria-labelledby="map-settings-dialog-measurement-units-label" :model-value="unitPref"
                         :options="UNIT_OPTIONS" option-label="label" option-value="value" class="setting-select" @update:model-value="onUnitsChange" />

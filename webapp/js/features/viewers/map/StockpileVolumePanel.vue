@@ -121,7 +121,7 @@
                 </button>
             </div>
             <div v-else-if="mode === 'draw'" ref="banner" class="section click-banner" data-testid="stockpile-draw-banner">
-                <i class="fa-solid fa-draw-polygon" />
+                <i :class="AREA_ICON" />
                 <span data-testid="stockpile-hint">{{ drawHint }}</span>
                 <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
                     <i class="fas fa-times" />
@@ -220,7 +220,7 @@
                         :disabled="loading" :aria-pressed="mode === 'draw'"
                         data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
                         @click="$emit('drawPolygon')">
-                    <i class="fa-solid fa-draw-polygon" />
+                    <i :class="AREA_ICON" />
                     <span class="action-label">{{ mode === 'draw' ? 'Drawing…' : 'Draw' }}</span>
                 </button>
                 <button class="panel-btn action-btn" :disabled="!canClear"
@@ -237,7 +237,7 @@
 
 <script>
 import AnalysisPanel from './AnalysisPanel.vue';
-import { STOCKPILE_ICON } from '@/libs/icons';
+import { AREA_ICON, STOCKPILE_ICON } from '@/libs/glyphs';
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, EMPTY_CELL, formatDensity, formatMoney, formatNumber, formatVolume, formatWeight } from '@/libs/format';
@@ -309,7 +309,7 @@ export default {
         return { auth: useAuthStore() };
     },
     data() {
-        return { STOCKPILE_ICON, customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false, settingsOpen: false };
+        return { AREA_ICON, STOCKPILE_ICON, customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false, settingsOpen: false };
     },
     computed: {
         // Below `sm`, while a mode is active or a result shows, the settings (base plane, sensitivity, radius, material) fold

@@ -92,11 +92,12 @@ describe('MapToolbar analysis buttons', () => {
         expect(button('raster-analysis-toolbar-btn').title).toMatch(/Turn off split compare/);
     });
 
-    // FR-MAP-24: the pile is not the stack of layers, and not the split of Compare
-    it('have a mountain for the Stockpile button, apart from the icon of the Compare button', () => {
+    // FR-MAP-24: the pile is a heap, not the stack of layers, the split of Compare or the hills Raster Analysis had too
+    it('have a heap for the Stockpile button, apart from the glyphs of Raster Analysis and of Compare', () => {
         mountWith({ rasterCount: 2, canCompare: true });
-        expect(button('stockpile-toolbar-btn').querySelector('i').className).toBe('fa-solid fa-mountain');
-        expect(zones.topCenter.querySelector(COMPARE).querySelector('i').className).toBe('fa-solid fa-table-columns');
+        expect(button('stockpile-toolbar-btn').querySelector('i').className).toBe('ddb-icon ddb-icon-stockpile');
+        expect(button('raster-analysis-toolbar-btn').querySelector('i').className).toBe('ddb-icon ddb-icon-raster-analysis');
+        expect(zones.topCenter.querySelector(COMPARE).querySelector('i').className).toBe('ddb-icon ddb-icon-compare');
     });
 
     it('ask for their panel', () => {
@@ -182,5 +183,31 @@ describe('MapToolbar on a map narrower than sm (FR-MAP-12)', () => {
     it('keeps Back on a wider map', () => {
         mountOn({ narrow: false });
         expect(labels()).toContain('Back to Dataset');
+    });
+});
+
+describe('MapToolbar glyphs', () => {
+    it('are one glyph of the set per button, each for its meaning', async () => {
+        const icons = await import('@/libs/glyphs');
+        wrapper = mount(MapToolbar, {
+            props: { zones, showBack: true, copyLink: true, analysisEntry: { path: 'odm_dem/dsm.tif' }, rasterCount: 2, canCompare: true }
+        });
+        const shown = zone => Object.fromEntries([...zone.querySelectorAll('button')].map(b => [b.getAttribute('aria-label'), b.querySelector('i').className]));
+        const topRight = shown(zones.topRight);
+        // Fullscreen is offered where the browser has it
+        const { Fullscreen: fullscreen, ...others } = topRight;
+        if (fullscreen !== undefined) expect(fullscreen).toBe(icons.FULLSCREEN_ICON);
+        expect(others).toEqual({
+            'Back to Dataset': icons.BACK_ICON,
+            'Reset View': icons.RESET_VIEW_ICON,
+            'Copy link': icons.COPY_LINK_ICON,
+            'Raster Analysis': icons.RASTER_ANALYSIS_ICON,
+            'Stockpile Volume': icons.STOCKPILE_ICON
+        });
+        expect(shown(zones.topCenter)).toEqual({
+            'Show direction and speed indicators': icons.DIRECTION_ICON,
+            'Show drone flight path': icons.FLIGHT_PATH_ICON,
+            'Compare georasters side by side': icons.COMPARE_ICON
+        });
     });
 });

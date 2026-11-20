@@ -8,7 +8,7 @@
             </button>
             <button v-if="showClear" type="button" :disabled="!canClear" title="Clear measurements" aria-label="Clear measurements" data-testid="measure-clear"
                     @click="emit('clear')">
-                <i class="fa-solid fa-trash" />
+                <i :class="CLEAR_ALL_ICON" />
                 <span v-if="showLabels" class="tool-label">Clear</span>
             </button>
             <button v-if="canSetScale" type="button" :class="{ active: activeKind === 'scale' }" title="Set the scale: pick two points on something of a known length"
@@ -49,12 +49,13 @@ import { computed } from 'vue';
 import OverlayToolbar from '@/components/OverlayToolbar.vue';
 import { drawingHint } from '@/libs/measureHints';
 import { useStackedLayout } from '@/composables/useStackedLayout';
+import { AREA_ICON, CLEAR_ALL_ICON, HEIGHT_ICON, LENGTH_ICON, POINT_ICON } from '@/libs/glyphs';
 
 const ALL_TOOLS = [
-    { kind: 'point', label: 'Point', title: 'Measure a point', icon: 'fa-solid fa-location-dot' },
-    { kind: 'distance', label: 'Distance', title: 'Measure a distance', icon: 'fa-solid fa-ruler' },
-    { kind: 'height', label: 'Height', title: 'Measure a height', icon: 'fa-solid fa-ruler-vertical' },
-    { kind: 'area', label: 'Area', title: 'Measure an area', icon: 'fa-solid fa-draw-polygon' }
+    { kind: 'point', label: 'Point', title: 'Measure a point', icon: POINT_ICON },
+    { kind: 'distance', label: 'Distance', title: 'Measure a distance', icon: LENGTH_ICON },
+    { kind: 'height', label: 'Height', title: 'Measure a height', icon: HEIGHT_ICON },
+    { kind: 'area', label: 'Area', title: 'Measure an area', icon: AREA_ICON }
 ];
 
 const props = defineProps({

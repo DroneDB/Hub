@@ -31,7 +31,7 @@
  * `delete` events). Names are shown as text, whatever they contain.
  */
 import { ref } from 'vue';
-import { VIEWS_ICON } from '@/libs/icons';
+import { VIEWS_ICON } from '@/libs/glyphs';
 import ContextMenu from './ContextMenu.vue';
 import { savedViewUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyLinkWithNotice } from '@/composables/useCopyText';

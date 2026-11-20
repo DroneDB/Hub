@@ -1,5 +1,6 @@
 import { Control } from 'ol/control';
 import { controlButton } from './controlButton';
+import { SETTINGS_ICON } from '@/libs/glyphs';
 
 /**
  * Map settings control - a single button that opens the MapSettingsDialog.
@@ -12,7 +13,7 @@ class SettingsControl extends Control {
     constructor(opt_options) {
         const options = opt_options || {};
 
-        const btn = controlButton('Map Settings', 'Change basemap, units, and display options.', '/images/settings.svg');
+        const btn = controlButton('Map Settings', 'Change basemap, units, and display options.', SETTINGS_ICON);
 
         const element = document.createElement('div');
         element.className = 'ol-settings ol-unselectable ol-control';

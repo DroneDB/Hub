@@ -6,7 +6,7 @@
 
             <div class="ol-map-buttons ol-unselectable ol-control dlm-tools">
                 <button type="button" title="Reset view" aria-label="Reset view" @click="resetView">
-                    <i class="fa-solid fa-house" aria-hidden="true" />
+                    <i :class="RESET_VIEW_ICON" aria-hidden="true" />
                 </button>
                 <button type="button" title="Show the names of the datasets" aria-label="Show the names of the datasets"
                         :class="{ active: showNames }" :aria-pressed="showNames" @click="showNames = !showNames">
@@ -88,6 +88,8 @@ import { bboxExtent } from '@/libs/map/mapUtils';
 import { createLocationStyles } from '@/libs/map/locationStyles';
 import { FIT_OPTIONS, overviewFitPadding } from '@/libs/map/mapUtils';
 import { mapRailReserve, mapBottomReserve } from '@/libs/map/overlayPlacement';
+import { defaultMapControls } from '@/libs/map/controls/defaultControls';
+import { RESET_VIEW_ICON } from '@/libs/glyphs';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
@@ -274,6 +276,7 @@ onMounted(() => {
         // The basemap must be layer 0 (useMapBasemap replaces it)
         layers: [createBasemapLayer(), pinLayer, boxLayer, labelLayer],
         view: new View({ center: [0, 0], zoom: 2 }),
+        controls: defaultMapControls(),
         // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042)
         pixelRatio: appliedPixelRatio()
     });

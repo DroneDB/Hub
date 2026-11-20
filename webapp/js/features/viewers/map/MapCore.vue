@@ -138,6 +138,7 @@ import { formatSpeed } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import SelectionControl from '@/libs/map/controls/selectionControl';
 import SettingsControl from '@/libs/map/controls/settingsControl';
+import { defaultMapControls } from '@/libs/map/controls/defaultControls';
 import { createControlZones, moveToZone } from '@/libs/map/controlZones';
 import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fileLayers';
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
@@ -472,6 +473,7 @@ export default {
                 target: this.$refs['map-container'],
                 layers: [this.createBasemapLayer(), ...this.fileLayers.layers, this.measureControls.getLayer()],
                 view: new View({ center: [0, 0], zoom: 2 }),
+                controls: defaultMapControls(),
                 // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042): OpenLayers would draw at the device ratio, uncapped
                 pixelRatio: appliedPixelRatio()
             });

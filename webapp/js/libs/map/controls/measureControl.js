@@ -22,9 +22,13 @@ import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 import { latLonText, stockpileLabel } from '@/libs/format';
 import { colorToken, tokenRgba } from '@/libs/colorScheme';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import {
+    AREA_ICON, CALLOUTS_ICON, CLEAR_ALL_ICON, DELETE_ICON, EDIT_VERTICES_ICON, ERASE_ICON, EXPORT_CSV_ICON, EXPORT_GEOJSON_ICON, LENGTH_ICON,
+    MEASUREMENT_LIST_ICON, MEASURE_ICON, POINT_ICON, SAVE_ICON, STOP_ICON
+} from '@/libs/glyphs';
 
-// Cursor shown over a measurement while the eraser tool is active. We use
-// the same static asset as the toolbar button (file URL, not an inline SVG
+// Cursor shown over a measurement while the eraser tool is active: an eraser,
+// as the glyph of the tool is. It is a static asset (file URL, not an inline SVG
 // data URL) because data-URL cursors are unreliable: some browsers fail to
 // load them and others re-normalize the value on read-back, breaking any
 // equality check used to detect ownership of the cursor.
@@ -61,33 +65,29 @@ class MeasureControls extends Control {
 
         const unitPref = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 
-        const btnPoint = controlButton('Point Annotation', 'Click on the map to place an annotation.', '/images/measure-point.svg');
-        const btnLength = controlButton('Measure Length', 'Click on the map to place points along a line. Double-click, right-click or Enter to finish. Press ESC to cancel.', '/images/measure-length.svg');
-        const btnArea = controlButton('Measure Area', 'Click on the map to draw a polygon. Double-click, right-click or Enter to finish and calculate the area. Press ESC to cancel.', '/images/measure-area.svg');
-        const btnErase = controlButton('Erase Measurement', 'Click on a measurement to delete it.', '/images/measure-erase.svg');
-        const btnEdit = controlButton('Edit/Move Measurements', 'Click and drag measurement points to reposition them.', '/images/edit.svg');
-        const btnStop = controlButton('Stop Measuring', 'Cancel the current measurement. Shortcut: ESC', '/images/measure-stop.svg');
+        const btnPoint = controlButton('Point Annotation', 'Click on the map to place an annotation.', POINT_ICON);
+        const btnLength = controlButton('Measure Length', 'Click on the map to place points along a line. Double-click, right-click or Enter to finish. Press ESC to cancel.', LENGTH_ICON);
+        const btnArea = controlButton('Measure Area', 'Click on the map to draw a polygon. Double-click, right-click or Enter to finish and calculate the area. Press ESC to cancel.', AREA_ICON);
+        const btnErase = controlButton('Erase Measurement', 'Click on a measurement to delete it.', ERASE_ICON);
+        const btnEdit = controlButton('Edit/Move Measurements', 'Click and drag measurement points to reposition them.', EDIT_VERTICES_ICON);
+        const btnStop = controlButton('Stop Measuring', 'Cancel the current measurement. Shortcut: ESC', STOP_ICON);
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
 
         // Save/Load/Clear buttons (hidden until there is something to manage)
-        const btnSave = controlButton('Save Measurements', 'Save all current measurements to the dataset.', '/images/save.svg');
-        const btnClear = controlButton('Clear All Measurements', 'Remove all measurements from the map.', '/images/eraser.svg');
-        const btnExport = controlButton('Export Measurements as GeoJSON', 'Download measurements as a GeoJSON file.', '/images/download.svg');
-        const btnExportCsv = controlButton('Export Measurements as CSV', 'Download measurements as a CSV table, in the units shown.');
-        btnExportCsv.innerHTML = '<i class="fa-solid fa-file-csv" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
-        const btnDelete = controlButton('Delete Saved Measurements', 'Permanently delete saved measurements from the dataset.', '/images/trash.svg');
-        const btnList = controlButton('Measurement List', 'View and manage all measurements.');
-        btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
+        const btnSave = controlButton('Save Measurements', 'Save all current measurements to the dataset.', SAVE_ICON);
+        const btnClear = controlButton('Clear All Measurements', 'Remove all measurements from the map.', CLEAR_ALL_ICON);
+        const btnExport = controlButton('Export Measurements as GeoJSON', 'Download measurements as a GeoJSON file.', EXPORT_GEOJSON_ICON);
+        const btnExportCsv = controlButton('Export Measurements as CSV', 'Download measurements as a CSV table, in the units shown.', EXPORT_CSV_ICON);
+        const btnDelete = controlButton('Delete Saved Measurements', 'Permanently delete saved measurements from the dataset.', DELETE_ICON);
+        const btnList = controlButton('Measurement List', 'View and manage all measurements.', MEASUREMENT_LIST_ICON);
         // Pressed: the callouts of the point annotations are always shown; released: each one shows while its point is
         // hovered (or tapped). Shown while the map has a point annotation; the account keeps the choice
-        const btnCallouts = controlButton(CALLOUTS_LABEL, '');
-        btnCallouts.innerHTML = '<i class="fa-solid fa-message" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
+        const btnCallouts = controlButton(CALLOUTS_LABEL, '', CALLOUTS_ICON);
         [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList, btnCallouts].forEach(btn => { btn.style.display = 'none'; });
 
         // The 'Measure' toggle: on a compact map (css/ol-controls.css: a phone, a small frame) it is the one button of the
         // measure tools in the rail, and the toolbars below open from it (FR-MAP-12). Elsewhere it is not shown
-        const btnToggle = controlButton('Measure', 'Show the measure tools.');
-        btnToggle.innerHTML = '<i class="fa-solid fa-ruler-combined" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
+        const btnToggle = controlButton('Measure', 'Show the measure tools.', MEASURE_ICON);
         btnToggle.setAttribute('aria-expanded', 'false');
         const toolbarToggle = controlGroup('Measure', 'ol-measure-toggle');
         toolbarToggle.appendChild(btnToggle);

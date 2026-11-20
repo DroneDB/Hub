@@ -2,23 +2,23 @@
     <Teleport :to="zones.topRight">
         <div class="ol-map-buttons ol-unselectable ol-control" style="order: -1">
             <button v-if="showBack && !embed && !mapSize.narrow" title="Back to Dataset" aria-label="Back to Dataset" @click="emit('back')">
-                <i class="fa-solid fa-arrow-left" />
+                <i :class="BACK_ICON" />
             </button>
             <button title="Reset View (H)" aria-label="Reset View" @click="emit('reset')">
-                <i class="fa-solid fa-house" />
+                <i :class="RESET_VIEW_ICON" />
             </button>
             <button v-if="canFullscreen" title="Fullscreen (F11)" aria-label="Fullscreen" @click="emit('fullscreen')">
-                <i class="fa-solid fa-expand" />
+                <i :class="FULLSCREEN_ICON" />
             </button>
             <!-- data-map-link-toggle: the map link panel leaves a press on this button to the button -->
             <button v-if="copyLink && !embed" title="Copy link" aria-label="Copy link" data-map-link-toggle
                     data-testid="copy-link-toolbar-btn" @click="emit('copy-link')">
-                <i class="fa-solid fa-link" />
+                <i :class="COPY_LINK_ICON" />
             </button>
             <template v-if="analysisEntry">
                 <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis" :disabled="splitMode"
                         data-testid="raster-analysis-toolbar-btn" @click="emit('analysis', 'rasterAnalysis')">
-                    <i class="fa-solid fa-chart-area" />
+                    <i :class="RASTER_ANALYSIS_ICON" />
                 </button>
                 <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume" :disabled="splitMode"
                         data-testid="stockpile-toolbar-btn" @click="emit('analysis', 'stockpile')">
@@ -32,15 +32,15 @@
             <button v-if="displayOptions" title="Show direction and speed indicators" aria-label="Show direction and speed indicators"
                     :class="{ active: directionIndicators }" :aria-pressed="directionIndicators"
                     @click="emit('update:directionIndicators', !directionIndicators)">
-                <i class="fa-solid fa-location-arrow" />
+                <i :class="DIRECTION_ICON" />
             </button>
             <button v-if="displayOptions" title="Show drone flight path" aria-label="Show drone flight path"
                     :class="{ active: flightPath }" :aria-pressed="flightPath" @click="emit('update:flightPath', !flightPath)">
-                <i class="fa-solid fa-signs-post" />
+                <i :class="FLIGHT_PATH_ICON" />
             </button>
             <button v-if="showCompare" :title="compareLabel" :aria-label="compareLabel"
                     :class="{ active: splitMode }" :aria-pressed="splitMode" @click="emit(canCompare ? 'toggle-split' : 'compare-to')">
-                <i class="fa-solid fa-table-columns" />
+                <i :class="COMPARE_ICON" />
             </button>
         </div>
     </Teleport>
@@ -58,7 +58,9 @@
  */
 import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
-import { STOCKPILE_ICON } from '@/libs/icons';
+import {
+    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, FULLSCREEN_ICON, RASTER_ANALYSIS_ICON, RESET_VIEW_ICON, STOCKPILE_ICON
+} from '@/libs/glyphs';
 
 const props = defineProps({
     /** Zones from createControlZones */

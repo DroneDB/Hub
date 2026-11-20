@@ -1,9 +1,22 @@
 /**
+ * The glyph of a button built outside a Vue template: an <i> with the class of the glyph (libs/glyphs), hidden from
+ * assistive technology as the icons of the templates are (the button has the name).
+ * @param {string} icon the class of a glyph of libs/glyphs
+ * @returns {HTMLElement}
+ */
+export function iconElement(icon) {
+    const el = document.createElement('i');
+    el.className = icon;
+    el.setAttribute('aria-hidden', 'true');
+    return el;
+}
+
+/**
  * The icon button of a map control: its name is the aria-label (for assistive technology and
  * selectors), and the tooltip is "<name> - <how to use it>".
  * @param {string} label accessible name
  * @param {string} hint how to use it, after the name in the tooltip
- * @param {string} [icon] URL of the icon image (decorative)
+ * @param {string} [icon] the class of its glyph (libs/glyphs), decorative
  * @returns {HTMLButtonElement}
  */
 export function controlButton(label, hint, icon) {
@@ -11,7 +24,7 @@ export function controlButton(label, hint, icon) {
     btn.type = 'button';
     btn.setAttribute('aria-label', label);
     btn.title = `${label} - ${hint}`;
-    if (icon) btn.innerHTML = '<img src="' + icon + '" alt=""/>';
+    if (icon) btn.appendChild(iconElement(icon));
     return btn;
 }
 

@@ -47,10 +47,10 @@ beforeEach(() => { h.auth.isLoggedIn = true; });
 afterEach(() => wrapper?.unmount());
 
 describe('StockpileVolumePanel icon (FR-MAP-24)', () => {
-    it('has a mountain in front of its title, not the stacked layers', () => {
+    it('has a heap in front of its title, not the stacked layers nor a mountain', () => {
         render();
         const icon = wrapper.find('.panel-title i');
-        expect(icon.classes()).toEqual(['fa-solid', 'fa-mountain']);
+        expect(icon.classes()).toEqual(['ddb-icon', 'ddb-icon-stockpile']);
     });
 });
 

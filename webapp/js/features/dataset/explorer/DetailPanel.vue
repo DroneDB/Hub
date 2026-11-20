@@ -78,7 +78,7 @@
                     <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
                     <Button v-if="canBuild" severity="secondary"
                             icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
-                    <Button v-if="isGeoraster" severity="secondary" icon="fa-solid fa-table-columns" label="Compare to"
+                    <Button v-if="isGeoraster" severity="secondary" :icon="COMPARE_ICON" label="Compare to"
                             title="Compare this georaster with others of the dataset" @click="handleCompareTo" />
                 </div>
             </div>
@@ -124,6 +124,7 @@ import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { savedViewUrl, fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { viewsUsing } from '@/libs/views/viewStore';
+import { COMPARE_ICON } from '@/libs/glyphs';
 
 // The preview box is as wide as the panel, and as high as 18.75rem at most (css); a box that is not measured
 // yet (the panel is not on the page) is taken as 400 CSS px wide
@@ -162,7 +163,7 @@ export default {
     emits: ['close', 'open', 'share', 'buildStarted', 'buildError', 'downloadItems', 'deleteSelecteditems'],
     setup() {
         // Lengths, speeds and areas follow the measurement units preference as it changes
-        return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
+        return { COMPARE_ICON, measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
     },
     data: function () {
         return {

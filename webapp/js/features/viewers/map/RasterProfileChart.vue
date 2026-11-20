@@ -65,7 +65,7 @@
                     <i class="fas fa-expand" aria-hidden="true" />
                 </button>
                 <button class="panel-btn" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
-                    <i class="fas fa-file-csv" aria-hidden="true" />
+                    <i :class="EXPORT_CSV_ICON" aria-hidden="true" />
                 </button>
             </span>
         </div>
@@ -89,6 +89,7 @@ import { rasterValueParts } from '@/libs/map/rasterUnit';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import Window from '@/components/HubWindow.vue';
+import { EXPORT_CSV_ICON } from '@/libs/glyphs';
 
 // The y labels: the width of a character at the label font and the gap between a label and the axis
 const LABEL_CHAR_WIDTH = 6.5;
@@ -120,7 +121,7 @@ export default {
     },
     emits: ['activeSample'],
     setup() {
-        return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
+        return { EXPORT_CSV_ICON, measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
     },
     data() {
         return {

@@ -18,6 +18,7 @@ import { MAX_LAYERS } from '@/libs/views/viewState';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { VIEWERS } from '@/libs/openItemDefaults';
 import { actionMenuItem } from '@/libs/dataset/explorerActions';
+import { COMPARE_ICON } from '@/libs/glyphs';
 
 /**
  * The context menu of the file explorer (grid, table and tree). The actions that other surfaces
@@ -188,7 +189,7 @@ function experimentalMenuItems(ctx) {
 function compareToItem(ctx) {
     return {
         label: 'Compare to',
-        icon: 'fa-solid fa-table-columns',
+        icon: COMPARE_ICON,
         group: 'open',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
@@ -202,7 +203,7 @@ function compareToItem(ctx) {
 function compareInMapItem(ctx) {
     return {
         label: 'Compare in Map',
-        icon: 'fa-solid fa-table-columns',
+        icon: COMPARE_ICON,
         group: 'open',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();

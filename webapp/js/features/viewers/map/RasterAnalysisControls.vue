@@ -214,6 +214,7 @@ import { nodataNumber } from '@/libs/ddb/dataset';
 import { rasterValueParts, isElevationRaster, THERMAL_UNIT_OPTIONS, thermalBandUnit, thermalFormulaOfUnit, thermalUnitOfFormula } from '@/libs/map/rasterUnit';
 import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { formatNumber, formatNumberList } from '@/libs/format';
+import { RASTER_ANALYSIS_ICON } from '@/libs/glyphs';
 
 const formatCount = n => formatNumber(n, 'count');
 
@@ -283,7 +284,7 @@ export default {
             return this.isThermal ? 'Thermal' : 'Raster Analysis';
         },
         panelIconClass() {
-            return this.isThermal ? 'fas fa-temperature-high' : 'fas fa-chart-area';
+            return this.isThermal ? 'fas fa-temperature-high' : RASTER_ANALYSIS_ICON;
         },
         rangeLabel() {
             return this.isThermal ? 'Temperature Range' : 'Value Range';

@@ -5,6 +5,7 @@ import { Vector as VectorSource } from 'ol/source';
 import { Vector as VectorLayer } from 'ol/layer';
 import { controlButton, controlGroup } from './controlButton';
 import { tokenRgba } from '@/libs/colorScheme';
+import { CLEAR_SELECTION_ICON, SELECT_POLYGON_ICON, SELECT_RECTANGLE_ICON } from '@/libs/glyphs';
 
 /**
  * Unified selection control that groups rectangle and polygon selection
@@ -21,10 +22,10 @@ class SelectionControl extends Control {
     constructor(opt_options) {
         const options = opt_options || {};
 
-        const btnRectangle = controlButton('Rectangle Selection', 'Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.', '/images/rectangle-selection.svg');
-        const btnPolygon = controlButton('Polygon Selection', 'Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.', '/images/polygon-selection.svg');
+        const btnRectangle = controlButton('Rectangle Selection', 'Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.', SELECT_RECTANGLE_ICON);
+        const btnPolygon = controlButton('Polygon Selection', 'Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.', SELECT_POLYGON_ICON);
         // Hidden by default, shown when there's an active selection
-        const btnClear = controlButton('Clear Selection', 'Deselect all selected features.', '/images/clear-selection.svg');
+        const btnClear = controlButton('Clear Selection', 'Deselect all selected features.', CLEAR_SELECTION_ICON);
         btnClear.style.display = 'none';
 
         // Single container for all buttons

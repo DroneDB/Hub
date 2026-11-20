@@ -117,7 +117,7 @@ import Button from 'primevue/button';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 import { countOf } from '@/libs/format';
-import { STOCKPILE_ICON } from '@/libs/icons';
+import { AREA_ICON, LENGTH_ICON, POINT_ICON, STOCKPILE_ICON } from '@/libs/glyphs';
 
 export default {
     components: { Window, Button, ConfirmDialog },
@@ -201,9 +201,9 @@ export default {
         },
         typeIcon(type) {
             switch (type) {
-                case 'point': return 'fa-solid fa-map-pin';
-                case 'length': return 'fa-solid fa-ruler';
-                case 'area': return 'fa-solid fa-draw-polygon';
+                case 'point': return POINT_ICON;
+                case 'length': return LENGTH_ICON;
+                case 'area': return AREA_ICON;
                 case 'stockpile': return STOCKPILE_ICON;
                 case 'profile': return 'fa-solid fa-route';
                 case 'contour': return 'fa-solid fa-map-pin';

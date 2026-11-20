@@ -28,6 +28,12 @@
     background-color: rgba(var(--ddb-primary-rgb), 0.8) !important;
 }
 
+/* The glyph of a button (libs/glyphs.js: a Font Awesome glyph or one drawn for the Hub): one size on every button,
+   whichever toolbar or OpenLayers control it belongs to */
+.ol-control button i {
+    font-size: 1rem;
+}
+
 .ol-control button.active {
     background-color: var(--ddb-success) !important;
     box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5);

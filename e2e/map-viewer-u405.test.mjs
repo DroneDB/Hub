@@ -131,13 +131,13 @@ test('FR-MAP-23: the first Save of a file map offers the stem of the file, selec
     assert.deepEqual(errors, []);
 });
 
-test('FR-MAP-24: the Stockpile button is a mountain, the Compare button keeps the split icon', async () => {
+test('FR-MAP-24: the Stockpile button is a heap, not the stack of layers', async () => {
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(RASTER))}/map`);
     await appReady(page);
     await page.waitForSelector('.map-container', { timeout: 30000 });
     const stockpile = page.locator('[data-testid="stockpile-toolbar-btn"]');
-    if (await stockpile.count()) assert.ok(await stockpile.locator('i.fa-mountain').count());
+    if (await stockpile.count()) assert.ok(await stockpile.locator('i.ddb-icon-stockpile').count());
     assert.equal(await page.locator('[data-testid="stockpile-toolbar-btn"] i.fa-layer-group').count(), 0);
     assert.deepEqual(errors, []);
 });
