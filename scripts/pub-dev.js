@@ -9,7 +9,7 @@ const dest = path.resolve(__dirname, '..', '..', 'registry-data', 'ClientApp');
 try {
     execSync('npm run build', { stdio: 'inherit' });
     console.log('Build OK, publishing...');
-} catch (e) {
+} catch {
     console.error('Build failed');
     process.exit(1);
 }

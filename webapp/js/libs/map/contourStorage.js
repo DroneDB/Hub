@@ -8,6 +8,8 @@
  * just the in-memory draft on regeneration.
  */
 
+import { newId } from '@/libs/ids';
+
 // Default elevation color ramp (low -> high). Mirrors a terrain palette so
 // users immediately recognize "low = blue/green, high = orange/white".
 const ELEVATION_RAMP = [
@@ -54,13 +56,6 @@ export function colorForElevation(elev, min, max) {
     return rampColor((elev - min) / (max - min));
 }
 
-function makeId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-}
-
 /**
  * Wrap a single contour LineString geometry into a measurement-shaped Feature.
  *
@@ -88,7 +83,7 @@ export function buildContourFeature(geometry, elev, extra = {}) {
         geometry,
         properties: {
             ...extra,
-            id: extra.id || makeId(),
+            id: extra.id || newId(),
             name,
             measurementType: 'contour',
             // Discriminator for the regeneration overwrite policy: only

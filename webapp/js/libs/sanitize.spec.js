@@ -3,7 +3,7 @@
  * Verifies XSS protection in HTML sanitization.
  */
 import { describe, it, expect } from 'vitest';
-import { sanitizeHtml } from './sanitize';
+import { sanitizeHtml, textToHtml, htmlToText, isWebUrl } from './sanitize';
 
 describe('sanitizeHtml', () => {
     it('returns empty string for null/undefined/empty', () => {
@@ -133,5 +133,60 @@ describe('sanitizeHtml', () => {
     it('handles hr and div tags', () => {
         expect(sanitizeHtml('<hr>')).toBe('<hr>');
         expect(sanitizeHtml('<div>content</div>')).toBe('<div>content</div>');
+    });
+});
+
+describe('isWebUrl', () => {
+    it('accepts absolute http and https addresses', () => {
+        expect(isWebUrl('https://dronedb.app/request-license')).toBe(true);
+        expect(isWebUrl('http://example.com')).toBe(true);
+    });
+
+    it('refuses other schemes, relative addresses and non-strings', () => {
+        expect(isWebUrl('javascript:alert(1)')).toBe(false);
+        expect(isWebUrl('data:text/html,x')).toBe(false);
+        expect(isWebUrl('mailto:a@b.c')).toBe(false);
+        expect(isWebUrl('/relative/path')).toBe(false);
+        expect(isWebUrl(null)).toBe(false);
+        expect(isWebUrl(42)).toBe(false);
+    });
+});
+
+describe('textToHtml and htmlToText', () => {
+    const TEXTS = ['plain', 'a & b < c > d', '"quoted" \'text\'', '<img src=x onerror=alert(1)>', '&amp; &lt;', '</textarea><b>x</b>',
+        'one\ntwo', 'one\n\nthree', 'a\n', '\na', 'a <br> b\n<div>c</div>', ''];
+
+    it('gives back the same text after the trip through HTML, with newlines and markup characters', () => {
+        for (const text of TEXTS) expect(htmlToText(textToHtml(text))).toBe(text);
+    });
+
+    it('makes a line break of a newline, and nothing else a tag', () => {
+        expect(textToHtml('a\nb')).toBe('a<br>b');
+        expect(textToHtml('<img src=x onerror=alert(1)> & "q"')).toBe('&lt;img src=x onerror=alert(1)&gt; &amp; &quot;q&quot;');
+        const holder = document.createElement('div');
+        holder.innerHTML = textToHtml('<img src=x onerror=alert(1)>\n<b>x</b>');
+        expect(holder.querySelectorAll('img, b')).toHaveLength(0);
+        expect(holder.querySelectorAll('br')).toHaveLength(1);
+    });
+
+    it('reads the HTML a contenteditable makes of typed lines as lines', () => {
+        expect(htmlToText('a<br>b')).toBe('a\nb');
+        expect(htmlToText('a<div>b</div>')).toBe('a\nb');
+        expect(htmlToText('a<div>b</div><div>c</div>')).toBe('a\nb\nc');
+        expect(htmlToText('<div>a</div><div><br></div><div>b</div>')).toBe('a\n\nb');
+        expect(htmlToText('<p>a</p><p>b</p>')).toBe('a\nb');
+        expect(htmlToText('a &amp; b &lt;i&gt; &nbsp;x')).toBe('a & b <i> \u00a0x');
+        expect(htmlToText('<b>bold</b> and <i>italic</i>')).toBe('bold and italic');
+    });
+
+    it('takes only the text of a document: no tag is kept, nothing runs or loads', () => {
+        expect(htmlToText('x<img src=x onerror=alert(1)>y<script>alert(1)</script>z')).toBe('xyz');
+        expect(document.querySelector('img, script')).toBeNull();
+    });
+
+    it('gives an empty text for nothing', () => {
+        expect(htmlToText(null)).toBe('');
+        expect(htmlToText(undefined)).toBe('');
+        expect(textToHtml(undefined)).toBe('');
     });
 });

@@ -1,0 +1,163 @@
+/**
+ * PropsTable: EPSG codes in values get an info button to epsg.io, the copy buttons copy the value
+ * given for their row and the Type row explains the entry type. Dates and numbers are written with
+ * libs/format.js.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mount, flushPromises } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
+
+vi.mock('@/composables/useCopyText', () => ({ copyText: vi.fn(() => Promise.resolve()) }));
+import { copyText } from '@/composables/useCopyText';
+import PropsTable from './PropsTable.vue';
+import { formatModifiedDate } from '@/libs/propertiesUtils';
+import { readSource, ruleOf } from '@/specs/cssSource';
+
+const notify = { success: vi.fn() };
+const mountTable = (props) => mount(PropsTable, {
+    props: { preserveOrder: true, ...props },
+    global: { plugins: [PrimeVue], mocks: { $notify: notify }, stubs: { Window: true, EntryTypeInfoDialog: true } }
+});
+
+describe('PropsTable', () => {
+    beforeEach(() => { copyText.mockClear(); notify.success.mockClear(); });
+
+    it('keeps the EPSG code as text, with an info button that opens epsg.io in a new tab', () => {
+        const wrapper = mountTable({ obj: { coordinates: 'EPSG:4326 11.2, 46.1, 300.00m' } });
+        const link = wrapper.find('a[href="https://epsg.io/4326"]');
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toBe('');
+        expect(link.find('.fa-circle-question').exists()).toBe(true);
+        expect(link.attributes('aria-label')).toBe('What is EPSG:4326? (opens epsg.io)');
+        expect(link.attributes('target')).toBe('_blank');
+        expect(link.attributes('rel')).toContain('noopener');
+        expect(wrapper.text()).toContain('EPSG:4326 11.2, 46.1, 300.00m');
+    });
+
+    it('shows the warning of a file in the warning yellow with an icon, as a note, and nested warnings as text', () => {
+        const text = 'coordinate system ignored: the coordinates do not fit WGS 84';
+        const wrapper = mountTable({ obj: { warning: text, type: 'Point Cloud' } });
+        const warning = wrapper.find('.entry-warning');
+        expect(warning.exists()).toBe(true);
+        expect(warning.attributes('role')).toBe('note');
+        expect(warning.text()).toBe(text);
+        expect(warning.find('.fa-triangle-exclamation').exists()).toBe(true);
+        expect(mountTable({ obj: { info: { warning: text } } }).find('.entry-warning').exists()).toBe(false);
+    });
+
+    it('shows each line of a warning as an item of its own, with a bullet and a gap when there are several', () => {
+        const lines = ['3D Tiles not generated: Element not supported: \'cstype bspline\'', 'Textures outside the dataset left out: ../outside/checker.png'];
+        const wrapper = mountTable({ obj: { warning: `${lines[0]}\n${lines[1]}\n`, type: '3D Model' } });
+        const items = wrapper.findAll('.entry-warning li');
+        expect(items.map(li => li.text())).toEqual(lines);
+        expect(wrapper.find('.entry-warning-lines').classes()).toContain('several');
+        expect(mountTable({ obj: { warning: lines[1] } }).find('.entry-warning-lines').classes()).not.toContain('several');
+        const source = readSource(__dirname, 'PropsTable.vue');
+        expect(ruleOf(source, '.entry-warning-lines.several')).toContain('list-style: disc');
+        expect(ruleOf(source, '.entry-warning-lines > li + li')).toContain('margin-top: var(--ddb-spacing-xs)');
+    });
+
+    it('puts the warning above the table, on the whole width, not in the narrow value column', () => {
+        const wrapper = mountTable({ obj: { warning: 'Textures outside the dataset left out: ../a/b.png', type: '3D Model' } });
+        const warning = wrapper.find('.entry-warning');
+        expect(warning.element.closest('table')).toBeNull();
+        expect(warning.element.parentElement.classList.contains('props-table-wrapper')).toBe(true);
+        expect(wrapper.findAll('tbody tr').map(r => r.text())).toEqual(['Type3D Model']);
+    });
+
+    it('colours the warning with the warning tokens (yellow, dark text), never an orange', () => {
+        const rule = ruleOf(readSource(__dirname, 'PropsTable.vue'), '.entry-warning');
+        expect(rule).toContain('background-color: var(--ddb-warning)');
+        expect(rule).toContain('color: var(--ddb-text-on-warning)');
+        expect(rule).not.toMatch(/orange/i);
+    });
+
+    it('stacks the keys of a nested table over their values, which break at spaces, not letter by letter', () => {
+        const wrapper = mountTable({ obj: { vector: { crs: { label: 'EPSG:4326', source: 'lonlat' }, driver: 'DXF' } } });
+        const nested = wrapper.findAll('.props-table-wrapper').slice(1);
+        expect(nested.length).toBe(2);
+        expect(nested.every(table => table.classes('props-nested'))).toBe(true);
+        expect(wrapper.find('.props-table-wrapper').classes('props-nested')).toBe(false);
+        const source = readSource(__dirname, 'PropsTable.vue');
+        // The rows of a nested table are blocks: the key over the value, both on the whole width of the cell
+        expect(ruleOf(source, '.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td)')).toContain('display: block');
+        const key = ruleOf(source, '.props-nested > .props-datatable :deep(.p-datatable-tbody > tr > td:first-child)');
+        expect(key).toContain('width: 100%');
+        expect(key).toContain('overflow-wrap: normal');
+    });
+
+    it('links codes in nested values too', () => {
+        const wrapper = mountTable({ obj: { vector: { crs: 'EPSG:32633 (from the .prj file)' } } });
+        expect(wrapper.find('a[href="https://epsg.io/32633"]').exists()).toBe(true);
+    });
+
+    it('copies the value given for the row and names it', async () => {
+        const wrapper = mountTable({
+            obj: { coordinates: 'EPSG:4326 11.2, 46.1', size: '10 B' },
+            copyableValues: {
+                coordinates: { text: '11.2, 46.1', label: 'coordinates' },
+                size: { text: 'abc123', label: 'hash' }
+            }
+        });
+        const button = wrapper.find('button[aria-label="Copy coordinates to clipboard"]');
+        expect(button.exists()).toBe(true);
+        expect(wrapper.find('button[aria-label="Copy hash to clipboard"]').exists()).toBe(true);
+        await button.trigger('click');
+        await flushPromises();
+        expect(copyText).toHaveBeenCalledWith('11.2, 46.1');
+        expect(notify.success).toHaveBeenCalledWith('Coordinates copied to clipboard', { summary: 'Copied' });
+    });
+
+    it('has no copy button on rows without a copy value, nor on nested rows with the same key', () => {
+        const wrapper = mountTable({
+            obj: { path: 'a.jpg', meta: { coordinates: 'x' } },
+            copyableValues: { coordinates: { text: '1, 2', label: 'coordinates' } }
+        });
+        expect(wrapper.find('button[aria-label^="Copy"]').exists()).toBe(false);
+    });
+
+    it('shows the type name as text and opens its description only from the ? button', async () => {
+        const wrapper = mountTable({ obj: { type: 'GeoRaster', meta: { type: 'Feature' } }, entryType: 4 });
+        const buttons = wrapper.findAll('button.type-info-btn');
+        expect(buttons).toHaveLength(1);
+        expect(buttons[0].attributes('aria-label')).toBe('What is GeoRaster?');
+        const name = buttons[0].element.parentElement.querySelector('span');
+        expect(name.textContent).toBe('GeoRaster');
+        expect(name.closest('button')).toBeNull();
+        expect(wrapper.findComponent({ name: 'EntryTypeInfoDialog' }).exists()).toBe(false);
+        await buttons[0].trigger('click');
+        expect(wrapper.findComponent({ name: 'EntryTypeInfoDialog' }).props('type')).toBe(4);
+    });
+
+    it('keeps the Type row plain without an entry type, or for a type without a description', () => {
+        expect(mountTable({ obj: { type: 'GeoRaster' } }).find('button.type-info-btn').exists()).toBe(false);
+        expect(mountTable({ obj: { type: 'Unknown' }, entryType: 0 }).find('button.type-info-btn').exists()).toBe(false);
+    });
+
+    it('reads an entry type given as a string', () => {
+        expect(mountTable({ obj: { type: 'Vector' }, entryType: '14' }).find('button.type-info-btn').exists()).toBe(true);
+    });
+
+    // FR-EXP-26, FR-RAS-29: the capture time is written as Modified is, and "Unknown" when it is not known
+    it('writes the capture time as Modified is written, in local time with seconds', () => {
+        const ms = new Date(2016, 5, 23, 23, 32, 13).getTime();
+        const wrapper = mountTable({ obj: { captureTime: ms } });
+        expect(wrapper.find('tbody').text()).toContain(formatModifiedDate(ms / 1000));
+        expect(wrapper.find('tbody').text()).not.toContain('GMT');
+    });
+
+    it.each([0, null])('shows "Unknown" for a capture time of %s', value => {
+        const wrapper = mountTable({ obj: { captureTime: value } });
+        const row = wrapper.findAll('tbody tr').find(r => r.text().startsWith('Capture Time'));
+        expect(row.text()).toBe('Capture TimeUnknown');
+    });
+
+    it('writes numbers with the formatter of the browser locale', () => {
+        Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
+        try {
+            expect(mountTable({ obj: { focalLength: 1234.5678 } }).find('tbody').text()).toContain('1.234,568');
+        } finally {
+            delete navigator.language;
+        }
+    });
+});

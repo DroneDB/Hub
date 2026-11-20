@@ -1,68 +1,65 @@
 <template>
-    <Window title="Add User" id="addUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Add User" :busy="busy" @confirm="submitForm()" @close="$emit('close')">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
-
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Username</label>
-                    <InputText ref="txtUsername" @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="username" placeholder="" class="w-100" />
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Email</label>
-                    <InputText @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="email" placeholder="user@example.com" class="w-100" />
-                    <div v-if="email && !isEmailValid()" class="text-danger small">
-                        Please enter a valid email address
+            <Form ref="formRef" :resolver="resolver" :initial-values="{ roles: [] }" @submit="submit(addUser, $event)">
+                <template #default="$form">
+                    <PrimeMessage v-if="formError" severity="error" role="alert" class="mb-3 form-error">{{ formError }}</PrimeMessage>
+                    <div class="mb-3">
+                        <label for="add-user-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
+                        <InputText id="add-user-dialog-username" name="username" placeholder="" class="w-100" autocomplete="off"
+                                   :readonly="busy" :invalid="!!errorOf($form, 'username')"
+                                   :aria-invalid="errorOf($form, 'username') ? 'true' : undefined"
+                                   :aria-describedby="errorOf($form, 'username') ? 'add-user-dialog-username-error add-user-dialog-username-help' : 'add-user-dialog-username-help'" />
+                        <!-- The rule of the Registry, before any input (FR-ADM-02) -->
+                        <small id="add-user-dialog-username-help" class="field-help">Use {{ nameRule }}</small>
+                        <FieldError id="add-user-dialog-username-error" :message="errorOf($form, 'username')" />
                     </div>
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Password</label>
-                    <Password ref="txtPassword" @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="password" placeholder="" :feedback="false" toggleMask class="w-100" @input="onPasswordInput" />
-                    <div v-if="passwordPolicy && password" class="password-requirements">
-                        <small v-for="(req, idx) in passwordRequirements" :key="idx"
-                            :class="{ met: isRequirementMet(req) }">
-                            <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
-                            {{ req }}
-                        </small>
+                    <div class="mb-3">
+                        <label for="add-user-dialog-email" class="d-block mb-1 fw-semibold">Email</label>
+                        <InputText id="add-user-dialog-email" name="email" placeholder="user@example.com" class="w-100" autocomplete="off"
+                                   :readonly="busy" :invalid="!!errorOf($form, 'email')"
+                                   :aria-invalid="errorOf($form, 'email') ? 'true' : undefined"
+                                   :aria-describedby="errorOf($form, 'email') ? 'add-user-dialog-email-error' : undefined" />
+                        <FieldError id="add-user-dialog-email-error" :message="errorOf($form, 'email')" />
                     </div>
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Roles</label>
-                    <MultiSelect v-model="roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
-                </div>
-            </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="adding" label="Close" />
-                <Button @click="confirmAddUser()" :disabled="adding || !isFilled()" :loading="adding"
-                    severity="primary" label="Add User" />
-            </div>
+                    <NewPasswordFields id-prefix="add-user-dialog" :policy="passwordPolicy" :new-password="$form.newPassword?.value ?? ''"
+                                       new-label="Password" confirm-label="Confirm Password"
+                                       :errors="{ newPassword: errorOf($form, 'newPassword'), confirmPassword: errorOf($form, 'confirmPassword') }"
+                                       :readonly="busy" />
+                    <div class="mb-3">
+                        <label id="add-user-dialog-roles-label" for="add-user-dialog-roles" class="d-block mb-1 fw-semibold">Roles</label>
+                        <MultiSelect name="roles" input-id="add-user-dialog-roles" aria-labelledby="add-user-dialog-roles-label" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
+                    </div>
+                </template>
+            </Form>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
+import Form from '@primevue/forms/form';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
+import PrimeMessage from 'primevue/message';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
-import Password from 'primevue/password';
-import Button from 'primevue/button';
-import PrimeMessage from 'primevue/message';
+import FieldError from '@/components/FieldError.vue';
+import NewPasswordFields from '@/components/NewPasswordFields.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
+import { emailProblem, nameDescription, userNameProblem } from '@/libs/nameRules';
+import { pickableRoles } from '@/libs/roles';
+import { createResolver } from '@/libs/forms/resolver';
+import { newPasswordProblem, confirmPasswordProblem } from '@/libs/accountProblems';
+import { useHubForm } from '@/composables/useHubForm';
 
 export default {
     components: {
-        Window, Message, MultiSelect, InputText, Password, Button, PrimeMessage
+        LoadingSpinner,
+        Window, PrimeMessage, MultiSelect, InputText, Form, FieldError, NewPasswordFields
     },
     props: {
         availableRoles: {
@@ -70,113 +67,56 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        const policy = reg.features?.value?.(Features.PASSWORD_POLICY) ?? null;
+        const resolver = createResolver({
+            // The rule of the Registry (lowercase letters and digits), in its words, as the user types
+            username: userNameProblem,
+            // The server's rule text, at the field; the e-mail is optional
+            email: v => emailProblem(v),
+            newPassword: v => newPasswordProblem(v, { policy }),
+            confirmPassword: (v, values) => confirmPasswordProblem(v, { newPassword: values.newPassword })
+        });
+        const form = useHubForm({
+            fields: ['username', 'email', 'newPassword', 'confirmPassword'],
+            // The Registry names the field of a refusal by the member of the request (D-047)
+            aliases: { userName: 'username', password: 'newPassword' },
+            dependents: { newPassword: ['confirmPassword'] }
+        });
+        return { ...form, resolver, passwordPolicy: policy, nameRule: nameDescription() };
+    },
     data: function () {
         return {
-            adding: false,
-            loading: false,
-            error: "",
-            username: "",
-            email: "",
-            password: "",
-            roles: [],
-            passwordPolicy: null,
-            passwordRequirements: [],
-            passwordValidation: { isValid: true, errors: [] }
+            loading: false
         };
     },
     computed: {
+        // 'deactivated' is not a role to give: Disable in the Users list blocks sign-in
         roleOptions() {
-            return this.availableRoles.map(r => ({ label: r, value: r }));
+            return pickableRoles(this.availableRoles).map(r => ({ label: r, value: r }));
         }
     },
-    mounted: function () {
-        // Load password policy from features
-        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
-        this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
-    },
     methods: {
-        close: function () {
-            this.$emit('onClose');
-        },
-        clearError: function () {
-            this.error = "";
-        },
-        isFilled: function () {
-            return this.username !== "" && this.password !== "" && this.isEmailValid() && this.isPasswordValid();
-        },
-        isPasswordValid: function () {
-            if (!this.passwordPolicy || !this.password) return true;
-            return this.passwordValidation.isValid;
-        },
-        onPasswordInput: function () {
-            this.passwordValidation = validatePassword(this.password, this.passwordPolicy);
-        },
-        isRequirementMet: function (requirement) {
-            if (!this.password) return false;
-            const req = requirement.toLowerCase();
-            if (req.includes('character') && !req.includes('special'))
-                return this.password.length >= (this.passwordPolicy?.minLength || 0);
-            if (req.includes('digit'))
-                return /\d/.test(this.password);
-            if (req.includes('uppercase'))
-                return /[A-Z]/.test(this.password);
-            if (req.includes('lowercase'))
-                return /[a-z]/.test(this.password);
-            if (req.includes('special'))
-                return !/^[a-zA-Z0-9]*$/.test(this.password);
-            return false;
-        },
-        isEmailValid: function () {
-            if (!this.email || this.email.trim() === "") return true; // Email is optional
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(this.email.trim());
-        },
-        confirmAddUser: async function () {
-            if (!this.isFilled()) {
-                if (!this.isEmailValid()) {
-                    this.error = "Please enter a valid email address";
-                    return;
-                }
-                return;
-            }
-
-            this.adding = true;
-            try {
-                const user = await reg.addUser(this.username, this.password, this.roles, this.email);
-                this.$toast.add({ severity: 'success', summary: 'User Added', detail: `User "${this.username}" created successfully`, life: 3000 });
-                this.adding = false;
-                this.$emit('onClose', user);
-            } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add user: ' + e.message, life: 5000 });
-                this.error = e.message;
-                this.adding = false;
-            }
+        addUser: async function (values) {
+            const user = await reg.admin.addUser(values.username.trim(), values.newPassword, values.roles ?? [], (values.email ?? '').trim());
+            this.$notify.success(`User "${values.username.trim()}" created successfully`, { summary: 'User Added' });
+            this.$emit('close', user);
         }
     }
 }
 </script>
 
 <style scoped>
+.field-help {
+    display: block;
+    margin-top: var(--ddb-spacing-xs);
+    color: var(--ddb-text-secondary);
+}
+
 .dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;
-}
-
-.password-requirements {
-    margin-top: 0.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.password-requirements small {
-    color: var(--ddb-danger);
-}
-
-.password-requirements small.met {
-    color: var(--ddb-success);
 }
 </style>

@@ -1,12 +1,7 @@
 <template>
-    <Window title="Extract Archive" id="extractDialog" @onClose="close('close')" modal maxWidth="600px" fixedSize>
+    <Window id="extractDialog" title="Extract Archive" modal max-width="600px" fixed-size cancel-label="Close" confirm-label="Extract" confirm-icon="fa-solid fa-box-open" :confirm-disabled="!!destPathError" :busy="isExtracting" @confirm="extract" @close="close('close')">
         <div class="extract-dialog">
-            <form v-on:submit.prevent>
-
-                <!-- Error Message -->
-                <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
-                    {{ errorMessage }}
-                </PrimeMessage>
+            <form @submit.prevent>
 
                 <!-- Archive Info -->
                 <PrimeMessage severity="info" :closable="false">
@@ -15,25 +10,25 @@
 
                 <!-- Destination Path -->
                 <div class="my-3">
-                    <label class="d-block mb-1 fw-semibold">Extract to</label>
+                    <label for="extract-dialog-extract-to" class="d-block mb-1 fw-semibold">Extract to</label>
                     <div class="dest-path-row">
-                        <InputText v-model="destPath" placeholder="root folder" :disabled="isExtracting"
-                            :invalid="!!destPathError" @input="onDestPathInput" fluid />
+                        <InputText id="extract-dialog-extract-to" v-model="destPath" placeholder="root folder" :disabled="isExtracting"
+                                   :invalid="!!destPathError" fluid @input="onDestPathInput" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-folder-open"
-                            :disabled="isExtracting" @click="openFolderPicker" title="Browse folders"
-                            aria-label="Browse folders" />
+                                :disabled="isExtracting" title="Browse folders" aria-label="Browse folders"
+                                @click="openFolderPicker" />
                     </div>
                     <small v-if="destPathError" class="dest-error">{{ destPathError }}</small>
-                    <small v-else-if="destPathChecking" class="help-text"><i class="fa-solid fa-circle-notch fa-spin"></i> Checking destination…</small>
-                    <small v-else-if="destPathExists === true" class="dest-exists"><i class="fa-solid fa-folder-open"></i> This folder already exists; extracted files will be added to it.</small>
-                    <small v-else-if="destPathExists === false" class="dest-create"><i class="fa-solid fa-folder-plus"></i> This folder will be created.</small>
+                    <small v-else-if="destPathChecking" class="help-text"><LoadingSpinner inline label="Checking destination…" /></small>
+                    <small v-else-if="destPathExists === true" class="dest-exists"><i class="fa-solid fa-folder-open" /> This folder already exists; extracted files will be added to it.</small>
+                    <small v-else-if="destPathExists === false" class="dest-create"><i class="fa-solid fa-folder-plus" /> This folder will be created.</small>
                     <small v-else class="help-text">Destination folder (leave empty for the dataset root).</small>
                 </div>
 
                 <!-- Overwrite Checkbox -->
                 <div class="mb-2">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="overwrite" :binary="true" inputId="extractOverwrite" :disabled="isExtracting" />
+                        <Checkbox v-model="overwrite" :binary="true" input-id="extractOverwrite" :disabled="isExtracting" />
                         <label for="extractOverwrite">Overwrite existing files</label>
                     </div>
                 </div>
@@ -41,65 +36,76 @@
                 <!-- Delete Archive Checkbox -->
                 <div class="mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="deleteArchive" :binary="true" inputId="extractDeleteArchive" :disabled="isExtracting" />
+                        <Checkbox v-model="deleteArchive" :binary="true" input-id="extractDeleteArchive" :disabled="isExtracting" />
                         <label for="extractDeleteArchive">Delete archive after extraction</label>
                     </div>
                 </div>
 
-                <!-- Progress Bar -->
-                <div v-if="isExtracting" class="progress-section">
-                    <ProgressBar :value="progress" :showValue="true" />
-                    <div class="progress-label">{{ statusMessage }}</div>
-                </div>
+                <!-- The task: queued, extracting, failed with its reason (FR-XC-15) -->
+                <HeavyTaskStatus :task="extractTask" :error="errorMessage" label="Extract" :phases="PHASES" cancellable :cancelling="cancelling"
+                                 @cancel="cancelHeavyTask($event, 'Extract archive')" />
 
             </form>
 
             <!-- Buttons -->
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" :disabled="isExtracting" label="Close" />
-                <Button @click="extract" :disabled="isExtracting || !!destPathError" :loading="isExtracting"
-                    severity="primary" icon="fa-solid fa-box-open" label="Extract" />
-            </div>
         </div>
 
         <!-- Guided folder browser -->
-        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initialPath="destPath"
-            @onClose="handleFolderPickerClose" />
+        <FolderPicker v-if="folderPickerOpen" :dataset="dataset" mode="folder" title="Select Destination Folder" :initial-path="destPath"
+                      @close="handleFolderPickerClose" />
+        <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
-import ProgressBar from 'primevue/progressbar';
-import FolderPickerDialog from './FolderPickerDialog.vue';
-import useHeavyTask from '@/composables/useHeavyTask';
+import HeavyTaskStatus from '@/components/HeavyTaskStatus.vue';
+import FolderPicker from '@/components/FolderPicker.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { useDialogs } from '@/composables/useDialogs';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
+import { extractSummary } from '@/libs/tasks/extractSummary';
 import ddb from 'ddb';
 
 const { pathutils } = ddb;
 
+// The phases the archive-extract tool reports, in words
+const PHASES = Object.freeze({
+    extracting: 'Extracting files…',
+    building: 'Building derivatives…',
+    done: 'Finishing…'
+});
+
 export default {
-    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPickerDialog },
-    mixins: [useHeavyTask],
+    components: { Window, Button, PrimeMessage, InputText, Checkbox, HeavyTaskStatus, FolderPicker, LoadingSpinner, DialogHost },
 
     props: {
         file: { type: Object, required: true },
         dataset: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup(props) {
+        const { runHeavyTask, heavyTasks } = useHeavyTask();
+        const dialogs = useDialogs();
+        const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => props.dataset, dialogs);
+        return { runHeavyTask, heavyTasks, PHASES, dialogs, cancelHeavyTask, cancelling };
+    },
     data() {
         return {
             destPath: '',
             overwrite: false,
             deleteArchive: false,
             isExtracting: false,
-            progress: 0,
-            statusMessage: '',
-            errorMessage: null,
+            // The task of the latest submit (its state is read from heavyTasks) and the refusal of a submit with no task
+            extractTaskId: null,
+            errorMessage: '',
             destPathError: null,
             destPathExists: null,    // null = unknown/root, true = exists, false = will be created
             destPathChecking: false,
@@ -108,6 +114,9 @@ export default {
     },
 
     computed: {
+        extractTask() {
+            return this.extractTaskId ? this.heavyTasks[this.extractTaskId] ?? null : null;
+        },
         archiveName() {
             const p = this.file && this.file.entry ? this.file.entry.path : '';
             return p ? pathutils.basename(p) : '';
@@ -155,11 +164,8 @@ export default {
                 this.destPathError = 'Path cannot contain empty folder names.';
                 return false;
             }
-            // Reserved DroneDB database folder (server rejects any ".ddb" prefix).
-            if (raw.startsWith('.ddb')) {
-                this.destPathError = 'This is a reserved path.';
-                return false;
-            }
+            // A reserved folder (".ddb" in any of the spellings a file system opens as it) is refused
+            // by the server with the rule of libddb when the extraction is submitted
             return true;
         },
 
@@ -167,10 +173,11 @@ export default {
             this.folderPickerOpen = true;
         },
 
-        handleFolderPickerClose(action, path) {
+        // FolderPicker: { path, entry }, or null when cancelled
+        handleFolderPickerClose(result) {
             this.folderPickerOpen = false;
-            if (action === 'select') {
-                this.destPath = path || '';
+            if (result) {
+                this.destPath = result.path || '';
                 this.validateDestPath();
                 this.checkDestExistence();
             }
@@ -208,7 +215,7 @@ export default {
                     this.destPathExists = null;
                     this.destPathError = 'A file with this name already exists.';
                 }
-            } catch (e) {
+            } catch {
                 // Parent folder doesn't exist yet (or listing failed): it will be created.
                 if (norm(raw) === norm(this.destPath)) this.destPathExists = false;
             } finally {
@@ -223,55 +230,44 @@ export default {
             if (!sourcePath) return;
 
             this.isExtracting = true;
-            this.errorMessage = null;
-            this.progress = 0;
-            this.statusMessage = 'Starting…';
+            this.errorMessage = '';
+            this.extractTaskId = null;
 
             try {
                 // Offloaded to the archive-extract heavy task. Awaits completion so the
-                // file listing can be refreshed when the dialog closes.
-                // Pass sourcePath as the task's `path` field so TasksTable shows the
-                // archive name instead of "Whole dataset".
-                await this.runHeavyTask(this.dataset, 'archive-extract', {
-                    path: sourcePath,
+                // file listing can be refreshed when the dialog closes. The task lists
+                // name it by the label the tool gives it (archive → folder, FR-PRC-22):
+                // no `path` is sent only for that.
+                const task = await this.runHeavyTask(this.dataset, 'archive-extract', {
                     params: {
                         sourcePath,
                         destPath: this.destPath || '',
                         deleteArchive: this.deleteArchive,
                         overwrite: this.overwrite
                     },
-                    force: true,
+                    // No force: a second submit of the same extraction gets the running task (FR-PRC-02)
                     notify: false,
-                    onProgress: (t) => {
-                        this.progress = t.percent || 0;
-                        this.statusMessage = this.phaseLabel(t.phase);
-                    }
+                    onSubmitted: entry => { this.extractTaskId = entry.taskId; }
                 });
 
-                this.$emit('onClose', 'extracted', {
+                this.$emit('close', 'extracted', {
                     destPath: this.destPath || '',
                     deletedArchive: this.deleteArchive,
-                    archivePath: sourcePath
+                    archivePath: sourcePath,
+                    // What the extraction did not extract, named with the reason (FR-PRC-30)
+                    summary: extractSummary(task && task.logTail)
                 });
             } catch (e) {
-                this.errorMessage = (e && e.message) ? e.message : String(e);
+                // A failed task shows its own reason in the status; a refusal of the submit has no task
+                if (!e?.task) this.errorMessage = (e && e.message) ? e.message : String(e);
             } finally {
                 this.isExtracting = false;
             }
         },
 
-        phaseLabel(phase) {
-            switch (phase) {
-                case 'extracting': return 'Extracting files…';
-                case 'building': return 'Building derivatives…';
-                case 'done': return 'Finishing…';
-                default: return 'Working…';
-            }
-        },
-
         close(id) {
             if (this.isExtracting) return;
-            this.$emit('onClose', id || 'close');
+            this.$emit('close', id || 'close');
         }
     }
 };
@@ -279,7 +275,7 @@ export default {
 
 <style scoped>
 .extract-dialog {
-    min-width: 380px;
+    min-width: min(380px, var(--window-content-width, 100%));
 }
 
 .dest-path-row {
@@ -293,33 +289,22 @@ export default {
 }
 
 .dest-error {
-    color: var(--p-red-500, #e24c4c);
+    color: var(--p-red-500);
     font-size: 0.8rem;
 }
 
 .help-text {
-    color: var(--p-text-muted-color, #888);
+    color: var(--p-text-muted-color);
     font-size: 0.8rem;
 }
 
 .dest-exists {
-    color: var(--p-text-muted-color, #888);
+    color: var(--p-text-muted-color);
     font-size: 0.8rem;
 }
 
 .dest-create {
-    color: var(--p-primary-color, #3b82f6);
+    color: var(--p-primary-color);
     font-size: 0.8rem;
-}
-
-.progress-section {
-    margin-top: 1rem;
-}
-
-.progress-label {
-    margin-top: 0.4rem;
-    font-size: 0.85rem;
-    color: var(--p-text-muted-color, #888);
-    text-align: center;
 }
 </style>

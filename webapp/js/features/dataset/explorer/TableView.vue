@@ -1,61 +1,48 @@
 <template>
     <div id="table-view-container">
         <ContextMenu :items="contextMenu" />
-        <Toolbar :tools="tools" v-if="tools" />
+        <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-3">
-                <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon"></i>
-                        <template v-else>{{ item.label }}</template>
-                    </a>
-                    <span v-else class="bc-active">{{ item.label }}</span>
-                </template>
-                <template #separator> / </template>
-            </Breadcrumb>
-            <!--<div class="ui divider"></div>-->
+            <PathBreadcrumb :path="currentPath" root-path="/" class="m-3" @navigate="goToPath" />
         </div>
-        <div ref="tableview" id="table-view" :class="{ dropping }"
-            @drop="explorerDropHandler($event)"
-            @dragleave="explorerDragLeave($event)"
-            @dragenter="explorerDragEnter($event)"
-            @dragover.prevent
-            @click="onClick">
-            <DataTable :value="sortedFiles" :paginator="false" scrollable scrollHeight="flex" size="small"
-                dataKey="path" stripedRows
-                :rowClass="rowClass"
-                :pt="{ bodyRow: rowPt }"
-                @row-click="onRowClick"
-                @row-dblclick="onRowDblClick"
-                @row-contextmenu="onRowContextMenu">
+        <!-- A click on the empty area clears the selection, Escape does it from the keyboard -->
+        <div id="table-view" ref="tableview" :class="{ dropping }" role="presentation"
+             @keydown.esc="clearSelection"
+             @drop="explorerDropHandler($event)"
+             @dragleave="explorerDragLeave($event)"
+             @dragenter="explorerDragEnter($event)"
+             @dragover.prevent
+             @click="onClick"
+             @contextmenu="onBackgroundContextMenu">
+            <DataTable :value="sortedFiles" :paginator="false" scrollable scroll-height="flex" size="small"
+                       data-key="path" striped-rows
+                       :row-class="rowClass"
+                       :pt="{ bodyRow: rowPt, table: tablePt }"
+                       @row-click="onRowClick"
+                       @row-dblclick="onRowDblClick"
+                       @row-contextmenu="onRowContextMenu">
                 <Column header="" style="width: 3rem; text-align: center;">
                     <template #body="{ data }">
-                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
+                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon" />
                         <template v-else-if="expandedGrid">
-                            <img v-if="getThumbnail(data)" class="thumb-preview" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)" />
-                            <i v-else class="icon" :class="data.icon"></i>
+                            <img v-if="getThumbnail(data)" class="thumb-preview" loading="lazy" decoding="async" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)">
+                            <i v-else class="icon" :class="data.icon" />
                         </template>
-                        <i v-else class="icon" :class="data.icon"></i>
-                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)"></i>
+                        <i v-else class="icon" :class="data.icon" />
+                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)" />
                     </template>
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span @click="sortBy('name')" class="sortable-header">
-                            Name
-                            <i v-if="sortColumn === 'name'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-name">{{ data.label }}</span>
                     </template>
                 </Column>
-                <Column style="width: 7.5rem;">
+                <Column style="width: 7.5rem;" v-bind="columnFrom('md')">
                     <template #header>
-                        <span @click="sortBy('type')" class="sortable-header">
-                            Type
-                            <i v-if="sortColumn === 'type'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-type">{{ getFileType(data) }}</span>
@@ -63,21 +50,15 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span @click="sortBy('size')" class="sortable-header">
-                            Size
-                            <i v-if="sortColumn === 'size'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Size" column="size" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-size">{{ getFileSize(data) }}</span>
                     </template>
                 </Column>
-                <Column style="width: 12rem">
+                <Column style="width: 12rem" v-bind="columnFrom('lg')">
                     <template #header>
-                        <span @click="sortBy('modified')" class="sortable-header">
-                            Modified
-                            <i v-if="sortColumn === 'modified'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <div class="file-date">
@@ -87,12 +68,10 @@
                     </template>
                 </Column>
                 <template #empty>
-                    <div v-if="isLoadingFiles" class="text-center p-4">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i>
-                    </div>
-                    <div v-else class="text-center p-4">
-                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;"></i>
-                        <p class="mt-2">This folder is empty</p>
+                    <LoadingSpinner v-if="isLoadingFiles" />
+                    <!-- Not while an import runs: its files are coming (the banner of the page says so, FR-UPL-10) -->
+                    <div v-else-if="!importing" class="text-center p-4">
+                        <FolderEmptyState :can-write="canWrite" @upload="$emit('upload')" @import-from-url="$emit('importFromUrl')" />
                     </div>
                 </template>
             </DataTable>
@@ -101,23 +80,37 @@
 </template>
 
 <script>
-import Toolbar from '@/components/Toolbar.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import FolderEmptyState from './FolderEmptyState.vue';
+import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
-import Mouse from '@/libs/mouse';
-import { clone, formatTimeAgo, bytesToSize } from '@/libs/utils';
-import { dragDropMixin } from '@/libs/dragDropUtils';
+import { getFileSizeDisplay, formatModifiedDate, formatModifiedTimeAgo } from '@/libs/propertiesUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
-import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
+import { sortFileRows, nextSort } from '@/libs/dataset/fileSort';
+import { hasThumbnail } from '@/libs/entryTypeCapabilities';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 
 import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
 
-import ContextMenu from '@/components/ContextMenu';
-import Breadcrumb from 'primevue/breadcrumb';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
+import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import { getCurrentInstance, nextTick, useId } from 'vue';
+import { useDragDrop } from '@/composables/useDragDrop';
+import { useFileSelection } from '@/composables/useFileSelection';
+import { useListNavigation } from '@/composables/useListNavigation';
+import { useCutMarks } from '@/composables/useCutMarks';
+import { columnFrom } from '@/libs/responsiveColumns';
+
+// The preview of a row is a 48 px box that `object-fit: cover` fills along the long side of a 16:9 photo:
+// 48 x 16 / 9 = 85.3, so 86 CSS px of bitmap (FR-EXP-41); the request adds the pixel ratio (128 at 1x, 256 at 2x)
+const ROW_PREVIEW_CSS_PX = 86;
 
 /**
  * TableView - Flat-list table view for dataset files.
@@ -126,13 +119,43 @@ import Column from 'primevue/column';
  * drag-and-drop support, and a context menu for file operations.
  */
 export default {
-    mixins: [dragDropMixin],
     components: {
-        Toolbar, ContextMenu, Breadcrumb, DataTable, Column
+        LoadingSpinner, FolderEmptyState,
+        Toolbar, ContextMenu, PathBreadcrumb, SortHeader, DataTable, Column
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'expandedGrid', 'canWrite', 'isLoadingFiles'],
     inject: { showBuildConfirm: { default: null } },
+    props: {
+        files: { type: Array, required: true },
+        currentPath: { type: String, default: null },
+        tools: { type: Array, default: null },
+        dataset: { type: Object, required: true },
+        expandedGrid: { type: Boolean, default: false },
+        canWrite: { type: Boolean, default: false },
+        // An import into the dataset runs: the empty-folder hint is not shown (FR-UPL-10)
+        importing: { type: Boolean, default: false },
+        isLoadingFiles: { type: Boolean, default: false }
+    },
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    setup(props) {
+        const instance = getCurrentInstance();
+        // One tab stop: the table holds the focus and names its active row (aria-activedescendant), FR-EXP-09
+        const nav = useListNavigation({
+            count: () => instance.proxy.sortedFiles.length,
+            horizontal: false,
+            idPrefix: `${useId()}-row`,
+            move: (index, mods) => instance.proxy.moveTo(index, mods),
+            open: index => instance.proxy.openAt(index),
+            toggle: index => instance.proxy.toggleAt(index)
+        });
+        return {
+            ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
+            // Ranges follow the rows as sorted on screen
+            selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path),
+            nav,
+            columnFrom,
+            ...useCutMarks(() => props.dataset)
+        };
+    },
     data: function () {
         const self = this;
         const ctx = {
@@ -141,13 +164,8 @@ export default {
             get dataset() { return self.dataset; },
             get showBuildConfirm() { return self.showBuildConfirm; },
             emit: (...args) => self.$emit(...args),
-            onSelectAllNone: () => {
-                if (self.selectedFiles.length === self.files.length) {
-                    self.deselectAll();
-                } else {
-                    self.selectAll();
-                }
-            },
+            getFiles: () => self.files,
+            selectAll: on => (on ? self.selectAll() : self.deselectAll()),
             component: self
         };
 
@@ -155,17 +173,83 @@ export default {
 
         return {
             loading: false,
-            dropping: false,
             contextMenu,
             sortColumn: 'name',
             sortDirection: 'asc',
-            rangeStartIdx: null,
             thumbnailCache: new Map(), // path -> thumbnail URL, or null if unsupported/unavailable
             // Paths whose thumbnail failed to load (e.g. build artifact missing).
             // Component-scoped (cleared on mount / dataset switch) so failures
             // stick for this list without cross-dataset poisoning (Fix 1 Q7).
             failedThumbs: new Set()
         };
+    },
+    computed: {
+        selectedFiles: function () {
+            return this.files.filter(f => f.selected);
+        },
+        sortedFiles: function() {
+            return sortFileRows(this.files, this.sortColumn, this.sortDirection);
+        },
+        // The row the keyboard is on
+        activePath: function () {
+            return this.sortedFiles[this.nav.active.value]?.path;
+        },
+        // The table is the list: one tab stop, an ARIA grid of rows that can be selected
+        tablePt: function () {
+            return {
+                role: 'grid',
+                'aria-label': 'Files',
+                'aria-multiselectable': 'true',
+                'aria-activedescendant': this.nav.activeId.value,
+                tabindex: 0,
+                'data-file-list': '',
+                onFocus: e => {
+                    if (e.target !== e.currentTarget || this.nav.active.value >= 0) return;
+                    this.nav.setActive(Math.max(0, this.sortedFiles.findIndex(f => f.selected)));
+                },
+                // The keys of the table or of a row, not of a sort button in the header
+                onKeydown: e => {
+                    if (e.target === e.currentTarget || e.target.closest('tbody tr')) this.nav.onKeydown(e);
+                }
+            };
+        },
+        // Row events find their file by the row's position (the header is row 0); the row's pass-through
+        // options say whether it is selected (aria-selected) and name it for aria-activedescendant
+        rowPt: function () {
+            const fileOf = e => {
+                const row = e.target.closest('tr');
+                return row ? this.sortedFiles[row.rowIndex - 1] : undefined;
+            };
+            return ({ context }) => ({
+                // Not a tab stop: the table holds the focus
+                tabindex: -1,
+                id: this.nav.idOf(context.index),
+                'aria-selected': !!this.sortedFiles[context.index]?.selected,
+                onDragstart: e => {
+                    const file = fileOf(e);
+                    if (file) this.startDrag(e, file);
+                },
+                onDrop: e => {
+                    const file = fileOf(e);
+                    if (file) this.onDrop(e, file);
+                },
+                onDragenter: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragEnter(e, file);
+                    else e.preventDefault();
+                },
+                onDragover: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragOver(e, file);
+                    else e.preventDefault();
+                },
+                onDragleave: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragLeave(e, file);
+                },
+                draggable: this.canWrite
+            });
+        }
     },
     watch: {
         files: {
@@ -193,137 +277,13 @@ export default {
         // Failed-thumbnail tracking is component-scoped: fresh set per mount.
         this.failedThumbs.clear();
     },
-    computed: {
-        selectedFiles: function () {
-            return this.files.filter(f => f.selected);
-        },
-        breadcrumbs: function () {
-            if (this.currentPath == null || this.currentPath.length == 0) return null;
-
-            var folders = this.currentPath.split('/');
-            var cur = "";
-            var bc = [];
-
-            for (var el of folders) {
-                cur += '/' + el;
-
-                bc.push({
-                    path: cur.substring(1),
-                    name: el
-                });
-            }
-
-            if (bc.length > 0) {
-                bc.unshift({
-                    path: "/",
-                    name: "~"
-                })
-            }
-
-            return bc;
-        },
-        breadcrumbHome: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
-            const home = this.breadcrumbs[0];
-            return {
-                icon: 'fa-solid fa-home',
-                command: () => this.goTo(home)
-            };
-        },
-        breadcrumbItems: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
-            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
-                if (idx < arr.length - 1) {
-                    return { label: b.name, command: () => this.goTo(b) };
-                }
-                return { label: b.name };
-            });
-        },
-        sortedFiles: function() {
-            const sorted = [...this.files];
-
-            sorted.sort((a, b) => {
-                // Folders first
-                let aDir = ddb.entry.isDirectory(a.entry);
-                let bDir = ddb.entry.isDirectory(b.entry);
-
-                if (aDir && !bDir) return -1;
-                else if (!aDir && bDir) return 1;
-
-                // Then sort by column
-                let result = 0;
-                switch(this.sortColumn) {
-                    case 'name':
-                        result = a.label.toLowerCase().localeCompare(b.label.toLowerCase());
-                        break;
-                    case 'type':
-                        result = this.getFileType(a).localeCompare(this.getFileType(b));
-                        break;
-                    case 'size':
-                        const sizeA = a.entry.size || 0;
-                        const sizeB = b.entry.size || 0;
-                        result = sizeA - sizeB;
-                        break;
-                    case 'modified':
-                        const modA = a.entry.mtime || 0;
-                        const modB = b.entry.mtime || 0;
-                        result = modA - modB;
-                        break;
-                }
-
-                return this.sortDirection === 'asc' ? result : -result;
-            });
-
-            return sorted;
-        },
-        rowPt: function () {
-            const self = this;
-            return {
-                onDragstart(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1; // account for header row
-                    const file = self.sortedFiles[idx];
-                    if (file) self.startDrag(e, file);
-                },
-                onDrop(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.onDrop(e, file);
-                },
-                onDragenter(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragEnter(e, file);
-                    else e.preventDefault();
-                },
-                onDragover(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) { e.preventDefault(); return; }
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragOver(e, file);
-                    else e.preventDefault();
-                },
-                onDragleave(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragLeave(e, file);
-                },
-                draggable: this.canWrite
-            };
-        }
-    },
     methods: {
         rowClass(data) {
             const classes = [];
             if (data.selected) classes.push('row-selected');
+            if (this.activePath === data.path) classes.push('row-active');
+            // Cut (Ctrl+X) and not pasted yet: dimmed (FR-EXP-16)
+            if (this.isCut(data)) classes.push('row-cut');
             if (data.entry && this.dropTargetPath === data.entry.path) classes.push('drop-target');
             return classes.join(' ');
         },
@@ -340,31 +300,50 @@ export default {
             this.handleRightClick(event.originalEvent, event.data);
         },
 
-        goTo: function (itm) {
-            emitter.emit("folderOpened", pathutils.getTree(itm.path));
+        goToPath: function (path) {
+            emitter.emit("folderOpened", pathutils.getTree(path));
         },
 
-        // startDrag, onDrop and explorerDropHandler are inherited from dragDropMixin.
+        // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
+
+        // The empty area: the wrapper, the empty message, or the table outside its rows
+        isBackground: function (target) {
+            return target.id === 'table-view' || !!target.closest('.p-datatable-empty-message') || (!target.closest('tr') && !!target.closest('.p-datatable'));
+        },
 
         onClick: function (e) {
-            // Clicked an empty area (DataTable wrapper or empty body)
-            const target = e.target;
-            if (target.id === 'table-view' || target.closest('.p-datatable-empty-message') || (!target.closest('tr') && target.closest('.p-datatable'))) {
-                this.clearSelection();
-            }
+            if (this.isBackground(e.target)) this.clearSelection();
+        },
+
+        // A right click on the empty area clears the selection first: the menu that opens is the
+        // folder's (New folder, Upload, Paste, Select all, Refresh), as in a file manager
+        onBackgroundContextMenu: function (e) {
+            if (this.isBackground(e.target)) this.clearSelection();
         },
 
         selectAll: function () {
-            this.files.forEach(f => f.selected = true);
+            this.selection.selectAll();
+            this.applySelection();
         },
 
         deselectAll: function () {
-            this.files.forEach(f => f.selected = false);
+            this.selection.clear();
+            this.applySelection();
         },
 
         clearSelection: function () {
-            this.files.forEach(f => f.selected = false);
-            this.rangeStartIdx = null;
+            this.deselectAll();
+        },
+
+        // The explorer items carry the selection (the map and the file grid share them)
+        applySelection: function () {
+            this.files.forEach(f => { f.selected = this.selection.has(f); });
+        },
+
+        select: function (file, mods) {
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(this.sortedFiles.indexOf(file), mods);
+            this.applySelection();
         },
 
         handleOpen: async function (file) {
@@ -376,55 +355,58 @@ export default {
             }
         },
 
-        handleSelection: function (evt, file) {
-            Keyboard.updateState(evt);
-
-            const idx = this.sortedFiles.indexOf(file);
-
-            if (Keyboard.isShiftPressed() && this.selectedFiles.length > 0 && this.rangeStartIdx !== null) {
-                // Range selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                this.selectRange(this.rangeStartIdx, idx);
-            } else if (Keyboard.isCtrlPressed()) {
-                // Toggle selection
-                file.selected = !file.selected;
-                if (file.selected) this.rangeStartIdx = idx;
-            } else {
-                // Single selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-                this.rangeStartIdx = idx;
+        // ---- Keyboard (useListNavigation) ----
+        // The arrows move the selection with the active row; Ctrl+arrow moves the active row only
+        moveTo: function (index, { extend, keepSelection }) {
+            const file = this.sortedFiles[index];
+            if (!file) return;
+            if (!keepSelection) {
+                this.selection.load(this.selectedFiles);
+                this.selection.toggle(index, { shift: extend });
+                this.applySelection();
+                this.$emit('selectionChanged', file);
             }
+            this.reveal(index);
+        },
+        toggleAt: function (index) {
+            const file = this.sortedFiles[index];
+            if (!file) return;
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(index, { ctrl: true });
+            this.applySelection();
+            this.$emit('selectionChanged', file);
+        },
+        openAt: function (index) {
+            const file = this.sortedFiles[index];
+            if (file) this.handleOpen(file);
+        },
+        reveal: async function (index) {
+            await nextTick();
+            document.getElementById(this.nav.idOf(index))?.scrollIntoView?.({ block: 'nearest' });
+        },
+        // The row clicked is the active one, and the table has the focus (not the row)
+        activate: function (file) {
+            this.nav.setActive(this.sortedFiles.indexOf(file));
+            this.$refs.tableview?.querySelector('table')?.focus({ preventScroll: true });
+        },
 
-            // Emit selection changed event
+        handleSelection: function (evt, file) {
+            this.activate(file);
+            Keyboard.updateState(evt);
+            this.select(file, { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isToggleSelectPressed() });
             this.$emit('selectionChanged', file);
         },
 
         handleRightClick: function (evt, file) {
+            this.activate(file);
             Keyboard.updateState(evt);
-
-            // If right-clicking on an unselected item, select only that item
-            if (!file.selected) {
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-            }
-        },
-
-        selectRange: function (startIdx, endIdx) {
-            const [low, high] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
-
-            for (let i = low; i <= high; i++) {
-                this.sortedFiles[i].selected = true;
-            }
+            this.select(file, { right: true });
         },
 
         sortBy: function(column) {
-            if (this.sortColumn === column) {
-                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortColumn = column;
-                this.sortDirection = 'asc';
-            }
+            const next = nextSort(this.sortColumn, this.sortDirection, column);
+            this.sortColumn = next.column;
+            this.sortDirection = next.direction;
         },
 
         getFileType: function(file) {
@@ -432,22 +414,15 @@ export default {
         },
 
         getFileSize: function(file) {
-            if (entry.isDirectory(file.entry)) return '';
-            if (!file.entry.size) return '';
-            return bytesToSize(file.entry.size);
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate: function(file) {
-            if (!file.entry.mtime) return '--';
-
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         getFileModifiedDateRel: function(file) {
-            if (!file.entry.mtime) return '';
-
-            return formatTimeAgo(file.entry.mtime * 1000);
+            return formatModifiedTimeAgo(file.entry.mtime);
         },
 
         // Returns the cached thumbnail URL for a file, or null if unsupported/not yet available
@@ -470,13 +445,13 @@ export default {
             if (!this.files) return;
 
             for (const file of this.files) {
-                if (!thumbs.supportedForType(file.entry.type)) continue;
+                if (!hasThumbnail(file.entry.type)) continue;
                 // Skip paths whose thumbnail already failed in this component
                 // instance; they heal on remount / dataset switch.
                 if (this.failedThumbs.has(file.entry.path)) continue;
                 try {
-                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48));
-                } catch (e) {
+                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, thumbnailRequestSize(ROW_PREVIEW_CSS_PX), file.entry.hash));
+                } catch {
                     // Unsupported URI scheme or fetch error - fall back to icon
                 }
             }
@@ -503,16 +478,6 @@ export default {
             return getBuildBadgeTooltip(this.dataset, file);
         },
 
-        buildSelectedFile: async function() {
-            if (this.selectedFiles.length !== 1) return;
-            const file = this.selectedFiles[0];
-            try {
-                await buildFile(this.dataset, file);
-            } catch (error) {
-                this.$emit('buildError', { file, error: error.message });
-            }
-        },
-
         onTabActivated: function () {
             // Called when the tab becomes active
             // Currently no specific action needed for table view
@@ -526,39 +491,27 @@ export default {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../../css/breakpoints' as *;
+
+/* On a very wide screen the table has the width of its content: the Name column is at most 40rem and the other
+   columns follow it, so a name and its type are not 2000 px apart (FR-EXP-42, FR-XC-33) */
+@include xwide-up {
+    #table-view :deep(.p-datatable-table) {
+        width: auto;
+    }
+
+    #table-view :deep(.file-name) {
+        display: block;
+        max-width: 40rem;
+    }
+}
+
 #table-view-container {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-
-    :deep(.p-breadcrumb) {
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-size: 1rem;
-
-        .p-breadcrumb-separator {
-            color: var(--ddb-text-muted);
-            margin: 0 0.25rem;
-        }
-    }
-
-    .bc-link {
-        color: var(--ddb-link);
-        cursor: pointer;
-        text-decoration: none;
-
-        &:hover {
-            text-decoration: underline;
-        }
-    }
-
-    .bc-active {
-        color: inherit;
-        font-weight: 600;
-    }
 }
 
 #table-view {
@@ -585,20 +538,24 @@ export default {
         cursor: pointer;
     }
 
-    .sortable-header {
-        cursor: pointer;
-        user-select: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-
-        &:hover {
-            color: var(--ddb-primary);
-        }
-    }
 
     tr {
         cursor: pointer;
+    }
+
+    /* The table holds the focus; its active row shows the focus ring, only while the table has it (FR-EXP-09) */
+    table:focus-visible {
+        outline: none;
+    }
+
+    table:focus-visible tr.row-active {
+        outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+        outline-offset: calc(-1 * var(--ddb-focus-ring-width));
+    }
+
+    /* A second cue of the selection besides the tint (FR-EXP-10): a bar on its left edge */
+    tr.row-selected > td:first-child {
+        box-shadow: inset 0.25rem 0 0 var(--ddb-primary);
     }
 
     tr.row-selected {
@@ -609,19 +566,14 @@ export default {
         }
     }
 
+    tr.row-cut {
+        opacity: 0.5;
+    }
+
     tr.drop-target > td {
-        outline: 2px dashed var(--ddb-color-primary, #1976d2);
+        outline: 2px dashed var(--ddb-primary);
         outline-offset: -2px;
         background-color: var(--ddb-bg-hover) !important;
-    }
-
-    .icon-column i.icon {
-        margin: 0;
-    }
-
-    .icon-column i.icon.badge {
-        margin-left: var(--ddb-spacing-xs);
-        font-size: var(--ddb-font-size-base);
     }
 
     .loading-icon {
@@ -638,12 +590,21 @@ export default {
     }
 
     .file-name {
-        word-break: break-all;
+        overflow-wrap: anywhere;
+    }
+
+    /* A sort header is a tap target */
+    .sort-header {
+        min-height: 2rem;
     }
 
     .file-size, .file-date {
         text-align: right;
         display: block;
+    }
+
+    .file-size {
+        white-space: nowrap;
     }
 
     .file-date {

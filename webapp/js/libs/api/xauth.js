@@ -13,7 +13,7 @@ export function getXAuthToken() {
     } else return "";
 }
 
-export function getXAuthLogoutUrl() {
+function getXAuthLogoutUrl() {
     if (xAuthAvailable()) {
         return getCookie("xAuthToken").split("|")[1];
     } else return "";

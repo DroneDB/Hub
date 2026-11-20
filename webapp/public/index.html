@@ -1,5 +1,5 @@
 <!doctype html>
-<html class="no-js" lang="">
+<html class="no-js" lang="en">
 
 <head>
     <meta charset="utf-8">
@@ -7,8 +7,8 @@
     <title>Hub</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Identifies the Hub shell in the page the server sends, branded or not and before any script runs: keep the value unchanged -->
+    <meta name="hub-shell" content="hs-6af916c1c37b">
 
     <style>
         #main-loading {
@@ -19,8 +19,8 @@
             margin-top: -11px;
             border: 4px solid #f3f3f3;
             /* Light grey */
-            border-top: 4px solid #3498db;
-            /* Blue */
+            border-top: 4px solid #0070e0;
+            /* The brand blue (PRIMARY[500] of js/libs/palette.js): the app's CSS variables are not loaded yet */
             border-radius: 50%;
             width: 22px;
             height: 22px;
@@ -41,7 +41,32 @@
             display: flex;
             height: 100%;
         }
+
+        /* The page of the dark theme before the stylesheets load (--ddb-bg of the dark theme) */
+        html.app-dark {
+            background: #09090b;
+            color-scheme: dark;
+        }
     </style>
+    <script>
+        // The colour scheme, before anything is drawn (FR-XC-21, D-044): the rule of
+        // js/libs/colorScheme.js (resolveScheme), which keeps it in step once the app runs. The
+        // Appearance preference of this device (ddb.appearance: system, light or dark), System
+        // when there is none; an embedded view always follows the system.
+        (function () {
+            var appearance = null;
+            try { appearance = window.localStorage.getItem('ddb.appearance'); } catch (e) { /* no storage */ }
+            var embedded = /[?&]embed=[^&]/.test(window.location.search);
+            try { embedded = embedded || window.self !== window.top; } catch (e) { embedded = true; }
+            if (embedded || (appearance !== 'light' && appearance !== 'dark')) {
+                appearance = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            if (appearance === 'dark') {
+                document.documentElement.classList.add('app-dark');
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            }
+        })();
+    </script>
     <script>
         // HubOptions is populated at runtime by hubBranding.js after /sys/features
         // resolves. We seed it with safe defaults here so legacy components reading

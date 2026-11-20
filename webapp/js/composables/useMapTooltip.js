@@ -1,19 +1,22 @@
 /**
- * Mixin for tooltip overlay on vector features.
- * Shared between Map.vue and SingleMap.vue.
+ * Feature scope for the tooltip overlay on vector features.
+ * Shared by the dataset map and the single-file map (MapCore).
  *
  * The consuming component should define a method `getLayerDisplayName(layer)`
  * that returns the fallback label for a layer (e.g. layer.file.name or layer.entry.name).
  */
 import Overlay from 'ol/Overlay';
-import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
+import ddb from 'ddb';
+import { extractFeatureDisplayName, unnamedFeatureLabel } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import Lara from '@primevue/themes/lara';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
+import { createFeatureScope } from '@/composables/featureScope';
+import { keepOverlayInView } from '@/libs/map/overlayPlacement';
 
-export default {
+// The label goes on the right of the pointer; keepOverlayInView moves it to the left (or along the edge) where the map ends
+const TOOLTIP_PLACEMENT = Object.freeze({ positioning: 'center-left', offset: [12, 0] });
+
+const definition = {
     data() {
         return {
             tooltipElement: null,
@@ -31,8 +34,8 @@ export default {
 
             this.tooltipOverlay = new Overlay({
                 element: this.tooltipElement,
-                offset: [12, 0],
-                positioning: 'center-left'
+                offset: [...TOOLTIP_PLACEMENT.offset],
+                positioning: TOOLTIP_PLACEMENT.positioning
             });
         },
 
@@ -52,14 +55,14 @@ export default {
 
             if (content === 'Unknown feature') {
                 const resolvedLayer = layer || findVectorLayerForFeature(feature, this.vectorLayers);
-                if (resolvedLayer) {
-                    content = this.getLayerDisplayName(resolvedLayer) || 'Unknown layer';
-                }
+                if (resolvedLayer || properties.Layer) content = unnamedFeatureLabel(properties, resolvedLayer ? this.getLayerDisplayName(resolvedLayer) : '');
             }
 
-            this.tooltipElement.innerHTML = content;
+            this.tooltipElement.textContent = content;
             this.tooltipElement.style.display = 'block';
             this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
+            // The label has its content and its place: it stays out of the toolbar rail and inside the map (FR-MAP-19)
+            keepOverlayInView(this.map, this.tooltipOverlay, this.tooltipElement, TOOLTIP_PLACEMENT);
         },
 
         /**
@@ -102,29 +105,7 @@ export default {
                 }
             }
 
-            const container = document.createElement('div');
-            document.body.appendChild(container);
-
-            const cleanup = () => {
-                try {
-                    dialogApp.unmount();
-                } catch (e) { /* already unmounted */ }
-                if (container.parentNode) {
-                    document.body.removeChild(container);
-                }
-            };
-
-            const dialogApp = createApp(FeatureInfoDialog, {
-                title,
-                properties,
-                onOnClose: cleanup
-            });
-            dialogApp.config.errorHandler = (err) => {
-                console.error('FeatureInfoDialog error:', err);
-                cleanup();
-            };
-            dialogApp.use(PrimeVue, { theme: { preset: Lara } });
-            dialogApp.mount(container);
+            this.dialogs.open(FeatureInfoDialog, { title, properties });
         },
 
         /**
@@ -133,9 +114,20 @@ export default {
          * @returns {string}
          */
         getLayerDisplayName(layer) {
-            if (layer.entry) return layer.entry.name || '';
-            if (layer.file) return layer.file.name || (layer.file.entry && layer.file.entry.name) || '';
+            // An entry as the server lists it has a path and no name: the name is the last part of the path
+            const nameOf = item => (item ? item.name || item.label || (item.path ? ddb.pathutils.basename(item.path) : '') : '');
+            if (layer.entry) return nameOf(layer.entry);
+            if (layer.file) return nameOf(layer.file) || nameOf(layer.file.entry);
             return '';
         }
     }
 };
+
+/**
+ * The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useMapTooltip(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

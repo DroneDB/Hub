@@ -1,127 +1,78 @@
 <template>
-    <Window title="Change Password" id="changePwdDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" :busy="busy || success" @confirm="submitForm()" @close="$emit('close')">
         <div class="dialog">
-            <form v-on:submit.prevent>
-                <Message v-if="error" severity="error">{{ error }}</Message>
-                <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Old Password</label>
-                    <Password ref="oldPwd" @keydown="clearError()" @keyup.enter="changePwd()"
-                        v-model="oldPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="changePwd()" v-model="newPwd"
-                        :feedback="false" toggleMask @input="onPasswordInput" class="w-100" inputClass="w-100" />
-                    <div v-if="passwordPolicy && newPwd" class="password-requirements">
-                        <small v-for="(req, idx) in passwordRequirements" :key="idx"
-                            :class="{ met: isRequirementMet(req) }">
-                            <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
-                            {{ req }}
-                        </small>
+            <Form ref="formRef" :resolver="resolver" @submit="onSubmit">
+                <template #default="$form">
+                    <Message v-if="formError" severity="error" role="alert" class="mb-3 form-error">{{ formError }}</Message>
+                    <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
+                    <div class="mb-3">
+                        <label for="change-pwd-dialog-old-password" class="d-block mb-1 fw-semibold">Current Password</label>
+                        <PasswordInput name="oldPassword" input-id="change-pwd-dialog-old-password" autocomplete="current-password"
+                                       :error="errorOf($form, 'oldPassword')" :readonly="busy || success" />
                     </div>
-                </div>
-                <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="changePwd()"
-                        v-model="confirmPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
-                </div>
-            </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="changing" label="Close" />
-                <Button @click="changePwd()" :disabled="changing || !isFilled()" :loading="changing"
-                    severity="info" label="Change Password" />
-            </div>
+                    <NewPasswordFields id-prefix="change-pwd-dialog" :policy="passwordPolicy" :new-password="$form.newPassword?.value ?? ''"
+                                       :errors="{ newPassword: errorOf($form, 'newPassword'), confirmPassword: errorOf($form, 'confirmPassword') }"
+                                       :readonly="busy || success" />
+                </template>
+            </Form>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
-import Password from 'primevue/password';
+import Form from '@primevue/forms/form';
+import Window from '@/components/HubWindow.vue';
 import Message from 'primevue/message';
+import PasswordInput from '@/components/PasswordInput.vue';
+import NewPasswordFields from '@/components/NewPasswordFields.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
+import { createResolver } from '@/libs/forms/resolver';
+import { currentPasswordProblem, newPasswordProblem, confirmPasswordProblem } from '@/libs/accountProblems';
+import { useHubForm } from '@/composables/useHubForm';
+import { useTimerGroup } from '@/composables/useTimers';
 
 export default {
     components: {
-        Window, Button, Password, Message
+        Window, Message, Form, PasswordInput, NewPasswordFields
     },
     props: {
 
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        const policy = reg.features?.value?.(Features.PASSWORD_POLICY) ?? null;
+        const resolver = createResolver({
+            oldPassword: v => currentPasswordProblem(v),
+            newPassword: (v, values) => newPasswordProblem(v, { policy, current: values.oldPassword }),
+            confirmPassword: (v, values) => confirmPasswordProblem(v, { newPassword: values.newPassword })
+        });
+        const form = useHubForm({
+            fields: ['oldPassword', 'newPassword', 'confirmPassword'],
+            // The Registry names the field of a refusal (D-047): a wrong current password under
+            // `currentPassword`, the policy under `newPassword`
+            aliases: { currentPassword: 'oldPassword' },
+            dependents: { oldPassword: ['newPassword'], newPassword: ['confirmPassword'] }
+        });
+        return { ...form, resolver, passwordPolicy: policy, later: useTimerGroup() };
+    },
     data: function () {
         return {
-            changing: false,
-            success: false,
-            error: "",
-            oldPwd: "",
-            newPwd: "",
-            confirmPwd: "",
-            passwordPolicy: null,
-            passwordRequirements: [],
-            passwordValidation: { isValid: true, errors: [] }
+            success: false
         };
     },
-    mounted: function () {
-        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
-        this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
-    },
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose');
+        // Once the password is changed the form is done: the fields stay read-only until the
+        // window closes, and a submit (Enter in a field) sends nothing (FR-XC-11)
+        onSubmit: function (e) {
+            if (this.success) return;
+            return this.submit(this.change, e);
         },
-        clearError: function () {
-            this.error = "";
-        },
-        isFilled: function () {
-            return this.oldPwd !== "" && this.newPwd !== "" && this.confirmPwd !== "" && this.isPasswordValid();
-        },
-        isPasswordValid: function () {
-            if (!this.passwordPolicy || !this.newPwd) return true;
-            return this.passwordValidation.isValid;
-        },
-        onPasswordInput: function () {
-            this.passwordValidation = validatePassword(this.newPwd, this.passwordPolicy);
-        },
-        isRequirementMet: function (requirement) {
-            if (!this.newPwd) return false;
-            const req = requirement.toLowerCase();
-            if (req.includes('character') && !req.includes('special'))
-                return this.newPwd.length >= (this.passwordPolicy?.minLength || 0);
-            if (req.includes('digit'))
-                return /\d/.test(this.newPwd);
-            if (req.includes('uppercase'))
-                return /[A-Z]/.test(this.newPwd);
-            if (req.includes('lowercase'))
-                return /[a-z]/.test(this.newPwd);
-            if (req.includes('special'))
-                return !/^[a-zA-Z0-9]*$/.test(this.newPwd);
-            return false;
-        },
-        changePwd: async function () {
-            if (!this.isFilled()) return;
-            if (this.newPwd !== this.confirmPwd) {
-                this.error = "The new passwords do not match.";
-                return;
-            }
-
-            this.changing = true;
-            try {
-                await reg.changePwd(this.oldPwd, this.newPwd);
-                this.success = true;
-                setTimeout(() => {
-                    this.close();
-                    this.changing = false;
-                }, 2500);
-            } catch (e) {
-                this.error = e.message;
-                this.changing = false;
-            }
+        change: async function (values) {
+            await reg.changePwd(values.oldPassword, values.newPassword);
+            this.success = true;
+            this.later(() => this.$emit('close'), 2500);
         }
     }
 }
@@ -129,22 +80,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;
-}
-
-.password-requirements {
-    margin-top: var(--ddb-spacing-xs);
-    display: flex;
-    flex-direction: column;
-    gap: var(--ddb-spacing-xs);
-}
-
-.password-requirements small {
-    color: var(--ddb-danger);
-}
-
-.password-requirements small.met {
-    color: var(--ddb-success);
 }
 </style>

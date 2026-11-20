@@ -1,10 +1,7 @@
 <template>
-    <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
-            modal
-            header="Vegetation index formulas"
-            :style="{ width: '640px' }"
-            :draggable="false">
+    <Window id="plant-health-formulas" :visible="visible" title="Vegetation index formulas" modal fixed-position
+            width="640px" max-width="95vw" height="auto" close-button cancel-label="Close"
+            @update:visible="$emit('update:visible', $event)">
         <div class="info-dialog-body">
             <p class="info-intro">
                 Each formula combines spectral bands to highlight a specific
@@ -12,108 +9,115 @@
                 matches what you want to inspect.
             </p>
 
-            <div class="formula-card" v-for="entry in entries" :key="entry.id">
+            <div v-for="entry in entries" :key="entry.id" class="formula-card">
                 <h4>
                     <span class="formula-id">{{ entry.id }}</span>
                     <span class="formula-name">{{ entry.name }}</span>
                 </h4>
                 <p class="line"><b>What it measures:</b> {{ entry.measures }}</p>
-                <p class="line" v-if="entry.expression">
+                <p v-if="entry.expression" class="line">
                     <b>Formula:</b> <code>{{ entry.expression }}</code>
                 </p>
-                <p class="line"><b>Bands required:</b> {{ entry.bands }}</p>
-                <p class="line"><b>When to use:</b> {{ entry.when }}</p>
-                <p class="line unavailable" v-if="entry.disabled">
-                    <i class="fas fa-ban"></i>
+                <p v-if="entry.bands" class="line"><b>Bands required:</b> {{ entry.bands }}</p>
+                <p v-if="entry.when" class="line"><b>When to use:</b> {{ entry.when }}</p>
+                <p v-if="entry.disabled" class="line unavailable">
+                    <i class="fas fa-ban" />
                     Not available on this raster: {{ entry.disabledReason }}
                 </p>
             </div>
 
-            <p class="empty-hint" v-if="entries.length === 0">
+            <p v-if="entries.length === 0" class="empty-hint">
                 No formulas are available for this raster.
             </p>
         </div>
 
-        <template #footer>
-            <Button label="Close" icon="fas fa-times" severity="secondary"
-                    @click="onClose" />
-        </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 
-// Curated copy for the most common multispectral indices. Anything not listed
-// here falls back to the descriptions provided by the backend.
-// `bands` mirrors the requiredBands field in the DDB C++ formula struct.
+// Curated copy for the formulas of ddb (DDBGetRasterMetadata lists 18). It holds what the list cannot: what an index
+// measures and when to use it, each text its own. Anything not listed here shows the help of the list as what it
+// measures and has no "when to use". The bands come from the list (`requiredBands`).
 const FORMULA_INFO = {
+    VARI: {
+        measures: 'the fraction of green vegetation in ordinary RGB photos, with less sensitivity to the atmosphere.',
+        when: 'RGB cameras: a quick check of crop cover when the camera has no NIR band.'
+    },
+    EXG: {
+        measures: 'the greenness of foliage against soil and residue.',
+        when: 'separating plants from soil in RGB orthophotos, to count plants or map weeds.'
+    },
+    GLI: {
+        measures: 'green leaf cover using only the RGB bands, from -1 to 1.',
+        when: 'comparing the green cover of fields photographed with a standard RGB camera (no NIR).'
+    },
+    vNDVI: {
+        measures: 'an approximation of NDVI computed from the RGB bands.',
+        when: 'RGB-only flights where you still want an NDVI-like picture of plant vigor.'
+    },
     NDVI: {
         measures: 'overall vegetation vigor and biomass density.',
-        bands: 'Red, NIR',
         when: 'general crop health monitoring; the most common starting point.'
-    },
-    NDRE: {
-        measures: 'nitrogen content and chlorophyll in mid-to-late season crops.',
-        bands: 'Red Edge, NIR',
-        when: 'mature canopies where NDVI saturates; nitrogen management.'
     },
     NDWI: {
         measures: 'leaf and canopy water content.',
-        bands: 'Green, NIR',
         when: 'irrigation checks and drought stress detection.'
     },
     GNDVI: {
         measures: 'chlorophyll concentration; more sensitive than NDVI in dense canopies.',
-        bands: 'Green, NIR',
         when: 'late-stage crop monitoring and chlorophyll variability.'
     },
-    ENDVI: {
-        measures: 'plant health using the blue band, reducing soil noise.',
-        bands: 'Green, Blue, NIR',
-        when: 'sensors that lack a true NIR band but have NDVI-like requirements.'
+    SAVI: {
+        measures: 'vegetation with a soil-adjustment factor (L = 0.5).',
+        when: 'sparse cover or early growth stages where soil dominates the signal; reflectance rasters only.'
     },
     EVI: {
         measures: 'vegetation while correcting for atmosphere and soil background.',
-        bands: 'Red, Blue, NIR',
-        when: 'forested areas or dense canopies where NDVI saturates.'
+        when: 'forested areas or dense canopies where NDVI saturates; reflectance rasters only.'
     },
-    EVI2: {
-        measures: 'EVI without the blue band; lighter and more robust.',
-        bands: 'Red, NIR',
-        when: 'sensors without a blue band; quick canopy assessment.'
+    NDRE: {
+        measures: 'nitrogen content and chlorophyll in mid-to-late season crops.',
+        when: 'mature canopies where NDVI saturates; nitrogen management.'
     },
-    SAVI: {
-        measures: 'vegetation with a soil-adjustment factor (L).',
-        bands: 'Red, NIR',
-        when: 'sparse cover or early growth stages where soil dominates the signal.'
+    NDYI: {
+        measures: 'yellowness: the yellow of flowers, and of stressed or ripening leaves.',
+        when: 'flowering crops such as canola, and spotting yellowing.'
     },
-    MSAVI2: {
-        measures: 'a self-adjusting variant of SAVI.',
-        bands: 'Red, NIR',
-        when: 'very sparse vegetation; emerging crops on bare soil.'
+    MPRI: {
+        measures: 'a modified photochemical reflectance index from the green and red bands, a proxy of plant pigment change.',
+        when: 'spotting early stress changes of the canopy with a green and a red band.'
     },
-    MCARI2: {
-        measures: 'chlorophyll content with reduced soil and LAI bias.',
-        bands: 'Red, Red Edge, NIR',
-        when: 'precision agriculture focused on chlorophyll status.'
+    OSAVI: {
+        measures: 'vegetation with a fixed soil-adjustment factor of 0.16.',
+        when: 'young crops and orchards with bare soil between the plants; reflectance rasters only.'
     },
-    GLI: {
-        measures: 'green leaf cover using only RGB bands.',
-        bands: 'Red, Green, Blue',
-        when: 'standard RGB cameras (no NIR).'
+    GRVI: {
+        measures: 'the ratio of NIR to green, a measure of green biomass with no fixed range.',
+        when: 'comparing biomass between dates or plots with the same sensor.'
     },
-    BAI: {
-        measures: 'burned area / fire-affected vegetation.',
-        bands: 'Red, NIR',
-        when: 'post-fire damage assessment and burn severity mapping.'
+    ENDVI: {
+        measures: 'plant health using the blue band, reducing soil noise.',
+        when: 'cameras that record blue, green and NIR (a modified RGB camera, for example).'
+    },
+    ARVI: {
+        measures: 'vegetation with a correction for the atmosphere, using the blue band.',
+        when: 'flights through haze or smoke, where the atmosphere changes NDVI.'
+    },
+    CELSIUS: {
+        measures: 'the temperature in degrees Celsius, as the thermal band gives it.',
+        when: 'thermal rasters: hot spots, water stress and heat loss.'
+    },
+    KELVIN: {
+        measures: 'the same temperature in kelvin (K).',
+        when: 'a model or a report that needs absolute temperatures.'
     }
 };
 
 export default {
     name: 'PlantHealthFormulasDialog',
-    components: { Dialog, Button },
+    components: { Window },
     props: {
         visible: { type: Boolean, default: false },
         formulas: { type: Array, default: () => [] }
@@ -123,34 +127,22 @@ export default {
         entries() {
             return (this.formulas || []).map(f => {
                 const id = f.id || f.name || '';
-                const curated = FORMULA_INFO[String(id).toUpperCase()] || null;
+                const curated = FORMULA_INFO[id] || null;
                 const help = (f.help && String(f.help).trim()) || '';
                 return {
                     id,
                     name: f.name || id,
                     expression: f.expr || '',
-                    bands: this._formatBands(f, curated),
+                    // The bands the formula reads: the structured list of ddb
+                    bands: Array.isArray(f.requiredBands) ? f.requiredBands.join(', ') : '',
                     measures: curated ? curated.measures : (help || 'See product documentation for details.'),
-                    when: curated ? curated.when : (help || 'Use when this index is part of your standard workflow.'),
+                    // Only the curated text says when: the help is not repeated
+                    when: curated ? curated.when : '',
                     disabled: !!f.disabled,
                     disabledReason: f.disabledReason || ''
                 };
             });
         }
-    },
-    methods: {
-        _formatBands(f, curated) {
-            // 1. Use curated band info if available (most reliable source)
-            if (curated && curated.bands) return curated.bands;
-            // 2. Extract from disabledReason: DDB emits "Requires bands: Red, NIR"
-            if (f.disabledReason && f.disabledReason.startsWith('Requires bands: ')) {
-                return f.disabledReason.slice('Requires bands: '.length);
-            }
-            // 3. Fall back gracefully
-            return 'see formula expression above';
-        },
-        onVisibleChange(v) { this.$emit('update:visible', v); },
-        onClose() { this.$emit('update:visible', false); }
     }
 };
 </script>
@@ -168,11 +160,11 @@ export default {
 }
 
 .formula-card {
-    border: 1px solid var(--p-content-border-color, rgba(255, 255, 255, 0.15));
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(var(--ddb-ink-rgb), 0.03);
 }
 
 .formula-card h4 {
@@ -185,7 +177,7 @@ export default {
 
 .formula-id {
     font-weight: 700;
-    color: #4caf50;
+    color: var(--ddb-success-text);
 }
 
 .formula-name {
@@ -198,14 +190,14 @@ export default {
 }
 
 .line code {
-    background: rgba(0, 0, 0, 0.25);
+    background: rgba(var(--ddb-ink-rgb), 0.08);
     padding: 0.05rem 0.3rem;
     border-radius: 0.2rem;
     font-size: 0.85rem;
 }
 
 .unavailable {
-    color: #ef9a9a;
+    color: var(--ddb-danger);
 }
 
 .unavailable i {

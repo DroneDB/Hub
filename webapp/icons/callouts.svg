@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <mask id="cut">
+        <rect width="24" height="24" fill="#fff"/>
+        <path d="M8 8h8" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+    </mask>
+    <path d="M6 3h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-3.2L12 16.4 9.2 13H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="#000" stroke="none" mask="url(#cut)"/>
+    <circle cx="12" cy="20.7" r="1.9" fill="#000" stroke="none"/>
+</svg>

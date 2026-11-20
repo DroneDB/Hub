@@ -1,14 +1,15 @@
 <template>
     <div class="pdf-viewer-wrapper">
-        <Window :title="windowTitle" id="pdfViewerDialog" @onClose="close" modal width="85%" height="90%">
+        <Window id="pdfViewerDialog" :title="windowTitle" modal width="85%" height="90%" @close="$emit('close')">
             <div class="pdf-viewer-dialog">
                 <div class="pdf-container">
                     <iframe
                         ref="pdfFrame"
                         :src="pdfUrl"
+                        :title="windowTitle"
                         frameborder="0"
                         class="pdf-iframe"
-                    ></iframe>
+                    />
                 </div>
             </div>
         </Window>
@@ -16,14 +17,13 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
 export default {
     components: {
-        Window, Button
+        Window
     },
     props: {
         dataset: {
@@ -35,6 +35,7 @@ export default {
             required: true
         }
     },
+    emits: ['close'],
     computed: {
         fileName() {
             return pathutils.basename(this.entry.path);
@@ -56,16 +57,10 @@ export default {
         document.removeEventListener('keydown', this.handleKeyDown);
     },
     methods: {
-        close() {
-            this.$emit('close');
-        },
         handleKeyDown(e) {
             if (e.key === 'Escape') {
-                this.close();
+                this.$emit('close');
             }
-        },
-        openInNewTab() {
-            window.open(this.pdfUrl, '_blank');
         },
         downloadFile() {
             window.open(this.downloadLink, '_blank');

@@ -25,6 +25,17 @@ export function liveSelectionEntries(selectedNodes) {
 }
 
 /**
+ * The chain of a 'folderOpened' event (pathutils.getTree: the folders from the outermost to the one to open) that
+ * a tree can follow: cut after the innermost folder that the tree has (`has(path)`), or the chain of the root
+ * when it has none of them. A tree that has the folder to open gets the chain as it is.
+ */
+export function nearestKnownChain(chain, has) {
+    let end = chain.length;
+    while (end > 0 && !has(chain[end - 1])) end--;
+    return end > 0 ? chain.slice(0, end) : pathutils.getTree('/');
+}
+
+/**
  * Folder that contains the given entries, relative to the dataset root
  * ('' = root). The clipboard has a single source folder, so the first
  * entry decides.

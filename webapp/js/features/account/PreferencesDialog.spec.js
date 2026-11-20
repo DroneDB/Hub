@@ -1,0 +1,666 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
+import { readSource, ruleOf } from '@/specs/cssSource';
+
+const h = vi.hoisted(() => ({ store: null, auth: null, reg: { notificationStatus: null } }));
+vi.mock('@/stores/preferences', async () => {
+    const { reactive } = await import('vue');
+    h.store = reactive({ status: 'idle', resetSection: vi.fn(), resetAll: vi.fn() });
+    return { usePreferencesStore: () => h.store };
+});
+vi.mock('@/stores/auth', async () => {
+    const { reactive } = await import('vue');
+    h.auth = reactive({ flags: { emailEnabled: true }, feature(name) { return this.flags[name]; } });
+    return { useAuthStore: () => h.auth };
+});
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: h.reg }));
+
+const { default: PreferencesDialog } = await import('./PreferencesDialog.vue');
+const { PREF, getPref, setPref, applyAccountValue, _resetPrefListenersForTests } = await import('@/libs/preferences');
+const { DARK_CLASS, startColorScheme } = await import('@/libs/colorScheme');
+
+// The window is teleported to the body: everything is looked up there
+let wrapper;
+const dom = () => new DOMWrapper(document.body);
+async function render(props = {}) {
+    wrapper = mount(PreferencesDialog, { props, attachTo: document.body, global: { plugins: [PrimeVue] } });
+    await flushPromises();
+}
+const buttonWith = (text, root = dom()) => root.findAll('button').find(b => b.text().includes(text));
+const tabs = () => dom().findAll('[role="tab"]');
+const confirmWindow = () => document.body.querySelector('#confirmDialog');
+
+beforeEach(() => {
+    _resetPrefListenersForTests();
+    setPref(PREF.MEASURE_UNIT, null);
+    setPref(PREF.CUSTOM_BASEMAP, null);
+    setPref(PREF.BUILD_NOTIFICATIONS, null);
+    setPref(PREF.TASK_NOTIFICATIONS, null);
+    setPref(PREF.APPEARANCE, null);
+    h.auth.flags.emailEnabled = true;
+    h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: true, reason: null }));
+    h.store.status = 'idle';
+    h.store.resetSection.mockReset();
+    h.store.resetAll.mockReset();
+});
+afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = '';
+    _resetPrefListenersForTests();
+});
+
+describe('PreferencesDialog', () => {
+    it('is a modal window titled User preferences with one tab per area and the sync status', async () => {
+        await render();
+        expect(document.body.querySelector('#preferencesDialog')).not.toBeNull();
+        expect(document.body.querySelector('.p-dialog-mask')).not.toBeNull();
+        expect(dom().find('.p-dialog-title').text()).toBe('User preferences');
+        expect(tabs().map(t => t.text())).toEqual(['Units', 'Map', 'Files', 'Lists', 'Viewers', 'Stockpiles', 'Appearance', 'Notifications']);
+        expect(dom().find('.sync-status').text()).toContain('Saved to your account');
+        h.store.status = 'error';
+        await flushPromises();
+        expect(dom().find('.sync-status').text()).toContain('Not saved');
+    });
+
+    it('Reset section asks the store to reset the sections of the tab', async () => {
+        await render();
+        await buttonWith('Reset section').trigger('click');
+        expect(h.store.resetSection).toHaveBeenCalledWith('units');
+    });
+
+    it('a Lists tab resets both of its sections', async () => {
+        await render();
+        await tabs()[3].trigger('click');
+        await flushPromises();
+        // Panels are in tab order: units, map, files, lists, ... (hidden ones may stay in the DOM)
+        const resets = dom().findAll('button').filter(b => b.text().includes('Reset section'));
+        await resets[resets.length >= 5 ? 3 : 1].trigger('click');
+        expect(h.store.resetSection.mock.calls.map(c => c[0])).toEqual(['datasets', 'orgs']);
+    });
+
+    it('follows an account change without writing it back as a local value', async () => {
+        await render();
+        applyAccountValue(PREF.MEASURE_UNIT, 'imperial');
+        await flushPromises();
+        expect(document.body.textContent).toContain('Imperial');
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
+    });
+
+    describe('Map tab', () => {
+        const urlInput = () => document.getElementById('pref-custom-basemap-url');
+        const open = async () => {
+            await render();
+            await tabs()[1].trigger('click');
+            await flushPromises();
+        };
+        // The basemap select, as a user's choice
+        async function chooseBasemap(value) {
+            wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-basemap').vm.$emit('update:modelValue', value);
+            await flushPromises();
+        }
+
+        beforeEach(() => {
+            setPref(PREF.BASEMAP, null);
+            setPref(PREF.LOCATIONS_MAP_NAMES, null);
+            vi.spyOn(globalThis, 'Image').mockImplementation(function () {
+                const img = {};
+                Object.defineProperty(img, 'src', { set(v) { if (v) queueMicrotask(() => img.onload?.()); } });
+                return img;
+            });
+        });
+        afterEach(() => vi.restoreAllMocks());
+
+        it('has no custom basemap editor while another basemap is chosen', async () => {
+            await open();
+            expect(urlInput()).toBeNull();
+        });
+
+        it('Custom opens the editor without storing Custom; Apply stores the source and Custom', async () => {
+            await open();
+            await chooseBasemap('custom');
+            expect(getPref(PREF.BASEMAP, 'satellite')).toBe('satellite');
+            expect(urlInput()).not.toBeNull();
+            await new DOMWrapper(urlInput()).setValue('https://tiles.example.com/{z}/{x}/{y}.png');
+            await buttonWith('Apply').trigger('click');
+            await flushPromises();
+            expect(getPref(PREF.CUSTOM_BASEMAP, null)).toMatchObject({ sourceType: 'xyz', url: 'https://tiles.example.com/{z}/{x}/{y}.png' });
+            expect(getPref(PREF.BASEMAP, '')).toBe('custom');
+        });
+
+        it('shows the stored custom source in the editor and Clear returns to the default basemap', async () => {
+            setPref(PREF.BASEMAP, 'custom');
+            setPref(PREF.CUSTOM_BASEMAP, { sourceType: 'xyz', url: 'https://tiles.example.com/{z}/{x}/{y}.png' });
+            await open();
+            expect(urlInput().value).toBe('https://tiles.example.com/{z}/{x}/{y}.png');
+            await buttonWith('Clear').trigger('click');
+            await flushPromises();
+            expect(getPref(PREF.CUSTOM_BASEMAP, null)).toBeNull();
+            expect(getPref(PREF.BASEMAP, '')).toBe('satellite');
+            expect(urlInput()).toBeNull();
+        });
+
+        it('an invalid stored custom source (javascript: URL) is not shown', async () => {
+            setPref(PREF.BASEMAP, 'custom');
+            setPref(PREF.CUSTOM_BASEMAP, { sourceType: 'xyz', url: 'javascript:alert(1)' });
+            await open();
+            expect(urlInput().value).toBe('');
+            expect(document.body.textContent).not.toContain('javascript:');
+        });
+
+        it('the dataset names of the datasets map are a toggle of the account', async () => {
+            await open();
+            const toggle = document.getElementById('pref-dataset-names');
+            expect(toggle.checked).toBe(false);
+            toggle.click();
+            await flushPromises();
+            expect(getPref(PREF.LOCATIONS_MAP_NAMES, false)).toBe(true);
+        });
+    });
+
+    describe('Gaussian splat quality', () => {
+        const quality = () => document.getElementById('pref-splat-quality');
+        const open = async () => {
+            await render();
+            await tabs()[4].trigger('click');
+            await flushPromises();
+        };
+
+        beforeEach(() => setPref(PREF.SPLAT_QUALITY, null));
+
+        it('is a select in the Viewers tab with auto, low, medium and high, automatic by default', async () => {
+            await open();
+            expect(quality()).not.toBeNull();
+            expect(quality().closest('.p-select').textContent).toContain('Auto');
+            quality().closest('.p-select').click();
+            await flushPromises();
+            expect(Array.from(document.body.querySelectorAll('[role="option"]')).map(o => o.textContent.trim())).toEqual(['Auto', 'Low', 'Medium', 'High']);
+        });
+
+        it('shows what is stored, and the default for a value that is not a quality', async () => {
+            setPref(PREF.SPLAT_QUALITY, 'medium');
+            await open();
+            expect(quality().closest('.p-select').textContent).toContain('Medium');
+            wrapper.unmount();
+            setPref(PREF.SPLAT_QUALITY, 'turbo');
+            await open();
+            expect(quality().closest('.p-select').textContent).toContain('Auto');
+        });
+
+        it('follows a change that comes from the account', async () => {
+            await open();
+            applyAccountValue(PREF.SPLAT_QUALITY, 'low');
+            await flushPromises();
+            expect(quality().closest('.p-select').textContent).toContain('Low');
+        });
+    });
+
+    describe('Organization sort', () => {
+        const column = () => document.getElementById('pref-orgs-sort-column');
+        const direction = () => document.getElementById('pref-orgs-sort-direction');
+        const open = async () => {
+            await render();
+            await tabs()[3].trigger('click');
+            await flushPromises();
+        };
+        beforeEach(() => setPref(PREF.ORG_PAGE, null));
+
+        it('is a sort field and an order in the Lists tab, by name ascending by default', async () => {
+            await open();
+            expect(column().closest('.p-select').textContent).toContain('Name');
+            expect(direction().closest('.p-select').textContent).toContain('Ascending');
+            column().closest('.p-select').click();
+            await flushPromises();
+            expect(Array.from(document.body.querySelectorAll('[role="option"]')).map(o => o.textContent.trim()))
+                .toEqual(['Name', 'Creation date', 'Last modified', 'Number of datasets']);
+        });
+
+        it('shows what is stored, and the default for a value the list does not know', async () => {
+            setPref(PREF.ORG_PAGE, { sortColumn: 'lastModified', sortDirection: 'desc' });
+            await open();
+            expect(column().closest('.p-select').textContent).toContain('Last modified');
+            expect(direction().closest('.p-select').textContent).toContain('Descending');
+            wrapper.unmount();
+            setPref(PREF.ORG_PAGE, { sortColumn: 'size', sortDirection: 'sideways' });
+            await open();
+            expect(column().closest('.p-select').textContent).toContain('Name');
+            expect(direction().closest('.p-select').textContent).toContain('Ascending');
+        });
+
+        it('names the default list for what it holds: owned, member and public organizations (D-003)', async () => {
+            await open();
+            const label = document.getElementById('pref-orgs-owned-only-label');
+            expect(label.textContent.trim()).toBe('Show only organizations I own, belong to, or that are public');
+            expect(label.getAttribute('for')).toBe('pref-orgs-owned-only');
+            expect(document.getElementById('pref-orgs-owned-only').checked).toBe(true);
+        });
+
+        it('follows a change that comes from the account', async () => {
+            await open();
+            applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'datasetCount', sortDirection: 'desc' });
+            await flushPromises();
+            expect(column().closest('.p-select').textContent).toContain('Number of datasets');
+            expect(direction().closest('.p-select').textContent).toContain('Descending');
+        });
+    });
+
+    describe('Page sizes of the lists (FR-XC-34)', () => {
+        const datasets = () => document.getElementById('pref-datasets-per-page');
+        const orgs = () => document.getElementById('pref-orgs-per-page');
+        const open = async () => {
+            await render();
+            await tabs()[3].trigger('click');
+            await flushPromises();
+        };
+        beforeEach(() => { setPref(PREF.ORG_PAGE, null); setPref(PREF.DATASET_TABLE, null); });
+
+        it('fit the screen by default: the choice reads Fit the screen, and offers it with the sizes', async () => {
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('Fit the screen');
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+            datasets().closest('.p-select').click();
+            await flushPromises();
+            expect(Array.from(document.body.querySelectorAll('[role="option"]')).map(o => o.textContent.trim()))
+                .toEqual(['Fit the screen', '5', '10', '25', '50', '100']);
+        });
+
+        it('store the size that is chosen, and none for Fit the screen', async () => {
+            await open();
+            const select = id => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === id);
+            select('pref-datasets-per-page').vm.$emit('update:modelValue', 25);
+            select('pref-orgs-per-page').vm.$emit('update:modelValue', 50);
+            await flushPromises();
+            expect(getPref(PREF.DATASET_TABLE, null)).toMatchObject({ itemsPerPage: 25, pageSizeChosen: true });
+            expect(getPref(PREF.ORG_PAGE, null)).toMatchObject({ itemsPerPage: 50, pageSizeChosen: true });
+            expect(datasets().closest('.p-select').textContent).toContain('25');
+            select('pref-datasets-per-page').vm.$emit('update:modelValue', 'auto');
+            await flushPromises();
+            expect(getPref(PREF.DATASET_TABLE, null)).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
+            expect(datasets().closest('.p-select').textContent).toContain('Fit the screen');
+        });
+
+        it('read the 10 that an older Hub stored with the other settings, without the mark, as Fit the screen', async () => {
+            setPref(PREF.DATASET_TABLE, { itemsPerPage: 10, sortColumn: 'size' });
+            setPref(PREF.ORG_PAGE, { itemsPerPage: 10, sortColumn: 'name' });
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('Fit the screen');
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+        });
+
+        it('read any other size that an older Hub stored without the mark as chosen, and save it back with the mark', async () => {
+            setPref(PREF.DATASET_TABLE, { itemsPerPage: 25, sortColumn: 'size' });
+            setPref(PREF.ORG_PAGE, { itemsPerPage: 25, ownedOnly: false, sortColumn: 'name' });
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('25');
+            expect(datasets().closest('.p-select').textContent).not.toContain('Fit the screen');
+            expect(orgs().closest('.p-select').textContent).toContain('25');
+            const select = id => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === id);
+            select('pref-orgs-sort-column').vm.$emit('update:modelValue', 'lastModified');
+            await flushPromises();
+            expect(getPref(PREF.ORG_PAGE, null)).toEqual({
+                itemsPerPage: 25, pageSizeChosen: true, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'asc', view: 'list'
+            });
+            expect(orgs().closest('.p-select').textContent).toContain('25');
+            // Nothing else changed in the datasets section: its old value is not written
+            expect(getPref(PREF.DATASET_TABLE, null)).toEqual({ itemsPerPage: 25, sortColumn: 'size' });
+        });
+
+        it('save the old unmarked 10 back as Fit the screen when another setting changes', async () => {
+            setPref(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name' });
+            await open();
+            const select = id => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === id);
+            select('pref-orgs-sort-direction').vm.$emit('update:modelValue', 'desc');
+            await flushPromises();
+            expect(getPref(PREF.ORG_PAGE, null)).toMatchObject({ itemsPerPage: null, pageSizeChosen: false, sortDirection: 'desc' });
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+        });
+
+        it('follow an older Hub\'s account value (no mark) by the same rule', async () => {
+            await open();
+            applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 50, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+            await flushPromises();
+            expect(orgs().closest('.p-select').textContent).toContain('50');
+            applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+            await flushPromises();
+            expect(orgs().closest('.p-select').textContent).toContain('Fit the screen');
+            // Followed, not written back as a local change
+            expect(getPref(PREF.ORG_PAGE, null)).toEqual({ itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc' });
+        });
+
+        it('read a 10 stored with the mark as chosen', async () => {
+            setPref(PREF.DATASET_TABLE, { itemsPerPage: 10, pageSizeChosen: true });
+            await open();
+            expect(datasets().closest('.p-select').textContent).toContain('10');
+            expect(datasets().closest('.p-select').textContent).not.toContain('Fit the screen');
+        });
+    });
+
+    describe('Currency', () => {
+        const currency = () => document.getElementById('pref-currency');
+        beforeEach(() => setPref(PREF.CURRENCY, null));
+
+        it('is a general setting on the Units tab, US dollars by default', async () => {
+            await render();
+            expect(currency().closest('.p-select').textContent).toContain('USD');
+            expect(document.body.textContent).toContain('Changing it does not convert them');
+        });
+
+        it('stores the choice as the currency preference, not with the stockpile materials', async () => {
+            setPref(PREF.STOCKPILE_MATERIALS, { overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+            await render();
+            const select = wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-currency');
+            select.vm.$emit('update:modelValue', 'EUR');
+            await flushPromises();
+            expect(getPref(PREF.CURRENCY, null)).toBe('EUR');
+            expect(getPref(PREF.STOCKPILE_MATERIALS, null)).toEqual({ overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+        });
+
+        it('shows the default for a stored value that is not a currency code', async () => {
+            setPref(PREF.CURRENCY, 'euros');
+            await render();
+            expect(currency().closest('.p-select').textContent).toContain('USD');
+        });
+    });
+
+    describe('Stockpiles', () => {
+        beforeEach(() => setPref(PREF.STOCKPILE_MATERIALS, null));
+
+        it('has the materials, and no currency of its own', async () => {
+            await render({ initialTab: 'stockpiles' });
+            expect(document.body.querySelector('[data-testid="stockpile-materials-editor"]')).not.toBeNull();
+            expect(document.getElementById('pref-stockpile-currency')).toBeNull();
+        });
+
+        it('Reset section resets the stockpiles section', async () => {
+            await render({ initialTab: 'stockpiles' });
+            const panel = dom().findAll('[role="tabpanel"]').find(p => p.find('[data-testid="stockpile-materials-editor"]').exists());
+            await buttonWith('Reset section', panel).trigger('click');
+            expect(h.store.resetSection).toHaveBeenCalledWith('stockpiles');
+        });
+
+        // The layout is CSS: the rules that keep the sticky column titles of the materials off the text above them
+        it('sticks the column titles at the top edge of the panels, painting nothing outside them', () => {
+            const dialog = readSource(__dirname, 'PreferencesDialog.vue');
+            // The scroller has no top padding for the rows to show through above a sticky title...
+            expect(ruleOf(dialog, '.pref-tabs :deep(.p-tabpanels)')).toMatch(/padding:\s*0;/);
+            // ...the padding of the panels is inside what scrolls
+            expect(ruleOf(dialog, '.pref-tabs :deep(.p-tabpanel)')).toMatch(/padding:\s*var\(--p-tabs-tabpanel-padding\);/);
+            // ...so the titles stick at the top, with no shadow over the panel's padding (which covered
+            // the last line of the text above them while the list is at its top)
+            const head = ruleOf(readSource(__dirname, 'StockpileMaterialsEditor.vue'), '.materials-head');
+            expect(head).toMatch(/position:\s*sticky;/);
+            expect(head).toMatch(/top:\s*0;/);
+            expect(head).not.toMatch(/box-shadow/);
+        });
+    });
+
+    it('takes the focus to the first field of the shown tab, not of a hidden one, and gives it back on close (ACC-10)', async () => {
+        const Dialog = (await import('primevue/dialog')).default;
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+        await render({ initialTab: 'map' });
+        await wrapper.findComponent(Dialog).vm.$emit('show');
+        const active = document.activeElement;
+        const panel = active.closest('[role="tabpanel"]');
+        expect(document.getElementById('preferencesDialog').contains(active)).toBe(true);
+        expect(panel).not.toBeNull();
+        expect(panel.style.display).not.toBe('none');
+        expect(dom().find('[role="tab"][aria-selected="true"]').text()).toBe('Map');
+        wrapper.unmount();
+        wrapper = null;
+        expect(document.activeElement).toBe(opener);
+    });
+
+    it('Close emits close', async () => {
+        await render();
+        expect(wrapper.emitted('close')).toBeUndefined();
+        await buttonWith('Close').trigger('click');
+        expect(wrapper.emitted('close')).toHaveLength(1);
+    });
+
+    describe('Notifications', () => {
+        const select = () => document.getElementById('pref-build-notifications');
+        const selectRoot = () => select()?.closest('.p-select');
+        const hint = () => document.getElementById('pref-build-notifications-hint');
+        const activeTab = () => dom().find('[role="tab"][aria-selected="true"]').text();
+        const selectOf = inputId => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === inputId);
+
+        it('has no tab on a server that sends no e-mail, and asks nothing', async () => {
+            h.auth.flags.emailEnabled = false;
+            await render({ initialTab: 'notifications' });
+            expect(tabs().map(t => t.text())).not.toContain('Notifications');
+            expect(activeTab()).toBe('Units');
+            expect(h.reg.notificationStatus).not.toHaveBeenCalled();
+        });
+
+        it('asks for the e-mail status only when the tab is shown', async () => {
+            await render();
+            expect(h.reg.notificationStatus).not.toHaveBeenCalled();
+            await tabs().find(t => t.text() === 'Notifications').trigger('click');
+            await flushPromises();
+            expect(h.reg.notificationStatus).toHaveBeenCalledTimes(1);
+        });
+
+        it('brings the tab given by initialTab into view (the tab list scrolls when the tabs do not fit)', async () => {
+            const scrolled = [];
+            const original = HTMLElement.prototype.scrollIntoView;
+            HTMLElement.prototype.scrollIntoView = function () { scrolled.push(this.textContent.trim()); };
+            try {
+                await render({ initialTab: 'notifications' });
+                await flushPromises();
+                expect(scrolled).toContain('Notifications');
+            } finally {
+                HTMLElement.prototype.scrollIntoView = original;
+            }
+        });
+
+        it('opens on the tab given by initialTab, with None, All and Failed or waiting for files, None first', async () => {
+            await render({ initialTab: 'notifications' });
+            expect(activeTab()).toBe('Notifications');
+            expect(document.body.textContent).toContain('Send build notifications');
+            expect(selectRoot().classList.contains('p-disabled')).toBe(false);
+            expect(selectRoot().textContent).toContain('None');
+            const options = selectOf('pref-build-notifications').props('options');
+            expect(options).toEqual([
+                { value: 'none', label: 'None' }, { value: 'all', label: 'All' }, { value: 'failed', label: 'Failed or waiting for files' }
+            ]);
+            expect(hint().textContent).toContain('once when a build waits for files to be uploaded');
+        });
+
+        it('stores the choice as the build notifications preference', async () => {
+            await render({ initialTab: 'notifications' });
+            await selectOf('pref-build-notifications').vm.$emit('update:modelValue', 'failed');
+            await flushPromises();
+            expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('failed');
+            expect(getPref(PREF.TASK_NOTIFICATIONS, '')).toBe(''); // never chosen: nothing stored
+        });
+
+        // FR-PRC-40, D-012: a second setting for the tasks that end (photogrammetry, imports, exports)
+        it('has a task notifications setting beside the build one, None first and None by default', async () => {
+            await render({ initialTab: 'notifications' });
+            expect(document.body.textContent).toContain('Send task notifications');
+            expect(selectOf('pref-task-notifications').props('options')).toEqual([
+                { value: 'none', label: 'None' }, { value: 'all', label: 'All' }, { value: 'failed', label: 'Failed only' }
+            ]);
+            expect(selectOf('pref-task-notifications').props('modelValue')).toBe('none');
+            expect(document.getElementById('pref-task-notifications-hint').textContent)
+                .toContain('when a task of yours ends');
+        });
+
+        it('stores the task choice as the task notifications preference, apart from the build one', async () => {
+            await render({ initialTab: 'notifications' });
+            await selectOf('pref-task-notifications').vm.$emit('update:modelValue', 'failed');
+            await flushPromises();
+            expect(getPref(PREF.TASK_NOTIFICATIONS, '')).toBe('failed');
+            expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('');
+        });
+
+        it('disables the task setting too, with the same reason, for an account without an e-mail address', async () => {
+            h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: false, reason: 'noAddress' }));
+            await render({ initialTab: 'notifications' });
+            expect(document.getElementById('pref-task-notifications').closest('.p-select').classList.contains('p-disabled')).toBe(true);
+            expect(document.getElementById('pref-task-notifications-hint').textContent)
+                .toBe('Your account has no e-mail address. Ask an administrator to add one.');
+        });
+
+        it('is disabled, with the reason, for an account without an e-mail address', async () => {
+            h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: false, reason: 'noAddress' }));
+            await render({ initialTab: 'notifications' });
+            expect(selectRoot().classList.contains('p-disabled')).toBe(true);
+            expect(hint().textContent).toBe('Your account has no e-mail address. Ask an administrator to add one.');
+            expect(select().getAttribute('aria-describedby')).toBe('pref-build-notifications-hint');
+        });
+
+        it('hides the tab when the server says it sends no e-mail', async () => {
+            h.reg.notificationStatus = vi.fn(() => Promise.resolve({ canReceiveEmail: false, reason: 'emailDisabled' }));
+            await render({ initialTab: 'notifications' });
+            expect(tabs().map(t => t.text())).not.toContain('Notifications');
+            expect(activeTab()).toBe('Units');
+        });
+
+        it('stays usable when the status cannot be read', async () => {
+            vi.spyOn(console, 'warn').mockImplementation(() => {});
+            h.reg.notificationStatus = vi.fn(() => Promise.reject(new Error('offline')));
+            await render({ initialTab: 'notifications' });
+            expect(selectRoot().classList.contains('p-disabled')).toBe(false);
+        });
+
+        it('shows the tab asked for once the feature flags arrive', async () => {
+            h.auth.flags.emailEnabled = false;
+            await render({ initialTab: 'notifications' });
+            expect(activeTab()).toBe('Units');
+            h.auth.flags.emailEnabled = true;
+            await flushPromises();
+            expect(activeTab()).toBe('Notifications');
+        });
+
+        it('Reset section resets the notifications section', async () => {
+            await render({ initialTab: 'notifications' });
+            const resets = dom().findAll('button').filter(b => b.text().includes('Reset section'));
+            await resets.at(-1).trigger('click');
+            expect(h.store.resetSection).toHaveBeenCalledWith('notifications');
+        });
+    });
+
+    // FR-NAV-07, D-044: the theme, System by default, kept on this device; libs/colorScheme.js applies it
+    describe('Appearance', () => {
+        const appearanceSelect = () => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-appearance');
+        const choose = async value => {
+            appearanceSelect().vm.$emit('update:modelValue', value);
+            await flushPromises();
+        };
+        const isDark = () => document.documentElement.classList.contains(DARK_CLASS);
+        let media;
+        let stopScheme;
+        const realMatchMedia = window.matchMedia;
+        beforeEach(() => {
+            const listeners = new Set();
+            media = {
+                matches: false,
+                addEventListener: (_type, fn) => listeners.add(fn),
+                removeEventListener: (_type, fn) => listeners.delete(fn),
+                set(dark) { media.matches = dark; listeners.forEach(fn => fn()); }
+            };
+            window.matchMedia = vi.fn(() => media);
+            document.documentElement.classList.remove(DARK_CLASS);
+            stopScheme = startColorScheme();
+        });
+        afterEach(() => {
+            stopScheme();
+            window.matchMedia = realMatchMedia;
+            document.documentElement.classList.remove(DARK_CLASS);
+        });
+        const open = async () => {
+            await render({ initialTab: 'appearance' });
+            await flushPromises();
+        };
+
+        it('is a theme select with System, Light and Dark, System by default, kept on this device', async () => {
+            await open();
+            const select = appearanceSelect();
+            expect(select.props('options').map(o => o.label)).toEqual(['System', 'Light', 'Dark']);
+            expect(select.props('modelValue')).toBe('system');
+            expect(document.getElementById('pref-appearance-hint').textContent).toContain('on this device only');
+        });
+
+        it('choosing Dark applies the dark theme, Light the light one, and System follows the system', async () => {
+            await open();
+            await choose('dark');
+            expect(getPref(PREF.APPEARANCE, '')).toBe('dark');
+            expect(isDark()).toBe(true);
+            media.set(false);
+            expect(isDark()).toBe(true);
+            await choose('light');
+            expect(isDark()).toBe(false);
+            await choose('system');
+            media.set(true);
+            expect(isDark()).toBe(true);
+            media.set(false);
+            expect(isDark()).toBe(false);
+        });
+
+        it('shows System for a stored value that is not a choice', async () => {
+            setPref(PREF.APPEARANCE, 'sepia');
+            await open();
+            expect(appearanceSelect().props('modelValue')).toBe('system');
+        });
+
+        it('Reset section removes the choice from this device, and sends nothing to the account', async () => {
+            setPref(PREF.APPEARANCE, 'dark');
+            await open();
+            const resets = dom().findAll('button').filter(b => b.text().includes('Reset section'));
+            await resets.at(-2).trigger('click');
+            expect(getPref(PREF.APPEARANCE, null)).toBeNull();
+            expect(h.store.resetSection).not.toHaveBeenCalled();
+            expect(isDark()).toBe(false);
+        });
+
+        it('Reset all removes it too', async () => {
+            setPref(PREF.APPEARANCE, 'dark');
+            await render();
+            await buttonWith('Reset all').trigger('click');
+            await flushPromises();
+            await buttonWith('Reset all', new DOMWrapper(confirmWindow())).trigger('click');
+            await flushPromises();
+            expect(getPref(PREF.APPEARANCE, null)).toBeNull();
+        });
+    });
+
+    describe('Reset all', () => {
+        async function askToResetAll() {
+            await render();
+            await buttonWith('Reset all').trigger('click');
+            await flushPromises();
+        }
+
+        it('asks for confirmation first, in a window above the preferences', async () => {
+            await askToResetAll();
+            expect(confirmWindow()).not.toBeNull();
+            expect(h.store.resetAll).not.toHaveBeenCalled();
+            expect(document.body.querySelector('#preferencesDialog')).not.toBeNull();
+            const masks = [...document.body.querySelectorAll('.p-dialog-mask')];
+            expect(masks).toHaveLength(2);
+            // Later in the DOM: the confirm covers the window (the z-order is checked in the browser)
+            expect(masks[1].contains(confirmWindow())).toBe(true);
+        });
+
+        it('resets everything when confirmed', async () => {
+            await askToResetAll();
+            await buttonWith('Reset all', new DOMWrapper(confirmWindow())).trigger('click');
+            await flushPromises();
+            expect(h.store.resetAll).toHaveBeenCalledTimes(1);
+            expect(confirmWindow()).toBeNull();
+        });
+
+        it('resets nothing when cancelled', async () => {
+            await askToResetAll();
+            await buttonWith('Cancel', new DOMWrapper(confirmWindow())).trigger('click');
+            await flushPromises();
+            expect(h.store.resetAll).not.toHaveBeenCalled();
+            expect(confirmWindow()).toBeNull();
+            expect(document.body.querySelector('#preferencesDialog')).not.toBeNull();
+        });
+    });
+});

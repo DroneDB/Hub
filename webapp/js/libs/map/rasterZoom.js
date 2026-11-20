@@ -2,8 +2,8 @@
  * rasterZoom - Zoom-range helpers for on-the-fly rendered raster XYZ layers.
  *
  * Raster tiles are generated on demand from the source file, so the only real
- * cap on zoom is the native GSD of the raster. The viewer used to hard-cap
- * layers at z22 (~3.7 cm/px at the equator), which hides sub-cm detail.
+ * cap on zoom is the native GSD of the raster. A fixed cap at z22 (~3.7 cm/px at
+ * the equator) would hide sub-cm detail.
  *
  * Source zoom ceilings derive from each entry's native GSD zoom; the view
  * maxZoom is the largest native zoom across entries plus a small
@@ -13,6 +13,7 @@
 import { transformExtent } from 'ol/proj';
 import { getWidth, getHeight } from 'ol/extent';
 import bbox from '@turf/bbox';
+import { EPSG } from '@/libs/constants';
 
 // m/px at the equator for zoom 0 of the 256 px Web Mercator tile pyramid
 export const INITIAL_RESOLUTION = 156543.0339280410;
@@ -23,7 +24,7 @@ export const SOURCE_MIN_ZOOM = 14;
 // Upper bound to keep first-hit on-demand GDAL warping costs sane
 export const HARD_MAX_ZOOM = 26;
 // Extra zoom levels the view allows beyond the deepest native zoom
-export const VIEW_MAGNIFICATION = 1;
+const VIEW_MAGNIFICATION = 1;
 // OpenLayers default View maxZoom
 export const OL_DEFAULT_MAX_ZOOM = 28;
 
@@ -47,7 +48,7 @@ export function computeNativeZoom(entry) {
         return FALLBACK_NATIVE_ZOOM;
     }
 
-    const ext3857 = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+    const ext3857 = transformExtent(bbox(entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
     const gsd = Math.max(getWidth(ext3857) / width, getHeight(ext3857) / height);
     if (!isFinite(gsd) || gsd <= 0) return FALLBACK_NATIVE_ZOOM;
 

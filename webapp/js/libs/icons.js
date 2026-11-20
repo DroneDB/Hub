@@ -1,6 +1,7 @@
-import { entry } from 'ddb';
-import { isArchivePath } from '@/libs/entryTypes';
+import { entry, pathutils } from 'ddb';
+import { isArchivePath } from '@/libs/entryTypeCapabilities';
 
+/** The icon of an entry, by its type; the glyphs of the buttons and of the meanings of the map are in libs/glyphs.js */
 const typeIconMap = {
     [entry.type.DIRECTORY]: "fa-regular fa-folder",
     [entry.type.GENERIC]: "fa-regular fa-file",
@@ -26,10 +27,7 @@ const extensionIconMap = {
 };
 
 function getExtension(path) {
-    if (!path) return '';
-    const lastDot = path.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === 0) return '';
-    return path.substring(lastDot + 1).toLowerCase();
+    return path ? pathutils.extname(path).slice(1) : '';
 }
 
 export default {
