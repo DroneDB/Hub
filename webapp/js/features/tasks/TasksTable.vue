@@ -1,15 +1,15 @@
 <template>
-    <div class="tasks-table">
+    <div class="tasks-table" :class="{ 'with-names': showDataset || showOwner }">
         <!-- Skeleton while first load is in flight -->
         <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows :class="STACKED_TABLE_CLASS">
-            <Column header="State" v-bind="stackedColumn('State')" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
-            <Column header="Tool" v-bind="stackedColumn()"><template #body><Skeleton width="80%" /></template></Column>
-            <Column v-if="showDataset" header="Dataset" v-bind="stackedColumn('Dataset', 'md')"><template #body><Skeleton width="70%" /></template></Column>
-            <Column v-if="showOwner" header="Owner" v-bind="stackedColumn('Owner', 'xl')"><template #body><Skeleton width="60%" /></template></Column>
-            <Column header="Progress" v-bind="stackedColumn('Progress', 'md')"><template #body><Skeleton width="90%" /></template></Column>
-            <Column header="Created" v-bind="stackedColumn('Created', 'lg')"><template #body><Skeleton width="70%" /></template></Column>
-            <Column header="Duration" style="width: 9rem;" v-bind="stackedColumn('Duration', 'lg')"><template #body><Skeleton width="60%" /></template></Column>
-            <Column header="Actions" style="width: 10rem;" v-bind="stackedColumn()"><template #body><Skeleton width="90%" /></template></Column>
+            <Column header="State" class="col-fit" v-bind="stackedColumn('State')"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
+            <Column header="Tool" class="col-fit col-tool" v-bind="stackedColumn()"><template #body><Skeleton width="12rem" /></template></Column>
+            <Column v-if="showDataset" header="Dataset" class="col-fit" v-bind="stackedColumn('Dataset', 'md')"><template #body><Skeleton width="8rem" /></template></Column>
+            <Column v-if="showOwner" header="Owner" class="col-fit" v-bind="stackedColumn('Owner', 'xl')"><template #body><Skeleton width="5rem" /></template></Column>
+            <Column header="Progress" class="col-progress" v-bind="stackedColumn('Progress', 'md')"><template #body><Skeleton width="100%" /></template></Column>
+            <Column header="Created" class="col-fit" v-bind="stackedColumn('Created', 'lg')"><template #body><Skeleton width="10rem" /></template></Column>
+            <Column header="Duration" class="col-fit" v-bind="stackedColumn('Duration', 'lg')"><template #body><Skeleton width="4rem" /></template></Column>
+            <Column header="Actions" class="col-fit" v-bind="stackedColumn()"><template #body><Skeleton width="10rem" /></template></Column>
         </DataTable>
 
         <!-- Empty state -->
@@ -30,7 +30,7 @@
                    :page-link-size="3" @page="onPage" @sort="onSort">
             <!-- The parent's own page size select in place of the paginator's (Admin > Tasks labels the size that fits) -->
             <template v-if="$slots.paginatorend" #paginatorend><slot name="paginatorend" /></template>
-            <Column field="state" header="State" sortable v-bind="stackedColumn('State', undefined, {}, sortableHeaderPt(stacked))" style="width: 5rem;">
+            <Column field="state" header="State" sortable class="col-fit" v-bind="stackedColumn('State', undefined, {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
                     <Tag :severity="stateTag(slotProps.data).severity"
                          :pt="{ root: { title: stateTag(slotProps.data).title, 'aria-label': stateTag(slotProps.data).label } }">
@@ -38,9 +38,9 @@
                     </Tag>
                 </template>
             </Column>
-            <Column field="toolId" header="Tool" sortable v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
+            <Column field="toolId" header="Tool" sortable class="col-fit col-tool" v-bind="stackedColumn(undefined, undefined, {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
-                    <div :title="taskTarget(slotProps.data)">
+                    <div class="tool-cell" :title="taskTarget(slotProps.data)">
                         <strong>{{ toolTitle(slotProps.data.toolId, tools) }}</strong>
                         <span class="muted"> v{{ slotProps.data.version }}</span>
                         <small v-if="taskTarget(slotProps.data)" class="path-details">{{ targetText(slotProps.data) }}</small>
@@ -51,12 +51,12 @@
                     </div>
                 </template>
             </Column>
-            <Column v-if="showDataset" header="Dataset" class="col-dataset" v-bind="stackedColumn('Dataset', 'md')">
+            <Column v-if="showDataset" header="Dataset" class="col-fit" v-bind="stackedColumn('Dataset', 'md')">
                 <template #body="slotProps">
                     <span class="dataset-cell" :title="`${slotProps.data.orgSlug}/${slotProps.data.dsSlug}`">{{ slotProps.data.orgSlug }}/{{ slotProps.data.dsSlug }}</span>
                 </template>
             </Column>
-            <Column v-if="showOwner" header="Owner" class="col-owner" v-bind="stackedColumn('Owner', 'xl')">
+            <Column v-if="showOwner" header="Owner" class="col-fit" v-bind="stackedColumn('Owner', 'xl')">
                 <template #body="slotProps">
                     <span class="owner-cell" :title="slotProps.data.owner || slotProps.data.userId || 'System'">{{ slotProps.data.owner || slotProps.data.userId || 'System' }}</span>
                 </template>
@@ -99,7 +99,7 @@
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column field="createdAt" header="Created" sortable class="col-created" v-bind="stackedColumn('Created', 'lg', {}, sortableHeaderPt(stacked))">
+            <Column field="createdAt" header="Created" sortable class="col-fit" v-bind="stackedColumn('Created', 'lg', {}, sortableHeaderPt(stacked))">
                 <template #body="slotProps">
                     <div class="date-time">
                         <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
@@ -107,7 +107,7 @@
                     </div>
                 </template>
             </Column>
-            <Column header="Duration" style="width: 9rem;" v-bind="stackedColumn('Duration', 'lg')">
+            <Column header="Duration" class="col-fit" v-bind="stackedColumn('Duration', 'lg')">
                 <template #body="slotProps">
                     <div v-if="isActive(slotProps.data.state)" class="duration running" title="Running time">
                         <i class="fa-solid fa-stopwatch" /> {{ runningTime(slotProps.data) }}
@@ -120,9 +120,9 @@
                            data-testid="task-waiting">waited {{ taskWaiting(slotProps.data) }}</small>
                 </template>
             </Column>
-            <Column header="Actions" style="width: 10rem;" v-bind="stackedColumn()">
+            <Column header="Actions" class="col-fit" v-bind="stackedColumn()">
                 <template #body="slotProps">
-                    <div class="d-flex gap-1 flex-wrap">
+                    <div class="task-actions">
                         <Button v-if="offers(slotProps.data, 'viewLog')" size="small" severity="secondary" icon="fa-solid fa-terminal"
                                 title="View log" aria-label="View log" @click="$emit('view-log', slotProps.data)" />
                         <Button v-if="offers(slotProps.data, 'viewLog') && canDownloadResult(slotProps.data, tools)" size="small" icon="fa-solid fa-download"
@@ -334,11 +334,10 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../css/breakpoints' as *;
-
 /* The table takes the whole width of its page */
 .tasks-table {
     width: 100%;
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -352,9 +351,88 @@ export default {
     flex-direction: column;
 }
 
-/* Fixed columns: a cell never grows the table, long values are cut with an ellipsis */
+/* Every column but Progress has the width of its content (col-fit), and Progress has the rest of the width: a
+   tool, a path, a dataset or an owner longer than its cap is cut with an ellipsis, so a cell never grows the
+   table past its page */
 .tasks-table :deep(.p-datatable-table) {
-    table-layout: fixed;
+    table-layout: auto;
+}
+
+/* The caps of the text columns come from the width the other columns leave (state, dates, buttons and a short
+   bar: --tasks-other-width): Tool has all of it, or its share when Dataset and Owner are shown; never less than a
+   few words, never more than a long path */
+.tasks-table {
+    --tasks-other-width: 52rem;
+    --tasks-tool-share: 1;
+    --tasks-name-share: 0;
+    --tasks-text-room: calc(100cqi - var(--tasks-other-width));
+    --tasks-tool-max: clamp(6rem, var(--tasks-text-room) * var(--tasks-tool-share), 28rem);
+    --tasks-name-max: clamp(5rem, var(--tasks-text-room) * var(--tasks-name-share), 16rem);
+}
+
+/* Owner joins the table at xl: until then Dataset is the only other text column, and Duration and Created
+   join it at lg */
+.tasks-table.with-names {
+    --tasks-tool-share: 0.5;
+    --tasks-name-share: 0.25;
+}
+
+@media only screen and (max-width: 1199.98px) {
+    .tasks-table {
+        --tasks-other-width: 50rem;
+    }
+
+    .tasks-table.with-names {
+        --tasks-tool-share: 0.67;
+        --tasks-name-share: 0.33;
+    }
+}
+
+@media only screen and (max-width: 991.98px) {
+    .tasks-table {
+        --tasks-other-width: 36rem;
+    }
+}
+
+/* Progress joins the table at md: until then Tool has the rest of the width */
+@media only screen and (min-width: 576px) and (max-width: 767.98px) {
+    .tasks-table :deep(.col-tool) {
+        width: auto;
+    }
+
+    .tasks-table {
+        --tasks-tool-max: none;
+    }
+}
+
+.tool-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* In a table (not a phone card) the text columns stop at their caps, and the content of Progress takes the width
+   the other columns leave and asks for no more than a short bar */
+@media only screen and (min-width: 576px) {
+    .tool-cell {
+        max-width: var(--tasks-tool-max);
+    }
+
+    .dataset-cell,
+    .owner-cell {
+        max-width: var(--tasks-name-max);
+    }
+
+    .tasks-table :deep(td.col-progress > *) {
+        contain: inline-size;
+        min-width: 5rem;
+    }
+}
+
+/* The buttons of a row stay on one line */
+.task-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: var(--ddb-spacing-xs);
 }
 
 .tasks-table :deep(.p-datatable-table-container) {
@@ -392,19 +470,9 @@ export default {
     overflow-wrap: anywhere;
 }
 
-/* The bar is at most 20rem wide, whatever the column (FR-EXP-42) */
+/* The bar fills its column */
 .task-progress {
     min-width: 0;
-    max-width: 20rem;
-}
-
-/* On a very wide screen only Tool is flexible: the other columns have the width of their content, so a row reads
-   in one look and the name and its data are not 2000 px apart (FR-EXP-42, FR-ADM-27) */
-@include xwide-up {
-    .tasks-table :deep(.col-progress) { width: 16rem; }
-    .tasks-table :deep(.col-created) { width: 11rem; }
-    .tasks-table :deep(.col-dataset),
-    .tasks-table :deep(.col-owner) { width: 14rem; }
 }
 
 .task-bar {

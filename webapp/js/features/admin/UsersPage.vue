@@ -55,7 +55,7 @@
                             aria-label="Users per page" class="page-size-select" @update:model-value="rows => onPage({ rows })" />
                 </template>
                 <!-- The checkbox of a row (not for the built-in admin); the header one selects every user that the search shows -->
-                <Column class="users-col-fit users-col-select" v-bind="stackedColumn(undefined, undefined, {}, {})">
+                <Column class="col-fit users-col-select" v-bind="stackedColumn(undefined, undefined, {}, {})">
                     <template #header>
                         <Checkbox :model-value="allSelected" :indeterminate="someSelected" binary input-id="users-select-all"
                                   aria-label="Select all users" :disabled="!selectableUsers.length" @update:model-value="toggleAll" />
@@ -91,15 +91,15 @@
                         <span v-else class="text-muted">No roles</span>
                     </template>
                 </Column>
-                <Column field="organizationCount" header="Organizations" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Organizations', 'md', {}, sortableHeaderPt(stacked))">
+                <Column field="organizationCount" header="Organizations" :sortable="true" class="col-fit" v-bind="stackedColumn('Organizations', 'md', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         <Button size="small" :title="organizationsLabel(slotProps.data)" :aria-label="organizationsLabel(slotProps.data)"
                                 severity="secondary" icon="fa-solid fa-sitemap"
                                 :label="String(slotProps.data.organizationCount)" @click="showUserOrganizations(slotProps.data)" />
                     </template>
                 </Column>
-                <Column field="datasetCount" header="Datasets" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
-                <Column field="storageUsed" header="Storage" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
+                <Column field="datasetCount" header="Datasets" :sortable="true" class="col-fit" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
+                <Column field="storageUsed" header="Storage" :sortable="true" class="col-fit" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         <!-- The bar is amber from 90 % and red from 100 % (D-030); with no quota there is no bar -->
                         <div v-if="!usageOf(slotProps.data).unlimited">
@@ -116,12 +116,12 @@
                         </div>
                     </template>
                 </Column>
-                <Column field="createdDate" header="Created" :sortable="true" class="users-col-fit" v-bind="stackedColumn('Created', 'xl', {}, sortableHeaderPt(stacked))">
+                <Column field="createdDate" header="Created" :sortable="true" class="col-fit" v-bind="stackedColumn('Created', 'xl', {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
                         {{ formatCreated(slotProps.data.createdDate) }}
                     </template>
                 </Column>
-                <Column header="Actions" class="users-col-fit" v-bind="stackedColumn(undefined, undefined, { style: 'text-align: center' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
+                <Column header="Actions" class="col-fit" v-bind="stackedColumn(undefined, undefined, { style: 'text-align: center' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
                     <template #body="slotProps">
                         <div class="d-flex gap-1 justify-content-center">
                             <Button size="small" :loading="slotProps.data.editing"
@@ -757,15 +757,8 @@ export default {
     margin-inline-start: auto;
 }
 
-/* The columns after Email take the width of their content, so Email is the flexible column and the name and
-   its buttons stay near each other; the storage bar is at most 20rem */
-@media only screen and (min-width: 576px) {
-    #users :deep(.users-col-fit) {
-        width: 1%;
-        white-space: nowrap;
-    }
-}
-
+/* The columns after Email take the width of their content (col-fit), so Email is the flexible column and the
+   name and its buttons stay near each other; the storage bar is at most 20rem */
 #users :deep(.p-progressbar) {
     max-width: 20rem;
 }

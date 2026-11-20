@@ -155,28 +155,47 @@ describe('FR-ADM-27: the widths of the admin tables', () => {
 
     it('the users table gives Organizations, Datasets, Storage, Created and Actions the width of their content', () => {
         const template = templateOf('js/features/admin/UsersPage.vue');
-        expect(template.match(/class="users-col-fit"/g)).toHaveLength(5);
+        expect(template.match(/class="col-fit"/g)).toHaveLength(5);
         const style = styleOf('js/features/admin/UsersPage.vue');
-        expect(style).toMatch(/\.users-col-fit\) \{\s*width: 1%;\s*white-space: nowrap;/);
         expect(blockAt(style, style.indexOf('.search-col {'))).toContain('max-width: 28rem;');
         expect(style).toMatch(/\.p-progressbar\) \{\s*max-width: 20rem;/);
     });
 });
 
 describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name', () => {
-    it('the task table has Progress 16rem (the bar at most 20rem), Created 11rem, Dataset and Owner 14rem from xwide', () => {
+    it('.col-fit gives a column the width of its content, on one line, in a table and not in a phone card', () => {
+        const media = blockAt(scss, scss.indexOf('@media only screen and (min-width: 576px) {\n    .col-fit {'));
+        expect(media).toMatch(/\.col-fit \{\s*width: 1%;\s*white-space: nowrap;\s*\}/);
+    });
+
+    it('every task column but Progress fits its content, and Progress has the rest of the width', () => {
         const file = 'js/features/tasks/TasksTable.vue';
         const style = styleOf(file);
-        const wide = blockAt(style, style.indexOf('@include xwide-up'));
-        expect(wide).toContain('.tasks-table :deep(.col-progress) { width: 16rem; }');
-        expect(wide).toContain('.tasks-table :deep(.col-created) { width: 11rem; }');
-        expect(wide).toMatch(/\.col-dataset\),\s*\.tasks-table :deep\(\.col-owner\) \{ width: 14rem; \}/);
-        expect(blockAt(style, style.indexOf('.task-progress {'))).toContain('max-width: 20rem;');
         const template = templateOf(file);
-        for (const cls of ['col-progress', 'col-created', 'col-dataset', 'col-owner']) expect(template).toContain(`class="${cls}"`);
+        const columns = template.slice(template.indexOf('<!-- Task table -->')).match(/<Column [^>]*>/g);
+        expect(columns).toHaveLength(8);
+        for (const column of columns) {
+            if (column.includes('header="Progress"')) expect(column).not.toContain('col-fit');
+            else expect(column).toMatch(/class="col-fit[ "]/);
+            expect(column).not.toMatch(/style="width/);
+        }
+        expect(blockAt(style, style.indexOf('.tasks-table :deep(.p-datatable-table) {'))).toContain('table-layout: auto;');
+        // the content of Progress asks for a short bar only, so the other columns keep their width
+        expect(style).toMatch(/td\.col-progress > \*\) \{\s*contain: inline-size;\s*min-width: 5rem;/);
+        expect(blockAt(style, style.indexOf('.task-progress {'))).not.toContain('max-width');
+        // the text columns stop at a cap taken from the width of the table
+        expect(style).toContain('--tasks-text-room: calc(100cqi - var(--tasks-other-width));');
+        expect(style).toMatch(/\.tool-cell \{\s*max-width: var\(--tasks-tool-max\);/);
+        expect(style).toMatch(/\.owner-cell \{\s*max-width: var\(--tasks-name-max\);/);
         // the table takes the whole width of its page (the dataset's task history)
-        expect(template).toContain('<div class="tasks-table">');
+        expect(template).toContain('<div class="tasks-table"');
         expect(blockAt(style, style.indexOf('.tasks-table {'))).toContain('width: 100%;');
+    });
+
+    it('the buttons of a task row stay on one line', () => {
+        const file = 'js/features/tasks/TasksTable.vue';
+        expect(templateOf(file)).toContain('<div class="task-actions">');
+        expect(blockAt(styleOf(file), styleOf(file).indexOf('.task-actions {'))).toContain('flex-wrap: nowrap;');
     });
 
     it('the files table has the width of its content from xwide, its Name column at most 40rem', () => {

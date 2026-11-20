@@ -344,6 +344,18 @@ $stacked-table: '.ui.table.stacked-table, .stacked-table.p-datatable .p-datatabl
     }
 }
 
+// --- Columns that fit their content ---
+//
+// A column of a table (a PrimeVue Column's class, or a <th>/<td>) that takes the width of its content, on one
+// line: the columns without it share the rest of the width. The table has the automatic layout. A phone card
+// gives its cells the width of the card.
+@media only screen and (min-width: 576px) {
+    .col-fit {
+        width: 1%;
+        white-space: nowrap;
+    }
+}
+
 // --- Select overlays (FR-XC-20) ---
 //
 // The one width rule of every Select's list. PrimeVue gives the list the width of its Select as a
