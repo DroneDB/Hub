@@ -336,7 +336,7 @@ export default {
 <style scoped lang="scss">
 @use '../../../css/breakpoints' as *;
 
-/* The table takes the whole width of its page: the admin task page keeps it to --ddb-page-max-width itself */
+/* The table takes the whole width of its page */
 .tasks-table {
     width: 100%;
     display: flex;

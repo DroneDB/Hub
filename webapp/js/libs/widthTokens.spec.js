@@ -135,14 +135,22 @@ describe('FR-EXP-39: the Markdown text and editor are centred columns', () => {
     });
 });
 
-describe('FR-ADM-27: the admin tables keep one column', () => {
-    it('/admin/users and /admin/tasks are page-scroll-column, with no side padding of their own', () => {
-        for (const [file, id] of [['UsersPage', '#users'], ['TasksPage', '.admin-tasks-page']]) {
-            expect(templateOf(`js/features/admin/${file}.vue`)).toMatch(/page-scroll page-scroll-column/);
-            const style = styleOf(`js/features/admin/${file}.vue`);
-            expect(blockAt(style, style.indexOf(`${id} {`))).toMatch(/padding-block: /);
-            expect(blockAt(style, style.indexOf(`${id} {`))).not.toMatch(/padding: /);
-        }
+describe('FR-ADM-27: the widths of the admin tables', () => {
+    it('/admin/users is page-scroll-column, with no side padding of its own', () => {
+        expect(templateOf('js/features/admin/UsersPage.vue')).toMatch(/page-scroll page-scroll-column/);
+        const style = styleOf('js/features/admin/UsersPage.vue');
+        expect(blockAt(style, style.indexOf('#users {'))).toMatch(/padding-block: /);
+        expect(blockAt(style, style.indexOf('#users {'))).not.toMatch(/padding: /);
+    });
+
+    it('/admin/tasks takes the whole width, with the side padding of the routed pages', () => {
+        const template = templateOf('js/features/admin/TasksPage.vue');
+        expect(template).toContain('class="admin-tasks-page page-scroll"');
+        expect(template).not.toMatch(/page-scroll-column|page-column/);
+        const style = styleOf('js/features/admin/TasksPage.vue');
+        const rule = blockAt(style, style.indexOf('.admin-tasks-page {'));
+        expect(rule).toContain('padding-inline: var(--ddb-page-padding-x);');
+        expect(rule).not.toMatch(/max-width/);
     });
 
     it('the users table gives Organizations, Datasets, Storage, Created and Actions the width of their content', () => {

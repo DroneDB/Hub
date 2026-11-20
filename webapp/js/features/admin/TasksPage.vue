@@ -1,5 +1,5 @@
 <template>
-    <div id="admin-tasks" ref="page" class="admin-tasks-page page-scroll page-scroll-column">
+    <div id="admin-tasks" ref="page" class="admin-tasks-page page-scroll">
 
         <div class="top-banner d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
@@ -334,9 +334,11 @@ export default {
 </script>
 
 <style scoped>
-/* The side padding is .page-scroll-column's: the content keeps the width of --ddb-page-max-width (FR-ADM-27) */
+/* The task list takes the whole width of the screen: a row has many columns, and on a very wide screen
+   TasksTable gives the short ones the width of their content, so only Tool grows */
 .admin-tasks-page {
     padding-block: var(--ddb-spacing-lg);
+    padding-inline: var(--ddb-page-padding-x);
     display: flex;
     flex-direction: column;
 }
