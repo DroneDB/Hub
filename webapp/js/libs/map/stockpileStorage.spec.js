@@ -71,6 +71,17 @@ describe('loadStockpile', () => {
         warn.mockRestore();
     });
 
+    it('does not ask for a file its folder does not list: no 404 for the browser to log when the panel opens', async () => {
+        const dataset = { ...datasetWith(orthophotoStockpileFile()), list: vi.fn(async () => [{ path: 'x.tif' }]) };
+        expect(await loadStockpile(dataset, 'site/x.tif')).toBeNull();
+        expect(dataset.list).toHaveBeenCalledWith('site');
+        expect(dataset.getFileContents).not.toHaveBeenCalled();
+
+        dataset.list = vi.fn(async () => [{ path: 'site/x.tif' }, { path: 'site/x_measurements.geojson' }]);
+        expect((await loadStockpile(dataset, 'site/x.tif')).properties.id).toBe('s1');
+        expect(dataset.getFileContents).toHaveBeenCalledWith('site/x_measurements.geojson');
+    });
+
     it('skips the piles the user removed', async () => {
         expect(await loadStockpile(datasetWith(orthophotoStockpileFile()), 'x.tif', new Set(['s1']))).toBeNull();
     });

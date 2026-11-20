@@ -15,6 +15,7 @@ import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { ANALYSIS_FILL } from '@/libs/map/analysisStyles';
 import { parse } from '@/libs/map/measurementFormat';
 import { isNotFound } from '@/libs/ddb/apiError';
+import { isListed } from '@/libs/optionalFile';
 
 const SUFFIX = '_measurements.geojson';
 
@@ -46,8 +47,11 @@ function getStockpilePath(rasterPath) {
  * The measurements file as measurementFormat reads it (the files of every earlier writer, the 3D
  * viewer's among them, and of the stockpile panel). Nothing is written. A missing file, or one that
  * cannot be used (not GeoJSON, of another application), has no stockpile to show: null.
+ * The file is asked for only when the listing of its folder holds it: most rasters have none, and
+ * the request would be a 404 that the browser logs as an error each time the panel opens (FR-XC-10).
  */
 async function readExisting(dataset, path) {
+    if (!(await isListed(dataset, path))) return null;
     try {
         return parse(await dataset.getFileContents(path));
     } catch (e) {

@@ -409,11 +409,19 @@ describe('a saved pile read while the panel changes', () => {
         olMap.value = { addLayer: l => layers.push(l), getView: () => ({ getProjection: () => 'EPSG:3857' }) };
         return () => layers.flatMap(l => l.getSource().getFeatures());
     }
-    /** Each read of a file waits until the test answers it, with the saved pile of that raster */
+    /**
+     * Each read of a file waits until the test answers it, with the saved pile of that raster. A read starts once the
+     * listing of the folder is asked (stockpileStorage), so `answer` lets the reads started so far reach the file first.
+     */
     function slowReads(dataset) {
         const reads = [];
-        dataset.getFileContents = path => new Promise(resolve => reads.push({ path, answer: () => resolve(JSON.stringify(savedPile({ title: path }))) }));
-        return reads;
+        dataset.getFileContents = path => new Promise(resolve => reads.push({ path, reply: () => resolve(JSON.stringify(savedPile({ title: path }))) }));
+        return {
+            async answer(path) {
+                await flushPromises();
+                (path ? reads.find(r => r.path === path) : reads[0]).reply();
+            }
+        };
     }
 
     it('is not shown when the panel opened on another raster before it was read', async () => {
@@ -423,14 +431,14 @@ describe('a saved pile read while the panel changes', () => {
         // The elevation model is switched while the pile of the DSM is still being read
         pile.closeStockpileVolume();
         pile.openStockpileVolume('dtm.tif');
-        reads.find(r => r.path === 'dsm_measurements.geojson').answer();
+        await reads.answer('dsm_measurements.geojson');
         await flushPromises();
         expect(pile.stockpileResult.value).toBeNull();
         expect(pile.stockpileTitle.value).toBe('');
         expect(pile.stockpileDetectedPolygon.value).toBeNull();
         expect(overlay()).toHaveLength(0);
         // The pile of the DTM is shown when it is read
-        reads.find(r => r.path === 'dtm_measurements.geojson').answer();
+        await reads.answer('dtm_measurements.geojson');
         await flushPromises();
         expect(pile.stockpileTitle.value).toBe('dtm_measurements.geojson');
         expect(overlay()).toHaveLength(1);
@@ -441,7 +449,7 @@ describe('a saved pile read while the panel changes', () => {
         const reads = slowReads(dataset);
         pile.openStockpileVolume('dsm.tif');
         pile.closeStockpileVolume();
-        reads[0].answer();
+        await reads.answer();
         await flushPromises();
         expect(pile.stockpileResult.value).toBeNull();
         expect(overlay()).toHaveLength(0);
@@ -453,7 +461,7 @@ describe('a saved pile read while the panel changes', () => {
         pile.openStockpileVolume('dsm.tif');
         await pile.autoDetectAndCalculate(9.0005, 45.0005);
         pile.stockpileTitle.value = 'North heap';
-        reads[0].answer();
+        await reads.answer();
         await flushPromises();
         expect(pile.stockpileResult.value).toMatchObject({ confidence: 0.8, estimatedFromDetection: 8.7 });
         expect(pile.stockpileResult.value._restored).toBeUndefined();
@@ -467,7 +475,7 @@ describe('a saved pile read while the panel changes', () => {
         const reads = slowReads(dataset);
         pile.openStockpileVolume('dsm.tif');
         const drawn = pile.calculateStockpileVolume(POLYGON);
-        reads[0].answer();
+        await reads.answer();
         await drawn;
         await flushPromises();
         expect(pile.stockpileResult.value._restored).toBeUndefined();
