@@ -165,8 +165,8 @@ describe('MapViewer on a file', () => {
         // A new view records no style: the map gives its rasters their default (FR-RAS-01)
         expect(mapProps().savedLayers).toEqual([]);
         expect(viewBar().text()).toContain('a.tif');
-        expect(barButton('Save')).toBeDefined();
-        expect(barButton('Save as new')).toBeUndefined();
+        expect(barButton('Save view')).toBeDefined();
+        expect(barButton('Save as new view')).toBeUndefined();
         expect(titles().at(-1)).toBe('a.tif - Map');
     });
 
@@ -224,8 +224,8 @@ describe('MapViewer on a saved view', () => {
         expect(mapProps().view.layers.map(l => l.path)).toEqual(['f/a.tif', 'f/b.tif']);
         expect(mapProps().linkTarget).toEqual({ uid: 'v_k3j9x2ab' });
         expect(viewBar().text()).toContain('Ortho over DSM');
-        expect(barButton('Save')).toBeDefined();
-        expect(barButton('Save as new')).toBeDefined();
+        expect(barButton('Save view')).toBeDefined();
+        expect(barButton('Save as new view')).toBeDefined();
         expect(titles().at(-1)).toBe('Ortho over DSM - Map');
     });
 
@@ -425,7 +425,7 @@ describe('MapViewer saving', () => {
     it('saves a new view under a name: the address, the bar and the title follow, and the map stays', async () => {
         const dataset = await open(fileUrl('f/a.tif'));
         answerWith('A');
-        await barButton('Save').trigger('click');
+        await barButton('Save view').trigger('click');
         await settle();
         expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save view', label: 'Name' });
         const uid = dataset.items[0].data.uid;
@@ -433,7 +433,7 @@ describe('MapViewer saving', () => {
         expect(window.location.pathname).toBe(`/r/acme/site/views/${uid}`);
         expect(router.currentRoute.value.name).toBe('SavedView');
         expect(viewBar().text()).toContain('A');
-        expect(barButton('Save as new')).toBeDefined();
+        expect(barButton('Save as new view')).toBeDefined();
         expect(mapProps().linkTarget).toEqual({ uid });
         expect(titles().at(-1)).toBe('A - Map');
         // The route changed under the page, which is the page's own move: the map is not built again
@@ -444,7 +444,7 @@ describe('MapViewer saving', () => {
     it('titles the page with the new name after Save as new', async () => {
         await open('/r/acme/site/views/v_k3j9x2ab', { dataset: fakeDataset({ items: [savedItem('v_k3j9x2ab', 'Ortho over DSM', twoLayers())] }) });
         answerWith('B');
-        await barButton('Save as new').trigger('click');
+        await barButton('Save as new view').trigger('click');
         await settle();
         expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save view as', initialValue: 'Ortho over DSM (copy)' });
         expect(titles().at(-1)).toBe('B - Map');
@@ -511,7 +511,7 @@ describe('MapViewer when the route names another view', () => {
         await settle();
         expect(mapProps().linkTarget).toEqual({ path: 'g/z.tif' });
         expect(viewBar().text()).toContain('z.tif');
-        expect(barButton('Save as new')).toBeUndefined();
+        expect(barButton('Save as new view')).toBeUndefined();
     });
 
     it('shows the error of an unknown view after a file, and the file after the error', async () => {

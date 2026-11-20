@@ -121,7 +121,7 @@ test('FR-MAP-23: the first Save of a file map offers the stem of the file, selec
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(RASTER))}/map`);
     await appReady(page);
     await page.waitForSelector('.map-container', { timeout: 30000 });
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await page.getByRole('button', { name: 'Save view', exact: true }).click();
 
     const input = page.locator('[role="dialog"] input[type=text]').first();
     await input.waitFor({ timeout: 10000 });

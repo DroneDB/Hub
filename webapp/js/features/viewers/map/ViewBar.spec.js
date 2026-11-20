@@ -29,15 +29,15 @@ describe('ViewBar', () => {
     it('a new view of a writer: the name and Save only', () => {
         render({ canWrite: true });
         expect(wrapper.text()).toContain('Ortho over DSM');
-        expect(buttons()).toEqual(['Save']);
-        expect(button('Save').attributes('title')).toBe('Save this view in the dataset');
+        expect(buttons()).toEqual(['Save view']);
+        expect(button('Save view').attributes('title')).toBe('Save this view in the dataset');
     });
 
     it('a saved view of a writer: Save and Save as new', () => {
         render({ canWrite: true, saved: true });
-        expect(buttons()).toEqual(['Save', 'Save as new']);
-        expect(button('Save').attributes('title')).toBe('Save the changes to this view');
-        expect(button('Save as new').attributes('title')).toBe('Save as a new view');
+        expect(buttons()).toEqual(['Save view', 'Save as new view']);
+        expect(button('Save view').attributes('title')).toBe('Save the changes to this view');
+        expect(button('Save as new view').attributes('title')).toBe('Save as a new view');
     });
 
     it('a reader sees the name only, with no button and no mark', () => {
@@ -50,7 +50,7 @@ describe('ViewBar', () => {
     it('shows the mark, as text, to a writer when the saved view changed', () => {
         render({ canWrite: true, saved: true, dirty: true });
         expect(mark()).toBe(true);
-        expect(buttons()).toEqual(['Save', 'Save as new']);
+        expect(buttons()).toEqual(['Save view', 'Save as new view']);
     });
 
     it('has no mark when the view is clean', () => {
@@ -60,7 +60,7 @@ describe('ViewBar', () => {
 
     it('disables the buttons and shows them as loading while a save runs', () => {
         render({ canWrite: true, saved: true, busy: true });
-        for (const label of ['Save', 'Save as new']) {
+        for (const label of ['Save view', 'Save as new view']) {
             expect(button(label).attributes('disabled')).toBeDefined();
             expect(button(label).classes()).toContain('p-button-loading');
         }
@@ -68,15 +68,15 @@ describe('ViewBar', () => {
 
     it('asks the viewer to save, and to save as new', async () => {
         render({ canWrite: true, saved: true });
-        await button('Save').trigger('click');
-        await button('Save as new').trigger('click');
+        await button('Save view').trigger('click');
+        await button('Save as new view').trigger('click');
         expect(wrapper.emitted('save')).toHaveLength(1);
         expect(wrapper.emitted('saveAsNew')).toHaveLength(1);
     });
 
     it('does not ask while a save runs', async () => {
         render({ canWrite: true, saved: true, busy: true });
-        await button('Save').trigger('click');
+        await button('Save view').trigger('click');
         expect(wrapper.emitted('save')).toBeUndefined();
     });
 
@@ -141,7 +141,7 @@ describe('ViewBar on a phone (FR-MAP-12)', () => {
         onPhone();
         render({ canWrite: true, saved: true });
         await more().trigger('click');
-        expect(items()).toEqual(['Save', 'Save as new']);
+        expect(items()).toEqual(['Save view', 'Save as new view']);
         const links = [...document.body.querySelectorAll('[role="menuitem"] .p-menu-item-link')];
         links[0].click();
         links[1].click();
@@ -153,6 +153,6 @@ describe('ViewBar on a phone (FR-MAP-12)', () => {
         onPhone();
         render({ canWrite: true });
         await more().trigger('click');
-        expect(items()).toEqual(['Save']);
+        expect(items()).toEqual(['Save view']);
     });
 });

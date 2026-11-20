@@ -11,9 +11,9 @@
             <Menu :id="menuId" ref="menu" :model="items" popup @show="menuOpen = true" @hide="menuOpen = false" />
         </template>
         <div v-else-if="canWrite" class="view-actions">
-            <Button size="small" icon="fa-solid fa-floppy-disk" label="Save" :disabled="busy" :loading="busy"
+            <Button size="small" icon="fa-solid fa-floppy-disk" label="Save view" :disabled="busy" :loading="busy"
                     :title="saved ? 'Save the changes to this view' : 'Save this view in the dataset'" @click="emit('save')" />
-            <Button v-if="saved" size="small" severity="secondary" label="Save as new" :disabled="busy" :loading="busy"
+            <Button v-if="saved" size="small" severity="secondary" label="Save as new view" :disabled="busy" :loading="busy"
                     title="Save as a new view" @click="emit('saveAsNew')" />
         </div>
     </div>
@@ -24,11 +24,11 @@
  * ViewBar - the content of the view bar of the map viewer (ViewerShell's bar, after the way back
  * to the dataset): the name of the view (the saved name, or
  * the name of the base file of a new view; always text), the mark of unsaved changes and, for a
- * user who can save, Save (a new or a saved view) and Save as new (a saved view). A reader sees
+ * user who can save, Save view (a new or a saved view) and Save as new view (a saved view). A reader sees
  * the name only. ViewerShell has no bar in Viewer only.
  *
  * It is one line at any width: a long name ends with an ellipsis (the full name is its title). Below
- * `sm` Save and Save as new are the two items of a menu (the "View actions" button) instead of two buttons.
+ * `sm` Save view and Save as new view are the two items of a menu (the "View actions" button) instead of two buttons.
  */
 import { computed, ref, useId } from 'vue';
 import Button from 'primevue/button';
@@ -39,7 +39,7 @@ const props = defineProps({
     name: { type: String, required: true },
     /** The view is a saved one and differs from what was saved: the mark shows to a user who can save */
     dirty: { type: Boolean, default: false },
-    /** The view is a saved one: Save as new is offered, and Save replaces it */
+    /** The view is a saved one: Save as new view is offered, and Save view replaces it */
     saved: { type: Boolean, default: false },
     canWrite: { type: Boolean, default: false },
     /** A save is running */
@@ -47,14 +47,14 @@ const props = defineProps({
 });
 const emit = defineEmits(['save', 'saveAsNew']);
 
-// Below `sm` (the window, the breakpoint of libs/responsiveColumns.js) Save and Save as new are the items of one menu
+// Below `sm` (the window, the breakpoint of libs/responsiveColumns.js) Save view and Save as new view are the items of one menu
 const stacked = useStackedLayout();
 const menu = ref(null);
 const menuId = useId();
 const menuOpen = ref(false);
 const items = computed(() => [
-    { label: 'Save', icon: 'fa-solid fa-floppy-disk', disabled: props.busy, command: () => emit('save') },
-    ...(props.saved ? [{ label: 'Save as new', icon: 'fa-solid fa-copy', disabled: props.busy, command: () => emit('saveAsNew') }] : [])
+    { label: 'Save view', icon: 'fa-solid fa-floppy-disk', disabled: props.busy, command: () => emit('save') },
+    ...(props.saved ? [{ label: 'Save as new view', icon: 'fa-solid fa-copy', disabled: props.busy, command: () => emit('saveAsNew') }] : [])
 ]);
 </script>
 
