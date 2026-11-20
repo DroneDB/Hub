@@ -708,7 +708,7 @@ describe('HubHeader organization look-up (breadcrumb)', () => {
         await renderWith(info, { loggedIn: true });
         expect(h.reg.Organization).toHaveBeenCalledWith('acme');
         expect(info).toHaveBeenCalledWith({ skipUnauthorized: true });
-        expect(crumbs()).toEqual(['Organizations', 'Acme Inc', 'site']);
+        expect(crumbs()).toEqual(['Acme Inc', 'site']);
     });
 
     it.each([401, 403])('shows the slug, not as a link, and does not navigate when the look-up answers %i', async status => {

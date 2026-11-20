@@ -12,18 +12,19 @@
 
 <script setup>
 /**
- * HubBreadcrumb - where the user is, in the header (FR-NAV-03): Organizations / <organization> / <dataset>, on the
- * pages of an organization, of a dataset and of its viewers. Every crumb but the last is a link; the last one names
- * the page (aria-current).
+ * HubBreadcrumb - where the user is, in the header (FR-NAV-03): <organization> / <dataset>, on the pages of an
+ * organization, of a dataset and of its viewers, after the Organizations link of the main navigation, which is its
+ * root. Without that link (nobody is signed in, so the header has no main navigation), the trail starts with an
+ * Organizations crumb. Every crumb but the last is a link; the last one names the page (aria-current).
  *
  * The slugs come from the route (`org`, `ds`). The name of the organization is read here (the organization look-up, which
  * the user did not ask for: it opts out of the global 401 redirect, FR-XC-05); the name of the dataset is the one the page
  * puts in the dataset session (stores/datasetSession.js: the dataset page, and a viewer from the dataset info it reads),
  * formatted as the tree shows it. Until a name is known, and when it cannot be read (no access, an error), the crumb shows the
  * slug; an organization the visitor has no access to is not a link, since the page would only refuse them. In a
- * one-organization install the organization is home, so there is no Organizations crumb.
+ * one-organization install the organization is home, so there is no Organizations crumb either.
  *
- *   <HubBreadcrumb :org="$route.params.org" :ds="$route.params.ds" />
+ *   <HubBreadcrumb :org="$route.params.org" :ds="$route.params.ds" :home-in-nav="primaryNav.length > 0" />
  */
 import { computed, ref, watch } from 'vue';
 import ddb from 'ddb';
@@ -38,7 +39,9 @@ const props = defineProps({
     /** Slug of the organization (the route's `org`); no breadcrumb without one */
     org: { type: String, default: '' },
     /** Slug of the dataset (the route's `ds`); the last crumb is the organization without one */
-    ds: { type: String, default: '' }
+    ds: { type: String, default: '' },
+    /** The main navigation of the header already links the list of organizations (it is the root of the trail): no Organizations crumb */
+    homeInNav: { type: Boolean, default: false }
 });
 
 const session = useDatasetSessionStore();
@@ -71,7 +74,7 @@ const crumbs = computed(() => {
     const home = homeLocation();
     /** @type {Array<{ id: string, label: string, to?: import('vue-router').RouteLocationRaw, current?: boolean }>} */
     const list = [];
-    if (home.name === 'Organizations') list.push({ id: 'organizations', label: 'Organizations', to: { name: 'Organizations' } });
+    if (home.name === 'Organizations' && !props.homeInNav) list.push({ id: 'organizations', label: 'Organizations', to: { name: 'Organizations' } });
     list.push({
         id: 'org',
         label: orgName.value || props.org,

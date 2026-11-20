@@ -18,8 +18,10 @@
             </RouterLink>
         </nav>
 
-        <!-- Where the user is: Organizations / organization / dataset (FR-NAV-03, FR-NAV-04) -->
-        <HubBreadcrumb v-if="params.org" class="header-crumbs" :org="String(params.org)" :ds="params.ds ? String(params.ds) : ''" />
+        <!-- Where the user is: organization / dataset, after the Organizations link of the main navigation, which is its
+             root; an anonymous visitor has no such link, so the trail has an Organizations crumb (FR-NAV-03, FR-NAV-04) -->
+        <HubBreadcrumb v-if="params.org" class="header-crumbs" :org="String(params.org)" :ds="params.ds ? String(params.ds) : ''"
+                       :home-in-nav="primaryNav.length > 0" />
 
         <nav class="right" aria-label="Page actions and account">
 
@@ -340,10 +342,12 @@ export default {
                 isAdmin: this.isAdmin,
                 accountManagement: this.accountManagement,
                 usersManagement: this.usersManagement,
+                fileUploads: this.fileUploads,
                 storage: this.storageInfo,
                 versions: this.versions,
                 run: {
                     myDatasets: () => this.myDatasets(),
+                    upload: () => this.$router.push({ name: 'Upload' }),
                     storage: () => { this.storageInfoDialogOpen = true; },
                     account: () => this.manageAccount(),
                     preferences: () => this.openPreferences(),
@@ -354,9 +358,9 @@ export default {
                 }
             });
         },
-        // Organizations and Upload, as links of the header
+        // Organizations, as a link of the header (Upload is in the user menu)
         primaryNav: function () {
-            return primaryNavItems({ loggedIn: this.loggedIn, fileUploads: this.fileUploads, home: this.homeTarget });
+            return primaryNavItems({ loggedIn: this.loggedIn, home: this.homeTarget });
         }
     },
     watch: {

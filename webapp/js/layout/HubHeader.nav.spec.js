@@ -1,5 +1,5 @@
 /**
- * The navigation of the header (FR-NAV-01, FR-NAV-03, FR-NAV-04): Organizations and Upload as links with
+ * The navigation of the header (FR-NAV-01, FR-NAV-03, FR-NAV-04): Organizations as a link with
  * aria-current on the page, the user named beside the avatar (and the role of an administrator), the user menu
  * in labelled groups, the breadcrumb of an organization and of a dataset, and the labels of Download and
  * Settings from md. A real router, so the links are real ones.
@@ -81,29 +81,36 @@ beforeEach(() => {
 afterEach(() => wrapper?.unmount());
 
 describe('the main navigation (FR-NAV-01)', () => {
-    it('has Organizations and Upload as links of a Main navigation, for a signed-in user', async () => {
+    it('has Organizations as the link of a Main navigation, for a signed-in user; Upload is in the user menu', async () => {
         await renderAt('/r');
         const nav = wrapper.find('nav[aria-label="Main"]');
         expect(nav.exists()).toBe(true);
-        expect(nav.findAll('a').map(a => a.text())).toEqual(['Organizations', 'Upload']);
+        expect(nav.findAll('a').map(a => a.text())).toEqual(['Organizations']);
         expect(navLink('organizations').attributes('href')).toBe('/r');
-        expect(navLink('upload').attributes('href')).toBe('/upload');
+        expect(navLink('upload').exists()).toBe(false);
     });
 
-    it('marks the link of the page it is on with aria-current, and no other', async () => {
+    it('marks the link of the page it is on with aria-current', async () => {
         await renderAt('/r');
         expect(navLink('organizations').attributes('aria-current')).toBe('page');
-        expect(navLink('upload').attributes('aria-current')).toBeUndefined();
         await router.push('/upload');
         await flushPromises();
         expect(navLink('organizations').attributes('aria-current')).toBeUndefined();
-        expect(navLink('upload').attributes('aria-current')).toBe('page');
     });
 
-    it('has no Upload where datasets cannot be created', async () => {
+    it('opens the upload page from Upload of the user menu', async () => {
+        await renderAt('/r');
+        const account = wrapper.vm.userMenuItems.find(i => i.label === 'Account').items;
+        account.find(i => i.label === 'Upload').command();
+        await flushPromises();
+        expect(router.currentRoute.value.name).toBe('Upload');
+    });
+
+    it('has no Upload in the user menu where datasets cannot be created', async () => {
         globalThis.HubOptions = { disableDatasetCreation: true };
         await renderAt('/r');
-        expect(navLink('upload').exists()).toBe(false);
+        const all = wrapper.vm.userMenuItems.flatMap(i => i.items ?? [i]).map(i => i.label);
+        expect(all).not.toContain('Upload');
         expect(navLink('organizations').exists()).toBe(true);
     });
 
@@ -131,11 +138,10 @@ describe('the main navigation (FR-NAV-01)', () => {
         const groups = wrapper.vm.userMenuItems.filter(i => i.items).map(i => [i.label, i.items.filter(e => !e.separator).map(e => e.label)]);
         expect(groups).toEqual([
             ['Administration', ['Manage Users', 'Tasks', 'Configuration', 'Hangfire', 'API Docs', 'System health']],
-            ['Account', ['My Datasets', 'My Account', 'Preferences', 'Logout']]
+            ['Account', ['My Datasets', 'Upload', 'My Account', 'Preferences', 'Logout']]
         ]);
-        // The destinations of the primary navigation are not repeated in the menu
+        // The destination of the primary navigation is not repeated in the menu
         const all = wrapper.vm.userMenuItems.flatMap(i => i.items ?? [i]).map(i => i.label);
-        expect(all).not.toContain('Upload Files');
         expect(all).not.toContain('My Organizations');
     });
 });
@@ -146,30 +152,38 @@ describe('the breadcrumb of the header (FR-NAV-03)', () => {
         expect(wrapper.find('.hub-breadcrumb').exists()).toBe(false);
     });
 
-    it('shows Organizations / organization on the page of an organization', async () => {
+    it('shows the organization on the page of an organization, after the Organizations link of the main navigation', async () => {
         await renderAt('/r/t-orgs-bulk');
+        expect(navLink('organizations').exists()).toBe(true);
+        expect(crumbs()).toEqual(['T Orgs Bulk']);
+    });
+
+    it('starts with an Organizations crumb for a visitor, who has no main navigation', async () => {
+        h.auth.isLoggedIn = false;
+        await renderAt('/r/t-orgs-bulk');
+        expect(navLink('organizations').exists()).toBe(false);
         expect(crumbs()).toEqual(['Organizations', 'T Orgs Bulk']);
     });
 
-    it('shows Organizations / organization / dataset on the page of a dataset, and replaces the sitemap button', async () => {
+    it('shows organization / dataset on the page of a dataset, and replaces the sitemap button', async () => {
         await renderAt('/r/t-orgs-bulk/bulk-dataset-26');
         useDatasetSessionStore().setRootEntry({ path: 'x', properties: { meta: { name: { data: 'Bulk dataset 26' } } } });
         await flushPromises();
-        expect(crumbs()).toEqual(['Organizations', 'T Orgs Bulk', 'Bulk dataset 26']);
+        expect(crumbs()).toEqual(['T Orgs Bulk', 'Bulk dataset 26']);
         expect(wrapper.find('button[title="Back to organization"]').exists()).toBe(false);
         expect(wrapper.find('.fa-sitemap').exists() && wrapper.find('button .fa-sitemap').exists()).toBe(false);
     });
 
     it('is on a viewer route too, with the slug of the dataset until the viewer reads its name', async () => {
         await renderAt('/r/t-orgs-bulk/bulk-dataset-26/view/YS50aWY=/map');
-        expect(crumbs()).toEqual(['Organizations', 'T Orgs Bulk', 'bulk-dataset-26']);
+        expect(crumbs()).toEqual(['T Orgs Bulk', 'bulk-dataset-26']);
     });
 
     it('follows the route from one dataset to another', async () => {
         await renderAt('/r/t-orgs-bulk/one');
         await router.push('/r/other/two');
         await flushPromises();
-        expect(crumbs()[2]).toBe('two');
+        expect(crumbs()[1]).toBe('two');
     });
 });
 

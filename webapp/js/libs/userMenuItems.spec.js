@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { userMenuItems, primaryNavItems, storageEntry, versionsLine } from './userMenuItems';
 
 const run = () => ({
-    myDatasets: vi.fn(), storage: vi.fn(), account: vi.fn(), preferences: vi.fn(), users: vi.fn(), tasks: vi.fn(), config: vi.fn(), logout: vi.fn()
+    myDatasets: vi.fn(), upload: vi.fn(), storage: vi.fn(), account: vi.fn(), preferences: vi.fn(), users: vi.fn(), tasks: vi.fn(), config: vi.fn(), logout: vi.fn()
 });
 const state = (over = {}) => ({
-    loggedIn: true, username: 'maria', isAdmin: false, accountManagement: true, usersManagement: true, storage: null, run: run(), ...over
+    loggedIn: true, username: 'maria', isAdmin: false, accountManagement: true, usersManagement: true, fileUploads: true, storage: null, run: run(), ...over
 });
 const group = (items, title) => items.find(i => i.label === title);
 const labels = items => items.filter(i => !i.separator).map(i => i.label);
@@ -19,7 +19,11 @@ describe('userMenuItems (FR-NAV-01)', () => {
         const items = userMenuItems(state());
         expect(items[0]).toMatchObject({ label: 'maria', disabled: true, class: 'user-menu-header' });
         expect(items.map(i => i.label)).toEqual(['maria', 'Account']);
-        expect(labels(group(items, 'Account').items)).toEqual(['My Datasets', 'My Account', 'Preferences', 'Logout']);
+        expect(labels(group(items, 'Account').items)).toEqual(['My Datasets', 'Upload', 'My Account', 'Preferences', 'Logout']);
+    });
+
+    it('has no Upload when the creation of datasets is off', () => {
+        expect(labels(group(userMenuItems(state({ fileUploads: false })), 'Account').items)).not.toContain('Upload');
     });
 
     it('names an administrator whose name is not admin', () => {
@@ -55,18 +59,18 @@ describe('userMenuItems (FR-NAV-01)', () => {
         const s = state({ isAdmin: true });
         const items = userMenuItems(s);
         const all = items.flatMap(i => i.items ?? [i]);
-        for (const [label, key] of [['My Datasets', 'myDatasets'], ['My Account', 'account'], ['Preferences', 'preferences'],
+        for (const [label, key] of [['My Datasets', 'myDatasets'], ['Upload', 'upload'], ['My Account', 'account'], ['Preferences', 'preferences'],
             ['Logout', 'logout'], ['Manage Users', 'users'], ['Tasks', 'tasks'], ['Configuration', 'config']]) {
             all.find(i => i.label === label).command();
             expect(s.run[key]).toHaveBeenCalledTimes(1);
         }
     });
 
-    it('puts the storage row after the datasets in the Account group', () => {
+    it('puts the storage row after the datasets and Upload in the Account group', () => {
         const s = state({ storage: { total: 1000, used: 100, usedPercentage: 0.1 } });
         const account = group(userMenuItems(s), 'Account').items;
-        expect(labels(account).slice(0, 2)).toEqual(['My Datasets', 'Storage: 100 B of 1,000 B · 10%']);
-        account[1].command();
+        expect(labels(account).slice(0, 3)).toEqual(['My Datasets', 'Upload', 'Storage: 100 B of 1,000 B · 10%']);
+        account[2].command();
         expect(s.run.storage).toHaveBeenCalledTimes(1);
     });
 });
@@ -149,23 +153,18 @@ describe('versions and System health (FR-NAV-08)', () => {
 describe('primaryNavItems (FR-NAV-01)', () => {
     const home = { name: 'Organizations' };
 
-    it('are Organizations and Upload for a signed-in user', () => {
-        expect(primaryNavItems({ loggedIn: true, fileUploads: true, home })).toEqual([
-            { id: 'organizations', label: 'Organizations', icon: 'fa-solid fa-sitemap', to: { name: 'Organizations' } },
-            { id: 'upload', label: 'Upload', icon: 'fa-solid fa-cloud-arrow-up', to: { name: 'Upload' } }
+    it('are Organizations alone for a signed-in user: Upload is in the user menu', () => {
+        expect(primaryNavItems({ loggedIn: true, home })).toEqual([
+            { id: 'organizations', label: 'Organizations', icon: 'fa-solid fa-sitemap', to: { name: 'Organizations' } }
         ]);
     });
 
-    it('have no Upload when the creation of datasets is off', () => {
-        expect(primaryNavItems({ loggedIn: true, fileUploads: false, home }).map(l => l.id)).toEqual(['organizations']);
-    });
-
     it('lead to the datasets of the one organization of a one-organization install', () => {
-        const [first] = primaryNavItems({ loggedIn: true, fileUploads: true, home: { name: 'Datasets', params: { org: 'acme' } } });
+        const [first] = primaryNavItems({ loggedIn: true, home: { name: 'Datasets', params: { org: 'acme' } } });
         expect(first).toMatchObject({ label: 'Datasets', to: { name: 'Datasets', params: { org: 'acme' } } });
     });
 
     it('are none for a visitor', () => {
-        expect(primaryNavItems({ loggedIn: false, fileUploads: true, home })).toEqual([]);
+        expect(primaryNavItems({ loggedIn: false, home })).toEqual([]);
     });
 });

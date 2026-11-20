@@ -1,8 +1,8 @@
 // @ts-check
 /**
  * userMenuItems - what the header offers a signed-in user, as pure functions of the state (FR-NAV-01): the model
- * of the user menu in labelled groups (Account, Administration), and the main destinations the header shows as
- * links (Organizations, Upload). The header renders them and owns what each command does, which it passes in.
+ * of the user menu in labelled groups (Account, Administration), and the main destination the header shows as
+ * a link (Organizations). The header renders them and owns what each command does, which it passes in.
  * The same pattern as libs/dataset/explorerTools.js and libs/contextMenuItems.js.
  */
 import { storageUsage } from '@/libs/storageUsage';
@@ -36,9 +36,10 @@ import { storageUsage } from '@/libs/storageUsage';
  * @property {boolean} isAdmin
  * @property {boolean} accountManagement  the user manages their account here (a local user)
  * @property {boolean} usersManagement  users are managed here (local authentication)
+ * @property {boolean} [fileUploads]  the user may create datasets: the menu has Upload
  * @property {StorageInfo|null} storage  null: not read, or hidden
  * @property {Versions|null} [versions]  the running versions (an administrator sees them, with System health)
- * @property {Record<'myDatasets'|'storage'|'account'|'preferences'|'users'|'tasks'|'config'|'logout', () => void>} run
+ * @property {Record<'myDatasets'|'upload'|'storage'|'account'|'preferences'|'users'|'tasks'|'config'|'logout', () => void>} run
  *   what each entry does
  */
 
@@ -92,18 +93,20 @@ function externalEntry(label, icon, url) {
 
 /**
  * The user menu, in groups. The first entry names the user (disabled). The Account group has the user's datasets,
- * their storage, My Account (a local user), Preferences and Logout; the Administration group, for an administrator,
- * has Users (local authentication), Tasks, Configuration, and the Hangfire, API documentation and System health pages,
- * which open in a new tab (their names say so), and the running versions on a line of their own (FR-NAV-08).
+ * Upload (unless creating datasets is off), their storage, My Account (a local user), Preferences and Logout; the
+ * Administration group, for an administrator, has Users (local authentication), Tasks, Configuration, and the
+ * Hangfire, API documentation and System health pages, which open in a new tab (their names say so), and the
+ * running versions on a line of their own (FR-NAV-08).
  * @param {MenuState} state
  * @returns {MenuItem[]}  empty when nobody is signed in
  */
 export function userMenuItems(state) {
-    const { loggedIn, username, isAdmin, accountManagement, usersManagement, storage, versions, run } = state;
+    const { loggedIn, username, isAdmin, accountManagement, usersManagement, fileUploads, storage, versions, run } = state;
     if (!loggedIn) return [];
 
     /** @type {MenuItem[]} */
     const account = [{ label: 'My Datasets', icon: 'fa-solid fa-database', command: run.myDatasets }];
+    if (fileUploads) account.push({ label: 'Upload', icon: 'fa-solid fa-cloud-arrow-up', command: run.upload });
     const storageRow = storageEntry(storage, run.storage);
     if (storageRow) account.push(storageRow);
     if (accountManagement) account.push({ label: 'My Account', icon: 'fa-solid fa-user', command: run.account });
@@ -146,19 +149,16 @@ export function userMenuItems(state) {
 
 /**
  * The main destinations the header shows to a signed-in user, as links: Organizations (the datasets of the one
- * organization of a one-organization install, which is home there) and Upload, unless creating datasets is off.
- * @param {{ loggedIn: boolean, fileUploads: boolean, home: { name: string, params?: Record<string, string> } }} state
+ * organization of a one-organization install, which is home there). Upload is in the user menu.
+ * @param {{ loggedIn: boolean, home: { name: string, params?: Record<string, string> } }} state
  * @returns {NavLink[]}
  */
-export function primaryNavItems({ loggedIn, fileUploads, home }) {
+export function primaryNavItems({ loggedIn, home }) {
     if (!loggedIn) return [];
-    /** @type {NavLink[]} */
-    const links = [{
+    return [{
         id: 'organizations',
         label: home.name === 'Organizations' ? 'Organizations' : 'Datasets',
         icon: home.name === 'Organizations' ? 'fa-solid fa-sitemap' : 'fa-solid fa-database',
         to: home
     }];
-    if (fileUploads) links.push({ id: 'upload', label: 'Upload', icon: 'fa-solid fa-cloud-arrow-up', to: { name: 'Upload' } });
-    return links;
 }
