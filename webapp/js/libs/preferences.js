@@ -20,6 +20,7 @@ export const PREF = Object.freeze({
     CUSTOM_BASEMAP: 'customBasemap',
     SHOW_DIRECTION_INDICATORS: 'showDirectionIndicators',
     SHOW_FLIGHT_PATH: 'showFlightPath',
+    SHOW_POINT_CALLOUTS: 'showPointCallouts', // true: the callouts of the point annotations are always shown; false: only while their point is hovered
     FILE_VIEW_MODE: 'fileViewMode',
     TABLE_EXPANDED_GRID: 'tableExpandedGrid',
     TILE_SIZE: 'explorerTileSize', // 's' | 'm' | 'l': the thumbnails of the grid view; device only (a size follows the screen), M from a 4K screen until chosen (FR-EXP-43)
@@ -161,6 +162,7 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.CUSTOM_BASEMAP]: ['map', 'customBasemap'],
     [PREF.SHOW_DIRECTION_INDICATORS]: ['map', 'showDirectionIndicators'],
     [PREF.SHOW_FLIGHT_PATH]: ['map', 'showFlightPath'],
+    [PREF.SHOW_POINT_CALLOUTS]: ['map', 'showPointCallouts'],
     [PREF.LOCATIONS_MAP_NAMES]: ['map', 'showDatasetNames'],
     [PREF.FILE_VIEW_MODE]: ['explorer', 'viewMode'],
     [PREF.TABLE_EXPANDED_GRID]: ['explorer', 'tableExpandedGrid'],
@@ -202,6 +204,7 @@ export const PREF_DEFAULTS = frozen({
     [PREF.CUSTOM_BASEMAP]: null,
     [PREF.SHOW_DIRECTION_INDICATORS]: false,
     [PREF.SHOW_FLIGHT_PATH]: true,
+    [PREF.SHOW_POINT_CALLOUTS]: true,
     [PREF.LOCATIONS_MAP_NAMES]: false,
     [PREF.FILE_VIEW_MODE]: 'grid',
     [PREF.TABLE_EXPANDED_GRID]: true,

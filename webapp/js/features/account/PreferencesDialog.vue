@@ -293,6 +293,8 @@ const TABS = [
                 select('basemap', 'Default basemap', basemapChoice, basemapOptions),
                 toggle('flight-path', 'Show flight path', usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH])),
                 toggle('direction-indicators', 'Show direction indicators', usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS])),
+                toggle('point-callouts', 'Always show the callouts of point annotations', usePreference(PREF.SHOW_POINT_CALLOUTS, PREF_DEFAULTS[PREF.SHOW_POINT_CALLOUTS]),
+                    { hint: ref('Off: the callout of a point shows while the pointer is over it, or after a tap on it.') }),
                 toggle('dataset-names', 'Show dataset names on the datasets map', usePreference(PREF.LOCATIONS_MAP_NAMES, PREF_DEFAULTS[PREF.LOCATIONS_MAP_NAMES]),
                     { hint: ref('The Map view of the Organizations and Datasets pages.') })
             ]

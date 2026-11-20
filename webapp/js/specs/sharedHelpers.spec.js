@@ -188,7 +188,8 @@ describe('escapeHtml + point popup', () => {
         const html = pointPopupHtml({ lat: 45.5, lon: 9.25, name: '<b>x</b>', description: '"q"' });
         expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
         expect(html).toContain('&quot;q&quot;');
-        expect(html).toContain(`45\u00B030'00.00" N`);
+        // A point with a name or a description does not show its coordinates
+        expect(html).not.toContain('ol-point-popup-coords');
         expect(html).not.toContain('ol-point-popup-actions');
         expect(pointPopupHtml({ lat: 0, lon: 0, actions: true })).toContain('ol-point-popup-actions');
     });

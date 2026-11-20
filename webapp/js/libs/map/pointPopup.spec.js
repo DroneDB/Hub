@@ -1,11 +1,20 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
+import { fromLonLat } from 'ol/proj';
 import Observable from 'ol/Observable';
 import Collection from 'ol/Collection';
-import { showPointPopup, POPUP_BELOW_CLASS } from './pointPopup';
+import { showPointPopup, pointPopupHtml, POPUP_BELOW_CLASS } from './pointPopup';
+import { copyText } from '@/composables/useCopyText';
+
+vi.mock('@/composables/useCopyText', () => ({ copyText: vi.fn(() => Promise.resolve()) }));
+
+/** A point feature at map coordinates `coords` (Web Mercator) */
+const pointAt = (coords, properties = {}) => new Feature({ geometry: new Point(coords), ...properties });
+const noActions = () => ({ onEdit: vi.fn(), onDelete: vi.fn(), onMoved: vi.fn() });
 
 /**
- * A map that has a size and puts every coordinate at `pixel` (or at `pixels.get(coordinate)`); its events
+ * A map that has a size and puts every coordinate at `pixel` (or at the pixel `pixels` sets for that coordinate); its events
  * are real (an Observable), fired by hand with dispatchEvent, and its overlays a real Collection.
  */
 function fakeMap({ size = [800, 600], pixel = [400, 300] } = {}) {
@@ -19,7 +28,13 @@ function fakeMap({ size = [800, 600], pixel = [400, 300] } = {}) {
         removeOverlay: overlay => overlays.remove(overlay),
         getOverlays: () => overlays,
         getSize: () => size,
-        getPixelFromCoordinate(coordinate) { return this.pixels.get(coordinate) || this.pixel; },
+        // A point's geometry hands out copies of its coordinates: they are matched by value
+        // The map coordinate of a pointer event: its client position, as if the map were at its origin with 1 m per pixel
+        getEventCoordinate: e => [e.clientX, e.clientY],
+        getPixelFromCoordinate(coordinate) {
+            const set = [...this.pixels].find(([c]) => String(c) === String(coordinate));
+            return set ? set[1] : this.pixel;
+        },
         getTargetElement: () => null
     });
 }
@@ -34,12 +49,13 @@ afterEach(() => vi.restoreAllMocks());
 describe('showPointPopup', () => {
     it('puts the popup of the point on the map and keeps it on the feature for cleanup', () => {
         const map = fakeMap();
-        const feature = new Feature({ name: 'Gate', stroke: '#ff0000', description: 'North gate' });
+        const coords = fromLonLat([9.25, 45.5]);
+        const feature = pointAt(coords, { name: 'Gate', stroke: '#ff0000', description: 'North gate' });
 
-        const { popupEl, popupOverlay } = showPointPopup(map, feature, { lat: 45.5, lon: 9.25, coords: [1, 2] });
+        const { popupEl, popupOverlay } = showPointPopup(map, feature);
 
         expect(map.addOverlay).toHaveBeenCalledWith(popupOverlay);
-        expect(popupOverlay.getPosition()).toEqual([1, 2]);
+        expect(popupOverlay.getPosition()).toEqual(coords);
         expect(popupEl.className).toBe('ol-point-popup');
         expect(popupEl.textContent).toContain('Gate');
         expect(popupEl.textContent).toContain('North gate');
@@ -48,25 +64,88 @@ describe('showPointPopup', () => {
         expect(feature.get('measureTooltip')).toBe(popupOverlay);
     });
 
+    it('leaves the coordinates out of a point with a description or a name: the copy button names them', () => {
+        for (const properties of [{ description: 'Ciao a tutti' }, { name: 'Pippo' }, { name: 'Pippo', description: 'Ciao a tutti' }]) {
+            const feature = pointAt(fromLonLat([31.138658, -23.940176]), properties);
+            const { popupEl } = showPointPopup(fakeMap(), feature, noActions());
+            expect(popupEl.querySelector('.ol-point-popup-coords')).toBeNull();
+            expect(popupEl.textContent).not.toContain('-23.940176');
+            expect(popupEl.querySelector('.ol-point-popup-copy').getAttribute('title')).toBe('Copy coordinates: -23.940176, 31.138658');
+        }
+    });
+
+    it('shows the description under the name, and no empty text under a name alone', () => {
+        const both = showPointPopup(fakeMap(), pointAt([0, 0], { name: 'Pippo', description: 'Ciao a tutti' }), noActions()).popupEl;
+        expect(both.querySelector('.ol-point-popup-title').textContent).toBe('Pippo');
+        expect(both.querySelector('.ol-point-popup-text').textContent.trim()).toBe('Ciao a tutti');
+        const nameOnly = showPointPopup(fakeMap(), pointAt([0, 0], { name: 'Pippo' }), noActions()).popupEl;
+        expect(nameOnly.querySelector('.ol-point-popup-text')).toBeNull();
+    });
+
+    it('shows the coordinates of a point with neither a name nor a description, with the same point in DMS as tooltip', () => {
+        const { popupEl } = showPointPopup(fakeMap(), pointAt(fromLonLat([31.138658, -23.940176])), noActions());
+        expect(popupEl.querySelector('.ol-point-popup-text').textContent.trim()).toBe('-23.940176, 31.138658');
+        // The tooltip as the HTML writes it: its quotes escaped, so the seconds (") do not end the attribute
+        expect(pointPopupHtml({ lat: -23.940176, lon: 31.138658 }))
+            .toContain(`title="23\u00B056&#39;24.63&quot; S / 31\u00B008&#39;19.17&quot; E"`);
+    });
+
     it('hides its icons from screen readers', () => {
-        const feature = new Feature({ name: 'Gate' });
-        const { popupEl } = showPointPopup(fakeMap(), feature, { lat: 1, lon: 2, coords: [0, 0], actions: true });
+        const { popupEl } = showPointPopup(fakeMap(), pointAt([0, 0], { name: 'Gate' }), noActions());
         const icons = [...popupEl.querySelectorAll('i')];
         expect(icons.length).toBeGreaterThan(0);
         for (const i of icons) expect(i.getAttribute('aria-hidden')).toBe('true');
     });
 
-    it('adds the edit, copy and delete buttons for an imported point', () => {
-        const feature = new Feature({ name: 'Gate' });
-        const { popupEl } = showPointPopup(fakeMap(), feature, { lat: 1, lon: 2, coords: [0, 0], actions: true });
-        for (const action of ['edit', 'copy', 'delete']) {
-            expect(popupEl.querySelector(`.ol-point-popup-${action}`)).not.toBeNull();
-        }
+    it('adds the move, edit, copy and delete buttons, in this order, when it is given their handlers', () => {
+        const { popupEl } = showPointPopup(fakeMap(), pointAt([0, 0], { name: 'Gate' }), noActions());
+        expect([...popupEl.querySelectorAll('.ol-point-popup-actions button')].map(b => b.getAttribute('aria-label')))
+            .toEqual(['Move point', 'Edit annotation', 'Copy coordinates', 'Delete point']);
+    });
+
+    it('gives the point to the handlers of its edit and delete buttons, and copies its coordinates', () => {
+        const actions = noActions();
+        const feature = pointAt(fromLonLat([31.136198, -23.939526]));
+        const { popupEl } = showPointPopup(fakeMap(), feature, actions);
+        /** @type {HTMLElement} */ (popupEl.querySelector('.ol-point-popup-edit')).click();
+        expect(actions.onEdit).toHaveBeenCalledWith(feature);
+        /** @type {HTMLElement} */ (popupEl.querySelector('.ol-point-popup-copy')).click();
+        expect(copyText).toHaveBeenCalledWith('-23.939526, 31.136198');
+        /** @type {HTMLElement} */ (popupEl.querySelector('.ol-point-popup-delete')).click();
+        expect(actions.onDelete).toHaveBeenCalledWith(feature);
+    });
+
+    it('replaces the popup the point had: shown again after an edit, the point has one popup, with its buttons', () => {
+        const map = fakeMap();
+        const feature = pointAt([0, 0], { stroke: '#ffc107' });
+        const first = showPointPopup(map, feature, noActions());
+        document.body.appendChild(first.popupEl);
+        feature.set('description', 'Ciao');
+
+        const second = showPointPopup(map, feature, noActions());
+
+        expect(map.getOverlays().getArray()).toEqual([second.popupOverlay]);
+        expect(first.popupEl.isConnected).toBe(false);
+        expect(second.popupEl.textContent).toContain('Ciao');
+        expect(second.popupEl.querySelector('.ol-point-popup-edit')).not.toBeNull();
+        expect(feature.get('measureTooltip')).toBe(second.popupOverlay);
+    });
+
+    it('is at the place the point has now, once it is moved', () => {
+        const map = fakeMap();
+        const feature = pointAt(fromLonLat([9, 45]));
+        showPointPopup(map, feature, noActions());
+        feature.getGeometry().setCoordinates(fromLonLat([10, 46]));
+
+        const { popupEl, popupOverlay } = showPointPopup(map, feature, noActions());
+
+        expect(popupOverlay.getPosition()).toEqual(fromLonLat([10, 46]));
+        expect(popupEl.textContent).toContain('46.000000, 10.000000');
     });
 });
 
 describe('showPointPopup near the edges of the map (FR-MAP-26)', () => {
-    const show = (map, coords = [1, 2]) => showPointPopup(map, new Feature({ name: 'Gate' }), { lat: 1, lon: 2, coords });
+    const show = (map, coords = [1, 2]) => showPointPopup(map, pointAt(coords, { name: 'Gate' }));
 
     it('puts the popup above its point when there is room, with the arrow down', () => {
         popupSize(224, 80);
@@ -119,7 +198,7 @@ describe('showPointPopup near the edges of the map (FR-MAP-26)', () => {
 });
 
 describe('the popups of a map share one listener of the view (FR-MAP-26)', () => {
-    const show = (map, coords) => showPointPopup(map, new Feature({ name: 'Gate' }), { lat: 1, lon: 2, coords });
+    const show = (map, coords) => showPointPopup(map, pointAt(coords, { name: 'Gate' }));
     const listenerCount = (map, type) => (map.getListeners(type) || []).length;
 
     it('registers one moveend listener for any number of popups, and re-places all of them on a move', () => {
@@ -187,5 +266,87 @@ describe('the popups of a map share one listener of the view (FR-MAP-26)', () =>
         map.dispatchEvent('postrender');
         expect(popups.map(p => p.popupOverlay.getPositioning())).toEqual(['top-center', 'top-center']);
         expect(listenerCount(map, 'postrender')).toBe(0);
+    });
+});
+
+describe('the move handle of a point popup', () => {
+    // happy-dom has no pointer capture: the handle's calls are recorded
+    const captured = new Set();
+    beforeEach(() => {
+        captured.clear();
+        Object.assign(HTMLElement.prototype, {
+            setPointerCapture: id => captured.add(id),
+            releasePointerCapture: id => captured.delete(id),
+            hasPointerCapture: id => captured.has(id)
+        });
+    });
+    afterEach(() => {
+        delete HTMLElement.prototype.setPointerCapture;
+        delete HTMLElement.prototype.releasePointerCapture;
+        delete HTMLElement.prototype.hasPointerCapture;
+    });
+
+    function shown() {
+        const actions = noActions();
+        const feature = pointAt([1000, 2000]);
+        const { popupEl, popupOverlay } = showPointPopup(fakeMap(), feature, actions);
+        const handle = /** @type {HTMLElement} */ (popupEl.querySelector('.ol-point-popup-move'));
+        const pointer = (type, x, y, init = {}) => handle.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, pointerId: 7, button: 0, bubbles: true, cancelable: true, ...init }));
+        return { actions, feature, popupEl, popupOverlay, handle, pointer };
+    }
+    const at = feature => feature.getGeometry().getCoordinates();
+
+    it('moves the point and its popup by the distance the pointer moves, and reports the move on release', () => {
+        const { actions, feature, popupEl, popupOverlay, pointer } = shown();
+        pointer('pointerdown', 10, 10);
+        expect(captured.has(7)).toBe(true);
+        expect(popupEl.classList.contains('ol-point-popup-moving')).toBe(true);
+        pointer('pointermove', 110, 60);
+        expect(at(feature)).toEqual([1100, 2050]);
+        expect(popupOverlay.getPosition()).toEqual([1100, 2050]);
+        expect(actions.onMoved).not.toHaveBeenCalled();
+        pointer('pointerup', 110, 60);
+        expect(actions.onMoved).toHaveBeenCalledWith(feature, [1000, 2000]);
+        expect(at(feature)).toEqual([1100, 2050]);
+        expect(captured.has(7)).toBe(false);
+        expect(popupEl.classList.contains('ol-point-popup-moving')).toBe(false);
+    });
+
+    it('puts the point back on Esc while it drags, and reports no move', () => {
+        const { actions, feature, popupOverlay, pointer } = shown();
+        pointer('pointerdown', 10, 10);
+        pointer('pointermove', 60, 10);
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        expect(at(feature)).toEqual([1000, 2000]);
+        expect(popupOverlay.getPosition()).toEqual([1000, 2000]);
+        pointer('pointerup', 60, 10);
+        expect(actions.onMoved).not.toHaveBeenCalled();
+    });
+
+    it('puts the point back when the pointer is cancelled (a touch the browser took over)', () => {
+        const { actions, feature, pointer } = shown();
+        pointer('pointerdown', 10, 10);
+        pointer('pointermove', 60, 10);
+        pointer('pointercancel', 60, 10);
+        expect(at(feature)).toEqual([1000, 2000]);
+        expect(actions.onMoved).not.toHaveBeenCalled();
+    });
+
+    it('reports no move for a press without a move, or for another button than the main one', () => {
+        const { actions, feature, pointer } = shown();
+        pointer('pointerdown', 10, 10);
+        pointer('pointerup', 10, 10);
+        pointer('pointerdown', 10, 10, { button: 2 });
+        pointer('pointermove', 60, 10, { button: 2 });
+        pointer('pointerup', 60, 10, { button: 2 });
+        expect(at(feature)).toEqual([1000, 2000]);
+        expect(actions.onMoved).not.toHaveBeenCalled();
+    });
+
+    it('follows only the pointer that started the drag', () => {
+        const { feature, pointer } = shown();
+        pointer('pointerdown', 10, 10);
+        pointer('pointermove', 500, 500, { pointerId: 8 });
+        expect(at(feature)).toEqual([1000, 2000]);
     });
 });

@@ -89,7 +89,7 @@ describe('preferences store: load', () => {
         // A section is whole: unset fields are explicit nulls
         expect(body).toEqual({
             units: { measurement: 'imperial', currency: null },
-            map: { basemap: null, customBasemap: null, showDirectionIndicators: null, showFlightPath: false, showDatasetNames: null }
+            map: { basemap: null, customBasemap: null, showDirectionIndicators: null, showFlightPath: false, showDatasetNames: null, showPointCallouts: null }
         });
         expect(store.status).toBe('idle');
     });
@@ -134,7 +134,7 @@ describe('preferences store: load', () => {
         setPref(PREF.SHOW_DIRECTION_INDICATORS, true);
         await start({ units: { measurement: 'imperial' }, map: { showFlightPath: true } });
         expect(bodies()).toEqual([{
-            map: { basemap: null, customBasemap: null, showDirectionIndicators: true, showFlightPath: true, showDatasetNames: null }
+            map: { basemap: null, customBasemap: null, showDirectionIndicators: true, showFlightPath: true, showDatasetNames: null, showPointCallouts: null }
         }]);
     });
 

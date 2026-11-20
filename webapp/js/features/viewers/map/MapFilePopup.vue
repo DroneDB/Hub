@@ -65,7 +65,7 @@ import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
-import { formatDateTime, UNKNOWN } from '@/libs/format';
+import { formatDateTime, latLonText, UNKNOWN } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
 import { useTimeout } from '@/composables/useTimers';
 import { useOverlay } from '@/composables/useOverlay';
@@ -130,7 +130,7 @@ function clearRetry() {
 /** "lat, lon" of a point entry, or '' */
 function entryCoords(entry) {
     const coords = pointLonLat(entry.point_geom);
-    return coords ? `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}` : '';
+    return coords ? latLonText(coords[1], coords[0]) : '';
 }
 
 /**

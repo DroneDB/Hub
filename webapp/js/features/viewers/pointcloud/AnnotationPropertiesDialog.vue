@@ -1,26 +1,17 @@
 <template>
-    <Window id="annotation-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel" @confirm="save">
-        <div class="measurement-properties-form">
-            <div class="form-group">
-                <label for="ap-name">Name</label>
-                <input id="ap-name" v-model="formData.name" type="text" placeholder="Enter a name...">
+    <Window id="annotation-properties" title="Annotation" modal fixed-size size-class="dialog-sm" @close="cancel" @confirm="save">
+        <div class="annotation-properties-form">
+            <div class="mb-3">
+                <label for="ap-name" class="d-block mb-1 fw-semibold">Name</label>
+                <InputText id="ap-name" v-model="formData.name" placeholder="Optional" autocomplete="off" class="w-100" />
             </div>
 
-            <div class="form-group">
-                <label for="ap-description">Description</label>
-                <textarea id="ap-description" v-model="formData.description" placeholder="Enter a description..." rows="3" />
+            <div class="mb-3">
+                <label for="ap-description" class="d-block mb-1 fw-semibold">Description</label>
+                <Textarea id="ap-description" v-model="formData.description" placeholder="Optional" rows="3" auto-resize class="w-100" />
             </div>
 
-            <div class="form-group">
-                <span id="ap-position-label" class="form-label">Position</span>
-                <div class="coords-row" role="group" aria-labelledby="ap-position-label">
-                    <code class="coords-text">{{ coordsText }}</code>
-                    <button type="button" class="btn-copy-coords" :title="copyTooltip" :aria-label="copyTooltip" @click="copyCoordinates">
-                        <i :class="copyIconClass" />
-                    </button>
-                </div>
-            </div>
-
+            <CopyableCoordinates v-if="coordsCopyText" label-id="ap-position-label" label="Position" class="mb-3" :text="coordsText" :copy-text="coordsCopyText" />
         </div>
 
         <template #footer>
@@ -35,13 +26,15 @@
 <script>
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
-import { useCopyText } from '@/composables/useCopyText';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
+import CopyableCoordinates from '@/components/measurements/CopyableCoordinates.vue';
 import { htmlToText } from '@/libs/sanitize';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
  *
- * Name, description, and read-only XYZ position display with clipboard copy.
+ * Name, description, and the read-only XYZ position with a copy button (CopyableCoordinates).
  * Emits save with the changes, delete when the delete button
  * is pressed (annotation stays in memory until the caller removes it).
  *
@@ -51,7 +44,7 @@ import { htmlToText } from '@/libs/sanitize';
  */
 export default {
     components: {
-        Window, Button
+        Window, Button, InputText, Textarea, CopyableCoordinates
     },
     props: {
         annotation: {
@@ -64,10 +57,6 @@ export default {
         }
     },
     emits: ['close', 'save', 'delete'],
-    setup() {
-        const { copy: copyText, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
-        return { copyText, coordsCopied };
-    },
     data() {
         return {
             formData: {
@@ -77,21 +66,18 @@ export default {
         };
     },
     computed: {
-        dialogTitle() {
-            return this.formData.name ? `Edit: ${this.formData.name}` : 'Annotation Properties';
-        },
         coordsText() {
             const pos = this.annotation?.position;
-            if (!pos || !pos.toArray) return '—';
+            if (!pos || !pos.toArray) return '';
             return pos.toArray()
                 .map(c => parseFloat(c).toFixed(3).replace(/\B(?=(\d{3})+(?!\d))/g, ','))
                 .join(', ');
         },
-        copyIconClass() {
-            return this.coordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy';
-        },
-        copyTooltip() {
-            return this.coordsCopied ? 'Copied!' : 'Copy coordinates';
+        // Plain comma-separated numbers (no grouping commas), to paste elsewhere
+        coordsCopyText() {
+            const pos = this.annotation?.position;
+            if (!pos || !pos.toArray) return '';
+            return pos.toArray().map(c => parseFloat(c).toFixed(3)).join(', ');
         }
     },
     mounted() {
@@ -113,79 +99,14 @@ export default {
         },
         cancel() {
             this.$emit('close');
-        },
-        copyCoordinates() {
-            const pos = this.annotation?.position;
-            if (!pos || !pos.toArray) return;
-            // Plain comma-separated numeric text (no grouping commas)
-            const text = pos.toArray().map(c => parseFloat(c).toFixed(3)).join(', ');
-            this.copyText(text);
         }
     }
 };
 </script>
 
 <style scoped>
-.measurement-properties-form {
+.annotation-properties-form {
     padding: 1rem;
     min-width: min(18.75rem, var(--window-content-width, 100%));
 }
-
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label,
-.form-group .form-label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-weight: 500;
-    color: var(--ddb-text);
-}
-
-.form-group input[type="text"],
-.form-group textarea {
-    width: 100%;
-    padding: var(--ddb-spacing-sm);
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    font-size: var(--ddb-font-size-base);
-    box-sizing: border-box;
-}
-
-.form-group textarea {
-    resize: vertical;
-}
-
-.coords-row {
-    display: flex;
-    align-items: center;
-    gap: var(--ddb-spacing-sm);
-    padding: var(--ddb-spacing-sm);
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    background-color: var(--ddb-bg-subtle);
-}
-
-.coords-text {
-    flex: 1;
-    font-size: var(--ddb-font-size-sm);
-    color: var(--ddb-text);
-    word-break: break-all;
-}
-
-.btn-copy-coords {
-    background: transparent;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    padding: 0.25rem 0.5rem;
-    cursor: pointer;
-    color: var(--ddb-text);
-    transition: background-color 0.15s ease;
-}
-
-.btn-copy-coords:hover {
-    background-color: var(--ddb-border-separator);
-}
-
 </style>

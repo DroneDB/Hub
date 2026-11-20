@@ -405,6 +405,83 @@ export function toDms(degrees, axis) {
     return `${d}°${m < 10 ? '0' : ''}${m}'${s < 10 ? '0' : ''}${s.toFixed(2)}" ${dir}`;
 }
 
+/**
+ * A point to read and to paste elsewhere: "latitude, longitude" in decimal degrees with six decimals
+ * (about 10 cm). Latitude comes first, as Google Maps and the OpenStreetMap search read a pasted pair.
+ * @param {number} lat
+ * @param {number} lon
+ */
+export function latLonText(lat, lon) {
+    return `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+}
+
+/**
+ * The same point in degrees, minutes, seconds: 23°56'24.63" S / 31°08'19.17" E.
+ * @param {number} lat
+ * @param {number} lon
+ */
+export function latLonDmsText(lat, lon) {
+    return `${toDms(lat, 'lat')} / ${toDms(lon, 'lon')}`;
+}
+
+/** The latitudes a web map can show (Web Mercator stops at about 85.05° north and south) */
+export const MAP_MAX_LATITUDE = 85.0511287798;
+
+const DECIMAL = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const DMS_PART = /(\d+(?:\.\d+)?)\s*°\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*)?(?:(\d+(?:\.\d+)?)\s*(?:["″]|'')\s*)?([NSEW])/gi;
+const LAT_LON_FORMAT = 'Write the point as "latitude, longitude", for example 45.5, 9.25';
+
+/**
+ * The degrees of a pair written in degrees, minutes, seconds (as latLonDmsText writes it, or as a map site
+ * does: 23°56'24.63" S 31°08'19.17" E), or null when the text is not such a pair.
+ * @param {string} text
+ * @returns {{ lat: number, lon: number } | null}
+ */
+function parseDmsPair(text) {
+    const parts = [...text.matchAll(DMS_PART)];
+    if (parts.length !== 2) return null;
+    // Nothing but the two parts and the separators between them
+    if (text.replace(DMS_PART, '').replace(/[\s,;/]/g, '') !== '') return null;
+    /** @type {{ lat?: number, lon?: number }} */
+    const pair = {};
+    for (const [, d, m, s, hemisphere] of parts) {
+        const value = Number(d) + Number(m || 0) / 60 + Number(s || 0) / 3600;
+        const h = hemisphere.toUpperCase();
+        const axis = h === 'N' || h === 'S' ? 'lat' : 'lon';
+        if (pair[axis] !== undefined) return null;
+        pair[axis] = h === 'S' || h === 'W' ? -value : value;
+    }
+    return pair.lat === undefined || pair.lon === undefined ? null : { lat: pair.lat, lon: pair.lon };
+}
+
+/**
+ * Reads a point typed or pasted by a user: "latitude, longitude" in decimal degrees (as latLonText writes it and as
+ * Google Maps copies it; a space also separates the two; with a semicolon between them, a comma is the decimal mark:
+ * 45,5; 9,25), or the pair in degrees, minutes, seconds with their hemispheres. A latitude must be one a web map can
+ * show, a longitude within ±180°.
+ * @param {string} text
+ * @returns {{ lat: number, lon: number, error?: undefined } | { error: string }}
+ */
+export function parseLatLon(text) {
+    const trimmed = String(text ?? '').trim();
+    if (!trimmed) return { error: 'Enter the latitude and the longitude of the point' };
+    let pair = parseDmsPair(trimmed);
+    if (!pair) {
+        const parts = trimmed.includes(';')
+            ? trimmed.split(/\s*;\s*/).map(part => part.replace(',', '.'))
+            : trimmed.split(/\s*,\s*|\s+/);
+        if (parts.length !== 2 || !parts.every(part => DECIMAL.test(part))) return { error: LAT_LON_FORMAT };
+        pair = { lat: Number(parts[0]), lon: Number(parts[1]) };
+    }
+    const { lat, lon } = pair;
+    if (Math.abs(lat) > MAP_MAX_LATITUDE) {
+        const hint = Math.abs(lon) <= 90 && Math.abs(lat) <= 180 ? ' (is the longitude first? Latitude comes first)' : '';
+        return { error: `The latitude must be between -85.05 and 85.05${hint}` };
+    }
+    if (Math.abs(lon) > 180) return { error: 'The longitude must be between -180 and 180' };
+    return { lat, lon };
+}
+
 /** A value rounded to the decimals of `digits` (a number of decimals or a quantity) */
 const roundTo = (/** @type {number} */ v, /** @type {number|Quantity} */ digits) => {
     const f = Math.pow(10, decimalsOf(digits));

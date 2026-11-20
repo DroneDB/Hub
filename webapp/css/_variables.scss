@@ -50,8 +50,8 @@
 //    strings. These are rendering-engine colors, not CSS.
 //
 // 8. Color picker palette arrays:
-//    PointAnnotationDialog.vue, MeasurementPropertiesDialog.vue
-//    contain hard-coded hex color arrays for user selection.
+//    MEASUREMENT_SWATCHES (libs/map/mapUtils.js, shown by ColorSwatchPicker.vue)
+//    is a hard-coded hex color array for user selection.
 //    These are application data, not styling constants.
 //
 // 9. EntryThumbnail.vue: dynamic size prop

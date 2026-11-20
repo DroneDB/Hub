@@ -89,7 +89,9 @@ describe('the annotation dialog', () => {
 
         expect(document.getElementById('ap-name').value).toBe("Gate A & B's");
         expect(document.getElementById('ap-description').value).toBe('first\nsecond');
-        expect(document.querySelector('#annotation-properties').textContent).toContain("Edit: Gate A & B's");
+        // The title names what is edited; the name is in its own field
+        expect(document.querySelector('#annotation-properties').textContent).toContain('Annotation');
+        expect(document.querySelector('#annotation-properties').textContent).toContain('1.000, 2.000, 3.000');
         expect(props.annotation).toBe(annotation);
     });
 

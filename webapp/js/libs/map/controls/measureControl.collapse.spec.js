@@ -102,7 +102,7 @@ describe('the Measure toggle of the measure control', () => {
             'Point Annotation', 'Measure Length', 'Measure Area', 'Erase Measurement', 'Edit/Move Measurements', 'Stop Measuring'
         ]);
         expect(names('Manage Measurements')).toEqual([
-            'Measurement List', 'Save Measurements', 'Clear All Measurements', 'Export Measurements as GeoJSON',
+            'Measurement List', 'Always Show Point Callouts', 'Save Measurements', 'Clear All Measurements', 'Export Measurements as GeoJSON',
             'Export Measurements as CSV', 'Delete Saved Measurements'
         ]);
     });

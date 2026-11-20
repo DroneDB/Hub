@@ -79,6 +79,7 @@ const definition = {
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
                 onListOpen: () => { this.openMeasurementListDialog(); },
+                getGroups: () => this.measurementGroups,
                 onMeasurementDeleted: feature => {
                     if (!feature) return;
                     const id = feature.get && feature.get('id');
@@ -373,18 +374,12 @@ const definition = {
 
         /**
          * Edit a measurement from the list dialog: close the list and open the
-         * properties dialog for the selected feature. Point annotations have a
-         * dedicated dialog flow (color + description) so route those there.
+         * properties dialog of the selected measurement or point annotation.
          */
         handleEditMeasurementFromList(item) {
             if (!this.measureControls || !item || !item.feature) return;
             this.measurementListDialogOpen = false;
-            const feature = item.feature;
-            if (feature.get('measurementType') === 'point') {
-                this.measureControls.openPointAnnotationDialog(feature, this.measureControls.getMap(), true);
-            } else {
-                this.measureControls.openPropertiesDialog(feature, { showDelete: true, groups: this.measurementGroups });
-            }
+            this.measureControls.openPropertiesDialog(item.feature);
         },
 
         // ── Group management ────────────────────────────────────────────

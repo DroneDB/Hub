@@ -7,8 +7,7 @@ import Feature from 'ol/Feature';
 import Overlay from 'ol/Overlay';
 import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
-import { pointCoordinates, showPointPopup } from './pointPopup';
-import { copyText } from '@/composables/useCopyText';
+import { showPointPopup } from './pointPopup';
 import { escapeHtml } from '@/libs/sanitize';
 import { areaParts, lengthParts, stockpileLabel } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
@@ -213,12 +212,6 @@ function geoJSONToFeature(geoJsonFeature, unitPref) {
 
     feature.set('tooltipText', tooltipText);
 
-    // Store point coordinate data for re-creating popup on import
-    if (props.latitude !== undefined && props.longitude !== undefined) {
-        feature.set('pointLatitude', props.latitude);
-        feature.set('pointLongitude', props.longitude);
-    }
-
     return feature;
 }
 
@@ -281,9 +274,11 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
  * @param {ol.source.Vector} source - OpenLayers vector source
  * @param {string} unitPref - Unit preference the sizes are shown in ('metric' or 'imperial')
  * @param {ol.Map} map - OpenLayers map instance
+ * @param {import('./pointPopup').PointPopupActions} [pointActions] - The handlers of the edit and delete
+ *   buttons of the popups of the points
  * @returns {Array} Imported features
  */
-export function importMeasurements(geojson, source, unitPref, map, onPointEdit) {
+export function importMeasurements(geojson, source, unitPref, map, pointActions) {
     if (!geojson || !geojson.features) {
         console.warn('Invalid GeoJSON data');
         return [];
@@ -300,7 +295,7 @@ export function importMeasurements(geojson, source, unitPref, map, onPointEdit) 
 
             // Create tooltip or popup for the feature
             if (feature.get('measurementType') === 'point' && map) {
-                createPointPopup(feature, map, source, onPointEdit);
+                showPointPopup(map, feature, pointActions);
             } else {
                 const tooltipText = feature.get('tooltipText');
                 if (tooltipText && map) {
@@ -364,53 +359,6 @@ function createStaticTooltip(feature, text, map) {
         feature.set('measureTooltipElement', measureTooltipElement);
         feature.set('measureTooltip', measureTooltip);
     }
-}
-
-/**
- * Create a point annotation popup for an imported point feature
- * @param {ol.Feature} feature - Point feature
- * @param {ol.Map} map - OpenLayers map instance
- * @param {ol.source.Vector} source - Vector source for cleanup
- * @param {Function} [onEdit] - Optional callback when edit button is clicked, receives (feature, map)
- */
-function createPointPopup(feature, map, source, onEdit) {
-    const geometry = feature.getGeometry();
-    if (!geometry) return;
-
-    const coords = geometry.getCoordinates();
-    const lat = feature.get('pointLatitude');
-    const lon = feature.get('pointLongitude');
-
-    if (lat === undefined || lon === undefined) return;
-
-    const { ddLat, ddLon } = pointCoordinates(lat, lon);
-    const { popupEl, popupOverlay } = showPointPopup(map, feature, { lat, lon, coords, actions: true });
-
-    // Edit handler
-    // lifetime: element (buttons of the popup created here)
-    popupEl.querySelector('.ol-point-popup-edit').addEventListener('click', (e) => {
-        e.preventDefault();
-        if (onEdit) onEdit(feature, map);
-    });
-
-    // lifetime: element (buttons of the popup created here)
-    popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
-        e.preventDefault();
-        const text = `${ddLat}, ${ddLon}`;
-        copyText(text).then(() => {
-            const icon = popupEl.querySelector('.ol-point-popup-copy i');
-            if (icon) { icon.className = 'fa-solid fa-check'; }
-            setTimeout(() => { if (icon) { icon.className = 'fa-regular fa-copy'; } }, 1500);
-        });
-    });
-
-    // lifetime: element (buttons of the popup created here)
-    popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
-        e.preventDefault();
-        map.removeOverlay(popupOverlay);
-        if (popupEl.parentNode) popupEl.parentNode.removeChild(popupEl);
-        source.removeFeature(feature);
-    });
 }
 
 // ============================================================================

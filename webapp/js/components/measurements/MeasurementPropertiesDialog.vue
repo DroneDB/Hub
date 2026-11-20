@@ -1,91 +1,95 @@
 <template>
     <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel" @confirm="save">
         <div class="measurement-properties-form">
-            <div class="form-group">
-                <label for="mp-name">Name</label>
-                <input id="mp-name" v-model="formData.name" type="text" placeholder="Enter a name...">
+            <div class="mb-3">
+                <label for="mp-name" class="d-block mb-1 fw-semibold">Name</label>
+                <InputText id="mp-name" v-model="formData.name" placeholder="Optional" autocomplete="off" class="w-100" />
             </div>
 
-            <div class="form-group">
-                <label for="mp-description">Description</label>
-                <textarea id="mp-description" v-model="formData.description" placeholder="Enter a description..." rows="3" />
+            <div class="mb-3">
+                <label for="mp-description" class="d-block mb-1 fw-semibold">Description</label>
+                <Textarea id="mp-description" v-model="formData.description" placeholder="Optional" rows="3" auto-resize class="w-100" />
             </div>
 
-            <div class="form-group">
-                <label for="mp-stroke">Stroke Color</label>
-                <ColorSwatchPicker v-model="formData.stroke" input-id="mp-stroke" label="Stroke color" />
+            <div class="mb-3">
+                <label for="mp-stroke" class="d-block mb-1 fw-semibold">{{ colorLabel }}</label>
+                <ColorSwatchPicker v-model="formData.stroke" input-id="mp-stroke" :label="colorLabel" />
             </div>
 
-            <div v-if="showFill" class="form-group">
-                <label for="mp-fill">Fill Color</label>
+            <div v-if="isPolygon" class="mb-3">
+                <label for="mp-fill" class="d-block mb-1 fw-semibold">Fill color</label>
                 <ColorSwatchPicker v-model="formData.fill" input-id="mp-fill" label="Fill color" />
             </div>
 
-            <div class="form-group">
-                <label for="mp-stroke-width">Stroke Width: {{ formData['stroke-width'] }}px</label>
-                <input
-                    id="mp-stroke-width"
-                    v-model.number="formData['stroke-width']"
-                    type="range"
-                    min="1"
-                    max="10"
-                    step="1"
-                >
+            <div v-if="!isPoint" class="mb-3">
+                <label for="mp-stroke-width" class="d-block mb-1 fw-semibold">{{ widthLabel }}: {{ formData['stroke-width'] }} px</label>
+                <input id="mp-stroke-width" v-model.number="formData['stroke-width']" type="range" min="1" max="10" step="1" class="w-100">
             </div>
 
-            <div v-if="showFill" class="form-group">
-                <label for="mp-fill-opacity">Fill Opacity: {{ Math.round(formData['fill-opacity'] * 100) }}%</label>
-                <input
-                    id="mp-fill-opacity"
-                    v-model.number="formData['fill-opacity']"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                >
+            <div v-if="isPolygon" class="mb-3">
+                <label for="mp-fill-opacity" class="d-block mb-1 fw-semibold">Fill opacity: {{ Math.round(formData['fill-opacity'] * 100) }}%</label>
+                <input id="mp-fill-opacity" v-model.number="formData['fill-opacity']" type="range" min="0" max="1" step="0.1" class="w-100">
             </div>
 
-            <div v-if="isPoint" class="form-group">
-                <span id="mp-coords" class="form-label">Coordinates</span>
-                <div class="coords-row" role="group" aria-labelledby="mp-coords">
-                    <code class="coords-text">{{ coordsText }}</code>
-                    <button type="button" class="btn-copy-coords" :title="copyTooltip" :aria-label="copyTooltip" @click="copyCoordinates">
-                        <i :class="copyIconClass" />
-                    </button>
+            <div v-if="isPoint" class="mb-3">
+                <label for="mp-coords" class="d-block mb-1 fw-semibold">Coordinates</label>
+                <div class="coords-field">
+                    <InputText id="mp-coords" v-model="coordsInput" autocomplete="off" spellcheck="false" class="coords-input"
+                               :invalid="!!located.error" :aria-invalid="located.error ? 'true' : undefined"
+                               :aria-describedby="located.error ? 'mp-coords-error' : 'mp-coords-help'" />
+                    <Button type="button" severity="secondary" text :icon="coordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"
+                            :title="coordsCopied ? 'Copied!' : 'Copy coordinates'" :aria-label="coordsCopied ? 'Copied!' : 'Copy coordinates'"
+                            :disabled="!!located.error" @click="copyCoords(latLonText(located.lat, located.lon))" />
                 </div>
+                <FieldError id="mp-coords-error" :message="located.error" />
+                <small v-if="!located.error" id="mp-coords-help" class="d-block mt-1 coords-help">
+                    Latitude, longitude. {{ latLonDmsText(located.lat, located.lon) }}
+                </small>
             </div>
 
-            <div v-if="groups && groups.length > 0" class="form-group">
-                <label for="mp-group">Group</label>
-                <select id="mp-group" v-model="formData.groupId" class="group-dropdown">
-                    <option value="">None (Ungrouped)</option>
-                    <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
-                </select>
+            <div v-if="groups.length > 0" class="mb-3">
+                <label id="mp-group-label" for="mp-group" class="d-block mb-1 fw-semibold">Group</label>
+                <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
+                        option-label="label" option-value="value" class="w-100" />
             </div>
-
         </div>
 
         <template #footer>
-            <Button v-if="showDelete" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
-                    title="Delete this measurement" @click="deleteMeasurement" />
-            <Button label="Cancel" severity="secondary" @click="cancel" />
-            <Button label="Save" data-confirm @click="save" />
+            <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
+                    :title="`Delete this ${isPoint ? 'annotation' : 'measurement'}`" @click="deleteMeasurement" />
+            <Button :label="isNew ? 'Discard' : 'Cancel'" severity="secondary" @click="cancel" />
+            <Button label="Save" data-confirm :disabled="!!located.error" @click="save" />
         </template>
     </Window>
 </template>
 
 <script>
+/**
+ * The properties of a measurement or a point annotation: its name, description and colours, the width of a line,
+ * the fill of an area, the coordinates of a point (typed or pasted to move it: decimal degrees or DMS, see
+ * parseLatLon) and its group. The one dialog of a measurement, however it is
+ * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed).
+ *
+ * Emits `save` with the properties that apply to the geometry (a point has no width or fill; `coordinates`, its new
+ * [longitude, latitude], only when they were changed), `delete` from the
+ * Delete button, and `discard` when a new point (`isNew`) is not kept: Discard, the close button or Esc.
+ */
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
+import Select from 'primevue/select';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
+import FieldError from '@/components/FieldError.vue';
 import { toLonLat } from 'ol/proj';
+import { latLonText, latLonDmsText, parseLatLon } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
-        Window, Button,
-        ColorSwatchPicker
+        Window, Button, InputText, Textarea, Select,
+        ColorSwatchPicker, FieldError
     },
     props: {
         feature: {
@@ -96,26 +100,33 @@ export default {
             type: String,
             default: 'LineString'
         },
-        // When true the dialog renders a Delete button that emits delete.
-        // Used by the non-edit-mode double-click flow which doubles as a
-        // "detail" dialog with the option to remove the measurement.
+        // A Delete button that emits delete (a measurement that exists; a new point has Discard instead)
         showDelete: {
             type: Boolean,
             default: false
         },
-        // Available groups for the group assignment dropdown
+        // A point just placed: Discard (or closing the dialog) removes it
+        isNew: {
+            type: Boolean,
+            default: false
+        },
+        // The groups a measurement can be assigned to
         groups: {
             type: Array,
             default: () => []
         }
     },
-    emits: ['close', 'save', 'delete'],
+    emits: ['close', 'save', 'delete', 'discard'],
     setup() {
-        const { copy: copyText, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
-        return { copyText, coordsCopied };
+        const { copy: copyCoords, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
+        return { copyCoords, coordsCopied };
     },
     data() {
         return {
+            // The coordinates of a point as the field shows them: "latitude, longitude"
+            coordsInput: '',
+            // Set once Save or Delete is chosen: the close that follows is not a discard
+            done: false,
             formData: {
                 name: '',
                 description: '',
@@ -129,74 +140,88 @@ export default {
         };
     },
     computed: {
-        dialogTitle() {
-            return this.formData.name ? `Edit: ${this.formData.name}` : 'Measurement Properties';
-        },
-        showFill() {
-            return this.geometryType === 'Polygon';
-        },
         isPoint() {
             return this.geometryType === 'Point';
         },
-        pointCoordinates() {
-            if (!this.isPoint || !this.feature) return null;
-            const geom = this.feature.getGeometry && this.feature.getGeometry();
-            if (!geom) return null;
-            // Try to get lon/lat (WGS84). The geometry coords are in map
-            // projection; rely on the feature's stored 'coordinates' meta
-            // when available, otherwise convert via toLonLat dynamically.
-            try {
-                const c = geom.getCoordinates();
-                const [lon, lat] = toLonLat(c);
-                return { lon, lat };
-            } catch {
-                return null;
-            }
+        isPolygon() {
+            return this.geometryType === 'Polygon';
         },
-        coordsText() {
-            const c = this.pointCoordinates;
-            if (!c) return '';
-            return `${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
+        // A title that names what is edited: the name has its own field, the title does not change as it is typed
+        dialogTitle() {
+            if (this.isPoint) return this.isNew ? 'New Point Annotation' : 'Point Annotation';
+            return 'Measurement Properties';
         },
-        copyIconClass() {
-            return this.coordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy';
+        colorLabel() {
+            if (this.isPoint) return 'Color';
+            return this.isPolygon ? 'Outline color' : 'Line color';
         },
-        copyTooltip() {
-            return this.coordsCopied ? 'Copied!' : 'Copy coordinates';
+        widthLabel() {
+            return this.isPolygon ? 'Outline width' : 'Line width';
+        },
+        // The point where it is (its geometry is in the map's projection), as the field first shows it
+        pointText() {
+            const geom = this.isPoint ? this.feature?.getGeometry?.() : null;
+            if (!geom) return '';
+            const [lon, lat] = toLonLat(geom.getCoordinates());
+            return latLonText(lat, lon);
+        },
+        // The point the field holds: its latitude and longitude, or the error of what was typed (none for a measurement)
+        located() {
+            return this.isPoint ? parseLatLon(this.coordsInput) : { lat: 0, lon: 0 };
+        },
+        groupOptions() {
+            return [{ label: 'None (ungrouped)', value: '' }, ...this.groups.map(g => ({ label: g.name, value: g.id }))];
         }
     },
     mounted() {
-        // Load existing properties from feature. Use `!== undefined` checks for
-        // numeric properties so a legitimate `0` value is preserved (would be
-        // overridden by the `||` fallback otherwise).
-        if (this.feature) {
-            const get = (k) => this.feature.get(k);
-            this.formData.name = get('name') || '';
-            this.formData.description = get('description') || '';
-            this.formData.stroke = get('stroke') || MEASURE_COLOR;
-            this.formData['stroke-width'] = get('stroke-width') !== undefined ? get('stroke-width') : 2;
-            this.formData['stroke-opacity'] = get('stroke-opacity') !== undefined ? get('stroke-opacity') : 1;
-            this.formData.fill = get('fill') || MEASURE_COLOR;
-            this.formData['fill-opacity'] = get('fill-opacity') !== undefined ? get('fill-opacity') : 0.2;
-            this.formData.groupId = get('groupId') || '';
-        }
+        // `!== undefined` keeps a legitimate 0, which `||` would replace
+        const get = (k) => this.feature.get(k);
+        this.formData.name = get('name') || '';
+        this.formData.description = get('description') || '';
+        this.formData.stroke = get('stroke') || MEASURE_COLOR;
+        this.formData['stroke-width'] = get('stroke-width') !== undefined ? get('stroke-width') : 2;
+        this.formData['stroke-opacity'] = get('stroke-opacity') !== undefined ? get('stroke-opacity') : 1;
+        this.formData.fill = get('fill') || MEASURE_COLOR;
+        this.formData['fill-opacity'] = get('fill-opacity') !== undefined ? get('fill-opacity') : 0.2;
+        this.formData.groupId = get('groupId') || '';
+        this.coordsInput = this.pointText;
     },
     methods: {
+        latLonText,
+        latLonDmsText,
+        // The properties of this geometry: a point has no width or fill, a line no fill
+        properties() {
+            const { name, description, stroke, groupId } = this.formData;
+            const properties = { name, description, stroke, groupId };
+            if (!this.isPoint) {
+                properties['stroke-width'] = this.formData['stroke-width'];
+                properties['stroke-opacity'] = this.formData['stroke-opacity'];
+            }
+            if (this.isPolygon) {
+                properties.fill = this.formData.fill;
+                properties['fill-opacity'] = this.formData['fill-opacity'];
+            }
+            // A point moves only when its coordinates were changed: the text it was shown with is where it is, to
+            // the 6 decimals shown, and saving it unchanged must not round the point to them
+            const { lat, lon } = this.located;
+            if (this.isPoint && latLonText(lat, lon) !== this.pointText) properties.coordinates = [lon, lat];
+            return properties;
+        },
         save() {
-            this.$emit('save', { ...this.formData });
+            if (this.located.error) return;
+            this.done = true;
+            this.$emit('save', this.properties());
             this.$emit('close');
         },
         deleteMeasurement() {
+            this.done = true;
             this.$emit('delete');
             this.$emit('close');
         },
+        // Cancel, the close button and Esc: a new point that was not saved is not kept
         cancel() {
+            if (this.isNew && !this.done) this.$emit('discard');
             this.$emit('close');
-        },
-        copyCoordinates() {
-            const text = this.coordsText;
-            if (!text) return;
-            this.copyText(text);
         }
     }
 };
@@ -208,76 +233,19 @@ export default {
     min-width: min(18.75rem, var(--window-content-width, 100%));
 }
 
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label,
-.form-group .form-label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-weight: 500;
-    color: var(--ddb-text);
-}
-
-.form-group input[type="text"],
-.form-group textarea {
-    width: 100%;
-    padding: var(--ddb-spacing-sm);
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    font-size: var(--ddb-font-size-base);
-    box-sizing: border-box;
-}
-
-.form-group textarea {
-    resize: vertical;
-}
-
-.form-group input[type="range"] {
-    width: 100%;
-}
-
-.coords-row {
+.coords-field {
     display: flex;
     align-items: center;
-    gap: var(--ddb-spacing-sm);
-    padding: var(--ddb-spacing-sm);
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    background-color: var(--ddb-bg-subtle);
+    gap: var(--ddb-spacing-xs);
 }
 
-.coords-text {
+.coords-input {
     flex: 1;
-    font-size: var(--ddb-font-size-sm);
-    color: var(--ddb-text);
-    word-break: break-all;
+    min-width: 0;
+    font-family: monospace;
 }
 
-.btn-copy-coords {
-    background: transparent;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    padding: 0.25rem 0.5rem;
-    cursor: pointer;
-    color: var(--ddb-text);
-    transition: background-color 0.15s ease;
-}
-
-.btn-copy-coords:hover {
-    background-color: var(--ddb-border-separator);
-}
-
-.group-dropdown {
-    width: 100%;
-    padding: var(--ddb-spacing-sm);
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    font-size: var(--ddb-font-size-base);
-    background: var(--ddb-bg-surface);
-    color: var(--ddb-text);
-    cursor: pointer;
-    box-sizing: border-box;
+.coords-help {
+    color: var(--ddb-text-muted);
 }
 </style>

@@ -13,13 +13,13 @@ import { unByKey } from 'ol/Observable';
 import { geodesicArea, geodesicLength } from '@/libs/map/geodesic';
 import { startDrawingSession } from '@/libs/map/drawingSession';
 import { LineString, Polygon, Point } from 'ol/geom';
-import { toLonLat } from 'ol/proj';
+import { toLonLat, fromLonLat } from 'ol/proj';
+import { containsCoordinate } from 'ol/extent';
 import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
-import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
-import { showPointPopup } from '@/libs/map/pointPopup';
+import { showPointPopup, removeMeasureTooltip, setPointPopupShown, CALLOUTS_ON_HOVER_CLASS } from '@/libs/map/pointPopup';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
-import { stockpileLabel } from '@/libs/format';
+import { latLonText, stockpileLabel } from '@/libs/format';
 import { colorToken, tokenRgba } from '@/libs/colorScheme';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
@@ -36,6 +36,21 @@ const ERASE_HOVER_CURSOR = `url('${'/images/measure-erase.svg'}') 12 12, crossha
  * @param {Record<string, any>} props @param {string} unitPref
  */
 const stockpileText = (props, unitPref) => (typeof props.netVolume === 'number' ? stockpileLabel(props, unitPref) : null);
+
+/**
+ * The label of a measurement that shows only while its feature is hovered (`ol-tooltip`), or null:
+ * the popup of a point annotation (`ol-point-popup`) is always on show, so hovering its point
+ * neither reveals nor hides it.
+ * @param {any} feature
+ * @returns {HTMLElement | null}
+ */
+function hoverLabelOf(feature) {
+    const element = feature.get && feature.get('measureTooltipElement');
+    return element && element.classList && element.classList.contains('ol-tooltip') ? element : null;
+}
+
+/** The name of the button that switches the callouts of the point annotations between always and on hover */
+const CALLOUTS_LABEL = 'Always Show Point Callouts';
 
 class MeasureControls extends Control {
     /**
@@ -63,7 +78,11 @@ class MeasureControls extends Control {
         const btnDelete = controlButton('Delete Saved Measurements', 'Permanently delete saved measurements from the dataset.', '/images/trash.svg');
         const btnList = controlButton('Measurement List', 'View and manage all measurements.');
         btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
-        [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList].forEach(btn => { btn.style.display = 'none'; });
+        // Pressed: the callouts of the point annotations are always shown; released: each one shows while its point is
+        // hovered (or tapped). Shown while the map has a point annotation; the account keeps the choice
+        const btnCallouts = controlButton(CALLOUTS_LABEL, '');
+        btnCallouts.innerHTML = '<i class="fa-solid fa-message" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
+        [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList, btnCallouts].forEach(btn => { btn.style.display = 'none'; });
 
         // The 'Measure' toggle: on a compact map (css/ol-controls.css: a phone, a small frame) it is the one button of the
         // measure tools in the rail, and the toolbars below open from it (FR-MAP-12). Elsewhere it is not shown
@@ -86,6 +105,7 @@ class MeasureControls extends Control {
         const toolbar2 = controlGroup('Manage Measurements');
         toolbar2.style.display = 'none';
         toolbar2.appendChild(btnList);
+        toolbar2.appendChild(btnCallouts);
         toolbar2.appendChild(btnSave);
         toolbar2.appendChild(btnClear);
         toolbar2.appendChild(btnExport);
@@ -117,6 +137,7 @@ class MeasureControls extends Control {
         btnExportCsv.addEventListener('click', () => this.onExportCsv(), false);
         btnDelete.addEventListener('click', this.handleDeleteSaved.bind(this), false);
         btnList.addEventListener('click', this.handleListOpen.bind(this), false);
+        btnCallouts.addEventListener('click', () => this.setPointCallouts(!this.showPointCallouts), false);
 
         this.selectedTool = null;
         // On a compact map the tools are shown from the Measure toggle (the class and the toggle's state)
@@ -134,6 +155,8 @@ class MeasureControls extends Control {
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
         this.onListOpen = options.onListOpen || (() => { });
+        // The measurement groups, offered by the properties dialog
+        this.getGroups = options.getGroups || (() => []);
         // Notified whenever a feature is removed from the measurement source
         // (eraser tool, deleteMeasurement, etc.). Consumers use this to keep
         // the deletedMeasurementIds tracking in sync so persisted features
@@ -154,6 +177,9 @@ class MeasureControls extends Control {
         });
 
         this.unitPref = unitPref;
+        this.btnCallouts = btnCallouts;
+        this.showPointCallouts = getPref(PREF.SHOW_POINT_CALLOUTS, PREF_DEFAULTS[PREF.SHOW_POINT_CALLOUTS]);
+        this._syncCalloutsButton();
 
         // Store button references
         this.btnStop = btnStop;
@@ -210,6 +236,9 @@ class MeasureControls extends Control {
             this.deselectCurrent();
             if (this.isEditMode) this.disableEditMode();
         }
+        // The map the control leaves shows its point popups as it did before the control
+        const previous = this.getMap();
+        if (previous && previous !== map) previous.getViewport().classList.remove(CALLOUTS_ON_HOVER_CLASS);
         super.setMap(map);
 
         // The unit follows the Preferences page, other tabs and the account while on a map
@@ -221,10 +250,15 @@ class MeasureControls extends Control {
         // Initialize button visibility when control is added to map
         if (map) {
             this._unsubscribeUnitPref = onPrefChange(key => {
+                if (key === PREF.SHOW_POINT_CALLOUTS) {
+                    this.showCallouts(getPref(PREF.SHOW_POINT_CALLOUTS, PREF_DEFAULTS[PREF.SHOW_POINT_CALLOUTS]));
+                    return;
+                }
                 if (key !== PREF.MEASURE_UNIT) return;
                 const unit = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
                 if (unit !== this.unitPref) this.showUnit(unit);
             });
+            this.showCallouts(getPref(PREF.SHOW_POINT_CALLOUTS, PREF_DEFAULTS[PREF.SHOW_POINT_CALLOUTS]));
             this.refreshButtons();
             // Detail dialog: outside edit mode, double-clicking on a measurement
             // opens the properties dialog with a Delete button. We only act on
@@ -232,14 +266,11 @@ class MeasureControls extends Control {
             // native DoubleClickZoom interaction still zooms the map.
             this._detailDblClickKey = map.on('dblclick', (evt) => {
                 if (this.isEditMode || this.selectedTool) return;
-                const feature = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
-                    if (layer === this.vector && f.get('measurementType')) return f;
-                    return null;
-                }, { hitTolerance: 5 });
+                const feature = this._measurementAt(map, evt.pixel);
                 if (feature) {
                     evt.stopPropagation();
                     if (evt.preventDefault) evt.preventDefault();
-                    this.openPropertiesDialog(feature, { showDelete: true });
+                    this.openPropertiesDialog(feature);
                     return true;
                 }
             });
@@ -255,11 +286,16 @@ class MeasureControls extends Control {
                 if (evt.dragging || this.isEditMode) return;
                 const tool = this.selectedTool;
                 if (tool && tool !== 'erase') return;
-                const hit = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
-                    if (layer === this.vector && f.get('measurementType')) return f;
-                    return null;
-                }, { hitTolerance: 5 });
-                this._setHoveredFeature(hit || null);
+                // The pointer on the callout of a point hovers that point, not what is under the callout: the map
+                // still gets the moves over a popup (and the moves of a drag of its handle), and the buttons of a
+                // callout shown on hover are reached by moving from the point onto it
+                const callout = this._calloutPointAt(evt.originalEvent && evt.originalEvent.target);
+                if (callout) {
+                    this._setHoveredFeature(callout);
+                    return;
+                }
+                const hit = this._measurementAt(map, evt.pixel);
+                this._setHoveredFeature(hit);
                 const target = map.getTargetElement();
                 if (!target) return;
                 // Cursor ownership: we only manage the cursor when nothing
@@ -279,6 +315,12 @@ class MeasureControls extends Control {
                 target.style.cursor = next;
                 this._currentManagedCursor = next;
             });
+            // A touch screen has no hover: a tap on a measurement is the hover (it shows the callout of a point while
+            // callouts show on hover), and a tap elsewhere ends it
+            this._tapKey = map.on('singleclick', (evt) => {
+                if (this.isEditMode || this.selectedTool) return;
+                this._setHoveredFeature(this._measurementAt(map, evt.pixel));
+            });
         } else {
             if (this._detailDblClickKey) {
                 try { unByKey(this._detailDblClickKey); } catch { /* noop */ }
@@ -287,6 +329,10 @@ class MeasureControls extends Control {
             if (this._hoverPointerKey) {
                 try { unByKey(this._hoverPointerKey); } catch { /* noop */ }
                 this._hoverPointerKey = null;
+            }
+            if (this._tapKey) {
+                unByKey(this._tapKey);
+                this._tapKey = null;
             }
             this._setHoveredFeature(null);
         }
@@ -305,19 +351,17 @@ class MeasureControls extends Control {
             previous._hovered = false;
             try { previous.changed(); } catch { /* noop */ }
             // Re-hide the persistent tooltip label that was revealed on hover.
-            const prevTip = previous.get && previous.get('measureTooltipElement');
-            if (prevTip && prevTip.classList) {
-                prevTip.classList.add('ol-tooltip-hidden');
-            }
+            const prevTip = hoverLabelOf(previous);
+            if (prevTip) prevTip.classList.add('ol-tooltip-hidden');
+            setPointPopupShown(this.getMap(), previous, false);
         }
         if (feature) {
             feature._hovered = true;
             try { feature.changed(); } catch { /* noop */ }
             // Reveal the persistent tooltip label only for the hovered feature.
-            const tip = feature.get && feature.get('measureTooltipElement');
-            if (tip && tip.classList) {
-                tip.classList.remove('ol-tooltip-hidden');
-            }
+            const tip = hoverLabelOf(feature);
+            if (tip) tip.classList.remove('ol-tooltip-hidden');
+            setPointPopupShown(this.getMap(), feature, true);
         }
     }
 
@@ -455,6 +499,7 @@ class MeasureControls extends Control {
         const show = on => (on ? 'block' : 'none');
         this.toolbar2.style.display = show(hasMeasurements || this.hasSaved);
         this.btnList.style.display = show(hasMeasurements);
+        this.btnCallouts.style.display = show(this.source.getFeatures().some(f => f.get('measurementType') === 'point'));
         this.btnSave.style.display = show((hasMeasurements || this.hasSaved) && this.canWrite);
         this.btnClear.style.display = show(hasMeasurements);
         this.btnExport.style.display = show(hasMeasurements);
@@ -514,9 +559,8 @@ class MeasureControls extends Control {
                 const name = f.get('name') || f.get('title') || '';
                 let value;
                 if (type === 'point') {
-                    const coords = f.getGeometry().getCoordinates();
-                    const lonLat = toLonLat(coords);
-                    value = `${lonLat[1].toFixed(6)}, ${lonLat[0].toFixed(6)}`;
+                    const [lon, lat] = toLonLat(f.getGeometry().getCoordinates());
+                    value = latLonText(lat, lon);
                 } else {
                     // A stockpile with its volume: built from the stored metric properties, in the units of the map now
                     const label = type === 'stockpile' ? stockpileText(f.getProperties(), this.unitPref) : null;
@@ -576,15 +620,7 @@ class MeasureControls extends Control {
         if (this._hoveredFeature === feature) {
             this._setHoveredFeature(null);
         }
-        const map = this.getMap();
-        const tooltipOverlay = feature.get('measureTooltip');
-        if (tooltipOverlay && map) {
-            map.removeOverlay(tooltipOverlay);
-        }
-        const tooltipElement = feature.get('measureTooltipElement');
-        if (tooltipElement && tooltipElement.parentNode) {
-            tooltipElement.parentNode.removeChild(tooltipElement);
-        }
+        removeMeasureTooltip(this.getMap(), feature);
         this.source.removeFeature(feature);
         this.refreshButtons();
     }
@@ -663,18 +699,8 @@ class MeasureControls extends Control {
         const map = this.getMap();
         const features = this.source.getFeatures();
 
-        // Remove tooltip overlays from map
-        features.forEach(feature => {
-            const tooltipOverlay = feature.get('measureTooltip');
-            if (tooltipOverlay && map) {
-                map.removeOverlay(tooltipOverlay);
-            }
-            // Also remove the DOM element if still attached
-            const tooltipElement = feature.get('measureTooltipElement');
-            if (tooltipElement && tooltipElement.parentNode) {
-                tooltipElement.parentNode.removeChild(tooltipElement);
-            }
-        });
+        // Remove the labels and popups from the map
+        features.forEach(feature => removeMeasureTooltip(map, feature));
 
         // Clear all features
         this.source.clear();
@@ -696,9 +722,7 @@ class MeasureControls extends Control {
     importFromGeoJSON(geojson) {
         const map = this.getMap();
 
-        const result = importMeasurements(geojson, this.source, this.unitPref, map, (feature, m) => {
-            this.openPointAnnotationDialog(feature, m, true);
-        });
+        const result = importMeasurements(geojson, this.source, this.unitPref, map, this.pointPopupActions());
 
         // Update button visibility after import
         this.refreshButtons();
@@ -794,7 +818,7 @@ class MeasureControls extends Control {
                 this.updateTooltipPosition(feature);
                 // Rebuild point popup to reflect new coordinates
                 if (feature.get('measurementType') === 'point') {
-                    this.recreatePointPopup(feature, this.getMap());
+                    this.showPointPopup(feature);
                 }
             });
         });
@@ -805,7 +829,7 @@ class MeasureControls extends Control {
                 this.updateTooltipPosition(feature);
                 // Rebuild point popup to reflect new coordinates
                 if (feature.get('measurementType') === 'point') {
-                    this.recreatePointPopup(feature, this.getMap());
+                    this.showPointPopup(feature);
                 }
             });
         });
@@ -954,7 +978,7 @@ class MeasureControls extends Control {
         this.updateTooltipPosition(feature);
         // Rebuild point popup to reflect restored coordinates
         if (feature.get('measurementType') === 'point') {
-            this.recreatePointPopup(feature, this.getMap());
+            this.showPointPopup(feature);
         }
     }
 
@@ -1020,100 +1044,148 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Open annotation dialog for a new or existing point feature
+     * The handlers of the buttons of a point's popup: the properties dialog of the point, the deletion
+     * of a measurement, and the end of a drag of its move handle.
+     * @returns {import('@/libs/map/pointPopup').PointPopupActions}
+     */
+    pointPopupActions() {
+        return {
+            onEdit: feature => this.openPropertiesDialog(feature),
+            onDelete: feature => this.deleteMeasurement(feature),
+            onMoved: (feature, from) => this.pointMoved(feature, from)
+        };
+    }
+
+    /**
+     * A point moved by the handle of its popup: its popup is shown again at the new place (its coordinates, and
+     * above or below the point). In edit mode Ctrl+Z puts it back, as after a move of the point itself (the undo
+     * stack lives as long as edit mode).
+     * @param {ol.Feature} feature - The point feature, at its new place
+     * @param {number[]} from - Its map coordinates before the move
+     */
+    pointMoved(feature, from) {
+        this._recordPointMove(feature, from);
+        this.showPointPopup(feature);
+    }
+
+    /**
+     * In edit mode, a move of a point that Ctrl+Z undoes (the undo stack lives as long as edit mode).
+     * @param {ol.Feature} feature - The point feature, at its new place
+     * @param {number[]} from - Its map coordinates before the move
+     */
+    _recordPointMove(feature, from) {
+        if (this.isEditMode) this.undoStack.push({ feature, geometry: new Point(from), tooltipText: feature.get('tooltipText') });
+    }
+
+    /**
+     * Puts a point at the map coordinates its properties dialog was given, and brings it into view when it is
+     * outside the map's view (the map is centred on it, at the same zoom).
      * @param {ol.Feature} feature - The point feature
-     * @param {ol.Map} map - OpenLayers map instance
-     * @param {boolean} isEdit - Whether this is editing an existing point (true) or creating a new one (false)
+     * @param {number[]} to - Its new map coordinates
      */
-    openPointAnnotationDialog(feature, map, isEdit) {
-        this.closePropertiesDialog();
-
-        const currentColor = feature.get('stroke') || MEASURE_COLOR;
-        const currentDescription = feature.get('description') || '';
-
-        this._dialog = this.openDialog(PointAnnotationDialog, {
-            initialColor: currentColor,
-            initialDescription: currentDescription,
-            onSave: (data) => {
-                feature.set('stroke', data.color);
-                feature.set('description', data.description);
-                feature.changed();
-
-                if (isEdit) {
-                    // Re-create the popup to reflect new color/description
-                    this.recreatePointPopup(feature, map);
-                } else {
-                    // First time: create the popup
-                    this.createPointPopupElement(feature, map);
-                    this.refreshButtons();
-                }
-            },
-            onDiscard: () => {
-                if (!isEdit) {
-                    // New point: remove it
-                    this.source.removeFeature(feature);
-                    this.refreshButtons();
-                }
-            },
-            onClose: () => {
-                this._dialog = null;
-            }
-        });
+    _relocatePoint(feature, to) {
+        const point = feature.getGeometry();
+        const from = point.getCoordinates();
+        point.setCoordinates(to);
+        this._recordPointMove(feature, from);
+        const map = this.getMap();
+        const size = map && map.getSize();
+        if (!size) return;
+        const view = map.getView();
+        if (!containsCoordinate(view.calculateExtent(size), to)) view.animate({ center: to, duration: 250 });
     }
 
     /**
-     * Create the popup overlay for a point annotation feature
+     * Shows the popup of a point annotation, with its buttons, in place of the popup it had (after
+     * it was drawn, or its annotation edited, or the point moved).
+     * @param {ol.Feature} feature - The point feature
+     * @param {ol.Map} [map] - OpenLayers map instance (the map of the control by default)
      */
-    createPointPopupElement(feature, map) {
-        const coords = feature.getGeometry().getCoordinates();
-        const [lon, lat] = toLonLat(coords);
-
-        showPointPopup(map, feature, { lat, lon, coords });
+    showPointPopup(feature, map = this.getMap()) {
+        showPointPopup(map, feature, this.pointPopupActions());
+        // The point under the pointer keeps its callout on show while callouts show on hover
+        if (feature === this._hoveredFeature) setPointPopupShown(map, feature, true);
     }
 
     /**
-     * Re-create popup for a point after editing its annotation
+     * The point whose callout holds an element (the target of a pointer event), or null.
+     * @param {EventTarget | null | undefined} target
+     * @returns {ol.Feature | null}
      */
-    recreatePointPopup(feature, map) {
-        // Remove old popup
-        const oldOverlay = feature.get('measureTooltip');
-        const oldEl = feature.get('measureTooltipElement');
-        if (oldOverlay) map.removeOverlay(oldOverlay);
-        if (oldEl && oldEl.parentNode) oldEl.parentNode.removeChild(oldEl);
-
-        // Create new popup
-        this.createPointPopupElement(feature, map);
+    _calloutPointAt(target) {
+        const callout = target instanceof Element ? target.closest('.ol-point-popup') : null;
+        if (!callout) return null;
+        return this.source.getFeatures().find(f => f.get('measureTooltipElement') === callout) || null;
     }
 
     /**
-     * Open properties dialog for a feature.
+     * The measurement at a pixel of the map (within a few pixels), or null.
+     * @param {ol.Map} map
+     * @param {number[]} pixel
+     * @returns {ol.Feature | null}
+     */
+    _measurementAt(map, pixel) {
+        return map.forEachFeatureAtPixel(pixel, (f, layer) => (layer === this.vector && f.get('measurementType') ? f : null), { hitTolerance: 5 }) || null;
+    }
+
+    /**
+     * Shows the callouts of the point annotations always (true) or only while their point is hovered or
+     * tapped (false), and keeps the choice as the user's preference.
+     * @param {boolean} always
+     */
+    setPointCallouts(always) {
+        this.showCallouts(always);
+        setPref(PREF.SHOW_POINT_CALLOUTS, always);
+    }
+
+    /**
+     * Shows the callouts of the point annotations always (true) or on hover (false), without storing it
+     * (the preference changed elsewhere: the Preferences page, another tab, the account).
+     * @param {boolean} always
+     */
+    showCallouts(always) {
+        this.showPointCallouts = always !== false;
+        this._syncCalloutsButton();
+        const map = this.getMap();
+        if (map) map.getViewport().classList.toggle(CALLOUTS_ON_HOVER_CLASS, !this.showPointCallouts);
+    }
+
+    _syncCalloutsButton() {
+        const always = this.showPointCallouts;
+        this.btnCallouts.classList.toggle('active', always);
+        this.btnCallouts.setAttribute('aria-pressed', String(always));
+        this.btnCallouts.title = `${CALLOUTS_LABEL} - ${always
+            ? 'The callouts of the point annotations are always shown. Click to show each one only while the pointer is over its point.'
+            : 'Each callout shows while the pointer is over its point, or after a tap on it. Click to always show them.'}`;
+    }
+
+    /**
+     * The properties dialog of a measurement or a point annotation: the one dialog of a measurement, however it is
+     * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed). A
+     * measurement that exists has a Delete button; a point just placed has Discard, which removes it.
      * @param {ol.Feature} feature - The measurement feature to edit.
-     * @param {Object} [options]
-     * @param {boolean} [options.showDelete] - Render a Delete button in the
-     *   dialog. Used by the non-edit-mode "detail" double-click flow.
+     * @param {{ isNew?: boolean }} [options] isNew: a point just placed
      */
-    openPropertiesDialog(feature, options) {
-        // Close any existing dialog
+    openPropertiesDialog(feature, { isNew = false } = {}) {
         this.closePropertiesDialog();
 
         const geometry = feature.getGeometry();
-        const geometryType = geometry ? geometry.getType() : 'LineString';
-        const showDelete = !!(options && options.showDelete);
-        const groups = (options && options.groups) || [];
-
+        const isPoint = feature.get('measurementType') === 'point';
         this._dialog = this.openDialog(MeasurementPropertiesDialog, {
-            feature: feature,
-            geometryType: geometryType,
-            showDelete: showDelete,
-            groups: groups,
-            onSave: (properties) => {
-                // Update feature properties
-                Object.keys(properties).forEach(key => {
-                    feature.set(key, properties[key]);
-                });
+            feature,
+            geometryType: geometry ? geometry.getType() : 'LineString',
+            isNew,
+            showDelete: !isNew,
+            groups: this.getGroups(),
+            onSave: ({ groupId, coordinates, ...properties }) => {
+                Object.keys(properties).forEach(key => feature.set(key, properties[key]));
+                this.setMeasurementGroupId(feature, groupId);
+                // Coordinates typed in the dialog move the point
+                if (coordinates) this._relocatePoint(feature, fromLonLat(coordinates));
 
-                // Update tooltip with new name
-                updateFeatureTooltip(feature);
+                // The label with the new name; a point annotation has its popup instead, shown again with its buttons
+                if (isPoint) this.showPointPopup(feature);
+                else updateFeatureTooltip(feature);
 
                 // Trigger re-render for style changes. We invalidate both the
                 // feature and the vector layer: setting the same value via
@@ -1122,9 +1194,15 @@ class MeasureControls extends Control {
                 // default color the layer can otherwise miss the redraw.
                 feature.changed();
                 if (this.vector) this.vector.changed();
+                if (isNew) this.refreshButtons();
             },
             onDelete: () => {
                 this.deleteMeasurement(feature);
+            },
+            // A point just placed and not kept
+            onDiscard: () => {
+                this.source.removeFeature(feature);
+                this.refreshButtons();
             },
             onClose: () => {
                 this._dialog = null;
@@ -1319,7 +1397,7 @@ class MeasureControls extends Control {
                         feat.set('measurementType', 'point');
                         feat.set('createdAt', new Date().toISOString());
 
-                        self.openPointAnnotationDialog(feat, map, false);
+                        self.openPropertiesDialog(feat, { isNew: true });
                     }, 10);
                 } else if (tool === 'erase') {
                     // lifetime: defer (after OpenLayers adds the feature)

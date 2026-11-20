@@ -8,7 +8,7 @@ import {
     bulkUnits, stockpileLabel, distinctLabels, middleEllipsis, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize,
     formatNumber, formatNumberList, formatInputNumber, joinNumberTexts, parseNumber, formatBytes, formatDateTime, formatTime, formatTimeAgo, utcClockToLocal,
     lengthParts, areaParts, fixedLengthParts, formatVolume, formatWeight, formatDensity, formatSpeed,
-    PRECISION, UNKNOWN, EMPTY_CELL, displayLocale
+    PRECISION, UNKNOWN, EMPTY_CELL, displayLocale, latLonText, latLonDmsText, parseLatLon
 } from './format';
 import { bytesToSize, formatTimeAgo as utilsTimeAgo } from './utils';
 import { formatModifiedDate } from './propertiesUtils';
@@ -382,5 +382,55 @@ describe('pluralize and countOf', () => {
     it('use the singular for one only', () => {
         expect([0, 1, 2].map(n => countOf(n, 'file'))).toEqual(['0 files', '1 file', '2 files']);
         expect([1, 2].map(n => pluralize(n, 'has', 'have'))).toEqual(['has', 'have']);
+    });
+});
+
+describe('the text of a point', () => {
+    it('is "latitude, longitude" in decimal degrees with six decimals, as it is pasted elsewhere', () => {
+        expect(latLonText(-23.9401761234, 31.1386581)).toBe('-23.940176, 31.138658');
+        expect(latLonText(0, 0)).toBe('0.000000, 0.000000');
+    });
+
+    it('in degrees, minutes, seconds names the hemispheres', () => {
+        expect(latLonDmsText(-23.940176, 31.138658)).toBe(`23\u00B056'24.63" S / 31\u00B008'19.17" E`);
+        expect(latLonDmsText(45.5, -9.25)).toBe(`45\u00B030'00.00" N / 9\u00B015'00.00" W`);
+    });
+});
+
+describe('a point typed or pasted by a user', () => {
+    it('reads "latitude, longitude" in decimal degrees, as it is copied, with a comma or a space between them', () => {
+        expect(parseLatLon('-23.940176, 31.138658')).toEqual({ lat: -23.940176, lon: 31.138658 });
+        expect(parseLatLon('  45.5 9.25 ')).toEqual({ lat: 45.5, lon: 9.25 });
+        expect(parseLatLon('+45,-9')).toEqual({ lat: 45, lon: -9 });
+        expect(parseLatLon('.5, -.25')).toEqual({ lat: 0.5, lon: -0.25 });
+    });
+
+    it('reads a comma as the decimal mark when a semicolon separates the two', () => {
+        expect(parseLatLon('45,5; 9,25')).toEqual({ lat: 45.5, lon: 9.25 });
+    });
+
+    it('reads the pair in degrees, minutes, seconds, as the popup shows it and as map sites write it', () => {
+        const { lat, lon } = /** @type {{ lat: number, lon: number }} */ (parseLatLon(`23\u00B056'24.63" S / 31\u00B008'19.17" E`));
+        expect(lat).toBeCloseTo(-23.940175, 6);
+        expect(lon).toBeCloseTo(31.138658, 6);
+        expect(parseLatLon(`31\u00B008'19.17" E 23\u00B056'24.63" S`)).toEqual(parseLatLon(`23\u00B056'24.63" S, 31\u00B008'19.17" E`));
+        expect(parseLatLon('45\u00B0 30\u2032 N 9\u00B0 15\u2032 W')).toEqual({ lat: 45.5, lon: -9.25 });
+        expect(parseLatLon(`45\u00B030'00.00'' n 9\u00B015'00.00'' e`)).toEqual({ lat: 45.5, lon: 9.25 });
+    });
+
+    it('refuses text that is not one pair, and says how to write it', () => {
+        const format = 'Write the point as "latitude, longitude", for example 45.5, 9.25';
+        for (const text of ['45.5', '45.5, 9.25, 100', 'north, east', '45.5,, 9.25', '45.5 9.25 m', '1e3, 2', `45\u00B0 N 46\u00B0 N`]) {
+            expect(parseLatLon(text)).toEqual({ error: format });
+        }
+        expect(parseLatLon('  ')).toEqual({ error: 'Enter the latitude and the longitude of the point' });
+    });
+
+    it('refuses a latitude the map cannot show and a longitude past 180, and names a pair written longitude first', () => {
+        expect(parseLatLon('86, 9').error).toBe('The latitude must be between -85.05 and 85.05 (is the longitude first? Latitude comes first)');
+        expect(parseLatLon('120, 45').error).toBe('The latitude must be between -85.05 and 85.05 (is the longitude first? Latitude comes first)');
+        expect(parseLatLon('-95, 181').error).toBe('The latitude must be between -85.05 and 85.05');
+        expect(parseLatLon('45, 180.5').error).toBe('The longitude must be between -180 and 180');
+        expect(parseLatLon('85.05, -180')).toEqual({ lat: 85.05, lon: -180 });
     });
 });
