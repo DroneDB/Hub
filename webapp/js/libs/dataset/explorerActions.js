@@ -97,6 +97,9 @@ const filesOnly = (/** @type {ActionContext} */ c) => sel(c).length > 0 && !hasD
 // A dataset that did not load (ResourceState) offers no action on it
 const available = (/** @type {ActionContext} */ c) => !c.unavailable;
 const signedIn = (/** @type {ActionContext} */ c) => (c.signedIn ?? reg.isLoggedIn());
+// The view on show (the grid when none is said); an option of one view is shown in that view only
+const listView = (/** @type {ActionContext} */ c) => c.viewMode === 'table';
+const gridView = (/** @type {ActionContext} */ c) => !listView(c);
 
 // A download of several files, a folder or the whole dataset (nothing selected) is an archive; whether
 // an anonymous visitor may is the download module's rule (libs/datasetDownloads.js)
@@ -126,7 +129,7 @@ const viewerActions = VIEWERS.map(row => /** @type {ActionDefinition} */ ({
     }
 }));
 
-/** The toolbar's S | M | L of the grid view: a pressed one is the size in force; the list view has fixed thumbnails. */
+/** The toolbar's S | M | L, shown in the grid view only (the list view has fixed thumbnails): a pressed one is the size in force. */
 function tileSizeActions() {
     const sizes = /** @type {const} */ ([
         ['s', 'Small thumbnails', 'S', 'fa-solid fa-table-cells'],
@@ -141,9 +144,8 @@ function tileSizeActions() {
         text,
         surfaces: ['toolbar'],
         priority: 3,
-        applies: c => c.viewMode !== 'table',
-        pressed: c => c.viewMode !== 'table' && c.tileSize === size,
-        reason: () => 'The thumbnail size is an option of the grid view',
+        shownIn: gridView,
+        pressed: c => c.tileSize === size,
         run: c => c.emit('setTileSize', size)
     }));
 }
@@ -331,7 +333,7 @@ export const EXPLORER_ACTIONS = Object.freeze([
         surfaces: ['toolbar'],
         priority: 1,
         showLabel: true,
-        pressed: c => c.viewMode !== 'table',
+        pressed: gridView,
         run: c => c.emit('setViewMode', 'grid')
     },
     {
@@ -342,7 +344,7 @@ export const EXPLORER_ACTIONS = Object.freeze([
         surfaces: ['toolbar'],
         priority: 1,
         showLabel: true,
-        pressed: c => c.viewMode === 'table',
+        pressed: listView,
         run: c => c.emit('setViewMode', 'table')
     },
     {
@@ -352,12 +354,11 @@ export const EXPLORER_ACTIONS = Object.freeze([
         icon: 'fa-regular fa-image',
         surfaces: ['toolbar'],
         priority: 3,
-        applies: c => c.viewMode === 'table',
-        pressed: c => c.viewMode === 'table' && !!c.expandedGrid,
-        reason: () => 'Thumbnails are an option of the list view',
+        shownIn: listView,
+        pressed: c => !!c.expandedGrid,
         run: c => c.emit('toggleExpandedGrid')
     },
-    // The size of the thumbnails of the grid view: S, M, L (FR-EXP-43)
+    // The size of the thumbnails of the grid view: S, M, L
     ...tileSizeActions()
 ]);
 

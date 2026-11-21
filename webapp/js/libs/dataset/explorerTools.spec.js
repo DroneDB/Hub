@@ -19,8 +19,16 @@ function context({ canWrite = true, files = [], selected = [], viewMode = 'grid'
     };
 }
 
-const WRITER_IDS = ['upload', 'new-folder', 'separator', 'open', 'share-embed', 'rename', 'delete', 'separator',
-    'select-all', 'clear-selection', 'spacer', 'refresh', 'view-grid', 'view-list', 'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l'];
+// The options of a view come before Refresh and the view switch, so Grid | List stay at the end
+const VIEW_END = ['refresh', 'view-grid', 'view-list'];
+const GRID_OPTIONS = ['tile-size-s', 'tile-size-m', 'tile-size-l'];
+const LIST_OPTIONS = ['thumbnails'];
+const WRITER_START = ['upload', 'new-folder', 'separator', 'open', 'share-embed', 'rename', 'delete', 'separator',
+    'select-all', 'clear-selection', 'spacer'];
+const WRITER_IDS = {
+    grid: [...WRITER_START, ...GRID_OPTIONS, ...VIEW_END],
+    table: [...WRITER_START, ...LIST_OPTIONS, ...VIEW_END]
+};
 
 describe('explorerTools', () => {
     const a = file(T.GENERIC, 'a.bin'), b = file(T.GEOIMAGE, 'b.jpg'), c = file(T.IMAGE, 'c.png');
@@ -29,7 +37,7 @@ describe('explorerTools', () => {
     it('shows the same ids in the same order for 0, 1 and n selected files', () => {
         for (const selected of [[], [a], [a, b], files]) {
             for (const viewMode of ['grid', 'table']) {
-                expect(ids(explorerTools(context({ files, selected, viewMode })))).toEqual(WRITER_IDS);
+                expect(ids(explorerTools(context({ files, selected, viewMode })))).toEqual(WRITER_IDS[viewMode]);
             }
         }
     });
@@ -41,7 +49,6 @@ describe('explorerTools', () => {
             expect(byId(none, id).disabledReason).not.toBe('');
         }
         expect(byId(none, 'select-all').disabled).toBe(false);
-        expect(byId(none, 'thumbnails')).toMatchObject({ disabled: true, disabledReason: 'Thumbnails are an option of the list view' });
 
         const several = explorerTools(context({ files, selected: [a, b] }));
         expect(byId(several, 'rename')).toMatchObject({ disabled: true, disabledReason: 'Select one file to rename' });
@@ -56,7 +63,7 @@ describe('explorerTools', () => {
         const tools = explorerTools(context({ canWrite: false, files, selected: [a] }));
         // HubToolbar drops the separator left at the start
         expect(ids(tools)).toEqual(['separator', 'open', 'share-embed', 'separator', 'select-all', 'clear-selection', 'spacer',
-            'refresh', 'view-grid', 'view-list', 'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l']);
+            ...GRID_OPTIONS, ...VIEW_END]);
         expect(byId(tools, 'share-embed').disabled).toBe(false);
     });
 
@@ -91,19 +98,25 @@ describe('explorerTools', () => {
 
         const idle = context({ files, selected: [] });
         byId(explorerTools(idle), 'delete').onClick();
-        byId(explorerTools(idle), 'thumbnails').onClick();
         expect(idle.emit).not.toHaveBeenCalled();
+
+        const list = context({ files, selected: [], viewMode: 'table' });
+        byId(explorerTools(list), 'thumbnails').onClick();
+        expect(list.emit.mock.calls).toEqual([['toggleExpandedGrid']]);
     });
 
     it('gives the view tools a pressed state: a segmented Grid | List, and Thumbnails in the list view', () => {
         const grid = explorerTools(context({ viewMode: 'grid', expandedGrid: true }));
-        expect([byId(grid, 'view-grid').pressed, byId(grid, 'view-list').pressed, byId(grid, 'thumbnails').pressed]).toEqual([true, false, false]);
-        const table = explorerTools(context({ viewMode: 'table', expandedGrid: true }));
-        expect([byId(table, 'view-grid').pressed, byId(table, 'view-list').pressed, byId(table, 'thumbnails').pressed]).toEqual([false, true, true]);
-        expect(byId(table, 'thumbnails').disabled).toBe(false);
+        expect([byId(grid, 'view-grid').pressed, byId(grid, 'view-list').pressed]).toEqual([true, false]);
+        for (const expandedGrid of [true, false]) {
+            const table = explorerTools(context({ viewMode: 'table', expandedGrid }));
+            expect([byId(table, 'view-grid').pressed, byId(table, 'view-list').pressed, byId(table, 'thumbnails').pressed])
+                .toEqual([false, true, expandedGrid]);
+            expect(byId(table, 'thumbnails').disabled).toBe(false);
+        }
     });
 
-    it('offers the thumbnail size S | M | L in the grid view, the size in force pressed (FR-EXP-43)', () => {
+    it('offers the thumbnail size S | M | L in the grid view, the size in force pressed', () => {
         for (const tileSize of ['s', 'm', 'l']) {
             const tools = explorerTools(context({ viewMode: 'grid', tileSize }));
             const sizes = ['tile-size-s', 'tile-size-m', 'tile-size-l'].map(id => byId(tools, id));
@@ -114,10 +127,24 @@ describe('explorerTools', () => {
         }
     });
 
-    it('disables the thumbnail size in the list view, where the thumbnails are fixed, with its reason', () => {
-        const tools = explorerTools(context({ viewMode: 'table', tileSize: 'm' }));
-        for (const id of ['tile-size-s', 'tile-size-m', 'tile-size-l']) {
-            expect(byId(tools, id)).toMatchObject({ disabled: true, disabledReason: 'The thumbnail size is an option of the grid view', pressed: false });
+    it('shows the thumbnail size in the grid view only, and Thumbnails in the list view only', () => {
+        const grid = ids(explorerTools(context({ viewMode: 'grid', tileSize: 'm' })));
+        const list = ids(explorerTools(context({ viewMode: 'table', tileSize: 'm' })));
+        for (const id of GRID_OPTIONS) {
+            expect(grid).toContain(id);
+            expect(list).not.toContain(id);
+        }
+        for (const id of LIST_OPTIONS) {
+            expect(list).toContain(id);
+            expect(grid).not.toContain(id);
+        }
+    });
+
+    it('keeps Refresh and Grid | List at the end of the toolbar in both views, so the switch does not move', () => {
+        for (const viewMode of ['grid', 'table']) {
+            for (const canWrite of [true, false]) {
+                expect(ids(explorerTools(context({ viewMode, canWrite }))).slice(-VIEW_END.length)).toEqual(VIEW_END);
+            }
         }
     });
 
@@ -129,9 +156,6 @@ describe('explorerTools', () => {
         expect(ctx.emit.mock.calls).toEqual([['setTileSize', 'l'], ['setTileSize', 'm']]);
         expect(['tile-size-s', 'tile-size-m', 'tile-size-l'].map(id => byId(tools, id).priority)).toEqual([3, 3, 3]);
 
-        const list = context({ viewMode: 'table' });
-        byId(explorerTools(list), 'tile-size-l').onClick();
-        expect(list.emit).not.toHaveBeenCalled();
     });
 
     it('keeps Upload, New folder and the view toggle on a phone, and labels Upload and New folder', () => {

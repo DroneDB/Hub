@@ -2,9 +2,11 @@
 /**
  * The toolbar of the dataset explorer: a fixed list of actions of the registry
  * (libs/dataset/explorerActions.js), so the buttons keep their places whatever is selected. An
- * action that does not apply to the selection is disabled with its reason, not hidden; only an
- * action the user may not do at all (a reader's Upload) is left out. A function of the page
- * state, used by a computed.
+ * action that does not apply to the selection is disabled with its reason, not hidden; an action
+ * the user may not do at all (a reader's Upload) is left out, and so is an option of the view
+ * that is not on show (Thumbnails of the list view, S | M | L of the grid view). Those options
+ * come before Refresh and Grid | List, so the view switch keeps its place at the end of the
+ * toolbar in both views. A function of the page state, used by a computed.
  */
 import { resolveAction } from '@/libs/dataset/explorerActions';
 
@@ -14,7 +16,7 @@ export const TOOLBAR_IDS = Object.freeze([
     'open', 'share-embed', 'rename', 'delete', 'separator',
     'select-all', 'clear-selection',
     'spacer',
-    'refresh', 'view-grid', 'view-list', 'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l'
+    'thumbnails', 'tile-size-s', 'tile-size-m', 'tile-size-l', 'refresh', 'view-grid', 'view-list'
 ]);
 
 const STRUCTURAL = new Set(['separator', 'spacer']);
