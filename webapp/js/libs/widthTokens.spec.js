@@ -206,6 +206,10 @@ describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name
         expect(wide).toMatch(/\.p-datatable-table\) \{\s*width: auto;/);
         expect(wide).toMatch(/\.file-name\) \{\s*display: block;\s*max-width: 40rem;/);
     });
+
+    it('a type name, a size and a date stay on one line', () => {
+        expect(styleOf('js/features/dataset/explorer/TableView.vue')).toMatch(/\.file-type, \.file-size, \.file-date \{\s*white-space: nowrap;/);
+    });
 });
 
 describe('FR-ADM-28: the configuration page has one centred column of two cards', () => {

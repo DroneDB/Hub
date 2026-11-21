@@ -604,11 +604,9 @@ export default {
         display: block;
     }
 
-    .file-size {
-        white-space: nowrap;
-    }
-
-    .file-date {
+    /* A type name, a size and a date stay on one line ("Gaussian Splat", "3,18 GB"): their column grows to fit
+       them, the Name column wraps instead */
+    .file-type, .file-size, .file-date {
         white-space: nowrap;
     }
 
