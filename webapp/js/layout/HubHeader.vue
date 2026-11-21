@@ -19,9 +19,14 @@
         </nav>
 
         <!-- Where the user is: organization / dataset, after the Organizations link of the main navigation, which is its
-             root; an anonymous visitor has no such link, so the trail has an Organizations crumb (FR-NAV-03, FR-NAV-04) -->
+             root; an anonymous visitor has no such link, so the trail has an Organizations crumb (FR-NAV-03, FR-NAV-04).
+             The visibility of the dataset follows its name: the dataset page has no title block of its own -->
         <HubBreadcrumb v-if="params.org" class="header-crumbs" :org="String(params.org)" :ds="params.ds ? String(params.ds) : ''"
-                       :home-in-nav="primaryNav.length > 0" />
+                       :home-in-nav="primaryNav.length > 0">
+            <template v-if="params.ds" #after>
+                <VisibilityButton :org="String(params.org)" :ds="String(params.ds)" />
+            </template>
+        </HubBreadcrumb>
 
         <nav class="right" aria-label="Page actions and account">
 
@@ -122,6 +127,7 @@ import { Features } from '@/libs/features';
 import Alert from '@/components/HubAlert';
 import ActionButton from '@/components/ActionButton.vue';
 import HubBreadcrumb from '@/components/HubBreadcrumb.vue';
+import VisibilityButton from '@/components/VisibilityButton.vue';
 import UploadIndicator from '@/layout/UploadIndicator.vue';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
@@ -163,6 +169,7 @@ export default {
     components: {
         ActionButton,
         HubBreadcrumb,
+        VisibilityButton,
         UploadIndicator,
         Alert,
         ConfirmDialog,
@@ -692,7 +699,8 @@ export default {
         border-radius: var(--ddb-radius-md);
         color: var(--ddb-text-secondary);
         text-decoration: none;
-        font-size: var(--ddb-font-size-sm);
+        /* One text size in the header: the breadcrumb and the small buttons have it too */
+        font-size: var(--ddb-font-size-ui);
     }
 
     .primary-nav-link:hover {

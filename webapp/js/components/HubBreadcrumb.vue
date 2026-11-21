@@ -2,11 +2,16 @@
     <nav v-if="crumbs.length > 0" class="hub-breadcrumb" aria-label="Breadcrumb">
         <ol>
             <li v-for="crumb in crumbs" :key="crumb.id" :class="{ 'is-current': crumb.current }">
-                <span v-if="crumb.current" class="crumb crumb-current" :title="crumb.label" aria-current="page">{{ crumb.label }}</span>
+                <span v-if="crumb.current" class="crumb crumb-current" :title="crumb.title ?? crumb.label" aria-current="page">{{ crumb.label }}</span>
                 <RouterLink v-else-if="crumb.to" class="crumb crumb-link" :to="crumb.to" :title="crumb.label">{{ crumb.label }}</RouterLink>
                 <span v-else class="crumb" :title="crumb.label">{{ crumb.label }}</span>
             </li>
         </ol>
+        <!-- What the header shows about the page, after its name (the visibility of the dataset): it never shrinks,
+             the name is cut first -->
+        <div v-if="$slots.after" class="crumbs-after">
+            <slot name="after" />
+        </div>
     </nav>
 </template>
 
@@ -20,11 +25,16 @@
  * The slugs come from the route (`org`, `ds`). The name of the organization is read here (the organization look-up, which
  * the user did not ask for: it opts out of the global 401 redirect, FR-XC-05); the name of the dataset is the one the page
  * puts in the dataset session (stores/datasetSession.js: the dataset page, and a viewer from the dataset info it reads),
- * formatted as the tree shows it. Until a name is known, and when it cannot be read (no access, an error), the crumb shows the
+ * formatted as the tree shows it; its tooltip adds the tagline of the dataset. Until a name is known, and when it cannot be read (no access, an error), the crumb shows the
  * slug; an organization the visitor has no access to is not a link, since the page would only refuse them. In a
  * one-organization install the organization is home, so there is no Organizations crumb either.
  *
- *   <HubBreadcrumb :org="$route.params.org" :ds="$route.params.ds" :home-in-nav="primaryNav.length > 0" />
+ * The `after` slot follows the trail, outside the part that is cut with an ellipsis (the header puts the visibility of
+ * the dataset there).
+ *
+ *   <HubBreadcrumb :org="$route.params.org" :ds="$route.params.ds" :home-in-nav="primaryNav.length > 0">
+ *       <template #after><VisibilityButton ... /></template>
+ *   </HubBreadcrumb>
  */
 import { computed, ref, watch } from 'vue';
 import ddb from 'ddb';
@@ -68,11 +78,14 @@ watch(() => props.org, async org => {
 
 // The name of the dataset as the tree shows it, from the page's root entry
 const datasetName = computed(() => (session.rootEntry && !session.unavailable ? ddb.utils.entryLabel(session.rootEntry) : ''));
+// Its tagline: the page shows no title block, so the tooltip of the dataset's crumb carries it
+const datasetTagline = computed(() => (session.rootEntry && !session.unavailable
+    ? String(session.rootEntry.properties?.meta?.tagline?.data ?? '').trim() : ''));
 
 const crumbs = computed(() => {
     if (!props.org) return [];
     const home = homeLocation();
-    /** @type {Array<{ id: string, label: string, to?: import('vue-router').RouteLocationRaw, current?: boolean }>} */
+    /** @type {Array<{ id: string, label: string, title?: string, to?: import('vue-router').RouteLocationRaw, current?: boolean }>} */
     const list = [];
     if (home.name === 'Organizations' && !props.homeInNav) list.push({ id: 'organizations', label: 'Organizations', to: { name: 'Organizations' } });
     list.push({
@@ -81,25 +94,41 @@ const crumbs = computed(() => {
         to: orgDenied.value ? undefined : { name: 'Datasets', params: { org: props.org } },
         current: !props.ds
     });
-    if (props.ds) list.push({ id: 'ds', label: datasetName.value || props.ds, current: true });
+    if (props.ds) {
+        const label = datasetName.value || props.ds;
+        list.push({ id: 'ds', label, title: datasetTagline.value ? `${label} — ${datasetTagline.value}` : label, current: true });
+    }
     return list;
 });
 </script>
 
 <style scoped>
+/* The trail, then what follows it (the visibility): the trail shrinks, what follows does not */
 .hub-breadcrumb {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
     min-width: 0;
 }
 
+/* The text size of the header (its links and buttons): one size in the bar */
 ol {
     display: flex;
+    flex: 0 1 auto;
     flex-wrap: nowrap;
     align-items: center;
     min-width: 0;
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--ddb-font-size-sm);
+    font-size: var(--ddb-font-size-ui);
+}
+
+.crumbs-after {
+    display: flex;
+    flex: none;
+    align-items: center;
 }
 
 li {

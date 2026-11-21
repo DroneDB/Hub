@@ -4,6 +4,8 @@
  * read, and no redirect when it answers 401.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 
@@ -135,5 +137,45 @@ describe('HubBreadcrumb organization look-up (FR-XC-05)', () => {
         await render({ org: 'acme', ds: 'site' });
         expect(crumbs()).toEqual(['Organizations', 'acme', 'site']);
         expect(links()).toEqual([{ name: 'Organizations' }, { name: 'Datasets', params: { org: 'acme' } }]);
+    });
+});
+
+describe('HubBreadcrumb after the trail', () => {
+    const style = fs.readFileSync(path.join(__dirname, 'HubBreadcrumb.vue'), 'utf8').split(/<style[^>]*>/)[1];
+    const rule = selector => style.slice(style.indexOf(`${selector} {`)).split('}')[0];
+
+    it('shows the tagline of the dataset in the tooltip of its name: the page has no title block', async () => {
+        await render({ org: 't-orgs-bulk', ds: 'bulk-dataset-26', homeInNav: true });
+        useDatasetSessionStore().setRootEntry({ path: '', properties: { meta: { name: { data: 'Bulk' }, tagline: { data: ' Shore survey ' } } } });
+        await flushPromises();
+        expect(wrapper.find('[aria-current="page"]').attributes('title')).toBe('Bulk — Shore survey');
+        useDatasetSessionStore().setRootEntry(root('Bulk'));
+        await flushPromises();
+        expect(wrapper.find('[aria-current="page"]').attributes('title')).toBe('Bulk');
+    });
+
+    it('puts the after slot next to the trail, outside the part cut with an ellipsis', async () => {
+        wrapper = mount(HubBreadcrumb, {
+            props: { org: 't-orgs-bulk', ds: 'bulk-dataset-26', homeInNav: true },
+            slots: { after: '<span class="badge-stub">Private</span>' },
+            global: { plugins: [createPinia()], stubs: { RouterLink: RouterLinkStub } }
+        });
+        await flushPromises();
+        const after = wrapper.find('nav > .crumbs-after');
+        expect(after.find('.badge-stub').exists()).toBe(true);
+        expect(wrapper.find('ol .badge-stub').exists()).toBe(false);
+        // the trail shrinks and cuts the name; what follows keeps its size
+        expect(rule('.hub-breadcrumb')).toContain('display: flex;');
+        expect(rule('ol')).toContain('min-width: 0;');
+        expect(rule('.crumbs-after')).toContain('flex: none;');
+    });
+
+    it('has no after box without the slot', async () => {
+        await render({ org: 't-orgs-bulk', homeInNav: true });
+        expect(wrapper.find('.crumbs-after').exists()).toBe(false);
+    });
+
+    it('has the text size of the header', () => {
+        expect(rule('ol')).toContain('font-size: var(--ddb-font-size-ui);');
     });
 });

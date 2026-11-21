@@ -11,7 +11,7 @@
 //   In CSS-only contexts use var(--ddb-border-width)
 // - Layout via Bootstrap: d-flex, row/col-*, responsive classes
 // - Colors and typography via PrimeVue Lara theme tokens
-// - Font sizes: var(--ddb-font-size-sm/base/lg/xl) only
+// - Font sizes: var(--ddb-font-size-sm/ui/base/lg/xl) only (ui: the text of the header, as PrimeVue small controls)
 // - Forms via PrimeVue components (InputText, Password, Select, etc.)
 // - Badges via PrimeVue Tag component
 // - No PrimeFlex

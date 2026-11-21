@@ -40,4 +40,12 @@ describe('VisibilityTag', () => {
     it('no visibility is shown in warning orange', () => {
         for (const v of Object.values(Visibility)) expect(visibilityLook(v).severity).not.toBe('warn');
     });
+
+    it('puts what its slot holds after the label, inside the tag (the caret of the visibility menu)', () => {
+        const tag = mount(VisibilityTag, { props: { visibility: Visibility.PUBLIC }, slots: { default: '<i class="caret" />' }, global: { plugins: [PrimeVue] } });
+        expect(tag.text()).toBe('Public');
+        expect(tag.find('.fa-globe').exists()).toBe(true);
+        const label = tag.find('.p-tag-label');
+        expect(label.element.nextElementSibling.classList).toContain('caret');
+    });
 });

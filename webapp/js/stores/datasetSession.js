@@ -5,7 +5,7 @@
  * instead of a copy kept in step through events.
  */
 import { defineStore } from 'pinia';
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, triggerRef } from 'vue';
 
 export const useDatasetSessionStore = defineStore('datasetSession', () => {
     // Selected explorer items ({ path, entry, ... }); shallow: the page owns the objects
@@ -61,6 +61,24 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
         rootEntry.value = entry || null;
     }
 
+    /**
+     * A meta value of the dataset changed (its visibility, from the header): the root entry takes it. The entry is
+     * changed in place, not replaced: the page and the viewer that put it in the session hold the same object (a
+     * viewer takes it out only if it is still the one it put there), and they see the new value too. What reads the
+     * entry is told (triggerRef); a computed or watch that returns the entry itself sees the same object and stops
+     * there, so read the value through `rootEntry` in the same getter.
+     * @param {string} key  the meta key ('visibility')
+     * @param {object} value  the meta item the server returned ({ id, data })
+     */
+    function setRootMeta(key, value) {
+        const entry = rootEntry.value;
+        if (!entry) return;
+        entry.properties ??= {};
+        entry.properties.meta ??= {};
+        entry.properties.meta[key] = value;
+        triggerRef(rootEntry);
+    }
+
     /** @param {number|string|null} value */
     function setCreationDate(value) {
         creationDate.value = value ?? null;
@@ -79,6 +97,6 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
 
     return {
         selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable, canWrite, rootEntry, creationDate,
-        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, setRootEntry, setCreationDate, reset
+        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, setRootEntry, setRootMeta, setCreationDate, reset
     };
 });

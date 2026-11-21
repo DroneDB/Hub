@@ -168,21 +168,18 @@ describe('ViewDataset detail panel follows the list (FR-EXP-06)', () => {
 });
 
 describe('ViewDataset header (FR-EXP-14)', () => {
-    it('shows the name, the visibility and the tagline of the dataset above the tabs', async () => {
+    it('has the name of the dataset as its heading, for screen readers only: no title block above the tabs', async () => {
         await open();
-        const header = wrapper.find('header.dataset-header');
-        expect(header.exists()).toBe(true);
-        expect(header.find('h1').text()).toBe('Brighton Beach');
-        expect(header.text()).toContain('Unlisted');
-        expect(header.find('.dataset-tagline').text()).toBe('Survey of the shore');
+        const heading = wrapper.find('h1.visually-hidden');
+        expect(heading.text()).toBe('Brighton Beach');
+        // the visibility and the tagline are in the header of the Hub (its breadcrumb), not on the page
+        expect(wrapper.find('header.dataset-header').exists()).toBe(false);
+        expect(wrapper.text()).not.toContain('Survey of the shore');
     });
 
-    it('names the dataset by its slug when it has no display name, and shows no tagline', async () => {
+    it('names the dataset by its slug when it has no display name', async () => {
         await open({ root: { path: 'site', type: T.DRONEDB, size: 1, properties: { entries: 1, meta: { visibility: { data: 0 } } } } });
-        const header = wrapper.find('header.dataset-header');
-        expect(header.find('h1').text()).toBe('site');
-        expect(header.text()).toContain('Private');
-        expect(header.find('.dataset-tagline').exists()).toBe(false);
+        expect(wrapper.find('h1.visually-hidden').text()).toBe('site');
     });
 
     it('keeps the root entry in the session, for the header of the page (FR-NAV-03)', async () => {
@@ -284,7 +281,7 @@ describe('ViewDataset after a name change (FR-EXP-24)', () => {
         await flushPromises();
 
         expect(h_.rootLabels).toContain('New Name');
-        expect(wrapper.find('header.dataset-header h1').text()).toBe('New Name');
+        expect(wrapper.find('h1.visually-hidden').text()).toBe('New Name');
     });
 });
 

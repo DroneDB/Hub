@@ -4,14 +4,16 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 import Select from 'primevue/select';
 import ddb from 'ddb';
 
 const h = vi.hoisted(() => ({ dataset: null }));
 vi.mock('ddb', async importOriginal => {
-    const real = (await importOriginal()).default;
-    return { default: { ...real, utils: { ...real.utils, datasetPathFromUri: () => [h.dataset, ''] } } };
+    const module = await importOriginal();
+    const real = module.default;
+    return { ...module, default: { ...real, utils: { ...real.utils, datasetPathFromUri: () => [h.dataset, ''] } } };
 });
 
 const { default: ShareEmbed } = await import('./ShareEmbed.vue');
@@ -46,6 +48,7 @@ async function chooseMode(value) {
 const button = text => [...document.body.querySelectorAll('button')].find(b => b.textContent.trim() === text);
 
 beforeEach(() => {
+    setActivePinia(createPinia());
     h.dataset = {
         getVisibility: vi.fn(() => Promise.resolve(ddb.Visibility.PRIVATE)),
         setVisibility: vi.fn(() => Promise.resolve()),
@@ -71,7 +74,8 @@ describe('ShareEmbed', () => {
         await open(photo);
         button('Make the dataset Unlisted...').click();
         await flushPromises();
-        expect(document.body.textContent).toContain('This changes the visibility of the whole dataset');
+        expect(document.body.textContent).toContain('This changes the visibility of the dataset ds from Private to Unlisted');
+        expect(document.body.textContent).toContain('not only this one');
         button('Cancel').click();
         await flushPromises();
         expect(h.dataset.setVisibility).not.toHaveBeenCalled();

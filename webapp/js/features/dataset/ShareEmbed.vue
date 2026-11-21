@@ -51,7 +51,7 @@
 
                 <!-- Link / Embed / TMS (legacy single-entry modes) -->
                 <div v-else-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" class="mt-3">
-                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="confirmUnlistedOpen = true" />
+                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="makeUnlisted" />
                     <template v-else>
                         <PrimeMessage v-if="!legacyUrl" severity="info" :closable="false">
                             <strong>Not supported</strong> - This file does not support this type of sharing.
@@ -79,7 +79,7 @@
 
                 <!-- OGC modes (WMS/WMTS/WFS/WCS/OGC API) -->
                 <div v-else-if="currentOgcService" class="mt-3">
-                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="confirmUnlistedOpen = true" />
+                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="makeUnlisted" />
                     <template v-else>
                         <PrimeMessage v-if="!ogcDescriptor || !ogcDescriptor.supported" severity="info"
                                       :closable="false">
@@ -104,12 +104,8 @@
         <OgcUsageHints v-if="hintsOpen && hintsService" :service="hintsService"
                        :url="primaryHintUrl" @close="hintsOpen = false" />
 
-        <ConfirmDialog v-if="confirmUnlistedOpen"
-                       title="Make the dataset Unlisted"
-                       :message="unlistedMessage"
-                       confirm-text="Make Unlisted"
-                       cancel-text="Cancel"
-                       @close="handleUnlistedConfirm" />
+        <!-- The question asked before the dataset becomes Unlisted -->
+        <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
 
@@ -125,13 +121,15 @@ import ddb from 'ddb';
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
 import { viewerUrl, VIEWER_ONLY_HELP } from '@/libs/views/viewLinks';
-import { escapeHtml } from '@/libs/sanitize';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
 import MakeUnlistedPrompt from './MakeUnlistedPrompt.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
+import { useVisibilityChange } from '@/composables/useVisibilityChange';
 import UrlRow from './ShareUrlRow.vue';
 import { useCopyText } from '@/composables/useCopyText';
 
@@ -144,7 +142,7 @@ const LEGACY_MODES = [
 
 export default {
     components: { LoadingSpinner,
-        Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow, MakeUnlistedPrompt, ConfirmDialog
+        Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow, MakeUnlistedPrompt, DialogHost
     },
     props: {
         // The file or folder to share, { path, entry }: a folder shares its OGC services
@@ -153,7 +151,10 @@ export default {
     emits: ['close'],
     setup() {
         const { copy, copied } = useCopyText();
-        return { copy, copied, VIEWER_ONLY_HELP };
+        // Making the dataset Unlisted asks first and goes through the one visibility change of the Hub
+        const dialogs = useDialogs();
+        const changeVisibility = useVisibilityChange(useConfirm(dialogs));
+        return { copy, copied, VIEWER_ONLY_HELP, dialogs, changeVisibility };
     },
     data() {
         return {
@@ -166,8 +167,7 @@ export default {
             dataset: null,
             hintsOpen: false,
             // Off every time the window opens: a link that hides the Hub is the exception
-            viewerOnly: false,
-            confirmUnlistedOpen: false
+            viewerOnly: false
         };
     },
     computed: {
@@ -182,11 +182,6 @@ export default {
             const name = ddb.pathutils.basename(this.file.entry.path || '');
             if (this.scope === 'folder') return name ? `Share Folder ${name}` : 'Share Folder';
             return name ? `Share ${name}` : 'Share / Embed';
-        },
-        unlistedMessage() {
-            return `This changes the visibility of the whole dataset <strong>${escapeHtml(this.ds)}</strong> from Private to Unlisted: ` +
-                'anyone with a link can then open every file and folder in it, not only this one. ' +
-                'An Unlisted dataset stays out of the public dataset lists. You can make it Private again in the dataset settings.';
         },
         baseUrl() {
             return `${window.location.protocol}//${window.location.host}`;
@@ -331,19 +326,14 @@ export default {
         copyToClipboard(value) {
             if (value) this.copy(value);
         },
-        handleUnlistedConfirm(action) {
-            this.confirmUnlistedOpen = false;
-            if (action === 'confirm') this.handleSetUnlisted();
-        },
-        async handleSetUnlisted() {
-            try {
-                this.loading = true;
-                await this.dataset.setVisibility(ddb.Visibility.UNLISTED);
-                this.needsAuth = false;
-            } catch (e) {
-                this.error = e.message;
-            }
-            this.loading = false;
+        // The links of a Private dataset work for its members only: sharing them makes the whole dataset Unlisted,
+        // which the window asks first (a failure is a toast, and the window stays as it is)
+        async makeUnlisted() {
+            const changed = await this.changeVisibility(this.dataset, {
+                name: this.ds, from: ddb.Visibility.PRIVATE, to: ddb.Visibility.UNLISTED,
+                note: 'Every file and folder in it can then be opened with a link, not only this one. You can make it Private again from its visibility in the header.'
+            });
+            if (changed) this.needsAuth = false;
         },
         typeIs(t) {
             return this.entry && this.entry.type === ddb.entry.type[t];

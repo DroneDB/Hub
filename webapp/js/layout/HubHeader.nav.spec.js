@@ -9,6 +9,8 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createRouter, createMemoryHistory } from 'vue-router';
 import PrimeVue from 'primevue/config';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const h = vi.hoisted(() => ({ reg: null, auth: null }));
 vi.mock('@/libs/api/sharedRegistry', () => {
@@ -174,6 +176,20 @@ describe('the breadcrumb of the header (FR-NAV-03)', () => {
         expect(wrapper.find('.fa-sitemap').exists() && wrapper.find('button .fa-sitemap').exists()).toBe(false);
     });
 
+    it('shows the visibility of the dataset after its name, outside the trail', async () => {
+        await renderAt('/r/t-orgs-bulk/bulk-dataset-26');
+        useDatasetSessionStore().setRootEntry({ path: 'x', properties: { meta: { name: { data: 'Bulk dataset 26' }, visibility: { data: 1 } } } });
+        await flushPromises();
+        const after = wrapper.find('.hub-breadcrumb > .crumbs-after');
+        expect(after.find('.p-tag').text()).toBe('Unlisted');
+        expect(crumbs()).toEqual(['T Orgs Bulk', 'Bulk dataset 26']);
+    });
+
+    it('has no visibility on the page of an organization', async () => {
+        await renderAt('/r/t-orgs-bulk');
+        expect(wrapper.find('.crumbs-after').exists()).toBe(false);
+    });
+
     it('is on a viewer route too, with the slug of the dataset until the viewer reads its name', async () => {
         await renderAt('/r/t-orgs-bulk/bulk-dataset-26/view/YS50aWY=/map');
         expect(crumbs()).toEqual(['T Orgs Bulk', 'bulk-dataset-26']);
@@ -206,5 +222,14 @@ describe('the actions of a dataset page (FR-NAV-04)', () => {
             // d-none d-md-inline: hidden below md, shown from it
             expect(label.classes()).toEqual(expect.arrayContaining(['d-none', 'd-md-inline']));
         }
+    });
+});
+
+describe('the text of the header', () => {
+    const style = fs.readFileSync(path.join(__dirname, 'HubHeader.vue'), 'utf8').split(/<style[^>]*>/)[1];
+    const rule = selector => style.slice(style.indexOf(`${selector} {`)).split('}')[0];
+
+    it('has one size: the links of the main navigation are as large as the breadcrumb and the small buttons', () => {
+        expect(rule('.primary-nav-link')).toContain('font-size: var(--ddb-font-size-ui);');
     });
 });

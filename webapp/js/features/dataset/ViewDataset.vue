@@ -12,7 +12,8 @@
                 </div>
             </template>
             <template #second>
-                <!-- The name, visibility and tagline of the dataset above its tabs (FR-EXP-14) -->
+                <!-- The heading of the page, for screen readers: the header of the Hub shows the name, the visibility and
+                     the tagline of the dataset (FR-EXP-14), so the tabs start at the top -->
                 <DatasetHeader :entry="rootEntry" />
                 <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="initialTab ?? mainTabs[0].key" position="top"
                              :hide-single="false" bottom-nav-phone @tab-change="onTabChange">
@@ -462,7 +463,7 @@ function onCurrentUriChanged(uri) {
     listing.isLoading.value = true;
 }
 
-// The root entry of the dataset: its permissions, the header's name, visibility and tagline, the README, the page title
+// The root entry of the dataset: its permissions, the name, visibility and tagline of the header, the README, the page title
 function applyRootEntry(entry) {
     rootEntry.value = entry;
     session.setRootEntry(entry);
