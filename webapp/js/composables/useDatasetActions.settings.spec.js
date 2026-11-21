@@ -113,37 +113,60 @@ describe('the README of the dataset from the Settings window (FR-EXP-24)', () =>
     });
 });
 
-describe('a new URL slug while uploads of the dataset run (FR-EXP-24)', () => {
+describe('a new URL slug, asked on Save in the Settings window (FR-EXP-24)', () => {
     const upload = (ds, left, org = 'acme') => ({ key: `${org}/${ds}`, org, ds, left });
 
-    it('asks first, saying that the uploads stop, and goes on when the user agrees', async () => {
-        h_.uploads = [upload('site', 2), upload('site', 1), upload('other', 5)];
-        const { props } = setup();
-
-        expect(await props.confirmSlugChange()).toBe(true);
-
-        const question = dialogs.open.mock.calls.at(-1)[1];
-        expect(question.title).toBe('Change URL');
-        expect(question.message).toBe('<p>3 files of this dataset are still uploading.</p>'
-            + '<p>Changing the URL stops the upload: the files that are not yet in the dataset will not be added.</p>');
-        expect(question.confirmButtonClass).toBe('danger');
-    });
-
-    it('does not rename when the user declines', async () => {
-        h_.uploads = [upload('site', 1)];
-        const { props } = setup();
-        dialogs.open.mockImplementation(() => Promise.resolve('cancel'));
-
-        expect(await props.confirmSlugChange()).toBe(false);
-    });
-
-    it('does not ask when no upload of this dataset has files left', async () => {
-        h_.uploads = [upload('site', 0), upload('other', 4), upload('site', 3, 'another-org')];
+    it('always asks, naming the old and the new address, and goes on when the user agrees', async () => {
         const { props } = setup();
         dialogs.open.mockClear();
 
-        expect(await props.confirmSlugChange()).toBe(true);
-        expect(dialogs.open).not.toHaveBeenCalled();
+        expect(await props.confirmSlugChange('site', 'pier')).toBe(true);
+
+        const question = dialogs.open.mock.calls.at(-1)[1];
+        expect(question.title).toBe('Change URL');
+        expect(question.message).toBe('<p>The dataset moves from <code>/r/acme/site</code> to <code>/r/acme/pier</code>.</p>'
+            + '<p>Links to the old address will stop working.</p>');
+        expect(question.warningMessage).toBeUndefined();
+        expect(question.confirmText).toBe('Change URL and save');
+        expect(question.confirmButtonClass).toBe('danger');
+    });
+
+    it('says that the uploads of this dataset stop, counting only theirs', async () => {
+        h_.uploads = [upload('site', 2), upload('site', 1), upload('other', 5), upload('site', 4, 'another-org')];
+        const { props } = setup();
+
+        expect(await props.confirmSlugChange('site', 'pier')).toBe(true);
+
+        const question = dialogs.open.mock.calls.at(-1)[1];
+        expect(question.warningTitle).toBe('3 files of this dataset are still uploading');
+        expect(question.warningMessage).toBe('Changing the URL stops the upload: the files that are not yet in the dataset will not be added.');
+        expect(question.confirmText).toBe('Stop uploads and change URL');
+    });
+
+    it('does not rename when the user declines', async () => {
+        const { props } = setup();
+        dialogs.open.mockImplementation(() => Promise.resolve('cancel'));
+
+        expect(await props.confirmSlugChange('site', 'pier')).toBe(false);
+    });
+});
+
+describe('closing the Settings window with changes that are not saved', () => {
+    it('asks, with Keep editing as the safe answer, and discards on Discard', async () => {
+        const { props } = setup();
+        dialogs.open.mockClear();
+
+        expect(await props.confirmDiscard()).toBe(true);
+
+        const question = dialogs.open.mock.calls.at(-1)[1];
+        expect(question).toMatchObject({ title: 'Unsaved changes', confirmText: 'Discard', cancelText: 'Keep editing', confirmButtonClass: 'danger' });
+    });
+
+    it('keeps the changes when the user says no', async () => {
+        const { props } = setup();
+        dialogs.open.mockImplementation(() => Promise.resolve('cancel'));
+
+        expect(await props.confirmDiscard()).toBe(false);
     });
 });
 

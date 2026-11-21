@@ -24,7 +24,7 @@
  * - `close` (with an optional result) on the X, a mask click (closeModalOnClick) or Escape;
  *   `update:visible` too, so `v-model:visible` works. Rendered with v-if, visible stays true.
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
- *   something else; never with `enterConfirms` false or `confirmDisabled`).
+ *   something else; never with `enterConfirms` false or `confirmDisabled`). That Enter is used up (default prevented).
  * - `busy` disables closing and the footer buttons.
  * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-log, dialog-wide) gives the window a stable width, the same
  *   whatever its content; a form dialog uses `dialog-xl`, a log `dialog-log`, a chart or a two-column form `dialog-wide`.
@@ -122,6 +122,9 @@ const handledInside = e => e.defaultPrevented && !!dialogElement()?.contains(e.t
 useEventListener(document, 'keydown', e => {
     if (e.key !== 'Enter' || !props.visible || !overlay.isTopmost() || handledInside(e) || e.isComposing) return;
     if (props.enterConfirms && !props.busy && !props.confirmDisabled && !(e.target instanceof Element && e.target.closest(NOT_FOR_ENTER))) {
+        // The key is used up: a question that the confirm opens (a destructive one focuses its Cancel button) must not
+        // receive the rest of this Enter, which would press that button
+        e.preventDefault();
         emit('confirm');
     }
 });

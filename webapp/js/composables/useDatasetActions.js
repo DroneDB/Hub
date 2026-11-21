@@ -355,7 +355,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             dataset, canWrite: canWrite.value,
             onRescanRequested: () => rescan(dialog),
             onChanged: () => rootChanged?.(),
-            confirmSlugChange: confirmStopUploads,
+            confirmSlugChange,
+            confirmDiscard: confirmDiscardSettings,
             onFileSaved: path => listing.addEntry(path).catch(e => console.warn(`Could not show ${path} in the file list:`, e)),
             onSlugRenamed: slug => {
                 busy.value = true;
@@ -372,20 +373,37 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     }
 
     /**
-     * Asked before the URL slug changes (FR-EXP-24): the page goes to the new address, which stops the uploads of this
-     * dataset that are still running (their queue belongs to the old address). True when there are none, or the user agrees.
+     * Asked on Save in the Settings window when the URL slug changed (FR-EXP-24): links to the old address stop working,
+     * and the page goes to the new one, which stops the uploads of this dataset that are still running (their queue
+     * belongs to the old address): said when there are some. True when the user agrees.
+     * @param {string} from  the slug the dataset has
+     * @param {string} to  the new slug
      * @returns {Promise<boolean>}
      */
-    async function confirmStopUploads() {
+    function confirmSlugChange(from, to) {
         const left = useUploadsStore().uploads
             .filter(u => u.org === dataset.org && u.ds === dataset.ds)
             .reduce((sum, u) => sum + u.left, 0);
-        if (!left) return true;
         return confirm({
             title: 'Change URL',
-            message: `<p>${countOf(left, 'file')} of this dataset ${left === 1 ? 'is' : 'are'} still uploading.</p>`
-                + '<p>Changing the URL stops the upload: the files that are not yet in the dataset will not be added.</p>',
-            confirmText: 'Stop uploads and change URL',
+            message: `<p>The dataset moves from <code>/r/${dataset.org}/${from}</code> to <code>/r/${dataset.org}/${to}</code>.</p>`
+                + '<p>Links to the old address will stop working.</p>',
+            ...(left ? {
+                warningTitle: `${countOf(left, 'file')} of this dataset ${left === 1 ? 'is' : 'are'} still uploading`,
+                warningMessage: 'Changing the URL stops the upload: the files that are not yet in the dataset will not be added.'
+            } : {}),
+            confirmText: left ? 'Stop uploads and change URL' : 'Change URL and save',
+            danger: true
+        });
+    }
+
+    /** Asked before the Settings window closes with changes that are not saved: true to discard them. */
+    function confirmDiscardSettings() {
+        return confirm({
+            title: 'Unsaved changes',
+            message: '<p>The changes to the settings are not saved. Discard them?</p>',
+            confirmText: 'Discard',
+            cancelText: 'Keep editing',
             danger: true
         });
     }

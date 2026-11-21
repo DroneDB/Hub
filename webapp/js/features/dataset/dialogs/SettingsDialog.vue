@@ -1,6 +1,6 @@
 <template>
     <Window id="settings" title="Dataset Settings" modal size-class="dialog-lg" fixed-position close-modal-on-click
-            @close="$emit('close', 'close')">
+            :busy="saving" :confirm-disabled="!dirty" @confirm="save" @close="requestClose">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
@@ -15,7 +15,7 @@
                         <InputText id="settings-name" v-model="name" :maxlength="nameMaxLength" autocomplete="off"
                                    placeholder="Dataset name" :invalid="!!nameError" :aria-invalid="nameError ? 'true' : undefined"
                                    :aria-describedby="nameError ? 'settings-name-error' : 'settings-name-hint'"
-                                   fluid @change="setName" />
+                                   :disabled="saving" fluid @input="nameError = ''" />
                         <FieldError id="settings-name-error" :message="nameError" />
                         <small id="settings-name-hint" class="field-hint">Shown on the dataset page and in the lists. The URL stays as it is.</small>
                     </div>
@@ -27,15 +27,13 @@
                         <InputText id="settings-slug" v-model="slug" autocomplete="off" spellcheck="false"
                                    :invalid="!!slugError" :aria-invalid="slugError ? 'true' : undefined"
                                    :aria-describedby="slugError ? 'settings-slug-error settings-slug-hint' : 'settings-slug-hint'"
-                                   :disabled="slugRenaming" fluid @input="slugError = ''" @keydown.enter.prevent="renameSlug" />
+                                   :disabled="saving" fluid @input="slugError = ''" />
                         <FieldError id="settings-slug-error" :message="slugError" />
                         <small id="settings-slug-hint" class="field-hint">The dataset is at /r/{{ dataset.org }}/{{ slug.trim() || '…' }}. A slug: {{ slugRuleText }}</small>
-                        <!-- A new slug breaks the links that exist: said before it is applied -->
+                        <!-- A new slug breaks the links that exist: said before it is saved, and asked again on Save -->
                         <PrimeMessage v-if="slugChanged" severity="warn" :closable="false" class="slug-warning">
                             {{ slugChangeWarning }}
                         </PrimeMessage>
-                        <Button v-if="slugChanged" severity="secondary" icon="fa-solid fa-link" label="Change URL"
-                                :loading="slugRenaming" @click="renameSlug" />
                     </div>
                 </div>
 
@@ -44,10 +42,47 @@
                     <div class="settings-control">
                         <InputText id="settings-tagline" v-model="tagline" :maxlength="taglineMaxLength"
                                    placeholder="A short description" aria-describedby="settings-tagline-count"
-                                   fluid @change="setTagline" />
+                                   :disabled="saving" fluid />
                         <small id="settings-tagline-count" class="char-count">{{ tagline ? tagline.length : 0 }}/{{ taglineMaxLength }}</small>
                     </div>
                 </div>
+            </section>
+
+            <section class="settings-group" aria-labelledby="settings-sharing">
+                <h3 id="settings-sharing" class="settings-group-title">Sharing</h3>
+
+                <div class="settings-field">
+                    <label id="settings-visibility-label" for="settings-visibility" class="settings-label">
+                        <i class="fa-solid" :class="noAuthRequired ? 'fa-unlock' : 'fa-lock'" aria-hidden="true" />Visibility
+                    </label>
+                    <div class="settings-control">
+                        <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label"
+                                aria-describedby="settings-visibility-hint" :options="visibilityOptions" option-label="label"
+                                option-value="value" :disabled="!canWrite || saving" class="settings-select" />
+                        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
+                        <small id="settings-visibility-hint" class="field-hint" v-html="safeDescription" />
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <label id="settings-license-label" for="settings-license" class="settings-label">
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true" />License
+                    </label>
+                    <div class="settings-control">
+                        <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label"
+                                :options="licenseOptions" option-label="label" option-value="value" :disabled="!canWrite || saving"
+                                class="settings-select" :title="licenseInfo.name" />
+                        <small v-if="licenseInfo.url" class="field-hint">
+                            <a :href="licenseInfo.url" target="_blank" rel="noopener">Read the license</a>
+                        </small>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Files of the dataset: these buttons write or delete them at once, Save is not needed -->
+            <section v-if="canWrite" class="settings-group" aria-labelledby="settings-files" aria-describedby="settings-files-hint">
+                <h3 id="settings-files" class="settings-group-title">Files</h3>
+                <p id="settings-files-hint" class="settings-group-hint">These buttons change the files of the dataset right away.</p>
 
                 <div class="settings-field">
                     <span id="settings-thumbnail-label" class="settings-label"><i class="fa-solid fa-image" aria-hidden="true" />Thumbnail</span>
@@ -85,41 +120,10 @@
                         <template v-else>
                             <span class="settings-value">{{ readme }}</span>
                             <div class="readme-actions">
-                                <Button severity="secondary" icon="fa-solid fa-book-open" label="Open" @click="$emit('openReadme', readme)" />
-                                <Button v-if="canWrite" severity="secondary" icon="fa-solid fa-pen-to-square" label="Edit" @click="$emit('editReadme', readme)" />
+                                <Button severity="secondary" icon="fa-solid fa-book-open" label="Open" @click="leaveFor('openReadme', readme)" />
+                                <Button severity="secondary" icon="fa-solid fa-pen-to-square" label="Edit" @click="leaveFor('editReadme', readme)" />
                             </div>
                         </template>
-                    </div>
-                </div>
-            </section>
-
-            <section class="settings-group" aria-labelledby="settings-sharing">
-                <h3 id="settings-sharing" class="settings-group-title">Sharing</h3>
-
-                <div class="settings-field">
-                    <label id="settings-visibility-label" for="settings-visibility" class="settings-label">
-                        <i class="fa-solid" :class="noAuthRequired ? 'fa-unlock' : 'fa-lock'" aria-hidden="true" />Visibility
-                    </label>
-                    <div class="settings-control">
-                        <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label"
-                                aria-describedby="settings-visibility-hint" :options="visibilityOptions" option-label="label"
-                                option-value="value" :disabled="!canWrite" class="settings-select" @change="setVisibility" />
-                        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
-                        <small id="settings-visibility-hint" class="field-hint" v-html="safeDescription" />
-                    </div>
-                </div>
-
-                <div class="settings-field">
-                    <label id="settings-license-label" for="settings-license" class="settings-label">
-                        <i class="fa-solid fa-scale-balanced" aria-hidden="true" />License
-                    </label>
-                    <div class="settings-control">
-                        <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label"
-                                :options="licenseOptions" option-label="label" option-value="value" :disabled="!canWrite"
-                                class="settings-select" :title="licenseInfo.name" @change="setLicense" />
-                        <small v-if="licenseInfo.url" class="field-hint">
-                            <a :href="licenseInfo.url" target="_blank" rel="noopener">Read the license</a>
-                        </small>
                     </div>
                 </div>
             </section>
@@ -131,7 +135,7 @@
                     <span class="settings-label"><i class="fa-solid fa-rotate" aria-hidden="true" />Rescan</span>
                     <div class="settings-control">
                         <Button severity="secondary" icon="fa-solid fa-rotate" label="Rescan Dataset"
-                                aria-describedby="settings-rescan-hint" @click="$emit('rescanRequested')" />
+                                aria-describedby="settings-rescan-hint" @click="leaveFor('rescanRequested')" />
                         <small id="settings-rescan-hint" class="field-hint">
                             Reads the metadata of every file again (GPS position, timestamps, thumbnails).
                             Use it after a DroneDB upgrade or when file metadata looks wrong.
@@ -142,8 +146,13 @@
         </div>
 
         <template #footer>
-            <span class="save-note me-auto"><i class="fa-solid fa-circle-check" aria-hidden="true" /> Changes are saved as you make them</span>
-            <Button label="Close" severity="secondary" @click="$emit('close', 'close')" />
+            <template v-if="canWrite">
+                <span v-if="dirty" class="unsaved-note me-auto" role="status">Unsaved changes</span>
+                <Button label="Cancel" severity="secondary" data-cancel :disabled="saving" @click="requestClose" />
+                <Button label="Save" icon="fa-solid fa-floppy-disk" data-confirm :disabled="!dirty || saving" :loading="saving"
+                        @click="save" />
+            </template>
+            <Button v-else label="Close" severity="secondary" data-cancel @click="$emit('close', 'close')" />
         </template>
     </Window>
 </template>
@@ -166,6 +175,18 @@ import { datasetThumbnailUrl } from '@/libs/optionalFile';
 import { slugProblem, slugDescription } from '@/libs/slug';
 import { displayNameLimits, displayNameLengthProblem } from '@/libs/nameRules';
 
+/**
+ * The settings Save writes, in this order: the slug is last because a new slug takes the page to the new address.
+ * `write` sends the value; `what` names the setting in an error that has no field of its own.
+ */
+const SETTINGS = [
+    { key: 'name', write: (ds, v) => ds.metaSet('name', v) },
+    { key: 'tagline', what: 'tagline', write: (ds, v) => (v ? ds.metaSet('tagline', v) : ds.metaUnset('tagline')) },
+    { key: 'license', what: 'license', write: (ds, v) => ds.metaSet('license', v) },
+    { key: 'visibility', what: 'visibility', write: (ds, v) => ds.setVisibility(v) },
+    { key: 'slug', write: (ds, v) => ds.rename(v) }
+];
+
 export default {
     components: {
         LoadingSpinner,
@@ -180,15 +201,22 @@ export default {
             type: Boolean,
             default: false
         },
-        // Asked before the URL slug changes: resolves to false when the user does not agree (the page stops uploads then)
+        // Asked on Save when the URL slug changed, with the old and the new slug: resolves to false when the user does not
+        // agree, and nothing is saved then
         confirmSlugChange: {
+            type: Function,
+            default: null
+        },
+        // Asked before the window closes (or opens something else) with changes that are not saved: resolves to true to
+        // discard them
+        confirmDiscard: {
             type: Function,
             default: null
         }
     },
-    // changed: a setting was saved (the page reads the dataset again); slugRenamed: the URL changed, the page goes to it;
-    // openReadme / editReadme: the README opens in its viewer / in the editor
-    // fileSaved: a file of the dataset was written (the thumbnail), the file list shows it
+    // close: the window closes ('saved' after a Save); changed: a setting was saved (the page reads the dataset again);
+    // slugRenamed: the URL changed, the page goes to it; openReadme / editReadme: the README opens in its viewer / in the
+    // editor; fileSaved: a file of the dataset was written (the thumbnail), the file list shows it
     emits: ['close', 'rescanRequested', 'addMarkdown', 'openReadme', 'editReadme', 'changed', 'slugRenamed', 'fileSaved'],
     data: function () {
         return {
@@ -196,26 +224,26 @@ export default {
             placeholderUrl: '/images/dataset-placeholder.svg',
             taglineMaxLength: TAGLINE_MAX_LENGTH,
             error: "",
-            properties: null,
             loading: true,
+            saving: false,
             readme: null,
-            license: "proprietary",
+            // The fields: a draft until Save
             name: "",
-            // The name the dataset has, to tell a change from the typed text
-            savedName: "",
+            slug: this.dataset.ds,
+            tagline: "",
+            license: "proprietary",
+            visibility: DEFAULT_VISIBILITY,
+            // The settings as the dataset has them (normalised as `draft`): a field that differs is a change
+            saved: null,
             nameError: "",
             nameMaxLength: displayNameLimits().max,
-            slug: this.dataset.ds,
             slugError: "",
-            slugRenaming: false,
-            tagline: "",
             thumbnailPreview: null,
             thumbnailError: false,
             thumbnailUploading: false,
             thumbnailRemoving: false,
             Licenses,
-            visibilityOptions: VISIBILITY_OPTIONS,
-            visibility: DEFAULT_VISIBILITY
+            visibilityOptions: VISIBILITY_OPTIONS
         }
     },
     computed: {
@@ -233,6 +261,24 @@ export default {
             } else {
                 return `Only you and people in your organization can see and download the data.`;
             }
+        },
+        // The fields as Save sends them
+        draft: function () {
+            return {
+                name: this.name.trim(),
+                slug: this.slug.trim(),
+                tagline: (this.tagline || '').trim(),
+                license: this.license,
+                visibility: parseInt(this.visibility)
+            };
+        },
+        // The settings that differ from the dataset, in the order Save writes them
+        changes: function () {
+            if (!this.saved || !this.canWrite) return [];
+            return SETTINGS.filter(s => this.draft[s.key] !== this.saved[s.key]);
+        },
+        dirty: function () {
+            return this.changes.length > 0;
         },
         slugChanged: function () {
             return this.slug.trim() !== this.dataset.ds;
@@ -259,19 +305,19 @@ export default {
     mounted: async function () {
         try {
             const info = await this.dataset.info();
-            this.properties = info[0].properties;
+            const properties = info[0].properties;
 
-            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
-            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
-            this.visibility = this.properties?.meta?.visibility?.data ?? DEFAULT_VISIBILITY;
-            this.tagline = this.properties?.meta?.tagline?.data ?? '';
+            this.readme = (typeof properties.readme !== 'undefined') ? properties.readme : null;
+            this.license = properties?.meta?.license?.data ?? 'proprietary';
+            this.visibility = properties?.meta?.visibility?.data ?? DEFAULT_VISIBILITY;
+            this.tagline = properties?.meta?.tagline?.data ?? '';
             // Without a name the dataset shows its slug
-            this.name = this.properties?.meta?.name?.data ?? '';
-            this.savedName = this.name;
+            this.name = properties?.meta?.name?.data ?? '';
+            this.saved = { ...this.draft };
 
             // The existing dataset thumbnail, asked for only when the dataset has one (its entry says so): a request for
             // a cover that is not there logs a 404 in the console (FR-XC-10, FR-EXP-28)
-            const thumbnail = datasetThumbnailUrl(this.dataset, this.properties, 256);
+            const thumbnail = datasetThumbnailUrl(this.dataset, properties, 256);
             this.thumbnailPreview = thumbnail && thumbnail + '&t=' + Date.now();
             this.thumbnailError = false;
 
@@ -281,82 +327,78 @@ export default {
 
         this.loading = false;
     },
-    beforeUnmount: function () {
-    },
     methods: {
-        setVisibility: async function () {
-            try {
-                this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);
-                this.$notify.success('Dataset visibility updated successfully', { summary: 'Visibility Updated' });
-                this.$emit('changed');
-            } catch (e) {
-                this.$notify.error('Failed to update visibility: ' + e.message);
-                this.error = e.message;
-            }
-        },
-        setLicense: async function () {
-            try {
-                this.properties.meta.license = await this.dataset.metaSet("license", this.license);
-                this.$notify.success('Dataset license updated successfully', { summary: 'License Updated' });
-                this.$emit('changed');
-            } catch (e) {
-                this.$notify.error('Failed to update license: ' + e.message);
-                this.error = e.message;
-            }
-        },
-        setName: async function () {
-            const name = this.name.trim();
-            this.nameError = '';
-            if (name === this.savedName) {
-                this.name = name;
-                return;
-            }
+        /** The field problems of the changes, at their fields: true when there is none. */
+        validate: function () {
+            const changed = new Set(this.changes.map(s => s.key));
             // A name is never empty: the dataset would show its slug in its place
-            this.nameError = name === '' ? 'Enter a name' : (displayNameLengthProblem(name) || '');
-            if (this.nameError) return;
-            try {
-                await this.dataset.metaSet('name', name);
-                this.name = name;
-                this.savedName = name;
-                this.$notify.success('Dataset name updated successfully', { summary: 'Name Updated' });
-                this.$emit('changed');
-            } catch (e) {
-                // The Registry's words, at the field (FR-XC-11)
-                this.nameError = e.message;
-            }
+            this.nameError = !changed.has('name') ? ''
+                : this.draft.name === '' ? 'Enter a name' : (displayNameLengthProblem(this.draft.name) || '');
+            this.slugError = changed.has('slug') ? (slugProblem(this.draft.slug, { kind: 'Dataset' }) || '') : '';
+            return !this.nameError && !this.slugError;
         },
-        renameSlug: async function () {
-            if (!this.slugChanged || this.slugRenaming) return;
-            const slug = this.slug.trim();
-            this.slugError = slugProblem(slug, { kind: 'Dataset' }) || '';
-            if (this.slugError) return;
-            if (this.confirmSlugChange && !await this.confirmSlugChange()) return;
-            this.slugRenaming = true;
+        /**
+         * Writes the settings that changed, the slug last. Nothing is sent while a field has a problem or when the user
+         * does not agree to a new URL. A setting that fails stops the save: the window stays open with the error, and the
+         * settings written before it are no longer changes. All saved: the window closes, or the page goes to the new URL.
+         */
+        save: async function () {
+            if (!this.dirty || this.saving) return;
+            this.error = '';
+            if (!this.validate()) return;
+            const changes = this.changes;
+            const draft = { ...this.draft };
+            const renames = changes.some(s => s.key === 'slug');
+            if (renames && this.confirmSlugChange && !await this.confirmSlugChange(this.dataset.ds, draft.slug)) return;
+
+            this.saving = true;
+            let written = 0;
+            let renamed = null;
             try {
-                const renamed = await this.dataset.rename(slug);
-                this.$emit('slugRenamed', renamed?.slug || slug);
-            } catch (e) {
-                this.slugError = e.message;
-            } finally {
-                this.slugRenaming = false;
-            }
-        },
-        setTagline: async function () {
-            try {
-                if (this.tagline && this.tagline.trim()) {
-                    await this.dataset.metaSet('tagline', this.tagline.trim());
-                    this.$notify.success('Tagline updated successfully', { summary: 'Tagline Updated' });
-                    this.$emit('changed');
-                } else {
-                    await this.dataset.metaUnset('tagline');
-                    this.tagline = '';
-                    this.$notify.success('Tagline removed successfully', { summary: 'Tagline Removed' });
-                    this.$emit('changed');
+                for (const setting of changes) {
+                    const result = await setting.write(this.dataset, draft[setting.key]);
+                    if (setting.key === 'slug') renamed = result?.slug || draft.slug;
+                    this.saved = { ...this.saved, [setting.key]: draft[setting.key] };
+                    written++;
                 }
             } catch (e) {
-                this.$notify.error('Failed to update tagline: ' + e.message);
-                this.error = e.message;
+                const failed = changes[written];
+                // The Registry's words, at the field when it has one (FR-XC-11)
+                if (failed.key === 'name') this.nameError = e.message;
+                else if (failed.key === 'slug') this.slugError = e.message;
+                else this.error = `Could not save the ${failed.what}: ${e.message}`;
             }
+            if (written) this.$emit('changed');
+            if (written < changes.length) {
+                this.saving = false;
+                return;
+            }
+
+            // The fields as they were saved (trimmed)
+            this.name = draft.name;
+            this.tagline = draft.tagline;
+            this.slug = draft.slug;
+            this.$notify.success('Settings saved', { summary: 'Dataset Settings' });
+            // A new URL: the page goes there, and the window stays busy until it does
+            if (renamed) this.$emit('slugRenamed', renamed);
+            else {
+                this.saving = false;
+                this.$emit('close', 'saved');
+            }
+        },
+        /** Whether the window can go: no changes, or the user discards them. */
+        canLeave: async function () {
+            if (!this.dirty) return true;
+            return this.confirmDiscard ? !!await this.confirmDiscard() : true;
+        },
+        /** Cancel, the close button, Escape and a click beside the window. */
+        requestClose: async function () {
+            if (this.saving) return;
+            if (await this.canLeave()) this.$emit('close', 'close');
+        },
+        /** An action that closes the window to open something else: asked first with changes that are not saved. */
+        leaveFor: async function (event, ...args) {
+            if (await this.canLeave()) this.$emit(event, ...args);
         },
         handleThumbnailSelect: async function (event) {
             const file = event.target.files[0];
@@ -417,6 +459,8 @@ export default {
             this.thumbnailRemoving = false;
         },
         addDocument: async function (document) {
+            // The new README opens in the editor and this window closes: its changes are asked about first
+            if (!await this.canLeave()) return;
 
             this.loading = true;
 
@@ -553,8 +597,14 @@ export default {
     margin-top: 0;
 }
 
-.save-note {
+.unsaved-note {
     align-self: center;
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
+}
+
+.settings-group-hint {
+    margin: 0 0 var(--ddb-spacing-xs);
     color: var(--ddb-text-muted);
     font-size: var(--ddb-font-size-sm);
 }
