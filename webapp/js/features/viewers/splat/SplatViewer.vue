@@ -21,13 +21,19 @@
         </div>
 
         <div v-if="loaded" class="top-left-stack">
-            <!-- Paged .rad: level-of-detail streaming -->
-            <div v-if="streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
-                <i class="fa-solid fa-tower-broadcast m-0" />
-            </div>
             <MeasureToolbar :active-kind="measureKind" :count="measureCount" :metric="measureScale.metric"
                             :can-set-scale="canWrite && !georeferenced" :coordinate-mode="coordToggle" @toggle-coordinates="toggleCoordinates" @measure="startMeasure"
-                            @clear="clearMeasurements" @finish="finishMeasure" @cancel="cancelMeasure" />
+                            @clear="clearMeasurements" @finish="finishMeasure" @cancel="cancelMeasure">
+                <!-- Paged .rad: level-of-detail streaming, a state of the view after the tools -->
+                <template v-if="streaming" #extra>
+                    <div class="tool-group">
+                        <span class="tool-status" role="img" aria-label="Level-of-detail streaming" data-testid="splat-streaming"
+                              title="Level-of-detail streaming: only the detail in view is downloaded">
+                            <i class="fa-solid fa-tower-broadcast" />
+                        </span>
+                    </div>
+                </template>
+            </MeasureToolbar>
         </div>
 
         <div v-if="loaded" class="btn-stack">

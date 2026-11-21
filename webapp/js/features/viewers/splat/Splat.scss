@@ -71,18 +71,6 @@
     pointer-events: none;
 }
 
-#splat .streaming-badge {
-    background: rgba(var(--ddb-shade-rgb), 0.55);
-    color: var(--ddb-text-on-dark);
-    padding: 0.25rem 0.6rem;
-    border-radius: var(--ddb-border-radius, 4px);
-    font-size: var(--ddb-font-size-sm, 0.8rem);
-}
-
-#splat .streaming-badge i {
-    margin-right: 0.35rem;
-}
-
 #splat .btn-stack {
     position: absolute;
     bottom: var(--ddb-spacing-md);

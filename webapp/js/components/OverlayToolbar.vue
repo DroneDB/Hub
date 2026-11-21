@@ -14,6 +14,7 @@
  *   button.active           the tool in use; with `.danger`, a tool in use that deletes
  *   button.primary          the action of the bar that saves
  *   .tool-group             tools that belong together: a divider before them
+ *   .tool-status            a state of the view, not a tool (an icon with a title): the size of a tool, never pressed
  *   .tool-choice            a choice: a `select.tool-select`, with its name (`label.tool-label`) before it or none, that looks like a tool
  *   .tool-hint              a line of its own under the tools: how to use the one in use, with its `button.hint-action`s
  *
@@ -78,6 +79,18 @@ $tool: 'button:not([role="menuitem"], .hint-action)';
     gap: 0.25rem;
     padding-left: 0.25rem;
     border-left: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25);
+}
+
+// A state of the view: where a tool would be, dimmed, so it does not read as one
+.overlay-toolbar :deep(.tool-status) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: var(--ddb-font-size-base);
+    opacity: 0.7;
+    cursor: help;
 }
 
 // After every tool, wherever its own tool stands in the bar
