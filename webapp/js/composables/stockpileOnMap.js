@@ -141,6 +141,8 @@ export const onMapMethods = {
         });
         feature.set('tooltipText', stockpileLabel(feature.getProperties(), this.currentUnitPref));
         updateFeatureTooltip(feature);
+        // Its row in the list of the found piles has its volume and its outline
+        this._syncPileRowOf(feature);
         if (feature.get('id') !== this._chosenStockpileFeatureId) return;
         this.stockpileResult = resultOfProperties(feature.getProperties());
         this.stockpileBaseMethod = feature.get('basePlaneMethod');

@@ -120,7 +120,7 @@
                                     @mouseenter="$emit('hoverPile', pile)" @focus="$emit('hoverPile', pile)"
                                     @mouseleave="$emit('hoverPile', null)" @blur="$emit('hoverPile', null)">
                                 <span class="pile-rank">{{ index + 1 }}</span>
-                                <span>{{ formatArea(pile.areaM2) }}</span>
+                                <span>{{ formatArea(pileArea(pile)) }}</span>
                                 <span data-testid="stockpile-pile-volume">
                                     <i v-if="isMeasuring(pile)" class="fas fa-spinner fa-spin" role="status" aria-label="Measuring" data-testid="stockpile-pile-spinner" />
                                     <template v-else>{{ pile.measured ? formatVolume(pile.measured.netVolume) : EMPTY_CELL }}</template>
@@ -556,9 +556,14 @@ export default {
             return typeof c === 'number' && isFinite(c) ? `${this._fmt(c * 100, 0)}%` : EMPTY_CELL;
         },
         // What a row of the list says to a screen reader: its three figures
+        // The area of a row: the one its volume was measured with (the Result's 2D area, the measurement's once the pile
+        // is one), else the one the search found
+        pileArea(pile) {
+            return pile.measured && typeof pile.measured.area2d === 'number' ? pile.measured.area2d : pile.areaM2;
+        },
         pileSummary(pile) {
             const volume = pile.measured ? this.formatVolume(pile.measured.netVolume) : 'volume not measured';
-            return `${this.formatArea(pile.areaM2)}, ${volume}, confidence ${this.formatConfidence(pile.confidence)}`;
+            return `${this.formatArea(this.pileArea(pile))}, ${volume}, confidence ${this.formatConfidence(pile.confidence)}`;
         },
         formatElevation(v) {
             if (v == null || !isFinite(v)) return EMPTY_CELL;

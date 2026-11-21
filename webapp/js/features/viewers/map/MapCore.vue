@@ -93,7 +93,9 @@
                            :measurements-count="changeUnitsMeasurementsCount" @close="handleChangeUnitsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
                                :groups="measurementGroups" :saved-path="measurementsFilePath"
+                               :can-work-on-stockpiles="!!analysisEntry"
                                @close="measurementListDialogOpen = false"
+                               @work-on-stockpile="item => { measurementListDialogOpen = false; workOnStockpile(item.feature); }"
                                @delete-measurement="handleDeleteMeasurementFromList"
                                @edit-measurement="handleEditMeasurementFromList"
                                @create-group="openCreateGroupDialog"

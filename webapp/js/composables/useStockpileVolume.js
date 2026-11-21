@@ -67,9 +67,10 @@ function stockpileStyle() {
 // The material of a restored pile whose values are not those of any of the user's materials
 const SAVED_MATERIAL_SLUG = '__saved__';
 
-// What the pile on the map takes from the panel when it changes (its id and save time stay)
+// What the pile on the map takes from the panel when it changes (its id, its save time and the key of the outline it
+// was found with stay)
 const CHOSEN_PILE_PROPERTIES = ['name', 'description', 'tooltipText',
-    ...STOCKPILE_PROPERTIES.filter(k => k !== 'id' && k !== 'savedAt')];
+    ...STOCKPILE_PROPERTIES.filter(k => k !== 'id' && k !== 'savedAt' && k !== 'detectionKey')];
 
 const definition = {
     data() {
@@ -378,10 +379,7 @@ const definition = {
             if (!id) return;
             this._dropRemeasure(id);
             const row = this._pileRowOf(id);
-            if (row !== null) {
-                delete this.stockpileAddedPiles[row];
-                this._syncAddedPiles();
-            }
+            if (row !== null) this._releasePileRow(row);
             if (id === this._draftStockpileFeatureId) this._draftStockpileFeatureId = null;
             if (id !== this._chosenStockpileFeatureId) return;
             this.stockpileError = null;

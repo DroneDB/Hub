@@ -7,6 +7,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { effectScope, reactive, nextTick } from 'vue';
 import { Tile as TileLayer } from 'ol/layer';
+import Feature from 'ol/Feature';
+import OlMap from 'ol/Map';
+import View from 'ol/View';
+import { Polygon } from 'ol/geom';
 import ddb from 'ddb';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { FileLayers } from '@/libs/map/fileLayers';
@@ -280,5 +284,48 @@ describe('split compare', () => {
         await features.toggleAnalysisPanel('rasterAnalysis');
         expect(features.splitMode.value).toBe(false);
         expect(features.rasterPanelVisible.value).toBe(true);
+    });
+});
+
+describe('a pile chosen in the measurement list', () => {
+    const pileOn = sourceRaster => {
+        const feature = new Feature(new Polygon([[[0, 0], [10, 0], [10, 10], [0, 0]]]));
+        feature.setProperties({ measurementType: 'stockpile', id: 'p1', netVolume: 5, sourceRaster });
+        features.measureControls.value.source.addFeature(feature);
+        return feature;
+    };
+
+    it('opens Stockpile Volume on the model the pile was measured on, and the panel works on that pile', () => {
+        start([onGround(DSM), onGround(DTM)]);
+        const feature = pileOn(DSM.path);
+        expect(features.workOnStockpile(feature)).toBe(true);
+        expect(features.stockpilePanelVisible.value).toBe(true);
+        expect(features.analysisTargetPath.value).toBe(DSM.path);
+        expect(features.stockpileResult.value).toMatchObject({ netVolume: 5 });
+    });
+
+    it('brings the pile into view', () => {
+        start([onGround(DSM)]);
+        const olMap = new OlMap({ view: new View({ center: [0, 0], zoom: 2 }) });
+        olMap.setSize([800, 600]);
+        const fit = vi.spyOn(olMap.getView(), 'fit').mockImplementation(() => {});
+        features.map.value = olMap;
+        const feature = pileOn(DSM.path);
+        features.workOnStockpile(feature);
+        expect(fit).toHaveBeenCalledWith(feature.getGeometry(), expect.objectContaining({ maxZoom: 21 }));
+    });
+
+    it('opens on the top model for a pile of a model that is not on the map', () => {
+        start([onGround(DSM), onGround(DTM)]);
+        expect(features.workOnStockpile(pileOn('elsewhere/dsm.tif'))).toBe(true);
+        expect(features.analysisTargetPath.value).toBe(DTM.path);
+    });
+
+    it('does nothing for a measurement that is not a pile', () => {
+        start([onGround(DSM)]);
+        const area = new Feature(new Polygon([[[0, 0], [1, 0], [1, 1], [0, 0]]]));
+        area.set('measurementType', 'area');
+        expect(features.workOnStockpile(area)).toBe(false);
+        expect(features.stockpilePanelVisible.value).toBe(false);
     });
 });

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
-import { buildStockpileFeature, legacySourceRaster, loadStockpile, sameOutline, stockpilePolygonOf, STOCKPILE_PROPERTIES } from './stockpileStorage';
+import { buildStockpileFeature, detectionKeyOf, legacySourceRaster, loadStockpile, sameOutline, stockpilePolygonOf, STOCKPILE_PROPERTIES } from './stockpileStorage';
 import { write, read, VIEW } from './measurementFormat';
 import { pointCloudFile10, legacyStockpileFile, orthophotoStockpileFile } from './measurementFormat.fixtures';
 import { exportMeasurements, importMeasurements } from './olMeasurementConverter';
@@ -152,6 +152,16 @@ describe('loadStockpile', () => {
             const loaded = await loadStockpile(datasetWith(fileOf([pileOn('a', 'site/dtm.tif')], 'site/dsm.tif')), 'site/measurements.geojson', 'site/dsm.tif');
             expect(loaded.properties.sourceRaster).toBe('site/dtm.tif');
         });
+    });
+});
+
+describe('detectionKeyOf', () => {
+    const square = (d = 0) => ({ type: 'Polygon', coordinates: [[[9 + d, 45], [9.001, 45], [9.001, 45.001], [9 + d, 45]]] });
+    it('is the same for the same outline and another for another one', () => {
+        expect(detectionKeyOf(square())).toMatch(/^[0-9a-f]{16}$/);
+        expect(detectionKeyOf(square())).toBe(detectionKeyOf(JSON.parse(JSON.stringify(square()))));
+        expect(detectionKeyOf(square(1e-6))).not.toBe(detectionKeyOf(square()));
+        expect(detectionKeyOf(null)).toBeNull();
     });
 });
 

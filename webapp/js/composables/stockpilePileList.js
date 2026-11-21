@@ -9,7 +9,7 @@
  */
 import { toRaw } from 'vue';
 import { createPilePreview } from '@/libs/map/stockpilePreview';
-import { sameOutline, stockpilePolygonOf } from '@/libs/map/stockpileStorage';
+import { detectionKeyOf, resultOfProperties, sameOutline, stockpilePolygonOf } from '@/libs/map/stockpileStorage';
 import { runLimited } from '@/libs/runLimited';
 import { friendlyStockpileError } from '@/libs/stockpileErrors';
 import { BASE_METHOD, PILE_OUTLINE, baseMethodFor } from '@/libs/stockpileBase';
@@ -99,32 +99,58 @@ export const pileListMethods = {
     async _measureStockpilePiles() {
         const piles = this.stockpilePiles;
         if (!piles || !piles.length || !this.dataset) return;
-        const turn = ++this._stockpileMeasureTurn;
-        const path = this.rasterFilePath;
+        ++this._stockpileMeasureTurn;
         const baseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
-        const flatElevation = this.stockpileFlatElevation;
-        const isCurrent = () => turn === this._stockpileMeasureTurn;
         this.stockpilePilesBase = baseMethod;
         // The panel shows the base the list is measured from, unless it shows a pile of its own
         if (!this._chosenStockpileFeatureId) this.stockpileBaseMethod = baseMethod;
-        piles.forEach(pile => {
-            pile.measured = null;
-            pile.measureState = 'measuring';
-        });
-        await runLimited([...piles], PILES_IN_FLIGHT, async pile => {
-            try {
-                const volume = await this._measureStockpile(pile.polygon, path, baseMethod, flatElevation);
-                if (!isCurrent()) return;
-                pile.measured = volume;
-                pile.measureState = 'done';
-            } catch (e) {
-                console.warn('Could not measure a pile of the list:', e);
-                if (!isCurrent()) return;
-                pile.measureState = 'failed';
-            }
-            // The pile that is the chosen one shows its volume as soon as it has one
-            if (pile.id === this.stockpileChosenPile && !this._chosenStockpileFeatureId) this._showListPile(pile);
-        }, { shouldContinue: isCurrent });
+        // A pile that is a measurement has the volume of the measurement (its own base, its outline as edited)
+        const toMeasure = piles.filter(pile => !this._linkedStockpileFeature(pile.id));
+        const isCurrent = this._listMeasureTurn();
+        await runLimited(toMeasure, PILES_IN_FLIGHT, pile => this._measureListPile(pile, isCurrent), { shouldContinue: isCurrent });
+    },
+
+    /** Whether the measuring of the list that runs now is still the current one, for an answer that comes later. */
+    _listMeasureTurn() {
+        const turn = this._stockpileMeasureTurn;
+        return () => turn === this._stockpileMeasureTurn;
+    },
+
+    /**
+     * Measure one pile of the list, with its detected outline, from the base of the list and on the raster of the
+     * panel. The answer is dropped when `isCurrent` says the list was measured again or forgotten meanwhile.
+     * @param {object} pile  a pile of `stockpilePiles`
+     * @param {() => boolean} isCurrent
+     */
+    async _measureListPile(pile, isCurrent) {
+        pile.measured = null;
+        pile.measureState = 'measuring';
+        try {
+            const volume = await this._measureStockpile(pile.polygon, this.rasterFilePath, this.stockpilePilesBase, this.stockpileFlatElevation);
+            if (!isCurrent()) return;
+            pile.measured = volume;
+            pile.measureState = 'done';
+        } catch (e) {
+            console.warn('Could not measure a pile of the list:', e);
+            if (!isCurrent()) return;
+            pile.measureState = 'failed';
+        }
+        // The pile that is the chosen one shows its volume as soon as it has one
+        if (pile.id === this.stockpileChosenPile && !this._chosenStockpileFeatureId) this._showListPile(pile);
+    },
+
+    /**
+     * The measurement a row of the list was added as is gone (deleted): the row is a found pile again, with its
+     * detected outline on the map, and with the volume of that outline from the base of the list.
+     * @param {number} row  the id of the pile in the list
+     */
+    _releasePileRow(row) {
+        delete this.stockpileAddedPiles[row];
+        this._syncAddedPiles();
+        const pile = this.stockpilePiles && this.stockpilePiles.find(p => p.id === row);
+        if (!pile) return;
+        if (this._stockpilePreview) this._stockpilePreview.setOutline(pile.id, pile.polygon, this._mapProjection());
+        this._measureListPile(pile, this._listMeasureTurn());
     },
 
     /**
@@ -188,7 +214,10 @@ export const pileListMethods = {
             entries.push({
                 pile,
                 polygon: pile.polygon,
-                properties: this._buildStockpileProperties(result, { identify: pile.id === this.stockpileChosenPile })
+                properties: {
+                    ...this._buildStockpileProperties(result, { identify: pile.id === this.stockpileChosenPile }),
+                    detectionKey: detectionKeyOf(pile.polygon)
+                }
             });
         }
         if (!entries.length) return 0;
@@ -205,8 +234,10 @@ export const pileListMethods = {
     /**
      * The piles of the list that are measurements on the map already (added before the page was opened again, or
      * read from the measurements file) are linked to them, as if they had been added from this list: their rows
-     * show them as added and Add does not make a second measurement of them. A pile is one of them when the
-     * measurement has its outline and was measured on the same raster (or does not say which, as older files do).
+     * show them as added, with the volume and the outline of the measurement, and Add does not make a second
+     * measurement of them. A pile is one of them when the measurement was measured on the same raster (or does not
+     * say which, as older files do) and was added with the key of this outline (its outline may have been edited
+     * since), or has this outline.
      * @param {string} path  the raster the piles were found on
      */
     _linkPilesOnTheMap(path) {
@@ -214,14 +245,45 @@ export const pileListMethods = {
         if (!mc || !mc.source || !this.stockpilePiles) return;
         const projection = this._mapProjection();
         const onMap = mc.source.getFeatures()
-            .filter(f => f.get('measurementType') === 'stockpile' && (!f.get('sourceRaster') || f.get('sourceRaster') === path))
-            .map(f => ({ id: f.get('id'), polygon: stockpilePolygonOf(toRaw(f), projection) }));
+            .filter(f => f.get('measurementType') === 'stockpile' && f.get('id') && (!f.get('sourceRaster') || f.get('sourceRaster') === path))
+            .map(f => ({ id: f.get('id'), key: f.get('detectionKey'), polygon: stockpilePolygonOf(toRaw(f), projection) }));
         const taken = new Set();
-        for (const pile of this.stockpilePiles) {
-            const match = onMap.find(m => m.id && !taken.has(m.id) && sameOutline(m.polygon, pile.polygon));
-            if (!match) continue;
+        const link = (pile, test) => {
+            const match = onMap.find(m => !taken.has(m.id) && test(m));
+            if (!match) return false;
             taken.add(match.id);
             this.stockpileAddedPiles[pile.id] = match.id;
+            return true;
+        };
+        // The key first: an edited pile must not be taken by the outline test of another row
+        const rest = this.stockpilePiles.filter(pile => {
+            const key = detectionKeyOf(pile.polygon);
+            return !(key && link(pile, m => m.key === key));
+        });
+        rest.forEach(pile => link(pile, m => !m.key && sameOutline(m.polygon, pile.polygon)));
+        Object.values(this.stockpileAddedPiles).forEach(id => this._syncPileRowOf(this._stockpileFeatureById(id)));
+    },
+
+    /** The measurement on the map that the row `id` of the list was added as (or found to be), or null. @param {number} id */
+    _linkedStockpileFeature(id) {
+        return this._stockpileFeatureById(this.stockpileAddedPiles[id]);
+    },
+
+    /**
+     * The row of the list that a measurement on the map is shows what the measurement is now: its volume (from its
+     * own base, after an edit of its outline) and, on the map, its outline.
+     * @param {import('ol/Feature').default|null} feature
+     */
+    _syncPileRowOf(feature) {
+        if (!feature || !this.stockpilePiles) return;
+        const row = this._pileRowOf(feature.get('id'));
+        const pile = row === null ? null : this.stockpilePiles.find(p => p.id === row);
+        if (!pile) return;
+        pile.measured = resultOfProperties(feature.getProperties());
+        pile.measureState = pile.measured ? 'done' : 'failed';
+        if (this._stockpilePreview) {
+            const projection = this._mapProjection();
+            this._stockpilePreview.setOutline(pile.id, stockpilePolygonOf(toRaw(feature), projection), projection);
         }
     },
 

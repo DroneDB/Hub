@@ -18,6 +18,7 @@
  *   const target = useAnalysisTarget({ candidates, splitMode, panels });
  *   target.requestToggle('stockpile');    // the toolbar button
  *   target.requestSwitch(path);           // the "Elevation model" selector
+ *   target.requestOpenOn('stockpile', p); // a panel asked for on a given raster (a pile of the list)
  *   target.onCandidatesChanged();         // after the layers were rebuilt
  *   target.restoreTarget(path);           // a saved view's target: no panel of its own
  *   target.defaultTarget();               // the path a tool picks when nothing was chosen
@@ -105,6 +106,22 @@ export function useAnalysisTarget({ candidates, splitMode = () => false, panels 
     }
 
     /**
+     * Opens `kind` on the raster `path` when it is a candidate (the elevation model a pile was measured on), else
+     * as its button does. A panel already open on that raster stays as it is.
+     * @param {AnalysisPanelKind} kind
+     * @param {string|null|undefined} path
+     * @returns {boolean}  whether the panel is open
+     */
+    function requestOpenOn(kind, path) {
+        if (splitMode()) return false;
+        const next = path ? items().find(c => c.path === path) : null;
+        if (!next) return panels.openKind() === kind || requestOpen(kind);
+        if (next.path === targetPath.value && panels.openKind() === kind) return true;
+        commit(next, kind);
+        return true;
+    }
+
+    /**
      * The button again: closes its panel when it is open, else opens it.
      * @param {AnalysisPanelKind} kind
      */
@@ -167,5 +184,5 @@ export function useAnalysisTarget({ candidates, splitMode = () => false, panels 
         if (kind) panels.close(kind);
     });
 
-    return { targetPath, targetEntry, candidates: list, toolbarEntry, requestOpen, requestToggle, requestSwitch, restoreTarget, defaultTarget, onCandidatesChanged };
+    return { targetPath, targetEntry, candidates: list, toolbarEntry, requestOpen, requestOpenOn, requestToggle, requestSwitch, restoreTarget, defaultTarget, onCandidatesChanged };
 }

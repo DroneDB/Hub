@@ -43,6 +43,11 @@
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
+                                <button v-if="canWorkOn(m)" class="btn-icon btn-stockpile" title="Work on this pile in Stockpile Volume"
+                                        aria-label="Work on this pile in Stockpile Volume" data-testid="measurement-work-on-stockpile"
+                                        @click="$emit('workOnStockpile', m)">
+                                    <i :class="stockpileIcon" />
+                                </button>
                                 <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
                                     <i class="fa-solid fa-pencil" />
                                 </button>
@@ -77,6 +82,11 @@
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
+                                <button v-if="canWorkOn(m)" class="btn-icon btn-stockpile" title="Work on this pile in Stockpile Volume"
+                                        aria-label="Work on this pile in Stockpile Volume" data-testid="measurement-work-on-stockpile"
+                                        @click="$emit('workOnStockpile', m)">
+                                    <i :class="stockpileIcon" />
+                                </button>
                                 <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
                                     <i class="fa-solid fa-pencil" />
                                 </button>
@@ -137,6 +147,12 @@ export default {
         savedPath: {
             type: String,
             default: ''
+        },
+        // Whether the map can open Stockpile Volume (an elevation model is on it): a pile then has a button that
+        // chooses it there, to change its base, its material or its outline
+        canWorkOnStockpiles: {
+            type: Boolean,
+            default: false
         }
     },
     emits: [
@@ -147,10 +163,12 @@ export default {
         'renameGroup',
         'deleteGroup',
         'toggleGroupVisibility',
-        'moveMeasurementToGroup'
+        'moveMeasurementToGroup',
+        'workOnStockpile'
     ],
     data() {
         return {
+            stockpileIcon: STOCKPILE_ICON,
             deleteConfirmOpen: false,
             pendingDeleteItem: null,
             deleteGroupConfirmOpen: false,
@@ -206,6 +224,9 @@ export default {
                 case 'contour': return 'Contour';
                 default: return type || 'Unknown';
             }
+        },
+        canWorkOn(m) {
+            return this.canWorkOnStockpiles && m.type === 'stockpile' && !!m.feature;
         },
         typeIcon(type) {
             switch (type) {

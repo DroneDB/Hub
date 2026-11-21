@@ -241,3 +241,39 @@ describe('restoring a saved target', () => {
         expect(m.log).toEqual([]);
     });
 });
+
+describe('a panel asked for on a given raster (a pile of the measurement list)', () => {
+    it('opens on that raster when it is a candidate, and takes it as the target', () => {
+        const m = map();
+        expect(m.target.requestOpenOn('stockpile', DSM)).toBe(true);
+        expect(m.target.targetPath.value).toBe(DSM);
+        expect(m.log).toEqual([`open stockpile ${DSM}`]);
+    });
+
+    it('leaves a panel that is open on that raster as it is', () => {
+        const m = opened({}, 'stockpile');
+        expect(m.target.requestOpenOn('stockpile', DTM)).toBe(true);
+        expect(m.log).toEqual([]);
+    });
+
+    it('opens again on the raster when the panel is open on another one', () => {
+        const m = opened({}, 'stockpile');
+        m.target.requestOpenOn('stockpile', DSM);
+        expect(m.log).toEqual(['close stockpile', `open stockpile ${DSM}`]);
+    });
+
+    it('opens as its button does for a raster that is not on the map, or none', () => {
+        const m = map();
+        expect(m.target.requestOpenOn('stockpile', 'other/dsm.tif')).toBe(true);
+        expect(m.target.targetPath.value).toBe(DTM);
+        const n = opened({}, 'stockpile');
+        expect(n.target.requestOpenOn('stockpile', null)).toBe(true);
+        expect(n.log).toEqual([]);
+    });
+
+    it('opens nothing in split compare', () => {
+        const m = map({ splitMode: ref(true) });
+        expect(m.target.requestOpenOn('stockpile', DSM)).toBe(false);
+        expect(m.log).toEqual([]);
+    });
+});

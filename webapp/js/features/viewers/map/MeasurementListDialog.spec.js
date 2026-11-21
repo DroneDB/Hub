@@ -110,3 +110,33 @@ describe('MeasurementListDialog owner hint', () => {
         expect(mountWith({}).find('[data-testid="measurements-file"]').exists()).toBe(false);
     });
 });
+
+describe('MeasurementListDialog piles', () => {
+    const PILE = { type: 'stockpile', name: 'North pile', value: '44 m³', feature: { ol_uid: 3 }, groupId: null };
+    const AREA = { type: 'area', name: 'Area', value: '12 m²', feature: { ol_uid: 4 }, groupId: null };
+    const mountWith = props => mount(MeasurementListDialog, {
+        props: { measurements: [PILE, AREA], ...props },
+        global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+    });
+    const buttons = wrapper => wrapper.findAll('[data-testid="measurement-work-on-stockpile"]');
+
+    it('a pile has a button that asks to work on it in Stockpile Volume, when the map can open it', async () => {
+        const wrapper = mountWith({ canWorkOnStockpiles: true });
+        expect(buttons(wrapper)).toHaveLength(1);
+        await buttons(wrapper)[0].trigger('click');
+        expect(wrapper.emitted('workOnStockpile')).toEqual([[PILE]]);
+    });
+
+    it('has no such button on a map with no elevation model', () => {
+        expect(buttons(mountWith({}))).toHaveLength(0);
+    });
+
+    it('has it for a pile in a group too', () => {
+        const wrapper = mountWith({
+            canWorkOnStockpiles: true,
+            measurements: [{ ...PILE, groupId: 'g1' }],
+            groups: [{ id: 'g1', name: 'Piles', color: '#f00', visible: true }]
+        });
+        expect(buttons(wrapper)).toHaveLength(1);
+    });
+});

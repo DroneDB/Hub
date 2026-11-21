@@ -1135,9 +1135,63 @@ describe('Find all piles (detect-all)', () => {
             pile.onStockpileFeatureRemoved(added);
 
             expect(pile.stockpileAddedPiles.value).toEqual({});
+            // The row is a found pile again: its detected outline is measured again before it can be added
+            await flushPromises();
+            expect(row(0).measureState).toBe('done');
             expect(pile.addStockpilePiles([row(0)])).toBe(1);
             expect(piles()).toHaveLength(1);
             expect(piles()[0]).not.toBe(added);
+        });
+
+        it('a deleted measurement that was edited gives its row back the volume of the detected outline', async () => {
+            await open();
+            await find();
+            pile.addStockpilePiles([row(0)]);
+            const added = piles()[0];
+            // The measurement as an edit of its outline left it
+            added.set('netVolume', 7);
+            await find();
+            expect(row(0).measured.netVolume).toBe(7);
+
+            netVolumeOf = { best_fit: 33 };
+            source.removeFeature(added);
+            pile.onStockpileFeatureRemoved(added);
+            await flushPromises();
+            expect(row(0).measured.netVolume).toBe(33);
+            expect(measureCalls.at(-1).polygon).toEqual(POLYGON);
+        });
+
+        it('a pile whose outline was edited is still that measurement when found again: its row has the volume of the measurement, which is not measured as a row', async () => {
+            await open();
+            await find();
+            pile.addStockpilePiles([row(0)]);
+            const added = piles()[0];
+            expect(added.get('detectionKey')).toMatch(/^[0-9a-f]{16}$/);
+            // An edit of the outline, and the volume measured for it
+            added.getGeometry().translate(50, 0);
+            added.set('netVolume', 7);
+            measureCalls.length = 0;
+
+            await find();
+
+            expect(pile.stockpileAddedPiles.value).toEqual({ 0: added.get('id') });
+            expect(row(0).measured.netVolume).toBe(7);
+            expect(measureCalls.map(c => c.polygon)).not.toContainEqual(POLYGON);
+            expect(pile.addStockpilePiles(pile.stockpilePiles.value)).toBe(1);
+            expect(piles()).toHaveLength(2);
+        });
+
+        it('keeps the key of the found outline when the panel changes the pile (title, material)', async () => {
+            await open();
+            await find();
+            pile.chooseStockpilePile(row(0), { fit: false });
+            pile.addStockpilePiles([row(0)]);
+            const key = piles()[0].get('detectionKey');
+            pile.stockpileTitle.value = 'North pile';
+            pile.stockpileMaterial.value = 'gravel';
+            await flushPromises();
+            expect(piles()[0].get('title')).toBe('North pile');
+            expect(piles()[0].get('detectionKey')).toBe(key);
         });
 
         it('adds a pile again that is no longer on the map even when the removal was not told', async () => {
@@ -1694,6 +1748,23 @@ describe('the outline of a pile on the map changes', () => {
         expect(feature.get('weightEstimate').tons).toBeCloseTo(140, 9);
         expect(feature.get('costEstimate')).toEqual({ amount: 1400, currency: 'EUR' });
         expect(feature.get('tooltipText')).toBe('70 m³ - Gravel - 2 t/m³');
+    });
+
+    it('gives the row of the found piles that the pile was added from its new volume', async () => {
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+        dataset.detectAllStockpiles = vi.fn(async () => ({ stockpiles: [{ id: 0, polygon: POLYGON, estimatedVolume: 8, confidence: 0.9, areaM2: 50 }] }));
+        await pile.findAllStockpiles();
+        await settle();
+        pile.addStockpilePiles(pile.stockpilePiles.value);
+        const feature = source.getFeatures().find(f => f.get('measurementType') === 'stockpile');
+        netVolumeOf = { best_fit: 91 };
+        moveOutline(feature, 10);
+
+        pile.remeasureStockpileFeature(feature);
+        await vi.advanceTimersByTimeAsync(500);
+
+        expect(pile.stockpilePiles.value[0].measured.netVolume).toBe(91);
     });
 
     it('measures once for a run of changes, with the last outline', async () => {

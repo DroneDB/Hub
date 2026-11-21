@@ -8,7 +8,8 @@
  *
  *   setup(props) { return { ...useMapFeatures(props), ... }; }
  */
-import { shallowRef, computed } from 'vue';
+import { shallowRef, computed, toRaw } from 'vue';
+import { fitPile } from '@/libs/map/stockpilePreview';
 import { toLonLat } from 'ol/proj';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
@@ -134,6 +135,15 @@ export function useMapFeatures(props, fileEvents = {}) {
             return analysisTarget.requestToggle(kind);
         },
         selectAnalysisTarget: analysisTarget.requestSwitch,
+        // A pile of the measurement list: Stockpile Volume opens on the model it was measured on and works on it
+        workOnStockpile: feature => {
+            if (!feature || !feature.get || feature.get('measurementType') !== 'stockpile') return false;
+            if (split.splitMode.value) split.exitSplitMode();
+            if (!analysisTarget.requestOpenOn('stockpile', feature.get('sourceRaster'))) return false;
+            stockpile.selectStockpileFeature(feature);
+            fitPile(toRaw(map.value), feature.getGeometry());
+            return true;
+        },
         // What a view records: the model the tools pick when none was chosen, and a saved choice put back without a question
         defaultAnalysisTarget: analysisTarget.defaultTarget,
         restoreAnalysisTarget: analysisTarget.restoreTarget,

@@ -34,7 +34,7 @@ export const STOCKPILE_PROPERTIES = Object.freeze([
     'id', 'title', 'material', 'materialName', 'materialDensity', 'costPerTon', 'currency',
     'netVolume', 'cutVolume', 'fillVolume',
     'area2d', 'area3d', 'baseElevation', 'basePlaneMethod', 'sourceRaster', 'flatElevation', 'confidence',
-    'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
+    'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt', 'detectionKey'
 ]);
 
 /** What a measured pile says of itself: the volumes, the base they are from and the model they were measured on */
@@ -94,6 +94,30 @@ export function stockpilePolygonOf(feature, featureProjection = EPSG.WEB_MERCATO
     const geometry = feature.getGeometry();
     if (!geometry || geometry.getType() !== 'Polygon') return null;
     return new GeoJSON().writeGeometryObject(geometry, { dataProjection: EPSG.WGS84, featureProjection });
+}
+
+/**
+ * A short key of the outline a pile was found with by "Find all piles" (a WGS84 GeoJSON polygon, as the server
+ * gives it). A pile added from the list keeps it (`detectionKey`), so the same pile found again is known as that
+ * measurement after its outline was edited, when its outline is not the one found any more. The search finds the
+ * same outline, to the last digit, while the raster and the sensitivity are the same.
+ * @param {{ coordinates: number[][][] }|null} polygon
+ * @returns {string|null}
+ */
+export function detectionKeyOf(polygon) {
+    const rings = polygon && polygon.coordinates;
+    if (!Array.isArray(rings) || !rings.length) return null;
+    const text = rings.map(ring => ring.map(([x, y]) => `${x.toFixed(9)},${y.toFixed(9)}`).join(';')).join('|');
+    // FNV-1a, 32 bits, twice with two seeds: a key that two piles of one raster do not share
+    const hash = seed => {
+        let h = seed >>> 0;
+        for (let i = 0; i < text.length; i++) {
+            h ^= text.charCodeAt(i);
+            h = Math.imul(h, 0x01000193) >>> 0;
+        }
+        return h.toString(16).padStart(8, '0');
+    };
+    return `${hash(0x811c9dc5)}${hash(0x01234567)}`;
 }
 
 /**

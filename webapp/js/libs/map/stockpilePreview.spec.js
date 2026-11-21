@@ -35,6 +35,15 @@ describe('the preview of the found piles', () => {
         expect(numberOf(9).getText()).toBe('2');
     });
 
+    it('takes the outline of the measurement a pile is (an edited outline), and leaves an unknown pile alone', () => {
+        preview.setOutline(7, polygon(10, 45), 'EPSG:3857');
+        // 10 degrees east is about 1,113,195 m in Web Mercator
+        expect(featureOf(7).getGeometry().getExtent()[0]).toBeCloseTo(1113194.9, 0);
+        expect(featureOf(7).get('rank')).toBe(1);
+        expect(() => preview.setOutline(42, polygon(10, 45), 'EPSG:3857')).not.toThrow();
+        expect(featureOf(9).getGeometry().getExtent()[0]).toBeCloseTo(1002988.6, 0);
+    });
+
     it('shows a new list in place of the old one', () => {
         preview.show([PILES[1]], 'EPSG:3857');
         expect(preview.layer.getSource().getFeatures().map(f => f.get('pileId'))).toEqual([9]);

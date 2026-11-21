@@ -70,10 +70,22 @@ function outlineStyles(look, rank) {
  *   setChosen: (id: number|null) => void,
  *   setHovered: (id: number|null) => void,
  *   setAdded: (ids: Iterable<number>) => void,
+ *   setOutline: (id: number, polygon: object, mapProjection: any) => void,
  *   pileAt: (map: import('ol/Map').default, pixel: number[]) => number|null,
  *   fit: (map: import('ol/Map').default, id: number) => void
  * }}
  */
+/**
+ * Bring a pile into view: its outline with a margin, at most at the zoom of a few centimetres a pixel. A map that has
+ * no size (not laid out yet) is left alone.
+ * @param {import('ol/Map').default} map
+ * @param {import('ol/geom').Geometry|undefined|null} geometry  in the projection of the map
+ */
+export function fitPile(map, geometry) {
+    if (!map || !geometry || !map.getSize()) return;
+    map.getView().fit(/** @type {any} */ (geometry), { padding: [60, 60, 60, 60], maxZoom: 21, duration: 250 });
+}
+
 export function createPilePreview() {
     const source = new VectorSource();
     /** @type {{ chosen: number|null, hovered: number|null, added: Set<number> }} */
@@ -126,6 +138,12 @@ export function createPilePreview() {
             state.added = new Set(ids);
             layer.changed();
         },
+        // The outline of a pile that is a measurement follows the measurement (its outline edited)
+        setOutline(id, polygon, mapProjection) {
+            const feature = featureOf(id);
+            if (!feature || !polygon) return;
+            feature.setGeometry(new GeoJSON().readGeometry(polygon, { dataProjection: EPSG.WGS84, featureProjection: mapProjection }));
+        },
         pileAt(map, pixel) {
             const hit = map.forEachFeatureAtPixel(pixel, feature => feature, {
                 layerFilter: candidate => candidate === layer, hitTolerance: 4
@@ -134,9 +152,7 @@ export function createPilePreview() {
             return typeof id === 'number' ? id : null;
         },
         fit(map, id) {
-            const geometry = /** @type {import('ol/geom').Polygon | undefined} */ (featureOf(id)?.getGeometry());
-            if (!geometry || !map.getSize()) return;
-            map.getView().fit(geometry, { padding: [60, 60, 60, 60], maxZoom: 21, duration: 250 });
+            fitPile(map, featureOf(id)?.getGeometry());
         }
     });
 }

@@ -385,6 +385,19 @@ describe('StockpileVolumePanel Find all piles', () => {
         expect(wrapper.find('[data-testid="stockpile-piles"]').text()).not.toContain('999');
     });
 
+    it('gives a measured pile the 2D area its volume was measured with (the area of the Result), and the found area until then', () => {
+        render({
+            piles: [
+                { ...PILES[0], measured: { netVolume: 44.14, area2d: 25.68 } },
+                { ...PILES[1], measured: null, measureState: 'measuring' }
+            ],
+            unitPref: 'metric'
+        });
+        const cells = rows().map(r => r.findAll('span').map(s => s.text()));
+        expect(cells[0][1]).toBe('25.68 m²');
+        expect(cells[1][1]).toBe('40 m²');
+    });
+
     it('says the base the volumes are above', () => {
         render({ piles: PILES, pilesBase: 'best_fit' });
         expect(text('stockpile-piles-base')).toBe('Volumes above the best-fit plane');
