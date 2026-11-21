@@ -23,8 +23,8 @@
  * Keyboard: Enter or Space on the button opens it with the first item focused, the arrows move between the items,
  * Escape closes it and gives the focus back to the button, Tab leaves and closes it. A click outside closes it.
  */
-import { ref, nextTick, useId } from 'vue';
-import { useEventListener } from '@/composables/useEventListener';
+import { ref, useId } from 'vue';
+import { useMenu } from '@/composables/useMenu';
 
 defineProps({
     /** The accessible name of the button and of its menu */
@@ -40,65 +40,24 @@ const MENU_WIDTH_PX = 260;
 const root = ref(null);
 const trigger = ref(null);
 const list = ref(null);
-const open = ref(false);
 // The menu ends at the right edge of the button: the button is too near the right edge of the window to start one there
 const alignEnd = ref(false);
 const menuId = useId();
 
-const enabledItems = () => [...(list.value?.querySelectorAll('[role="menuitem"]:not(:disabled)') ?? [])];
-
-async function show() {
-    const left = trigger.value?.getBoundingClientRect().left ?? 0;
-    alignEnd.value = left + MENU_WIDTH_PX > window.innerWidth;
-    open.value = true;
-    await nextTick();
-    enabledItems()[0]?.focus();
-}
-
-/** @param {{ refocus?: boolean }} [options] refocus: the focus goes back to the button (the menu was closed from inside it) */
-function close({ refocus = false } = {}) {
-    if (!open.value) return;
-    open.value = false;
-    if (refocus) trigger.value?.focus();
-}
-
-const toggle = () => (open.value ? close() : show());
+// An action that is off is a real `disabled` button here: it cannot be focused, so the arrows leave it out
+const { open, close, toggle, onKey, onFocusOut } = useMenu({
+    root, trigger, list,
+    itemSelector: '[role="menuitem"]:not(:disabled)',
+    beforeOpen() {
+        const left = trigger.value?.getBoundingClientRect().left ?? 0;
+        alignEnd.value = left + MENU_WIDTH_PX > window.innerWidth;
+    }
+});
 
 function pick(item) {
     close({ refocus: true });
     emit('select', item.key);
 }
-
-/** Moves the focus to the next (1) or the previous (-1) item, around the ends */
-function move(step) {
-    const items = enabledItems();
-    if (!items.length) return;
-    const at = items.indexOf(document.activeElement);
-    items[(at + step + items.length) % items.length].focus();
-}
-
-function onKey(e) {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (open.value) move(e.key === 'ArrowDown' ? 1 : -1);
-        else show();
-    } else if (e.key === 'Escape' && open.value) {
-        // The menu takes the key: it does not also cancel what the viewer draws
-        e.preventDefault();
-        e.stopPropagation();
-        close({ refocus: true });
-    }
-}
-
-// The focus left the button and its menu (Tab, or a click on another control)
-function onFocusOut(e) {
-    if (!root.value?.contains(e.relatedTarget)) close();
-}
-
-// A click that gives the focus to nothing (the 3D view) closes it too
-useEventListener(document, 'pointerdown', e => {
-    if (open.value && !root.value?.contains(e.target)) close();
-});
 </script>
 
 <style scoped lang="scss">

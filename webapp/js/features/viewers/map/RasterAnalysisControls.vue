@@ -1,10 +1,53 @@
 <template>
     <AnalysisPanel v-if="visible" variant="raster" class="raster-panel"
                    :icon="panelIconClass" :title="panelTitle" @close="close">
-        <div v-if="rasterInfo" class="panel-body">
-            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath" label="Raster"
-                                  @update:model-value="path => $emit('selectTarget', path)" />
+        <!-- The tool bar: what puts the map in a mode or starts a map action. It stays in view with the header -->
+        <template v-if="rasterInfo" #tools>
+            <button type="button" class="panel-btn tool-btn"
+                    :class="{ 'is-active': drawingProfile }"
+                    :aria-pressed="String(drawingProfile)"
+                    :disabled="profileLoading"
+                    :title="drawingProfile
+                        ? 'Stop drawing and discard the partial profile (Esc)'
+                        : (profile ? 'Discard the current profile and draw a new one'
+                            : 'Draw a profile line on the map')"
+                    @click="onProfileButtonClick">
+                <i :class="profileLoading ? 'fas fa-spinner fa-spin'
+                    : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')" />
+                <span class="tool-label">{{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}</span>
+            </button>
+            <button type="button" class="panel-btn tool-btn"
+                    :class="{ 'is-active': inspectActive }"
+                    :aria-pressed="String(inspectActive)"
+                    :title="inspectActive
+                        ? 'Stop inspecting raster values (Esc)'
+                        : 'Click on the map to read the raster value'"
+                    @click="toggleInspect">
+                <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'" />
+                <span class="tool-label">Inspect</span>
+            </button>
+            <button type="button" class="panel-btn tool-btn"
+                    :class="{ 'is-active': drawingArea }"
+                    :aria-pressed="String(drawingArea)"
+                    :disabled="areaStatsLoading"
+                    :title="drawingArea
+                        ? 'Stop drawing the rectangle (Esc)'
+                        : 'Draw a rectangle on the map to get the statistics of the values inside it'"
+                    data-testid="raster-area-stats-btn"
+                    @click="$emit('toggleAreaStats')">
+                <i :class="drawingArea ? 'fas fa-stop' : 'far fa-square'" />
+                <span class="tool-label">{{ drawingArea ? 'Stop' : 'Area' }}</span>
+            </button>
+            <button v-if="!isThermal && !loadError" type="button" class="panel-btn tool-btn"
+                    :title="isElevation ? 'Generate contour lines from this elevation raster' : 'Generate contour lines from the values of this raster'"
+                    data-testid="raster-contours-btn"
+                    @click="onGenerateContoursClick">
+                <i class="fas fa-layer-group" />
+                <span class="tool-label">Contours</span>
+            </button>
+        </template>
 
+        <div v-if="rasterInfo" class="panel-body">
             <!-- Raw counts of a sensor (no calibration, not temperatures): the notice. A raster whose values are temperatures
                  says the unit they are in (FR-RAS-06) -->
             <div v-if="isThermal && !thermalUnit" class="section">
@@ -18,104 +61,56 @@
                 </div>
             </div>
 
-            <!-- Value Range -->
-            <div v-if="!loadError" class="section">
-                <span class="section-label">{{ rangeLabel }}</span>
-                <div class="temp-range" :class="{ 'thermal': isThermal }">
-                    <span>{{ formatValue(rasterInfo.valueMin, rasterInfo.unit) }}</span>
-                    <span>-</span>
-                    <span>{{ formatValue(rasterInfo.valueMax, rasterInfo.unit) }}</span>
+            <!-- Spot value: the last value read with Inspect -->
+            <div v-if="spotInfo" class="result-card" data-testid="raster-spot-value">
+                <div class="result-card-header">
+                    <span class="result-card-title">{{ isThermal ? 'Spot temperature' : 'Spot value' }}</span>
+                    <button type="button" class="result-card-clear" title="Clear the spot value" aria-label="Clear the spot value"
+                            data-testid="raster-spot-clear" @click="$emit('clearSpot')">
+                        <i class="fas fa-times" />
+                    </button>
                 </div>
-            </div>
-
-            <!-- Sensor Info -->
-            <div v-if="rasterInfo.sensorId" class="section">
-                <span class="section-label">Sensor</span>
-                <span class="sensor-badge" :class="{ thermal: isThermal }">{{ rasterInfo.sensorId }}</span>
-            </div>
-
-            <!-- Unit (thermal: °C, K or °F, converted by ddb from the unit of the band; generic: free text with autodetected default) -->
-            <div v-if="isThermal && thermalUnit" class="section">
-                <label for="raster-analysis-controls-unit" class="section-label">Unit</label>
-                <select id="raster-analysis-controls-unit" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
-                    <option v-for="option in thermalUnitOptions" :key="option.formula" :value="option.formula">{{ option.label }}</option>
-                </select>
-            </div>
-            <div v-else-if="!isThermal" class="section">
-                <label for="raster-analysis-controls-unit-name" class="section-label">Unit</label>
-                <input id="raster-analysis-controls-unit-name" v-model="unitLabel" class="panel-input" placeholder="e.g. m, ft">
-            </div>
-
-            <!-- Colormap -->
-            <div class="section">
-                <label id="raster-analysis-controls-colormap-label" for="raster-analysis-controls-colormap" class="section-label">Colormap</label>
-                <ColormapDropdown
-                    v-model="selectedColormap"
-                    input-id="raster-analysis-controls-colormap" aria-labelledby="raster-analysis-controls-colormap-label"
-                    :colormaps="availableColormaps"
-                    @update:model-value="debouncedApply" />
-            </div>
-
-            <!-- Rescale -->
-            <div class="section">
-                <span id="raster-analysis-controls-rescale-label" class="section-label">{{ rescaleLabel }}</span>
-                <!-- Min and Max, numbers in the user's locale; a bad range shows its error here and the map keeps the last valid one (FR-RAS-10) -->
-                <RescaleFields v-model="rescale" id-prefix="raster-analysis-controls-rescale" @commit="onRescaleChange" />
-            </div>
-
-            <!-- NoData value: replaces the one of the file (FR-RAS-31), for the tiles and for every number the panel shows -->
-            <div class="section" data-testid="raster-nodata-section">
-                <label for="raster-analysis-controls-nodata" class="section-label">NoData value</label>
-                <input id="raster-analysis-controls-nodata" v-model="nodata" class="panel-input"
-                       inputmode="decimal" :placeholder="nodataPlaceholder"
-                       data-testid="raster-nodata-input" @change="onNodataChange">
-                <div v-if="nodataError" class="profile-error" data-testid="raster-nodata-error">
-                    <i class="fas fa-exclamation-triangle" /> {{ nodataError }}
-                </div>
-                <div v-else-if="nodataInvalid" class="no-calibration-info" data-testid="raster-nodata-invalid">
-                    <i class="fas fa-info-circle" />&nbsp;The NoData value of the file ({{ fileNodataText }}) cannot be held
-                    by its data type: no pixel is treated as no data. Enter the value of the background (for example 0).
-                </div>
-            </div>
-
-            <!-- Spot Info: the last value read with Inspect -->
-            <div v-if="spotInfo" class="section" data-testid="raster-spot-value">
-                <span class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</span>
                 <div class="spot-info">
                     <span class="spot-temp" :class="{ thermal: isThermal }">{{ formatValue(spotInfo.value, spotInfo.unit) }}</span>
                     <span class="spot-coords">{{ spotPlace }}</span>
                 </div>
             </div>
 
-            <!-- Area Stats: the values in the rectangle drawn with Area -->
-            <div v-if="areaStats || areaStatsLoading || areaStatsError" class="section" data-testid="raster-area-stats">
-                <span class="section-label">
-                    Area Statistics
-                    <button v-if="areaStats || areaStatsError" type="button" class="info-icon-btn"
+            <!-- Area statistics: the values in the rectangle drawn with Area -->
+            <div v-if="areaStats || areaStatsLoading || areaStatsError" class="result-card" data-testid="raster-area-stats">
+                <div class="result-card-header">
+                    <span class="result-card-title">Area statistics</span>
+                    <button v-if="areaStats || areaStatsError" type="button" class="result-card-clear"
                             title="Clear the statistics and remove the rectangle from the map"
                             aria-label="Clear the statistics and remove the rectangle from the map"
                             data-testid="raster-area-stats-clear"
                             @click="$emit('clearAreaStats')">
-                        <i class="fas fa-eraser" />
+                        <i class="fas fa-times" />
                     </button>
-                </span>
+                </div>
                 <LoadingSpinner v-if="areaStatsLoading" inline label="Computing statistics..." />
                 <div v-else-if="areaStatsError" class="profile-error">
                     <i class="fas fa-exclamation-triangle" /> {{ areaStatsError }}
                 </div>
                 <dl v-else class="stats-grid area-stats">
                     <div v-for="row in areaStatsRows" :key="row.label">
-                        <dt>{{ row.label }}:</dt>
+                        <dt>{{ row.label }}</dt>
                         <dd>{{ row.value }}</dd>
                     </div>
                 </dl>
             </div>
 
-            <!-- Profile (elevation / value along a polyline) -->
-            <div v-if="!loadError" class="section">
-                <span class="section-label">
-                    {{ isThermal ? 'Thermal Profile' : 'Value Profile' }}
-                </span>
+            <!-- Profile (elevation / value along a polyline): no card until there is a line, a refusal or an answer on its way -->
+            <div v-if="!loadError && (profile || profileError || profileLoading)" class="result-card" data-testid="raster-profile">
+                <div class="result-card-header">
+                    <span class="result-card-title">{{ isThermal ? 'Thermal profile' : 'Value profile' }}</span>
+                    <button type="button" class="result-card-clear"
+                            title="Clear the chart and remove the line from the map" aria-label="Clear the chart and remove the line from the map"
+                            data-testid="raster-profile-clear" @click="clearProfile">
+                        <i class="fas fa-times" />
+                    </button>
+                </div>
+                <LoadingSpinner v-if="profileLoading && !profile" inline label="Computing profile..." />
                 <div v-if="profileError" class="profile-error">
                     <i class="fas fa-exclamation-triangle" /> {{ profileError }}
                 </div>
@@ -125,76 +120,97 @@
                                     :is-thermal="isThermal"
                                     @active-sample="onProfileHover" />
             </div>
+
+            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath" label="Raster"
+                                  @update:model-value="path => $emit('selectTarget', path)" />
+
+            <!-- Sensor Info -->
+            <div v-if="rasterInfo.sensorId" class="panel-row">
+                <span class="section-label">Sensor</span>
+                <span class="sensor-badge" :class="{ thermal: isThermal }">{{ rasterInfo.sensorId }}</span>
+            </div>
+
+            <!-- Colormap -->
+            <div class="panel-row">
+                <label id="raster-analysis-controls-colormap-label" for="raster-analysis-controls-colormap" class="section-label">Colors</label>
+                <ColormapDropdown
+                    v-model="selectedColormap"
+                    input-id="raster-analysis-controls-colormap" aria-labelledby="raster-analysis-controls-colormap-label"
+                    :colormaps="availableColormaps"
+                    @update:model-value="debouncedApply" />
+            </div>
+
+            <!-- Range: Min and Max, numbers in the user's locale; a bad range shows its error here and the map keeps the last valid
+                 one (FR-RAS-10). The caption has the range of the values in the unit the panel shows, which Fit to data
+                 takes the range to -->
+            <div class="panel-row range-row">
+                <span id="raster-analysis-controls-rescale-label" class="section-label">{{ rescaleLabel }}</span>
+                <RescaleFields v-model="rescale" id-prefix="raster-analysis-controls-rescale"
+                               labelledby="raster-analysis-controls-rescale-label"
+                               :unit="rangeUnit" :data-range="dataRange" :data-unit="dataUnit" :format-value="formatBareValue"
+                               @commit="onRescaleChange" @fit="onRescaleFit" />
+            </div>
+
+            <!-- Data settings: what is set once per raster (the unit of its values and which value is no data). Folded, with
+                 its values in the summary, unless a NoData value needs the user's attention -->
+            <button type="button" class="panel-fold" :aria-expanded="String(dataSettingsOpen)"
+                    aria-controls="raster-analysis-controls-data-settings" data-testid="raster-data-settings-toggle"
+                    @click="dataSettingsOpened = !dataSettingsOpened">
+                <i class="fas fa-chevron-right" aria-hidden="true" />
+                <span class="panel-fold-name">Data settings</span>
+                <span class="panel-fold-summary" data-testid="raster-data-settings-summary">{{ dataSettingsSummary }}</span>
+            </button>
+            <div v-show="dataSettingsOpen" id="raster-analysis-controls-data-settings" class="panel-fold-body" role="region"
+                 aria-label="Data settings" data-testid="raster-data-settings">
+                <!-- Unit (thermal: °C, K or °F, converted by ddb from the unit of the band; generic: free text with autodetected default) -->
+                <div v-if="isThermal && thermalUnit" class="panel-row">
+                    <label for="raster-analysis-controls-unit" class="section-label">Unit</label>
+                    <select id="raster-analysis-controls-unit" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
+                        <option v-for="option in thermalUnitOptions" :key="option.formula" :value="option.formula">{{ option.label }}</option>
+                    </select>
+                </div>
+                <div v-else-if="!isThermal" class="panel-row">
+                    <label for="raster-analysis-controls-unit-name" class="section-label">Unit</label>
+                    <input id="raster-analysis-controls-unit-name" v-model="unitLabel" class="panel-input" placeholder="e.g. m, ft">
+                </div>
+
+                <!-- NoData value: replaces the one of the file (FR-RAS-31), for the tiles and for every number the panel shows -->
+                <div class="panel-row" data-testid="raster-nodata-section">
+                    <label for="raster-analysis-controls-nodata" class="section-label">NoData</label>
+                    <input id="raster-analysis-controls-nodata" v-model="nodata" class="panel-input"
+                           inputmode="decimal" :placeholder="nodataPlaceholder"
+                           data-testid="raster-nodata-input" @change="onNodataChange">
+                </div>
+                <div v-if="nodataError" class="panel-row-note">
+                    <div class="profile-error" data-testid="raster-nodata-error">
+                        <i class="fas fa-exclamation-triangle" /> {{ nodataError }}
+                    </div>
+                </div>
+                <div v-else-if="nodataInvalid" class="panel-row-note">
+                    <div class="no-calibration-info" data-testid="raster-nodata-invalid">
+                        <i class="fas fa-info-circle" />&nbsp;The NoData value of the file ({{ fileNodataText }}) cannot be held
+                        by its data type: no pixel is treated as no data. Enter the value of the background (for example 0).
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div v-else class="panel-body loading">
             <LoadingSpinner inline label="Loading raster info..." />
         </div>
-        <!-- Actions: two rows so each button has room for a short label; the foot of the panel, always in view (FR-RAS-23) -->
+        <!-- Actions: one row, the foot of the panel, always in view (FR-RAS-23) -->
         <template v-if="rasterInfo" #actions>
-            <div class="actions-grid">
-                <button class="panel-btn action-btn"
-                        :class="{ 'is-active': drawingProfile }"
-                        :disabled="profileLoading"
-                        :title="drawingProfile
-                            ? 'Stop drawing and discard the partial profile (Esc)'
-                            : (profile ? 'Discard the current profile and draw a new one'
-                                : 'Draw a profile line on the map')"
-                        @click="onProfileButtonClick">
-                    <i :class="profileLoading ? 'fas fa-spinner fa-spin'
-                        : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')" />
-                    {{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}
-                </button>
-                <button v-if="profile && !drawingProfile" class="panel-btn action-btn"
-                        title="Clear the chart and remove the line from the map" aria-label="Clear the chart and remove the line from the map"
-                        @click="clearProfile">
-                    <i class="fas fa-eraser" />
-                </button>
-                <button class="panel-btn action-btn"
-                        :class="{ 'is-active': inspectActive }"
-                        :title="inspectActive
-                            ? 'Stop inspecting raster values (Esc)'
-                            : 'Click on the map to read the raster value'"
-                        @click="toggleInspect">
-                    <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'" />
-                    <span class="action-label">Inspect</span>
-                </button>
-                <button class="panel-btn action-btn"
-                        :class="{ 'is-active': drawingArea }"
-                        :disabled="areaStatsLoading"
-                        :title="drawingArea
-                            ? 'Stop drawing the rectangle (Esc)'
-                            : 'Draw a rectangle on the map to get the statistics of the values inside it'"
-                        data-testid="raster-area-stats-btn"
-                        @click="$emit('toggleAreaStats')">
-                    <i :class="drawingArea ? 'fas fa-stop' : 'far fa-square'" />
-                    <span class="action-label">{{ drawingArea ? 'Stop' : 'Area' }}</span>
-                </button>
-                <button v-if="!isThermal && !loadError" class="panel-btn action-btn"
-                        :title="isElevation ? 'Generate contour lines from this elevation raster' : 'Generate contour lines from the values of this raster'"
-                        data-testid="raster-contours-btn"
-                        @click="onGenerateContoursClick">
-                    <i class="fas fa-layer-group" />
-                    <span class="action-label">Contours</span>
-                </button>
-                <button class="panel-btn action-btn" title="Reset all visualization parameters to their defaults"
-                        @click="reset">
-                    <i class="fas fa-rotate-left" />
-                    <span class="action-label">Reset</span>
-                </button>
-                <button class="panel-btn action-btn"
-                        :class="{ 'panel-btn--primary': originalView }"
-                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
-                        @click="toggleOriginalView">
-                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-                    <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
-                </button>
-            </div>
+            <div class="panel-footer-row">
+                <StyleViewActions :original-view="originalView" reset-title="Reset all visualization parameters to their defaults"
+                                  reset-aria-label="Reset all visualization parameters to their defaults"
+                                  original-aria-label="Original raster (no styling applied)"
+                                  @reset="reset" @toggle-original="toggleOriginalView" />
 
-            <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16). This panel is for a
-                 raster of one data band, so its colormap makes the styled image (FR-RAS-26) -->
-            <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox"
-                                :info="rasterInfo" :read-estimate="false" single-band />
+                <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16). This panel is for a
+                     raster of one data band, so its colormap makes the styled image (FR-RAS-26) -->
+                <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox"
+                                    :info="rasterInfo" :read-estimate="false" single-band />
+            </div>
         </template>
     </AnalysisPanel>
 </template>
@@ -205,13 +221,14 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import RescaleFields from './RescaleFields.vue';
+import StyleViewActions from './StyleViewActions.vue';
 import RasterExportButton from './RasterExportButton.vue';
 import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
 import RasterProfileChart from './RasterProfileChart.vue';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterAreaStats';
 import { nodataNumber } from '@/libs/ddb/dataset';
-import { rasterValueParts, isElevationRaster, THERMAL_UNIT_OPTIONS, thermalBandUnit, thermalFormulaOfUnit, thermalUnitOfFormula } from '@/libs/map/rasterUnit';
+import { rasterValueParts, rasterUnitSymbol, isElevationRaster, THERMAL_UNIT_OPTIONS, thermalBandUnit, thermalFormulaOfUnit, thermalUnitOfFormula } from '@/libs/map/rasterUnit';
 import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { formatNumber, formatNumberList } from '@/libs/format';
 import { RASTER_ANALYSIS_ICON } from '@/libs/glyphs';
@@ -219,7 +236,7 @@ import { RASTER_ANALYSIS_ICON } from '@/libs/glyphs';
 const formatCount = n => formatNumber(n, 'count');
 
 export default {
-    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect, RescaleFields, RasterExportButton },
+    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect, RescaleFields, StyleViewActions, RasterExportButton },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -248,7 +265,7 @@ export default {
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
             'profileHover', 'cancelDrawProfile', 'toggleInspectValue',
-            'openContourDialog', 'toggleAreaStats', 'clearAreaStats', 'selectTarget'],
+            'openContourDialog', 'toggleAreaStats', 'clearAreaStats', 'clearSpot', 'selectTarget'],
 
     setup() {
         return { applyLater: useTimerGroup() };
@@ -269,7 +286,9 @@ export default {
             // The NoData value typed in the panel ('' keeps the one of the file)
             nodata: '',
             unitLabel: '',
-            originalView: false
+            originalView: false,
+            // The user opened the Data settings fold; see dataSettingsOpen
+            dataSettingsOpened: false
         };
     },
     computed: {
@@ -285,9 +304,6 @@ export default {
         },
         panelIconClass() {
             return this.isThermal ? 'fas fa-temperature-high' : RASTER_ANALYSIS_ICON;
-        },
-        rangeLabel() {
-            return this.isThermal ? 'Temperature Range' : 'Value Range';
         },
         availableColormaps() {
             return colormapList(this.isThermal ? THERMAL_COLORMAPS : GENERIC_COLORMAPS);
@@ -359,9 +375,42 @@ export default {
             if (this.isThermal) return thermalUnitOfFormula(this.selectedFormula);
             return this.unitLabel || '';
         },
-        // The rescale has the unit it was written in when that is a temperature unit
+        // The unit a thermal rescale was written in; '' when the range is in the unit the panel shows
+        rescaleUnitShown() {
+            return this.isThermal && this.thermalUnit && this.rescale && this.rescaleUnit ? this.rescaleUnit : '';
+        },
+        // The range has the unit it was written in when that is a temperature unit
         rescaleLabel() {
-            return this.isThermal && this.thermalUnit && this.rescale && this.rescaleUnit ? `Rescale (${this.rescaleUnit})` : 'Rescale';
+            return this.rescaleUnitShown ? `Range (${this.rescaleUnitShown})` : 'Range';
+        },
+        // The unit written after the range fields
+        rangeUnit() {
+            return this.rescaleUnitShown || this.displayUnit;
+        },
+        // The range of the values of the raster, for the caption of the range. It is given in its own unit (dataUnit), which
+        // after a change of unit is not the one a thermal range was written in, so the caption stays after the change. Fit
+        // to data writes the range in that unit (onRescaleFit), so the label and the unit of the fields follow
+        dataRange() {
+            const info = this.rasterInfo;
+            if (this.loadError || !info || typeof info.valueMin !== 'number' || typeof info.valueMax !== 'number') return null;
+            return { min: info.valueMin, max: info.valueMax };
+        },
+        // The unit of the numbers of the info, as its symbol ('Celsius' is °C): the one the panel shows, unless the server
+        // answered in another
+        dataUnit() {
+            return rasterUnitSymbol(this.rasterInfo ? this.valueUnit(this.rasterInfo.unit) : this.displayUnit);
+        },
+        // The Data settings fold is open when the user opened it, and stays open while a NoData value needs their attention
+        // (a value that is no number, a value of the file that cannot be used), even after they closed it
+        dataSettingsOpen() {
+            return this.dataSettingsOpened || !!this.nodataError || this.nodataInvalid;
+        },
+        // What is folded, so that it can be read without opening it: the unit and the NoData value that is in force (the one typed,
+        // else the one of the file)
+        dataSettingsSummary() {
+            const typed = String(this.nodata ?? '').trim();
+            const nodata = typed || this.fileNodataText;
+            return `Unit ${this.displayUnit || 'none'} \u00b7 NoData ${nodata}`;
         }
     },
 
@@ -496,6 +545,12 @@ export default {
             this.debouncedApply();
         },
 
+        // Fit to data has committed the range of the info (onRescaleChange, whose apply waits): its numbers are in the unit
+        // of the info, which is the one the panel shows unless the server answered in another
+        onRescaleFit() {
+            this.rescaleUnit = this.dataUnit;
+        },
+
         // A NoData value changes which pixels have a value: the range of the info is that of the new ones
         async onNodataChange() {
             if (this.nodataError || !this.filePath || !this.dataset) return;
@@ -617,6 +672,12 @@ export default {
             return rasterValueParts(val, this.valueUnit(unit)).text;
         },
 
+        // A value of the raster as formatValue writes it, without its unit: the unit is written once, after the range fields
+        formatBareValue(val) {
+            const parts = rasterValueParts(val, this.valueUnit(this.rasterInfo && this.rasterInfo.unit));
+            return parts.unit ? parts.text.slice(0, -(parts.unit.length + 1)) : parts.text;
+        },
+
         // A spread of values (a standard deviation): in the unit of the values
         formatSpread(val, unit) {
             return typeof val === 'number' ? rasterValueParts(val, this.valueUnit(unit)).text : '-';
@@ -632,18 +693,19 @@ export default {
     color: var(--panel-thermal-strong);
 }
 
-.temp-range {
-    display: flex;
-    gap: 0.3rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--panel-accent);
+/* The label of the Range row sits beside its fields, the line above the caption, not in the middle of both */
+.range-row {
+    align-items: start;
 }
 
-.temp-range.thermal {
-    color: var(--panel-thermal);
+.range-row .section-label {
+    line-height: 1.9rem;
 }
 
+/* The badge is as wide as its text, not as the field column */
+.panel-row .sensor-badge {
+    justify-self: start;
+}
 
 .sensor-badge.thermal {
     background: rgba(var(--panel-thermal-strong-rgb), 0.25);
@@ -666,21 +728,28 @@ export default {
     color: var(--panel-thermal);
 }
 
-.area-stats {
-    margin: 0;
+/* The statistics in three columns, each a label over its value: a label beside its value would not fit three in a row of a narrow panel */
+.analysis-panel .area-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.15rem 0.5rem;
+    margin: 0.25rem 0 0;
 }
 
 .area-stats div {
     display: flex;
-    gap: 0.3rem;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .area-stats dt {
+    font-size: 0.6875rem;
     font-weight: normal;
+    color: var(--panel-text-faint);
 }
 
 .area-stats dd {
     margin: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 .spot-coords {

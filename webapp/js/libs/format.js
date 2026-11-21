@@ -143,6 +143,56 @@ function separators() {
 }
 
 /**
+ * The decimal sign of the browser's locale ("," in it, "." in en).
+ * @returns {string}
+ */
+export function decimalSeparator() {
+    return separators().decimal;
+}
+
+// Machine number text: an optional sign, digits with an optional ".", an optional exponent
+const MACHINE_NUMBER = /^([+-]?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i;
+// An exponent this large is not a number a range holds (Number reads it as Infinity or 0)
+const MAX_EXPONENT = 400;
+
+/**
+ * A number the program wrote ("194.66", "1e-7"), as the same digits with the browser's decimal sign
+ * ("194,66" in it): for showing a value the panel set in a field the user edits, where the user
+ * reads and types numbers in their locale. There is no grouping and no rounding, so parseNumber
+ * reads it back as the same number. An exponent is written out as digits (parseNumber does not read
+ * "1e-7"), which neither rounds. '' and text that is not a number are returned as they are.
+ * @param {string} text
+ * @returns {string}
+ */
+export function localiseNumberText(text) {
+    if (typeof text !== 'string') return text;
+    const match = MACHINE_NUMBER.exec(text.trim());
+    if (!match) return text;
+    const [, sign, whole = '', fraction = '', exponent] = match;
+    if (!whole && !fraction) return text;
+    let integer = whole;
+    let decimals = fraction;
+    if (exponent !== undefined) {
+        const shift = Number(exponent);
+        if (Math.abs(shift) > MAX_EXPONENT) return text;
+        const digits = whole + fraction;
+        const point = whole.length + shift;
+        if (point <= 0) {
+            integer = '0';
+            decimals = '0'.repeat(-point) + digits;
+        } else if (point >= digits.length) {
+            integer = digits + '0'.repeat(point - digits.length);
+            decimals = '';
+        } else {
+            integer = digits.slice(0, point);
+            decimals = digits.slice(point);
+        }
+    }
+    integer = integer.replace(/^0+(?=\d)/, '') || '0';
+    return sign + integer + (decimals ? decimalSeparator() + decimals : '');
+}
+
+/**
  * Numbers already written (formatNumber), one after the other: joined by ", ", or by "; " in a
  * locale whose decimal sign is a comma ("45,5; 9,25"), so the list stays readable.
  * @param {string[]} texts

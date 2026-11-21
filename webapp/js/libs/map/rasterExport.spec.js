@@ -99,14 +99,14 @@ describe('the label follows the style (FR-RAS-26, the rule of ddb: a formula, or
         expect(exportsStyledImage({ formula: 'NDVI', colormap: 'rdylgn' })).toBe(true);
         expect(exportsStyledImage({ formula: 'CELSIUS' })).toBe(true);
         expect(exportLabel({ formula: 'NDVI' })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
-        expect(exportNote({ formula: 'NDVI' })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
+        expect(exportNote({ formula: 'NDVI' })).toBe('The picture of the style, not the values.');
     });
 
     it('is the styled image for a colormap on a raster of one data band, formula or not', () => {
         expect(exportsStyledImage({ colormap: 'viridis' }, { singleBand: true })).toBe(true);
         expect(exportsStyledImage({ colormap: 'viridis', rescale: '0,50' }, { singleBand: true })).toBe(true);
         expect(exportLabel({ colormap: 'viridis' }, { singleBand: true })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
-        expect(exportNote({ colormap: 'viridis' }, { singleBand: true })).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
+        expect(exportNote({ colormap: 'viridis' }, { singleBand: true })).toBe('The picture of the style, not the values.');
     });
 
     it('is the styled image for a colormap on one band the style names, the same band three times included', () => {
@@ -129,6 +129,6 @@ describe('the label follows the style (FR-RAS-26, the rule of ddb: a formula, or
             expect(exportsStyledImage(style)).toBe(false);
             expect(exportLabel(style)).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
         }
-        expect(exportNote({ colormap: 'ironbow', bands: '1,2' })).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file): the bands scaled to 8 bits, not the values.');
+        expect(exportNote({ colormap: 'ironbow', bands: '1,2' })).toBe('The bands scaled to 8 bits, not the values.');
     });
 });

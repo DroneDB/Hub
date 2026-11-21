@@ -2,8 +2,8 @@
  * The Rescale range of the raster panels (FR-RAS-10, FR-RAS-20, D-025): two numbers typed the way the
  * user's locale writes them, Min below Max, sent as the machine value "min,max".
  */
-import { describe, it, expect } from 'vitest';
-import { rescaleErrors, rescaleProblem, rescaleValue, splitRescale } from './rescale';
+import { describe, it, expect, afterEach } from 'vitest';
+import { rescaleErrors, rescaleProblem, rescaleValue, splitRescale, localiseRescale } from './rescale';
 
 describe('rescaleProblem', () => {
     it('refuses text that is not a number, at the field it is in', () => {
@@ -49,5 +49,27 @@ describe('splitRescale', () => {
         expect(splitRescale('')).toEqual({ min: '', max: '' });
         expect(splitRescale(undefined)).toEqual({ min: '', max: '' });
         expect(splitRescale('5')).toEqual({ min: '5', max: '' });
+    });
+});
+
+describe('localiseRescale', () => {
+    afterEach(() => {
+        delete navigator.language;
+    });
+    const inLocale = locale => Object.defineProperty(navigator, 'language', { value: locale, configurable: true });
+
+    it('gives the two texts of the machine value in the decimal sign of the locale', () => {
+        inLocale('it-IT');
+        expect(localiseRescale('194.66,227.75')).toEqual({ min: '194,66', max: '227,75' });
+        expect(localiseRescale('-1, 1e-7')).toEqual({ min: '-1', max: '0,0000001' });
+        inLocale('en-US');
+        expect(localiseRescale('194.66,227.75')).toEqual({ min: '194.66', max: '227.75' });
+    });
+
+    it('gives empty fields for no value', () => {
+        inLocale('it-IT');
+        expect(localiseRescale('')).toEqual({ min: '', max: '' });
+        expect(localiseRescale(undefined)).toEqual({ min: '', max: '' });
+        expect(localiseRescale(null)).toEqual({ min: '', max: '' });
     });
 });

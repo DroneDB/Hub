@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
     bulkUnits, stockpileLabel, distinctLabels, middleEllipsis, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize,
-    formatNumber, formatNumberList, formatInputNumber, joinNumberTexts, parseNumber, formatBytes, formatDateTime, formatTime, formatTimeAgo, utcClockToLocal,
+    formatNumber, formatNumberList, formatInputNumber, joinNumberTexts, decimalSeparator, localiseNumberText, parseNumber, formatBytes, formatDateTime, formatTime, formatTimeAgo, utcClockToLocal,
     lengthParts, areaParts, fixedLengthParts, formatVolume, formatWeight, formatDensity, formatSpeed,
     PRECISION, UNKNOWN, EMPTY_CELL, displayLocale, latLonText, latLonDmsText, parseLatLon
 } from './format';
@@ -130,6 +130,47 @@ describe('parseNumber (D-025)', () => {
         inLocale('en-US');
         expect(formatInputNumber(1234.5)).toBe('1234.5');
         expect(formatInputNumber(null)).toBe('');
+    });
+});
+
+describe('localiseNumberText', () => {
+    const SAMPLES = ['-0.5', '194.66', '5', '1e-7', '1.5e-7', '1e+21', '0.123456789012345678', '0', '-1234567.25'];
+
+    it('writes the decimal sign of the browser locale, with no grouping', () => {
+        inLocale('it-IT');
+        expect(decimalSeparator()).toBe(',');
+        expect(localiseNumberText('194.66')).toBe('194,66');
+        expect(localiseNumberText('-1234567.25')).toBe('-1234567,25');
+        inLocale('en-US');
+        expect(decimalSeparator()).toBe('.');
+        expect(localiseNumberText('194.66')).toBe('194.66');
+    });
+
+    it('is read back by parseNumber as the same number, in every locale', () => {
+        for (const locale of ['en-US', 'it-IT', 'de-DE', 'de-CH', 'fr-FR', 'en-IN']) {
+            inLocale(locale);
+            for (const s of SAMPLES) {
+                expect(parseNumber(localiseNumberText(s)), `${locale} ${s}`).toBe(Number(s));
+            }
+        }
+    });
+
+    it('keeps every digit: no rounding, and an exponent is written out as digits', () => {
+        inLocale('it-IT');
+        expect(localiseNumberText('0.123456789012345678')).toBe('0,123456789012345678');
+        expect(localiseNumberText('1e-7')).toBe('0,0000001');
+        expect(localiseNumberText('1.5e-7')).toBe('0,00000015');
+        expect(localiseNumberText('1e+21')).toBe('1000000000000000000000');
+        expect(localiseNumberText('12.5e1')).toBe('125');
+        expect(localiseNumberText('1.25E2')).toBe('125');
+        expect(localiseNumberText('2.50')).toBe('2,50');
+    });
+
+    it('returns empty and non-numeric text as it is', () => {
+        inLocale('it-IT');
+        for (const text of ['', 'abc', '1.2.3', '12,5', '.', '-', '1e', '1e999']) {
+            expect(localiseNumberText(text), text).toBe(text);
+        }
     });
 });
 

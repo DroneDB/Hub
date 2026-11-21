@@ -18,12 +18,11 @@ export const ruleOf = (source, selector) => {
 };
 
 /**
- * The text inside the first `@media (query) { ... }` block (its nested braces balanced), '' when there is none;
- * `ruleOf` reads the rules of a media query from it.
- * @param {string} source @param {string} query the condition as written, e.g. 'max-width: 767.98px'
+ * The text inside the first `@<at-rule> <prelude> { ... }` block (its nested braces balanced), '' when there is none.
+ * @param {string} source @param {string} header everything between the `@` and the `{`, as written
  */
-export const mediaBlock = (source, query) => {
-    const start = source.indexOf(`@media (${query}) {`);
+const atRuleBlock = (source, header) => {
+    const start = source.indexOf(`@${header} {`);
     if (start < 0) return '';
     const open = source.indexOf('{', start);
     let depth = 0;
@@ -33,3 +32,16 @@ export const mediaBlock = (source, query) => {
     }
     return '';
 };
+
+/**
+ * The text inside the first `@media (query) { ... }` block (its nested braces balanced), '' when there is none;
+ * `ruleOf` reads the rules of a media query from it.
+ * @param {string} source @param {string} query the condition as written, e.g. 'max-width: 767.98px'
+ */
+export const mediaBlock = (source, query) => atRuleBlock(source, `media (${query})`);
+
+/**
+ * The text inside the first `@container <name> (query) { ... }` block, '' when there is none; `ruleOf` reads its rules.
+ * @param {string} source @param {string} name the container, e.g. 'analysis-panel' @param {string} query the condition as written, e.g. 'width < 23.5rem'
+ */
+export const containerBlock = (source, name, query) => atRuleBlock(source, `container ${name} (${query})`);

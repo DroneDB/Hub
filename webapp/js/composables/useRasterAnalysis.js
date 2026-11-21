@@ -76,6 +76,8 @@ const definition = {
             // The number of the last statistics and profile questions: only the newest answer is used
             _rasterAreaTurn: 0,
             _rasterProfileTurn: 0,
+            // The number of the last spot value question: only the newest answer is used, and none after the spot is forgotten
+            _rasterSpotTurn: 0,
             _rasterAreaLayer: null,
             _rasterAreaSource: null,
             _rasterInspectMoveKey: null,
@@ -106,7 +108,7 @@ const definition = {
                 // The rectangle, its statistics and the spot value were of the other raster
                 this._stopRasterAreaDrawing();
                 this.handleClearAreaStats();
-                this.rasterSpotInfo = null;
+                this._forgetRasterSpot();
                 // A profile in flight was asked for the other raster: its answer is dropped, and the panel waits for no one
                 this._rasterProfileTurn++;
                 this.rasterProfileLoading = false;
@@ -131,7 +133,7 @@ const definition = {
             this.rasterPanelVisible = false;
             this.rasterFilePath = null;
             this.rasterInitialParams = null;
-            this.rasterSpotInfo = null;
+            this._forgetRasterSpot();
             this.handleClearAreaStats();
             this._removeRasterAreaLayer();
             this.rasterProfile = null;
@@ -219,10 +221,8 @@ const definition = {
         async queryRasterPointAt(mapCoord) {
             if (!this.rasterFilePath || !this.dataset) return null;
             const [lon, lat] = transform(mapCoord, this.map.getView().getProjection(), EPSG.WGS84);
-            const result = await this.dataset.getRasterPointValueAt(this.rasterFilePath, lon, lat,
-                this._rasterValueOptions());
-            this.rasterSpotInfo = result;
-            return result;
+            const options = this._rasterValueOptions();
+            return this._keepRasterSpot(path => this.dataset.getRasterPointValueAt(path, lon, lat, options));
         },
 
         /**
@@ -232,9 +232,31 @@ const definition = {
          */
         async queryRasterPoint(x, y) {
             if (!this.rasterFilePath || !this.dataset) return null;
-            const result = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y, this._rasterValueOptions());
+            const options = this._rasterValueOptions();
+            return this._keepRasterSpot(path => this.dataset.getRasterPointValue(path, x, y, options));
+        },
+
+        /**
+         * Asks a spot value and keeps the answer as the spot value of the panel, unless the question is over when it comes: a
+         * newer question was asked, the spot was cleared (the × of its card), or the panel moved to another raster. Such an
+         * answer is dropped and null is returned, so that a value the user cleared does not come back and an older value does
+         * not replace a newer one.
+         * @param {(path: string) => Promise<any>} read  the call to the server, for the raster of the panel
+         * @returns {Promise<any>} the server's answer, or null when it is dropped
+         */
+        async _keepRasterSpot(read) {
+            const path = this.rasterFilePath;
+            const turn = ++this._rasterSpotTurn;
+            const result = await read(path);
+            if (turn !== this._rasterSpotTurn || path !== this.rasterFilePath) return null;
             this.rasterSpotInfo = result;
             return result;
+        },
+
+        /** Forgets the spot value; a question in flight is over for the panel, its answer is dropped. */
+        _forgetRasterSpot() {
+            this._rasterSpotTurn++;
+            this.rasterSpotInfo = null;
         },
 
         /**
@@ -323,6 +345,16 @@ const definition = {
             this.rasterAreaStats = null;
             this.rasterAreaStatsError = null;
             this.rasterAreaStatsLoading = false;
+        },
+
+        /**
+         * Forgets the spot value and removes its marker. The marker and its tooltip belong to Inspect, so with Inspect off (no
+         * marker layer) there is only the value to forget.
+         */
+        handleClearSpot() {
+            this._forgetRasterSpot();
+            if (this._rasterInspectSource) this._rasterInspectSource.clear();
+            if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
         },
 
         _rasterAreaStyle(sketch) {

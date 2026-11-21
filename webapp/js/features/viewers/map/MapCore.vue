@@ -53,7 +53,7 @@
                                     @viz-params-changed="handleRasterVizParamsChanged" @pick-profile="handlePickProfile"
                                     @clear-profile="handleClearProfile" @cancel-draw-profile="cancelRasterProfileDrawing"
                                     @toggle-inspect-value="toggleRasterInspect" @profile-hover="handleProfileHover"
-                                    @toggle-area-stats="toggleRasterAreaDrawing" @clear-area-stats="handleClearAreaStats"
+                                    @toggle-area-stats="toggleRasterAreaDrawing" @clear-area-stats="handleClearAreaStats" @clear-spot="handleClearSpot"
                                     @open-contour-dialog="openContourDialog" @select-target="selectAnalysisTarget" />
             <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
                                   :raster-min="contourRasterMin" :raster-max="contourRasterMax" :initial-options="contourLastOptions"

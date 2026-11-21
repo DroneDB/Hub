@@ -54,12 +54,12 @@ export function exportLabel(vizParams, options) {
 }
 
 /**
- * The note under the export: the label and what the file is.
+ * The note at the foot of the export menu: what the file holds. The items above it already name the export.
  * @param {Record<string, any> | null | undefined} vizParams
  * @param {{ singleBand?: boolean }} [options]  as exportsStyledImage
  */
 export function exportNote(vizParams, options) {
-    return `${exportLabel(vizParams, options)}: ${exportsStyledImage(vizParams, options) ? 'the picture of the style' : 'the bands scaled to 8 bits'}, not the values.`;
+    return `${exportsStyledImage(vizParams, options) ? 'The picture of the style' : 'The bands scaled to 8 bits'}, not the values.`;
 }
 
 /** The second export: what the map shows now, at the resolution of the raster (D-023). */

@@ -73,7 +73,8 @@ describe('the panels over the bottom of the map', () => {
     it('fold the sheet to its header and show the fold button only on a phone', () => {
         const phone = mediaBlock(scss, PHONE);
         expect(ruleOf(phone, '&.is-minimised')).toMatch(/max-height:\s*var\(--map-sheet-peek\)/);
-        expect(phone).toMatch(/> :not\(\.panel-header\)\s*\{\s*display:\s*none/);
+        expect(phone).toMatch(/> :not\(\.panel-top\)\s*\{\s*display:\s*none/);
+        expect(phone).toMatch(/> \.panel-top > \.panel-tools\s*\{\s*display:\s*none/);
         expect(phone).toMatch(/\.sheet-toggle\s*\{[^}]*display:\s*inline-flex/);
         expect(scss.replace(phone, '')).toMatch(/\.sheet-toggle\s*\{\s*display:\s*none/);
     });

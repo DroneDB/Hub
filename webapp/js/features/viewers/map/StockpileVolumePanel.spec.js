@@ -43,6 +43,7 @@ const materialOptions = () => wrapper.find('[data-testid="stockpile-material"]')
 // As the panel writes numbers: the browser locale, at most `digits` decimals
 // As libs/format.js writes numbers: in the browser's locale (navigator.language)
 const num = (n, digits = 2) => n.toLocaleString(navigator.language, { maximumFractionDigits: digits });
+const twoDecimals = n => n.toLocaleString(navigator.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 beforeEach(() => { h.auth.isLoggedIn = true; });
 afterEach(() => wrapper?.unmount());
@@ -151,7 +152,7 @@ describe('StockpileVolumePanel elevation model', () => {
 
     it('shows the selector with two rasters to measure on, and the current one', () => {
         render({ targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
-        expect(wrapper.text()).toContain('Elevation model');
+        expect(wrapper.find('.analysis-target label').text()).toBe('Model');
         expect(select().findAll('option').map(o => o.text())).toEqual(['dtm.tif', 'dsm.tif']);
         expect(select().element.value).toBe('odm_dem/dsm.tif');
     });
@@ -234,8 +235,9 @@ describe('StockpileVolumePanel on a map narrower than sm (FR-MAP-16)', () => {
         expect(toggle().attributes('aria-expanded')).toBe('false');
         expect(hidden()).toBe(true);
         expect(wrapper.find('[data-testid="stockpile-click-banner"]').exists()).toBe(true);
-        // What is behind the button is the four settings, and not the banner or the buttons of the modes
+        // What is behind the button is the settings and the Detection fold, and not the banner or the buttons of the modes
         expect(settings().find('[data-testid="stockpile-base-method"]').exists()).toBe(true);
+        expect(settings().find('[data-testid="stockpile-detection-toggle"]').exists()).toBe(true);
         expect(settings().find('[data-testid="stockpile-sensitivity"]').exists()).toBe(true);
         expect(settings().find('[data-testid="stockpile-radius"]').exists()).toBe(true);
         expect(settings().find('[data-testid="stockpile-material"]').exists()).toBe(true);
@@ -363,15 +365,25 @@ describe('StockpileVolumePanel Find all piles', () => {
 
     it('has the action, which asks for the search', async () => {
         render();
-        expect(button().text()).toBe('Find all piles');
+        expect(button().text()).toBe('Find all');
+        expect(button().attributes('disabled')).toBeUndefined();
+        expect(button().attributes('title')).toBe('Scan the whole raster for piles, with the detection sensitivity above');
+        expect(button().find('.fa-spinner').exists()).toBe(false);
         await button().trigger('click');
         expect(wrapper.emitted('findAll')).toHaveLength(1);
     });
 
     it('is busy while the search runs', () => {
         render({ pilesLoading: true });
-        expect(button().text()).toBe('Finding piles…');
+        expect(button().text()).toBe('Find all');
+        expect(button().find('.fa-spinner').exists()).toBe(true);
         expect(button().attributes('disabled')).toBeDefined();
+    });
+
+    it('is disabled while a volume loads, and is in the tool bar', () => {
+        render({ loading: true });
+        expect(button().attributes('disabled')).toBeDefined();
+        expect(wrapper.get('[role="toolbar"]').find('[data-testid="stockpile-find-all-btn"]').exists()).toBe(true);
     });
 
     it('lists the area, the measured volume and the confidence of each pile, in the units of the panel, and not the estimate of the detection', () => {
@@ -424,10 +436,10 @@ describe('StockpileVolumePanel Find all piles', () => {
     it('says "Largest 50 piles" for a list as long as the search asks for (there may be more), and the count below it', () => {
         const many = n => Array.from({ length: n }, (_, i) => ({ id: i, areaM2: 100 - i, confidence: 0.5, measured: { netVolume: 10 }, measureState: 'done' }));
         render({ piles: many(50) });
-        expect(wrapper.find('[data-testid="stockpile-piles"] .section-label').text()).toBe('Largest 50 piles');
+        expect(wrapper.find('[data-testid="stockpile-piles"] .result-card-title').text()).toBe('Largest 50 piles');
         wrapper.unmount();
         render({ piles: many(49) });
-        expect(wrapper.find('[data-testid="stockpile-piles"] .section-label').text()).toBe('Piles found (49)');
+        expect(wrapper.find('[data-testid="stockpile-piles"] .result-card-title').text()).toBe('Piles found (49)');
     });
 
     it('lists them in yd³ and imperial areas for an imperial map', () => {
@@ -568,7 +580,7 @@ describe('StockpileVolumePanel flat elevation', () => {
         wrapper.unmount();
         render({ baseMethod: 'flat', flatElevation: 12.5 });
         expect(input().element.value).toBe('12.5');
-        expect(wrapper.find('.flat-elevation').text()).toContain('Flat elevation (m)');
+        expect(wrapper.find('.flat-elevation').text()).toMatch(/^Flat elevation\s*m$/);
     });
 
     it('gives back what was typed once it is entered, in metres', async () => {
@@ -580,7 +592,7 @@ describe('StockpileVolumePanel flat elevation', () => {
     it('is shown and typed in feet for imperial units, and given back in metres', async () => {
         render({ baseMethod: 'flat', flatElevation: 10, unitPref: 'imperial' });
         expect(Number(input().element.value)).toBeCloseTo(32.808, 3);
-        expect(wrapper.find('.flat-elevation').text()).toContain('(ft)');
+        expect(wrapper.find('.flat-elevation').text()).toMatch(/ft$/);
         await input().setValue('100');
         expect(wrapper.emitted('update:flatElevation')[0][0]).toBeCloseTo(30.48, 3);
     });
@@ -606,42 +618,194 @@ describe('StockpileVolumePanel chosen pile', () => {
     });
 });
 
-// FR-RAS-23: the action grid is the footer of the panel
-describe('StockpileVolumePanel footer', () => {
-    it('has Click map, Draw and Clear in the footer, not in the body that scrolls', () => {
+// The buttons that start a mode or an action are the tool bar of the panel, which stays in view; there is no footer
+describe('StockpileVolumePanel tool bar', () => {
+    const edit = () => wrapper.find('[data-testid="stockpile-edit-outline-btn"]');
+
+    it('has Click map, Draw, Find all and Outline in the tool bar, and no footer nor Clear button', () => {
         render();
-        const footer = wrapper.get('[data-testid="panel-actions"]');
-        expect(footer.findAll('button').map(b => b.text())).toEqual(['Click map', 'Draw', 'Clear']);
+        const tools = wrapper.get('[role="toolbar"]');
+        expect(tools.findAll('button').map(b => b.text())).toEqual(['Click map', 'Draw', 'Find all', 'Outline']);
+        expect(wrapper.find('[data-testid="panel-actions"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="stockpile-clear-btn"]').exists()).toBe(false);
         expect(wrapper.get('.panel-body').find('[data-testid="stockpile-click-btn"]').exists()).toBe(false);
     });
 
-    describe('Edit outline', () => {
-        const edit = () => wrapper.find('[data-testid="stockpile-edit-outline-btn"]');
+    it('keeps the labels of Click map and Draw while pressed: the pressed state says the mode is on', () => {
+        const pressed = [['click', 'stockpile-click-btn', 'Click map'], ['draw', 'stockpile-draw-btn', 'Draw']];
+        pressed.forEach(([mode, id, label], index) => {
+            if (index) wrapper.unmount();
+            render({ mode });
+            const button = wrapper.get(`[data-testid="${id}"]`);
+            expect(button.attributes('aria-pressed')).toBe('true');
+            expect(button.classes()).toContain('is-active');
+            expect(button.text()).toBe(label);
+        });
+    });
 
-        it('is in the footer when the chosen pile is on the map, and asks for the edit', async () => {
+    it('shows a spinner on Click map and Draw, and disables them, while a volume loads', () => {
+        render({ loading: true });
+        for (const id of ['stockpile-click-btn', 'stockpile-draw-btn']) {
+            const button = wrapper.get(`[data-testid="${id}"]`);
+            expect(button.attributes('disabled')).toBeDefined();
+            expect(button.find('.fa-spinner').exists()).toBe(true);
+        }
+    });
+
+    describe('Outline', () => {
+        it('asks for the edit when the chosen pile is on the map', async () => {
             render({ result: RESULT, canEditOutline: true });
-            expect(wrapper.get('[data-testid="panel-actions"]').findAll('button').map(b => b.text())).toEqual(['Click map', 'Draw', 'Clear', 'Edit outline']);
+            expect(edit().attributes('disabled')).toBeUndefined();
             await edit().trigger('click');
             expect(wrapper.emitted('editOutline')).toHaveLength(1);
             expect(edit().attributes('aria-pressed')).toBe('false');
         });
 
-        it('is not there for a pile that is not on the map', () => {
+        it('is there but disabled for a pile that is not on the map, and without a pile', () => {
             render({ result: RESULT, canEditOutline: false });
-            expect(edit().exists()).toBe(false);
+            expect(edit().exists()).toBe(true);
+            expect(edit().attributes('disabled')).toBeDefined();
+            wrapper.unmount();
+            render();
+            expect(edit().attributes('disabled')).toBeDefined();
         });
 
         it('is pressed while the outline is edited, and says how to leave', () => {
             render({ result: RESULT, canEditOutline: true, editing: true });
             expect(edit().attributes('aria-pressed')).toBe('true');
             expect(edit().classes()).toContain('active');
-            expect(edit().text()).toBe('Done editing');
+            expect(edit().text()).toBe('Done');
         });
-    });
-
-    it('keeps the label "Elevation model" on its selector', () => {
-        render({ targetCandidates: [{ path: 'a/dsm.tif', label: 'dsm.tif' }, { path: 'a/dtm.tif', label: 'dtm.tif' }], targetPath: 'a/dsm.tif' });
-        expect(wrapper.find('.analysis-target label').text()).toBe('Elevation model');
     });
 });
 
+// The × of each card and of the notes without a card does what the Clear button did
+describe('StockpileVolumePanel clear buttons', () => {
+    const PILES = [{ id: 0, areaM2: 40, confidence: 0.5, measured: { netVolume: 12.4 }, measureState: 'done' }];
+
+    it('the × of the Result card clears the overlay, and says what it clears', async () => {
+        render({ result: RESULT });
+        const clear = wrapper.get('[data-testid="stockpile-result"] .result-card-clear');
+        expect(clear.attributes('aria-label')).toBe('Clear the result and the outline');
+        await clear.trigger('click');
+        expect(wrapper.emitted('clearOverlay')).toHaveLength(1);
+    });
+
+    it('titles the Result card with the pile name, or "Result" without one', () => {
+        render({ result: RESULT, pileName: 'North pile' });
+        expect(wrapper.get('[data-testid="stockpile-result"] .result-card-title').text()).toBe('North pile');
+        wrapper.unmount();
+        render({ result: RESULT });
+        expect(wrapper.get('[data-testid="stockpile-result"] .result-card-title').text()).toBe('Result');
+    });
+
+    it('the × of the pile list card clears the overlay while there is something to clear', async () => {
+        render({ piles: PILES, result: RESULT });
+        const clear = wrapper.get('[data-testid="stockpile-piles-clear"]');
+        // It clears the result and its outline too, and says so
+        expect(clear.attributes('aria-label')).toBe('Clear the piles, the result and the outline');
+        expect(clear.attributes('title')).toBe('Clear the piles, the result and the outline');
+        expect(wrapper.get('[data-testid="stockpile-result-clear"]').attributes('aria-label')).toBe('Clear the piles, the result and the outline');
+        await clear.trigger('click');
+        expect(wrapper.emitted('clearOverlay')).toHaveLength(1);
+    });
+
+    it('the × of the pile list card is enabled for a list on its own, and clears the overlay (the list with it)', async () => {
+        render({ piles: PILES });
+        const clear = wrapper.get('[data-testid="stockpile-piles-clear"]');
+        expect(clear.attributes('disabled')).toBeUndefined();
+        await clear.trigger('click');
+        expect(wrapper.emitted('clearOverlay')).toHaveLength(1);
+    });
+
+    it('the error has a × that clears the overlay', async () => {
+        render({ error: 'No pile here' });
+        expect(wrapper.get('[data-testid="stockpile-error"]').text()).toBe('No pile here');
+        expect(wrapper.get('[data-testid="stockpile-error-clear"]').attributes('aria-label')).toBe('Clear the error');
+        await wrapper.setProps({ piles: PILES });
+        expect(wrapper.get('[data-testid="stockpile-error-clear"]').attributes('aria-label')).toBe('Clear the error and the piles');
+        await wrapper.get('[data-testid="stockpile-error-clear"]').trigger('click');
+        expect(wrapper.emitted('clearOverlay')).toHaveLength(1);
+    });
+
+    it('a measure that runs without a result says so, with a × that clears the overlay', async () => {
+        render({ loading: true });
+        expect(wrapper.get('[data-testid="stockpile-measuring"]').text()).toBe('Measuring…');
+        expect(wrapper.get('[data-testid="stockpile-measuring-clear"]').attributes('aria-label')).toBe('Clear the measurement in progress and the outline');
+        await wrapper.get('[data-testid="stockpile-measuring-clear"]').trigger('click');
+        expect(wrapper.emitted('clearOverlay')).toHaveLength(1);
+        await wrapper.setProps({ loading: true, result: RESULT });
+        expect(wrapper.find('[data-testid="stockpile-measuring"]').exists()).toBe(false);
+    });
+
+    it('shows the mode banner first, then the error, then the cards', () => {
+        render({ mode: 'click', error: 'No pile here', piles: PILES, result: RESULT });
+        const order = ['stockpile-click-banner', 'stockpile-error', 'stockpile-piles', 'stockpile-result'];
+        const html = wrapper.get('.panel-body').html();
+        const positions = order.map(id => html.indexOf(`data-testid="${id}"`));
+        expect(positions.every(p => p >= 0)).toBe(true);
+        expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    });
+});
+
+describe('StockpileVolumePanel result card', () => {
+    it('shows the net volume first, then the other figures as label and value pairs, and the Title and Description', () => {
+        render({ result: { ...RESULT, area3d: 60, baseElevation: 12, confidence: 0.87 }, baseMethod: 'best_fit' });
+        const card = wrapper.get('[data-testid="stockpile-result"]');
+        const html = card.html();
+        expect(html.indexOf('stockpile-net-volume')).toBeLessThan(html.indexOf('result-grid'));
+        const labels = card.findAll('.result-label').map(l => l.text());
+        expect(labels).toEqual(['Cut', 'Fill', '2D area', '3D surface', 'Base elevation', 'Confidence', 'Weight', 'Est. cost']);
+        expect(card.find('[data-testid="stockpile-title"]').attributes('aria-label')).toBe('Title');
+        expect(card.find('[data-testid="stockpile-description"]').attributes('aria-label')).toBe('Description');
+        expect(card.find('[data-testid="stockpile-export-btn"]').exists()).toBe(true);
+    });
+
+    it('has no Fill pair, and says why, for a base that makes it nothing', () => {
+        render({ result: RESULT, baseMethod: 'lowest_perimeter' });
+        expect(wrapper.findAll('.result-label').map(l => l.text())).not.toContain('Fill');
+        expect(wrapper.find('[data-testid="stockpile-fill-hint"]').exists()).toBe(true);
+    });
+});
+
+describe('StockpileVolumePanel Detection fold', () => {
+    const toggle = () => wrapper.get('[data-testid="stockpile-detection-toggle"]');
+    const body = () => wrapper.get('[data-testid="stockpile-detection"]');
+
+    it('is closed by default, with the sensitivity and the radius in its summary in the user\'s locale', () => {
+        render({ sensitivity: 0.5, radius: 20 });
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+        expect(toggle().attributes('aria-controls')).toBe(body().attributes('id'));
+        expect(body().attributes('style')).toContain('display: none');
+        expect(text('stockpile-detection-summary')).toBe(`Sensitivity ${twoDecimals(0.5)} · Radius ${num(20)} m`);
+    });
+
+    it('opens from its button, and holds the slider with its value and the radius with its unit and hint', async () => {
+        render({ sensitivity: 0.35, radius: 20 });
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(body().attributes('style') ?? '').not.toContain('display: none');
+        expect(body().find('[data-testid="stockpile-sensitivity"]').exists()).toBe(true);
+        expect(text('stockpile-sensitivity-value')).toBe(twoDecimals(0.35));
+        expect(body().text()).toContain('Used by Click map');
+        expect(body().findAll('.field-unit').map(u => u.text()).at(-1)).toBe('m');
+    });
+
+    it('gives back the sensitivity and the radius that are set', async () => {
+        render();
+        await wrapper.get('[data-testid="stockpile-sensitivity"]').setValue('0.8');
+        await wrapper.get('[data-testid="stockpile-radius"]').setValue('35');
+        expect(wrapper.emitted('update:sensitivity')).toEqual([[0.8]]);
+        expect(wrapper.emitted('update:radius')).toEqual([[35]]);
+    });
+});
+
+describe('StockpileVolumePanel settings rows', () => {
+    it('labels Model, Base and Material, with the guide button next to Base and the materials link under Material', () => {
+        render({ targetCandidates: [{ path: 'a/dsm.tif', label: 'dsm.tif' }, { path: 'a/dtm.tif', label: 'dtm.tif' }], targetPath: 'a/dsm.tif' });
+        const labels = wrapper.findAll('.panel-settings > .panel-row > .section-label, .panel-settings > .analysis-target > .section-label').map(l => l.text());
+        expect(labels).toEqual(['Model', 'Base', 'Material']);
+        expect(wrapper.find('.panel-row [data-testid="stockpile-base-method-info"]').exists()).toBe(true);
+        expect(wrapper.find('.materials-link [data-testid="stockpile-edit-materials"]').exists()).toBe(true);
+    });
+});

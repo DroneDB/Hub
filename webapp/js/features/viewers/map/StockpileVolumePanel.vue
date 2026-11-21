@@ -1,154 +1,43 @@
 <template>
     <AnalysisPanel v-if="visible" variant="stockpile" class="stockpile-panel" data-testid="stockpile-panel"
                    :icon="STOCKPILE_ICON" title="Stockpile Volume" @close="$emit('close')">
-        <div class="panel-body">
-            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath"
-                                  @update:model-value="path => $emit('selectTarget', path)" />
-
-            <!-- A map narrower than `sm` with a mode active or a result: the settings fold behind this button, so the
-                 prompt of the mode and the result are in view (FR-MAP-16) -->
-            <button v-if="foldable" type="button" class="settings-toggle" data-testid="stockpile-settings-toggle"
-                    :aria-expanded="String(settingsOpen)" aria-controls="stockpile-volume-panel-settings" @click="settingsOpen = !settingsOpen">
-                <i class="fas" :class="settingsOpen ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true" />
-                Settings
+        <!-- The buttons that put the map in a mode or start a map action: the tool bar stays in view while the body scrolls -->
+        <template #tools>
+            <button type="button" class="panel-btn tool-btn" :class="{ active: mode === 'click', 'is-active': mode === 'click' }"
+                    :disabled="loading" :aria-pressed="mode === 'click'"
+                    data-testid="stockpile-click-btn" title="Click on the map to detect a pile at that point"
+                    @click="$emit('clickOnMap')">
+                <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'" aria-hidden="true" />
+                <span class="tool-label">Click map</span>
             </button>
-            <div v-show="!foldable || settingsOpen" id="stockpile-volume-panel-settings" class="panel-settings" data-testid="stockpile-settings">
-                <div class="section">
-                    <label for="stockpile-volume-panel-base-plane-method" class="section-label">
-                        Base Plane Method
-                        <button type="button" class="info-icon-btn"
-                                :title="baseMethodTooltip" :aria-label="baseMethodTooltip"
-                                data-testid="stockpile-base-method-info"
-                                @click="showBaseMethodsInfo = true">
-                            <i class="fas fa-info-circle" />
-                        </button>
-                    </label>
-                    <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select"
-                            :disabled="loading" data-testid="stockpile-base-method">
-                        <option v-for="m in baseMethods" :key="m.id" :value="m.id">{{ m.name }}</option>
-                    </select>
-                    <!-- The elevation of the flat base, in the unit of the user; the pile is measured again when it is typed -->
-                    <label v-if="baseMethod === flatMethod" class="flat-elevation">
-                        <span>Flat elevation ({{ elevationUnit }})</span>
-                        <input v-model.lazy.number="localFlatElevation" type="number" step="any" class="panel-input"
-                               :disabled="loading" data-testid="stockpile-flat-elevation">
-                    </label>
-                </div>
-
-                <div class="section">
-                    <label for="stockpile-volume-panel-detection-sensitivity" class="section-label">Detection Sensitivity: <strong>{{ localSensitivity.toFixed(2) }}</strong></label>
-                    <input id="stockpile-volume-panel-detection-sensitivity" v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
-                           class="panel-range" data-testid="stockpile-sensitivity">
-                </div>
-
-                <div class="section">
-                    <label for="stockpile-volume-panel-search-radius" class="section-label">Search Radius (m)</label>
-                    <input id="stockpile-volume-panel-search-radius" v-model.number="localRadius" type="number" min="5" step="5"
-                           class="panel-input" aria-describedby="stockpile-volume-panel-search-radius-hint" data-testid="stockpile-radius">
-                    <small id="stockpile-volume-panel-search-radius-hint" class="field-hint" data-testid="stockpile-radius-hint">Used by Click map</small>
-                </div>
-
-                <div class="section">
-                    <div class="section-label-row">
-                        <label for="stockpile-volume-panel-material" class="section-label">Material (optional)</label>
-                        <button v-if="canEditMaterials" type="button" class="link-btn" data-testid="stockpile-edit-materials"
-                                title="Change the densities and prices of your materials, add your own"
-                                @click="editMaterials">
-                            Edit materials…
-                        </button>
-                    </div>
-                    <select id="stockpile-volume-panel-material" v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
-                        <option :value="null">- none -</option>
-                        <option v-for="m in savedMaterials" :key="m.slug" :value="m.slug">
-                            {{ m.name }} (saved, {{ formatDensity(m.densityTonPerM3) }})
-                        </option>
-                        <optgroup v-for="group in materialGroups" :key="group.label" :label="group.label">
-                            <option v-for="m in group.materials" :key="m.slug" :value="m.slug">
-                                {{ m.name }} ({{ formatDensity(m.densityTonPerM3) }})
-                            </option>
-                        </optgroup>
-                        <option :value="customSlug">+ Custom…</option>
-                    </select>
-                    <div v-if="localMaterial === customSlug" class="custom-material-grid">
-                        <label>
-                            <span>Density ({{ units.density.unit }})</span>
-                            <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
-                                   class="panel-input" data-testid="stockpile-custom-density"
-                                   :aria-invalid="densityProblem ? 'true' : undefined"
-                                   :aria-describedby="densityProblem ? 'stockpile-volume-panel-density-error' : undefined">
-                            <!-- The rule of the material catalog (isValidDensity), in the user's unit (FR-MAP-27) -->
-                            <small v-if="densityProblem" id="stockpile-volume-panel-density-error" class="density-error" role="alert"
-                                   data-testid="stockpile-density-error">{{ densityProblem }}</small>
-                        </label>
-                        <label>
-                            <span>Cost / {{ units.perWeight.unit }} ({{ currency }})</span>
-                            <input v-model.number="localCustomCostPerTon" type="number" min="0" step="1"
-                                   class="panel-input" data-testid="stockpile-custom-cost">
-                        </label>
-                    </div>
-                </div>
-            </div>
-
+            <button type="button" class="panel-btn tool-btn" :class="{ active: mode === 'draw', 'is-active': mode === 'draw' }"
+                    :disabled="loading" :aria-pressed="mode === 'draw'"
+                    data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
+                    @click="$emit('drawPolygon')">
+                <i :class="loading ? 'fas fa-spinner fa-spin' : AREA_ICON" aria-hidden="true" />
+                <span class="tool-label">Draw</span>
+            </button>
             <!-- Every pile of the raster at once: the list chooses the pile the Result shows, and adds piles to the measurements -->
-            <div class="section find-all">
-                <button type="button" class="panel-btn find-all-btn" :disabled="loading || pilesLoading"
-                        data-testid="stockpile-find-all-btn" title="Scan the whole raster for piles, with the detection sensitivity above"
-                        @click="$emit('findAll')">
-                    <i :class="pilesLoading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-magnifying-glass-location'" aria-hidden="true" />
-                    {{ pilesLoading ? 'Finding piles…' : 'Find all piles' }}
-                </button>
-                <div v-if="pilesError" class="find-all-note error" data-testid="stockpile-piles-error">
-                    <i class="fas fa-exclamation-triangle" aria-hidden="true" /> {{ pilesError }}
-                </div>
-                <div v-else-if="piles && !piles.length" class="find-all-note" role="status" data-testid="stockpile-piles-empty">
-                    No piles found. Raise the detection sensitivity to find finer ones.
-                </div>
-                <div v-else-if="piles" class="pile-list" data-testid="stockpile-piles">
-                    <span class="section-label">{{ pilesTitle }}</span>
-                    <span class="find-all-note pile-base" data-testid="stockpile-piles-base">Volumes above the {{ pilesBaseName }}</span>
-                    <div ref="pileRows" class="pile-rows">
-                        <div class="pile-head" aria-hidden="true">
-                            <span /><span>#</span><span>Area</span><span>Volume</span><span>Confidence</span><span />
-                        </div>
-                        <div v-for="(pile, index) in piles" :key="pile.id" class="pile-row" :data-pile-id="pile.id"
-                             :class="{ chosen: pile.id === chosenPile, added: isAdded(pile) }">
-                            <input v-model="checked" type="checkbox" class="pile-check" :value="pile.id"
-                                   :disabled="!canAdd(pile)" :aria-label="`Select pile ${index + 1}`" data-testid="stockpile-pile-check">
-                            <button type="button" class="pile-main" :aria-pressed="String(pile.id === chosenPile)" :disabled="loading"
-                                    :aria-label="`Pile ${index + 1}: ${pileSummary(pile)}`" data-testid="stockpile-pile"
-                                    @click="$emit('pickPile', pile)"
-                                    @mouseenter="$emit('hoverPile', pile)" @focus="$emit('hoverPile', pile)"
-                                    @mouseleave="$emit('hoverPile', null)" @blur="$emit('hoverPile', null)">
-                                <span class="pile-rank">{{ index + 1 }}</span>
-                                <span>{{ formatArea(pileArea(pile)) }}</span>
-                                <span data-testid="stockpile-pile-volume">
-                                    <i v-if="isMeasuring(pile)" class="fas fa-spinner fa-spin" role="status" aria-label="Measuring" data-testid="stockpile-pile-spinner" />
-                                    <template v-else>{{ pile.measured ? formatVolume(pile.measured.netVolume) : EMPTY_CELL }}</template>
-                                </span>
-                                <span>{{ formatConfidence(pile.confidence) }}</span>
-                            </button>
-                            <i v-if="isAdded(pile)" class="fas fa-check pile-added" title="Added to the measurements"
-                               role="img" aria-label="Added" data-testid="stockpile-pile-added" />
-                            <button v-else type="button" class="link-btn pile-add" :disabled="!canAdd(pile)"
-                                    :aria-label="`Add pile ${index + 1}`" data-testid="stockpile-pile-add"
-                                    @click="addPiles([pile])">
-                                Add
-                            </button>
-                        </div>
-                    </div>
-                    <div class="pile-actions">
-                        <button type="button" class="panel-btn" :disabled="!selectedPiles.length" data-testid="stockpile-add-selected"
-                                @click="addPiles(selectedPiles)">
-                            Add selected ({{ selectedPiles.length }})
-                        </button>
-                        <button type="button" class="panel-btn" :disabled="!addablePiles.length" data-testid="stockpile-add-all"
-                                @click="addPiles(addablePiles)">
-                            Add all
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <button type="button" class="panel-btn tool-btn" :disabled="loading || pilesLoading"
+                    data-testid="stockpile-find-all-btn" title="Scan the whole raster for piles, with the detection sensitivity above"
+                    @click="$emit('findAll')">
+                <i :class="pilesLoading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-magnifying-glass-location'" aria-hidden="true" />
+                <!-- The label stays: the spinner says the search runs, and a longer label would not fit the bar -->
+                <span class="tool-label">Find all</span>
+            </button>
+            <!-- The outline of the chosen pile, which is a measurement on the map; its volume is measured again as it changes.
+                 Always there, so the tool bar does not change shape, and disabled while there is no outline to edit -->
+            <button type="button" class="panel-btn tool-btn" :class="{ active: editing, 'is-active': editing }"
+                    :disabled="!canEditOutline" :aria-pressed="editing"
+                    data-testid="stockpile-edit-outline-btn"
+                    title="Drag the corners of the outline, or the middle of an edge to add one (Alt+click removes one): the volume is calculated again"
+                    @click="$emit('editOutline')">
+                <i :class="EDIT_VERTICES_ICON" aria-hidden="true" />
+                <span class="tool-label">{{ editing ? 'Done' : 'Outline' }}</span>
+            </button>
+        </template>
 
+        <div class="panel-body">
             <div v-if="mode === 'click'" ref="banner" class="section click-banner" data-testid="stockpile-click-banner">
                 <i class="fa-solid fa-crosshairs" />
                 <span data-testid="stockpile-hint">{{ clickHint }}</span>
@@ -164,79 +53,166 @@
                 </button>
             </div>
 
+            <!-- An error and a measure that runs have no card of their own, and a result that is not there has no × to dismiss
+                 them with: they carry the one that clears the overlay. Every × clears all of it, and its name says so -->
             <div v-if="error" class="section error" data-testid="stockpile-error">
-                <i class="fas fa-exclamation-triangle" /> {{ error }}
+                <i class="fas fa-exclamation-triangle" />
+                <span class="note-text">{{ error }}</span>
+                <button type="button" class="note-clear" :disabled="!canClear" :title="clearLabel" :aria-label="clearLabel"
+                        data-testid="stockpile-error-clear" @click="$emit('clearOverlay')">
+                    <i class="fas fa-times" aria-hidden="true" />
+                </button>
             </div>
 
-            <div v-if="result" ref="resultSection" class="section result" data-testid="stockpile-result">
-                <!-- The pile the panel works on, and the model it was measured on when that is not the one selected above -->
-                <div v-if="pileName" class="pile-name" data-testid="stockpile-pile-name">{{ pileName }}</div>
+            <div v-if="loading && !result" class="section measuring" role="status" data-testid="stockpile-measuring">
+                <i class="fas fa-spinner fa-spin" aria-hidden="true" />
+                <span class="note-text">Measuring…</span>
+                <button type="button" class="note-clear" :disabled="!canClear" :title="clearLabel" :aria-label="clearLabel"
+                        data-testid="stockpile-measuring-clear" @click="$emit('clearOverlay')">
+                    <i class="fas fa-times" aria-hidden="true" />
+                </button>
+            </div>
+
+            <div v-if="pilesError" class="section find-all-note error" data-testid="stockpile-piles-error">
+                <i class="fas fa-exclamation-triangle" aria-hidden="true" /> {{ pilesError }}
+            </div>
+            <div v-else-if="piles && !piles.length" class="section find-all-note" role="status" data-testid="stockpile-piles-empty">
+                No piles found. Raise the detection sensitivity to find finer ones.
+            </div>
+            <div v-else-if="piles" class="result-card pile-list" data-testid="stockpile-piles">
+                <div class="result-card-header">
+                    <span class="result-card-title">{{ pilesTitle }}</span>
+                    <button type="button" class="result-card-clear" :disabled="!canClear" :title="clearLabel" :aria-label="clearLabel"
+                            data-testid="stockpile-piles-clear" @click="$emit('clearOverlay')">
+                        <i class="fas fa-times" aria-hidden="true" />
+                    </button>
+                </div>
+                <span class="find-all-note pile-base" data-testid="stockpile-piles-base">Volumes above the {{ pilesBaseName }}</span>
+                <div ref="pileRows" class="pile-rows">
+                    <div class="pile-head" aria-hidden="true">
+                        <span /><span>#</span><span>Area</span><span>Volume</span><span>Confidence</span><span />
+                    </div>
+                    <div v-for="(pile, index) in piles" :key="pile.id" class="pile-row" :data-pile-id="pile.id"
+                         :class="{ chosen: pile.id === chosenPile, added: isAdded(pile) }">
+                        <input v-model="checked" type="checkbox" class="pile-check" :value="pile.id"
+                               :disabled="!canAdd(pile)" :aria-label="`Select pile ${index + 1}`" data-testid="stockpile-pile-check">
+                        <button type="button" class="pile-main" :aria-pressed="String(pile.id === chosenPile)" :disabled="loading"
+                                :aria-label="`Pile ${index + 1}: ${pileSummary(pile)}`" data-testid="stockpile-pile"
+                                @click="$emit('pickPile', pile)"
+                                @mouseenter="$emit('hoverPile', pile)" @focus="$emit('hoverPile', pile)"
+                                @mouseleave="$emit('hoverPile', null)" @blur="$emit('hoverPile', null)">
+                            <span class="pile-rank">{{ index + 1 }}</span>
+                            <span>{{ formatArea(pileArea(pile)) }}</span>
+                            <span data-testid="stockpile-pile-volume">
+                                <i v-if="isMeasuring(pile)" class="fas fa-spinner fa-spin" role="status" aria-label="Measuring" data-testid="stockpile-pile-spinner" />
+                                <template v-else>{{ pile.measured ? formatVolume(pile.measured.netVolume) : EMPTY_CELL }}</template>
+                            </span>
+                            <span>{{ formatConfidence(pile.confidence) }}</span>
+                        </button>
+                        <i v-if="isAdded(pile)" class="fas fa-check pile-added" title="Added to the measurements"
+                           role="img" aria-label="Added" data-testid="stockpile-pile-added" />
+                        <button v-else type="button" class="link-btn pile-add" :disabled="!canAdd(pile)"
+                                :aria-label="`Add pile ${index + 1}`" data-testid="stockpile-pile-add"
+                                @click="addPiles([pile])">
+                            Add
+                        </button>
+                    </div>
+                </div>
+                <div class="pile-actions">
+                    <button type="button" class="panel-btn" :disabled="!selectedPiles.length" data-testid="stockpile-add-selected"
+                            @click="addPiles(selectedPiles)">
+                        Add selected ({{ selectedPiles.length }})
+                    </button>
+                    <button type="button" class="panel-btn" :disabled="!addablePiles.length" data-testid="stockpile-add-all"
+                            @click="addPiles(addablePiles)">
+                        Add all
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="result" ref="resultSection" class="result-card result" data-testid="stockpile-result">
+                <!-- The pile the panel works on (the card is the Result of no pile in particular without one) -->
+                <div class="result-card-header">
+                    <span class="result-card-title result-title" :data-testid="pileName ? 'stockpile-pile-name' : undefined">{{ pileName || 'Result' }}</span>
+                    <button type="button" class="result-card-clear" :disabled="!canClear" :title="clearLabel" :aria-label="clearLabel"
+                            data-testid="stockpile-result-clear" @click="$emit('clearOverlay')">
+                        <i class="fas fa-times" aria-hidden="true" />
+                    </button>
+                </div>
+                <!-- The model it was measured on, when that is not the one selected below -->
                 <div v-if="measuredOn" class="measured-on" data-testid="stockpile-measured-on">
                     <i class="fas fa-info-circle" aria-hidden="true" /> Measured on {{ measuredOnName }}
                 </div>
-                <label for="stockpile-volume-panel-identification" class="section-label">Identification</label>
-                <input id="stockpile-volume-panel-identification" v-model="localTitle" type="text" class="panel-input"
-                       placeholder="Title (e.g. North pile)" maxlength="120"
-                       data-testid="stockpile-title">
-                <textarea v-model="localDescription" class="panel-input panel-textarea" aria-label="Description"
-                          rows="2" placeholder="Description (optional)" maxlength="500"
-                          data-testid="stockpile-description" />
 
-                <span class="section-label">Result</span>
+                <div class="net-volume">
+                    <strong class="net-value" data-testid="stockpile-net-volume">{{ formatVolume(result.netVolume) }}</strong>
+                    <span class="net-label">net volume</span>
+                </div>
+                <!-- Label and value pairs: two to a line while the card is wide enough for two, one to a line otherwise -->
                 <div class="result-grid">
-                    <span class="result-label">Cut volume</span>
-                    <span class="result-value">{{ formatVolume(result.cutVolume) }}</span>
+                    <div class="result-pair">
+                        <span class="result-label">Cut</span>
+                        <span class="result-value">{{ formatVolume(result.cutVolume) }}</span>
+                    </div>
 
-                    <template v-if="showFillRow">
-                        <span class="result-label">Fill volume</span>
+                    <div v-if="showFillRow" class="result-pair">
+                        <span class="result-label">Fill</span>
                         <span class="result-value">{{ formatVolume(result.fillVolume) }}</span>
-                    </template>
+                    </div>
 
-                    <span class="result-label highlight">Net volume</span>
-                    <span class="result-value highlight" data-testid="stockpile-net-volume">{{ formatVolume(result.netVolume) }}</span>
+                    <div class="result-pair">
+                        <span class="result-label">2D area</span>
+                        <span class="result-value">{{ formatArea(result.area2d) }}</span>
+                    </div>
 
-                    <span class="result-label">2D area</span>
-                    <span class="result-value">{{ formatArea(result.area2d) }}</span>
-
-                    <template v-if="result.area3d">
+                    <div v-if="result.area3d" class="result-pair">
                         <span class="result-label">3D surface</span>
                         <span class="result-value">{{ formatArea(result.area3d) }}</span>
-                    </template>
+                    </div>
 
-                    <template v-if="typeof result.baseElevation === 'number'">
+                    <div v-if="typeof result.baseElevation === 'number'" class="result-pair">
                         <span class="result-label">Base elevation</span>
                         <span class="result-value">{{ formatElevation(result.baseElevation) }}</span>
-                    </template>
+                    </div>
 
-                    <template v-if="typeof result.confidence === 'number'">
+                    <div v-if="typeof result.confidence === 'number'" class="result-pair">
                         <span class="result-label">Confidence</span>
                         <span class="result-value">{{ (result.confidence * 100).toFixed(0) }}%</span>
-                    </template>
+                    </div>
 
-                    <template v-if="result.weightEstimate">
+                    <div v-if="result.weightEstimate" class="result-pair">
                         <span class="result-label">Weight</span>
                         <span class="result-value" data-testid="stockpile-weight">{{ formatTons(result.weightEstimate.tons) }}</span>
-                    </template>
+                    </div>
 
-                    <template v-if="result.costEstimate">
+                    <div v-if="result.costEstimate" class="result-pair">
                         <span class="result-label">Est. cost</span>
                         <span class="result-value" data-testid="stockpile-cost">{{ formatCost(result.costEstimate) }}</span>
-                    </template>
+                    </div>
 
                     <!-- A custom material with a density the catalog refuses: the rows stay, with the reason (FR-MAP-27) -->
-                    <template v-if="densityProblem && !result.weightEstimate">
+                    <div v-if="densityProblem && !result.weightEstimate" class="result-pair">
                         <span class="result-label">Weight</span>
                         <span class="result-value density-error" data-testid="stockpile-weight-error">{{ densityProblem }}</span>
-                    </template>
-                    <template v-if="densityProblem && !result.costEstimate">
+                    </div>
+                    <div v-if="densityProblem && !result.costEstimate" class="result-pair">
                         <span class="result-label">Est. cost</span>
                         <span class="result-value density-error" data-testid="stockpile-cost-error">{{ densityProblem }}</span>
-                    </template>
+                    </div>
                 </div>
                 <div v-if="!showFillRow" class="fill-hint" data-testid="stockpile-fill-hint">
                     <i class="fas fa-info-circle" />
                     Fill volume is not applicable for the selected base plane method.
                 </div>
+
+                <!-- The fields keep their labels for assistive technology: the placeholders say what they are for the eye -->
+                <input id="stockpile-volume-panel-identification" v-model="localTitle" type="text" class="panel-input result-field"
+                       aria-label="Title" placeholder="Title (e.g. North pile)" maxlength="120"
+                       data-testid="stockpile-title">
+                <textarea v-model="localDescription" class="panel-input panel-textarea" aria-label="Description"
+                          rows="2" placeholder="Description (optional)" maxlength="500"
+                          data-testid="stockpile-description" />
+
                 <div class="result-actions">
                     <button class="panel-btn" data-testid="stockpile-export-btn"
                             title="Download the pile contour as GeoJSON"
@@ -246,41 +222,111 @@
                     </button>
                 </div>
             </div>
-        </div>
-        <!-- The actions stay in view at the foot of the panel, whatever the length of what is above (FR-RAS-23) -->
-        <template #actions>
-            <div class="actions-grid">
-                <button class="panel-btn action-btn" :class="{ active: mode === 'click', 'is-active': mode === 'click' }"
-                        :disabled="loading" :aria-pressed="mode === 'click'"
-                        data-testid="stockpile-click-btn" title="Click on the map to detect a pile at that point"
-                        @click="$emit('clickOnMap')">
-                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'" />
-                    <span class="action-label">{{ mode === 'click' ? 'Click map…' : 'Click map' }}</span>
+
+            <!-- A map narrower than `sm` with a mode active or a result: the settings fold behind this button, so the
+                 prompt of the mode and the result are in view (FR-MAP-16) -->
+            <button v-if="foldable" type="button" class="settings-toggle" data-testid="stockpile-settings-toggle"
+                    :aria-expanded="String(settingsOpen)" aria-controls="stockpile-volume-panel-settings" @click="settingsOpen = !settingsOpen">
+                <i class="fas" :class="settingsOpen ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true" />
+                Settings
+            </button>
+            <div v-show="!foldable || settingsOpen" id="stockpile-volume-panel-settings" class="panel-settings" data-testid="stockpile-settings">
+                <AnalysisTargetSelect label="Model" :candidates="targetCandidates" :model-value="targetPath"
+                                      @update:model-value="path => $emit('selectTarget', path)" />
+
+                <div class="panel-row">
+                    <span class="section-label label-with-info">
+                        <label for="stockpile-volume-panel-base-plane-method">Base</label>
+                        <button type="button" class="info-icon-btn"
+                                :title="baseMethodTooltip" :aria-label="baseMethodTooltip"
+                                data-testid="stockpile-base-method-info"
+                                @click="showBaseMethodsInfo = true">
+                            <i class="fas fa-info-circle" />
+                        </button>
+                    </span>
+                    <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select"
+                            :disabled="loading" data-testid="stockpile-base-method">
+                        <option v-for="m in baseMethods" :key="m.id" :value="m.id">{{ m.name }}</option>
+                    </select>
+                </div>
+                <!-- The elevation of the flat base, in the unit of the user; the pile is measured again when it is typed -->
+                <div v-if="baseMethod === flatMethod" class="panel-row flat-elevation">
+                    <label for="stockpile-volume-panel-flat-elevation" class="section-label">Flat elevation</label>
+                    <span class="field-with-unit">
+                        <input id="stockpile-volume-panel-flat-elevation" v-model.lazy.number="localFlatElevation" type="number" step="any" class="panel-input"
+                               :disabled="loading" data-testid="stockpile-flat-elevation">
+                        <span class="field-unit">{{ elevationUnit }}</span>
+                    </span>
+                </div>
+
+                <div class="panel-row">
+                    <label for="stockpile-volume-panel-material" class="section-label">Material</label>
+                    <select id="stockpile-volume-panel-material" v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
+                        <option :value="null">- none -</option>
+                        <option v-for="m in savedMaterials" :key="m.slug" :value="m.slug">
+                            {{ m.name }} (saved, {{ formatDensity(m.densityTonPerM3) }})
+                        </option>
+                        <optgroup v-for="group in materialGroups" :key="group.label" :label="group.label">
+                            <option v-for="m in group.materials" :key="m.slug" :value="m.slug">
+                                {{ m.name }} ({{ formatDensity(m.densityTonPerM3) }})
+                            </option>
+                        </optgroup>
+                        <option :value="customSlug">+ Custom…</option>
+                    </select>
+                </div>
+                <div v-if="canEditMaterials" class="panel-row-note materials-link">
+                    <button type="button" class="link-btn" data-testid="stockpile-edit-materials"
+                            title="Change the densities and prices of your materials, add your own"
+                            @click="editMaterials">
+                        Edit materials…
+                    </button>
+                </div>
+                <div v-if="localMaterial === customSlug" class="custom-material-grid">
+                    <label>
+                        <span>Density ({{ units.density.unit }})</span>
+                        <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
+                               class="panel-input" data-testid="stockpile-custom-density"
+                               :aria-invalid="densityProblem ? 'true' : undefined"
+                               :aria-describedby="densityProblem ? 'stockpile-volume-panel-density-error' : undefined">
+                        <!-- The rule of the material catalog (isValidDensity), in the user's unit (FR-MAP-27) -->
+                        <small v-if="densityProblem" id="stockpile-volume-panel-density-error" class="density-error" role="alert"
+                               data-testid="stockpile-density-error">{{ densityProblem }}</small>
+                    </label>
+                    <label>
+                        <span>Cost / {{ units.perWeight.unit }} ({{ currency }})</span>
+                        <input v-model.number="localCustomCostPerTon" type="number" min="0" step="1"
+                               class="panel-input" data-testid="stockpile-custom-cost">
+                    </label>
+                </div>
+
+                <!-- What Find all and Click map detect with: set once, so it folds, with its values in the summary -->
+                <button type="button" class="panel-fold" :aria-expanded="String(detectionOpen)" aria-controls="stockpile-volume-panel-detection"
+                        data-testid="stockpile-detection-toggle" @click="detectionOpen = !detectionOpen">
+                    <i class="fas fa-chevron-right" aria-hidden="true" />
+                    <span class="panel-fold-name">Detection</span>
+                    <span class="panel-fold-summary" data-testid="stockpile-detection-summary">{{ detectionSummary }}</span>
                 </button>
-                <button class="panel-btn action-btn" :class="{ active: mode === 'draw', 'is-active': mode === 'draw' }"
-                        :disabled="loading" :aria-pressed="mode === 'draw'"
-                        data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
-                        @click="$emit('drawPolygon')">
-                    <i :class="AREA_ICON" />
-                    <span class="action-label">{{ mode === 'draw' ? 'Drawing…' : 'Draw' }}</span>
-                </button>
-                <button class="panel-btn action-btn" :disabled="!canClear"
-                        data-testid="stockpile-clear-btn" title="Clear the overlay, exit any active mode and reset the panel"
-                        @click="$emit('clearOverlay')">
-                    <i class="fa-solid fa-eraser" />
-                    <span class="action-label">Clear</span>
-                </button>
-                <!-- The outline of the chosen pile, which is a measurement on the map; its volume is measured again as it changes -->
-                <button v-if="canEditOutline" class="panel-btn action-btn edit-outline-btn"
-                        :class="{ active: editing, 'is-active': editing }" :aria-pressed="editing"
-                        data-testid="stockpile-edit-outline-btn"
-                        title="Drag the corners of the outline, or the middle of an edge to add one (Alt+click removes one): the volume is calculated again"
-                        @click="$emit('editOutline')">
-                    <i :class="EDIT_VERTICES_ICON" />
-                    <span class="action-label">{{ editing ? 'Done editing' : 'Edit outline' }}</span>
-                </button>
+                <div v-show="detectionOpen" id="stockpile-volume-panel-detection" class="panel-fold-body" data-testid="stockpile-detection">
+                    <div class="panel-row">
+                        <label for="stockpile-volume-panel-detection-sensitivity" class="section-label">Sensitivity</label>
+                        <span class="field-with-unit">
+                            <input id="stockpile-volume-panel-detection-sensitivity" v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
+                                   class="panel-range" data-testid="stockpile-sensitivity">
+                            <strong class="field-unit sensitivity-value" data-testid="stockpile-sensitivity-value">{{ sensitivityText }}</strong>
+                        </span>
+                    </div>
+                    <div class="panel-row">
+                        <label for="stockpile-volume-panel-search-radius" class="section-label">Search radius</label>
+                        <span class="field-with-unit">
+                            <input id="stockpile-volume-panel-search-radius" v-model.number="localRadius" type="number" min="5" step="5"
+                                   class="panel-input" aria-describedby="stockpile-volume-panel-search-radius-hint" data-testid="stockpile-radius">
+                            <span class="field-unit">m</span>
+                        </span>
+                    </div>
+                    <div id="stockpile-volume-panel-search-radius-hint" class="panel-row-note" data-testid="stockpile-radius-hint">Used by Click map</div>
+                </div>
             </div>
-        </template>
+        </div>
         <StockpileBaseMethodsDialog v-model:visible="showBaseMethodsInfo" />
     </AnalysisPanel>
 </template>
@@ -376,12 +422,14 @@ export default {
         return {
             AREA_ICON, EDIT_VERTICES_ICON, STOCKPILE_ICON, EMPTY_CELL, customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS,
             flatMethod: BASE_METHOD.FLAT, showBaseMethodsInfo: false, settingsOpen: false,
+            // The Detection fold: closed until the user opens it, the summary says what it holds
+            detectionOpen: false,
             // The ids of the rows ticked for Add selected
             checked: []
         };
     },
     computed: {
-        // Below `sm`, while a mode is active or a result shows, the settings (base plane, sensitivity, radius, material) fold
+        // Below `sm`, while a mode is active or a result shows, the settings (model, base plane, material, detection) fold
         foldable() { return !!this.mapSize?.narrow && !!(this.mode || this.result); },
         localBaseMethod: {
             get() { return this.baseMethod; },
@@ -397,6 +445,10 @@ export default {
             }
         },
         elevationUnit() { return this.isImperial ? 'ft' : 'm'; },
+        // The sensitivity as the rest of the Hub writes a number (the user's decimal sign), for the slider and for the fold summary
+        sensitivityText() { return formatNumber(this.sensitivity, 2); },
+        // What the folded Detection holds, so the values are known without opening it
+        detectionSummary() { return `Sensitivity ${this.sensitivityText} · Radius ${formatNumber(this.radius, 2, { trim: true })} m`; },
         localSensitivity: {
             get() { return this.sensitivity; },
             set(v) { this.$emit('update:sensitivity', Number(v)); }
@@ -474,10 +526,24 @@ export default {
         },
         canEditMaterials() { return !this.embed && this.auth.isLoggedIn; },
         // Clear should be available whenever there is something visible to clear
-        // (a result, a banner error, an active mode, or a loading request the
-        // user wants to abandon).
+        // (a result, a banner error, an active mode, a loading request the
+        // user wants to abandon, or a list of piles: clearing resets it too).
         canClear() {
-            return Boolean(this.result || this.error || this.mode || this.loading);
+            return Boolean(this.result || this.error || this.mode || this.loading || this.piles?.length);
+        },
+        // The name of every × of the panel. Each one clears the overlay, which takes the error, the measurement that runs,
+        // the piles found, the result and its outline at once: the name lists what of that the panel shows, so that the × of
+        // one card does not seem to clear that card alone
+        clearLabel() {
+            const parts = [];
+            if (this.error) parts.push('the error');
+            if (this.loading) parts.push('the measurement in progress');
+            if (this.piles || this.pilesError) parts.push('the piles');
+            if (this.result) parts.push('the result');
+            if (this.result || this.loading) parts.push('the outline');
+            if (!parts.length) return 'Clear';
+            const last = parts.pop();
+            return `Clear ${parts.length ? `${parts.join(', ')} and ${last}` : last}`;
         },
         isImperial() { return this.unitPref === 'imperial'; },
         // Hide the Fill volume row when the chosen base plane method makes it
@@ -591,16 +657,8 @@ export default {
 <style scoped>
 /* Shared look and palette: css/_analysis-panel.scss */
 
-.find-all-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.4rem;
-    width: 100%;
-}
-
 .find-all-note {
-    margin-top: 0.4rem;
+    margin: 0;
     font-size: 0.75rem;
     color: var(--panel-text-soft);
 }
@@ -609,17 +667,11 @@ export default {
     color: var(--panel-warn-text);
 }
 
-/* The list: one line per pile, as wide as the panel, scrolled when there are many. A row is a tick, the button
+/* The list: one line per pile, as wide as the card, scrolled when there are many. A row is a tick, the button
    that chooses the pile (its four figures) and Add, or the check mark of a pile that was added */
-.pile-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    margin-top: 0.4rem;
-}
-
 .pile-base {
-    margin-top: 0;
+    display: block;
+    margin: 0.1rem 0 0.35rem;
 }
 
 .pile-rows {
@@ -724,34 +776,65 @@ export default {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.4rem;
-    margin-top: 0.3rem;
-}
-
-.field-hint {
-    display: block;
-    margin-top: 0.2rem;
-    font-size: 0.7rem;
-    color: var(--panel-muted);
-}
-
-.flat-elevation {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
     margin-top: 0.4rem;
-    font-size: 0.7rem;
+}
+
+/* A control with a unit (or the value of a slider) after it: the control takes what the unit leaves */
+.field-with-unit {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.field-with-unit > .panel-input,
+.field-with-unit > .panel-range {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+}
+
+.field-unit {
+    flex: none;
+    font-size: 0.8rem;
     color: var(--panel-muted);
 }
 
-/* Which pile the Result is of, and the model it was measured on */
-.pile-name {
-    font-size: 0.8rem;
+.sensitivity-value {
+    min-width: 2.2rem;
+    text-align: right;
     font-weight: 600;
+    color: var(--panel-text);
+}
+
+/* The label of Base, with the button that opens the guide beside it */
+.label-with-info {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+}
+
+.label-with-info .info-icon-btn {
+    margin-left: 0.2rem;
+}
+
+/* "Edit materials…" under the Material field, at the right */
+.materials-link {
+    text-align: right;
+}
+
+/* The chosen pile's name is the title of its card: the one text of the header that is not a muted caption */
+.result-title {
+    font-size: 0.84rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--panel-text);
     overflow-wrap: anywhere;
 }
 
 .measured-on {
+    margin-top: 0.15rem;
     font-size: 0.72rem;
     color: var(--panel-text-soft);
     overflow-wrap: anywhere;
@@ -762,9 +845,25 @@ export default {
     margin-right: 0.25rem;
 }
 
-/* The fourth button of the foot has the whole row */
-.edit-outline-btn {
-    grid-column: 1 / -1;
+/* The figure the pile is measured for comes first and is the largest thing of the card */
+.net-volume {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.1rem 0.5rem;
+    margin: 0.3rem 0 0.35rem;
+}
+
+.net-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--panel-accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.net-label {
+    font-size: 0.75rem;
+    color: var(--panel-muted);
 }
 
 /* The disclosure of the settings: a line the width of the panel */
@@ -773,6 +872,7 @@ export default {
     align-items: center;
     gap: 0.4rem;
     width: 100%;
+    margin-bottom: 0.35rem;
     background: none;
     border: none;
     padding: 0.15rem 0;
@@ -780,12 +880,6 @@ export default {
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
-}
-
-.section-label strong {
-    color: var(--panel-text);
-    text-transform: none;
-    letter-spacing: 0;
 }
 
 .fill-hint {
@@ -804,30 +898,82 @@ export default {
     margin-right: 0.25rem;
 }
 
-.section.error {
+/* A note that has no card (an error, a measure that runs): the icon, the text and the × that dismisses it */
+.section.error,
+.section.measuring {
     display: flex;
     align-items: flex-start;
     gap: 0.4rem;
     font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.section.error {
     color: var(--panel-warn-text);
     background: rgba(var(--panel-warn-rgb), 0.1);
     border: 1px solid rgba(var(--panel-warn-rgb), 0.3);
     border-radius: 4px;
     padding: 0.4rem 0.5rem;
-    line-height: 1.3;
 }
 
-.section.error i {
+.section.measuring {
+    align-items: center;
+    color: var(--panel-text-soft);
+}
+
+.section.error > i:first-child,
+.section.measuring > i:first-child {
     color: var(--panel-accent);
-    margin-top: 0.1rem;
     flex-shrink: 0;
 }
 
+.section.error > i:first-child {
+    margin-top: 0.1rem;
+}
+
+.note-text {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.note-clear {
+    flex: none;
+    margin-left: auto;
+    padding: 0 0.25rem;
+    background: none;
+    border: 0;
+    color: inherit;
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.note-clear:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.note-clear:focus-visible {
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+    outline-offset: var(--ddb-focus-ring-offset);
+}
+
+/* The figures of the result: pairs of label and value, as many to a line as the card holds (two when it is wide
+   enough, one on a narrow panel) */
 .result-grid {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.2rem 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: 0.2rem 0.8rem;
     font-size: 0.75rem;
+}
+
+.result-pair {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
 }
 
 .result-label {
@@ -838,16 +984,11 @@ export default {
     color: var(--panel-text-soft);
     font-family: monospace;
     text-align: right;
+    overflow-wrap: anywhere;
 }
 
-.result-label.highlight {
-    color: var(--panel-accent);
-    font-weight: 600;
-}
-
-.result-value.highlight {
-    color: var(--panel-accent);
-    font-weight: 700;
+.result-field {
+    margin-top: 0.5rem;
 }
 
 .click-banner {
@@ -879,13 +1020,6 @@ export default {
 }
 .banner-cancel:hover { color: var(--ddb-text-on-dark); }
 
-.section-label-row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5rem;
-}
-
 .link-btn {
     background: none;
     border: none;
@@ -904,7 +1038,7 @@ export default {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.4rem;
-    margin-top: 0.35rem;
+    margin-bottom: 0.5rem;
 }
 .custom-material-grid label {
     display: flex;

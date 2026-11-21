@@ -34,6 +34,8 @@ async function render(props = {}, info = DSM_INFO) {
     return wrapper;
 }
 const byId = id => wrapper.find(`[data-testid="${id}"]`);
+// The Range row's caption: the range of the values of the raster, as the panel writes it ("Data 194.7 – 229.5 m")
+const dataRange = () => byId('rescale-data-range').find('span').text();
 const statRows = () => byId('raster-area-stats').findAll('dl > div').map(d => `${d.find('dt').text()} ${d.find('dd').text()}`);
 
 afterEach(() => wrapper?.unmount());
@@ -54,8 +56,8 @@ describe('RasterAnalysisControls area statistics', () => {
     it('shows min, max, mean, median and spread in the unit, then the pixels and those without data', async () => {
         await render({ areaStats: STATS });
         expect(statRows()).toEqual([
-            'Min: 196.96 m', 'Max: 197.71 m', 'Mean: 197.21 m', 'Median: 197.19 m', 'Std dev: 0.17 m',
-            `Pixels: ${(9000).toLocaleString(navigator.language)}`, `No data: ${(1000).toLocaleString(navigator.language)}`
+            'Min 196.96 m', 'Max 197.71 m', 'Mean 197.21 m', 'Median 197.19 m', 'Std dev 0.17 m',
+            `Pixels ${(9000).toLocaleString(navigator.language)}`, `No data ${(1000).toLocaleString(navigator.language)}`
         ]);
     });
 
@@ -70,8 +72,8 @@ describe('RasterAnalysisControls area statistics', () => {
         wrapper.vm.rasterInfo = { valueMin: 20, valueMax: 40, isThermal: true, calibration: {} };
         wrapper.vm.selectedFormula = 'KELVIN';
         await wrapper.setProps({ areaStats: { ...STATS, min: 293.15, stddev: 1.25, isThermal: true } });
-        expect(statRows()).toContain('Min: 293.2 K');
-        expect(statRows()).toContain('Std dev: 1.3 K');
+        expect(statRows()).toContain('Min 293.2 K');
+        expect(statRows()).toContain('Std dev 1.3 K');
     });
 
     it('shows the computation, then an error, and Clear asks the host to remove them', async () => {
@@ -97,14 +99,14 @@ describe('RasterAnalysisControls area statistics', () => {
 describe('RasterAnalysisControls unit', () => {
     it('is none for the raw values of a raster that is not an elevation model', async () => {
         await render({ areaStats: { ...STATS, min: 145, max: 402 }, filePath: 'Airborne_thermal_infrared_mosaic.tif' }, RAW_INFO);
-        expect(statRows()).toContain('Min: 145');
-        expect(statRows()).toContain('Max: 402');
+        expect(statRows()).toContain('Min 145');
+        expect(statRows()).toContain('Max 402');
         expect(statRows().join(' ')).not.toMatch(/ m\b/);
     });
 
     it('is the own unit of the raster when it has one', async () => {
         await render({ areaStats: STATS }, { ...DSM_INFO, unit: 'ft' });
-        expect(statRows()).toContain('Min: 196.96 ft');
+        expect(statRows()).toContain('Min 196.96 ft');
     });
 });
 
@@ -309,12 +311,12 @@ describe('RasterAnalysisControls default style', () => {
     it('Reset sets the Unit back to the default and emits the default style', async () => {
         await render({ filePath: 'hatcreek/mosaic.tif' }, RAW_INFO);
         await unitInput().setValue('dC');
-        expect(wrapper.find('.temp-range').text()).toContain('145 dC');
+        expect(dataRange()).toBe('Data 145 \u2013 402 dC');
         await setRescale('0', '5');
         await resetButton().trigger('click');
         await flushPromises();
         expect(unitInput().element.value).toBe('');
-        expect(wrapper.find('.temp-range').text()).not.toContain('dC');
+        expect(dataRange()).toBe('Data 145 \u2013 402');
         expect(rescaleShown()).toBe('145,402');
         expect(last()).toEqual({ colormap: 'viridis', rescale: '145,402' });
     });
@@ -355,16 +357,19 @@ describe('RasterAnalysisControls value format', () => {
         await render({ spotInfo: { value: 29.06, x: 1, y: 1, hasGeo: false } },
             { valueMin: 12.76, valueMax: 35.27, isThermal: true, calibration: {}, unit: 'Celsius' });
         expect(byId('raster-spot-value').text()).toContain('29.1 °C');
-        expect(wrapper.find('.temp-range').text()).toContain('12.8 °C');
-        expect(wrapper.find('.temp-range').text()).toContain('35.3 °C');
+        expect(dataRange()).toBe('Data 12.8 \u2013 35.3 °C');
     });
 });
 
 // FR-RAS-16: the export of Raster Analysis is the one export control (a task), not a direct download; one over the limit is a
 // button that can be focused with its reason as visible text
 describe('RasterAnalysisControls export', () => {
+    // The items are in the menu of the Export button, which is closed until it is opened
+    const openMenu = () => byId('raster-export-menu-btn').trigger('click');
+
     it('refuses an export over the limit with a focusable button and the reason as text, from the value info of the Registry', async () => {
         await render({}, { ...DSM_INFO, estimatedExportBytes: 9985798963, exportLimitBytes: 1073741824 });
+        await openMenu();
         const button = byId('raster-export-whole');
         expect(button.element.tagName).toBe('BUTTON');
         expect(button.attributes('disabled')).toBeUndefined();
@@ -394,18 +399,21 @@ describe('RasterAnalysisControls export', () => {
     // FR-RAS-26: ddb writes the RGBA image of a DEM painted with a colormap (as of a formula, the thermal unit)
     it('names the file of the export after the style: a styled image for an elevation raster with its colormap and for a thermal unit', async () => {
         await render();
+        await openMenu();
         expect(byId('raster-export-whole').attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
-        expect(byId('raster-export-note').text()).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file): the picture of the style, not the values.');
+        expect(byId('raster-export-note').text()).toBe('The picture of the style, not the values.');
         wrapper.unmount();
 
         await render({}, { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '',
             valueMin: 280.1, valueMax: 308.4, stretch: [{ min: 280.1, max: 308.4 }] });
+        await openMenu();
         expect(byId('raster-export-whole').attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
         expect(byId('raster-export-whole').attributes('title')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
     });
 
     it('offers the export of the whole raster when it is within the limit', async () => {
         await render({}, { ...DSM_INFO, estimatedExportBytes: 1000, exportLimitBytes: 1073741824 });
+        await openMenu();
         expect(byId('raster-export-whole').attributes('aria-disabled')).toBeUndefined();
         expect(byId('raster-export-whole-reason').exists()).toBe(false);
     });
@@ -417,6 +425,7 @@ describe('RasterAnalysisControls export', () => {
             global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
         });
         await flushPromises();
+        await openMenu();
         await byId('raster-export-whole').trigger('click');
         await flushPromises();
         expect(dataset.exportUrl).not.toHaveBeenCalled();
@@ -447,12 +456,38 @@ describe('RasterAnalysisControls Contours button wording', () => {
 
 // FR-RAS-23: the action grid is the footer of the panel, not part of the body that scrolls
 describe('RasterAnalysisControls footer', () => {
-    it('has its actions in the footer of the panel', async () => {
+    it('has its actions in one row in the footer of the panel, the export menu closed', async () => {
         await render();
         const footer = wrapper.get('[data-testid="panel-actions"]');
-        expect(footer.findAll('button').map(b => b.text()).filter(Boolean)).toEqual(['Profile', 'Inspect', 'Area', 'Contours', 'Reset', 'Original', 'Export', 'Visible extent']);
+        expect(footer.findAll('.panel-footer-row button').map(b => b.text())).toEqual(['Reset', 'Original', 'Export']);
         expect(footer.find('[data-testid="raster-export"]').exists()).toBe(true);
+        expect(footer.find('[data-testid="raster-export-menu"]').exists()).toBe(false);
         expect(wrapper.get('.panel-body').find('[data-testid="raster-area-stats-btn"]').exists()).toBe(false);
+    });
+
+    it('Reset has its title as its name, because its label is hidden on a narrow panel', async () => {
+        await render();
+        const reset = wrapper.get('button[title="Reset all visualization parameters to their defaults"]');
+        expect(reset.attributes('aria-label')).toBe('Reset all visualization parameters to their defaults');
+        expect(reset.classes()).toContain('footer-btn');
+    });
+
+    it('Original is pressed while the original is shown, and says so in its label', async () => {
+        await render();
+        const original = () => wrapper.findAll('.panel-footer-row > button')[1];
+        expect(original().attributes('aria-pressed')).toBe('false');
+        expect(original().classes()).not.toContain('is-active');
+        await original().trigger('click');
+        expect(original().attributes('aria-pressed')).toBe('true');
+        // The pressed look of a toggle, as in Plant Health; the primary look is the one of Export
+        expect(original().classes()).toContain('is-active');
+        expect(original().classes()).not.toContain('panel-btn--primary');
+        expect(original().attributes('aria-label')).toBe('Original raster (no styling applied)');
+        expect(original().text()).toBe('Hide orig.');
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({});
+        await original().trigger('click');
+        expect(original().text()).toBe('Original');
+        expect(original().attributes('aria-pressed')).toBe('false');
     });
 
     it('has no footer while the raster info is loading', () => {
@@ -492,7 +527,8 @@ describe('RasterAnalysisControls thermal units', () => {
     }
     const select = () => wrapper.find('#raster-analysis-controls-unit');
     const last = () => wrapper.emitted('vizParamsChanged').at(-1)[0];
-    const range = () => wrapper.findAll('.temp-range span').map(span => span.text()).join(' ');
+    // The range of the values, as the Range row's caption says it
+    const range = () => byId('rescale-data-range').find('.rescale-data').text();
     // The Rescale range of the two fields (U-401 RescaleFields) as the panel's machine value "min,max"
     const rescaleShown = () => `${wrapper.find('#raster-analysis-controls-rescale-min').element.value},${wrapper.find('#raster-analysis-controls-rescale-max').element.value}`;
     // The user types a range and leaves the field (the commit the panel applies)
@@ -507,7 +543,7 @@ describe('RasterAnalysisControls thermal units', () => {
     it('opens a Kelvin raster in K, with the formula of the band and no 273.15 added', async () => {
         await mountThermal(KELVIN, KELVIN_IN);
         expect(select().element.value).toBe('KELVIN');
-        expect(range()).toBe('280.1 K - 308.4 K');
+        expect(range()).toBe('280.1 \u2013 308.4 K');
         expect(last()).toEqual({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280.1,308.4' });
         expect(wrapper.vm.formatValue(284.6)).toBe('284.6 K');
         expect(wrapper.vm.formatSpread(1.25)).toBe('1.3 K');
@@ -518,8 +554,37 @@ describe('RasterAnalysisControls thermal units', () => {
         await chooseUnit('CELSIUS');
         // The value info is asked again in the unit
         expect(getRasterValueInfo).toHaveBeenLastCalledWith('hatcreek/clip.tif', { nodata: undefined, formula: 'CELSIUS' });
-        expect(range()).toBe('7.0 °C - 35.3 °C');
+        expect(wrapper.vm.rasterInfo).toMatchObject({ unit: '°C', valueMin: 6.95, valueMax: 35.25 });
         expect(wrapper.vm.formatValue(11.5)).toBe('11.5 °C');
+    });
+
+    // The range of the fields keeps its temperatures in K after a change of unit; the caption is in the unit the panel shows,
+    // and Fit to data writes the range in that unit, so the label and the unit of the fields follow
+    it('keeps the caption of the range in the unit the panel shows after a change of unit, and fits in that unit', async () => {
+        await mountThermal(KELVIN, KELVIN_IN);
+        expect(range()).toBe('280.1 \u2013 308.4 K');
+        await chooseUnit('CELSIUS');
+        expect(rescaleLabel()).toBe('Range (K)');
+        expect(byId('rescale-unit').text()).toBe('K');
+        expect(range()).toBe('7.0 \u2013 35.3 °C');
+
+        await byId('rescale-fit').trigger('click');
+        expect(rescaleShown()).toBe('6.95,35.25');
+        expect(rescaleLabel()).toBe('Range (°C)');
+        expect(byId('rescale-unit').text()).toBe('°C');
+        await new Promise(resolve => setTimeout(resolve, 350));
+        expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '6.95,35.25' });
+    });
+
+    // A server that did not apply the formula answers in K: Fit writes those numbers as K, not as the °C the panel shows
+    it('fits in the unit of the answer when the server answered in another unit than the one shown', async () => {
+        await mountThermal(KELVIN, { CELSIUS: KELVIN });
+        await chooseUnit('CELSIUS');
+        expect(range()).toBe('280.1 \u2013 308.4 K');
+        await byId('rescale-fit').trigger('click');
+        expect(rescaleLabel()).toBe('Range (K)');
+        await new Promise(resolve => setTimeout(resolve, 350));
+        expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '280.1,308.4', rescaleUnit: 'K' });
     });
 
     it('the Unit select offers °C, K and °F, and °F sends the Fahrenheit formula', async () => {
@@ -530,22 +595,22 @@ describe('RasterAnalysisControls thermal units', () => {
         await chooseUnit('FAHRENHEIT');
         expect(getRasterValueInfo).toHaveBeenLastCalledWith('hatcreek/clip.tif', { nodata: undefined, formula: 'FAHRENHEIT' });
         expect(last().formula).toBe('FAHRENHEIT');
-        expect(range()).toBe('44.5 °F - 95.5 °F');
+        expect(wrapper.vm.rasterInfo).toMatchObject({ unit: '°F', valueMin: 44.51, valueMax: 95.45 });
     });
 
     // D-022: a rescale keeps its temperatures when the unit changes: it goes with the unit it was written in
     it('sends the rescale with the unit it was written in after the unit changed', async () => {
         await mountThermal(KELVIN, KELVIN_IN);
-        expect(rescaleLabel()).toBe('Rescale (K)');
+        expect(rescaleLabel()).toBe('Range (K)');
         await chooseUnit('CELSIUS');
         expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '280.1,308.4', rescaleUnit: 'K' });
-        expect(rescaleLabel()).toBe('Rescale (K)');
+        expect(rescaleLabel()).toBe('Range (K)');
 
         // A rescale typed now is in °C: it needs no unit of its own
         await typeRescale('10', '30');
         await new Promise(resolve => setTimeout(resolve, 350));
         expect(last()).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '10,30' });
-        expect(rescaleLabel()).toBe('Rescale (°C)');
+        expect(rescaleLabel()).toBe('Range (°C)');
     });
 
     it('Reset goes back to the unit of the band and to its stretch', async () => {
@@ -556,7 +621,7 @@ describe('RasterAnalysisControls thermal units', () => {
         await flushPromises();
         expect(select().element.value).toBe('KELVIN');
         expect(rescaleShown()).toBe('280.1,308.4');
-        expect(range()).toBe('280.1 K - 308.4 K');
+        expect(range()).toBe('280.1 \u2013 308.4 K');
         expect(last()).toEqual({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280.1,308.4' });
     });
 
@@ -581,7 +646,7 @@ describe('RasterAnalysisControls thermal units', () => {
         expect(select().exists()).toBe(true);
         expect(select().element.value).toBe('CELSIUS');
         expect(last().formula).toBe('CELSIUS');
-        expect(range()).toBe('7.0 °C - 35.3 °C');
+        expect(range()).toBe('7.0 \u2013 35.3 °C');
     });
 
     it('has the notice only for the raw counts of a sensor, and then no Unit select and no formula', async () => {
@@ -590,7 +655,7 @@ describe('RasterAnalysisControls thermal units', () => {
         expect(wrapper.find('[data-testid="raster-thermal-file-unit"]').exists()).toBe(false);
         expect(select().exists()).toBe(false);
         expect(last()).toEqual({ colormap: 'ironbow', rescale: '14000,16000' });
-        expect(range()).toMatch(/^14[,.\s\u00a0\u202f]?000 - 16[,.\s\u00a0\u202f]?000$/);
+        expect(range()).toMatch(/^14[,.\s\u00a0\u202f]?000 \u2013 16[,.\s\u00a0\u202f]?000$/);
     });
 
     it('a calibrated raster has its Unit select, no notice and no "from the file" text', async () => {
@@ -606,15 +671,15 @@ describe('RasterAnalysisControls thermal units', () => {
         await mountThermal(KELVIN, { CELSIUS: KELVIN });
         await chooseUnit('CELSIUS');
         expect(select().element.value).toBe('CELSIUS');
-        expect(range()).toBe('280.1 K - 308.4 K');
+        expect(range()).toBe('280.1 \u2013 308.4 K');
 
         await wrapper.setProps({
             areaStats: { ...STATS, min: 293.15, max: 295.4, mean: 294.0, median: 294.1, stddev: 1.25, unit: 'K', isThermal: true },
             spotInfo: { value: 284.6, unit: 'K', x: 4, y: 5, hasGeo: false },
             profile: { unit: 'K', samples: [{ distance: 0, value: 284.6 }] }
         });
-        expect(statRows()).toContain('Min: 293.2 K');
-        expect(statRows()).toContain('Std dev: 1.3 K');
+        expect(statRows()).toContain('Min 293.2 K');
+        expect(statRows()).toContain('Std dev 1.3 K');
         expect(byId('raster-spot-value').text()).toContain('284.6 K');
         expect(wrapper.findComponent({ name: 'RasterProfileChart' }).props('unit')).toBe('K');
 
@@ -627,7 +692,7 @@ describe('RasterAnalysisControls thermal units', () => {
     it('labels no raw count of a sensor with a temperature unit, whatever the answer says', async () => {
         await mountThermal(RAW_COUNTS);
         await wrapper.setProps({ areaStats: { ...STATS, min: 14000, unit: '°C', isThermal: true } });
-        expect(statRows().find(row => row.startsWith('Min'))).toMatch(/^Min: 14[,.\s\u00a0\u202f]?000$/);
+        expect(statRows().find(row => row.startsWith('Min'))).toMatch(/^Min 14[,.\s\u00a0\u202f]?000$/);
     });
 
     // F5: the value info in the new unit fails: the panel says so and goes back to the unit it shows, with no unhandled error
@@ -658,12 +723,340 @@ describe('RasterAnalysisControls thermal units', () => {
             expect(notifyError).toHaveBeenCalledWith(failure, { summary: 'Unit' });
             expect(errorHandler).not.toHaveBeenCalled();
             expect(select().element.value).toBe('CELSIUS');
-            expect(range()).toBe('7.0 °C - 35.3 °C');
+            expect(wrapper.vm.rasterInfo.unit).toBe('°C');
             // The style of the layer is not changed to a unit the panel does not show
             expect(wrapper.emitted('vizParamsChanged').length).toBe(emitted);
             expect(last().formula).toBe('CELSIUS');
         } finally {
             consoleError.mockRestore();
         }
+    });
+});
+
+// The layout: a tool bar under the header, the results as cards, then the settings rows and the folded Data settings
+describe('RasterAnalysisControls tool bar', () => {
+    const tools = () => wrapper.get('[role="toolbar"]');
+    const toolButtons = () => tools().findAll('button');
+    const tool = label => toolButtons().find(b => b.text() === label);
+
+    it('has Profile, Inspect, Area and Contours, none of them pressed to begin with', async () => {
+        await render();
+        expect(toolButtons().map(b => b.text())).toEqual(['Profile', 'Inspect', 'Area', 'Contours']);
+        expect(toolButtons().every(b => b.classes().includes('tool-btn') && b.attributes('type') === 'button')).toBe(true);
+        expect(tool('Profile').attributes('title')).toBe('Draw a profile line on the map');
+        expect(tool('Inspect').attributes('title')).toBe('Click on the map to read the raster value');
+        expect(toolButtons().filter(b => b.attributes('aria-pressed') === 'true')).toHaveLength(0);
+        // The tools are not in the footer any more
+        expect(wrapper.get('[data-testid="panel-actions"]').find('[data-testid="raster-area-stats-btn"]').exists()).toBe(false);
+    });
+
+    it('Profile starts the line, and is Stop while it is drawn, Redraw once there is one', async () => {
+        await render();
+        await tool('Profile').trigger('click');
+        expect(wrapper.emitted('pickProfile')).toHaveLength(1);
+
+        await wrapper.setProps({ drawingProfile: true });
+        expect(tool('Stop').classes()).toContain('is-active');
+        expect(tool('Stop').attributes('aria-pressed')).toBe('true');
+        await tool('Stop').trigger('click');
+        expect(wrapper.emitted('cancelDrawProfile')).toHaveLength(1);
+
+        await wrapper.setProps({ drawingProfile: false, profile: { samples: [] } });
+        expect(tool('Redraw').attributes('title')).toBe('Discard the current profile and draw a new one');
+        expect(tool('Redraw').attributes('aria-pressed')).toBe('false');
+    });
+
+    it('Profile waits while the profile is read', async () => {
+        await render({ profileLoading: true });
+        expect(tool('Profile').attributes('disabled')).toBeDefined();
+        expect(tool('Profile').find('i').classes()).toContain('fa-spin');
+    });
+
+    it('Inspect is a toggle, pressed while the host has it on', async () => {
+        await render();
+        await tool('Inspect').trigger('click');
+        expect(wrapper.emitted('toggleInspectValue')).toHaveLength(1);
+        await wrapper.setProps({ inspectActive: true });
+        expect(tool('Inspect').classes()).toContain('is-active');
+        expect(tool('Inspect').attributes('aria-pressed')).toBe('true');
+        expect(tool('Inspect').attributes('title')).toBe('Stop inspecting raster values (Esc)');
+    });
+
+    it('Area is pressed while it draws, and waits while the statistics are read', async () => {
+        await render({ drawingArea: true });
+        expect(byId('raster-area-stats-btn').attributes('aria-pressed')).toBe('true');
+        await wrapper.setProps({ drawingArea: false, areaStatsLoading: true });
+        expect(byId('raster-area-stats-btn').attributes('aria-pressed')).toBe('false');
+        expect(byId('raster-area-stats-btn').attributes('disabled')).toBeDefined();
+    });
+
+    it('has Contours for a raster that is not thermal, and none for a thermal one or a value info that failed to load', async () => {
+        await render();
+        expect(byId('raster-contours-btn').exists()).toBe(true);
+        wrapper.unmount();
+
+        await render({}, { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '',
+            valueMin: 280.1, valueMax: 308.4, stretch: [{ min: 280.1, max: 308.4 }] });
+        expect(byId('raster-contours-btn').exists()).toBe(false);
+        expect(toolButtons().map(b => b.text())).toEqual(['Profile', 'Inspect', 'Area']);
+        wrapper.unmount();
+
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset: { getRasterValueInfo: vi.fn(async () => { throw new Error('500'); }) }, filePath: 'odm_dem/dsm.tif' },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        await flushPromises();
+        expect(byId('raster-contours-btn').exists()).toBe(false);
+    });
+
+    it('has no profile eraser button, the card has its ×', async () => {
+        await render({ profile: { samples: [] } });
+        expect(tools().find('i.fa-eraser').exists()).toBe(false);
+        expect(wrapper.find('i.fa-eraser').exists()).toBe(false);
+    });
+});
+
+describe('RasterAnalysisControls results', () => {
+    const cards = () => wrapper.findAll('.panel-body .result-card');
+    const titles = () => cards().map(c => c.get('.result-card-title').text());
+
+    it('has no card before there is a result', async () => {
+        await render();
+        expect(cards()).toHaveLength(0);
+        expect(wrapper.get('.panel-body').text()).not.toMatch(/profile/i);
+    });
+
+    it('shows the spot value, the area statistics and the profile, in that order, above the settings', async () => {
+        await render({
+            spotInfo: { value: 197.111, x: 1, y: 1, hasGeo: false },
+            areaStats: STATS,
+            profile: { samples: [] }
+        });
+        expect(titles()).toEqual(['Spot value', 'Area statistics', 'Value profile']);
+        expect(cards().at(-1).element.nextElementSibling.querySelector('#raster-analysis-controls-colormap-label')).not.toBeNull();
+    });
+
+    it('calls the cards of a thermal raster by their temperatures', async () => {
+        await render({ spotInfo: { value: 29, x: 1, y: 1, hasGeo: false }, profile: { samples: [] } },
+            { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '', valueMin: 280, valueMax: 308 });
+        expect(titles()).toEqual(['Spot temperature', 'Thermal profile']);
+    });
+
+    it('shows the spot value large, with where it was read beside it', async () => {
+        await render({ spotInfo: { value: 3, x: 4, y: 5, hasGeo: false } });
+        const card = byId('raster-spot-value');
+        expect(card.find('.spot-temp').text()).toBe('3.00 m');
+        expect(card.find('.spot-coords').text()).toBe('pixel 4, 5');
+    });
+
+    it('× of the spot value asks the host to clear it', async () => {
+        await render({ spotInfo: { value: 3, x: 4, y: 5, hasGeo: false } });
+        const clear = byId('raster-spot-clear');
+        expect(clear.attributes('aria-label')).toBe('Clear the spot value');
+        await clear.trigger('click');
+        expect(wrapper.emitted('clearSpot')).toHaveLength(1);
+    });
+
+    it('shows the area statistics as label over value, three to a line', async () => {
+        await render({ areaStats: STATS });
+        const rows = byId('raster-area-stats').findAll('dl > div');
+        expect(rows[0].find('dt').text()).toBe('Min');
+        expect(rows[0].find('dd').text()).toBe('196.96 m');
+        expect(byId('raster-area-stats').text()).not.toContain(':');
+    });
+
+    it('shows a profile that is being read, and an error with no chart', async () => {
+        await render({ profileLoading: true });
+        expect(titles()).toEqual(['Value profile']);
+        expect(cards()[0].text()).toContain('Computing profile');
+        await wrapper.setProps({ profileLoading: false, profileError: 'The line is outside the raster.' });
+        expect(cards()[0].text()).toContain('The line is outside the raster.');
+        expect(wrapper.findComponent({ name: 'RasterProfileChart' }).exists()).toBe(false);
+    });
+
+    it('× of the profile asks the host to clear it', async () => {
+        await render({ profile: { samples: [] } });
+        expect(wrapper.findComponent({ name: 'RasterProfileChart' }).exists()).toBe(true);
+        const clear = byId('raster-profile-clear');
+        expect(clear.attributes('aria-label')).toBe('Clear the chart and remove the line from the map');
+        await clear.trigger('click');
+        expect(wrapper.emitted('clearProfile')).toHaveLength(1);
+    });
+
+    it('has no profile card when the value info failed to load', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset: { getRasterValueInfo: vi.fn(async () => { throw new Error('500'); }) },
+                     filePath: 'odm_dem/dsm.tif', profile: { samples: [] } },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        await flushPromises();
+        expect(cards()).toHaveLength(0);
+    });
+
+    it('shows the thermal notices at the top of the body, above the results', async () => {
+        await render({ spotInfo: { value: 3, x: 4, y: 5, hasGeo: false } },
+            { isThermal: true, isDirectValue: false, bandCount: 1, dataType: 'UInt16', unit: '', sensorId: 'flir', valueMin: 1, valueMax: 2 });
+        const children = [...wrapper.get('.panel-body').element.children];
+        const notice = children.findIndex(c => c.querySelector('[data-testid="raster-thermal-notice"]'));
+        const spot = children.findIndex(c => c.matches('[data-testid="raster-spot-value"]'));
+        expect(notice).toBe(0);
+        expect(spot).toBeGreaterThan(notice);
+    });
+});
+
+describe('RasterAnalysisControls settings rows', () => {
+    const labels = () => wrapper.findAll('.panel-body .panel-row > .section-label').map(l => l.text());
+
+    it('has Colors and Range, no separate Value range row, and the Data settings fold last', async () => {
+        await render();
+        expect(labels()).toEqual(['Colors', 'Range', 'Unit', 'NoData']);
+        expect(wrapper.text()).not.toMatch(/value range|temperature range/i);
+        expect(wrapper.get('.panel-body').element.lastElementChild.id).toBe('raster-analysis-controls-data-settings');
+    });
+
+    it('has the Raster row only with two rasters, and the Sensor row only with a sensor', async () => {
+        await render({ targetCandidates: [{ path: 'a.tif', label: 'a.tif' }, { path: 'b.tif', label: 'b.tif' }], targetPath: 'a.tif' },
+            { ...DSM_INFO, sensorId: 'DJI-M3T' });
+        expect(labels().slice(0, 4)).toEqual(['Raster', 'Sensor', 'Colors', 'Range']);
+        expect(wrapper.get('.sensor-badge').text()).toBe('DJI-M3T');
+    });
+
+    it('labels the Colors row for the colormap, with the wiring it had', async () => {
+        await render();
+        const label = wrapper.get('#raster-analysis-controls-colormap-label');
+        expect(label.text()).toBe('Colors');
+        expect(label.attributes('for')).toBe('raster-analysis-controls-colormap');
+        const dropdown = wrapper.findComponent({ name: 'ColormapDropdown' });
+        expect(dropdown.props('inputId')).toBe('raster-analysis-controls-colormap');
+        expect(dropdown.props('ariaLabelledby')).toBe('raster-analysis-controls-colormap-label');
+    });
+
+    it('gives the Range its unit and the range of the values, written like the rest of the panel without the unit', async () => {
+        await render();
+        const fields = wrapper.findComponent({ name: 'RescaleFields' });
+        expect(fields.props('unit')).toBe('m');
+        expect(fields.props('dataRange')).toEqual({ min: 194.7, max: 229.5 });
+        expect(fields.props('labelledby')).toBe('raster-analysis-controls-rescale-label');
+        expect(wrapper.get('#raster-analysis-controls-rescale-label').text()).toBe('Range');
+        expect(wrapper.get('[role="group"]').attributes('aria-labelledby')).toBe('raster-analysis-controls-rescale-label');
+        expect(byId('rescale-unit').text()).toBe('m');
+        expect(dataRange()).toBe('Data 194.70 – 229.50 m');
+        expect(fields.props('formatValue')(12.345)).toBe('12.35');
+    });
+
+    it('Fit to data takes the range of the values and applies it', async () => {
+        await render();
+        await wrapper.get('#raster-analysis-controls-rescale-min').setValue('0');
+        await wrapper.get('#raster-analysis-controls-rescale-max').setValue('5');
+        await byId('rescale-fit').trigger('click');
+        expect(wrapper.get('#raster-analysis-controls-rescale-min').element.value).toBe('194.7');
+        await new Promise(resolve => setTimeout(resolve, 350));
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0].rescale).toBe('194.7,229.5');
+    });
+
+    it('has no range of the values when the value info failed to load', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        wrapper = mount(RasterAnalysisControls, {
+            props: { visible: true, dataset: { getRasterValueInfo: vi.fn(async () => { throw new Error('500'); }) }, filePath: 'odm_dem/dsm.tif' },
+            global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
+        });
+        await flushPromises();
+        expect(wrapper.findComponent({ name: 'RescaleFields' }).props('dataRange')).toBeNull();
+        expect(byId('rescale-data-range').exists()).toBe(false);
+    });
+
+    it('writes the unit of a thermal range as the Range label says it', async () => {
+        await render({}, { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '',
+            valueMin: 280.1, valueMax: 308.4, stretch: [{ min: 280.1, max: 308.4 }] });
+        expect(wrapper.get('#raster-analysis-controls-rescale-label').text()).toBe('Range (K)');
+        expect(wrapper.findComponent({ name: 'RescaleFields' }).props('unit')).toBe('K');
+    });
+});
+
+describe('RasterAnalysisControls Data settings', () => {
+    const toggle = () => byId('raster-data-settings-toggle');
+    const summary = () => byId('raster-data-settings-summary').text();
+    const body = () => byId('raster-data-settings');
+    // The folded region stays in the page, hidden (jsdom has no layout to ask)
+    const shown = () => body().element.style.display !== 'none';
+
+    it('is closed to begin with, with the unit and the NoData value of the file in its summary', async () => {
+        await render({}, { ...DSM_INFO, nodata: -9999, nodataInvalid: false, nodataOverridden: false });
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+        expect(toggle().attributes('aria-controls')).toBe(body().attributes('id'));
+        expect(toggle().classes()).toContain('panel-fold');
+        expect(toggle().text()).toContain('Data settings');
+        expect(shown()).toBe(false);
+        expect(summary()).toBe('Unit m · NoData -9999');
+    });
+
+    it('says none for a unit and a NoData value it does not have', async () => {
+        await render({}, RAW_INFO);
+        expect(summary()).toBe('Unit none · NoData none');
+    });
+
+    it('opens and closes with its button', async () => {
+        await render();
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(shown()).toBe(true);
+        expect(body().find('#raster-analysis-controls-unit-name').exists()).toBe(true);
+        expect(byId('raster-nodata-input').exists()).toBe(true);
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+        expect(shown()).toBe(false);
+    });
+
+    it('has the unit and the NoData value that are typed in its summary', async () => {
+        await render({}, { ...DSM_INFO, nodata: -9999 });
+        await wrapper.get('#raster-analysis-controls-unit-name').setValue('ft');
+        await byId('raster-nodata-input').setValue(' 0 ');
+        expect(summary()).toBe('Unit ft · NoData 0');
+    });
+
+    it('has the Unit select of a thermal raster, and its unit in the summary', async () => {
+        await render({}, { isThermal: true, isDirectValue: true, bandCount: 1, dataType: 'Float32', unit: 'K', sensorId: '',
+            valueMin: 280.1, valueMax: 308.4, stretch: [{ min: 280.1, max: 308.4 }] });
+        expect(body().find('select#raster-analysis-controls-unit').exists()).toBe(true);
+        expect(summary()).toBe('Unit K · NoData none');
+    });
+
+    // The user must see what is wrong: the fold opens by itself and stays open, even when they closed it
+    it('opens by itself for a NoData value that is no number, and stays open until it is fixed', async () => {
+        await render();
+        await byId('raster-nodata-input').setValue('abc');
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(shown()).toBe(true);
+        expect(byId('raster-nodata-error').exists()).toBe(true);
+
+        await toggle().trigger('click');
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(shown()).toBe(true);
+
+        await byId('raster-nodata-input').setValue('0');
+        expect(byId('raster-nodata-error').exists()).toBe(false);
+        // The user had it closed with a click that did nothing, then opened it: it is theirs to close now
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+    });
+
+    it('opens by itself while the NoData value of the file cannot be held by its data type', async () => {
+        await render({}, { ...RAW_INFO, nodata: 65536, nodataInvalid: true, nodataOverridden: false });
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(byId('raster-nodata-invalid').exists()).toBe(true);
+        expect(shown()).toBe(true);
+    });
+
+    it('closes again with the NoData notice gone, when the user had closed it', async () => {
+        await render();
+        await toggle().trigger('click');
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+        await byId('raster-nodata-input').setValue('abc');
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        await byId('raster-nodata-input').setValue('');
+        expect(toggle().attributes('aria-expanded')).toBe('false');
     });
 });

@@ -231,6 +231,93 @@ describe('Inspect from the keyboard (FR-RAS-30)', () => {
     });
 });
 
+// The × of the spot value card: the host forgets the value and, if Inspect is on, its marker
+describe('useRasterAnalysis handleClearSpot', () => {
+    it('forgets the spot value when Inspect is off, where there is no marker layer to clear', async () => {
+        const { raster } = setup();
+        await raster.queryRasterPoint(12, 7);
+        expect(raster.rasterSpotInfo.value).not.toBeNull();
+        expect(raster.rasterInspectActive.value).toBe(false);
+        expect(() => raster.handleClearSpot()).not.toThrow();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+
+    it('removes the marker and hides the tooltip of Inspect, which stays on for the next point', async () => {
+        const { map, raster } = setup();
+        map.getView().setCenter([100, 50]);
+        raster.toggleRasterInspect();
+        key('Enter');
+        const markers = () => map.getLayers().getArray().find(l => l.getSource() instanceof VectorSource).getSource().getFeatures();
+        const tooltip = () => map.getOverlays().getArray()[0].getElement();
+        await vi.waitFor(() => expect(tooltip().style.display).toBe('block'));
+        expect(markers()).toHaveLength(1);
+        expect(raster.rasterSpotInfo.value).not.toBeNull();
+
+        raster.handleClearSpot();
+
+        expect(raster.rasterSpotInfo.value).toBeNull();
+        expect(markers()).toHaveLength(0);
+        expect(tooltip().style.display).toBe('none');
+        expect(raster.rasterInspectActive.value).toBe(true);
+        raster.toggleRasterInspect();
+    });
+});
+
+// An answer that comes after the × of the spot card, or after a newer question, would bring back a value the user cleared or
+// replace the newer one
+describe('useRasterAnalysis spot answers that are over', () => {
+    /** A server call whose answers the test releases in its own order */
+    function deferredAnswers(dataset, method) {
+        const pending = [];
+        dataset[method].mockImplementation((path, a, b) => new Promise(resolve => pending.push(() => resolve({ value: a, x: a, y: b, hasGeo: false }))));
+        return pending;
+    }
+
+    it('drops an answer that comes after the spot was cleared', async () => {
+        const { raster, dataset } = setup();
+        const pending = deferredAnswers(dataset, 'getRasterPointValue');
+        const query = raster.queryRasterPoint(12, 7);
+        raster.handleClearSpot();
+        pending[0]();
+        expect(await query).toBeNull();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+
+    it('drops an answer at a map coordinate that comes after the spot was cleared', async () => {
+        const { raster, dataset } = setup();
+        let answer;
+        dataset.getRasterPointValueAt.mockImplementation(() => new Promise(resolve => { answer = () => resolve({ value: 197.1, hasGeo: true }); }));
+        const query = raster.queryRasterPointAt([505, 255]);
+        raster.handleClearSpot();
+        answer();
+        expect(await query).toBeNull();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+
+    it('keeps the newest question when an older answer comes last', async () => {
+        const { raster, dataset } = setup();
+        const pending = deferredAnswers(dataset, 'getRasterPointValue');
+        const older = raster.queryRasterPoint(1, 1);
+        const newer = raster.queryRasterPoint(2, 2);
+        pending[1]();
+        expect(await newer).toMatchObject({ value: 2 });
+        pending[0]();
+        expect(await older).toBeNull();
+        expect(raster.rasterSpotInfo.value).toMatchObject({ value: 2 });
+    });
+
+    it('drops an answer that comes after the panel was closed and opened again on the same raster', async () => {
+        const { raster, dataset } = setup();
+        const pending = deferredAnswers(dataset, 'getRasterPointValue');
+        const query = raster.queryRasterPoint(12, 7);
+        raster.closeRasterAnalysis();
+        raster.openRasterAnalysis(PATH);
+        pending[0]();
+        expect(await query).toBeNull();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+});
+
 describe('Profile from the keyboard and the mouse (FR-RAS-30, D-027)', () => {
     it('Space adds a vertex, Enter finishes the line: one profile measurement, asked of the server', async () => {
         const { map, raster, dataset, measureControls } = setup();

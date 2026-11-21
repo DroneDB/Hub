@@ -68,11 +68,31 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     max-height: calc(100% - 1rem);
     overflow-y: auto;
-    // A field the keyboard focuses scrolls clear of the sticky footer (.panel-actions) and its fade, not under it
-    // (FR-RAS-23): about their height, rows of 2.6rem buttons with 0.4rem gaps, 0.9rem of padding and the 1.25rem fade;
-    // two rows here, a panel with another number of rows says so
-    --panel-actions-reserve: 7.75rem;
-    scroll-padding-bottom: var(--panel-actions-reserve);
+    // The panel is the container its tool bar and footer query: what they need depends on the width the panel has (16rem on a
+    // laptop, the sheet on a phone), not on the screen
+    container: analysis-panel / inline-size;
+    // A field the keyboard focuses, and what scrollIntoView aims at, stays clear of the sticky header and tool bar
+    // (.panel-top) above it and, with a footer, of the footer (.panel-actions) and its fade below it. AnalysisPanel measures
+    // both blocks and sets --panel-top-reserve and --panel-actions-reserve, so a tool bar of two rows or a footer that wraps
+    // are counted, whatever their height
+    scroll-padding-top: var(--panel-top-reserve, 0px);
+    // The width of the label column of a .panel-row, and the height of the fade over the foot of the body
+    --panel-label-width: 4.5rem;
+    --panel-actions-fade: 1.25rem;
+
+    // Only a panel with a footer keeps clear of one
+    &.has-actions {
+        scroll-padding-bottom: calc(var(--panel-actions-reserve, 0px) + var(--panel-actions-fade));
+    }
+
+    // The block that stays in view while the body scrolls: the header and, under it, the tool bar. On the solid colour of the
+    // panel, so that the body does not show through it
+    .panel-top {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--panel-bg-solid);
+    }
 
     .panel-header {
         display: flex;
@@ -80,6 +100,21 @@
         align-items: center;
         padding: 0.5rem 0.75rem;
         border-bottom: 1px solid var(--panel-line);
+    }
+
+    .panel-heading {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    // Under the title, in line with its text rather than with the icon in front of it
+    .panel-subtitle {
+        padding-left: 1.4rem;
+        margin-top: 1px;
+        font-size: 0.75rem;
+        color: var(--panel-muted);
+        overflow-wrap: anywhere;
     }
 
     .panel-title {
@@ -246,7 +281,7 @@
             left: 0;
             right: 0;
             bottom: 100%;
-            height: 1.25rem;
+            height: var(--panel-actions-fade);
             background: linear-gradient(to top, var(--panel-bg-solid), transparent);
             pointer-events: none;
         }
@@ -280,6 +315,9 @@
         border-radius: 0.25rem;
         padding: 0.3rem 0.6rem;
         cursor: pointer;
+        // In the font of the panel (a button does not inherit it), so the buttons of a panel share one font and the
+        // widths the container queries below are measured from hold on every system
+        font-family: inherit;
         font-size: 0.875rem;
         background: rgba(255, 255, 255, 0.15);
         color: var(--panel-text-soft);
@@ -315,15 +353,273 @@
             background: var(--panel-primary-hover);
         }
     }
+
+    // ---- The tool bar (AnalysisPanel's #tools slot) ----
+    // One row: each tool as wide as its icon and label, the width left over shared between them. A panel too narrow for
+    // its tools in one row has two columns of them (the container queries below: the width is the panel's own)
+    .panel-tools {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        border-bottom: 1px solid var(--panel-line);
+
+        > .tool-btn {
+            flex: 1 1 auto;
+        }
+
+        // The tool the map is in may have another label: on a row just wide enough for the others, its label is the
+        // one cut short, not all of them
+        > .tool-btn:not(.is-active) {
+            flex-shrink: 0;
+        }
+    }
+
+    // A tool or a footer button (a .panel-btn, so in the font of the panel): the icon beside its label, 2rem high. Their
+    // size is the mockup's 12.5px, a step under the 0.875rem of the fields
+    .tool-btn,
+    .footer-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+        min-width: 0;
+        min-height: 2rem;
+        padding: 0 0.25rem;
+        font-size: 0.78125rem;
+        font-weight: 500;
+        line-height: 1.2;
+        white-space: nowrap;
+
+        i {
+            flex: none;
+            font-size: 0.95rem;
+        }
+    }
+
+    .tool-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    // ---- Settings rows ----
+    // A row is its own grid: the label (the .section-label look) in a column of one width for every row, the control after it
+    .panel-row {
+        display: grid;
+        grid-template-columns: var(--panel-label-width) minmax(0, 1fr);
+        column-gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+
+        .section-label {
+            margin: 0;
+        }
+    }
+
+    // A wide control (the band selector, a histogram) under its label, at the full width
+    .panel-row--stacked {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 0.15rem;
+        align-items: stretch;
+    }
+
+    // A line under a row (a hint, an error), in line with the field column; the whole width on a narrow panel
+    .panel-row-note {
+        margin: -0.25rem 0 0.5rem calc(var(--panel-label-width) + 0.5rem);
+        font-size: 0.75rem;
+        color: var(--panel-muted);
+    }
+
+    // ---- The fold: a disclosure button and what it opens ----
+    .panel-fold {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        width: 100%;
+        margin-top: 0.5rem;
+        padding: 0.4rem 0;
+        background: none;
+        border: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--panel-text-soft);
+        font: inherit;
+        font-size: 0.78125rem;
+        text-align: left;
+        cursor: pointer;
+
+        // The chevron points right while folded
+        > i:first-child {
+            flex: none;
+            transition: transform 0.15s;
+        }
+
+        &[aria-expanded='true'] > i:first-child {
+            transform: rotate(90deg);
+        }
+
+        &:focus-visible {
+            outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+            outline-offset: var(--ddb-focus-ring-offset);
+        }
+    }
+
+    // The name stays on one line: on a narrow panel the summary gives way, not the name
+    .panel-fold-name {
+        flex: none;
+        white-space: nowrap;
+    }
+
+    // What the folded values come to, to the right of the name; cut with an ellipsis rather than wrapped
+    .panel-fold-summary {
+        margin-left: auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--panel-muted);
+    }
+
+    .panel-fold-body {
+        padding-top: 0.5rem;
+    }
+
+    // ---- The result card ----
+    .result-card {
+        margin-bottom: 0.5rem;
+        padding: 0.4rem 0.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 0.375rem;
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .result-card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.75rem;
+        color: var(--panel-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .result-card-title {
+        min-width: 0;
+    }
+
+    // The × that clears the card
+    .result-card-clear {
+        margin-left: auto;
+        padding: 0 0.25rem;
+        background: none;
+        border: 0;
+        color: var(--panel-muted);
+        font-size: 0.9rem;
+        line-height: 1;
+        cursor: pointer;
+
+        &:hover {
+            color: #fff;
+        }
+
+        &:focus-visible {
+            outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
+            outline-offset: var(--ddb-focus-ring-offset);
+        }
+    }
+
+    // ---- The footer row (AnalysisPanel's #actions slot) ----
+    // One row of buttons; what does not fit (the status of an export, its open menu) takes a row of its own above it, so
+    // the footer grows upward inside the sticky block and is never wider than the panel
+    .panel-footer-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .footer-btn {
+        position: relative;
+        padding: 0 0.3125rem;
+    }
+
+    // The main button of the footer (Export) and what follows it go to the right end
+    .footer-btn--end {
+        margin-left: auto;
+    }
+
+    // The status of a task the footer started: a row above the buttons
+    .footer-status {
+        flex-basis: 100%;
+        order: -1;
+    }
+}
+
+// A tool bar too narrow for its tools in one row: two columns of them, the labels kept
+@mixin two-columns-of-tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+// A footer too narrow for its labels: the buttons beside the main one keep their icon and their aria-label and title;
+// the label stays for assistive technology and leaves the layout. The main one keeps its label
+@mixin footer-labels-hidden {
+    .footer-btn:not(.footer-btn--end) .footer-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+    }
+}
+
+// Each panel changes its layout below the width its own tools and footer need in one row, measured in Chrome from their
+// labels at 12.5px Inter with the widest icon and label each can show (a pressed tool, "Hide orig."), the gaps and the
+// padding of the bar: a narrower panel (16rem on a laptop, the sheet of a phone) gets the two columns or the icons.
+// Raster Analysis, Redraw, Inspect (pressed, its wider icon), Area and Contours: 330px
+@container analysis-panel (width < 20.625rem) {
+    .analysis-panel--raster .panel-tools {
+        @include two-columns-of-tools;
+    }
+}
+
+// Stockpile Volume, Click map, Draw, Find all and Outline: 334px. Click map and Draw keep their labels while their mode
+// is on, and "Done", the label of Outline while the outline is edited, is narrower than "Outline", so the width holds for
+// them. Find all keeps its label while the piles are found (its spinner says so)
+@container analysis-panel (width < 21rem) {
+    .analysis-panel--stockpile .panel-tools {
+        @include two-columns-of-tools;
+    }
+}
+
+// The footer of Raster Analysis, Reset, Hide orig. and Export: 281px
+@container analysis-panel (width < 17.625rem) {
+    .analysis-panel--raster {
+        @include footer-labels-hidden;
+    }
+}
+
+// The footer of Plant Health, Reset, Hide orig., Link and Export: 343px
+@container analysis-panel (width < 21.5rem) {
+    .analysis-panel--plant-health {
+        @include footer-labels-hidden;
+    }
+}
+
+// A note under a row leaves the field column for the whole width on a narrow panel
+@container analysis-panel (width < 23.5rem) {
+    .analysis-panel .panel-row-note {
+        margin-left: 0;
+    }
 }
 
 .analysis-panel--plant-health {
     --panel-accent: #4caf50;
     --panel-accent-rgb: 76, 175, 80;
     --panel-primary-hover: #388e3c;
-    // One row of actions and the export control under it (RasterExportButton, FR-RAS-16): its label, a row of two buttons
-    // and its note of up to three lines, about 8rem
-    --panel-actions-reserve: 12.75rem;
 }
 
 .analysis-panel--raster {
@@ -331,7 +627,6 @@
     --panel-accent-rgb: 77, 156, 240; // shade 300 as a triplet
     --panel-primary: var(--ddb-primary); // white text on the button: 4.8:1
     --panel-primary-hover: var(--ddb-primary-hover);
-    --panel-actions-reserve: 18.75rem; // three rows of actions and the export control (about 8rem, as in Plant Health)
 }
 
 .analysis-panel--stockpile {
@@ -340,7 +635,6 @@
     --panel-primary: #ffc107; // dark text on the button: 10.7:1
     --panel-primary-hover: #ffb300;
     --panel-primary-text: #1a1a1a;
-    --panel-actions-reserve: 4.75rem; // one row of actions
 }
 
 // A map that shows a colour legend keeps its bottom row for it: the legend stands there, left of the attribution button,
@@ -371,8 +665,12 @@
             padding: 0.5rem;
         }
 
+        .panel-tools {
+            padding: 0.375rem 0.5rem;
+        }
+
         // The footer stays in view on the sheet too (FR-RAS-23), so it is short there (U-415): the icon beside the label,
-        // rows of 2rem rather than 2.6rem (the note of the export folds behind an info button, RasterExportButton)
+        // rows of 2rem rather than 2.6rem
         .panel-actions {
             padding: 0.4rem 0.5rem 0.5rem;
 
@@ -404,28 +702,19 @@
             max-height: var(--map-sheet-peek);
             overflow: hidden;
 
-            > .panel-header {
+            > .panel-top > .panel-header {
                 border-bottom: 0;
             }
 
-            > :not(.panel-header) {
+            // The header only: the tool bar folds with the body
+            > :not(.panel-top) {
+                display: none;
+            }
+
+            > .panel-top > .panel-tools {
                 display: none;
             }
         }
-    }
-
-    // The shorter footer of the sheet: rows of 2rem with their 0.4rem gap, the export control as its label and one row
-    // (about 4.4rem, the note folded), 0.9rem of padding and the 1.25rem fade
-    .analysis-panel--plant-health {
-        --panel-actions-reserve: 8.75rem; // one row and the export control
-    }
-
-    .analysis-panel--raster {
-        --panel-actions-reserve: 13.25rem; // three rows and the export control
-    }
-
-    .analysis-panel--stockpile {
-        --panel-actions-reserve: 4.25rem; // one row
     }
 
     // On a phone the open sheet is the task: it takes the place of the layer panel, and folding

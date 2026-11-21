@@ -1,14 +1,14 @@
 /**
- * The one export control of Raster Analysis and Plant Health (FR-RAS-16, FR-PRC-15, FR-RAS-26, D-023): the styled raster as the
- * raster-export task with 'Queued…', 'Exporting n %' and Cancel, a toast and the download when it is ready, the visible
+ * The one export control of Raster Analysis and Plant Health (FR-RAS-16, FR-PRC-15, FR-RAS-26, D-023): an Export button with a
+ * menu of the two exports, which run the styled raster as the raster-export task with 'Queued…', 'Exporting n %' and Cancel, a toast and the download when it is ready, the visible
  * extent as a window, and a refusal for the size that is a focusable button with its reason as visible text. The sizes are
  * the examples of the SPEC (about 9.3 GB over a 1 GB limit), as literals.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
-import { readSource, ruleOf, mediaBlock } from '@/specs/cssSource';
+import { readSource, ruleOf } from '@/specs/cssSource';
 
 const runHeavyTask = vi.fn();
 const heavyTasks = ref({});
@@ -42,9 +42,42 @@ function makeDataset() {
 function mountControl(props = {}, dataset = makeDataset()) {
     wrapper = mount(RasterExportButton, {
         props: { dataset, filePath: 'hatcreek/mosaic.tif', vizParams: { colormap: 'ironbow', rescale: '10,40', stretch: 'percentile' }, bbox: BBOX, info: SMALL, readEstimate: false, ...props },
-        global: { plugins: [PrimeVue] }
+        global: { plugins: [PrimeVue] },
+        // In the page, so that the focus the menu moves can be read
+        attachTo: document.body
     });
     return { wrapper, dataset };
+}
+/** Mounts the control with its menu open, as the items are only there while it is */
+async function mountOpen(props = {}, dataset = makeDataset()) {
+    const mounted = mountControl(props, dataset);
+    await openMenu();
+    return mounted;
+}
+/** The whole raster is over the limit and the estimate of the visible extent is in: the first item is off, the second is on */
+async function mountWholeOff() {
+    const dataset = makeDataset();
+    dataset.getRasterValueInfo.mockResolvedValue({ estimatedExportBytes: 200 * 1024 * 1024, exportLimitBytes: GIB });
+    vi.useFakeTimers();
+    mountControl({ info: HUGE }, dataset);
+    await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
+    vi.useRealTimers();
+    await flushPromises();
+    expect(trigger().exists()).toBe(true);
+}
+const trigger = () => wrapper.find('[data-testid="raster-export-menu-btn"]');
+const menu = () => wrapper.find('[role="menu"]');
+// nextTick, not flushPromises: some tests run on fake timers, which the latter waits on
+const openMenu = async () => { await trigger().trigger('click'); await nextTick(); await nextTick(); };
+/**
+ * A key as a browser handles it: the keydown, then, on a button, the click that Enter and Space are (unless the keydown
+ * was taken). jsdom does not make that click, and a menu that took Enter or Space would answer twice in a browser.
+ */
+async function press(element, key) {
+    const down = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    element.dispatchEvent(down);
+    if (!down.defaultPrevented && (key === 'Enter' || key === ' ')) element.click();
+    await flushPromises();
 }
 const whole = () => wrapper.find('[data-testid="raster-export-whole"]');
 const extent = () => wrapper.find('[data-testid="raster-export-extent"]');
@@ -80,11 +113,11 @@ function controlledRun() {
 describe('RasterExportButton the export of the whole raster', () => {
     it('says what the file is: the scaled bands without a formula, a styled image with one or with a colormap on one band, in the CRS of the file, not the values (FR-RAS-26)', async () => {
         // The default style of the tests has a colormap and no formula, on a raster not known to have one band: ddb scales the bands to 8 bits and applies no colormap
-        mountControl();
+        await mountOpen();
         const bands = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
         expect(whole().attributes('aria-label')).toBe(bands);
         expect(whole().attributes('title')).toBe(bands);
-        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${bands}: the bands scaled to 8 bits, not the values.`);
+        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe('The bands scaled to 8 bits, not the values.');
         expect(extent().attributes('aria-label')).toBe('Export visible extent');
 
         // A formula makes the RGBA image; the label follows the style as it changes
@@ -92,7 +125,7 @@ describe('RasterExportButton the export of the whole raster', () => {
         await wrapper.setProps({ vizParams: { formula: 'CELSIUS', colormap: 'ironbow' } });
         expect(whole().attributes('aria-label')).toBe(styled);
         expect(whole().attributes('title')).toBe(styled);
-        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
+        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe('The picture of the style, not the values.');
 
         await wrapper.setProps({ vizParams: { colormap: 'ironbow' } });
         expect(whole().attributes('aria-label')).toBe(bands);
@@ -100,46 +133,14 @@ describe('RasterExportButton the export of the whole raster', () => {
         // A colormap on a raster of one data band is the styled image too (the rule of ddb), several bands of it are not
         await wrapper.setProps({ singleBand: true });
         expect(whole().attributes('aria-label')).toBe(styled);
-        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe(`${styled}: the picture of the style, not the values.`);
+        expect(wrapper.find('[data-testid="raster-export-note"]').text()).toBe('The picture of the style, not the values.');
         await wrapper.setProps({ vizParams: { colormap: 'ironbow', bands: '1,2' } });
         expect(whole().attributes('aria-label')).toBe(bands);
     });
 
-    it('folds its note behind an info button on a phone (U-415): the note stays the description of the buttons, the button shows it', async () => {
-        mountControl({ vizParams: { formula: 'CELSIUS', colormap: 'ironbow' } });
-        const note = wrapper.find('[data-testid="raster-export-note"]');
-        const toggle = wrapper.find('[data-testid="raster-export-note-toggle"]');
-        expect(toggle.attributes('aria-controls')).toBe(note.attributes('id'));
-        expect(toggle.attributes('aria-expanded')).toBe('false');
-        expect(toggle.attributes('aria-label')).toBe('What the export writes');
-        expect(note.classes()).not.toContain('is-open');
-        // Folded or not it is in the page, and the buttons name it as their description
-        expect(whole().attributes('aria-describedby')).toContain(note.attributes('id'));
-        expect(extent().attributes('aria-describedby')).toContain(note.attributes('id'));
-
-        await toggle.trigger('click');
-        expect(toggle.attributes('aria-expanded')).toBe('true');
-        expect(toggle.attributes('aria-label')).toBe('Hide what the export writes');
-        expect(note.classes()).toContain('is-open');
-        await toggle.trigger('click');
-        expect(note.classes()).not.toContain('is-open');
-    });
-
-    it('folds the note only below the phone breakpoint: the button is hidden and the note shown on a wider screen', () => {
-        const source = readSource(__dirname, 'RasterExportButton.vue');
-        const style = source.slice(source.indexOf('<style scoped>'));
-        const phone = mediaBlock(style, 'max-width: 767.98px');
-        expect(ruleOf(style, '.export-note-toggle')).toMatch(/display:\s*none/);
-        expect(ruleOf(phone, '.export-note-toggle')).toMatch(/display:\s*inline-flex/);
-        expect(ruleOf(phone, '.export-note:not(.is-open)')).toMatch(/clip:\s*rect\(0, 0, 0, 0\)/);
-        expect(ruleOf(phone, '.export-note:not(.is-open)')).not.toMatch(/display:\s*none/);
-        // Outside the media query nothing hides the note
-        expect(style.slice(0, style.indexOf('@media'))).not.toContain(':not(.is-open)');
-    });
-
     it('submits the raster-export task with the style (not the stretch of the panel) and the file name, without a toast of its own', async () => {
         runHeavyTask.mockResolvedValue({ taskId: 't1' });
-        const { dataset } = mountControl();
+        const { dataset } = await mountOpen();
         await whole().trigger('click');
         await flushPromises();
 
@@ -157,7 +158,7 @@ describe('RasterExportButton the export of the whole raster', () => {
 
     it('shows Queued…, then Exporting n %, then downloads the file and says it is ready (FR-PRC-15)', async () => {
         const run = controlledRun();
-        const { dataset } = mountControl();
+        const { dataset } = await mountOpen();
         await whole().trigger('click');
         await flushPromises();
         expect(status().text()).toContain('Queued…');
@@ -187,10 +188,12 @@ describe('RasterExportButton the export of the whole raster', () => {
     it('offers Cancel while it runs, asks, cancels the task and unlocks when it ends (FR-PRC-10)', async () => {
         confirmCancel.mockResolvedValue(true);
         const run = controlledRun();
-        const { dataset } = mountControl();
+        const { dataset } = await mountOpen();
         await whole().trigger('click');
         await flushPromises();
-        // Busy: both exports wait, and say why
+        // Busy: both exports wait, and say why; the menu closed when the export was chosen, and the status is outside it
+        expect(menu().exists()).toBe(false);
+        await openMenu();
         expect(whole().attributes('aria-disabled')).toBe('true');
         expect(extent().attributes('aria-disabled')).toBe('true');
 
@@ -209,7 +212,7 @@ describe('RasterExportButton the export of the whole raster', () => {
 
     it('shows the failure of the task and does not download', async () => {
         const run = controlledRun();
-        mountControl();
+        await mountOpen();
         await whole().trigger('click');
         await flushPromises();
         run().end({ taskId: 't1', state: 'Failed', error: 'Cannot read the raster', percent: 10 });
@@ -220,21 +223,27 @@ describe('RasterExportButton the export of the whole raster', () => {
 
     it('starts one task on a double click', async () => {
         runHeavyTask.mockImplementation(() => new Promise(() => {}));
-        mountControl();
-        await whole().trigger('click');
+        await mountOpen();
         await whole().trigger('click');
         await flushPromises();
+        // The menu is shut; opened again, the export that runs keeps both items off
+        await openMenu();
+        await whole().trigger('click');
+        await extent().trigger('click');
+        await flushPromises();
         expect(runHeavyTask).toHaveBeenCalledOnce();
+        expect(menu().exists()).toBe(true);
     });
 
     it('shows the refusal of the submit as the control words it, with the estimate and the limit of the Registry', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         runHeavyTask.mockRejectedValue(Object.assign(new Error('Export output exceeds maximum allowed size (9.3 GB > 1 GB).'),
             { status: 400, estimatedExportBytes: 9985798963, exportLimitBytes: GIB }));
-        mountControl();
+        await mountOpen();
         await whole().trigger('click');
         await flushPromises();
         expect(wrapper.find('[data-testid="heavy-task-error"]').text()).toBe('Too large to export: about 9.3 GB > 1 GB limit');
+        await openMenu();
         expect(whole().attributes('aria-disabled')).toBeUndefined();
     });
 });
@@ -242,7 +251,7 @@ describe('RasterExportButton the export of the whole raster', () => {
 describe('RasterExportButton the visible extent', () => {
     it('submits the window of the map at the native resolution, under its own file name', async () => {
         runHeavyTask.mockResolvedValue({ taskId: 't1' });
-        mountControl();
+        await mountOpen();
         await extent().trigger('click');
         await flushPromises();
         const options = runHeavyTask.mock.calls[0][2];
@@ -257,7 +266,7 @@ describe('RasterExportButton the visible extent', () => {
         const dataset = makeDataset();
         dataset.getRasterValueInfo.mockResolvedValue({ estimatedExportBytes: 200 * 1024 * 1024, exportLimitBytes: GIB });
         vi.useFakeTimers();
-        mountControl({ info: HUGE }, dataset);
+        await mountOpen({ info: HUGE }, dataset);
         await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
         vi.useRealTimers();
         await flushPromises();
@@ -275,7 +284,7 @@ describe('RasterExportButton the visible extent', () => {
         const dataset = makeDataset();
         dataset.getRasterValueInfo.mockResolvedValue({ estimatedExportBytes: 1503238554, exportLimitBytes: GIB });
         vi.useFakeTimers();
-        mountControl({ info: HUGE }, dataset);
+        await mountOpen({ info: HUGE }, dataset);
         await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
         vi.useRealTimers();
         await flushPromises();
@@ -290,14 +299,14 @@ describe('RasterExportButton the visible extent', () => {
     it('does not read the estimate of the window when the whole raster fits (it is smaller)', async () => {
         const dataset = makeDataset();
         vi.useFakeTimers();
-        mountControl({ info: SMALL }, dataset);
+        await mountOpen({ info: SMALL }, dataset);
         await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
         vi.useRealTimers();
         expect(dataset.getRasterValueInfo).not.toHaveBeenCalled();
     });
 
     it('waits, with its reason, until the map says what it shows', async () => {
-        mountControl({ bbox: null });
+        await mountOpen({ bbox: null });
         expect(extent().attributes('aria-disabled')).toBe('true');
         expect(wrapper.find('[data-testid="raster-export-extent-reason"]').text()).toBe('The visible extent of the map is not known yet');
         await extent().trigger('click');
@@ -311,7 +320,7 @@ describe('RasterExportButton the visible extent while its estimate is read', () 
         const dataset = makeDataset();
         dataset.getRasterValueInfo.mockResolvedValue({ estimatedExportBytes: 200 * 1024 * 1024, exportLimitBytes: GIB });
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-        mountControl({ info: HUGE }, dataset);
+        await mountOpen({ info: HUGE }, dataset);
         // The first estimate is read: until then the button waits, with its reason
         expect(extent().attributes('aria-disabled')).toBe('true');
         expect(wrapper.find('[data-testid="raster-export-extent-reason"]').text()).toBe('Checking size…');
@@ -345,11 +354,12 @@ describe('RasterExportButton the visible extent while its estimate is read', () 
 
 describe('RasterExportButton an export refused for its size (FR-XC-22)', () => {
     it('is a button that can be focused, with the reason as visible text and as its description', async () => {
-        mountControl({ info: HUGE });
+        await mountOpen({ info: HUGE });
         const button = whole();
         expect(button.element.tagName).toBe('BUTTON');
         expect(button.attributes('disabled')).toBeUndefined();
-        expect(button.attributes('tabindex')).toBeUndefined();
+        // Out of the tab order like every item of a menu (the arrows reach it), but not out of reach: it is not `disabled`
+        expect(button.attributes('tabindex')).toBe('-1');
         expect(button.attributes('aria-disabled')).toBe('true');
 
         const reason = wrapper.find('[data-testid="raster-export-whole-reason"]');
@@ -361,14 +371,14 @@ describe('RasterExportButton an export refused for its size (FR-XC-22)', () => {
         expect(runHeavyTask).not.toHaveBeenCalled();
     });
 
-    it('has no reason without a limit', () => {
-        mountControl({ info: { estimatedExportBytes: 9985798963, exportLimitBytes: null } });
+    it('has no reason without a limit', async () => {
+        await mountOpen({ info: { estimatedExportBytes: 9985798963, exportLimitBytes: null } });
         expect(whole().attributes('aria-disabled')).toBeUndefined();
         expect(wrapper.find('[data-testid="raster-export-whole-reason"]').exists()).toBe(false);
     });
 
-    it('falls back to the limit of the server features for a value info that has none', () => {
-        mountControl({ info: { estimatedExportBytes: 9985798963 } });
+    it('falls back to the limit of the server features for a value info that has none', async () => {
+        await mountOpen({ info: { estimatedExportBytes: 9985798963 } });
         expect(wrapper.find('[data-testid="raster-export-whole-reason"]').text()).toContain('about 9.3 GB > 1 GB limit');
     });
 });
@@ -378,7 +388,7 @@ describe('RasterExportButton the estimate of a panel that has no value info', ()
         const dataset = makeDataset();
         dataset.getRasterValueInfo.mockResolvedValue({ ...HUGE });
         vi.useFakeTimers();
-        mountControl({ info: null, readEstimate: true, vizParams: { colormap: 'rdylgn', nodata: 0 } }, dataset);
+        await mountOpen({ info: null, readEstimate: true, vizParams: { colormap: 'rdylgn', nodata: 0 } }, dataset);
         await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS - 100);
         expect(dataset.getRasterValueInfo).not.toHaveBeenCalled();
 
@@ -395,10 +405,276 @@ describe('RasterExportButton the estimate of a panel that has no value info', ()
         dataset.getRasterValueInfo.mockRejectedValue(new Error('boom'));
         vi.spyOn(console, 'error').mockImplementation(() => {});
         vi.useFakeTimers();
-        mountControl({ info: null, readEstimate: true }, dataset);
+        await mountOpen({ info: null, readEstimate: true }, dataset);
         await vi.advanceTimersByTimeAsync(ESTIMATE_DELAY_MS + 50);
         vi.useRealTimers();
         await flushPromises();
         expect(whole().attributes('aria-disabled')).toBeUndefined();
+    });
+});
+
+describe('RasterExportButton the menu button', () => {
+    it('is the Export button of the footer row, with a menu that is not in the page until it is opened', async () => {
+        mountControl();
+        expect(wrapper.find('[data-testid="raster-export"]').classes()).toContain('raster-export');
+        expect(trigger().element.tagName).toBe('BUTTON');
+        expect(trigger().classes()).toEqual(expect.arrayContaining(['panel-btn', 'panel-btn--primary', 'footer-btn', 'footer-btn--end']));
+        expect(trigger().find('.footer-label').text()).toBe('Export');
+        expect(trigger().attributes('aria-haspopup')).toBe('menu');
+        expect(trigger().attributes('aria-expanded')).toBe('false');
+        expect(trigger().attributes('aria-controls')).toBeUndefined();
+        expect(menu().exists()).toBe(false);
+        expect(whole().exists()).toBe(false);
+
+        await openMenu();
+        expect(trigger().attributes('aria-expanded')).toBe('true');
+        expect(trigger().attributes('aria-controls')).toBe(menu().attributes('id'));
+        expect(wrapper.findAll('[role="menuitem"]').map(item => item.attributes('data-testid')))
+            .toEqual(['raster-export-whole', 'raster-export-extent']);
+
+        await openMenu();
+        expect(trigger().attributes('aria-expanded')).toBe('false');
+        expect(menu().exists()).toBe(false);
+    });
+
+    it('gives each item a visible name that is its accessible name, and a line that says how much it exports', async () => {
+        await mountOpen({ vizParams: { formula: 'CELSIUS', colormap: 'ironbow' } });
+        const styled = 'Export styled image (RGBA GeoTIFF, in the CRS of the file)';
+        expect(whole().find('.export-item-name').text()).toBe(styled);
+        expect(whole().attributes('aria-label')).toBe(styled);
+        expect(whole().find('.export-item-detail').text()).toBe('The whole file');
+        expect(extent().find('.export-item-name').text()).toBe('Export visible extent');
+        expect(extent().attributes('aria-label')).toBe('Export visible extent');
+        expect(extent().find('.export-item-detail').text()).toBe('What the map shows now');
+        // The name follows the style, and stays the accessible name
+        await wrapper.setProps({ vizParams: { colormap: 'ironbow' } });
+        const bands = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
+        expect(whole().find('.export-item-name').text()).toBe(bands);
+        expect(whole().attributes('aria-label')).toBe(bands);
+    });
+
+    it('shows why both items are off while an export runs, as their description', async () => {
+        controlledRun();
+        await mountOpen();
+        await whole().trigger('click');
+        await flushPromises();
+        await openMenu();
+        for (const [item, testid] of [[whole(), 'raster-export-whole-unavailable'], [extent(), 'raster-export-extent-unavailable']]) {
+            expect(item.attributes('aria-disabled')).toBe('true');
+            const reason = item.find(`[data-testid="${testid}"]`);
+            expect(reason.text()).toBe('An export is running');
+            expect(item.attributes('aria-describedby').split(' ')).toContain(reason.attributes('id'));
+        }
+    });
+
+    it('shows why both items are off without a raster', async () => {
+        await mountOpen({ filePath: null });
+        expect(whole().find('[data-testid="raster-export-whole-unavailable"]').text()).toBe('No raster to export');
+        expect(extent().find('[data-testid="raster-export-extent-unavailable"]').text()).toBe('No raster to export');
+    });
+
+    it('shows the note of what the export writes as text at the foot of the menu, not behind a button', async () => {
+        await mountOpen({ vizParams: { formula: 'CELSIUS', colormap: 'ironbow' } });
+        const note = wrapper.find('[data-testid="raster-export-note"]');
+        expect(note.text()).toBe('The picture of the style, not the values.');
+        expect(wrapper.find('[data-testid="raster-export-menu"]').element.lastElementChild).toBe(note.element);
+        expect(wrapper.find('[data-testid="raster-export-note-toggle"]').exists()).toBe(false);
+        // The items name it as their description
+        expect(whole().attributes('aria-describedby').split(' ')).toContain(note.attributes('id'));
+        expect(extent().attributes('aria-describedby').split(' ')).toContain(note.attributes('id'));
+    });
+
+    it('shows the reason of an item that is off inside the item', async () => {
+        await mountOpen({ info: HUGE });
+        const reason = whole().find('[data-testid="raster-export-whole-reason"]');
+        expect(reason.exists()).toBe(true);
+        expect(reason.text()).toBe('Too large to export: about 9.3 GB > 1 GB limit. Use Visible extent to export it in parts.');
+        expect(whole().classes()).toContain('is-disabled');
+    });
+
+    it('closes when an export is chosen, runs it, and gives the focus back to the button', async () => {
+        runHeavyTask.mockResolvedValue({ taskId: 't1' });
+        await mountOpen();
+        await extent().trigger('click');
+        await flushPromises();
+        expect(runHeavyTask).toHaveBeenCalledOnce();
+        expect(menu().exists()).toBe(false);
+        expect(trigger().attributes('aria-expanded')).toBe('false');
+        expect(document.activeElement).toBe(trigger().element);
+    });
+});
+
+describe('RasterExportButton the keyboard', () => {
+    it('opens on Enter, on Space and on the down arrow, with the first item that is on focused', async () => {
+        for (const key of ['Enter', ' ', 'ArrowDown']) {
+            // The whole raster is over the limit: the first item that is on is the visible extent
+            await mountWholeOff();
+            trigger().element.focus();
+            await press(trigger().element, key);
+            expect(menu().exists(), key).toBe(true);
+            expect(trigger().attributes('aria-expanded'), key).toBe('true');
+            expect(document.activeElement, key).toBe(extent().element);
+            wrapper.unmount();
+        }
+    });
+
+    it('focuses the first item when the first is on', async () => {
+        mountControl();
+        await press(trigger().element, 'ArrowDown');
+        expect(document.activeElement).toBe(whole().element);
+    });
+
+    it('focuses the first item when none is on, so that its reason is read', async () => {
+        mountControl({ info: HUGE, bbox: null });
+        await press(trigger().element, 'ArrowDown');
+        expect(whole().attributes('aria-disabled')).toBe('true');
+        expect(extent().attributes('aria-disabled')).toBe('true');
+        expect(document.activeElement).toBe(whole().element);
+    });
+
+    it('moves between the items with the arrows, around the ends, and with Home and End', async () => {
+        await mountOpen();
+        expect(document.activeElement).toBe(whole().element);
+        await press(menu().element, 'ArrowDown');
+        expect(document.activeElement).toBe(extent().element);
+        await press(extent().element, 'ArrowDown');
+        expect(document.activeElement).toBe(whole().element);
+        await press(whole().element, 'ArrowUp');
+        expect(document.activeElement).toBe(extent().element);
+        await press(extent().element, 'Home');
+        expect(document.activeElement).toBe(whole().element);
+        await press(whole().element, 'End');
+        expect(document.activeElement).toBe(extent().element);
+    });
+
+    it('reaches an item that is off with the arrows, and Enter on it does nothing', async () => {
+        await mountWholeOff();
+        await openMenu();
+        expect(document.activeElement).toBe(extent().element);
+        await press(extent().element, 'ArrowDown');
+        expect(document.activeElement).toBe(whole().element);
+        expect(whole().attributes('aria-disabled')).toBe('true');
+
+        await press(whole().element, 'Enter');
+        await press(whole().element, ' ');
+        expect(runHeavyTask).not.toHaveBeenCalled();
+        expect(menu().exists()).toBe(true);
+        expect(document.activeElement).toBe(whole().element);
+    });
+
+    it('runs the export of the item that has the focus on Enter and on Space, and closes', async () => {
+        runHeavyTask.mockResolvedValue({ taskId: 't1' });
+        await mountOpen();
+        await press(whole().element, 'Enter');
+        expect(runHeavyTask).toHaveBeenCalledOnce();
+        expect(menu().exists()).toBe(false);
+
+        await press(trigger().element, 'ArrowDown');
+        await press(menu().element, 'ArrowDown');
+        expect(document.activeElement).toBe(extent().element);
+        await press(extent().element, ' ');
+        expect(runHeavyTask).toHaveBeenCalledTimes(2);
+        expect(runHeavyTask.mock.calls[1][2].params.bbox).toEqual(BBOX);
+        expect(menu().exists()).toBe(false);
+    });
+
+    it('closes on Escape, gives the focus back to the button, and does not pass the key on', async () => {
+        const outside = vi.fn();
+        document.addEventListener('keydown', outside);
+        try {
+            await mountOpen();
+            await press(whole().element, 'Escape');
+            expect(menu().exists()).toBe(false);
+            expect(trigger().attributes('aria-expanded')).toBe('false');
+            expect(document.activeElement).toBe(trigger().element);
+            expect(outside).not.toHaveBeenCalled();
+        } finally {
+            document.removeEventListener('keydown', outside);
+        }
+    });
+
+    it('closes when the focus leaves it (Tab), not while it moves inside it', async () => {
+        await mountOpen();
+        await whole().trigger('focusout', { relatedTarget: extent().element });
+        expect(menu().exists()).toBe(true);
+        await extent().trigger('focusout', { relatedTarget: trigger().element });
+        expect(menu().exists()).toBe(true);
+        await extent().trigger('focusout', { relatedTarget: document.body });
+        expect(menu().exists()).toBe(false);
+    });
+
+    it('closes on a press outside, not on one inside', async () => {
+        await mountOpen();
+        whole().element.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        await nextTick();
+        expect(menu().exists()).toBe(true);
+        document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        await nextTick();
+        expect(menu().exists()).toBe(false);
+    });
+
+    it('focuses an item without scrolling the panel to it', async () => {
+        const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+        try {
+            mountControl();
+            await press(trigger().element, 'ArrowDown');
+            expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+            expect(focus.mock.contexts).toContain(whole().element);
+        } finally {
+            focus.mockRestore();
+        }
+    });
+});
+
+describe('RasterExportButton the status of the export with the menu shut', () => {
+    it('shows the task and Cancel in a status item of the footer row, and the spinner on the button, while the menu is closed', async () => {
+        const run = controlledRun();
+        await mountOpen();
+        expect(trigger().find('.fa-spinner').exists()).toBe(false);
+        expect(wrapper.find('.footer-status').classes()).toContain('is-idle');
+
+        await whole().trigger('click');
+        await flushPromises();
+        expect(menu().exists()).toBe(false);
+        const footerStatus = wrapper.find('.footer-status');
+        expect(footerStatus.classes()).not.toContain('is-idle');
+        expect(footerStatus.find('[data-testid="heavy-task-status"]').text()).toContain('Queued…');
+        expect(footerStatus.find('[data-testid="heavy-task-cancel"]').exists()).toBe(true);
+        expect(trigger().find('.fa-spinner').exists()).toBe(true);
+        expect(trigger().find('.fa-download').exists()).toBe(false);
+
+        run().succeed();
+        await flushPromises();
+        expect(trigger().find('.fa-spinner').exists()).toBe(false);
+    });
+
+    it('shows the error with the menu closed', async () => {
+        const run = controlledRun();
+        await mountOpen();
+        await whole().trigger('click');
+        await flushPromises();
+        run().end({ taskId: 't1', state: 'Failed', error: 'Cannot read the raster', percent: 10 });
+        await flushPromises();
+        expect(menu().exists()).toBe(false);
+        expect(wrapper.find('.footer-status [data-testid="heavy-task-error"]').text()).toBe('Cannot read the raster');
+    });
+});
+
+describe('RasterExportButton in the footer row', () => {
+    const style = readSource(__dirname, 'RasterExportButton.vue').split('<style scoped>')[1];
+
+    it('has no box of its own: its parts are items of the footer row', () => {
+        expect(ruleOf(style, '.raster-export')).toMatch(/display:\s*contents/);
+    });
+
+    it('draws the menu as a row of the footer above the button, in the flow, wrapping its text, never outside the panel', () => {
+        const rule = ruleOf(style, '.export-menu');
+        expect(rule).toMatch(/flex:\s*0 0 100%/);
+        expect(rule).toMatch(/order:\s*-2/);
+        expect(rule).toMatch(/min-width:\s*0/);
+        for (const selector of ['.export-menu', '.export-item', '.export-item-text', '.export-item-detail', '.export-item-reason', '.export-note']) {
+            expect(ruleOf(style, selector), selector).not.toMatch(/position:|white-space:\s*nowrap|(?<!-)width:\s*[\d.]+(px|rem|em)/);
+        }
+        expect(style).not.toMatch(/orange|ff9800/i);
     });
 });

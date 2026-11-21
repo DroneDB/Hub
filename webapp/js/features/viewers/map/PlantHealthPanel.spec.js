@@ -162,7 +162,7 @@ describe('PlantHealthPanel histogram note', () => {
     });
 });
 
-describe('PlantHealthPanel Copy Link', () => {
+describe('PlantHealthPanel Link', () => {
     it('writes the settings in the hash keeping the address and the history state of the router', async () => {
         // The router keeps the address it is at in the history state; without it, its next
         // navigation writes the address of its last one back over this entry
@@ -244,7 +244,7 @@ describe('PlantHealthPanel default stretch', () => {
         });
     });
 
-    // FR-RAS-05: the Copy Link of earlier releases wrote the rescale and the stretch without a formula
+    // FR-RAS-05: the link of earlier releases wrote the rescale and the stretch without a formula
     it('opens an old link with a rescale and no formula: the bands, without a stretch or a request for one', async () => {
         await renderWith(CLEAN_STATS, { pick: null, initialParams: { bands: '4,2,1', rescale: '0.1,0.9', stretch: 'percentile' } });
         expect(wrapper.find('#plant-health-panel-formula').element.value).toBe('');
@@ -314,6 +314,11 @@ describe('PlantHealthPanel close (FR-RAS-01)', () => {
 // FR-RAS-16, FR-PRC-15, FR-RAS-26: the export of Plant Health is the one export control, with the state of its task
 describe('PlantHealthPanel export', () => {
     const exportWhole = () => wrapper.find('[data-testid="raster-export-whole"]');
+    // The items are in the menu of the Export button: open it first
+    const openExportMenu = async () => {
+        await wrapper.get('[data-testid="raster-export-menu-btn"]').trigger('click');
+        await flushPromises();
+    };
     const exportStatus = () => wrapper.find('[data-testid="heavy-task-status"]');
 
     it('submits the raster-export task with the style of the layer and shows Queued…, then Exporting n %', async () => {
@@ -324,6 +329,7 @@ describe('PlantHealthPanel export', () => {
             options.onSubmitted({ taskId: 't1' });
         }));
         await renderWith(CLEAN_STATS);
+        await openExportMenu();
         expect(exportWhole().attributes('aria-label')).toBe('Export styled image (RGBA GeoTIFF, in the CRS of the file)');
 
         await exportWhole().trigger('click');
@@ -347,6 +353,7 @@ describe('PlantHealthPanel export', () => {
         await wrapper.setProps({ visibleBbox: [15, 45, 15.5, 45.5] });
         heavy.runHeavyTask.mockReset();
         heavy.runHeavyTask.mockResolvedValue({ taskId: 't1' });
+        await openExportMenu();
         await wrapper.find('[data-testid="raster-export-extent"]').trigger('click');
         await flushPromises();
         expect(heavy.runHeavyTask.mock.calls[0][2].params).toMatchObject({ bbox: [15, 45, 15.5, 45.5], fileName: 'odm_orthophoto_extent_export.tif' });
@@ -368,10 +375,10 @@ describe('PlantHealthPanel export', () => {
             vi.useRealTimers();
         }
 
+        await openExportMenu();
         const button = exportWhole();
         expect(button.element.tagName).toBe('BUTTON');
         expect(button.attributes('disabled')).toBeUndefined();
-        expect(button.attributes('tabindex')).toBeUndefined();
         expect(button.attributes('aria-disabled')).toBe('true');
         const reason = wrapper.find('[data-testid="raster-export-whole-reason"]');
         expect(reason.text()).toBe('Too large to export: about 9.3 GB > 1 GB limit. Use Visible extent to export it in parts.');
@@ -426,6 +433,7 @@ describe('PlantHealthPanel presets', () => {
     it('names the export after the style: scaled bands for a band preset, a styled image for an index', async () => {
         await renderWith(CLEAN_STATS, { info: INFO, algorithms: [{ id: 'NDWI', name: 'NDWI', range: [-1, 1] }], pick: '' });
         const label = () => wrapper.find('[data-testid="raster-export-whole"]').attributes('aria-label');
+        await wrapper.get('[data-testid="raster-export-menu-btn"]').trigger('click');
         await preset().setValue('false-color-ir');
         expect(label()).toBe('Export scaled bands (8-bit GeoTIFF, in the CRS of the file)');
         await preset().setValue('ndwi');
@@ -563,13 +571,151 @@ describe('PlantHealthPanel formula error', () => {
 
 // FR-RAS-23: the actions are the footer of the panel
 describe('PlantHealthPanel footer', () => {
-    it('has Reset, Original, Copy Link and the export control in the footer', async () => {
+    it('has Reset, Original, Link and the export control in one footer row', async () => {
         await renderWith(CLEAN_STATS);
         const footer = wrapper.get('[data-testid="panel-actions"]');
-        // The buttons with a text (the info button of the export note is an icon, U-415)
-        expect(footer.findAll('button').map(b => b.text()).filter(Boolean)).toEqual(['Reset', 'Original', 'Copy Link', 'Export', 'Visible extent']);
+        // The buttons with a text; the items of the export menu are not there while it is closed
+        expect(footer.findAll('button').map(b => b.text()).filter(Boolean)).toEqual(['Reset', 'Original', 'Link', 'Export']);
+        expect(footer.find('.panel-footer-row').exists()).toBe(true);
         expect(footer.find('[data-testid="raster-export"]').exists()).toBe(true);
         expect(wrapper.get('.panel-body').find('.actions-grid').exists()).toBe(false);
+        expect(footer.find('[data-testid="raster-export-whole"]').exists()).toBe(false);
+    });
+
+    it('names the Link button by what it does, and presses Original while the original is shown', async () => {
+        await renderWith(CLEAN_STATS);
+        const link = wrapper.get('[data-testid="panel-actions"] button[title="Copy a shareable link with the current settings"]');
+        expect(link.attributes('aria-label')).toBe('Copy a shareable link with the current settings');
+        expect(link.text()).toBe('Link');
+
+        const original = () => wrapper.findAll('[data-testid="panel-actions"] button').find(b => /orig\./i.test(b.text()) || b.text() === 'Original');
+        expect(original().attributes('aria-pressed')).toBe('false');
+        await original().trigger('click');
+        expect(original().attributes('aria-pressed')).toBe('true');
+        expect(original().classes()).toContain('is-active');
+        expect(original().text()).toBe('Hide orig.');
     });
 });
 
+// The layout of the panel: rows, the histogram right after the range, one line of statistics
+describe('PlantHealthPanel layout', () => {
+    const rowOf = id => wrapper.get(id).element.closest('.panel-row');
+    const headings = () => wrapper.findAll('.section-label').map(l => l.text());
+
+    it('puts the sensor in the subtitle, with its id as the title, and has no Sensor section', async () => {
+        await renderWith(CLEAN_STATS, {
+            info: { bands: [{}, {}, {}, {}], detectedSensor: 'generic-4band', detectedSensorName: 'Generic 4-band' }, pick: ''
+        });
+        const sensor = wrapper.get('[data-testid="plant-health-sensor"]');
+        expect(sensor.text()).toBe('Generic 4-band');
+        expect(sensor.attributes('title')).toBe('generic-4band');
+        expect(sensor.element.closest('.panel-subtitle')).not.toBeNull();
+        expect(wrapper.get('.panel-body').find('[data-testid="plant-health-sensor"]').exists()).toBe(false);
+        expect(headings()).not.toContain('Sensor');
+    });
+
+    it('has no subtitle when no sensor is detected', async () => {
+        await renderWith(CLEAN_STATS);
+        expect(wrapper.find('[data-testid="plant-health-sensor"]').exists()).toBe(false);
+        expect(wrapper.find('.panel-subtitle').exists()).toBe(false);
+    });
+
+    it('has no tool bar', async () => {
+        await renderWith(CLEAN_STATS);
+        expect(wrapper.find('.panel-tools').exists()).toBe(false);
+    });
+
+    it('lists the settings as rows: Formula, Colors, Stretch, Range', async () => {
+        await renderWith(CLEAN_STATS);
+        expect(headings()).toEqual(['Formula', 'Colors', 'Stretch', 'Range']);
+        expect(rowOf('#plant-health-panel-formula')).not.toBeNull();
+        expect(rowOf('#plant-health-panel-stretch')).not.toBeNull();
+        expect(wrapper.get('[role="group"][aria-labelledby="plant-health-panel-rescale-label"]').element.closest('.panel-row')).not.toBeNull();
+    });
+
+    it('keeps the guide button beside the Formula label text and out of the label', async () => {
+        await renderWith(CLEAN_STATS);
+        const info = wrapper.get('[data-testid="plant-health-formulas-info"]');
+        const label = wrapper.get('label[for="plant-health-panel-formula"]');
+        expect(label.text()).toBe('Formula');
+        expect(label.element.contains(info.element)).toBe(false);
+        expect(info.element.parentElement).toBe(label.element.parentElement);
+    });
+
+    it('shows the Colors, Stretch and Range rows only with a formula', async () => {
+        await renderWith(CLEAN_STATS, { pick: '' });
+        // The bands row takes their place without a formula (the raster has 5 bands)
+        expect(headings()).toEqual(['Formula', 'Bands (R,G,B)']);
+        expect(wrapper.find('#plant-health-panel-stretch').exists()).toBe(false);
+        expect(wrapper.find('#plant-health-panel-rescale-min').exists()).toBe(false);
+    });
+
+    it('shows the range without a unit or a data caption', async () => {
+        await renderWith(CLEAN_STATS);
+        const group = wrapper.get('[role="group"][aria-labelledby="plant-health-panel-rescale-label"]');
+        expect(group.text()).not.toMatch(/Data/);
+        expect(wrapper.find('[data-testid="rescale-fit"]').exists()).toBe(false);
+    });
+
+    it('shows the histogram right after the Range row, full width, with its note under it and no heading', async () => {
+        await renderWith(OUTLIER_STATS);
+        const group = wrapper.get('[role="group"][aria-label="Histogram"]');
+        const range = wrapper.get('[role="group"][aria-labelledby="plant-health-panel-rescale-label"]').element.closest('.panel-row');
+        expect(range.nextElementSibling).toBe(group.element);
+        expect(group.element.closest('.panel-row')).toBeNull();
+        expect(group.attributes('style')).toBeUndefined();
+        expect(group.element.contains(chart().element)).toBe(true);
+        expect(note().element.parentElement).toBe(group.element);
+        expect(group.find('.section-label').exists()).toBe(false);
+        expect(wrapper.text()).not.toMatch(/Histogram/);
+    });
+
+    it('gives the statistics as one muted line, with the number format of the panel and no heading', async () => {
+        await renderWith(CLEAN_STATS);
+        const line = wrapper.get('[data-testid="plant-health-stats"]');
+        expect(line.text().replace(/\s+/g, ' ')).toBe('Min -0.200 · Max 0.900 · Mean 0.500 · σ 0.100');
+        expect(wrapper.text()).not.toMatch(/Statistics/);
+        expect(wrapper.find('.stats-grid').exists()).toBe(false);
+        // After the histogram
+        const group = wrapper.get('[role="group"][aria-label="Histogram"]').element;
+        expect(group.nextElementSibling).toBe(line.element);
+    });
+
+    it('shows the statistics of the raster, and no histogram, when it has none', async () => {
+        await renderWith({ 1: { min: 0, max: 1, mean: 0.5, std: 0.25 } });
+        expect(wrapper.find('[role="group"][aria-label="Histogram"]').exists()).toBe(false);
+        expect(wrapper.get('[data-testid="plant-health-stats"]').text()).toBe('Min 0.000 · Max 1.000 · Mean 0.500 · σ 0.250');
+    });
+
+    describe('Bands (R,G,B)', () => {
+        const bands = n => Array.from({ length: n }, (_, i) => ({ index: i + 1, name: `B${i + 1}` }));
+        const bandsRow = () => wrapper.find('#plant-health-panel-bands-label');
+
+        it('is a stacked row without a formula and with more than 3 bands', async () => {
+            await renderWith(CLEAN_STATS, { info: { bands: bands(5) }, pick: '' });
+            expect(bandsRow().exists()).toBe(true);
+            expect(bandsRow().text()).toBe('Bands (R,G,B)');
+            expect(bandsRow().element.closest('.panel-row').classList).toContain('panel-row--stacked');
+        });
+
+        it('is not shown with 3 bands or fewer, or with a formula', async () => {
+            await renderWith(CLEAN_STATS, { info: { bands: bands(3) }, pick: '' });
+            expect(bandsRow().exists()).toBe(false);
+            wrapper.unmount();
+            await renderWith(CLEAN_STATS, { info: { bands: bands(5) } });
+            expect(bandsRow().exists()).toBe(false);
+        });
+    });
+
+    it('keeps the unavailable-formulas hint under the Formula row, linked to the select', async () => {
+        const algorithms = [
+            { id: 'NDVI', name: 'Normalized Difference Vegetation Index', category: 'multispectral' },
+            { id: 'VARI', name: 'Visual Atmospheric Resistance Index', category: 'rgb', disabled: true, disabledReason: 'Requires bands: RGB' }
+        ];
+        await renderWith(CLEAN_STATS, { algorithms, pick: '' });
+        const hint = wrapper.get('[data-testid="plant-health-formula-hint"]');
+        expect(hint.classes()).toContain('panel-row-note');
+        expect(rowOf('#plant-health-panel-formula').nextElementSibling).toBe(hint.element);
+        expect(wrapper.get('#plant-health-panel-formula').attributes('aria-describedby')).toBe(hint.attributes('id'));
+    });
+});

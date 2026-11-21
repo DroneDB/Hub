@@ -1,5 +1,5 @@
 <template>
-    <div v-if="candidates.length > 1" class="section analysis-target">
+    <div v-if="candidates.length > 1" class="panel-row analysis-target">
         <label :for="selectId" class="section-label">{{ label }}</label>
         <select :id="selectId" ref="select" class="panel-select" data-testid="analysis-target-select" @change="onChange">
             <option v-for="(c, i) in candidates" :key="c.path" :value="c.path" :title="c.label" :selected="c.path === modelValue">{{ labels[i] }}</option>
@@ -14,6 +14,7 @@
  * and the parent decides: it may refuse (unsaved measurements the user keeps), so the
  * select always goes back to the value the parent holds. Hidden with fewer than two
  * candidates, there is nothing to choose. The options show the part of the names that differs.
+ * It is one settings row of the panel (.panel-row): the label on the left, the select on the right.
  */
 import { ref, computed, nextTick, useId } from 'vue';
 import { distinctLabels } from '@/libs/format';

@@ -5,7 +5,7 @@
  * libs/format.js parseNumber); the `rescale` request parameter keeps its machine format "min,max"
  * with "." as the decimal sign, which the Registry also checks (a bad value is a 400 there).
  */
-import { parseNumber } from '@/libs/format';
+import { localiseNumberText, parseNumber } from '@/libs/format';
 
 /**
  * What is wrong with each field of a Rescale range typed as text, or null for a field that is fine.
@@ -57,4 +57,15 @@ export function splitRescale(value) {
     if (typeof value !== 'string' || value.trim() === '') return { min: '', max: '' };
     const [min = '', max = ''] = value.split(',');
     return { min: min.trim(), max: max.trim() };
+}
+
+/**
+ * The two texts of a machine value ("min,max") as the fields show a range the panel set: numbers in
+ * the user's locale ("194,66" in it), with the digits of the value. Empty texts when there is none.
+ * @param {string|null|undefined} value
+ * @returns {{ min: string, max: string }}
+ */
+export function localiseRescale(value) {
+    const { min, max } = splitRescale(value);
+    return { min: localiseNumberText(min), max: localiseNumberText(max) };
 }

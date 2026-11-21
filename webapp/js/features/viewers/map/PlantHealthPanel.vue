@@ -1,15 +1,14 @@
 <template>
     <AnalysisPanel v-if="visible" variant="plant-health" class="plant-health-panel"
                    icon="fas fa-leaf" title="Plant Health" @close="close">
-        <div v-if="rasterInfo" class="panel-body">
-            <!-- Sensor Info: the name of its profile (the id as the title) -->
-            <div v-if="rasterInfo.detectedSensor" class="section">
-                <span class="section-label">Sensor</span>
-                <span class="sensor-badge" :title="rasterInfo.detectedSensor" data-testid="plant-health-sensor">{{ sensorLabel }}</span>
-            </div>
+        <!-- The name of the sensor profile (the id as the title): a line under the title, as it is a fact of the raster and no setting -->
+        <template v-if="rasterInfo && rasterInfo.detectedSensor" #subtitle>
+            <span :title="rasterInfo.detectedSensor" data-testid="plant-health-sensor">{{ sensorLabel }}</span>
+        </template>
 
+        <div v-if="rasterInfo" class="panel-body">
             <!-- Preset Selection: the presets of the sensor, built from the bands the raster has (FR-RAS-18) -->
-            <div v-if="presetList.length > 0" class="section">
+            <div v-if="presetList.length > 0" class="panel-row">
                 <label for="plant-health-panel-preset" class="section-label">Preset</label>
                 <select id="plant-health-panel-preset" v-model="selectedPreset" class="panel-select" @change="onPresetChange">
                     <option value="">Custom...</option>
@@ -17,17 +16,17 @@
                 </select>
             </div>
 
-            <!-- Formula Selection -->
-            <div class="section">
-                <label for="plant-health-panel-formula" class="section-label">
-                    Formula
+            <!-- Formula Selection: the guide button sits beside the label text, outside the label, so the select is not named after it -->
+            <div class="panel-row">
+                <span class="section-label">
+                    <label for="plant-health-panel-formula">Formula</label>
                     <button type="button" class="info-icon-btn"
                             title="Learn more about each vegetation index" aria-label="Learn more about each vegetation index"
                             data-testid="plant-health-formulas-info"
                             @click="showFormulasInfo = true">
                         <i class="fas fa-info-circle" />
                     </button>
-                </label>
+                </span>
                 <!-- The id first, so that the closed select reads "NDVI – ..." even when the name is cut (FR-RAS-32) -->
                 <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" data-testid="plant-health-formula"
                         :aria-describedby="disabledCount ? 'plant-health-panel-formula-hint' : undefined" @change="onFormulaChange">
@@ -38,15 +37,15 @@
                         {{ f.id }} – {{ f.name }}{{ f.disabled ? ' ✗' : '' }}
                     </option>
                 </select>
-                <!-- A disabled option cannot take the focus: the reason of every one is in the guide, and a select reads this hint (FR-XC-22) -->
-                <p v-if="disabledCount" id="plant-health-panel-formula-hint" class="formula-hint" data-testid="plant-health-formula-hint">
-                    ✗ {{ disabledCount === 1 ? '1 formula is' : `${disabledCount} formulas are` }} not available for this raster: it lacks
-                    the bands. The guide (<i class="fas fa-info-circle" />) lists the bands each one needs.
-                </p>
             </div>
+            <!-- A disabled option cannot take the focus: the reason of every one is in the guide, and a select reads this hint (FR-XC-22) -->
+            <p v-if="disabledCount" id="plant-health-panel-formula-hint" class="panel-row-note" data-testid="plant-health-formula-hint">
+                ✗ {{ disabledCount === 1 ? '1 formula is' : `${disabledCount} formulas are` }} not available for this raster: it lacks
+                the bands. The guide (<i class="fas fa-info-circle" />) lists the bands each one needs.
+            </p>
 
             <!-- Band Mapping (when no formula) -->
-            <div v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3" class="section">
+            <div v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3" class="panel-row panel-row--stacked">
                 <span id="plant-health-panel-bands-label" class="section-label">Bands (R,G,B)</span>
                 <BandSelector
                     v-model="customBands"
@@ -72,8 +71,8 @@
             </div>
 
             <!-- Colormap (when formula is active) -->
-            <div v-if="selectedFormula" class="section">
-                <label id="plant-health-panel-colormap-label" for="plant-health-panel-colormap" class="section-label">Colormap</label>
+            <div v-if="selectedFormula" class="panel-row">
+                <label id="plant-health-panel-colormap-label" for="plant-health-panel-colormap" class="section-label">Colors</label>
                 <ColormapDropdown
                     v-model="selectedColormap"
                     input-id="plant-health-panel-colormap" aria-labelledby="plant-health-panel-colormap-label"
@@ -82,7 +81,7 @@
             </div>
 
             <!-- Stretch Type -->
-            <div v-if="selectedFormula" class="section">
+            <div v-if="selectedFormula" class="panel-row">
                 <label for="plant-health-panel-stretch" class="section-label">Stretch</label>
                 <select id="plant-health-panel-stretch" v-model="selectedStretch" class="panel-select" @change="onStretchChange">
                     <option value="percentile">Percentile (2%-98%)</option>
@@ -93,15 +92,15 @@
             </div>
 
             <!-- Rescale (when formula is active) -->
-            <div v-if="selectedFormula" class="section">
-                <span id="plant-health-panel-rescale-label" class="section-label">Rescale</span>
+            <div v-if="selectedFormula" class="panel-row">
+                <span id="plant-health-panel-rescale-label" class="section-label">Range</span>
                 <!-- The same Min and Max fields as the raster panel; a bad range shows its error here and the layer keeps the last valid one (FR-RAS-20) -->
-                <RescaleFields v-model="rescale" id-prefix="plant-health-panel-rescale" @commit="onRescaleManualChange" />
+                <RescaleFields v-model="rescale" id-prefix="plant-health-panel-rescale" labelledby="plant-health-panel-rescale-label"
+                               @commit="onRescaleManualChange" />
             </div>
 
-            <!-- Histogram -->
-            <div v-if="histogramData" class="section" style="margin-bottom: 1rem" role="group" aria-label="Histogram">
-                <span class="section-label">Histogram</span>
+            <!-- Histogram: right under the range it sets, no heading of its own -->
+            <div v-if="histogramData" class="plant-health-histogram" role="group" aria-label="Histogram">
                 <HistogramChart
                     :data="histogramData"
                     :min="histogramMin"
@@ -112,46 +111,29 @@
                 <p v-if="histogramNote" class="histogram-note" data-testid="plant-health-histogram-note">{{ histogramNote }}</p>
             </div>
 
-            <!-- Statistics -->
-            <div v-if="metadata && metadata.statistics" class="section">
-                <span class="section-label">Statistics</span>
-                <div class="stats-grid">
-                    <span>Min: {{ formatNum(firstBandStats.min) }}</span>
-                    <span>Max: {{ formatNum(firstBandStats.max) }}</span>
-                    <span>Mean: {{ formatNum(firstBandStats.mean) }}</span>
-                    <span>StdDev: {{ formatNum(firstBandStats.stddev || firstBandStats.std) }}</span>
-                </div>
-            </div>
-
+            <!-- Statistics: one muted line -->
+            <p v-if="metadata && metadata.statistics" class="stats-line" data-testid="plant-health-stats">
+                Min {{ formatNum(firstBandStats.min) }} · Max {{ formatNum(firstBandStats.max) }} · Mean {{ formatNum(firstBandStats.mean) }} · σ {{ formatNum(firstBandStats.stddev || firstBandStats.std) }}
+            </p>
         </div>
 
         <div v-else class="panel-body loading">
             <LoadingSpinner inline label="Loading raster info..." />
         </div>
-        <!-- Reset / Toggle / Copy Link / Export: the foot of the panel, always in view (FR-RAS-23) -->
+        <!-- Reset / Original / Link / Export: the foot of the panel, always in view (FR-RAS-23) -->
         <template v-if="rasterInfo" #actions>
-            <div class="actions-grid">
-                <button class="panel-btn action-btn" title="Reset visualization parameters to defaults"
-                        @click="reset">
-                    <i class="fas fa-rotate-left" />
-                    <span class="action-label">Reset</span>
-                </button>
-                <button class="panel-btn action-btn"
-                        :class="{ 'panel-btn--primary': originalView }"
-                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
-                        @click="toggleOriginalView">
-                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
-                    <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
-                </button>
-                <button class="panel-btn action-btn" title="Copy a shareable link with the current settings"
-                        @click="copyLink">
+            <div class="panel-footer-row">
+                <StyleViewActions :original-view="originalView" reset-title="Reset visualization parameters to defaults"
+                                  @reset="reset" @toggle-original="toggleOriginalView" />
+                <button type="button" class="panel-btn footer-btn" title="Copy a shareable link with the current settings"
+                        aria-label="Copy a shareable link with the current settings" @click="copyLink">
                     <i class="fas fa-link" />
-                    <span class="action-label">Copy Link</span>
+                    <span class="footer-label">Link</span>
                 </button>
-            </div>
 
-            <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16, FR-PRC-15) -->
-            <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox" />
+                <!-- The one export control: the styled image as a task, or the visible extent (FR-RAS-16, FR-PRC-15) -->
+                <RasterExportButton :dataset="dataset" :file-path="filePath" :viz-params="vizParams()" :bbox="visibleBbox" />
+            </div>
         </template>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
@@ -168,6 +150,7 @@ import { colormap, INDEX_COLORMAPS } from '@/libs/map/colormaps';
 import BandSelector from '@/features/viewers/map/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import RescaleFields from './RescaleFields.vue';
+import StyleViewActions from './StyleViewActions.vue';
 import RasterExportButton from './RasterExportButton.vue';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
 import { encodeVizParamsHash } from '@/libs/map/vizParamsHash';
@@ -186,7 +169,7 @@ import { replaceHash } from '@/libs/routeQuery';
  * rescaling, and copy-link functionality.
  */
 export default {
-    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner, RescaleFields, RasterExportButton },
+    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner, RescaleFields, StyleViewActions, RasterExportButton },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -592,11 +575,16 @@ export default {
     color: var(--panel-text-soft);
 }
 
-.formula-hint {
-    margin: 0.25rem 0 0;
-    font-size: 0.7rem;
+.plant-health-histogram {
+    margin: 0.25rem 0 0.5rem;
+}
+
+.stats-line {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
     line-height: 1.3;
-    color: var(--panel-text-soft);
+    font-variant-numeric: tabular-nums;
+    color: var(--panel-muted);
 }
 
 .single-band-info {

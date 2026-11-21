@@ -29,6 +29,18 @@ describe('AnalysisTargetSelect', () => {
         expect(select.element.value).toBe('odm_dem/dsm.tif');
     });
 
+    it('is one settings row: the label on the left, the select on the right, in a row of its own', () => {
+        render();
+        const row = wrapper.get('.panel-row');
+        expect(row.element).toBe(wrapper.element);
+        expect([...row.element.children].map(c => c.tagName)).toEqual(['LABEL', 'SELECT']);
+        expect(row.get('label').classes()).toContain('section-label');
+        // Not the stacked section it was: the row has no .section of its own
+        expect(wrapper.classes()).not.toContain('section');
+        expect(wrapper.attributes('data-testid')).toBeUndefined();
+        expect(row.get('select').attributes('data-testid')).toBe('analysis-target-select');
+    });
+
     it('asks for the path that was picked', async () => {
         render();
         await wrapper.find('select').setValue('odm_dem/dtm.tif');
