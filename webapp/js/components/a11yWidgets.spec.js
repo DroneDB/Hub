@@ -21,6 +21,14 @@ describe('PathBreadcrumb', () => {
         expect(mount(PathBreadcrumb, { props: { path: '' } }).find('nav, .p-breadcrumb').exists()).toBe(false);
     });
 
+    it('shows the home icon as the current folder at the root with showRoot', () => {
+        const w = mount(PathBreadcrumb, { props: { path: '', showRoot: true } });
+        expect(w.findAll('button')).toHaveLength(0);
+        const root = w.find('[aria-current="location"]');
+        expect(root.attributes('aria-label')).toBe('Root folder');
+        expect(root.find('i.fa-home').exists()).toBe(true);
+    });
+
     it('makes every folder but the current one a button that navigates', async () => {
         const w = mount(PathBreadcrumb, { props: { path: 'a/b/c', rootPath: '/' } });
         const buttons = w.findAll('button');

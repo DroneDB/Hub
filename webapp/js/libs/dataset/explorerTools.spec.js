@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import ddb from 'ddb';
-import { explorerTools } from './explorerTools';
+import { explorerTools, locationTools } from './explorerTools';
 
 const T = ddb.entry.type;
 const file = (type, path = 'x') => ({ path: `ddb://h/o/d/${path}`, entry: { type, path } });
@@ -19,8 +19,8 @@ function context({ canWrite = true, files = [], selected = [], viewMode = 'grid'
     };
 }
 
-// The options of a view come before Refresh and the view switch, so Grid | List stay at the end
-const VIEW_END = ['refresh', 'view-grid', 'view-list'];
+// The options of a view come before the view switch, so Grid | List stay at the end
+const VIEW_END = ['view-grid', 'view-list'];
 const GRID_OPTIONS = ['tile-size-s', 'tile-size-m', 'tile-size-l'];
 const LIST_OPTIONS = ['thumbnails'];
 const WRITER_START = ['upload', 'new-folder', 'separator', 'open', 'share-embed', 'rename', 'delete', 'separator',
@@ -88,12 +88,11 @@ describe('explorerTools', () => {
         byId(tools, 'share-embed').onClick();
         byId(tools, 'new-folder').onClick();
         byId(tools, 'upload').onClick();
-        byId(tools, 'refresh').onClick();
         byId(tools, 'view-list').onClick();
         byId(tools, 'select-all').onClick();
         byId(tools, 'clear-selection').onClick();
         expect(ctx.emit.mock.calls).toEqual([['moveSelectedItems'], ['deleteSelecteditems'], ['shareEmbed', a],
-            ['createFolder'], ['upload'], ['refresh'], ['setViewMode', 'table']]);
+            ['createFolder'], ['upload'], ['setViewMode', 'table']]);
         expect(ctx.selectAll.mock.calls).toEqual([[true], [false]]);
 
         const idle = context({ files, selected: [] });
@@ -163,7 +162,25 @@ describe('explorerTools', () => {
         const phone = tools.filter(t => t.priority === 1).map(t => t.id);
         expect(phone).toEqual(['upload', 'new-folder', 'view-grid', 'view-list']);
         expect(tools.filter(t => t.showLabel).map(t => t.id)).toEqual(['upload', 'new-folder', 'view-grid', 'view-list']);
-        // Refresh goes to More on a phone, stays on a tablet
-        expect(byId(tools, 'refresh').priority).toBe(2);
+    });
+});
+
+describe('locationTools', () => {
+    it('holds Refresh, the action on the folder shown, which the toolbar does not', () => {
+        for (const canWrite of [true, false]) {
+            for (const viewMode of ['grid', 'table']) {
+                const ctx = context({ canWrite, viewMode });
+                expect(ids(locationTools(ctx))).toEqual(['refresh']);
+                expect(ids(explorerTools(ctx))).not.toContain('refresh');
+            }
+        }
+    });
+
+    it('refreshes through the page handler, whatever is selected', () => {
+        const ctx = context({ selected: [file(T.GENERIC)] });
+        const [refresh] = locationTools(ctx);
+        expect(refresh).toMatchObject({ title: 'Refresh', icon: 'fa-solid fa-rotate-right', disabled: false });
+        refresh.onClick();
+        expect(ctx.emit.mock.calls).toEqual([['refresh']]);
     });
 });

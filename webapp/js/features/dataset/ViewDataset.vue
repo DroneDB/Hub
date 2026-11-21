@@ -73,7 +73,7 @@
  * detail panel, the Map and Tasks tabs. The page composes; what it does lives in
  * useDatasetListing (the folder on show), useDatasetActions (every file operation through
  * its dialog, on the dialog registry), useDatasetClipboard, useOpenItem and
- * useDatasetShortcuts; the toolbar is libs/dataset/explorerTools, from the action registry
+ * useDatasetShortcuts; the toolbar and the location bar (Refresh) are libs/dataset/explorerTools, from the action registry
  * (libs/dataset/explorerActions) that the menus and the shortcuts read too; the lightbox is a component.
  */
 import { ref, shallowRef, reactive, computed, watch, provide, nextTick, onMounted, onBeforeUnmount } from 'vue';
@@ -98,7 +98,7 @@ import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError, needsC
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
 import { splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
-import { explorerTools } from '@/libs/dataset/explorerTools';
+import { explorerTools, locationTools } from '@/libs/dataset/explorerTools';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { useUploadsStore } from '@/stores/uploads';
 import { useRequestScope, isAbort } from '@/composables/useRequestScope';
@@ -667,8 +667,9 @@ const toolbarContext = {
     emit: (event, ...args) => toolbarEvents[event]?.(...args)
 };
 const tools = computed(() => explorerTools(toolbarContext));
+const folderTools = computed(() => locationTools(toolbarContext));
 const explorerProps = computed(() => ({
-    files: listing.files.value, tools: tools.value, currentPath: listing.currentPath.value, dataset,
+    files: listing.files.value, tools: tools.value, locationTools: folderTools.value, currentPath: listing.currentPath.value, dataset,
     canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value, importing: !!runningImport.value
 }));
 

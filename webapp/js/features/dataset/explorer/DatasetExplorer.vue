@@ -2,9 +2,8 @@
     <div id="explorer-container">
         <ContextMenu :items="contextMenu" />
         <Toolbar v-if="tools" :tools="tools" />
-        <div v-if="currentPath">
-            <PathBreadcrumb :path="currentPath" root-path="/" class="mt-3 ms-3" @navigate="goToPath" />
-        </div>
+        <ExplorerLocationBar v-if="currentPath || locationTools.length" class="mt-2 mx-3"
+                             :path="currentPath" root-path="/" :tools="locationTools" @navigate="goToPath" />
         <!-- A list of files is a listbox; an empty folder is not (its empty state has buttons of its own), the
              drop area stays -->
         <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- a listbox (bound role) while it has files; empty, its keys and clicks only clear a selection and it is the drop area -->
@@ -77,7 +76,7 @@ const { pathutils } = ddb;
 
 import { entry } from 'ddb';
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
-import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import ExplorerLocationBar from '@/features/dataset/explorer/ExplorerLocationBar.vue';
 import { getCurrentInstance, nextTick, useId } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
@@ -87,7 +86,7 @@ import { useCutMarks } from '@/composables/useCutMarks';
 export default {
     name: 'DatasetExplorer',
     components: {
-        Thumbnail, LoadingSpinner, FolderEmptyState, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
+        Thumbnail, LoadingSpinner, FolderEmptyState, Toolbar, ContextMenu, ExplorerLocationBar, VirtualScroller
     },
     // Thumbnails load as they come into view, a few at a time
     provide: function () {
@@ -103,6 +102,8 @@ export default {
         files: { type: Array, required: true },
         currentPath: { type: String, default: null },
         tools: { type: Array, default: null },
+        // The actions on the folder shown, after its path (libs/dataset/explorerTools locationTools)
+        locationTools: { type: Array, default: () => [] },
         dataset: { type: Object, required: true },
         canWrite: { type: Boolean, default: false },
         // An import into the dataset runs: the empty-folder hint is not shown (FR-UPL-10)

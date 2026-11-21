@@ -11,7 +11,8 @@
  *   - `surfaces`: where it is offered ('toolbar', 'menu' for a selection, 'background' for the menu
  *     of an empty selection, 'shortcut', 'header' for the dataset actions of the page header, which
  *     like a menu shows only what applies, 'panel' for the actions of the detail panel's summary of a
- *     selection of several items);
+ *     selection of several items, 'location' for the actions on the folder shown, at the end of its
+ *     path above the list);
  *   - `permitted(ctx)`: false hides it on every surface (a reader has no Delete);
  *   - `applies(ctx)`: whether it applies to the selection. The menus show only the actions that
  *     apply; the toolbar keeps a fixed list and disables the others, with `reason(ctx)`;
@@ -30,7 +31,7 @@ import { useClipboardStore } from '@/stores/clipboard';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 /**
- * @typedef {'toolbar'|'menu'|'background'|'shortcut'|'header'|'panel'} Surface
+ * @typedef {'toolbar'|'menu'|'background'|'shortcut'|'header'|'panel'|'location'} Surface
  *
  * @typedef {object} ActionContext
  * @property {() => any[]} getSelectedEntries   the explorer items acted on
@@ -307,8 +308,7 @@ export const EXPLORER_ACTIONS = Object.freeze([
         group: 'folder',
         label: 'Refresh',
         icon: 'fa-solid fa-rotate-right',
-        surfaces: ['toolbar', 'background'],
-        priority: 2,
+        surfaces: ['location', 'background'],
         run: c => c.emit('refresh')
     },
     {
@@ -373,6 +373,9 @@ export function actionById(id) {
 
 const valueOf = (v, c) => (typeof v === 'function' ? v(c) : v);
 
+/** The bars of fixed buttons: an action that does not apply is disabled there, not left out. */
+const FIXED_SURFACES = new Set(['toolbar', 'location']);
+
 /**
  * What `action` is on `surface` for the context `ctx`, read now.
  * @param {ActionDefinition|string} action
@@ -386,7 +389,7 @@ export function resolveAction(action, ctx, surface) {
     const applies = def.applies ? def.applies(ctx) : true;
     const enabled = applies && (def.enabled ? def.enabled(ctx) : true);
     const visible = def.surfaces.includes(surface) && permitted
-        && (surface === 'toolbar' || applies)
+        && (FIXED_SURFACES.has(surface) || applies)
         && (def.shownIn ? def.shownIn(ctx, surface) : true);
     return {
         id: def.id,

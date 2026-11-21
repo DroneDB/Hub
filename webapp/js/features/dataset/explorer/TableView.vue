@@ -2,9 +2,8 @@
     <div id="table-view-container">
         <ContextMenu :items="contextMenu" />
         <Toolbar v-if="tools" :tools="tools" />
-        <div v-if="currentPath">
-            <PathBreadcrumb :path="currentPath" root-path="/" class="m-3" @navigate="goToPath" />
-        </div>
+        <ExplorerLocationBar v-if="currentPath || locationTools.length" class="my-2 mx-3"
+                             :path="currentPath" root-path="/" :tools="locationTools" @navigate="goToPath" />
         <!-- A click on the empty area clears the selection, Escape does it from the keyboard -->
         <div id="table-view" ref="tableview" :class="{ dropping }" role="presentation"
              @keydown.esc="clearSelection"
@@ -97,7 +96,7 @@ import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
 
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
-import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import ExplorerLocationBar from '@/features/dataset/explorer/ExplorerLocationBar.vue';
 import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -121,13 +120,15 @@ const ROW_PREVIEW_CSS_PX = 86;
 export default {
     components: {
         LoadingSpinner, FolderEmptyState,
-        Toolbar, ContextMenu, PathBreadcrumb, SortHeader, DataTable, Column
+        Toolbar, ContextMenu, ExplorerLocationBar, SortHeader, DataTable, Column
     },
     inject: { showBuildConfirm: { default: null } },
     props: {
         files: { type: Array, required: true },
         currentPath: { type: String, default: null },
         tools: { type: Array, default: null },
+        // The actions on the folder shown, after its path (libs/dataset/explorerTools locationTools)
+        locationTools: { type: Array, default: () => [] },
         dataset: { type: Object, required: true },
         expandedGrid: { type: Boolean, default: false },
         canWrite: { type: Boolean, default: false },
