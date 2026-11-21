@@ -59,8 +59,7 @@
                         <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label"
                                 aria-describedby="settings-visibility-hint" :options="visibilityOptions" option-label="label"
                                 option-value="value" :disabled="!canWrite || saving" class="settings-select" />
-                        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
-                        <small id="settings-visibility-hint" class="field-hint" v-html="safeDescription" />
+                        <small id="settings-visibility-hint" class="field-hint">{{ visibilityHint }}</small>
                     </div>
                 </div>
 
@@ -168,9 +167,8 @@ import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
 import FieldError from '@/components/FieldError.vue';
 import ddb from 'ddb';
-import { sanitizeHtml } from '@/libs/sanitize';
 import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
-import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY } from '@/libs/visibility';
+import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY, visibilityDescription } from '@/libs/visibility';
 import { datasetThumbnailUrl } from '@/libs/optionalFile';
 import { slugProblem, slugDescription } from '@/libs/slug';
 import { displayNameLimits, displayNameLengthProblem } from '@/libs/nameRules';
@@ -204,6 +202,12 @@ export default {
         // Asked on Save when the URL slug changed, with the old and the new slug: resolves to false when the user does not
         // agree, and nothing is saved then
         confirmSlugChange: {
+            type: Function,
+            default: null
+        },
+        // Asked on Save when the visibility changed, with the dataset's name and the old and the new visibility (every change
+        // asks, as in the header): resolves to false when the user does not agree, and nothing is saved then
+        confirmVisibilityChange: {
             type: Function,
             default: null
         },
@@ -247,20 +251,12 @@ export default {
         }
     },
     computed: {
-        currentUrl: function () {
-            return window.location.href;
-        },
         noAuthRequired: function () {
             return [ddb.Visibility.PUBLIC, ddb.Visibility.UNLISTED].indexOf(this.visibility) !== -1;
         },
-        description: function () {
-            if (parseInt(this.visibility) === ddb.Visibility.PUBLIC) {
-                return `This dataset will be discoverable. Anybody with the <a href="${this.currentUrl}">link</a> to this page can also see and download the data`;
-            } else if (parseInt(this.visibility) === ddb.Visibility.UNLISTED) {
-                return `Anybody with the <a href="${this.currentUrl}">link</a> to this page can see and download the data, but it will not be discoverable.`;
-            } else {
-                return `Only you and people in your organization can see and download the data.`;
-            }
+        // What the chosen visibility means, in the words of the header's visibility menu
+        visibilityHint: function () {
+            return visibilityDescription(parseInt(this.visibility));
         },
         // The fields as Save sends them
         draft: function () {
@@ -291,9 +287,6 @@ export default {
         },
         licenseInfo: function () {
             return this.Licenses[this.license] ?? { name: this.license, url: null };
-        },
-        safeDescription: function () {
-            return sanitizeHtml(this.description);
         },
         licenseOptions: function () {
             return Object.entries(this.Licenses).map(([k, v]) => ({
@@ -339,7 +332,7 @@ export default {
         },
         /**
          * Writes the settings that changed, the slug last. Nothing is sent while a field has a problem or when the user
-         * does not agree to a new URL. A setting that fails stops the save: the window stays open with the error, and the
+         * does not agree to a new visibility or a new URL. A setting that fails stops the save: the window stays open with the error, and the
          * settings written before it are no longer changes. All saved: the window closes, or the page goes to the new URL.
          */
         save: async function () {
@@ -349,6 +342,9 @@ export default {
             const changes = this.changes;
             const draft = { ...this.draft };
             const renames = changes.some(s => s.key === 'slug');
+            const revisibles = changes.some(s => s.key === 'visibility');
+            if (revisibles && this.confirmVisibilityChange
+                && !await this.confirmVisibilityChange(draft.name || this.dataset.ds, this.saved.visibility, draft.visibility)) return;
             if (renames && this.confirmSlugChange && !await this.confirmSlugChange(this.dataset.ds, draft.slug)) return;
 
             this.saving = true;

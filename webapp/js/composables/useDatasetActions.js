@@ -24,6 +24,7 @@ import { formatAlignResult } from '@/libs/dataset/alignResult';
 import { skippedSentence } from '@/libs/tasks/extractSummary';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
+import { visibilityChangeConfirmation } from '@/libs/visibility';
 import { useUploadsStore } from '@/stores/uploads';
 import { useConfirmReplace, existingItem, replaceConflictPath, conflictIsFolder } from '@/composables/useConfirmReplace';
 import { namesClash, nameClashMessage } from '@/libs/nameRules';
@@ -356,6 +357,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             onRescanRequested: () => rescan(dialog),
             onChanged: () => rootChanged?.(),
             confirmSlugChange,
+            confirmVisibilityChange: (name, from, to) => confirm(visibilityChangeConfirmation({ name, from, to })),
             confirmDiscard: confirmDiscardSettings,
             onFileSaved: path => listing.addEntry(path).catch(e => console.warn(`Could not show ${path} in the file list:`, e)),
             onSlugRenamed: slug => {

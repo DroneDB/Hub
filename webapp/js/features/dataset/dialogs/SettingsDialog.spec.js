@@ -9,6 +9,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import SettingsDialog from './SettingsDialog.vue';
+import { visibilityDescription } from '@/libs/visibility';
 
 // The window: its content, its footer, and its close and Enter (confirm) events as buttons the tests press
 const WindowStub = {
@@ -28,7 +29,7 @@ const ROOT = {
 let wrapper;
 let dataset;
 let calls;
-async function render({ canWrite = true, root = ROOT, confirmSlugChange = undefined, confirmDiscard = undefined } = {}) {
+async function render({ canWrite = true, root = ROOT, confirmSlugChange = undefined, confirmDiscard = undefined, confirmVisibilityChange = undefined } = {}) {
     calls = [];
     const track = (what, result = {}) => vi.fn(async (...args) => { calls.push([what, ...args]); return result; });
     dataset = {
@@ -38,7 +39,7 @@ async function render({ canWrite = true, root = ROOT, confirmSlugChange = undefi
         datasetThumbUrl: () => '/thumb'
     };
     wrapper = mount(SettingsDialog, {
-        props: { dataset, canWrite, confirmSlugChange, confirmDiscard },
+        props: { dataset, canWrite, confirmSlugChange, confirmDiscard, confirmVisibilityChange },
         attachTo: document.body,
         global: { plugins: [PrimeVue], stubs: { Window: WindowStub }, mocks: { $notify: notify } }
     });
@@ -188,6 +189,42 @@ describe('SettingsDialog Save', () => {
         await slug().setValue('new-site');
         expect(wrapper.find('.slug-warning').text()).toBe('Links to /r/acme/site will stop working');
         expect(wrapper.text()).toContain('/r/acme/new-site');
+    });
+
+    it('asks before a new visibility is saved, naming the dataset and the old and the new visibility', async () => {
+        const confirmVisibilityChange = vi.fn().mockResolvedValue(true);
+        await render({ confirmVisibilityChange });
+        await name().setValue('Pier');
+        await save();
+        // no question without a change of the visibility
+        expect(confirmVisibilityChange).not.toHaveBeenCalled();
+        expect(calls).toEqual([['metaSet', 'name', 'Pier']]);
+
+        await render({ confirmVisibilityChange });
+        await choose('visibility', 2);
+        await save();
+        expect(confirmVisibilityChange).toHaveBeenCalledWith('Brighton Beach', 1, 2);
+        expect(calls).toEqual([['setVisibility', 2]]);
+    });
+
+    it('sends nothing, the other settings neither, and stays open when the page does not agree to the new visibility', async () => {
+        const confirmVisibilityChange = vi.fn().mockResolvedValue(false);
+        const confirmSlugChange = vi.fn().mockResolvedValue(true);
+        await render({ confirmVisibilityChange, confirmSlugChange });
+        await name().setValue('Pier');
+        await choose('visibility', 0);
+        await save();
+
+        expect(confirmVisibilityChange).toHaveBeenCalledWith('Pier', 1, 0);
+        expect(writes()).toBe(0);
+        expect(wrapper.emitted('close')).toBeUndefined();
+    });
+
+    it('says what the chosen visibility means, in the words of the header', async () => {
+        await render();
+        expect(wrapper.find('#settings-visibility-hint').text()).toBe(visibilityDescription(1));
+        await choose('visibility', 2);
+        expect(wrapper.find('#settings-visibility-hint').text()).toBe(visibilityDescription(2));
     });
 
     it('sends nothing and stays open when the page does not agree to the new slug', async () => {

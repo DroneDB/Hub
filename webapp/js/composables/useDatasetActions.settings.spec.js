@@ -113,6 +113,19 @@ describe('the README of the dataset from the Settings window (FR-EXP-24)', () =>
     });
 });
 
+describe('a new visibility, asked on Save in the Settings window', () => {
+    it('asks the question of the header: the dataset, the old and the new visibility, and what it means', async () => {
+        const { props } = setup();
+        dialogs.open.mockClear();
+        const answer = props.confirmVisibilityChange('Brighton', 1, 2);
+        const question = dialogs.open.mock.calls.at(-1)[1];
+        expect(question.title).toBe('Make the dataset Public?');
+        expect(question.message).toContain('<strong>Brighton</strong> from Unlisted to Public.');
+        expect(question.confirmText).toBe('Make Public');
+        expect(await answer).toBe(true);
+    });
+});
+
 describe('a new URL slug, asked on Save in the Settings window (FR-EXP-24)', () => {
     const upload = (ds, left, org = 'acme') => ({ key: `${org}/${ds}`, org, ds, left });
 
