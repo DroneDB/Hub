@@ -94,3 +94,19 @@ describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () =>
         expect(ruleOf('.measurement-name')).toMatch(/min-width:\s*0/);
     });
 });
+
+describe('MeasurementListDialog owner hint', () => {
+    const mountWith = props => mount(MeasurementListDialog, {
+        props: { measurements: [], ...props },
+        global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+    });
+
+    it('says which file the measurements are saved in, also with none on the map', () => {
+        const wrapper = mountWith({ savedPath: 'flight/measurements.geojson' });
+        expect(wrapper.find('[data-testid="measurements-file"]').text()).toBe('Saved in flight/measurements.geojson');
+    });
+
+    it('shows no line before the file is known', () => {
+        expect(mountWith({}).find('[data-testid="measurements-file"]').exists()).toBe(false);
+    });
+});

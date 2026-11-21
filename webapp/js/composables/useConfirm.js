@@ -16,12 +16,35 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
  * @param {{ open: Function }} dialogs  from useDialogs()
  */
 export function useConfirm(dialogs) {
+    const choose = useChoice(dialogs);
     /**
      * @param {{ title?: string, message: string, confirmText?: string, cancelText?: string, danger?: boolean, requireText?: string, warningTitle?: string, warningMessage?: string }} options
      * @returns {Promise<boolean>}
      */
-    return function confirm({ danger = false, ...props }) {
-        return dialogs.open(ConfirmDialog, { ...props, confirmButtonClass: danger ? 'danger' : 'primary' })
-            .then(/** @param {any} result */ result => result === 'confirm');
+    return function confirm(options) {
+        return choose(options).then(result => result === 'confirm');
+    };
+}
+
+/**
+ * useChoice - a question with a third answer: the dialog's secondary button. It resolves to the
+ * answer itself: 'confirm', 'secondary', or 'cancel' (the Cancel button, Escape, the close button),
+ * so a caller can tell "do the other thing" from "do nothing".
+ *
+ *   const choose = useChoice(dialogs);
+ *   const answer = await choose({ message: '...', confirmText: 'Save', secondaryText: 'Discard', secondaryDanger: true });
+ *
+ * @param {{ open: Function }} dialogs  from useDialogs()
+ */
+export function useChoice(dialogs) {
+    /**
+     * @param {{ title?: string, message: string, confirmText?: string, cancelText?: string, secondaryText?: string, danger?: boolean, secondaryDanger?: boolean, requireText?: string, warningTitle?: string, warningMessage?: string }} options
+     * @returns {Promise<'confirm'|'secondary'|'cancel'>}
+     */
+    return function choose({ danger = false, secondaryDanger = false, ...props }) {
+        const classes = { confirmButtonClass: danger ? 'danger' : 'primary' };
+        if (props.secondaryText) Object.assign(classes, { secondaryButtonClass: secondaryDanger ? 'danger' : 'secondary' });
+        return dialogs.open(ConfirmDialog, { ...props, ...classes })
+            .then(/** @param {any} result */ result => (result === 'confirm' || result === 'secondary' ? result : 'cancel'));
     };
 }

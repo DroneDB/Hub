@@ -15,6 +15,7 @@ vi.mock('@/stores/auth', async () => {
 const { default: StockpileVolumePanel } = await import('./StockpileVolumePanel.vue');
 const { normalizeStockpileSettings, resolveStockpileCatalog } = await import('@/libs/stockpileMaterials');
 const { replaceQueryKeys, replaceHash } = await import('@/libs/routeQuery');
+const { EMPTY_CELL } = await import('@/libs/format');
 
 const catalog = settings => resolveStockpileCatalog(normalizeStockpileSettings(settings)).filter(m => !m.hidden);
 const RESULT = {
@@ -351,12 +352,14 @@ describe('StockpileVolumePanel custom density', () => {
 
 // FR-MAP-25: "Find all piles" and the list of what it found
 describe('StockpileVolumePanel Find all piles', () => {
+    // Each pile of the list: the detection, with its measured volume (`measured`) and the state of that measuring
     const PILES = [
-        { id: 0, areaM2: 1234.5, estimatedVolume: 8097.19, confidence: 0.912 },
-        { id: 3, areaM2: 40, estimatedVolume: 12.4, confidence: 0.5 }
+        { id: 0, areaM2: 1234.5, estimatedVolume: 999, confidence: 0.912, measured: { netVolume: 8097.19 }, measureState: 'done' },
+        { id: 3, areaM2: 40, estimatedVolume: 999, confidence: 0.5, measured: { netVolume: 12.4 }, measureState: 'done' }
     ];
     const button = () => wrapper.find('[data-testid="stockpile-find-all-btn"]');
     const rows = () => wrapper.findAll('[data-testid="stockpile-pile"]');
+    const rowOf = id => wrapper.find(`[data-pile-id="${id}"]`);
 
     it('has the action, which asks for the search', async () => {
         render();
@@ -371,16 +374,42 @@ describe('StockpileVolumePanel Find all piles', () => {
         expect(button().attributes('disabled')).toBeDefined();
     });
 
-    it('lists the area, the volume and the confidence of each pile, in the units of the panel', () => {
+    it('lists the area, the measured volume and the confidence of each pile, in the units of the panel, and not the estimate of the detection', () => {
         render({ piles: PILES, unitPref: 'metric' });
         expect(wrapper.find('[data-testid="stockpile-piles"]').text()).toContain('Piles found (2)');
         const cells = rows().map(r => r.findAll('span').map(s => s.text()));
         expect(cells[0]).toEqual(['1', '1,234.5 m²', '8,097.19 m³', '91%']);
         expect(cells[1]).toEqual(['2', '40 m²', '12.4 m³', '50%']);
+        expect(wrapper.find('.pile-head').text()).toContain('Volume');
+        expect(wrapper.find('.pile-head').text()).not.toContain('est');
+        expect(wrapper.find('[data-testid="stockpile-piles"]').text()).not.toContain('999');
+    });
+
+    it('says the base the volumes are above', () => {
+        render({ piles: PILES, pilesBase: 'best_fit' });
+        expect(text('stockpile-piles-base')).toBe('Volumes above the best-fit plane');
+        wrapper.unmount();
+        render({ piles: PILES, pilesBase: 'lowest_perimeter' });
+        expect(text('stockpile-piles-base')).toBe('Volumes above the lowest perimeter');
+    });
+
+    it('shows a spinner in place of the volume of a pile that is being measured, and a dash for one that failed', () => {
+        render({
+            piles: [
+                { id: 0, areaM2: 10, confidence: 0.5, measured: null, measureState: 'pending' },
+                { id: 1, areaM2: 10, confidence: 0.5, measured: null, measureState: 'measuring' },
+                { id: 2, areaM2: 10, confidence: 0.5, measured: null, measureState: 'failed' }
+            ]
+        });
+        const spinners = wrapper.findAll('[data-testid="stockpile-pile-spinner"]');
+        expect(spinners).toHaveLength(2);
+        expect(rowOf(0).find('[data-testid="stockpile-pile-spinner"]').exists()).toBe(true);
+        expect(rowOf(2).find('[data-testid="stockpile-pile-spinner"]').exists()).toBe(false);
+        expect(rowOf(2).find('[data-testid="stockpile-pile-volume"]').text()).toBe(EMPTY_CELL);
     });
 
     it('says "Largest 50 piles" for a list as long as the search asks for (there may be more), and the count below it', () => {
-        const many = n => Array.from({ length: n }, (_, i) => ({ id: i, areaM2: 100 - i, estimatedVolume: 10, confidence: 0.5 }));
+        const many = n => Array.from({ length: n }, (_, i) => ({ id: i, areaM2: 100 - i, confidence: 0.5, measured: { netVolume: 10 }, measureState: 'done' }));
         render({ piles: many(50) });
         expect(wrapper.find('[data-testid="stockpile-piles"] .section-label').text()).toBe('Largest 50 piles');
         wrapper.unmount();
@@ -396,13 +425,36 @@ describe('StockpileVolumePanel Find all piles', () => {
         expect(cells[1]).toBe('13,288.05 ft²');
     });
 
-    it('adopts the pile of a row that is clicked, and marks the chosen one', async () => {
+    it('chooses the pile of a row that is clicked, and marks the chosen one', async () => {
         render({ piles: PILES, chosenPile: 3 });
         await rows()[0].trigger('click');
         expect(wrapper.emitted('pickPile')).toEqual([[PILES[0]]]);
         expect(rows()[1].attributes('aria-pressed')).toBe('true');
-        expect(rows()[1].classes()).toContain('chosen');
+        expect(rowOf(3).classes()).toContain('chosen');
         expect(rows()[0].attributes('aria-pressed')).toBe('false');
+    });
+
+    it('tells which row the pointer is on, and that it left', async () => {
+        render({ piles: PILES });
+        await rows()[1].trigger('mouseenter');
+        await rows()[1].trigger('mouseleave');
+        expect(wrapper.emitted('hoverPile')).toEqual([[PILES[1]], [null]]);
+    });
+
+    it('does the same for the keyboard: the row focused is the one emphasised on the map', async () => {
+        render({ piles: PILES });
+        await rows()[0].trigger('focus');
+        await rows()[0].trigger('blur');
+        expect(wrapper.emitted('hoverPile')).toEqual([[PILES[0]], [null]]);
+    });
+
+    it('brings the chosen row into view when the chosen pile changes (a click on the map)', async () => {
+        render({ piles: PILES });
+        const scroll = vi.fn();
+        wrapper.find('[data-pile-id="3"]').element.scrollIntoView = scroll;
+        await wrapper.setProps({ chosenPile: 3 });
+        await wrapper.vm.$nextTick();
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
     });
 
     it('says when there is no pile, and when the search failed', () => {
@@ -419,6 +471,126 @@ describe('StockpileVolumePanel Find all piles', () => {
         expect(wrapper.find('[data-testid="stockpile-piles"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="stockpile-piles-empty"]').exists()).toBe(false);
     });
+
+    describe('adding piles', () => {
+        const checks = () => wrapper.findAll('[data-testid="stockpile-pile-check"]');
+        const addSelected = () => wrapper.find('[data-testid="stockpile-add-selected"]');
+        const addAll = () => wrapper.find('[data-testid="stockpile-add-all"]');
+
+        it('has a check box for each pile, Add selected with how many, and Add all', async () => {
+            render({ piles: PILES });
+            expect(checks()).toHaveLength(2);
+            expect(addSelected().text()).toBe('Add selected (0)');
+            expect(addSelected().attributes('disabled')).toBeDefined();
+            expect(addAll().attributes('disabled')).toBeUndefined();
+
+            await checks()[1].setValue(true);
+            expect(addSelected().text()).toBe('Add selected (1)');
+            await addSelected().trigger('click');
+            expect(wrapper.emitted('addPiles')).toEqual([[[PILES[1]]]]);
+            // The ticks go once they are added
+            expect(addSelected().text()).toBe('Add selected (0)');
+        });
+
+        it('Add all gives every pile that can be added', async () => {
+            render({ piles: PILES });
+            await addAll().trigger('click');
+            expect(wrapper.emitted('addPiles')).toEqual([[PILES]]);
+        });
+
+        it('has Add for each row, which gives that pile only', async () => {
+            render({ piles: PILES });
+            const adds = wrapper.findAll('[data-testid="stockpile-pile-add"]');
+            expect(adds).toHaveLength(2);
+            await adds[0].trigger('click');
+            expect(wrapper.emitted('addPiles')).toEqual([[[PILES[0]]]]);
+        });
+
+        it('shows a check mark in place of Add for a pile that is added, which cannot be ticked nor added again', async () => {
+            render({ piles: PILES, addedPiles: { 3: 'feature-id' } });
+            expect(rowOf(3).find('[data-testid="stockpile-pile-added"]').exists()).toBe(true);
+            expect(rowOf(3).find('[data-testid="stockpile-pile-add"]').exists()).toBe(false);
+            expect(rowOf(0).find('[data-testid="stockpile-pile-added"]').exists()).toBe(false);
+            expect(checks()[1].attributes('disabled')).toBeDefined();
+
+            await addAll().trigger('click');
+            expect(wrapper.emitted('addPiles')).toEqual([[[PILES[0]]]]);
+        });
+
+        it('cannot add a pile that has no volume yet, nor one that failed', async () => {
+            const waiting = [
+                { id: 0, areaM2: 10, confidence: 0.5, measured: null, measureState: 'measuring' },
+                { id: 1, areaM2: 10, confidence: 0.5, measured: null, measureState: 'failed' }
+            ];
+            render({ piles: waiting });
+            expect(checks().every(c => c.attributes('disabled') !== undefined)).toBe(true);
+            expect(wrapper.findAll('[data-testid="stockpile-pile-add"]').every(b => b.attributes('disabled') !== undefined)).toBe(true);
+            expect(addAll().attributes('disabled')).toBeDefined();
+        });
+
+        it('forgets the ticks when the list is replaced', async () => {
+            render({ piles: PILES });
+            await checks()[0].setValue(true);
+            await wrapper.setProps({ piles: [...PILES] });
+            expect(addSelected().text()).toBe('Add selected (0)');
+        });
+    });
+});
+
+describe('StockpileVolumePanel Search Radius', () => {
+    it('says that it is used by Click map', () => {
+        render();
+        expect(text('stockpile-radius-hint')).toBe('Used by Click map');
+        expect(wrapper.find('[data-testid="stockpile-radius"]').attributes('aria-describedby')).toBe('stockpile-volume-panel-search-radius-hint');
+        expect(wrapper.find('#stockpile-volume-panel-search-radius-hint').exists()).toBe(true);
+    });
+});
+
+describe('StockpileVolumePanel flat elevation', () => {
+    const input = () => wrapper.find('[data-testid="stockpile-flat-elevation"]');
+
+    it('is asked for with the flat base only', () => {
+        render({ baseMethod: 'best_fit' });
+        expect(input().exists()).toBe(false);
+        wrapper.unmount();
+        render({ baseMethod: 'flat', flatElevation: 12.5 });
+        expect(input().element.value).toBe('12.5');
+        expect(wrapper.find('.flat-elevation').text()).toContain('Flat elevation (m)');
+    });
+
+    it('gives back what was typed once it is entered, in metres', async () => {
+        render({ baseMethod: 'flat', flatElevation: 0 });
+        await input().setValue('15');
+        expect(wrapper.emitted('update:flatElevation')).toEqual([[15]]);
+    });
+
+    it('is shown and typed in feet for imperial units, and given back in metres', async () => {
+        render({ baseMethod: 'flat', flatElevation: 10, unitPref: 'imperial' });
+        expect(Number(input().element.value)).toBeCloseTo(32.808, 3);
+        expect(wrapper.find('.flat-elevation').text()).toContain('(ft)');
+        await input().setValue('100');
+        expect(wrapper.emitted('update:flatElevation')[0][0]).toBeCloseTo(30.48, 3);
+    });
+
+    it('is not given back for something that is not a number', async () => {
+        render({ baseMethod: 'flat', flatElevation: 3 });
+        await input().setValue('');
+        expect(wrapper.emitted('update:flatElevation')).toBeUndefined();
+    });
+});
+
+describe('StockpileVolumePanel chosen pile', () => {
+    it('names the pile the Result is of, and where it was measured when that is another elevation model', () => {
+        render({ result: RESULT, pileName: 'North pile', measuredOn: 'site/odm_dem/dtm.tif' });
+        expect(text('stockpile-pile-name')).toBe('North pile');
+        expect(text('stockpile-measured-on')).toBe('Measured on dtm.tif');
+    });
+
+    it('says nothing of a model when the pile was measured on the selected one, and names no pile that is not chosen', () => {
+        render({ result: RESULT });
+        expect(wrapper.find('[data-testid="stockpile-pile-name"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="stockpile-measured-on"]').exists()).toBe(false);
+    });
 });
 
 // FR-RAS-23: the action grid is the footer of the panel
@@ -428,6 +600,30 @@ describe('StockpileVolumePanel footer', () => {
         const footer = wrapper.get('[data-testid="panel-actions"]');
         expect(footer.findAll('button').map(b => b.text())).toEqual(['Click map', 'Draw', 'Clear']);
         expect(wrapper.get('.panel-body').find('[data-testid="stockpile-click-btn"]').exists()).toBe(false);
+    });
+
+    describe('Edit outline', () => {
+        const edit = () => wrapper.find('[data-testid="stockpile-edit-outline-btn"]');
+
+        it('is in the footer when the chosen pile is on the map, and asks for the edit', async () => {
+            render({ result: RESULT, canEditOutline: true });
+            expect(wrapper.get('[data-testid="panel-actions"]').findAll('button').map(b => b.text())).toEqual(['Click map', 'Draw', 'Clear', 'Edit outline']);
+            await edit().trigger('click');
+            expect(wrapper.emitted('editOutline')).toHaveLength(1);
+            expect(edit().attributes('aria-pressed')).toBe('false');
+        });
+
+        it('is not there for a pile that is not on the map', () => {
+            render({ result: RESULT, canEditOutline: false });
+            expect(edit().exists()).toBe(false);
+        });
+
+        it('is pressed while the outline is edited, and says how to leave', () => {
+            render({ result: RESULT, canEditOutline: true, editing: true });
+            expect(edit().attributes('aria-pressed')).toBe('true');
+            expect(edit().classes()).toContain('active');
+            expect(edit().text()).toBe('Done editing');
+        });
     });
 
     it('keeps the label "Elevation model" on its selector', () => {

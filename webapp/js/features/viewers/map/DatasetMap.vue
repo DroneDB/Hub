@@ -15,7 +15,8 @@
 /**
  * The dataset page's Map tab: MapCore plus the tab plumbing. The tab switcher
  * calls onTabActivated / onPanelResized; with `lazyload` the map is built the first
- * time the tab shows. ViewDataset opens Plant Health through openPlantHealth.
+ * time the tab shows. ViewDataset opens Plant Health through openPlantHealth, and asks for the
+ * unsaved measurements of the map (hasUnsavedMeasurements, saveMeasurements) when the page is left.
  */
 import { ref, inject, onMounted, onBeforeUnmount } from 'vue';
 import MapCore from './MapCore.vue';
@@ -55,7 +56,10 @@ const unregisterTabChild = inject('unregisterTabChild', null);
 const tab = {
     onTabActivated: () => core.value && core.value.activate(),
     onPanelResized: () => core.value && core.value.updateSize(),
-    openPlantHealth: (...args) => core.value && core.value.openPlantHealth(...args)
+    openPlantHealth: (...args) => core.value && core.value.openPlantHealth(...args),
+    // The measurements on the map that are not in their file yet: the page asks about them before it is left
+    hasUnsavedMeasurements: () => !!(core.value && core.value.hasUnsavedMeasurements),
+    saveMeasurements: () => core.value && core.value.saveMeasurements()
 };
 
 onMounted(() => { if (registerTabChild) registerTabChild('map', tab); });

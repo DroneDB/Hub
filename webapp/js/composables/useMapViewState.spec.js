@@ -39,8 +39,6 @@ let basemap;
 let analysis;
 let viz;
 let refresh;
-let confirmDiscard;
-let dirty;
 let binding;
 
 /** A map like MapCore builds it: the real feature composables, the state of the viewer in `target`. */
@@ -48,8 +46,6 @@ function start(initial = stateOf(), { draw = initial.layers.map(l => l.path) } =
     target = shallowRef(initial);
     // The parent keeps what the map reports, as the viewer does
     emit = vi.fn((event, state) => { target.value = state; });
-    confirmDiscard = vi.fn(async () => true);
-    dirty = false;
     viz = ref({});
     refresh = vi.fn();
     const map = shallowRef(null);
@@ -59,18 +55,11 @@ function start(initial = stateOf(), { draw = initial.layers.map(l => l.path) } =
         const group = shallowRef(new Group());
         rasters = useRasterLayers({ group, vectorLayers: shallowRef([]), splitMode: () => split.splitMode.value });
         split = useMapSplitCompare({ map, rasterLayers: rasters.rasterLayerList, onChange: rasters.updateRastersOpacity });
-        // The measurements stay with the DSM until a target decides it
-        const pathFor = entry => (entry ? entry.path : DSM);
         analysis = useAnalysisTarget({
             candidates: () => rasters.rasterLayerList.value.filter(r => r.olLayer).map(r => {
                 const entry = { path: r.path, type: ddb.entry.type.GEORASTER };
                 return { path: r.path, label: r.name, entry, file: { path: `ddb://x/${r.path}`, entry } };
             }),
-            measurementsPath: () => pathFor(analysis.targetEntry.value),
-            measurementsPathFor: pathFor,
-            isDirty: () => dirty,
-            confirmDiscard,
-            reloadMeasurements: () => Promise.resolve(),
             panels: { openKind: () => null, open: vi.fn(), close: vi.fn() }
         });
         binding = useMapViewState({
@@ -250,21 +239,21 @@ describe('reporting what the user changes', () => {
     });
 
     it('reports the elevation model when it is not the one the tools pick, and null when it is', async () => {
-        start(stateOf([ORTHO, DTM, DSM]));
+        start(stateOf([DTM, DSM, ORTHO]));
         await settle();
-        // The measurements are of the DSM: it is the default, not the DTM on top
-        expect(analysis.defaultTarget()).toBe(DSM);
+        // The default is the raster on top
+        expect(analysis.defaultTarget()).toBe(DTM);
         await analysis.requestOpen('stockpile');
         await settle();
-        expect(analysis.targetPath.value).toBe(DSM);
+        expect(analysis.targetPath.value).toBe(DTM);
         expect(emit).not.toHaveBeenCalled();
 
-        await analysis.requestSwitch(DTM);
+        await analysis.requestSwitch(DSM);
         await settle();
-        expect(reported().analysis).toEqual({ target: DTM });
+        expect(reported().analysis).toEqual({ target: DSM });
 
         emit.mockClear();
-        await analysis.requestSwitch(DSM);
+        await analysis.requestSwitch(DTM);
         await settle();
         expect(reported().analysis).toEqual({ target: null });
     });
@@ -274,7 +263,7 @@ describe('reporting what the user changes', () => {
         await settle();
         await analysis.requestOpen('rasterAnalysis');
         await settle();
-        expect(analysis.targetPath.value).toBe(DSM);
+        expect(analysis.targetPath.value).toBe(analysis.defaultTarget());
         expect(emit).not.toHaveBeenCalled();
     });
 });
@@ -437,7 +426,6 @@ describe('applying the state of the parent', () => {
         drawRows([DSM, DTM]);
         await settle();
         expect(analysis.targetPath.value).toBe(DTM);
-        expect(confirmDiscard).not.toHaveBeenCalled();
         // It is the state's own model: nothing to report
         expect(emit).not.toHaveBeenCalled();
     });
@@ -452,16 +440,6 @@ describe('applying the state of the parent', () => {
         expect(emit).not.toHaveBeenCalled();
     });
 
-    it('does not drop unsaved measurements to choose it: the map reports the model it has', async () => {
-        dirty = false;
-        start(stateOf([DSM, DTM], { analysis: { target: DTM } }), { draw: null });
-        dirty = true;
-        drawRows([DSM, DTM]);
-        await settle();
-        expect(analysis.targetPath.value).toBeNull();
-        expect(confirmDiscard).not.toHaveBeenCalled();
-        expect(reported().analysis).toEqual({ target: null });
-    });
 
     it('does nothing for a map without a state', async () => {
         start();

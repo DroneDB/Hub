@@ -13,9 +13,8 @@ import { toLonLat } from 'ol/proj';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 import { isRasterAnalysisCapable } from '@/libs/entryTypes';
-import { escapeHtml } from '@/libs/sanitize';
 import { useDialogs } from '@/composables/useDialogs';
-import { useConfirm } from '@/composables/useConfirm';
+import { useChoice } from '@/composables/useConfirm';
 import { useMapAlerts } from '@/composables/useMapAlerts';
 import { useMapBasemap } from '@/composables/useMapBasemap';
 import { useMapTooltip } from '@/composables/useMapTooltip';
@@ -42,6 +41,7 @@ export function useMapFeatures(props, fileEvents = {}) {
     const vectorLayers = shallowRef([]);
     const currentUnitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
     const dialogs = useDialogs();
+    const choose = useChoice(dialogs);
     const alerts = useMapAlerts();
     const dataset = () => props.dataset;
     const showAlert = () => alerts.showAlert;
@@ -61,8 +61,8 @@ export function useMapFeatures(props, fileEvents = {}) {
     const measurements = useMapMeasurements({
         canWrite: () => props.canWrite, canDelete: () => props.canDelete, measureControls, currentUnitPref,
         files: () => props.files, dataset, showAlert, showFlash,
-        // The measurements follow the analysis target (see below)
-        analysisTarget: () => analysisTarget.targetEntry.value,
+        // Unsaved measurements are offered a Save before the map shows the measurements of other files
+        choose: () => choose,
         onFileWritten: () => fileEvents.onFileWritten || (() => {}),
         onFileRemoved: () => fileEvents.onFileRemoved || (() => {})
     });
@@ -77,6 +77,9 @@ export function useMapFeatures(props, fileEvents = {}) {
     const stockpile = useStockpileVolume({
         dataset, map, measureControls, currentUnitPref,
         deletedMeasurementIds: measurements.deletedMeasurementIds,
+        // The file the piles are saved in and read from: the measurements the map shows
+        measurementsPath: () => measurements.measurementStorage.value?.measurementPath ?? null,
+        showFlash,
         rasterFilePath: raster.rasterFilePath,
         getMapCenterLatLon: () => getMapCenterLatLon
     });
@@ -101,20 +104,8 @@ export function useMapFeatures(props, fileEvents = {}) {
             return { path: row.path, label: row.name, entry: file && file.entry, file };
         })
         .filter(c => c.entry && isRasterAnalysisCapable(c.entry));
-    const confirm = useConfirm(dialogs);
     const analysisTarget = useAnalysisTarget({
         candidates: analysisCandidates,
-        measurementsPath: () => measurements.measurementsRasterPath(),
-        measurementsPathFor: entry => measurements.measurementEntryFor(entry).path,
-        isDirty: () => !!measureControls.value && measureControls.value.isDirty(),
-        confirmDiscard: file => confirm({
-            title: 'Discard measurements',
-            message: `Discard the unsaved measurements of ${escapeHtml(file)}?`,
-            confirmText: 'Discard',
-            cancelText: 'Cancel',
-            danger: true
-        }),
-        reloadMeasurements: () => measurements.loadSavedMeasurements(),
         splitMode: () => split.splitMode.value,
         panels: {
             openKind: () => panels.openAmong(ANALYSIS_PANELS),

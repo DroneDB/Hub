@@ -27,6 +27,12 @@
                             :disabled="loading" data-testid="stockpile-base-method">
                         <option v-for="m in baseMethods" :key="m.id" :value="m.id">{{ m.name }}</option>
                     </select>
+                    <!-- The elevation of the flat base, in the unit of the user; the pile is measured again when it is typed -->
+                    <label v-if="baseMethod === flatMethod" class="flat-elevation">
+                        <span>Flat elevation ({{ elevationUnit }})</span>
+                        <input v-model.lazy.number="localFlatElevation" type="number" step="any" class="panel-input"
+                               :disabled="loading" data-testid="stockpile-flat-elevation">
+                    </label>
                 </div>
 
                 <div class="section">
@@ -38,7 +44,8 @@
                 <div class="section">
                     <label for="stockpile-volume-panel-search-radius" class="section-label">Search Radius (m)</label>
                     <input id="stockpile-volume-panel-search-radius" v-model.number="localRadius" type="number" min="5" step="5"
-                           class="panel-input" data-testid="stockpile-radius">
+                           class="panel-input" aria-describedby="stockpile-volume-panel-search-radius-hint" data-testid="stockpile-radius">
+                    <small id="stockpile-volume-panel-search-radius-hint" class="field-hint" data-testid="stockpile-radius-hint">Used by Click map</small>
                 </div>
 
                 <div class="section">
@@ -82,7 +89,7 @@
                 </div>
             </div>
 
-            <!-- Every pile of the raster at once (FR-MAP-25): the list adopts the chosen one as the draft pile -->
+            <!-- Every pile of the raster at once: the list chooses the pile the Result shows, and adds piles to the measurements -->
             <div class="section find-all">
                 <button type="button" class="panel-btn find-all-btn" :disabled="loading || pilesLoading"
                         data-testid="stockpile-find-all-btn" title="Scan the whole raster for piles, with the detection sensitivity above"
@@ -98,18 +105,47 @@
                 </div>
                 <div v-else-if="piles" class="pile-list" data-testid="stockpile-piles">
                     <span class="section-label">{{ pilesTitle }}</span>
-                    <div class="pile-head" aria-hidden="true">
-                        <span>#</span><span>Area</span><span>Volume (est.)</span><span>Confidence</span>
+                    <span class="find-all-note pile-base" data-testid="stockpile-piles-base">Volumes above the {{ pilesBaseName }}</span>
+                    <div ref="pileRows" class="pile-rows">
+                        <div class="pile-head" aria-hidden="true">
+                            <span /><span>#</span><span>Area</span><span>Volume</span><span>Confidence</span><span />
+                        </div>
+                        <div v-for="(pile, index) in piles" :key="pile.id" class="pile-row" :data-pile-id="pile.id"
+                             :class="{ chosen: pile.id === chosenPile, added: isAdded(pile) }">
+                            <input v-model="checked" type="checkbox" class="pile-check" :value="pile.id"
+                                   :disabled="!canAdd(pile)" :aria-label="`Select pile ${index + 1}`" data-testid="stockpile-pile-check">
+                            <button type="button" class="pile-main" :aria-pressed="String(pile.id === chosenPile)" :disabled="loading"
+                                    :aria-label="`Pile ${index + 1}: ${pileSummary(pile)}`" data-testid="stockpile-pile"
+                                    @click="$emit('pickPile', pile)"
+                                    @mouseenter="$emit('hoverPile', pile)" @focus="$emit('hoverPile', pile)"
+                                    @mouseleave="$emit('hoverPile', null)" @blur="$emit('hoverPile', null)">
+                                <span class="pile-rank">{{ index + 1 }}</span>
+                                <span>{{ formatArea(pile.areaM2) }}</span>
+                                <span data-testid="stockpile-pile-volume">
+                                    <i v-if="isMeasuring(pile)" class="fas fa-spinner fa-spin" role="status" aria-label="Measuring" data-testid="stockpile-pile-spinner" />
+                                    <template v-else>{{ pile.measured ? formatVolume(pile.measured.netVolume) : EMPTY_CELL }}</template>
+                                </span>
+                                <span>{{ formatConfidence(pile.confidence) }}</span>
+                            </button>
+                            <i v-if="isAdded(pile)" class="fas fa-check pile-added" title="Added to the measurements"
+                               role="img" aria-label="Added" data-testid="stockpile-pile-added" />
+                            <button v-else type="button" class="link-btn pile-add" :disabled="!canAdd(pile)"
+                                    :aria-label="`Add pile ${index + 1}`" data-testid="stockpile-pile-add"
+                                    @click="addPiles([pile])">
+                                Add
+                            </button>
+                        </div>
                     </div>
-                    <button v-for="(pile, index) in piles" :key="pile.id" type="button" class="pile-row"
-                            :class="{ chosen: pile.id === chosenPile }" :aria-pressed="String(pile.id === chosenPile)" :disabled="loading"
-                            :aria-label="`Pile ${index + 1}: ${pileSummary(pile)}`" data-testid="stockpile-pile"
-                            @click="$emit('pickPile', pile)">
-                        <span class="pile-rank">{{ index + 1 }}</span>
-                        <span>{{ formatArea(pile.areaM2) }}</span>
-                        <span>{{ formatVolume(pile.estimatedVolume) }}</span>
-                        <span>{{ formatConfidence(pile.confidence) }}</span>
-                    </button>
+                    <div class="pile-actions">
+                        <button type="button" class="panel-btn" :disabled="!selectedPiles.length" data-testid="stockpile-add-selected"
+                                @click="addPiles(selectedPiles)">
+                            Add selected ({{ selectedPiles.length }})
+                        </button>
+                        <button type="button" class="panel-btn" :disabled="!addablePiles.length" data-testid="stockpile-add-all"
+                                @click="addPiles(addablePiles)">
+                            Add all
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -133,6 +169,11 @@
             </div>
 
             <div v-if="result" ref="resultSection" class="section result" data-testid="stockpile-result">
+                <!-- The pile the panel works on, and the model it was measured on when that is not the one selected above -->
+                <div v-if="pileName" class="pile-name" data-testid="stockpile-pile-name">{{ pileName }}</div>
+                <div v-if="measuredOn" class="measured-on" data-testid="stockpile-measured-on">
+                    <i class="fas fa-info-circle" aria-hidden="true" /> Measured on {{ measuredOnName }}
+                </div>
                 <label for="stockpile-volume-panel-identification" class="section-label">Identification</label>
                 <input id="stockpile-volume-panel-identification" v-model="localTitle" type="text" class="panel-input"
                        placeholder="Title (e.g. North pile)" maxlength="120"
@@ -229,6 +270,15 @@
                     <i class="fa-solid fa-eraser" />
                     <span class="action-label">Clear</span>
                 </button>
+                <!-- The outline of the chosen pile, which is a measurement on the map; its volume is measured again as it changes -->
+                <button v-if="canEditOutline" class="panel-btn action-btn edit-outline-btn"
+                        :class="{ active: editing, 'is-active': editing }" :aria-pressed="editing"
+                        data-testid="stockpile-edit-outline-btn"
+                        title="Drag the corners of the outline, or the middle of an edge to add one (Alt+click removes one): the volume is calculated again"
+                        @click="$emit('editOutline')">
+                    <i :class="EDIT_VERTICES_ICON" />
+                    <span class="action-label">{{ editing ? 'Done editing' : 'Edit outline' }}</span>
+                </button>
             </div>
         </template>
         <StockpileBaseMethodsDialog v-model:visible="showBaseMethodsInfo" />
@@ -237,17 +287,20 @@
 
 <script>
 import AnalysisPanel from './AnalysisPanel.vue';
-import { AREA_ICON, STOCKPILE_ICON } from '@/libs/glyphs';
+import { AREA_ICON, EDIT_VERTICES_ICON, STOCKPILE_ICON } from '@/libs/glyphs';
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
+import { pathutils } from 'ddb';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, EMPTY_CELL, formatDensity, formatMoney, formatNumber, formatVolume, formatWeight } from '@/libs/format';
 import { CUSTOM_MATERIAL_SLUG, MAX_DENSITY_TON_PER_M3, isValidDensity, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
-import { BASE_METHOD, BASE_METHODS } from '@/libs/stockpileBase';
+import { BASE_METHOD, BASE_METHODS, baseMethodName } from '@/libs/stockpileBase';
 import { drawingHint } from '@/libs/measureHints';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { currentLocation } from '@/libs/routeQuery';
 import { useAuthStore } from '@/stores/auth';
 import { DETECT_ALL_MAX_RESULTS } from '@/libs/ddb/dataset';
+
+const FEET_PER_METRE = 3.28084;
 
 /**
  * StockpileVolumePanel - Stockpile volume measurement panel.
@@ -281,8 +334,19 @@ export default {
         pilesLoading: { type: Boolean, default: false },
         pilesError: { type: String, default: null },
         chosenPile: { type: Number, default: null },
+        // The base the volumes of the list are measured from, and the piles of the list that are measurements (pile id -> feature id)
+        pilesBase: { type: String, default: BASE_METHOD.BEST_FIT },
+        addedPiles: { type: Object, default: () => ({}) },
+        // The pile the Result is of: its name, the model it was measured on when that is not the selected one, and whether
+        // its outline can be edited (it is a measurement on the map) and is being edited
+        pileName: { type: String, default: '' },
+        measuredOn: { type: String, default: null },
+        canEditOutline: { type: Boolean, default: false },
+        editing: { type: Boolean, default: false },
         // The base of the pile shown; a pick is emitted (update:baseMethod) and the pile measured again
         baseMethod: { type: String, default: BASE_METHOD.LOWEST_PERIMETER },
+        // The elevation of the flat base, in metres
+        flatElevation: { type: Number, default: 0 },
         sensitivity: { type: Number, default: 0.5 },
         radius: { type: Number, default: 50 },
         material: { type: String, default: null },
@@ -301,15 +365,20 @@ export default {
         description: { type: String, default: '' }
     },
     emits: ['close', 'clickOnMap', 'drawPolygon', 'clearOverlay',
-        'cancelMode', 'exportGeoJson', 'selectTarget', 'findAll', 'pickPile',
-        'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
+        'cancelMode', 'exportGeoJson', 'selectTarget', 'findAll', 'pickPile', 'hoverPile', 'addPiles', 'editOutline',
+        'update:baseMethod', 'update:flatElevation', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
         'update:title', 'update:description'],
     setup() {
         return { auth: useAuthStore() };
     },
     data() {
-        return { AREA_ICON, STOCKPILE_ICON, customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false, settingsOpen: false };
+        return {
+            AREA_ICON, EDIT_VERTICES_ICON, STOCKPILE_ICON, EMPTY_CELL, customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS,
+            flatMethod: BASE_METHOD.FLAT, showBaseMethodsInfo: false, settingsOpen: false,
+            // The ids of the rows ticked for Add selected
+            checked: []
+        };
     },
     computed: {
         // Below `sm`, while a mode is active or a result shows, the settings (base plane, sensitivity, radius, material) fold
@@ -318,6 +387,16 @@ export default {
             get() { return this.baseMethod; },
             set(v) { this.$emit('update:baseMethod', v); }
         },
+        // The flat elevation in the user's unit; the prop stays metres
+        localFlatElevation: {
+            get() { return this.isImperial ? Number((this.flatElevation * FEET_PER_METRE).toFixed(3)) : this.flatElevation; },
+            set(v) {
+                const typed = Number(v);
+                if (v === '' || !Number.isFinite(typed)) return;
+                this.$emit('update:flatElevation', this.isImperial ? typed / FEET_PER_METRE : typed);
+            }
+        },
+        elevationUnit() { return this.isImperial ? 'ft' : 'm'; },
         localSensitivity: {
             get() { return this.sensitivity; },
             set(v) { this.$emit('update:sensitivity', Number(v)); }
@@ -368,6 +447,12 @@ export default {
                 ? `Largest ${formatNumber(count, 0)} piles`
                 : `Piles found (${formatNumber(count, 0)})`;
         },
+        pilesBaseName() { return baseMethodName(this.pilesBase).toLowerCase(); },
+        /** The piles of the list that have a volume and are not measurements yet: what Add can add */
+        addablePiles() { return (this.piles ?? []).filter(pile => this.canAdd(pile)); },
+        /** The addable piles that are ticked, in the order of the list */
+        selectedPiles() { return this.addablePiles.filter(pile => this.checked.includes(pile.id)); },
+        measuredOnName() { return this.measuredOn ? pathutils.basename(this.measuredOn) : ''; },
         // The one hint of every drawing tool (libs/measureHints): how to place a point, finish and cancel
         clickHint() { return drawingHint('pick', { crosshair: true }); },
         drawHint() { return drawingHint('area', { crosshair: true }); },
@@ -428,6 +513,11 @@ export default {
         },
         result(result) {
             if (result) this.scrollTo('resultSection');
+        },
+        // A new list has none ticked, and the pile that was chosen (a click on the map) is brought into view in the list
+        piles() { this.checked = []; },
+        chosenPile(id) {
+            if (id !== null) this.scrollToPile(id);
         }
     },
     methods: {
@@ -435,6 +525,19 @@ export default {
         async scrollTo(ref) {
             await this.$nextTick();
             this.$refs[ref]?.scrollIntoView?.({ block: 'nearest' });
+        },
+        /** Brings the row of a pile into the visible part of the list */
+        async scrollToPile(id) {
+            await this.$nextTick();
+            this.$refs.pileRows?.querySelector(`[data-pile-id="${id}"]`)?.scrollIntoView?.({ block: 'nearest' });
+        },
+        isAdded(pile) { return pile.id in this.addedPiles; },
+        isMeasuring(pile) { return pile.measureState === 'pending' || pile.measureState === 'measuring'; },
+        /** A pile can be added once it has its volume and while it is not a measurement */
+        canAdd(pile) { return pile.measureState === 'done' && !this.isAdded(pile); },
+        addPiles(piles) {
+            this.$emit('addPiles', piles);
+            this.checked = [];
         },
         // Every number through the one formatter (libs/format.js), so the panel and the label of the
         // pile on the map write the same quantity the same way
@@ -454,11 +557,12 @@ export default {
         },
         // What a row of the list says to a screen reader: its three figures
         pileSummary(pile) {
-            return `${this.formatArea(pile.areaM2)}, ${this.formatVolume(pile.estimatedVolume)}, confidence ${this.formatConfidence(pile.confidence)}`;
+            const volume = pile.measured ? this.formatVolume(pile.measured.netVolume) : 'volume not measured';
+            return `${this.formatArea(pile.areaM2)}, ${volume}, confidence ${this.formatConfidence(pile.confidence)}`;
         },
         formatElevation(v) {
             if (v == null || !isFinite(v)) return EMPTY_CELL;
-            return this.isImperial ? `${this._fmt(v * 3.28084, 'elevation')} ft` : `${this._fmt(v, 'elevation')} m`;
+            return this.isImperial ? `${this._fmt(v * FEET_PER_METRE, 'elevation')} ft` : `${this._fmt(v, 'elevation')} m`;
         },
         formatTons(t) {
             return formatWeight(t, this.unitPref);
@@ -500,54 +604,162 @@ export default {
     color: var(--panel-warn-text);
 }
 
-/* The list: one line per pile, as wide as the panel, scrolled when there are many */
+/* The list: one line per pile, as wide as the panel, scrolled when there are many. A row is a tick, the button
+   that chooses the pile (its four figures) and Add, or the check mark of a pile that was added */
 .pile-list {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
     margin-top: 0.4rem;
+}
+
+.pile-base {
+    margin-top: 0;
+}
+
+.pile-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
     max-height: 12rem;
     overflow-y: auto;
 }
 
-.pile-head,
 .pile-row {
     display: grid;
-    grid-template-columns: 1.5rem 1fr 1.3fr 1fr;
-    gap: 0.4rem;
+    grid-template-columns: 1.1rem minmax(0, 1fr) 2.4rem;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+/* The four figures of a row, and the header over them (the cells of the header are the columns of the row) */
+.pile-main,
+.pile-head {
+    display: grid;
     align-items: center;
     font-size: 0.72rem;
     text-align: right;
 }
 
+.pile-main {
+    grid-template-columns: 1.5rem 1fr 1.3fr 1fr;
+    gap: 0.4rem;
+}
+
 .pile-head {
-    color: var(--panel-muted);
+    grid-template-columns: 1.1rem 1.5rem 1fr 1.3fr 1fr 2.4rem;
+    gap: 0.35rem;
     padding: 0 0.4rem;
+    color: var(--panel-muted);
+}
+
+.pile-head > span:nth-child(2) {
+    text-align: left;
 }
 
 .pile-row {
-    width: 100%;
-    padding: 0.25rem 0.4rem;
+    padding: 0.2rem 0.4rem;
     border: 1px solid transparent;
     border-radius: 0.25rem;
     background: rgba(var(--ddb-glass-rgb), 0.08);
-    color: var(--panel-text-soft);
-    font-family: monospace;
-    cursor: pointer;
 }
 
-.pile-row:hover:not(:disabled) {
+.pile-row:hover {
     background: rgba(var(--ddb-glass-rgb), 0.18);
 }
 
 .pile-row.chosen {
     border-color: var(--panel-accent);
+}
+
+/* A pile that is a measurement already: the row is quieter, the check mark says why */
+.pile-row.added .pile-main {
+    opacity: 0.7;
+}
+
+.pile-main {
+    width: 100%;
+    padding: 0.05rem 0;
+    border: none;
+    background: none;
+    color: var(--panel-text-soft);
+    font-family: monospace;
+    cursor: pointer;
+}
+
+.pile-row.chosen .pile-main {
     color: var(--panel-text);
+}
+
+.pile-check {
+    margin: 0;
 }
 
 .pile-rank {
     text-align: left;
     color: var(--panel-muted);
+}
+
+.pile-add,
+.pile-added {
+    justify-self: end;
+}
+
+.pile-added {
+    color: var(--panel-accent);
+    font-size: 0.75rem;
+}
+
+.pile-add:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.pile-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+}
+
+.field-hint {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    color: var(--panel-muted);
+}
+
+.flat-elevation {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin-top: 0.4rem;
+    font-size: 0.7rem;
+    color: var(--panel-muted);
+}
+
+/* Which pile the Result is of, and the model it was measured on */
+.pile-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--panel-text);
+    overflow-wrap: anywhere;
+}
+
+.measured-on {
+    font-size: 0.72rem;
+    color: var(--panel-text-soft);
+    overflow-wrap: anywhere;
+}
+
+.measured-on i {
+    color: var(--panel-accent);
+    margin-right: 0.25rem;
+}
+
+/* The fourth button of the foot has the whole row */
+.edit-outline-btn {
+    grid-column: 1 / -1;
 }
 
 /* The disclosure of the settings: a line the width of the panel */

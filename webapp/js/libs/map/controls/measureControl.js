@@ -2,6 +2,7 @@ import { createUndoStack } from '@/libs/undoStack';
 import { controlButton, controlGroup } from './controlButton';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
+import Collection from 'ol/Collection';
 import Modify from 'ol/interaction/Modify';
 import Translate from 'ol/interaction/Translate';
 import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
@@ -162,6 +163,9 @@ class MeasureControls extends Control {
         // the deletedMeasurementIds tracking in sync so persisted features
         // (stockpiles) don't get re-hydrated from the saved GeoJSON file.
         this.onMeasurementDeleted = options.onMeasurementDeleted || (() => { });
+        // Told after the user changed the geometry of a measurement: a vertex dragged or added, the feature
+        // moved, a change undone (the owner measures again what depends on the geometry, a pile's volume)
+        this.onFeatureModified = options.onFeatureModified || (() => { });
         // Renders a dialog inside the app (useDialogs().open) and returns its handle
         this.openDialog = options.openDialog;
         this._dialog = null;
@@ -211,6 +215,8 @@ class MeasureControls extends Control {
         this.modifyInteraction = null;
         this.translateInteraction = null;
         this.isEditMode = false;
+        // Told when edit mode ends, whoever ends it (a panel that started it for one feature shows its own state)
+        this._onEditModeExit = null;
 
         // Dialog instance reference
         this.propertiesDialog = null;
@@ -758,12 +764,20 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Enable edit mode with Modify and Translate interactions
+     * Enable edit mode with Modify and Translate interactions: on every measurement, or on `features` only
+     * (a panel that edits the outline of one pile). A vertex is added by dragging the middle of an edge, and
+     * removed with Alt+click (OpenLayers' defaults).
+     * @param {import('ol/Map').default} map
+     * @param {{ features?: import('ol/Feature').default[], onExit?: () => void }} [options]
+     *   `features`: the only features that can be edited; `onExit`: called once when edit mode ends
      */
-    enableEditMode(map) {
+    enableEditMode(map, { features, onExit } = {}) {
         if (!map) return;
 
         this.isEditMode = true;
+        this._onEditModeExit = onExit || null;
+        // Modify takes a source or a collection, never both; Translate takes layers or the collection
+        const editable = features ? new Collection(features) : null;
         this.btnEdit.classList.add('active');
         // Edit mode keeps the tools open, as a drawing tool does: Edit (which ends it) stays in reach
         this.setToolsOpen(true);
@@ -773,7 +787,7 @@ class MeasureControls extends Control {
 
         // Create Modify interaction for vertex editing
         this.modifyInteraction = new Modify({
-            source: this.source,
+            ...(editable ? { features: editable } : { source: this.source }),
             style: new Style({
                 image: new CircleStyle({
                     radius: 6,
@@ -785,7 +799,7 @@ class MeasureControls extends Control {
 
         // Create Translate interaction for moving entire features (Shift+drag)
         this.translateInteraction = new Translate({
-            layers: [this.vector],
+            ...(editable ? { features: editable } : { layers: [this.vector] }),
             condition: (event) => {
                 // Only translate when Shift key is pressed
                 return event.originalEvent.shiftKey;
@@ -820,6 +834,7 @@ class MeasureControls extends Control {
                 if (feature.get('measurementType') === 'point') {
                     this.showPointPopup(feature);
                 }
+                this.onFeatureModified(feature);
             });
         });
 
@@ -831,6 +846,7 @@ class MeasureControls extends Control {
                 if (feature.get('measurementType') === 'point') {
                     this.showPointPopup(feature);
                 }
+                this.onFeatureModified(feature);
             });
         });
 
@@ -868,7 +884,9 @@ class MeasureControls extends Control {
 
         // Show help tooltip
         if (this.helpTooltipElement) {
-            this.helpTooltipElement.innerHTML = 'Drag vertices to edit. Shift+drag to move. Double-click for properties. Ctrl+Z to undo. ESC to exit.';
+            this.helpTooltipElement.innerHTML = editable
+                ? 'Drag a vertex, or the middle of an edge to add one. Alt+click removes a vertex. Shift+drag to move. Ctrl+Z to undo. ESC to exit.'
+                : 'Drag vertices to edit. Shift+drag to move. Double-click for properties. Ctrl+Z to undo. ESC to exit.';
             this.helpTooltipElement.classList.remove('hidden');
         }
 
@@ -937,6 +955,11 @@ class MeasureControls extends Control {
 
         // Clear undo stack when exiting edit mode
         this.undoStack.clear();
+
+        // Whoever started it is told once, now that everything of the mode is gone
+        const exit = this._onEditModeExit;
+        this._onEditModeExit = null;
+        if (exit) exit();
     }
 
     /**
@@ -980,6 +1003,7 @@ class MeasureControls extends Control {
         if (feature.get('measurementType') === 'point') {
             this.showPointPopup(feature);
         }
+        this.onFeatureModified(feature);
     }
 
     /**

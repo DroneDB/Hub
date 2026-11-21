@@ -1,26 +1,28 @@
 /**
- * The map's measurements: where they are saved (the analysis target, else the first georaster / point cloud on
- * show, else the folder's measurements.geojson), load, save, export (GeoJSON, CSV), delete, clear,
- * the measurement list, groups and the units change.
+ * The map's measurements: where they are saved (the sidecar of the one file on show, else the
+ * measurements.geojson of the folder), load, save, export (GeoJSON, CSV), delete, clear, the
+ * measurement list, groups and the units change.
  *
  * The map is a working copy of its measurements in that file: Save makes the file match the
  * map, and Delete saved removes them from it. The 3D viewer's measurements in the same file
  * (next to a point cloud) are not shown and stay as they are; the file goes when nothing is
- * left in it. The file is read once per target; when the target changes (another folder),
- * the map shows the new file and unsaved measurements are dropped with a notice.
+ * left in it. The file is read once per owner; when the owner changes (another file, another
+ * folder, a layer added to a view) the map shows the new file, and unsaved measurements are
+ * offered a Save to the file they were made in first. The raster an analysis tool works on
+ * does not decide the file: a tool never moves the measurements.
  *
  * Externals: measureControls, files, dataset, canWrite, canDelete, currentUnitPref,
- * showAlert, showFlash, onFileWritten(path), onFileRemoved(path), analysisTarget (the entry
- * of the analysis target, or null: the measurements follow it).
+ * showAlert, showFlash, choose(options) (a question as a promise of 'confirm' / 'secondary' / 'cancel'),
+ * onFileWritten(path), onFileRemoved(path).
  */
 import { toRaw } from 'vue';
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
-import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, isMeasurementFile } from '@/libs/map/measurementStorage';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
-import { measurementsFollow } from '@/composables/useAnalysisTarget';
+import { escapeHtml } from '@/libs/sanitize';
 import { measurementsToCsv } from '@/libs/map/measurementCsv';
 import { downloadCsv } from '@/libs/csv';
 
@@ -38,6 +40,10 @@ const definition = {
             hasSavedMeasurements: false,
             // Storage path of the measurements on the map (the file is read once per path)
             _loadedMeasurementPath: null,
+            // A question about unsaved measurements (and the save it leads to) is going: no other change is handled meanwhile
+            _switching: false,
+            // Counts the changes of the map's measurements and of the file they match, for hasUnsavedMeasurements
+            _changeTick: 0,
             // Group create/rename dialog
             measurementGroupDialogOpen: false,
             pendingGroupForRename: null,
@@ -60,13 +66,25 @@ const definition = {
             deletedMeasurementIds: new Set()
         };
     },
+    computed: {
+        // Whether the map has measurements that are not in the file. isDirty reads the control, which is not reactive:
+        // the tick says when to ask it again (a change of the measurements, a load or a save)
+        hasUnsavedMeasurements() {
+            return this._changeTick >= 0 && !!this.measureControls && this.measureControls.isDirty();
+        },
+
+        // Where the measurements of the map are saved (the file of its owner); '' before the first load
+        measurementsFilePath() {
+            return this.measurementStorage ? this.measurementStorage.measurementPath : '';
+        }
+    },
     methods: {
         /**
          * Creates the measure control (into the `measureControls` external), wired to this
          * feature's save/clear/export/delete/list actions.
-         * @param {{ openDialog: Function, onToolSelected?: Function, onFeatureRemoved?: Function }} host
+         * @param {{ openDialog: Function, onToolSelected?: Function, onFeatureRemoved?: Function, onFeatureModified?: Function }} host
          */
-        createMeasureControls({ openDialog, onToolSelected = () => {}, onFeatureRemoved = () => {} }) {
+        createMeasureControls({ openDialog, onToolSelected = () => {}, onFeatureRemoved = () => {}, onFeatureModified = () => {} }) {
             this.measureControls = new MeasureControls({
                 openDialog,
                 onToolSelected: () => { this.measuring = true; onToolSelected(); },
@@ -86,50 +104,46 @@ const definition = {
                     if (id) this.deletedMeasurementIds.add(id);
                     onFeatureRemoved(feature);
                 },
+                onFeatureModified,
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
             });
+            // lifetime: owner (the measure control: its source goes with it, and the control is made once per map)
+            this.measureControls.source.on('change', () => { this._changeTick++; });
             return this.measureControls;
         },
 
-        // measurements.geojson in the folder on show (the measurements of a view without rasters)
+        // The path of a file on show: an entry, or the placeholder of a layer that cannot be drawn (yet)
+        _shownPath(file) {
+            return (file.entry && file.entry.path) || (file.placeholder && file.placeholder.path) || null;
+        },
+
+        /**
+         * The files the measurements are about: not the folders of a listing, nor the measurements files themselves
+         * (a Save adds one to the listing, which must not make the folder look like a different set of files).
+         */
+        _shownFiles() {
+            return this.files.filter(f => {
+                if (!f.entry) return !!f.placeholder;
+                return !ddb.entry.isDirectory(f.entry) && !isMeasurementFile(f.entry.path);
+            });
+        },
+
+        // measurements.geojson in the folder of the first file on show
         standaloneMeasurementEntry() {
-            const first = this.files.find(f => f.entry && f.entry.path);
-            const folder = first ? ddb.pathutils.getParentFolder(first.entry.path) || '' : '';
+            const first = this.files.find(f => this._shownPath(f));
+            const folder = first ? ddb.pathutils.getParentFolder(this._shownPath(first)) || '' : '';
             return { path: folder ? `${folder}/measurements.geojson` : 'measurements.geojson' };
         },
 
         /**
-         * The measurements entry while no analysis target decides it: the first georaster / point
-         * cloud on show, else the folder.
+         * The entry the measurements belong to: the one file on show (its sidecar holds them), else the folder
+         * (a folder's children, several files, a view with layers: the file of the folder of the first one).
          */
-        defaultMeasurementEntry() {
-            const T = ddb.entry.type;
-            const anchor = this.files.find(f => f.entry && (f.entry.type === T.GEORASTER || f.entry.type === T.POINTCLOUD));
-            return anchor ? anchor.entry : this.standaloneMeasurementEntry();
-        },
-
-        /**
-         * The entry the measurements belong to with `target` as the analysis target (null: no
-         * target): the target, so a pile is saved with the elevation model it was measured on;
-         * else the default. A target that is not a georaster (a thermal photo drawn as a raster)
-         * leaves the measurements where they are, otherwise the measurements of the folder would
-         * disappear with it. The analysis target asks it for a target it is about to choose.
-         * @param {any} target  the entry of the analysis target, or null
-         */
-        measurementEntryFor(target) {
-            if (target && measurementsFollow(target)) return target;
-            return this.defaultMeasurementEntry();
-        },
-
-        /** The entry the measurements belong to now, with the current analysis target. */
-        _measurementTargetEntry() {
-            return this.measurementEntryFor(this.analysisTarget);
-        },
-
-        /** Path of the raster (or folder file) whose measurements the map shows now. */
-        measurementsRasterPath() {
-            return this._measurementTargetEntry().path;
+        measurementOwnerEntry() {
+            const shown = this._shownFiles();
+            if (shown.length !== 1) return this.standaloneMeasurementEntry();
+            return shown[0].entry || { path: this._shownPath(shown[0]) };
         },
 
         // Whether the map still works on this storage (the state is reactive: its value is a proxy of the object)
@@ -142,31 +156,51 @@ const definition = {
             this.measureControls.setSavedState(saved);
         },
 
+        // The map's measurements are the file's now (after a load or a save); what reads isDirty follows
+        _markSaved() {
+            this.measureControls.markSaved();
+            this._changeTick++;
+        },
+
         /**
-         * Shows the saved measurements of the target on show. Runs on every change of the
-         * files; the file is read only when the target changes, so the map never gets the
-         * same measurements twice and keeps its unsaved edits while the target stays. After a
-         * read that failed, `reload` reads the file of the same target again (the map then shows
-         * the file, and the unsaved edits are dropped with a notice, as for another target).
+         * Shows the saved measurements of the owner on show. Runs on every change of the files;
+         * the file is read only when the owner changes, so the map never gets the same
+         * measurements twice and keeps its unsaved edits while the owner stays. After a read that
+         * failed, `reload` reads the file of the same owner again (the map then shows the file,
+         * and the unsaved edits are dropped with a notice).
+         * Unsaved edits are offered a Save to their own file before another one is shown (see
+         * _settleUnsaved); a files change that comes while that question is open is not
+         * handled on its own: the answer is followed by a read of whatever is on show then.
          */
         async loadSavedMeasurements({ reload = false } = {}) {
-            if (!this.dataset || !this.measureControls) return;
-            const entry = this._measurementTargetEntry();
-            const storage = new MeasurementStorage(this.dataset, entry, MeasurementOwner.MAP);
+            if (!this.dataset || !this.measureControls || this._switching) return;
             const previous = this._loadedMeasurementPath;
+            let entry = this.measurementOwnerEntry();
+            let storage = new MeasurementStorage(this.dataset, entry, MeasurementOwner.MAP);
             if (storage.measurementPath === previous && !reload) return;
-            this._loadedMeasurementPath = storage.measurementPath;
 
             if (previous && this.measureControls.isDirty()) {
-                this.showFlash(`Unsaved measurement changes for "${ddb.pathutils.basename(previous)}" discarded`, 'warning');
+                this._switching = true;
+                try {
+                    const next = storage.measurementPath;
+                    if (!(await this._settleUnsaved(next, reload))) return;
+                } finally {
+                    this._switching = false;
+                }
+                // The files may have changed while the question was open: what is on show now is read
+                entry = this.measurementOwnerEntry();
+                storage = new MeasurementStorage(this.dataset, entry, MeasurementOwner.MAP);
+                if (storage.measurementPath === previous && !reload) return;
             }
+            this._loadedMeasurementPath = storage.measurementPath;
+
             this.measureControls.clearAllMeasurements();
             this.measurementGroups = [];
             this.deletedMeasurementIds.clear();
             this.activeMeasurementEntry = entry;
             this.measurementStorage = storage;
             this._setSaved(false);
-            this.measureControls.markSaved();
+            this._markSaved();
 
             let geojson;
             try {
@@ -179,14 +213,52 @@ const definition = {
                 }
                 return;
             }
-            // Another read (another target, a Reload) or the end of the map took over while the file was read
+            // Another read (another owner, a Reload) or the end of the map took over while the file was read
             if (!this._isCurrentStorage(storage)) return;
             if (geojson) {
                 const result = this.measureControls.importFromGeoJSON(geojson);
                 if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
             }
             this._setSaved(!!geojson);
-            this.measureControls.markSaved();
+            this._markSaved();
+        },
+
+        /**
+         * What happens to the unsaved measurements when another file is about to be shown: the user
+         * is asked to Save them to the file they were made in, to Discard them, or to keep editing them
+         * (Cancel, Escape or the close button: nothing is lost by dismissing the question). Keeping them
+         * leaves the map on their own file while other files are on show (the measurement list names it);
+         * their next Save moves the map on to the file of what is on show. The question is not asked when a
+         * save is not possible (a user who cannot write, a file that was not read, a Reload that
+         * reads the same file again): they are dropped with a notice. A Save that does not
+         * succeed (its alert says why) keeps the map as it is, with its own file, instead of dropping
+         * what the user asked to keep.
+         * @param {string} next  the measurements path about to be shown
+         * @param {boolean} reload  a read of the same file again
+         * @returns {Promise<boolean>}  whether the map goes on to show the new file
+         */
+        async _settleUnsaved(next, reload) {
+            const own = toRaw(this.measurementStorage);
+            if (!own) return false;
+            if (reload || !this.canWrite || own.saveRefusal) {
+                this.showFlash(`Unsaved measurement changes for "${ddb.pathutils.basename(own.measurementPath)}" discarded`, 'warning');
+                return true;
+            }
+            const answer = await this.choose({
+                title: 'Unsaved measurements',
+                message: `Save the measurements to <strong>${escapeHtml(own.measurementPath)}</strong> before showing <strong>${escapeHtml(next)}</strong>?`,
+                confirmText: 'Save',
+                secondaryText: 'Discard',
+                secondaryDanger: true,
+                cancelText: 'Keep editing'
+            });
+            // The map was left while the question was open
+            if (!this._isCurrentStorage(own)) return false;
+            if (answer === 'cancel') return false;
+            if (answer === 'secondary') return true;
+            // The storage and the entry are still the previous file's: the Save writes the map to them
+            await this.saveMeasurements();
+            return !this.measureControls.isDirty();
         },
 
         // Units from the settings dialog: confirm first when measurements are on the map
@@ -267,13 +339,16 @@ const definition = {
             } catch (e) {
                 console.error('Error saving measurements:', e);
                 this.showAlert('Error', `Failed to save measurements: ${e.message}`);
+                return;
             }
+            // Measurements kept on their own file while other files came on show: saved, the map moves on
+            if (!this._switching) await this.loadSavedMeasurements();
         },
 
         // The file holds what the map shows now: the saved state, the file list and a message follow
         _afterFileChange(result) {
             this._setSaved(result.count > 0);
-            this.measureControls.markSaved();
+            this._markSaved();
             // The file mirrors the map, so the "logically deleted" IDs are no longer relevant
             this.deletedMeasurementIds.clear();
             if (result.deleted) this.onFileRemoved(result.path);
@@ -477,5 +552,5 @@ const definition = {
  */
 export function useMapMeasurements(externals) {
     const none = () => () => {};
-    return createFeatureScope({ ...definition, externals: { onFileWritten: none, onFileRemoved: none, analysisTarget: () => null, ...externals } });
+    return createFeatureScope({ ...definition, externals: { onFileWritten: none, onFileRemoved: none, ...externals } });
 }

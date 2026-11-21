@@ -63,12 +63,17 @@
                                   v-model:radius="stockpileRadius" v-model:material="stockpileMaterial"
                                   v-model:custom-density="stockpileCustomDensity" v-model:custom-cost-per-ton="stockpileCustomCostPerTon"
                                   v-model:title="stockpileTitle" v-model:description="stockpileDescription"
-                                  :base-method="stockpileBaseMethod" :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
+                                  :base-method="stockpileBaseMethod" :flat-elevation="stockpileFlatElevation"
+                                  :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
                                   :result="stockpileResult" :piles="stockpilePiles" :piles-loading="stockpilePilesLoading" :piles-error="stockpilePilesError"
+                                  :piles-base="stockpilePilesBase" :added-piles="stockpileAddedPiles"
+                                  :pile-name="stockpileChosenName" :measured-on="stockpileMeasuredOn"
+                                  :can-edit-outline="stockpileCanEditOutline" :editing="stockpileEditing"
                                   :chosen-pile="stockpileChosenPile" :materials="stockpileMaterials" :currency="stockpileCurrency" :mode="stockpileMode" :unit-pref="currentUnitPref"
                                   :target-candidates="analysisCandidates" :target-path="analysisTargetPath"
-                                  @find-all="findAllStockpiles" @pick-pile="adoptDetectedStockpile"
-                                  @update:base-method="chooseStockpileBaseMethod"
+                                  @find-all="findAllStockpiles" @pick-pile="chooseStockpilePile" @hover-pile="hoverStockpilePile"
+                                  @add-piles="addStockpilePiles" @edit-outline="toggleStockpileOutlineEdit"
+                                  @update:base-method="chooseStockpileBaseMethod" @update:flat-elevation="chooseStockpileFlatElevation"
                                   @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
                                   @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
                                   @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson"
@@ -87,7 +92,7 @@
         <ChangeUnitsDialog v-if="changeUnitsDialogOpen" :target-unit="changeUnitsTargetUnit"
                            :measurements-count="changeUnitsMeasurementsCount" @close="handleChangeUnitsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
-                               :groups="measurementGroups"
+                               :groups="measurementGroups" :saved-path="measurementsFilePath"
                                @close="measurementListDialogOpen = false"
                                @delete-measurement="handleDeleteMeasurementFromList"
                                @edit-measurement="handleEditMeasurementFromList"
@@ -465,8 +470,10 @@ export default {
             this.createMeasureControls({
                 openDialog: (component, props) => this.dialogs.open(component, props),
                 onToolSelected: () => { if (this.selectionControl) this.selectionControl.deactivate(); },
-                // The stockpile panel resets when its draft polygon is erased
-                onFeatureRemoved: feature => this.onStockpileFeatureRemoved(feature)
+                // The stockpile panel resets when its chosen pile is erased
+                onFeatureRemoved: feature => this.onStockpileFeatureRemoved(feature),
+                // A pile whose outline was edited gets its volume again
+                onFeatureModified: feature => this.remeasureStockpileFeature(feature)
             });
 
             this.map = new Map({
@@ -550,7 +557,7 @@ export default {
             this.refreshRasterLayers();
             this.loadSplatFootprints();
             this.updateRastersOpacity();
-            // A tool target that left the map is replaced first: it decides which measurements load
+            // A tool target that left the map is replaced
             this.reconcileAnalysisTarget();
             this.loadSavedMeasurements();
             this.restorePlantHealthFromHash(this.files);

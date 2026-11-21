@@ -90,6 +90,9 @@
             </div>
         </div>
 
+        <!-- Where the measurements go: the file of the one file on show, else of the folder -->
+        <p v-if="savedPath" class="saved-path" data-testid="measurements-file">Saved in <span class="saved-path-file" data-testid="measurements-file-path">{{ savedPath }}</span></p>
+
         <!-- Footer toolbar -->
         <div class="measurement-list-footer">
             <button class="btn-new-group" title="Create a new group" @click="$emit('createGroup')">
@@ -129,6 +132,11 @@ export default {
         groups: {
             type: Array,
             default: () => []
+        },
+        // The path of the file the measurements are saved in (empty: not known yet)
+        savedPath: {
+            type: String,
+            default: ''
         }
     },
     emits: [
@@ -253,6 +261,13 @@ export default {
     min-height: 6rem;
     max-height: 55vh;
     overflow-y: auto;
+}
+
+.saved-path {
+    margin: 0.5rem 0 0;
+    font-size: 0.78rem;
+    color: var(--ddb-text-muted);
+    overflow-wrap: anywhere;
 }
 
 .no-measurements {

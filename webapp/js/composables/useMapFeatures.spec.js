@@ -1,7 +1,8 @@
 /**
  * The map's analysis tools as the map wires them: the tools show as soon as a drawn raster
- * accepts them, a tool opens for the raster chosen at its first use, the measurements follow
- * it, a view has them like any map, and split compare closes them.
+ * accepts them, a tool opens for the raster chosen at its first use (the one on top), the
+ * measurements stay where the files on show put them whichever raster a tool works on, a view has
+ * the tools like any map, and split compare closes them.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { effectScope, reactive, nextTick } from 'vue';
@@ -17,7 +18,7 @@ const entryOf = (path, bands, type = T.GEORASTER) => ({ path, type, properties: 
 const ORTHO = entryOf('odm_orthophoto/ortho.tif', ['Red', 'Green', 'Blue', 'Alpha']);
 const DSM = entryOf('odm_dem/dsm.tif', ['Gray']);
 const DTM = entryOf('odm_dem/dtm.tif', ['Gray']);
-// A thermal photo drawn as a raster: the measurements do not follow it
+// A thermal photo drawn as a raster
 const THERMAL = {
     ...entryOf('flight/thermal.tif', ['Gray'], T.GEOIMAGE),
     polygon_geom: { type: 'Polygon', coordinates: [] },
@@ -126,9 +127,9 @@ describe('the analysis tools of the map', () => {
 });
 
 describe('the elevation model of a view', () => {
-    it('is the one a tool would pick when none was chosen', () => {
+    it('is the one a tool would pick when none was chosen: the raster on top', () => {
         start([DSM, DTM], { view: {} });
-        expect(features.defaultAnalysisTarget()).toBe(DSM.path);
+        expect(features.defaultAnalysisTarget()).toBe(DTM.path);
     });
 
     it('is put back without a question or a panel', () => {
@@ -142,20 +143,21 @@ describe('the elevation model of a view', () => {
 });
 
 describe('opening a tool', () => {
-    it('chooses the raster of the measurements, not the DTM drawn above it, and opens for it', async () => {
+    it('chooses the raster on top, and opens for it', async () => {
         start([DSM, DTM]);
         await stockpileButton();
-        expect(features.analysisTargetPath.value).toBe(DSM.path);
+        expect(features.analysisTargetPath.value).toBe(DTM.path);
         expect(features.stockpilePanelVisible.value).toBe(true);
-        expect(features.rasterFilePath.value).toBe(DSM.path);
+        expect(features.rasterFilePath.value).toBe(DTM.path);
     });
 
-    it('leaves the measurements of the first georaster where they are', async () => {
-        start([ORTHO, DSM]);
+    it('skips an orthophoto on top, which is no elevation model, and leaves the measurements where the files put them', async () => {
+        start([DSM, ORTHO]);
+        const owner = features.measurementOwnerEntry().path;
         await stockpileButton();
-        // The orthophoto is not an elevation model: the DSM is the topmost candidate, and the measurements follow it
         expect(features.analysisTargetPath.value).toBe(DSM.path);
-        expect(features.measurementsRasterPath()).toBe(DSM.path);
+        expect(features.measurementOwnerEntry().path).toBe(owner);
+        expect(owner).toBe('odm_dem/measurements.geojson');
     });
 
     it('closes its panel when the button is used again', async () => {
@@ -170,27 +172,28 @@ describe('opening a tool', () => {
         await stockpileButton();
         rebuild();
         await features.reconcileAnalysisTarget();
-        expect(features.analysisTargetPath.value).toBe(DSM.path);
+        expect(features.analysisTargetPath.value).toBe(DTM.path);
         expect(features.stockpilePanelVisible.value).toBe(true);
     });
 });
 
 describe('switching the elevation model', () => {
-    it('loads the measurements of the new raster, then opens the panel for it', async () => {
+    it('opens the panel for the new raster, and loads and moves no measurements', async () => {
         start([DSM, DTM]);
+        await features.loadSavedMeasurements();
         await stockpileButton();
-        const loads = [];
-        dataset.getFileContents.mockImplementation(async path => {
-            loads.push(`${path} ${features.stockpilePanelVisible.value ? 'open' : 'closed'}`);
-            throw Object.assign(new Error('Not found'), { status: 404 });
-        });
-        expect(await features.selectAnalysisTarget(DTM.path)).toBe(true);
-        expect(features.analysisTargetPath.value).toBe(DTM.path);
-        expect(features.rasterFilePath.value).toBe(DTM.path);
+        // The map holds the measurements of its owner: a load would make another storage, and another path
+        const storage = features.measurementStorage.value;
+        expect(storage).not.toBeNull();
+        const owner = features.measurementOwnerEntry().path;
+        expect(await features.selectAnalysisTarget(DSM.path)).toBe(true);
+        expect(features.analysisTargetPath.value).toBe(DSM.path);
+        expect(features.rasterFilePath.value).toBe(DSM.path);
         expect(features.stockpilePanelVisible.value).toBe(true);
-        expect(features.measurementsRasterPath()).toBe(DTM.path);
-        // The measurements file of the DTM was read while the panel was still closed
-        expect(loads[0]).toBe('odm_dem/dtm_measurements.geojson closed');
+        await features.loadSavedMeasurements();
+        expect(features.measurementStorage.value).toBe(storage);
+        expect(features.measurementOwnerEntry().path).toBe(owner);
+        expect(features.measurementsFilePath.value).toBe('odm_dem/measurements.geojson');
     });
 });
 
@@ -199,61 +202,33 @@ describe('switching with unsaved measurements', () => {
         type: 'Feature', geometry: { type: 'LineString', coordinates: [[10, 45], [10.001, 45]] },
         properties: { name: 'm1', measurementType: 'length', createdAt: '2026-10-30T10:00:00.000Z' }
     }] };
-    const question = () => features.dialogs.stack.value.at(-1);
 
-    async function withUnsavedMeasurement() {
-        start([DSM, DTM]);
+    async function withUnsavedMeasurement(entries = [DSM, DTM]) {
+        start(entries);
+        await features.loadSavedMeasurements();
         await stockpileButton();
         features.measureControls.value.importFromGeoJSON(unsaved);
         expect(features.measureControls.value.isDirty()).toBe(true);
     }
 
-    it('asks to discard them, and Cancel keeps the target, the panel and the measurements', async () => {
-        await withUnsavedMeasurement();
-        const answer = features.selectAnalysisTarget(DTM.path);
-        await nextTick();
-        expect(question().props.message).toBe('Discard the unsaved measurements of dsm.tif?');
-        expect(question().props.confirmText).toBe('Discard');
-        features.dialogs.close(question().id, 'cancel');
-        expect(await answer).toBe(false);
-        expect(features.analysisTargetPath.value).toBe(DSM.path);
-        expect(features.rasterFilePath.value).toBe(DSM.path);
-        expect(features.stockpilePanelVisible.value).toBe(true);
-        expect(features.measureControls.value.isDirty()).toBe(true);
+    it('asks nothing and keeps them, for another elevation model or a thermal photo', async () => {
+        await withUnsavedMeasurement([DSM, DTM, THERMAL]);
+        for (const path of [DSM.path, THERMAL.path]) {
+            expect(await features.selectAnalysisTarget(path)).toBe(true);
+            expect(features.analysisTargetPath.value).toBe(path);
+            expect(features.dialogs.stack.value).toHaveLength(0);
+            expect(features.measureControls.value.isDirty()).toBe(true);
+        }
     });
 
-    it('switches after Discard, to the measurements of the new raster', async () => {
+    it('asks nothing when a target left the map', async () => {
         await withUnsavedMeasurement();
-        const answer = features.selectAnalysisTarget(DTM.path);
-        await nextTick();
-        features.dialogs.close(question().id, 'confirm');
-        expect(await answer).toBe(true);
-        expect(features.analysisTargetPath.value).toBe(DTM.path);
-        expect(features.rasterFilePath.value).toBe(DTM.path);
-        expect(features.measureControls.value.isDirty()).toBe(false);
-    });
-
-    it('does not ask, and keeps them, when the switch leaves them in their file (to a thermal photo)', async () => {
-        start([DSM, THERMAL]);
-        await stockpileButton();
-        expect(features.analysisTargetPath.value).toBe(DSM.path);
-        features.measureControls.value.importFromGeoJSON(unsaved);
-        const answer = features.selectAnalysisTarget(THERMAL.path);
-        await nextTick();
-        expect(features.dialogs.stack.value).toHaveLength(0);
-        expect(await answer).toBe(true);
-        expect(features.analysisTargetPath.value).toBe(THERMAL.path);
-        expect(features.measurementsRasterPath()).toBe(DSM.path);
-        expect(features.measureControls.value.isDirty()).toBe(true);
-    });
-
-    it('does not ask when a target left the map: the measurements feature warns instead', async () => {
-        await withUnsavedMeasurement();
-        props.files = props.files.filter(f => f.entry.path !== DSM.path);
+        props.files = props.files.filter(f => f.entry.path !== DTM.path);
         rebuild();
         await features.reconcileAnalysisTarget();
         expect(features.dialogs.stack.value).toHaveLength(0);
-        expect(features.analysisTargetPath.value).toBe(DTM.path);
+        expect(features.analysisTargetPath.value).toBe(DSM.path);
+        expect(features.measureControls.value.isDirty()).toBe(true);
     });
 });
 
@@ -261,11 +236,12 @@ describe('a target that leaves the map', () => {
     it('is replaced by the other DEM, and the panel opens for it', async () => {
         start([DSM, DTM]);
         await stockpileButton();
-        props.files = props.files.filter(f => f.entry.path !== DSM.path);
+        expect(features.analysisTargetPath.value).toBe(DTM.path);
+        props.files = props.files.filter(f => f.entry.path !== DTM.path);
         rebuild();
         await features.reconcileAnalysisTarget();
-        expect(features.analysisTargetPath.value).toBe(DTM.path);
-        expect(features.rasterFilePath.value).toBe(DTM.path);
+        expect(features.analysisTargetPath.value).toBe(DSM.path);
+        expect(features.rasterFilePath.value).toBe(DSM.path);
         expect(features.stockpilePanelVisible.value).toBe(true);
     });
 

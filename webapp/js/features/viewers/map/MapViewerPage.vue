@@ -45,14 +45,21 @@ const dialogs = useDialogs();
 // Provided by the app: true on a view embedded in another page (Viewer only)
 const embed = inject('embed', false);
 const route = useRoute();
+const mapCore = ref(null);
 
 // The view needs the hashes of the layers to save, the layers need the view: one is set after the other exists
 const hashOf = shallowRef(null);
 const {
     dataset, loading, error, loadError, canWrite, canDelete, state, setState, saved, dirty, shareNote, name, pageTitle, identity,
     baseEntry, busy, pickOnLoad, linkTarget, save, saveAsNew
-} = useSavedView({ route, router: useRouter(), dialogs, embed, hashOf });
-const mapCore = ref(null);
+} = useSavedView({
+    route, router: useRouter(), dialogs, embed, hashOf,
+    // The measurements on the map leave with the view: one question for the page when it is left
+    measurements: {
+        isDirty: () => !!mapCore.value?.hasUnsavedMeasurements,
+        save: () => mapCore.value.saveMeasurements()
+    }
+});
 // A layer added where the map is not looking is told, with the way there (FR-MAP-08)
 const layers = useViewLayers({
     dataset, state, setState, baseEntry, savedData: () => saved.value?.data ?? null, dialogs, embed,

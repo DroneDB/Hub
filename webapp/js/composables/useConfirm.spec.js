@@ -5,13 +5,31 @@ import Dialog from 'primevue/dialog';
 import PrimeVue from 'primevue/config';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from './useDialogs';
-import { useConfirm } from './useConfirm';
+import { useConfirm, useChoice } from './useConfirm';
 
 let wrapper;
 afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = '';
+});
+
+describe('useChoice', () => {
+    it('resolves the answer, and anything that is not Save or the secondary button is cancel', async () => {
+        const dialogs = effectScope().run(() => useDialogs());
+        const choose = useChoice(dialogs);
+        const ask = () => choose({ message: 'Save?', confirmText: 'Save', secondaryText: 'Discard', secondaryDanger: true });
+        const saved = ask();
+        expect(dialogs.stack.value[0].props).toMatchObject({ secondaryText: 'Discard', secondaryButtonClass: 'danger', confirmButtonClass: 'primary' });
+        dialogs.close(dialogs.stack.value[0].id, 'confirm');
+        await expect(saved).resolves.toBe('confirm');
+        const discarded = ask();
+        dialogs.close(dialogs.stack.value[0].id, 'secondary');
+        await expect(discarded).resolves.toBe('secondary');
+        const dismissed = ask();
+        dialogs.close(dialogs.stack.value[0].id);
+        await expect(dismissed).resolves.toBe('cancel');
+    });
 });
 
 describe('useConfirm', () => {

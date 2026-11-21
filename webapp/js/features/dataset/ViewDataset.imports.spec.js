@@ -12,7 +12,7 @@ import ddb from 'ddb';
 
 const h_ = vi.hoisted(() => ({ dataset: null, route: null, imports: [], handlers: {}, reload: null, explorerProps: null }));
 
-vi.mock('vue-router', () => ({ useRoute: () => h_.route, useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock('vue-router', () => ({ useRoute: () => h_.route, useRouter: () => ({ replace: vi.fn() }), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
         Organization: () => ({ Dataset: () => h_.dataset }),

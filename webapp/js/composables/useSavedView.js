@@ -18,7 +18,9 @@
  *   has is not a new page.
  * - Leaving a saved view with unsaved changes (another page, a reload, closing the tab) asks
  *   first: Save, Discard or Cancel (useLeaveGuard). A route change to the identity the page has is
- *   not a leave, and an embedded view never asks.
+ *   not a leave, and an embedded view never asks. The measurements on the map are part of the same
+ *   question (the page has one guard): `measurements` says whether they have unsaved changes and
+ *   saves them, and they are asked about for a new view too, which has no changes of its own.
  * - Names are only ever given to dialogs and toasts as text (a ConfirmDialog renders its message
  *   as HTML, so no name goes into one; its title is text).
  *
@@ -107,8 +109,10 @@ function openProblem(view) {
  * @param {((path: string) => string|undefined) | import('vue').Ref<((path: string) => string|undefined) | null>} [ctx.hashOf]
  *   the hash of the file at a path as it is now (useViewLayers), or a ref of it set later; the hashes of a state to save
  *   are these, and the working state keeps the hashes the view was saved with until then
+ * @param {{ isDirty: () => boolean, save: () => Promise<unknown> }} [ctx.measurements]  the measurements on the map:
+ *   whether they have unsaved changes, and the save of them
  */
-export function useSavedView({ route, router, dialogs, embed = false, hashOf }) {
+export function useSavedView({ route, router, dialogs, embed = false, hashOf, measurements = { isDirty: () => false, save: async () => {} } }) {
     const notify = useNotify();
     const { org, ds, uid: routeUid } = route.params;
     const uid = routeUid ? String(routeUid) : null;
@@ -435,16 +439,26 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
 
     // ---- Leave -----------------------------------------------------------------------------
 
-    // The changes the view bar calls unsaved; a save that does not save (a cancelled name, a
-    // refused write) leaves them dirty, so the page stays
+    // The changes the view bar calls unsaved, and the measurements of the map; a save that does not save (a
+    // cancelled name, a refused write) leaves them dirty, so the page stays
+    const measurementsDirty = () => canWrite.value && measurements.isDirty();
     useLeaveGuard({
-        isDirty: () => !embed && canWrite.value && dirty.value,
-        save,
+        isDirty: () => !embed && canWrite.value && (dirty.value || measurements.isDirty()),
+        save: async () => {
+            // The view first: when it is not saved (a cancelled question) the page stays, whatever the measurements
+            if (dirty.value) await save();
+            if (!dirty.value && measurementsDirty()) await measurements.save();
+        },
         dialogs,
         router,
         ignore: to => routeIdentity(to) === identity.value,
         title: () => `Save changes to ${name.value}?`,
-        message: 'This view has changes that are not saved. Save them before you leave?'
+        message: () => {
+            if (!dirty.value) return 'The measurements on the map are not saved. Save them before you leave?';
+            return measurementsDirty()
+                ? 'This view and the measurements on its map have changes that are not saved. Save them before you leave?'
+                : 'This view has changes that are not saved. Save them before you leave?';
+        }
     });
 
     return {

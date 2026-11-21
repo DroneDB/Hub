@@ -1,10 +1,11 @@
 /**
- * The map's measurements are a working copy of their file: the file is read once per target
+ * The map's measurements are a working copy of their file: the file is read once per owner
  * (a change of the file list does not add them again), Save makes the file match the map and
- * tells the file list, and a new target replaces the measurements on the map.
+ * tells the file list, and a new owner replaces the measurements on the map, after a question
+ * about the unsaved ones. The owner is the one file on show, else the folder.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, shallowRef, defineComponent, h } from 'vue';
+import { ref, shallowRef, defineComponent, h, effectScope } from 'vue';
 import { mount } from '@vue/test-utils';
 import ddb from 'ddb';
 import MeasureControls from '@/libs/map/controls/measureControl';
@@ -29,8 +30,11 @@ let events;
 let flashes;
 let alerts;
 let unitPref;
+let choose;
 
-function start({ canWrite = true, analysisTarget = () => null } = {}) {
+/** `answer`: what the user answers to the question about unsaved measurements ('confirm': Save, 'secondary': Discard, 'cancel': keep editing). */
+function start({ canWrite = true, answer = 'confirm' } = {}) {
+    choose = vi.fn(async () => answer);
     controls = new MeasureControls({});
     events = { written: [], removed: [] };
     flashes = [];
@@ -47,7 +51,7 @@ function start({ canWrite = true, analysisTarget = () => null } = {}) {
         showFlash: () => (message, color) => flashes.push({ message, color }),
         onFileWritten: () => path => events.written.push(path),
         onFileRemoved: () => path => events.removed.push(path),
-        analysisTarget
+        choose: () => choose
     });
 }
 
@@ -69,7 +73,7 @@ beforeEach(() => {
 });
 
 describe('useMapMeasurements', () => {
-    it('reads the file once per target: a change of the file list does not add the measurements again', async () => {
+    it('reads the file once per owner: a change of the file list does not add the measurements again', async () => {
         const m = start();
         await m.loadSavedMeasurements();
         files.value = [...files.value, { entry: { path: 'a/ortho_measurements.geojson', type: T.VECTOR } }];
@@ -118,14 +122,15 @@ describe('useMapMeasurements', () => {
         expect(onMap()).toEqual([]);
     });
 
-    it('a new target replaces the measurements on the map, quietly when nothing was unsaved', async () => {
-        stored['b/measurements.geojson'] = fileOf('b1');
+    it('a new owner replaces the measurements on the map, quietly when nothing was unsaved', async () => {
+        stored['b/notes_measurements.geojson'] = fileOf('b1');
         const m = start();
         await m.loadSavedMeasurements();
         files.value = [{ entry: { path: 'b/notes.txt', type: T.GENERIC } }];
         await m.loadSavedMeasurements();
         expect(onMap()).toEqual(['b1']);
         expect(flashes).toEqual([]);
+        expect(choose).not.toHaveBeenCalled();
     });
 
     describe('after a read of the file that failed', () => {
@@ -216,8 +221,8 @@ describe('useMapMeasurements', () => {
             expect(onMap()).toEqual(['m1', 'm2']);
         });
 
-        it('does nothing when the notice of an earlier target is clicked after the map moved to another one', async () => {
-            stored['b/measurements.geojson'] = fileOf('b1');
+        it('does nothing when the notice of an earlier owner is clicked after the map moved to another one', async () => {
+            stored['b/notes_measurements.geojson'] = fileOf('b1');
             const m = start();
             await m.loadSavedMeasurements();
             await m.saveMeasurements();
@@ -240,8 +245,7 @@ describe('useMapMeasurements', () => {
                 setup() {
                     m = useMapMeasurements({
                         measureControls: shallowRef(controls), files: () => files.value, dataset: () => dataset, canWrite: () => true, canDelete: () => true,
-                        currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, onFileWritten: () => () => {}, onFileRemoved: () => () => {},
-                        analysisTarget: () => null
+                        currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, onFileWritten: () => () => {}, onFileRemoved: () => () => {}
                     });
                     return () => h('div');
                 }
@@ -306,74 +310,265 @@ describe('useMapMeasurements', () => {
         expect(onMap()).toEqual(['m1', 'm2']);
     });
 
-    describe('with an analysis target', () => {
-        let target;
-        beforeEach(() => {
-            target = null;
-            stored['a/dtm_measurements.geojson'] = fileOf('t1');
-            files.value = [
-                { entry: { path: 'a/ortho.tif', type: T.GEORASTER } },
-                { entry: { path: 'a/dtm.tif', type: T.GEORASTER } }
+    describe('the file the measurements belong to', () => {
+        const raster = path => ({ entry: { path, type: T.GEORASTER } });
+        const pathOnMap = async files_ => {
+            files.value = files_;
+            const m = start();
+            await m.loadSavedMeasurements();
+            return { m, path: m.measurementsFilePath.value };
+        };
+
+        it('is the sidecar of the one file on show, whatever its type', async () => {
+            for (const [entry, sidecar] of [
+                [{ path: 'a/ortho.tif', type: T.GEORASTER }, 'a/ortho_measurements.geojson'],
+                [{ path: 'a/cloud.laz', type: T.POINTCLOUD }, 'a/cloud_measurements.geojson'],
+                [{ path: 'a/photo.jpg', type: T.GEOIMAGE }, 'a/photo_measurements.geojson'],
+                [{ path: 'top.tif', type: T.GEORASTER }, 'top_measurements.geojson']
+            ]) {
+                const { m, path } = await pathOnMap([{ entry }]);
+                expect(path).toBe(sidecar);
+                expect(m.measurementOwnerEntry().path).toBe(entry.path);
+            }
+        });
+
+        it('is the file of the folder for the children of a folder, however many rasters they hold', async () => {
+            const { path } = await pathOnMap([raster('a/ortho.tif'), raster('a/dtm.tif'), { entry: { path: 'a/notes.txt', type: T.GENERIC } }]);
+            expect(path).toBe('a/measurements.geojson');
+        });
+
+        it('is the file of the folder of the first file for several files, and the root file in the root', async () => {
+            expect((await pathOnMap([raster('a/ortho.tif'), raster('b/dtm.tif')])).path).toBe('a/measurements.geojson');
+            expect((await pathOnMap([raster('ortho.tif'), raster('dtm.tif')])).path).toBe('measurements.geojson');
+        });
+
+        it('is the file of the folder for a view with layers: its base and a layer that cannot be drawn yet', async () => {
+            const layer = { entry: null, placeholder: { path: 'a/building.tif', kind: 'building', text: 'Building' } };
+            expect((await pathOnMap([raster('a/ortho.tif'), raster('a/dtm.tif')])).path).toBe('a/measurements.geojson');
+            expect((await pathOnMap([raster('a/ortho.tif'), layer])).path).toBe('a/measurements.geojson');
+        });
+
+        it('is the sidecar of a single layer that cannot be drawn yet', async () => {
+            const layer = { entry: null, placeholder: { path: 'a/building.tif', kind: 'building', text: 'Building' } };
+            expect((await pathOnMap([layer])).path).toBe('a/building_measurements.geojson');
+        });
+
+        it('does not count the folders of a listing nor the measurements files in it (a save adds one, and must not move the file)', async () => {
+            const listing = [
+                raster('a/ortho.tif'),
+                { entry: { path: 'a/sub', type: T.DIRECTORY } },
+                { entry: { path: 'a/ortho_measurements.geojson', type: T.VECTOR } },
+                { entry: { path: 'a/measurements.geojson', type: T.VECTOR } }
             ];
-        });
-        // The target is an external of the feature, read on every load
-        const startOnTarget = () => start({ analysisTarget: () => target });
-
-        it('are the measurements of the target, not of the first georaster', async () => {
-            target = files.value[1].entry;
-            const m = startOnTarget();
-            await m.loadSavedMeasurements();
-            expect(onMap()).toEqual(['t1']);
-            expect(m.measurementsRasterPath()).toBe('a/dtm.tif');
+            expect((await pathOnMap(listing)).path).toBe('a/ortho_measurements.geojson');
         });
 
-        it('stay the default ones without a target', async () => {
-            const m = startOnTarget();
-            await m.loadSavedMeasurements();
-            expect(onMap()).toEqual(['m1', 'm2']);
-            expect(m.measurementsRasterPath()).toBe('a/ortho.tif');
-            expect(m.defaultMeasurementEntry().path).toBe('a/ortho.tif');
-        });
-
-        it('move to the file of a new target, with the warning for what was unsaved', async () => {
-            const m = startOnTarget();
-            await m.loadSavedMeasurements();
-            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
-            target = files.value[1].entry;
-            await m.loadSavedMeasurements();
-            expect(onMap()).toEqual(['t1']);
-            expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
-        });
-
-        it('save to the file of the target', async () => {
-            target = files.value[1].entry;
-            const m = startOnTarget();
+        it('keeps the file after a save that adds the sidecar to the listing', async () => {
+            delete stored['a/ortho_measurements.geojson'];
+            const m = start();
             await m.loadSavedMeasurements();
             controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
             await m.saveMeasurements();
-            expect(events.written).toEqual(['a/dtm_measurements.geojson']);
-            expect(JSON.parse(stored['a/dtm_measurements.geojson']).features.map(f => f.properties.name)).toContain('n1');
-            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features).toHaveLength(2);
+            files.value = [...files.value, { entry: { path: 'a/ortho_measurements.geojson', type: T.VECTOR } }];
+            await m.loadSavedMeasurements();
+            expect(m.measurementsFilePath.value).toBe('a/ortho_measurements.geojson');
+            expect(onMap()).toEqual(['n1']);
+            expect(choose).not.toHaveBeenCalled();
         });
 
-        it('stay where they are for a target that is not a georaster (a thermal photo drawn as a raster)', async () => {
-            const photo = { path: 'a/thermal.tif', type: T.GEOIMAGE };
-            files.value = [files.value[0], { entry: photo }];
-            target = photo;
-            const m = startOnTarget();
+        it('shows the file of the folder when a single file becomes a folder, and the sidecar when it is a single file again', async () => {
+            stored['a/measurements.geojson'] = fileOf('f1');
+            const m = start();
             await m.loadSavedMeasurements();
             expect(onMap()).toEqual(['m1', 'm2']);
-            expect(m.measurementsRasterPath()).toBe('a/ortho.tif');
+
+            files.value = [raster('a/ortho.tif'), raster('a/dtm.tif')];
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['f1']);
+            expect(m.activeMeasurementEntry.value.path).toBe('a/measurements.geojson');
+
+            files.value = [raster('a/ortho.tif')];
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['m1', 'm2']);
         });
 
-        it('answer for a target about to be chosen the file they would move to, as they do once it is chosen', () => {
-            const photo = { path: 'a/thermal.tif', type: T.GEOIMAGE };
-            const m = startOnTarget();
-            expect(m.measurementEntryFor(files.value[1].entry).path).toBe('a/dtm.tif');
-            expect(m.measurementEntryFor(photo).path).toBe('a/ortho.tif');
-            expect(m.measurementEntryFor(null).path).toBe('a/ortho.tif');
-            target = files.value[1].entry;
-            expect(m.measurementsRasterPath()).toBe(m.measurementEntryFor(target).path);
+        it('saves to the file of the folder for several files, and leaves the sidecars alone', async () => {
+            files.value = [raster('a/ortho.tif'), raster('a/dtm.tif')];
+            const m = start();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            await m.saveMeasurements();
+            expect(events.written).toEqual(['a/measurements.geojson']);
+            expect(JSON.parse(stored['a/measurements.geojson']).features.map(f => f.properties.name)).toEqual(['n1']);
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features).toHaveLength(2);
+        });
+    });
+
+    describe('when the owner changes with unsaved measurements', () => {
+        const SIDECAR = 'a/ortho_measurements.geojson';
+        const raster = path => ({ entry: { path, type: T.GEORASTER } });
+        const toFolder = () => { files.value = [raster('a/ortho.tif'), raster('a/dtm.tif')]; };
+
+        beforeEach(() => { stored['a/measurements.geojson'] = fileOf('f1'); });
+
+        async function draft(options) {
+            const m = start(options);
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            expect(controls.isDirty()).toBe(true);
+            return m;
+        }
+
+        it('asks to Save them to the file they were made in before showing the other one, naming both', async () => {
+            const m = await draft();
+            toFolder();
+            await m.loadSavedMeasurements();
+            expect(choose).toHaveBeenCalledTimes(1);
+            const question = choose.mock.calls[0][0];
+            expect(question.message).toBe(`Save the measurements to <strong>${SIDECAR}</strong> before showing <strong>a/measurements.geojson</strong>?`);
+            expect(question).toMatchObject({ confirmText: 'Save', secondaryText: 'Discard', secondaryDanger: true, cancelText: 'Keep editing' });
+        });
+
+        it('Save writes what is on the map to the previous file, then shows the new one', async () => {
+            const m = await draft({ answer: 'confirm' });
+            toFolder();
+            await m.loadSavedMeasurements();
+            expect(JSON.parse(stored[SIDECAR]).features.map(f => f.properties.name).sort()).toEqual(['m1', 'm2', 'n1']);
+            expect(events.written).toEqual([SIDECAR]);
+            expect(onMap()).toEqual(['f1']);
+            expect(m.measurementsFilePath.value).toBe('a/measurements.geojson');
+            expect(controls.isDirty()).toBe(false);
+            expect(flashes.map(f => f.color)).toEqual(['positive']);
+        });
+
+        it('Discard shows the new file and writes nothing', async () => {
+            const m = await draft({ answer: 'secondary' });
+            toFolder();
+            await m.loadSavedMeasurements();
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(JSON.parse(stored[SIDECAR]).features).toHaveLength(2);
+            expect(onMap()).toEqual(['f1']);
+            expect(controls.isDirty()).toBe(false);
+        });
+
+        it('Keep editing (or a dismissed question) keeps the map, its edits and its own file; their Save then shows the new file', async () => {
+            const m = await draft({ answer: 'cancel' });
+            toFolder();
+            await m.loadSavedMeasurements();
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(onMap()).toEqual(['m1', 'm2', 'n1']);
+            expect(m.measurementsFilePath.value).toBe(SIDECAR);
+            expect(controls.isDirty()).toBe(true);
+
+            await m.saveMeasurements();
+            expect(JSON.parse(stored[SIDECAR]).features.map(f => f.properties.name).sort()).toEqual(['m1', 'm2', 'n1']);
+            expect(m.measurementsFilePath.value).toBe('a/measurements.geojson');
+            expect(onMap()).toEqual(['f1']);
+            expect(choose).toHaveBeenCalledTimes(1);
+        });
+
+        it('asks nothing when nothing is unsaved, and none of the old notice is shown', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            toFolder();
+            await m.loadSavedMeasurements();
+            expect(choose).not.toHaveBeenCalled();
+            expect(flashes).toEqual([]);
+            expect(onMap()).toEqual(['f1']);
+        });
+
+        it('asks once for a change that comes while the question is open, and shows what is on show when it is answered', async () => {
+            const m = await draft();
+            let answer;
+            choose.mockImplementation(() => new Promise(resolve => { answer = resolve; }));
+            toFolder();
+            const first = m.loadSavedMeasurements();
+            await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+            // The user picks a single file meanwhile: no second question, and the map is not touched yet
+            files.value = [raster('a/dtm.tif')];
+            await m.loadSavedMeasurements();
+            expect(choose).toHaveBeenCalledTimes(1);
+            expect(onMap()).toContain('n1');
+
+            answer('confirm');
+            await first;
+            expect(JSON.parse(stored[SIDECAR]).features.map(f => f.properties.name)).toContain('n1');
+            expect(m.measurementsFilePath.value).toBe('a/dtm_measurements.geojson');
+            expect(onMap()).toEqual([]);
+        });
+
+        it('keeps the map and its own file when the Save fails, with the alert that says so', async () => {
+            const m = await draft({ answer: 'confirm' });
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            dataset.writeObj.mockRejectedValueOnce(new Error('disk full'));
+            toFolder();
+            await m.loadSavedMeasurements();
+            vi.restoreAllMocks();
+            expect(alerts).toEqual(['Error']);
+            expect(onMap()).toEqual(['m1', 'm2', 'n1']);
+            expect(m.measurementsFilePath.value).toBe(SIDECAR);
+            expect(controls.isDirty()).toBe(true);
+        });
+
+        it('drops them with the old notice, without a question, for a user who cannot write', async () => {
+            const m = await draft({ canWrite: false });
+            toFolder();
+            await m.loadSavedMeasurements();
+            expect(choose).not.toHaveBeenCalled();
+            expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
+            expect(onMap()).toEqual(['f1']);
+        });
+
+        it('drops them with the old notice, without a question, when the file was not read (a save would be refused)', async () => {
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const read = dataset.getFileContents;
+            dataset.getFileContents = vi.fn().mockRejectedValueOnce(Object.assign(new Error('Server Error'), { status: 500 })).mockImplementation(read);
+            const m = await draft();
+            toFolder();
+            await m.loadSavedMeasurements();
+            vi.restoreAllMocks();
+            expect(choose).not.toHaveBeenCalled();
+            expect(flashes).toHaveLength(1);
+            expect(onMap()).toEqual(['f1']);
+        });
+    });
+
+    describe('the measurements that are not in their file', () => {
+        let scope;
+        afterEach(() => scope?.stop());
+
+        function startWithControls() {
+            const holder = shallowRef(null);
+            scope = effectScope();
+            const m = scope.run(() => useMapMeasurements({
+                measureControls: holder, files: () => files.value, dataset: () => dataset, canWrite: () => true, canDelete: () => true,
+                currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, choose: () => async () => 'confirm'
+            }));
+            m.createMeasureControls({ openDialog: () => {} });
+            controls = holder.value;
+            return m;
+        }
+
+        it('are told reactively: a drawn measurement makes them unsaved, a save or a load makes them saved', async () => {
+            const m = startWithControls();
+            await m.loadSavedMeasurements();
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            expect(m.hasUnsavedMeasurements.value).toBe(true);
+            await m.saveMeasurements();
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+            controls.deleteMeasurement(controls.source.getFeatures()[0]);
+            expect(m.hasUnsavedMeasurements.value).toBe(true);
+            files.value = [{ entry: { path: 'b/other.tif', type: T.GEORASTER } }];
+            await m.loadSavedMeasurements();
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+        });
+
+        it('name the file they are saved in, once it is known', async () => {
+            const m = startWithControls();
+            expect(m.measurementsFilePath.value).toBe('');
+            await m.loadSavedMeasurements();
+            expect(m.measurementsFilePath.value).toBe('a/ortho_measurements.geojson');
         });
     });
 
@@ -404,16 +599,6 @@ describe('useMapMeasurements', () => {
             expect(m.hasSavedMeasurements.value).toBe(false);
             expect(onMap()).toEqual([]);
         });
-    });
-
-    it('a new target drops unsaved measurements with a notice', async () => {
-        const m = start();
-        await m.loadSavedMeasurements();
-        controls.importFromGeoJSON(JSON.parse(fileOf('draft')));
-        files.value = [{ entry: { path: 'b/notes.txt', type: T.GENERIC } }];
-        await m.loadSavedMeasurements();
-        expect(onMap()).toEqual([]);
-        expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
     });
 
     it('exports the measurements as CSV with their group names, in the units shown', async () => {

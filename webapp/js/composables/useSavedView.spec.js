@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { effectScope, reactive, shallowRef, nextTick } from 'vue';
+import { effectScope, reactive, shallowRef, ref, nextTick } from 'vue';
 import ddb from 'ddb';
 import { b64encode, b64urlEncode } from '@/libs/base64';
 import { defaultState, buildEntryState, newLayer, MAX_VIEWS } from '@/libs/views/viewState';
@@ -101,7 +101,7 @@ let dialogs;
  * Opens the viewer on an address. `history` is what the browser history entry holds for it
  * (a reload); `ready` waits for the load.
  */
-async function open(url, { dataset = fakeDataset(), history = null, embed = false, hashOf = null } = {}) {
+async function open(url, { dataset = fakeDataset(), history = null, embed = false, hashOf = null, measurements = undefined } = {}) {
     ctx.dataset = dataset;
     window.history.replaceState({ current: url, ...(history ? { [HISTORY_KEY]: history } : {}) }, '', url);
     route = reactive({ params: {}, query: {}, fullPath: '' });
@@ -111,7 +111,7 @@ async function open(url, { dataset = fakeDataset(), history = null, embed = fals
     dialogs = { open: vi.fn() };
     let view;
     scope = effectScope();
-    scope.run(() => { view = useSavedView({ route, router, dialogs, embed, hashOf }); });
+    scope.run(() => { view = useSavedView({ route, router, dialogs, embed, hashOf, measurements }); });
     await view.loaded;
     return { view, dataset };
 }
@@ -1047,5 +1047,118 @@ describe('useSavedView leaving with unsaved changes', () => {
         const unload = new Event('beforeunload', { cancelable: true });
         window.dispatchEvent(unload);
         expect(unload.defaultPrevented).toBe(true);
+    });
+});
+
+describe('useSavedView leaving with unsaved measurements on the map', () => {
+    const dsRoute = { path: '/r/o/d', fullPath: '/r/o/d', params: { org: 'o', ds: 'd' } };
+    const here = () => ({ path: route.fullPath.split('?')[0], fullPath: route.fullPath, params: { ...route.params } });
+    const ConfirmDialog = { name: 'ConfirmDialog' };
+    const isQuestion = call => call[0].name === ConfirmDialog.name && /^Save changes to/.test(call[1].title);
+
+    /** The map's measurements as the page hands them over: dirty until they are saved. */
+    function unsavedMeasurements() {
+        const dirty = ref(true);
+        return { dirty, isDirty: () => dirty.value, save: vi.fn(async () => { dirty.value = false; }) };
+    }
+    async function openNewView(measurements, options = {}) {
+        return open(fileUrl('f/a.tif'), { dataset: fakeDataset(options.dataset), measurements, embed: options.embed });
+    }
+    async function openChangedView(measurements) {
+        const dataset = fakeDataset({ items: [savedItem('v_1', 'Ortho over DSM', twoLayers())] });
+        const opened = await open(viewUrl('v_1'), { dataset, measurements });
+        const state = opened.view.state.value;
+        opened.view.setState({ ...state, layers: state.layers.map((l, i) => (i ? l : { ...l, opacity: 0.5 })) });
+        return opened;
+    }
+
+    it('asks for a new view, which has no changes of its own, and says it is the measurements', async () => {
+        const measurements = unsavedMeasurements();
+        await openNewView(measurements);
+        dialogs.open.mockResolvedValue('cancel');
+        expect(await guards.leave(dsRoute, here())).toBe(false);
+        expect(dialogs.open.mock.calls[0][1].message).toBe('The measurements on the map are not saved. Save them before you leave?');
+        expect(dialogs.open.mock.calls[0][1]).toMatchObject({ confirmText: 'Save', secondaryText: 'Discard', cancelText: 'Cancel' });
+        expect(measurements.save).not.toHaveBeenCalled();
+    });
+
+    it('Save saves the measurements only (no view is made), then leaves', async () => {
+        const measurements = unsavedMeasurements();
+        const { dataset } = await openNewView(measurements);
+        dialogs.open.mockResolvedValue('confirm');
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(measurements.save).toHaveBeenCalledTimes(1);
+        expect(dataset.metaAdd).not.toHaveBeenCalled();
+        expect(dialogs.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('Discard leaves without saving them', async () => {
+        const measurements = unsavedMeasurements();
+        await openNewView(measurements);
+        dialogs.open.mockResolvedValue('secondary');
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(measurements.save).not.toHaveBeenCalled();
+    });
+
+    it('stays when the measurements could not be saved (they are still unsaved)', async () => {
+        const measurements = unsavedMeasurements();
+        measurements.save.mockImplementation(async () => {});
+        await openNewView(measurements);
+        dialogs.open.mockResolvedValue('confirm');
+        expect(await guards.leave(dsRoute, here())).toBe(false);
+    });
+
+    it('is one question for the view and its measurements: Save saves the view, then the measurements', async () => {
+        const measurements = unsavedMeasurements();
+        const { view, dataset } = await openChangedView(measurements);
+        dialogs.open.mockResolvedValue('confirm');
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(dialogs.open.mock.calls.filter(isQuestion)).toHaveLength(1);
+        expect(dialogs.open.mock.calls[0][1].message).toBe('This view and the measurements on its map have changes that are not saved. Save them before you leave?');
+        expect(dataset.items[0].data.layers[0].opacity).toBe(0.5);
+        expect(view.dirty.value).toBe(false);
+        expect(measurements.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not save the measurements when the view was not saved, and stays', async () => {
+        const measurements = unsavedMeasurements();
+        const { dataset } = await openChangedView(measurements);
+        dataset.items = [];
+        dialogs.open.mockImplementation(async (component, props) => (isQuestion([component, props]) ? 'confirm' : null));
+        expect(await guards.leave(dsRoute, here())).toBe(false);
+        expect(measurements.save).not.toHaveBeenCalled();
+    });
+
+    it('keeps the question about the view alone when the measurements are saved', async () => {
+        const measurements = unsavedMeasurements();
+        measurements.dirty.value = false;
+        await openChangedView(measurements);
+        dialogs.open.mockResolvedValue('cancel');
+        await guards.leave(dsRoute, here());
+        expect(dialogs.open.mock.calls[0][1].message).toBe('This view has changes that are not saved. Save them before you leave?');
+    });
+
+    it('asks nothing for a reader or Viewer only, whatever the map holds', async () => {
+        await openNewView(unsavedMeasurements(), { dataset: { canWrite: false } });
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        scope.stop();
+        await openNewView(unsavedMeasurements(), { embed: true });
+        expect(await guards.leave(dsRoute, here())).toBe(true);
+        expect(dialogs.open).not.toHaveBeenCalled();
+    });
+
+    it('shows the browser question on a page unload while the measurements are unsaved, and not after they are saved', async () => {
+        const measurements = unsavedMeasurements();
+        await openNewView(measurements);
+        await nextTick();
+        const unload = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(unload);
+        expect(unload.defaultPrevented).toBe(true);
+
+        measurements.dirty.value = false;
+        await nextTick();
+        const clean = new Event('beforeunload', { cancelable: true });
+        window.dispatchEvent(clean);
+        expect(clean.defaultPrevented).toBe(false);
     });
 });

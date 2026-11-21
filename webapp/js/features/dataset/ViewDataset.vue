@@ -107,6 +107,7 @@ import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
 import { useTimerGroup } from '@/composables/useTimers';
 import { useDialogs } from '@/composables/useDialogs';
+import { useLeaveGuard } from '@/composables/useLeaveGuard';
 import { useDatasetListing } from '@/composables/useDatasetListing';
 import { useDatasetActions } from '@/composables/useDatasetActions';
 import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
@@ -236,6 +237,14 @@ watch(shownFile, file => { if (!file) detailFile.value = null; });
 const stopHearingUploads = useUploadsStore().subscribe(params.org, params.ds, { added: entries => listing.uploaded(entries) });
 onBeforeUnmount(stopHearingUploads);
 const dialogs = useDialogs();
+// Measurements drawn on the Map tab that are not saved yet: leaving the page (another dataset, a reload, closing the tab) asks first
+useLeaveGuard({
+    isDirty: () => canWrite.value && !!mapViewer.value?.hasUnsavedMeasurements?.(),
+    save: () => mapViewer.value.saveMeasurements(),
+    dialogs,
+    title: 'Unsaved measurements',
+    message: 'The measurements on the map are not saved. Save them before you leave?'
+});
 // The tree that is on the page: the sidebar's, or on a phone the Browser tab's
 const activeTree = () => (phoneLayout.value ? mobileFileBrowser.value : fileBrowser.value) || fileBrowser.value || mobileFileBrowser.value;
 const refresh = () => {

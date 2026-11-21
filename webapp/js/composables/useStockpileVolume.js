@@ -7,6 +7,13 @@
  *  - this.rasterFilePath (shared with useRasterAnalysis)
  *  - this.map (OpenLayers Map instance) for interactive drawing/click flows.
  *  - optional: this.getMapCenterLatLon() → [lon, lat] for "detect at center" flow
+ *  - optional: this.measurementsPath, the measurements file the map shows (where the saved piles are read)
+ *  - optional: this.showFlash(message, kind), to say that a pile could not be measured again
+ *
+ * The panel works on one pile at a time, the chosen pile: a pile found by a click or drawn (it is added to the
+ * measurements at once), a pile of the list that "Find all piles" found (shown in the Result; added to the
+ * measurements with Add), or a pile already on the map, saved or not (chosen with a click on it). The base, the
+ * material, the title and the description in the panel are those of the chosen pile and nothing else.
  *
  * The materials are the user's (PREF.STOCKPILE_MATERIALS), priced in the user's currency
  * (PREF.CURRENCY): the weight and the cost follow a change of the material, of the values typed
@@ -16,14 +23,22 @@
  * The base the volume is measured from is the one the user picks in the panel; until they pick
  * one, a pile found by a click is measured on the best-fit plane and a drawn polygon on the
  * lowest perimeter (libs/stockpileBase). The panel shows the base of the pile, and picking
- * another one measures the pile again. The base is saved with the pile.
+ * another one measures the chosen pile again, on the elevation model it was measured on. The base, the flat
+ * elevation and that elevation model are saved with the pile, so a pile is measured again wherever it was made:
+ * with another base, or when the user changes its outline on the map (remeasureStockpileFeature).
  */
+import { nextTick, toRaw } from 'vue';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Feature } from 'ol';
 import { Polygon } from 'ol/geom';
 import { transform } from 'ol/proj';
-import { buildStockpileFeature, loadStockpile, STOCKPILE_PROPERTIES } from '@/libs/map/stockpileStorage';
+import {
+    buildStockpileFeature, loadStockpile, propertiesOfResult, resultOfProperties, stockpilePolygonOf, STOCKPILE_PROPERTIES
+} from '@/libs/map/stockpileStorage';
+import { friendlyStockpileError } from '@/libs/stockpileErrors';
+import { pileListMethods, pileListState } from '@/composables/stockpilePileList';
+import { onMapMethods, onMapState } from '@/composables/stockpileOnMap';
 import {
     CUSTOM_MATERIAL_SLUG,
     computeMaterialEstimate,
@@ -49,46 +64,25 @@ function stockpileStyle() {
     return analysisStyles({ width: 2, fill: ANALYSIS_FILL });
 }
 
-// Convert known technical/native error messages into something a user can act on.
-function friendlyStockpileError(raw, fallback) {
-    if (!raw) return fallback;
-    const msg = String(raw);
-    if (/no stockpile/i.test(msg) || /cannot detect stockpile/i.test(msg)) {
-        return 'No pile detected here. Try clicking closer to the top of a clearly elevated area, increase the search radius, or lower the sensitivity.';
-    }
-    if (/click point is outside/i.test(msg) || /outside raster bounds/i.test(msg)) {
-        return 'The clicked point is outside the raster. Click within the dataset area.';
-    }
-    if (/no valid data/i.test(msg)) {
-        return 'The selected area contains no elevation data. Try a different location.';
-    }
-    if (/cannot calculate volume/i.test(msg)) {
-        return 'Cannot calculate volume for this area. Make sure the polygon falls inside the raster and contains valid elevation data.';
-    }
-    if (/radius must be positive/i.test(msg)) {
-        return 'The search radius must be greater than zero.';
-    }
-    if (/at least two|at least 2|polyline with at least/i.test(msg)) {
-        return 'A polygon with at least three vertices is required.';
-    }
-    return fallback;
-}
-
 // The material of a restored pile whose values are not those of any of the user's materials
 const SAVED_MATERIAL_SLUG = '__saved__';
 
-// What the draft feature takes from the panel when it changes (its id and save time stay)
-const DRAFT_PROPERTIES = ['name', 'description', 'tooltipText',
+// What the pile on the map takes from the panel when it changes (its id and save time stay)
+const CHOSEN_PILE_PROPERTIES = ['name', 'description', 'tooltipText',
     ...STOCKPILE_PROPERTIES.filter(k => k !== 'id' && k !== 'savedAt')];
 
 const definition = {
     data() {
         return {
+            ...pileListState(),
+            ...onMapState(),
             stockpilePanelVisible: false,
             // The base of the pile shown (or of the next one); see chooseStockpileBaseMethod
             stockpileBaseMethod: BASE_METHOD.LOWEST_PERIMETER,
-            // The base the user picked in the panel, null until they pick one
+            // The base the user picked in the panel for the piles to come, null until they pick one
             _chosenStockpileBaseMethod: null,
+            // The elevation of the flat base (metres), of the pile shown or of the next one
+            stockpileFlatElevation: 0,
             stockpileSensitivity: 0.5,
             stockpileRadius: 50,
             stockpileMaterial: null,
@@ -100,14 +94,8 @@ const definition = {
             stockpileError: null,
             stockpileResult: null,
             stockpileDetectedPolygon: null,
-            // Every pile of the raster found at once (FR-MAP-25): null before a search, else the piles, the biggest first
-            stockpilePiles: null,
-            stockpilePilesLoading: false,
-            stockpilePilesError: null,
-            // The id of the pile of the list that was adopted (it shows as chosen)
-            stockpileChosenPile: null,
             stockpileMode: null, // 'click' | 'draw' | null
-            // User-editable identification of the saved pile.
+            // User-editable identification of the chosen pile.
             stockpileTitle: '',
             stockpileDescription: '',
             // Non-reactive OL refs (mutated directly).
@@ -117,21 +105,20 @@ const definition = {
             // the interaction, the keys, the crosshair and the measurement toolbar's lock
             _stockpileSession: null,
             _stockpilePrevCursor: '',
-            // Id of the current draft stockpile feature in the shared
-            // measurement layer. Tracks the polygon that has been auto-adopted
-            // as a regular measurement so it can be re-styled / replaced when
-            // the user re-detects, and removed when leaving the panel without
-            // ever saving via the toolbar.
+            // Id of the chosen pile's feature in the shared measurement layer, saved or not: what the panel's
+            // title, material and base are applied to. None while the panel shows a pile of the list that is
+            // not added yet, or a pile that has no feature on the map.
+            _chosenStockpileFeatureId: null,
+            // Id of the pile just found by a click or drawn, which Clear removes while it is not saved
             _draftStockpileFeatureId: null,
+            // The elevation model of the piles saved before it was recorded (see loadStockpile)
+            _legacyStockpileRaster: null,
+            // The panel is putting a pile into its fields: the watchers of the fields leave the pile alone
+            _applyingPile: false,
             // Counts the opens and closes of the panel and the piles measured in it: a saved pile
             // read for an earlier one is not shown (the panel may be open on another raster by
             // the time it is read, or show a pile the user measured meanwhile)
-            _stockpileRestoreTurn: 0,
-            // The same for the search of every pile: the answer of a search that a later one, the closing of the
-            // panel or another raster overtook is not shown
-            _stockpilePilesTurn: 0,
-            // The id of the draft pile taken from that list (another pile of the list replaces it while it is not saved)
-            _listStockpileFeatureId: null
+            _stockpileRestoreTurn: 0
         };
     },
     computed: {
@@ -147,14 +134,29 @@ const definition = {
         stockpileMaterials() {
             const shown = this.stockpileCatalog.filter(m => !m.hidden);
             return this._savedStockpileMaterial ? [this._savedStockpileMaterial, ...shown] : shown;
+        },
+        /** The elevation model the chosen pile was measured on, when it is not the one the panel is on; else null */
+        stockpileMeasuredOn() {
+            const raster = this.stockpileResult?.sourceRaster;
+            return raster && raster !== this.rasterFilePath ? raster : null;
+        },
+        /** The name of the chosen pile: its title, or its row of the list; '' when the panel shows none */
+        stockpileChosenName() {
+            if (this._chosenStockpileFeatureId) return this.stockpileTitle.trim() || 'Untitled pile';
+            const rank = (this.stockpilePiles ?? []).findIndex(p => p.id === this.stockpileChosenPile);
+            return rank >= 0 && this.stockpileResult ? `Pile ${rank + 1}` : '';
+        },
+        /** Whether the outline of the chosen pile can be edited: it is a measurement on the map */
+        stockpileCanEditOutline() {
+            return !!this._chosenStockpileFeatureId;
         }
     },
     watch: {
-        // Keep the in-memory draft feature's properties in sync with what the
+        // Keep the in-memory feature's properties in sync with what the
         // user types in the panel so the toolbar Save button captures the
         // latest title / notes / material without an extra "Apply" click.
-        stockpileTitle() { this._patchDraftStockpileProps(); },
-        stockpileDescription() { this._patchDraftStockpileProps(); },
+        stockpileTitle() { this._patchChosenStockpileProps(); },
+        stockpileDescription() { this._patchChosenStockpileProps(); },
         // The weight and the cost follow the material and its values
         stockpileMaterial() { this._refreshStockpileEstimate(); },
         stockpileCustomDensity() { this._refreshStockpileEstimate(); },
@@ -170,11 +172,16 @@ const definition = {
             }
         }
     },
-    // The drawing session of Click map and Draw ends with the map
+    // The drawing session of Click map and Draw ends with the map, and so do the click on the map and the pauses
     beforeUnmount() {
         this._stopStockpileInteractions();
+        this._endStockpileEdit();
+        this._unbindStockpileMapClick();
+        this._dropAllRemeasures();
     },
     methods: {
+        ...pileListMethods,
+        ...onMapMethods,
         async openStockpileVolume(file) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path || !this.dataset) return;
@@ -184,66 +191,36 @@ const definition = {
             // A measurement of the raster the panel was on is over for it (its answer is dropped)
             this.stockpileLoading = false;
             this.stockpileError = null;
-            this.stockpileResult = null;
-            this.stockpileDetectedPolygon = null;
-            this.stockpileTitle = '';
-            this.stockpileDescription = '';
-            this._savedStockpileMaterial = null;
+            this._legacyStockpileRaster = null;
             this._resetStockpilePiles();
+            this._forgetChosenStockpile();
             // The pile drawn for the raster the panel was open on is not this raster's
             this._clearStockpileOverlay();
+            this._bindStockpileMapClick();
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
             this._loadSavedStockpile();
         },
 
         async _loadSavedStockpile() {
-            if (!this.rasterFilePath || !this.dataset) return;
+            if (!this.rasterFilePath || !this.dataset || !this.measurementsPath) return;
             const turn = ++this._stockpileRestoreTurn;
             const path = this.rasterFilePath;
             try {
                 // Skip stockpiles the user has just removed via the Measurement
                 // List dialog (deletion is in-memory until the next save).
-                const saved = await loadStockpile(this.dataset, path, this.deletedMeasurementIds);
+                const saved = await loadStockpile(this.dataset, this.measurementsPath, path, this.deletedMeasurementIds);
                 // The panel closed, opened again (on another raster) or measured a pile while the file was read
                 if (!saved || turn !== this._stockpileRestoreTurn || path !== this.rasterFilePath) return;
-                this.stockpileDetectedPolygon = saved.polygon;
-                // The polygon may already be rendered by the regular measurements
-                // layer (when persisted with measurementType==='stockpile' it is
-                // imported via measureControls.importFromGeoJSON at dataset load).
-                // Render in our dedicated overlay only as a fallback.
-                if (!this._isStockpileInMeasureSource(saved.properties && saved.properties.id)) {
+                this._legacyStockpileRaster = saved.defaultRaster;
+                // The pile is on the map as a measurement (the file was imported when it was shown): that is the
+                // one the panel works on. Otherwise (no map, a pile that is not shown) the panel only shows it,
+                // with its polygon in the overlay.
+                const feature = this._stockpileFeatureById(saved.properties.id);
+                if (feature) {
+                    this.selectStockpileFeature(feature);
+                } else {
                     this._renderStockpilePolygon(saved.polygon);
-                }
-                // Re-hydrate the result panel from saved properties so volumes/area
-                // are visible without recomputing.
-                const p = saved.properties || {};
-                if (p.netVolume != null || p.cutVolume != null || p.area2d != null) {
-                    this.stockpileResult = {
-                        netVolume: p.netVolume,
-                        cutVolume: p.cutVolume,
-                        fillVolume: p.fillVolume,
-                        area2d: p.area2d,
-                        area3d: p.area3d,
-                        baseElevation: p.baseElevation,
-                        confidence: p.confidence,
-                        weightEstimate: p.weightEstimate,
-                        costEstimate: p.costEstimate,
-                        basePlaneMethod: p.basePlaneMethod,
-                        _restored: true
-                    };
-                }
-                // The panel shows the base the pile was measured from (piles saved before the
-                // base was saved with them leave the panel's as it is)
-                if (isBaseMethod(p.basePlaneMethod)) this.stockpileBaseMethod = p.basePlaneMethod;
-                this._restoreStockpileMaterial(p);
-                if (p.title) this.stockpileTitle = p.title;
-                // `description` is the canonical key; `notes` is read for
-                // backwards compatibility with stockpiles saved before the
-                // rename and migrated into `description` on next save.
-                if (p.description) {
-                    this.stockpileDescription = p.description;
-                } else if (p.notes) {
-                    this.stockpileDescription = p.notes;
+                    this._showStockpile(saved.polygon, saved.properties, null);
                 }
             } catch (e) {
                 console.warn('Could not restore saved stockpile:', e);
@@ -251,15 +228,69 @@ const definition = {
         },
 
         /**
+         * Put a pile into the panel: its volumes, its base, its material and its identification, as they are
+         * saved. Nothing is written to the pile, whatever the watchers of the fields do with the values.
+         * @param {object} polygon  the outline, a WGS84 GeoJSON polygon
+         * @param {Record<string, any>} p  the properties of the pile
+         * @param {string|null} featureId  the id of its feature on the map, null when it has none
+         */
+        _showStockpile(polygon, p, featureId) {
+            this._applyingPile = true;
+            this._chosenStockpileFeatureId = featureId;
+            this.stockpileDetectedPolygon = polygon;
+            this.stockpileError = null;
+            this.stockpileResult = resultOfProperties(p);
+            this.stockpileFlatElevation = typeof p.flatElevation === 'number' ? p.flatElevation : 0;
+            // The panel shows the base the pile was measured from (piles saved before the
+            // base was saved with them leave the panel's as it is)
+            if (isBaseMethod(p.basePlaneMethod)) this.stockpileBaseMethod = p.basePlaneMethod;
+            this._savedStockpileMaterial = null;
+            this._restoreStockpileMaterial(p);
+            this.stockpileTitle = p.title || '';
+            // `description` is the canonical key; `notes` is read for
+            // backwards compatibility with stockpiles saved before the
+            // rename and migrated into `description` on next save.
+            this.stockpileDescription = p.description || p.notes || '';
+            // The watchers of the fields run before this
+            nextTick(() => { this._applyingPile = false; });
+        },
+
+        /**
+         * Choose a pile that is on the map, saved or not: the panel shows it and works on it from now on (the
+         * base, the material, the title and the description are its own, and Edit outline edits it).
+         * @param {import('ol/Feature').default} feature  a feature of `measurementType` 'stockpile'
+         */
+        selectStockpileFeature(feature) {
+            if (!feature || !feature.get || feature.get('measurementType') !== 'stockpile') return;
+            const polygon = stockpilePolygonOf(feature, this._mapProjection());
+            if (!polygon) return;
+            const p = { ...feature.getProperties() };
+            if (this._chosenStockpileFeatureId !== p.id) this._endStockpileEdit();
+            this._stopStockpileInteractions();
+            // A pile being measured, or a saved one being read, is not the chosen one any more
+            this._stockpileRestoreTurn++;
+            this.stockpileLoading = false;
+            // A pile saved before the model was recorded was measured on the one of its file
+            const sourceRaster = p.sourceRaster ?? this._legacyStockpileRaster;
+            if (sourceRaster) p.sourceRaster = sourceRaster;
+            this._showStockpile(polygon, p, p.id ?? null);
+            this._setChosenPileRow(this._pileRowOf(p.id));
+        },
+
+        /**
          * Select the material a restored pile was weighed and priced with. When it is one of the
          * user's materials with the same values it is selected as such; otherwise (another
          * user's material, a hidden one, prices changed since) the panel offers it as it was
-         * saved, so the saved weight and cost stay what they were.
+         * saved, so the saved weight and cost stay what they were. A pile with no material
+         * leaves the panel with none.
          * @param {Record<string, any>} p  the saved feature's properties
          */
         _restoreStockpileMaterial(p) {
             const slug = p.material;
-            if (!slug) return;
+            if (!slug) {
+                this.stockpileMaterial = null;
+                return;
+            }
             const saved = materialOfSavedPile(p);
             if (slug === CUSTOM_MATERIAL_SLUG) {
                 if (saved) {
@@ -314,52 +345,73 @@ const definition = {
 
         /** Weigh the current result again, and update the pile on the map with it. */
         _refreshStockpileEstimate() {
+            if (this._applyingPile) return;
             if (this.stockpileResult) this.stockpileResult = this._withStockpileEstimate(this.stockpileResult);
-            this._patchDraftStockpileProps();
+            this._patchChosenStockpileProps();
         },
 
-        /**
-         * Returns true if a feature with the given id is already present in the
-         * shared measurements OL source - in which case our dedicated overlay
-         * does not need to render the polygon a second time.
-         */
-        _isStockpileInMeasureSource(id) {
-            if (!id || !this.measureControls || !this.measureControls.source) return false;
-            const features = this.measureControls.source.getFeatures();
-            return features.some(f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+        /** The stockpile feature of the measurement layer with this id (the raw OpenLayers feature), or null. */
+        _stockpileFeatureById(id) {
+            const mc = this.measureControls;
+            if (!id || !mc || !mc.source) return null;
+            const feature = mc.source.getFeatures().find(f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+            return feature ? toRaw(feature) : null;
+        },
+
+        /** The projection of the map (the one the outlines of the features are in). */
+        _mapProjection() {
+            return (this.map && this.map.getView && this.map.getView().getProjection()) || EPSG.WEB_MERCATOR;
         },
 
         /**
          * Hook invoked by the measure control (through MapCore) whenever a
-         * feature is removed from the shared measurement source. When the
-         * removed feature is the current stockpile draft (eraser tool, edit
-         * dialog Delete button, list-dialog delete, ...), reset the panel so
-         * the result fields, polygon reference and identification inputs no
+         * feature is removed from the shared measurement source. The row of the pile
+         * loses its check mark, a measuring of the pile in wait is dropped and, when the removed
+         * feature is the chosen pile (eraser tool, edit dialog Delete button, list-dialog delete, ...),
+         * reset the panel so the result fields, polygon reference and identification inputs no
          * longer point to a feature that is gone from the map.
          */
         _onStockpileFeatureRemoved(feature) {
             if (!feature || !feature.get) return;
             if (feature.get('measurementType') !== 'stockpile') return;
             const id = feature.get('id');
-            if (!id || id !== this._draftStockpileFeatureId) return;
+            if (!id) return;
+            this._dropRemeasure(id);
+            const row = this._pileRowOf(id);
+            if (row !== null) {
+                delete this.stockpileAddedPiles[row];
+                this._syncAddedPiles();
+            }
+            if (id === this._draftStockpileFeatureId) this._draftStockpileFeatureId = null;
+            if (id !== this._chosenStockpileFeatureId) return;
+            this.stockpileError = null;
+            this._forgetChosenStockpile();
+            this._clearStockpileOverlay();
+        },
+
+        /**
+         * The panel shows no pile any more: no result, outline, title or description, and no feature it works on.
+         * The feature itself stays on the map.
+         */
+        _forgetChosenStockpile() {
+            this._chosenStockpileFeatureId = null;
+            this._endStockpileEdit();
+            this._setChosenPileRow(null);
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
-            this.stockpileError = null;
             this.stockpileTitle = '';
             this.stockpileDescription = '';
-            this._draftStockpileFeatureId = null;
-            this._clearStockpileOverlay();
+            this._savedStockpileMaterial = null;
         },
 
         closeStockpileVolume() {
             this._stockpileRestoreTurn++;
             this.stockpileLoading = false;
             this._resetStockpilePiles();
+            this._unbindStockpileMapClick();
             this.stockpilePanelVisible = false;
             this.stockpileError = null;
-            this.stockpileResult = null;
-            this.stockpileDetectedPolygon = null;
-            this._savedStockpileMaterial = null;
+            this._forgetChosenStockpile();
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
             // Forget the draft id so the next session can adopt a fresh
@@ -372,8 +424,6 @@ const definition = {
             // A measurement in flight is over for the panel: its answer is dropped (see _stockpileCall)
             this._stockpileRestoreTurn++;
             this.stockpileError = null;
-            this.stockpileResult = null;
-            this.stockpileDetectedPolygon = null;
             this._resetStockpilePiles();
             // Reset the loading flag so an in-flight detection that is taking
             // too long no longer blocks the panel: the request itself still
@@ -382,32 +432,36 @@ const definition = {
             this.stockpileLoading = false;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
-            // A pile not saved yet is removed from the shared measurement layer (with its floating
+            // The pile just found, not saved yet, is removed from the shared measurement layer (with its floating
             // label), otherwise the label stays orphaned on the map. A pile that is in the saved
             // file stays: Clear resets the panel and the overlay only, and removing it from the
-            // map would delete it from the dataset with the next Save.
+            // map would delete it from the dataset with the next Save. A pile the user added from the list or
+            // chose on the map is theirs: it stays, saved or not.
             const id = this._draftStockpileFeatureId;
             const mc = this.measureControls;
-            if (!id || !(mc && mc.isSaved(id))) {
+            if (id && id === this._chosenStockpileFeatureId && !(mc && mc.isSaved(id))) {
                 this._removeDraftStockpileFromMeasureSource();
             }
             // The panel no longer tracks the pile, so a pile found next is a new one
+            this._forgetChosenStockpile();
             this._draftStockpileFeatureId = null;
         },
 
         /**
          * A new pile is measured (found by a click or drawn): an independent pile, so it is
-         * detached from the previous draft and the identification fields are reset, otherwise
+         * detached from the previous one and the identification fields are reset, otherwise
          * the previously-typed title/description would bleed into the next adopted feature (and
          * the watcher would overwrite the previous pile). It takes the turn of a saved pile still
          * being read, so that pile does not replace this one when it arrives. No pile of the list
-         * is the chosen one until adoptDetectedStockpile says so.
+         * is the chosen one.
          */
         _startNewStockpile() {
             this._stockpileRestoreTurn++;
             this.stockpileLoading = true;
             this.stockpileError = null;
-            this.stockpileChosenPile = null;
+            this._chosenStockpileFeatureId = null;
+            this._endStockpileEdit();
+            this._setChosenPileRow(null);
             this._draftStockpileFeatureId = null;
             this.stockpileTitle = '';
             this.stockpileDescription = '';
@@ -458,9 +512,9 @@ const definition = {
         },
 
         /**
-         * Measure a pile the detection found (one `detect` answer, or one pile of `detect-all`: `polygon`, `confidence`,
-         * `estimatedVolume`) from the base of the panel, show it and adopt it as the draft pile on the map. Nothing is
-         * shown or adopted when the panel moved on (Clear, Close, another raster or pile) while it was measured.
+         * Measure a pile a click found (one `detect` answer: `polygon`, `confidence`) from the base of the panel, show
+         * it and adopt it as the draft pile on the map. Nothing is shown or adopted when the panel moved on (Clear,
+         * Close, another raster or pile) while it was measured.
          * @param {object} detection
          * @param {{ turn: number, path: string }} call  the call that asked (see _stockpileCall)
          */
@@ -470,80 +524,8 @@ const definition = {
             this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
             const volume = await this._measureStockpile(detection.polygon, call.path);
             if (!this._isCurrentStockpileCall(call)) return;
-            this.stockpileResult = this._withStockpileEstimate({
-                ...volume,
-                confidence: detection.confidence,
-                estimatedFromDetection: detection.estimatedVolume
-            });
+            this.stockpileResult = this._withStockpileEstimate({ ...volume, confidence: detection.confidence });
             this._adoptDraftStockpile(detection.polygon);
-        },
-
-        /** The list of the piles found at once is forgotten (a search in flight is overtaken). */
-        _resetStockpilePiles() {
-            this._stockpilePilesTurn++;
-            this.stockpilePiles = null;
-            this.stockpilePilesLoading = false;
-            this.stockpilePilesError = null;
-            this.stockpileChosenPile = null;
-        },
-
-        /**
-         * "Find all piles" (FR-MAP-25): one scan of the whole raster, with the sensitivity of the panel. The piles are
-         * listed (the biggest first); the user adopts one with adoptDetectedStockpile.
-         */
-        async findAllStockpiles() {
-            if (!this.rasterFilePath || !this.dataset) return;
-            const turn = ++this._stockpilePilesTurn;
-            const path = this.rasterFilePath;
-            this.stockpilePilesLoading = true;
-            this.stockpilePilesError = null;
-            this.stockpileChosenPile = null;
-            try {
-                const found = await this.dataset.detectAllStockpiles(path, { sensitivity: this.stockpileSensitivity });
-                if (turn !== this._stockpilePilesTurn) return;
-                this.stockpilePiles = Array.isArray(found?.stockpiles) ? found.stockpiles : [];
-            } catch (e) {
-                console.error('Finding all the piles failed:', e);
-                if (turn !== this._stockpilePilesTurn) return;
-                this.stockpilePiles = null;
-                this.stockpilePilesError = friendlyStockpileError(e && e.message,
-                    'Could not find the piles of this raster. Try again, or adjust the sensitivity.');
-            } finally {
-                if (turn === this._stockpilePilesTurn) this.stockpilePilesLoading = false;
-            }
-        },
-
-        /**
-         * The user chose a pile of the list: it is measured like a pile found by a click, shown in the panel and drawn on
-         * the map as the draft pile, which the toolbar's Save writes with the others (FR-XC-30). Going through the list
-         * replaces the pile taken from it while that one is not saved, so piles 1, 2, 1 leave one pile on the map (pile 1),
-         * not three; a pile saved, clicked or drawn stays. The chosen pile chosen again changes nothing.
-         * @param {{ id: number, polygon: object, confidence?: number, estimatedVolume?: number }} pile
-         */
-        async adoptDetectedStockpile(pile) {
-            if (!pile || !pile.polygon || !this.rasterFilePath || !this.dataset) return;
-            const listDraft = this._draftStockpileFeatureId && this._draftStockpileFeatureId === this._listStockpileFeatureId
-                ? this._draftStockpileFeatureId : null;
-            // The chosen pile is on the map, or being measured for it
-            if (pile.id === this.stockpileChosenPile && (listDraft || this.stockpileLoading)) return;
-            const mc = this.measureControls;
-            if (listDraft && !(mc && mc.isSaved(listDraft))) this._removeDraftStockpileFromMeasureSource();
-            this._startNewStockpile();
-            const call = this._stockpileCall();
-            // The list stays: the user may look at another pile of it
-            this.stockpileChosenPile = pile.id;
-            try {
-                await this._measureDetectedStockpile(pile, call);
-                if (this._isCurrentStockpileCall(call)) this._listStockpileFeatureId = this._draftStockpileFeatureId;
-            } catch (e) {
-                console.error('Stockpile calculation failed:', e);
-                if (!this._isCurrentStockpileCall(call)) return;
-                this.stockpileError = friendlyStockpileError(e && e.message,
-                    'Cannot calculate the volume of this pile. Try another one.');
-                this.stockpileResult = null;
-            } finally {
-                if (this._isCurrentStockpileCall(call)) this.stockpileLoading = false;
-            }
         },
 
         /**
@@ -576,58 +558,78 @@ const definition = {
         },
 
         /**
-         * The volume of `polygon` above the base of the panel (stockpileBaseMethod), with the
-         * base it was measured from.
+         * The volume of `polygon` above a base, with the base it was measured from and the raster it was
+         * measured on: what is saved with the pile, so that it can be measured again.
          * @param {object} polygon  GeoJSON polygon, WGS84
-         * @param {string} path  the raster the call was made for (the panel may be on another one by the answer)
+         * @param {string} path  the raster to measure on (the panel may be on another one by the answer)
+         * @param {string} [baseMethod]  default: the base of the panel
+         * @param {number} [flatElevation]  default: the flat elevation of the panel
          */
-        async _measureStockpile(polygon, path) {
-            const baseMethod = this.stockpileBaseMethod;
-            const volume = await this.dataset.calculateStockpileVolume(path, polygon,
-                { baseMethod, flatElevation: 0 });
-            return { ...volume, basePlaneMethod: volume.basePlaneMethod ?? baseMethod };
+        async _measureStockpile(polygon, path, baseMethod = this.stockpileBaseMethod, flatElevation = this.stockpileFlatElevation) {
+            const volume = await this.dataset.calculateStockpileVolume(path, polygon, { baseMethod, flatElevation });
+            return { ...volume, basePlaneMethod: volume.basePlaneMethod ?? baseMethod, sourceRaster: path, flatElevation };
         },
 
         /**
-         * The user picks the base in the panel: it is the base of every pile from now on, the
-         * detected ones included, and the pile just measured is measured again from it (a
-         * restored pile keeps the volumes it was saved with).
+         * The user picks the base in the panel. It is the base of the chosen pile and of that pile only: the pile
+         * is measured again from it, on the elevation model it was measured on. With no pile on the map chosen (the
+         * panel shows a pile of the list, or none) it is the base of the piles to come: those found by a click, drawn
+         * or listed, and the list is measured again from it.
          * @param {string} method
          */
         async chooseStockpileBaseMethod(method) {
             if (!isBaseMethod(method)) return;
-            this._chosenStockpileBaseMethod = method;
+            if (!this._chosenStockpileFeatureId) this._chosenStockpileBaseMethod = method;
             if (method === this.stockpileBaseMethod) return;
             this.stockpileBaseMethod = method;
-            await this._remeasureDraftStockpile();
+            await this._remeasureWorkingStockpile();
         },
 
-        /** Measure the pile just measured again, from the base of the panel. */
-        async _remeasureDraftStockpile() {
-            const id = this._draftStockpileFeatureId;
-            const previous = this.stockpileResult;
-            const polygon = this.stockpileDetectedPolygon;
-            if (!id || !previous || previous._restored || !polygon || this.stockpileLoading) return;
+        /**
+         * The user types the elevation of the flat base: as for the base, the chosen pile (or the list) is
+         * measured again from it when the base is flat; else it is kept for when it is.
+         * @param {number} elevation  metres
+         */
+        async chooseStockpileFlatElevation(elevation) {
+            const flat = Number(elevation);
+            if (!Number.isFinite(flat) || flat === this.stockpileFlatElevation) return;
+            this.stockpileFlatElevation = flat;
+            if (this.stockpileBaseMethod === BASE_METHOD.FLAT) await this._remeasureWorkingStockpile();
+        },
+
+        /** Measure what the panel shows again from the base and the flat elevation of the panel. */
+        async _remeasureWorkingStockpile() {
+            const feature = this._stockpileFeatureById(this._chosenStockpileFeatureId);
+            if (feature) {
+                await this._remeasureChosenStockpile(feature);
+            } else if (this.stockpilePiles) {
+                await this._measureStockpilePiles();
+            }
+        },
+
+        /**
+         * Measure the chosen pile again from the base of the panel, with the panel waiting. When it cannot be
+         * measured the pile keeps the volumes (and the base) it had, and the panel says why.
+         */
+        async _remeasureChosenStockpile(feature) {
+            if (this.stockpileLoading) return;
+            const baseMethod = this.stockpileBaseMethod;
+            const flatElevation = this.stockpileFlatElevation;
             this.stockpileLoading = true;
             this.stockpileError = null;
             const call = this._stockpileCall();
-            try {
-                const volume = await this._measureStockpile(polygon, call.path);
-                // Cleared, or another pile or raster measured, meanwhile
-                if (this._draftStockpileFeatureId !== id || !this._isCurrentStockpileCall(call)) return;
-                const { confidence, estimatedFromDetection } = previous;
-                this.stockpileResult = this._withStockpileEstimate({ ...volume, confidence, estimatedFromDetection });
-                this._patchDraftStockpileProps();
-            } catch (e) {
-                console.error('Stockpile calculation failed:', e);
-                if (this._draftStockpileFeatureId !== id || !this._isCurrentStockpileCall(call)) return;
-                // The panel keeps the volumes of the pile, so it shows the base they are from
-                if (isBaseMethod(previous.basePlaneMethod)) this.stockpileBaseMethod = previous.basePlaneMethod;
-                this.stockpileError = friendlyStockpileError(e && e.message,
-                    'Cannot calculate the volume of this pile from the selected base.');
-            } finally {
-                if (this._draftStockpileFeatureId === id && this._isCurrentStockpileCall(call)) this.stockpileLoading = false;
-            }
+            const id = feature.get('id');
+            const outcome = await this._recalculateStockpile(feature, { baseMethod, flatElevation });
+            // Cleared, or another pile or raster chosen, meanwhile
+            if (!this._isCurrentStockpileCall(call) || this._chosenStockpileFeatureId !== id) return;
+            this.stockpileLoading = false;
+            if (outcome.status !== 'failed') return;
+            // The panel keeps the volumes of the pile, so it shows the base they are from
+            const previous = feature.getProperties();
+            if (isBaseMethod(previous.basePlaneMethod)) this.stockpileBaseMethod = previous.basePlaneMethod;
+            this.stockpileFlatElevation = typeof previous.flatElevation === 'number' ? previous.flatElevation : 0;
+            this.stockpileError = friendlyStockpileError(outcome.error && outcome.error.message,
+                'Cannot calculate the volume of this pile from the selected base.');
         },
 
         /** Triggers auto-detect at the current map view center (if available). */
@@ -715,6 +717,8 @@ const definition = {
          * mode showed goes with it.
          */
         _startStockpileSession(options) {
+            // A new pile is drawn or picked: the edit of an outline is over
+            this._endStockpileEdit();
             let session = null;
             session = startDrawingSession({
                 map: this.map,
@@ -793,12 +797,15 @@ const definition = {
         /**
          * Build the property bag persisted alongside the polygon (used by both
          * Save and Export so the two outputs stay consistent).
+         * @param {Record<string, any>|null} [result]  what was measured (default: the result of the panel)
+         * @param {{ identify?: boolean }} [options]  `identify`: the title and the description of the panel are the pile's
+         *   (not for a pile of the list that is not the chosen one)
          */
-        _buildStockpileProperties() {
+        _buildStockpileProperties(result = this.stockpileResult, { identify = true } = {}) {
             const material = this._selectedStockpileMaterial();
             const props = { material: material?.sourceSlug ?? (this.stockpileMaterial || null) };
-            const title = (this.stockpileTitle || '').trim();
-            const description = (this.stockpileDescription || '').trim();
+            const title = identify ? (this.stockpileTitle || '').trim() : '';
+            const description = identify ? (this.stockpileDescription || '').trim() : '';
             if (title) props.title = title;
             if (description) props.description = description;
             // What the pile is weighed and priced with, so it reads the same for every user
@@ -809,19 +816,7 @@ const definition = {
                 props.currency = material.currency;
             }
             if (this.currentUnitPref) props.unitSystem = this.currentUnitPref;
-            const r = this.stockpileResult;
-            if (r) {
-                if (typeof r.netVolume === 'number') props.netVolume = r.netVolume;
-                if (typeof r.cutVolume === 'number') props.cutVolume = r.cutVolume;
-                if (typeof r.fillVolume === 'number') props.fillVolume = r.fillVolume;
-                if (typeof r.area2d === 'number') props.area2d = r.area2d;
-                if (typeof r.area3d === 'number') props.area3d = r.area3d;
-                if (typeof r.baseElevation === 'number') props.baseElevation = r.baseElevation;
-                if (typeof r.confidence === 'number') props.confidence = r.confidence;
-                if (isBaseMethod(r.basePlaneMethod)) props.basePlaneMethod = r.basePlaneMethod;
-                if (r.weightEstimate) props.weightEstimate = r.weightEstimate;
-                if (r.costEstimate) props.costEstimate = r.costEstimate;
-            }
+            Object.assign(props, propertiesOfResult(result));
             // tooltipText is what the Measurement List dialog shows in the
             // "Value" column; build a compact human description here so the
             // saved feature looks meaningful when re-imported.
@@ -844,26 +839,35 @@ const definition = {
          */
         _adoptDraftStockpile(polygon) {
             if (!polygon || polygon.type !== 'Polygon') return;
-            if (!this.measureControls
-                || typeof this.measureControls.importFromGeoJSON !== 'function') return;
-
-            const props = this._buildStockpileProperties();
-            const feature = buildStockpileFeature(polygon, props);
-            const fc = {
-                type: 'FeatureCollection',
-                metadata: { application: 'DroneDB Registry', kind: 'measurements' },
-                features: [feature]
-            };
             try {
-                this.measureControls.importFromGeoJSON(fc);
-                this._draftStockpileFeatureId = feature.properties.id;
+                const [id] = this._importStockpiles([{ polygon, properties: this._buildStockpileProperties() }]);
+                if (!id) return;
+                this._chosenStockpileFeatureId = id;
+                this._draftStockpileFeatureId = id;
                 // Drop our temporary draw overlay - the polygon now lives in
                 // the regular measurements layer.
                 this._clearStockpileOverlay();
-                this.measureControls.refreshButtons();
             } catch (e) {
                 console.warn('Could not adopt stockpile into measurement layer:', e);
             }
+        },
+
+        /**
+         * Put piles into the shared measurements layer, in one import.
+         * @param {Array<{ polygon: object, properties: Record<string, any> }>} piles
+         * @returns {string[]}  the id of the feature of each pile, none when there is no measure control to take them
+         */
+        _importStockpiles(piles) {
+            const mc = this.measureControls;
+            if (!mc || typeof mc.importFromGeoJSON !== 'function') return [];
+            const features = piles.map(({ polygon, properties }) => buildStockpileFeature(polygon, properties));
+            mc.importFromGeoJSON({
+                type: 'FeatureCollection',
+                metadata: { application: 'DroneDB Registry', kind: 'measurements' },
+                features
+            });
+            mc.refreshButtons();
+            return features.map(f => f.properties.id);
         },
 
         /**
@@ -872,10 +876,7 @@ const definition = {
          * volume label (OL Overlay + DOM) is cleaned up too.
          */
         _removeDraftStockpileFromMeasureSource() {
-            const id = this._draftStockpileFeatureId;
-            if (!id || !this.measureControls || !this.measureControls.source) return;
-            const feature = this.measureControls.source.getFeatures().find(
-                f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+            const feature = this._stockpileFeatureById(this._draftStockpileFeatureId);
             if (!feature) return;
             try {
                 this.measureControls.deleteMeasurement(feature);
@@ -886,20 +887,18 @@ const definition = {
         },
 
         /**
-         * Patch the in-place properties of the current draft feature when the
+         * Patch the in-place properties of the chosen pile's feature when the
          * user edits title / notes / material in the panel. Avoids rebuilding
          * the geometry and keeps the same feature id so the toolbar Save
-         * captures the latest values.
+         * captures the latest values. Not while the panel is putting a pile into its fields.
          */
-        _patchDraftStockpileProps() {
-            const id = this._draftStockpileFeatureId;
-            if (!id || !this.measureControls || !this.measureControls.source) return;
-            const feature = this.measureControls.source.getFeatures().find(
-                f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+        _patchChosenStockpileProps() {
+            if (this._applyingPile) return;
+            const feature = this._stockpileFeatureById(this._chosenStockpileFeatureId);
             if (!feature) return;
             const props = this._buildStockpileProperties();
             // Don't touch geometry/style props that were set at build time.
-            DRAFT_PROPERTIES.forEach(k => {
+            CHOSEN_PILE_PROPERTIES.forEach(k => {
                 if (props[k] !== undefined) feature.set(k, props[k]);
                 else feature.unset && feature.unset(k);
             });

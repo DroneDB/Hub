@@ -780,26 +780,27 @@ describe('the analysis tools', () => {
     });
 
     it('take the elevation model a view records, without a panel, and record the one the user picks', async () => {
-        // The tools would pick MAIN (the measurements are on the first georaster): THIRD is a choice
-        await mountView([THIRD, MAIN], { state: { analysis: { target: THIRD.path } } });
-        expect(wrapper.vm.analysisTargetPath).toBe(THIRD.path);
+        // The tools would pick THIRD (the raster on top): MAIN is a choice
+        await mountView([THIRD, MAIN], { state: { analysis: { target: MAIN.path } } });
+        expect(wrapper.vm.analysisTargetPath).toBe(MAIN.path);
         expect(wrapper.vm.stockpilePanelVisible).toBe(false);
         reported.length = 0;
-        await wrapper.vm.selectAnalysisTarget(MAIN.path);
-        await settle();
-        expect(wrapper.vm.analysisTargetPath).toBe(MAIN.path);
-        // The model the tools pick anyway is not recorded
-        expect(reported.at(-1).analysis.target).toBeNull();
         await wrapper.vm.selectAnalysisTarget(THIRD.path);
         await settle();
-        expect(reported.at(-1).analysis.target).toBe(THIRD.path);
+        expect(wrapper.vm.analysisTargetPath).toBe(THIRD.path);
+        // The model the tools pick anyway is not recorded
+        expect(reported.at(-1).analysis.target).toBeNull();
+        await wrapper.vm.selectAnalysisTarget(MAIN.path);
+        await settle();
+        expect(reported.at(-1).analysis.target).toBe(MAIN.path);
     });
 
-    it('load the measurements of the elevation model of a view', async () => {
+    it('do not decide where the measurements of a view are: its layers do', async () => {
         dataset.getFileContents.mockClear();
         await mountView([ADDED, MAIN], { state: { analysis: { target: MAIN.path } } });
         const read = dataset.getFileContents.mock.calls.map(c => c[0]);
-        expect(read.some(path => path.startsWith('dsm_measurements'))).toBe(true);
+        expect(read.some(path => path.startsWith('dsm_measurements'))).toBe(false);
+        expect(read).toContain('measurements.geojson');
     });
 });
 
