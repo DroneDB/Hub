@@ -1,8 +1,8 @@
 <template>
     <div ref="shellEl" class="viewer-shell" :class="{ dark, 'has-fullscreen-overlay': fullscreenOverlay }">
         <div v-if="!embed" class="viewer-bar">
-            <RouterLink v-if="datasetLocation" :to="datasetLocation" class="viewer-back"
-                        title="Back to the dataset" aria-label="Back to the dataset">
+            <RouterLink v-if="backLocation" :to="backLocation" class="viewer-back"
+                        :title="backLabel" :aria-label="backLabel">
                 <i class="fa-solid fa-arrow-left" />
             </RouterLink>
             <slot name="bar">
@@ -17,7 +17,7 @@
 
         <!-- The file or its dataset did not load: not found, no access, sign in, a link that cannot be read, a busy dataset -->
         <ResourceState v-if="loadKind" :kind="loadKind" :resource="stateResource" :name="stateName" :message="stateMessage"
-                       :busy="stateBusy" :back-to="datasetLocation" back-label="Back to the dataset" />
+                       :busy="datasetBusy.busy.value" :actions="datasetBusy.actions.value" :back-to="backLocation" :back-label="backLabel" />
         <template v-else>
             <!-- A viewer that cannot open is an error, not a warning -->
             <Message v-model="error" severity="error" no-dismiss />
@@ -101,6 +101,8 @@
                 </aside>
             </div>
         </template>
+        <!-- The question of the Cancel of a busy dataset -->
+        <DialogHost :dialogs="busyDialogs" />
     </div>
 </template>
 
@@ -135,7 +137,11 @@
  *   </ViewerShell>
  */
 import { computed, inject, ref, watch, useId, onMounted, onBeforeUnmount } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import reg from '@/libs/api/sharedRegistry';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useDatasetBusy } from '@/composables/useDatasetBusy';
 import ddb from 'ddb';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/HubMessage.vue';
@@ -313,8 +319,29 @@ const stateResource = computed(() => (loadKind.value === LoadErrorKind.NOT_FOUND
 const stateName = computed(() => (loadKind.value === LoadErrorKind.NOT_FOUND
     ? routePath.value || shownName.value
     : String(route?.params?.ds ?? '')));
-// Its dataset is busy (an import or a rescan runs): what with
-const stateBusy = computed(() => datasetBusyOf(props.loadError));
+// Its dataset is busy (an import or a rescan runs): the same state as the dataset page's, with the progress and the
+// Cancel. The dataset page would only say it is busy: the way back is the list. When the task ends the dataset opens
+// (the viewer reads its file again from there), or, for an import that did not succeed, the list
+const router = useRouter();
+const busyDialogs = useDialogs();
+const datasetsList = computed(() => (datasetLocation.value ? { name: 'Datasets', params: { org: datasetLocation.value.params.org } } : null));
+const datasetApi = computed(() => (datasetLocation.value
+    ? reg.Organization(datasetLocation.value.params.org).Dataset(datasetLocation.value.params.ds) : null));
+const datasetBusy = useDatasetBusy({
+    dataset: () => datasetApi.value,
+    dialogs: busyDialogs,
+    enterFromStore: () => false,
+    onEnded: ({ rolledBack }) => {
+        const to = rolledBack ? datasetsList.value : datasetLocation.value;
+        if (to) void router?.replace(to);
+    }
+});
+watch(() => props.loadError, e => {
+    const busy = datasetBusyOf(e);
+    if (busy && datasetApi.value) datasetBusy.enter(busy);
+}, { immediate: true });
+const backLocation = computed(() => (loadKind.value === LoadErrorKind.BUSY ? datasetsList.value : datasetLocation.value));
+const backLabel = computed(() => (loadKind.value === LoadErrorKind.BUSY ? 'Back to datasets' : 'Back to the dataset'));
 const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LINK
     ? 'The file path in the address cannot be read. Check that the link was copied whole.'
     : ''));

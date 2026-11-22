@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useHeavyTaskCancel } from './useHeavyTaskCancel';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn() } }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn(), followCancelled: vi.fn(() => false) } }));
 vi.mock('@/libs/notify', () => ({ notify: { success: vi.fn(), info: vi.fn(), error: vi.fn() } }));
 const confirm = vi.fn();
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirm }));

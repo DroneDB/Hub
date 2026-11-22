@@ -44,6 +44,16 @@ describe('busyReason', () => {
         expect(busyTaskName(rescanning(1))).toBe('Index rescan');
     });
 
+    it('says a dataset whose import was cancelled is being deleted, with no task that its delete would stop', () => {
+        const deleting = { kind: 'deleting', taskId: 't1', progress: null };
+        expect(busyLabel(deleting)).toBe('Deleting…');
+        expect(busyBlockReason(deleting)).toBe('The dataset is being deleted');
+        expect(busyDeleteWarning(deleting)).toBeNull();
+        expect(busyPageText(deleting, 'site')).toEqual({
+            heading: 'This dataset is being deleted', text: '"site" is deleted because its import was cancelled.'
+        });
+    });
+
     it('has plain words for a kind this Hub does not know', () => {
         const other = { kind: 'compacting', taskId: 't3', progress: 10 };
         expect(busyLabel(other)).toBe('Updating… 10 %');

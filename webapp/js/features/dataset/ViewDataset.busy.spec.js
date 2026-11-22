@@ -11,7 +11,7 @@ import { ref, h, defineComponent, onMounted } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 
-const h_ = vi.hoisted(() => ({ dataset: null, busy: null, tasks: {}, handlers: {}, tracked: [], showError: null, loadBuilds: null, replace: null, confirm: null }));
+const h_ = vi.hoisted(() => ({ followed: null, dataset: null, busy: null, tasks: {}, handlers: {}, tracked: [], showError: null, loadBuilds: null, replace: null, confirm: null }));
 
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'acme', ds: 'site' }, query: {}, hash: '' }), useRouter: () => ({ replace: (...args) => h_.replace(...args) }), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }));
 // The question of the cancel: answered by the test (the dialog host is a stub)
@@ -36,7 +36,8 @@ vi.mock('@/libs/tasks/taskMonitor', async importOriginal => {
             getBusy: () => h_.busy,
             getTask: (_dataset, taskId) => h_.tasks[taskId] ?? null,
             trackBusy: (...args) => h_.tracked.push(args),
-            forceRefresh: () => Promise.resolve()
+            forceRefresh: () => Promise.resolve(),
+            followCancelled: (...args) => h_.followed(...args)
         },
         datasetKey: ds => ds.baseApi
     };
@@ -106,6 +107,7 @@ beforeEach(() => {
     h_.tasks = {};
     h_.replace = vi.fn(() => Promise.resolve());
     h_.confirm = vi.fn(() => Promise.resolve(true));
+    h_.followed = vi.fn((_dataset, task) => task.toolId === 'import-dataset');
 });
 afterEach(() => {
     wrapper?.unmount();
@@ -126,6 +128,8 @@ describe('ViewDataset of a busy dataset', () => {
         expect(useDatasetSessionStore().unavailable).toBe(true);
         expect(h_.showError).not.toHaveBeenCalled();
         expect(h_.tracked).toEqual([[h_.dataset, 'task-1', 'importing']]);
+        // Nothing else of the dataset is asked while it is busy: it would answer 409 too
+        expect(h_.dataset.metaGet).not.toHaveBeenCalled();
     });
 
     it('shows the progress the task store gives', async () => {
@@ -200,7 +204,9 @@ describe('ViewDataset of a busy dataset', () => {
         await flushPromises();
 
         expect(h_.replace).toHaveBeenCalledWith({ name: 'Datasets', params: { org: 'acme' } });
+        // The dataset does not open meanwhile
         expect(h_.dataset.info).toHaveBeenCalledTimes(1);
+        expect(wrapper.find('h1').text()).toBe('This dataset is being imported');
     });
 });
 
@@ -240,6 +246,8 @@ describe('Cancel on the busy state of a dataset', () => {
         expect(question.message).toContain('<strong>Dataset import</strong> will be stopped.');
         expect(question.warningMessage).toBe('The files imported so far are deleted, and so is the dataset that this import created.');
         expect(h_.dataset.cancelTask).toHaveBeenCalledWith('task-1');
+        // The store follows the cancelled import, whose notice is the one toast
+        expect(h_.followed).toHaveBeenCalledWith(h_.dataset, expect.objectContaining({ taskId: 'task-1', toolId: 'import-dataset' }));
 
         // The rollback deletes the dataset: the page goes back to the list
         emit('datasetGone', { error: new ApiError('Not found', 404) });

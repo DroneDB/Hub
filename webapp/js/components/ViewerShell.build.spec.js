@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'o', ds: 'd', encodedPath: '' } }), RouterLink: { template: '<a><slot /></a>' } }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'o', ds: 'd', encodedPath: '' } }), useRouter: () => ({ replace: vi.fn() }), RouterLink: { template: '<a><slot /></a>' } }));
 const ViewerShell = (await import('./ViewerShell.vue')).default;
 
 const notice = (extra = {}) => ({

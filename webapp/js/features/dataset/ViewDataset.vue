@@ -3,8 +3,8 @@
         <Message v-model="error" />
         <!-- The dataset is not there, not for this user, or needs a sign-in, or is busy (an import or a rescan runs): the page
              state in place of the panels. The panels come back, and load again, when the busy task ends -->
-        <ResourceState v-if="pageState" :kind="pageState" resource="dataset" :name="params.ds" :busy="datasetBusy"
-                       v-bind="datasetBusy && !loadKind ? BACK_TO_DATASETS : {}" :actions="loadKind ? [] : busyActions" />
+        <ResourceState v-if="pageState" :kind="pageState" resource="dataset" :name="params.ds" :busy="datasetBusy.busy.value"
+                       v-bind="loadKind ? {} : BACK_TO_DATASETS" :actions="loadKind ? [] : datasetBusy.actions.value" />
         <!-- One layout decision, from the window's width (phoneLayout, below sm): the panel hides its first pane and the
              tabs get Browser and Properties; the tabs (the second pane) are never rendered again when it changes -->
         <Panel v-else split="vertical" class="main" amount="23.6%" first-size="var(--ddb-panel-tree-width)" tablet-amount="30%" storage-key="dataset" :mobile-collapsed="phoneLayout">
@@ -87,10 +87,8 @@ import { loadErrorKind, datasetBusyOf, LoadErrorKind } from '@/libs/ddb/apiError
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { buildDownloadNote } from '@/libs/build/buildDownloads';
 import BuildManager from '@/libs/build/buildManager';
-import taskMonitor, { datasetKey, toolOfBusy, BUSY_TOOLS, IMPORT_TOOL_ID } from '@/libs/tasks/taskMonitor';
-import { busyCancelLabel, busyTaskName } from '@/libs/dataset/busyReason';
-import { offersAction, TaskAction } from '@/composables/useTaskActions';
-import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
+import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
+import { useDatasetBusy } from '@/composables/useDatasetBusy';
 import emitter from '@/libs/eventBus';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
@@ -159,11 +157,6 @@ const busy = ref(false);
 // The dataset did not load (not found, no access, sign in): ResourceState replaces the panels
 const loadError = shallowRef(null);
 const loadKind = computed(() => loadErrorKind(loadError.value));
-// The dataset is busy ({ kind, taskId, progress }): an import or a rescan runs, and the Registry refuses every request on it
-// but its delete and its tasks. ResourceState replaces the panels until the task ends
-const datasetBusy = shallowRef(null);
-// The page state in place of the panels: a dataset that did not load (it wins: one deleted while busy is not there), else busy
-const pageState = computed(() => loadKind.value ?? (datasetBusy.value ? LoadErrorKind.BUSY : null));
 const DATASETS_LIST = Object.freeze({ name: 'Datasets', params: { org: params.org } });
 const BACK_TO_DATASETS = Object.freeze({ backTo: DATASETS_LIST, backLabel: 'Back to datasets' });
 // A dataset opened after one that did not load starts with the toolbar's actions
@@ -526,7 +519,7 @@ async function reloadRoot() {
     } catch (e) {
         if (isAbort(e)) return;
         const busy = datasetBusyOf(e);
-        if (busy) enterBusy(busy);
+        if (busy) datasetBusy.enter(busy);
         else console.warn('Could not read the dataset again:', e);
     }
 }
@@ -558,6 +551,7 @@ async function rootNodes() {
     try {
         const entries = await dataset.info({ signal: requestSignal });
         if (entries.length) applyRootEntry(entries[0]);
+        loadViewsWhenOpen();
         return entries.map(e => ({
             icon: icons.getForType(e.type, e.path), label: ddb.utils.entryLabel(e), path: e.path,
             expanded: true, entry: e, isExpandable: ddb.entry.isDirectory(e)
@@ -568,7 +562,7 @@ async function rootNodes() {
         // An import or a rescan runs: the busy state, until it ends
         const busy = datasetBusyOf(e);
         if (busy) {
-            enterBusy(busy);
+            datasetBusy.enter(busy);
             return [];
         }
         // Not there, not for this user, or sign in (with a session, a 401 has already sent the user
@@ -603,8 +597,17 @@ async function loadViews({ fresh = false } = {}) {
     }
 }
 
-// Views are saved in the map, another tab: the list catches up when this tab is back
-useEventListener(window, 'focus', () => loadViews({ fresh: true }));
+// The views are read once the dataset answered (a busy one refuses them), and again when it opens after its busy state:
+// what the next read of the root asks for, null once asked
+let viewsWanted = { fresh: false };
+function loadViewsWhenOpen() {
+    if (!viewsWanted) return;
+    loadViews(viewsWanted);
+    viewsWanted = null;
+}
+
+// Views are saved in the map, another tab: the list catches up when this tab is back (not while the dataset is not open)
+useEventListener(window, 'focus', () => { if (!viewsWanted && !pageState.value) loadViews({ fresh: true }); });
 const viewActions = useViewActions({ dataset, dialogs, onChanged: () => loadViews({ fresh: true }) });
 
 // ---- Bindings --------------------------------------------------------------------------
@@ -705,71 +708,33 @@ function onDatasetGone({ dataset: gone, error: e }) {
 
 // ---- Busy dataset ----------------------------------------------------------------------
 
-/**
- * The dataset is busy: the 409 of a request said so, or the task store lists a task that keeps it busy (a rescan just
- * started from Settings, an import or a rescan another user started). The panels go, the header offers nothing on the
- * dataset, and the store follows the task until it ends. Called again, it updates the progress.
- * @param {{ kind: string, taskId: string | null, progress: number | null }} busy
- */
-function enterBusy(busy) {
-    const known = datasetBusy.value;
-    // The 409 does not carry the progress: keep the one the store gave for the same task
-    datasetBusy.value = busy.progress == null && known?.taskId === busy.taskId ? { ...busy, progress: known.progress } : busy;
-    session.setUnavailable(true);
-    if (busy.taskId) taskMonitor.trackBusy(dataset, busy.taskId, busy.kind);
-}
-
-// The task ended: the panels come back and read the dataset again (the tree asks for its root, the builds and the views
-// are read again). A dataset deleted meanwhile is not there: 'datasetGone' gives that state
-function leaveBusy() {
-    datasetBusy.value = null;
-    session.setUnavailable(!!loadKind.value);
-    if (loadKind.value) return;
-    loadViews({ fresh: true });
-    BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
-}
-
-// Cancel import / Cancel rescan: the Tasks tab is inside the dataset, so the busy state offers it. Shown when the Registry
-// offers the cancel of that task to this user (the `actions` of the task as the store lists it); the question and the
-// answer are those of every task cancel
-const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => dataset, dialogs);
-const busyActions = computed(() => {
-    const busy = datasetBusy.value;
-    const task = busy?.taskId ? taskMonitor.getTask(dataset, busy.taskId) : null;
-    if (!offersAction(task, TaskAction.CANCEL)) return [];
-    return [{
-        label: busyCancelLabel(busy), icon: 'fa-solid fa-stop', disabled: cancelling.value,
-        run: () => cancelHeavyTask({ taskId: busy.taskId, toolId: toolOfBusy(busy.kind) }, busyTaskName(busy))
-    }];
+// The dataset is busy (an import or a rescan runs): the 409 of its root said so, or the task store lists a task that
+// keeps it busy (a rescan just started from Settings, one another user started). The panels go and the header offers
+// nothing on the dataset until the task ends; then the panels come back and read the dataset again (the tree asks for
+// its root, which reads the views again, and the builds are read). An import that did not succeed has its dataset
+// deleted: the page goes back to the list, and the notice of the import says how it ended
+const datasetBusy = useDatasetBusy({
+    dataset: () => dataset,
+    dialogs,
+    enterFromStore: () => !loadKind.value,
+    onChange: state => session.setUnavailable(!!state || !!loadKind.value),
+    onEnded: ({ rolledBack }) => {
+        if (rolledBack) {
+            void router.replace(DATASETS_LIST);
+            return;
+        }
+        if (loadKind.value) return;
+        viewsWanted = { fresh: true };
+        BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
+    }
 });
-
-const isThisDataset = changed => !!changed && datasetKey(changed) === datasetKey(dataset);
-
-// The store's list of the tasks changed: a task that keeps the dataset busy runs now, or its progress moved
-function onTasksUpdated({ dataset: changed }) {
-    if (!isThisDataset(changed) || loadKind.value) return;
-    const busy = taskMonitor.getBusy(dataset);
-    if (busy) enterBusy(busy);
-}
-
-// A task that kept the dataset busy ended: the page opens, unless another one runs. An import that did not succeed
-// (cancelled, failed) rolls back and deletes the dataset it created: the page goes back to the list, and the notice of
-// the import says how it ended
-function onBusyEnded({ dataset: changed, task, gone, kind }) {
-    if (!isThisDataset(changed) || !datasetBusy.value) return;
-    const still = taskMonitor.getBusy(dataset);
-    if (still) enterBusy(still);
-    else if (kind === BUSY_TOOLS[IMPORT_TOOL_ID] && (gone || task?.state !== 'Succeeded')) void router.replace(DATASETS_LIST);
-    else leaveBusy();
-}
+// The page state in place of the panels: a dataset that did not load (it wins: one deleted while busy is not there), else busy
+const pageState = computed(() => loadKind.value ?? (datasetBusy.busy.value ? LoadErrorKind.BUSY : null));
 
 onMounted(() => {
     taskMonitor.on('datasetGone', onDatasetGone);
-    taskMonitor.on('tasksUpdated', onTasksUpdated);
-    taskMonitor.on('busyEnded', onBusyEnded);
     document.getElementById('app').classList.add('fullpage');
     setTitle(params.ds);
-    loadViews();
     loadCreationDate();
     BuildManager.registerDataset(dataset);
     BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
@@ -789,8 +754,6 @@ async function loadCreationDate() {
 
 onBeforeUnmount(() => {
     taskMonitor.off('datasetGone', onDatasetGone);
-    taskMonitor.off('tasksUpdated', onTasksUpdated);
-    taskMonitor.off('busyEnded', onBusyEnded);
     document.getElementById('app').classList.remove('fullpage');
     BuildManager.unregisterDataset(dataset);
     session.setUnavailable(false);

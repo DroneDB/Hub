@@ -194,4 +194,29 @@ describe('DatasetsPage rows of busy datasets', () => {
         expect(rowOf('aukerman').find('.ds-busy').exists()).toBe(false);
         expect(rowOf('aukerman').find('a.ds-name').exists()).toBe(true);
     });
+
+    it('shows the dataset of an import cancelled a moment ago as being deleted, not as a row to open, and drops it when it is gone', async () => {
+        const { ApiError } = await import('@/libs/ddb/apiError');
+        let rows = () => [serverDataset('river'), serverDataset('plain')];
+        tasksBySlug = { river: [importTask({ state: 'Deleted' })] };
+        await render(() => rows());
+        expect(rowOf('river').find('a.ds-name').exists()).toBe(true);
+
+        // The cancel answered and the list loaded before the Registry deleted the dataset
+        taskMonitor.followCancelled(datasets.river, { taskId: 'imp1', toolId: 'import-dataset' });
+        await vi.waitFor(() => expect(rowOf('river').find('.ds-busy').exists()).toBe(true));
+        expect(rowOf('river').find('.ds-busy').text()).toBe('Deleting…');
+        expect(rowOf('river').find('a.ds-name').exists()).toBe(false);
+        await rowOf('river').find('td').trigger('click');
+        expect(push).not.toHaveBeenCalled();
+
+        const loads = datasetsPage.mock.calls.length;
+        rows = () => [serverDataset('plain')];
+        datasets.river.getTasks.mockRejectedValue(new ApiError('Not found', 404));
+        await taskMonitor.forceRefresh(datasets.river);
+        await flushPromises();
+
+        expect(datasetsPage.mock.calls.length).toBeGreaterThan(loads);
+        expect(rowOf('river')).toBeUndefined();
+    });
 });

@@ -19,6 +19,7 @@ import { isTerminalState } from '@/libs/tasks/taskStates';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { cancelConfirmation } from '@/libs/tasks/cancelConfirmation';
 import { taskTarget, taskDateTime } from '@/libs/tasks/taskFormat';
+import taskMonitor from '@/libs/tasks/taskMonitor';
 
 /** The actions the server may list for a row. */
 export const TaskAction = Object.freeze({ CANCEL: 'cancel', RETRY: 'retry', DELETE: 'delete', VIEW_LOG: 'viewLog' });
@@ -90,8 +91,8 @@ export function useTaskActions(options) {
     const isBusy = task => busyIds.has(task?.taskId);
 
     /**
-     * Asks, then cancels: "Task cancelled" when it was, a neutral note when it had already ended (D-002), the error
-     * otherwise. The rows are read again in every case. The question is the one of every task cancel: a task that
+     * Asks, then cancels: "Task cancelled" when it was (an import: the import notice says "Import cancelled"), a neutral
+     * note when it had already ended (D-002), the error otherwise. The rows are read again in every case. The question is the one of every task cancel: a task that
      * adds files says what is deleted (libs/tasks/cancelConfirmation, FR-UPL-05).
      * @param {any} task
      * @returns {Promise<CancelOutcome | null>} null when the user did not confirm
@@ -111,8 +112,11 @@ export function useTaskActions(options) {
         if (!await confirm(cancelConfirmation(task, toolTitle(task)))) return null;
 
         try {
-            const result = await cancelTaskOutcome(datasetOf(task), task.taskId);
-            if (result.outcome === 'cancelled')
+            const dataset = datasetOf(task);
+            const result = await cancelTaskOutcome(dataset, task.taskId);
+            // A cancelled import is told by the import notice (libs/tasks/importNotices) when the store sees it end: one
+            // toast for one cancel. The store follows the dataset the Registry deletes then
+            if (result.outcome === 'cancelled' && !taskMonitor.followCancelled(dataset, task))
                 notify.success('The task has been stopped.', { summary: 'Task cancelled' });
             else if (result.outcome === 'alreadyEnded')
                 notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });

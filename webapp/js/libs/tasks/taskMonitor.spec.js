@@ -561,6 +561,74 @@ describe('busy datasets', () => {
         expect(importEnded).toHaveLength(0);
     });
 
+    describe('a task the user cancelled', () => {
+        it('ends an import cancelled, also when its dataset is gone before its list said so, and follows the dataset until it is', async () => {
+            const list = { tasks: [importTask()] };
+            const dataset = datasetWith(list);
+            const importEnded = watch('importEnded');
+            const gone = watch('datasetGone');
+            taskMonitor.trackBusy(dataset, 'imp1', 'importing');
+            await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+            expect(taskMonitor.followCancelled(dataset, { taskId: 'imp1', toolId: 'import-dataset' })).toBe(true);
+            // The list still has it running: the dataset is being deleted meanwhile
+            expect(taskMonitor.getBusy(dataset)).toEqual({ kind: 'importing', taskId: 'imp1', progress: 40 });
+            list.tasks = [importTask({ state: 'Deleted' })];
+            await taskMonitor.forceRefresh(dataset);
+            expect(importEnded).toHaveLength(1);
+            expect(importEnded[0].task.state).toBe('Deleted');
+            expect(taskMonitor.getBusy(dataset)).toEqual({ kind: 'deleting', taskId: 'imp1', progress: null });
+
+            dataset.getTasks.mockRejectedValue(new ApiError('Not found', 404));
+            await taskMonitor.forceRefresh(dataset);
+            expect(gone).toHaveLength(1);
+            expect(importEnded).toHaveLength(1);
+            // Let go: no store is kept for it
+            expect(taskMonitor.isGone(dataset)).toBe(false);
+        });
+
+        it('says the import was cancelled when the dataset goes while its last list had it running', async () => {
+            const list = { tasks: [importTask()] };
+            const dataset = datasetWith(list);
+            const importEnded = watch('importEnded');
+            taskMonitor.trackBusy(dataset, 'imp1', 'importing');
+            await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+            taskMonitor.followCancelled(dataset, { taskId: 'imp1', toolId: 'import-dataset' });
+            dataset.getTasks.mockRejectedValue(new ApiError('Not found', 404));
+            await taskMonitor.forceRefresh(dataset);
+
+            expect(importEnded).toHaveLength(1);
+            expect(importEnded[0]).toMatchObject({ gone: true, task: { taskId: 'imp1', toolId: 'import-dataset', state: 'Deleted' } });
+        });
+
+        it('ends a cancelled rescan with busyEnded, follows nothing after it, and asks the caller to say it', async () => {
+            const list = { tasks: [importTask({ taskId: 'r1', toolId: 'rescan-index' })] };
+            const dataset = datasetWith(list);
+            const busyEnded = watch('busyEnded');
+
+            expect(taskMonitor.followCancelled(dataset, { taskId: 'r1', toolId: 'rescan-index' })).toBe(false);
+            await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+            list.tasks = [importTask({ taskId: 'r1', toolId: 'rescan-index', state: 'Deleted' })];
+            await taskMonitor.forceRefresh(dataset);
+
+            expect(busyEnded).toHaveLength(1);
+            expect(busyEnded[0]).toMatchObject({ kind: 'rescanning', task: { state: 'Deleted' } });
+            expect(taskMonitor.getBusy(dataset)).toBeNull();
+        });
+
+        it('does nothing for a task that keeps no dataset busy, and lets the dataset go when the user deletes it', async () => {
+            const dataset = datasetWith({ tasks: [importTask()] });
+            expect(taskMonitor.followCancelled(dataset, { taskId: 'b1', toolId: 'build' })).toBe(false);
+            expect(taskMonitor.isLoaded(dataset)).toBe(false);
+
+            taskMonitor.followCancelled(dataset, { taskId: 'imp1', toolId: 'import-dataset' });
+            await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+            taskMonitor.forgetBusy(dataset);
+            expect(taskMonitor.isLoaded(dataset)).toBe(false);
+        });
+    });
+
     it('gives no busy state for the other tools, for tasks that ended, or for a dataset it does not follow', async () => {
         const list = { tasks: [makeTask({ taskId: 'b1', state: 'Processing' }), importTask({ taskId: 'old', state: 'Succeeded' }),
             makeTask({ taskId: 'f1', toolId: 'import-file', state: 'Processing' })] };

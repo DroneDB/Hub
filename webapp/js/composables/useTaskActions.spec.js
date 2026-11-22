@@ -125,6 +125,20 @@ describe('useTaskActions.cancel', () => {
         expect(refresh).toHaveBeenCalled();
     });
 
+    it('leaves the toast of a cancelled import to the import notice, and has the store follow its dataset; a rescan keeps "Task cancelled"', async () => {
+        const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
+        const follow = vi.spyOn(taskMonitor, 'followCancelled').mockImplementation((_dataset, task) => task.toolId === 'import-dataset');
+        const imported = setup();
+        await imported.actions.cancel({ ...TASK, toolId: 'import-dataset' });
+        expect(follow).toHaveBeenCalledWith(imported.dataset, expect.objectContaining({ taskId: 't1', toolId: 'import-dataset' }));
+        expect(imported.notify.success).not.toHaveBeenCalled();
+
+        const rescan = setup();
+        await rescan.actions.cancel({ ...TASK, toolId: 'rescan-index' });
+        expect(rescan.notify.success).toHaveBeenCalledWith('The task has been stopped.', { summary: 'Task cancelled' });
+        follow.mockRestore();
+    });
+
     it('shows a neutral message and refreshes when the server refuses the cancel of a task that has already ended', async () => {
         const { actions, notify, refresh, dataset } = setup({
             dataset: fakeDataset(() => Promise.reject(new ApiError(ENDED_MSG, 400)))

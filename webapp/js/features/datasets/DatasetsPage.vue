@@ -277,7 +277,7 @@ import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { visibilityLabel } from '@/libs/visibility';
 import { formatDateTime, countOf } from '@/libs/format';
-import taskMonitor, { BUSY_TOOLS, IMPORT_TOOL_ID, datasetKey } from '@/libs/tasks/taskMonitor';
+import taskMonitor, { BUSY_TOOLS, BUSY_DELETING, IMPORT_TOOL_ID, datasetKey } from '@/libs/tasks/taskMonitor';
 import { busyLabel, busyBlockReason, busyDeleteWarning } from '@/libs/dataset/busyReason';
 import { isUnauthorized, loadErrorKind } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
@@ -551,11 +551,14 @@ export default {
         // The tasks that keep a dataset busy (an import, a rescan) are in the store of the app: the row follows it, and the
         // list reloads when one ends. Not reactive on its own: the store tells when its tasks change
         this._onTasksUpdated = () => this.refreshBusy();
+        // A task ended, or the dataset is gone (the Registry deleted the dataset of an import that was cancelled): the page is
+        // read again
         this._onBusyEnded = ({ dataset }) => {
             if (this.org && this.datasets.some(ds => datasetKey(this.org.Dataset(ds.slug)) === datasetKey(dataset))) this.reloadDatasets();
         };
         taskMonitor.on('tasksUpdated', this._onTasksUpdated);
         taskMonitor.on('busyEnded', this._onBusyEnded);
+        taskMonitor.on('datasetGone', this._onBusyEnded);
         // The table settings follow the Preferences page, other tabs and the account; the watchers
         // above do not store them again (saveDatasetTablePreferences skips the values already stored)
         this._stopFollowingPreferences = followDatasetTablePreferences(prefs => {
@@ -594,6 +597,7 @@ export default {
     beforeUnmount() {
         taskMonitor.off('tasksUpdated', this._onTasksUpdated);
         taskMonitor.off('busyEnded', this._onBusyEnded);
+        taskMonitor.off('datasetGone', this._onBusyEnded);
         this._stopFollowingPreferences?.();
         clearTimeout(this._searchTimer);
         this._listRequest?.abort();
@@ -953,6 +957,8 @@ export default {
                     this.preloadDatasetThumbnail(ds);
                     this.trackBusy(ds);
                 });
+                // What the store knows and the list may not say yet: the dataset of an import cancelled a moment ago
+                this.refreshBusy();
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 throw e;
@@ -961,15 +967,14 @@ export default {
 
         // A busy row (the list says so): the store follows its task, which tells the progress and when it ends
         trackBusy(ds) {
-            if (ds.busy?.taskId) taskMonitor.trackBusy(this.org.Dataset(ds.slug), ds.busy.taskId, ds.busy.kind);
+            if (ds.busy?.taskId && ds.busy.kind !== BUSY_DELETING) taskMonitor.trackBusy(this.org.Dataset(ds.slug), ds.busy.taskId, ds.busy.kind);
         },
 
-        // The progress of the busy rows, from the store (a row it does not list as busy keeps what the list said, until the
-        // end of its task reloads the list)
+        // The busy state of the rows as the store says it: the progress, or the dataset of a cancelled import that is being
+        // deleted (a row the store does not say is busy keeps what the list said, until the end of its task reloads the list)
         refreshBusy() {
             if (!this.org) return;
             for (const ds of this.datasets) {
-                if (!ds.busy) continue;
                 const busy = taskMonitor.getBusy(this.org.Dataset(ds.slug));
                 if (busy) ds.busy = busy;
             }

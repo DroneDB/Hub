@@ -14,13 +14,16 @@ import { formatNumber } from '@/libs/format';
  */
 
 /** The words of each kind */
+// `ends`: what the page says it waits for; `stops`: the delete stops a task first
 const KINDS = Object.freeze({
-    importing: { label: 'Importing', task: 'import', passive: 'imported', name: 'Dataset import' },
-    rescanning: { label: 'Rescanning', task: 'rescan', passive: 'rescanned', name: 'Index rescan' }
+    importing: { label: 'Importing', task: 'import', passive: 'imported', name: 'Dataset import', ends: 'opens when the import ends', stops: true },
+    rescanning: { label: 'Rescanning', task: 'rescan', passive: 'rescanned', name: 'Index rescan', ends: 'opens when the rescan ends', stops: true },
+    // The import was cancelled: the Registry deletes the dataset it created
+    deleting: { label: 'Deleting', task: 'delete', passive: 'deleted', name: 'Dataset delete', ends: 'is deleted because its import was cancelled', stops: false }
 });
 
 // A kind this Hub does not know (a newer Registry)
-const OTHER = Object.freeze({ label: 'Updating', task: 'task', passive: 'updated', name: 'Task' });
+const OTHER = Object.freeze({ label: 'Updating', task: 'task', passive: 'updated', name: 'Task', ends: 'opens when the task ends', stops: true });
 
 /** @param {DatasetBusy | null | undefined} busy */
 const wordsOf = busy => KINDS[/** @type {keyof typeof KINDS} */ (busy?.kind)] ?? OTHER;
@@ -51,9 +54,9 @@ export function busyBlockReason(busy) {
  * @returns {string | null}
  */
 export function busyDeleteWarning(busy) {
-    if (!busy) return null;
-    const task = wordsOf(busy).task;
-    return `The ${task} stops first, then the dataset and all its files are deleted.`;
+    const words = busy ? wordsOf(busy) : null;
+    if (!words?.stops) return null;
+    return `The ${words.task} stops first, then the dataset and all its files are deleted.`;
 }
 
 /**
@@ -81,10 +84,10 @@ export function busyTaskName(busy) {
  * @returns {{ heading: string, text: string }}
  */
 export function busyPageText(busy, name) {
-    const { task, passive } = wordsOf(busy);
+    const { passive, ends, stops } = wordsOf(busy);
     const quoted = name ? `"${name}"` : 'The dataset';
     return {
         heading: `This dataset is being ${passive}`,
-        text: `${quoted} opens when the ${task} ends. Until then it can only be deleted.`
+        text: stops ? `${quoted} ${ends}. Until then it can only be deleted.` : `${quoted} ${ends}.`
     };
 }

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { ref, h, defineComponent } from 'vue';
+import { ref, h, defineComponent, onMounted } from 'vue';
 import { createPinia } from 'pinia';
 
 const h_ = vi.hoisted(() => ({ dataset: null, actions: null }));
@@ -61,6 +61,8 @@ const FileBrowserStub = defineComponent({
         dataset: { type: Object, default: null },
         rootNodes: { type: Function, default: null }
     },
+    // The tree asks for the root of the dataset when it mounts, as the real one does
+    setup(props) { onMounted(() => props.rootNodes?.()); },
     render() { return h('div', { class: 'browser' }, this.views.map(v => v.name).join('|')); }
 });
 const slotted = { render() { return h('div', [this.$slots.first?.(), this.$slots.second?.()]); } };
@@ -94,8 +96,14 @@ afterEach(() => {
 });
 
 describe('ViewDataset saved views', () => {
-    it('reads them with meta/get/views and gives the tree the list sorted by name', async () => {
+    it('reads them with meta/get/views once the dataset answered, and gives the tree the list sorted by name', async () => {
+        let answer;
+        h_.dataset.info = vi.fn(() => new Promise(resolve => { answer = resolve; }));
         await mountPage();
+        // A busy dataset would refuse them: not asked before the dataset answered
+        expect(h_.dataset.metaGet).not.toHaveBeenCalled();
+        answer([]);
+        await flushPromises();
         expect(h_.dataset.metaGet).toHaveBeenCalledTimes(1);
         expect(h_.dataset.metaGet.mock.calls[0][0]).toBe('views');
         expect(shown()).toEqual(['Alpha', 'Beta']);

@@ -35,7 +35,8 @@
  * monitor acquired until that task ends (then 'busyEnded', and the reference is released); getBusy(dataset) is what the
  * store says the dataset is busy with ({ kind, taskId, progress }, as the dataset list of the Registry gives it), for the
  * row and the page that show "Importing… 40 %"; forgetBusy(dataset) lets the tracks go without telling (the user deleted
- * the dataset: nothing ended on its own).
+ * the dataset: nothing ended on its own); followCancelled(dataset, task) records a cancel of the user, and follows the
+ * dataset of a cancelled import until the Registry has deleted it.
  */
 import { nextPollDelay } from './pollingPolicy';
 import { openEventStream } from '@/libs/sse';
@@ -79,6 +80,12 @@ export function toolOfBusy(kind) {
 
 /** The busy kind of an import */
 const IMPORTING = BUSY_TOOLS[IMPORT_TOOL_ID];
+
+/**
+ * The busy kind of a dataset whose import the user cancelled: the Registry deletes the dataset that the import created,
+ * and the store follows it until its task list answers 404 (see followCancelled).
+ */
+export const BUSY_DELETING = 'deleting';
 
 /**
  * What a task keeps its dataset busy with, in the form of the Registry's busy state, or null for a task that does not
@@ -141,8 +148,19 @@ function computeSignature(ent) {
 
 // ----- busy datasets -----
 
-// datasetKey -> { dataset, kinds: Map<taskId, busy kind or null>, last: Map<taskId, last listed summary> }
+// datasetKey -> { dataset, kinds: Map<taskId, busy kind or null>, last: Map<taskId, last listed summary>,
+//                cancelled: Set<taskId> the user cancelled }
 const busyTracks = new Map();
+
+// datasetKey -> { dataset, taskId }: the datasets of the imports the user cancelled, followed until they are gone
+const removals = new Map();
+
+// The dataset of a cancelled import is gone: the store lets it go
+function endRemoval(ent) {
+    const key = datasetKey(ent.dataset);
+    if (!removals.delete(key)) return;
+    TaskMonitor.release(ent.dataset);
+}
 
 // datasetKey|taskId of the tracked tasks being asked for by id
 const lookingUp = new Set();
@@ -150,6 +168,10 @@ const lookingUp = new Set();
 // The tracked task ended: told once, and let go with the reference trackBusy took when it was the last one
 function endBusy(ent, track, taskId, task, gone) {
     const kind = track.kinds.get(taskId) || BUSY_TOOLS[task?.toolId] || null;
+    // A task the user cancelled ended cancelled, also when its dataset went before its list said so
+    if (track.cancelled.delete(taskId) && !(task && isTerminalState(task.state))) {
+        task = { taskId, toolId: task?.toolId ?? toolOfBusy(kind), ...task, state: 'Deleted' };
+    }
     track.kinds.delete(taskId);
     track.last.delete(taskId);
     emit('busyEnded', { dataset: ent.dataset, task, gone, kind });
@@ -233,6 +255,7 @@ async function _fetch(ent) {
                 _closeStream(ent);
                 emit('datasetGone', { dataset: ds, error: err });
                 settleBusy(ent, true);
+                endRemoval(ent);
             }
             return;
         }
@@ -247,7 +270,8 @@ function _scheduleTick(ent) {
     if (!ent._started || ent.gone) return;
     _updateStream(ent);
     const delay = nextPollDelay({
-        hidden: isHidden(), active: hasActive(ent), idleStreak: ent.idleStreak, pushed: ent.streamUp
+        // The dataset of a cancelled import is about to go: followed at the pace of a running task
+        hidden: isHidden(), active: hasActive(ent) || removals.has(datasetKey(ent.dataset)), idleStreak: ent.idleStreak, pushed: ent.streamUp
     });
     if (delay == null) return; // hidden: visibilitychange refreshes and reschedules
     // Await the fetch before rescheduling to avoid overlapping/out-of-order requests
@@ -455,7 +479,7 @@ const TaskMonitor = {
         if (track?.kinds.has(taskId)) return;
         const followed = peekStore(dataset)?._started === true;
         if (!track) {
-            track = { dataset, kinds: new Map(), last: new Map() };
+            track = { dataset, kinds: new Map(), last: new Map(), cancelled: new Set() };
             busyTracks.set(key, track);
             TaskMonitor.acquire(dataset);
         }
@@ -471,6 +495,11 @@ const TaskMonitor = {
      */
     forgetBusy(dataset) {
         const key = datasetKey(dataset);
+        const removal = removals.get(key);
+        if (removal) {
+            removals.delete(key);
+            TaskMonitor.release(removal.dataset);
+        }
         const track = busyTracks.get(key);
         if (!track) return;
         busyTracks.delete(key);
@@ -478,8 +507,32 @@ const TaskMonitor = {
     },
 
     /**
+     * The user cancelled `task`, a task that keeps its dataset busy: it ends cancelled for the readers of 'busyEnded' and
+     * 'importEnded' (the notice says "Import cancelled", also when the dataset is deleted before the task list says it
+     * ended). The dataset of a cancelled import is deleted by the Registry: the store follows it until it is gone, getBusy
+     * says it is being deleted meanwhile, and 'datasetGone' tells when it is.
+     * @param {any} dataset
+     * @param {{ taskId: string, toolId?: string | null }} task
+     * @returns {boolean}  whether the import notice tells how the task ended (an import): the caller says nothing more
+     */
+    followCancelled(dataset, task) {
+        const kind = BUSY_TOOLS[task?.toolId];
+        if (!kind || !task.taskId) return false;
+        TaskMonitor.trackBusy(dataset, task.taskId, kind);
+        busyTracks.get(datasetKey(dataset))?.cancelled.add(task.taskId);
+        if (kind !== IMPORTING) return false;
+        const key = datasetKey(dataset);
+        if (!removals.has(key)) {
+            removals.set(key, { dataset, taskId: task.taskId });
+            TaskMonitor.acquire(dataset);
+        }
+        return true;
+    },
+
+    /**
      * What the store says `dataset` is busy with: the first task of its list that keeps it busy, as
-     * { kind, taskId, progress }, or null (none runs, the list is not loaded, the dataset is gone).
+     * { kind, taskId, progress }, else 'deleting' while the dataset of an import the user cancelled is not gone yet, or
+     * null (none runs, the list is not loaded, the dataset is gone).
      * @param {any} dataset
      * @returns {{ kind: string, taskId: string, progress: number | null } | null}
      */
@@ -490,7 +543,8 @@ const TaskMonitor = {
             const busy = busyOfTask(task);
             if (busy) return busy;
         }
-        return null;
+        const removal = removals.get(datasetKey(dataset));
+        return removal ? { kind: BUSY_DELETING, taskId: removal.taskId, progress: null } : null;
     },
 
     /** Subscribe to events (tasksUpdated, datasetGone, busyEnded, importEnded). */
