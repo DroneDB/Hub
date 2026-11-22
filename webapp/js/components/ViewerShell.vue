@@ -15,9 +15,9 @@
             </button>
         </div>
 
-        <!-- The file or its dataset did not load: not found, no access, sign in, a link that cannot be read -->
+        <!-- The file or its dataset did not load: not found, no access, sign in, a link that cannot be read, a busy dataset -->
         <ResourceState v-if="loadKind" :kind="loadKind" :resource="stateResource" :name="stateName" :message="stateMessage"
-                       :back-to="datasetLocation" back-label="Back to the dataset" />
+                       :busy="stateBusy" :back-to="datasetLocation" back-label="Back to the dataset" />
         <template v-else>
             <!-- A viewer that cannot open is an error, not a warning -->
             <Message v-model="error" severity="error" no-dismiss />
@@ -143,7 +143,7 @@ import Button from 'primevue/button';
 import ResourceState from '@/components/ResourceState.vue';
 import { useOverlay } from '@/composables/useOverlay';
 import { b64decode } from '@/libs/base64';
-import { LoadErrorKind, loadErrorKind } from '@/libs/ddb/apiError';
+import { LoadErrorKind, loadErrorKind, datasetBusyOf } from '@/libs/ddb/apiError';
 import keyboard from '@/libs/keyboard';
 import { supportsFullScreen } from '@/libs/utils';
 import { useFullscreen } from '@/composables/useFullscreen';
@@ -313,6 +313,8 @@ const stateResource = computed(() => (loadKind.value === LoadErrorKind.NOT_FOUND
 const stateName = computed(() => (loadKind.value === LoadErrorKind.NOT_FOUND
     ? routePath.value || shownName.value
     : String(route?.params?.ds ?? '')));
+// Its dataset is busy (an import or a rescan runs): what with
+const stateBusy = computed(() => datasetBusyOf(props.loadError));
 const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LINK
     ? 'The file path in the address cannot be read. Check that the link was copied whole.'
     : ''));

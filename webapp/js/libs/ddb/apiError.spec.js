@@ -36,13 +36,31 @@ describe('loadErrorKind (FR-XC-13)', () => {
         expect(loadErrorKind(new ApiError('denied', 403))).toBe(LoadErrorKind.NO_ACCESS);
         expect(loadErrorKind(new ApiError('who', 401))).toBe(LoadErrorKind.SIGN_IN);
         expect(loadErrorKind(new InvalidLinkError('bad link'))).toBe(LoadErrorKind.INVALID_LINK);
-        expect(LoadErrorKind).toEqual({ NOT_FOUND: 'not-found', NO_ACCESS: 'no-access', SIGN_IN: 'sign-in', INVALID_LINK: 'invalid-link' });
+        expect(loadErrorKind(new ApiError('busy', 409, { datasetBusy: 'importing', taskId: 't1' }))).toBe(LoadErrorKind.BUSY);
+        expect(LoadErrorKind).toEqual({ NOT_FOUND: 'not-found', NO_ACCESS: 'no-access', SIGN_IN: 'sign-in', INVALID_LINK: 'invalid-link', BUSY: 'busy' });
     });
 
     it('gives none for an error that says nothing about the resource: the page shows its message', async () => {
         const { loadErrorKind } = await import('./apiError');
-        for (const e of [new ApiError('network', 0), new ApiError('server', 500), new ApiError('bad', 400), new Error('x'), null, undefined, 'x']) {
+        for (const e of [new ApiError('network', 0), new ApiError('server', 500), new ApiError('bad', 400), new ApiError('taken', 409), new Error('x'), null, undefined, 'x']) {
             expect(loadErrorKind(e)).toBeNull();
+        }
+    });
+});
+
+describe('datasetBusyOf', () => {
+    it('reads the busy state of a 409 that names it, as the dataset list gives it but the progress', async () => {
+        const { datasetBusyOf } = await import('./apiError');
+        expect(datasetBusyOf(new ApiError('busy', 409, { datasetBusy: 'rescanning', taskId: 't9', noRetry: true })))
+            .toEqual({ kind: 'rescanning', taskId: 't9', progress: null });
+        expect(datasetBusyOf(new ApiError('busy', 409, { datasetBusy: 'importing' }))).toEqual({ kind: 'importing', taskId: null, progress: null });
+    });
+
+    it('is null for any other error: another conflict, another status, no error', async () => {
+        const { datasetBusyOf } = await import('./apiError');
+        for (const e of [new ApiError('taken', 409, { conflictPath: 'a.jpg' }), new ApiError('x', 400, { datasetBusy: 'importing' }),
+            new ApiError('x', 409, { datasetBusy: '' }), new Error('x'), null, undefined]) {
+            expect(datasetBusyOf(e)).toBeNull();
         }
     });
 });

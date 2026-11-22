@@ -205,3 +205,20 @@ describe('Set as Dataset Thumbnail (FR-EXP-30)', () => {
         expect(listing.removed).toHaveBeenCalledWith(['thumbnail.webp']);
     });
 });
+
+describe('Rescan from the Settings window', () => {
+    it('submits the rescan task, has the store of the app follow it so the page turns busy, and says when the page opens again', async () => {
+        const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
+        const track = vi.spyOn(taskMonitor, 'trackBusy').mockImplementation(() => {});
+        const submitTask = vi.fn().mockResolvedValue({ taskId: 'r1' });
+        const { settingsDialog, props } = setup({ submitTask });
+
+        await props.onRescanRequested();
+
+        expect(settingsDialog.close).toHaveBeenCalled();
+        expect(submitTask).toHaveBeenCalledWith('rescan-index', { params: { stopOnError: false }, force: true });
+        expect(track).toHaveBeenCalledWith(dataset, 'r1', 'rescanning');
+        expect(notify.info).toHaveBeenCalledWith('The dataset opens again when the rescan ends.', expect.objectContaining({ summary: 'Rescan Started' }));
+        track.mockRestore();
+    });
+});

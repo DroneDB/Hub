@@ -39,8 +39,8 @@ describe('the notice of an import that ended', () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
         // The dialog started it and closed with "Run in background": nothing but the store holds the task now
-        taskMonitor.trackImport(dataset, 'imp1');
-        await vi.waitFor(() => expect(taskMonitor.getImports(dataset)).toHaveLength(1));
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
+        await vi.waitFor(() => expect(taskMonitor.getBusy(dataset)).toMatchObject({ kind: 'importing', taskId: 'imp1' }));
         expect(add).not.toHaveBeenCalled();
 
         list.tasks = [importTask({ state: 'Succeeded', progressPercent: 100 })];
@@ -58,7 +58,7 @@ describe('the notice of an import that ended', () => {
     it('says "Import failed" with the task error and the link when the dataset still exists (an import into an existing dataset)', async () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
-        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
         await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
 
         list.tasks = [importTask({ state: 'Failed', error: 'The file is not a ZIP, TAR, 7z or RAR archive' })];
@@ -74,7 +74,7 @@ describe('the notice of an import that ended', () => {
     it('has no link when the failed import deleted the dataset that it created', async () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
-        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
         await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
         // The last list had the task running; then the rollback deleted the dataset: its task list is a 404
         dataset.getTasks.mockRejectedValue(new ApiError('not found', 404));
@@ -98,11 +98,21 @@ describe('the notice of an import that ended', () => {
         expect(toast(2)).toMatchObject({ severity: 'info', summary: 'Import cancelled', detail: 'Import of "x" was cancelled' });
     });
 
+    it('says nothing when a rescan ends: only imports have a notice', async () => {
+        const list = { tasks: [importTask({ taskId: 'r1', toolId: 'rescan-index' })] };
+        const dataset = datasetWith(list);
+        taskMonitor.trackBusy(dataset, 'r1', 'rescanning');
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+        list.tasks = [importTask({ taskId: 'r1', toolId: 'rescan-index', state: 'Succeeded' })];
+        await taskMonitor.forceRefresh(dataset);
+        expect(add).not.toHaveBeenCalled();
+    });
+
     it('stops with the function that startImportNotices returned', async () => {
         stop();
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
-        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
         await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
         list.tasks = [importTask({ state: 'Succeeded' })];
         await taskMonitor.forceRefresh(dataset);

@@ -31,6 +31,20 @@ export const isForbidden = e => hasStatus(e, 403);
 export const isNotFound = e => hasStatus(e, 404);
 
 /**
+ * The dataset is busy: an import or a rescan of its index runs, and the Registry refuses every request on it but its
+ * delete and its tasks (409, with the problem extensions `datasetBusy`, the kind, and `taskId`).
+ * @param {unknown} e
+ * @returns {{ kind: string, taskId: string | null, progress: null } | null}  the busy state, as the dataset list gives
+ *   it (without the progress, which the answer does not carry), or null for any other error
+ */
+export function datasetBusyOf(e) {
+    if (!hasStatus(e, 409)) return null;
+    const { datasetBusy, taskId } = /** @type {any} */ (e);
+    if (typeof datasetBusy !== 'string' || !datasetBusy) return null;
+    return { kind: datasetBusy, taskId: typeof taskId === 'string' && taskId ? taskId : null, progress: null };
+}
+
+/**
  * An address the app cannot read (a file path in a viewer link that does not decode): the page
  * shows the "invalid link" state, not the error text.
  */
@@ -50,7 +64,9 @@ export const LoadErrorKind = Object.freeze({
     NOT_FOUND: 'not-found',
     NO_ACCESS: 'no-access',
     SIGN_IN: 'sign-in',
-    INVALID_LINK: 'invalid-link'
+    INVALID_LINK: 'invalid-link',
+    // The dataset is busy (datasetBusyOf): it opens when its import or rescan ends
+    BUSY: 'busy'
 });
 
 /**
@@ -66,6 +82,7 @@ export function loadErrorKind(e) {
     if (isNotFound(e)) return LoadErrorKind.NOT_FOUND;
     if (isForbidden(e)) return LoadErrorKind.NO_ACCESS;
     if (isUnauthorized(e)) return LoadErrorKind.SIGN_IN;
+    if (datasetBusyOf(e)) return LoadErrorKind.BUSY;
     return null;
 }
 

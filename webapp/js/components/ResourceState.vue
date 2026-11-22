@@ -3,6 +3,10 @@
         <i class="resource-state-icon" :class="icon" />
         <h1 :id="headingId">{{ heading }}</h1>
         <p class="resource-state-text">{{ text }}</p>
+        <!-- A busy dataset: what runs, and how far it is -->
+        <p v-if="kind === LoadErrorKind.BUSY && busy" class="resource-state-progress" role="status">
+            <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true" /> {{ busyLabel(busy) }}
+        </p>
         <div class="resource-state-actions">
             <!-- Embedded in another site (an iframe without the session cookie): the links open a new tab -->
             <RouterLink v-for="(link, i) in links" :key="link.label" :to="link.to"
@@ -23,7 +27,7 @@
 <script setup>
 /**
  * ResourceState - the one page state of a primary resource that cannot be shown (FR-XC-13):
- * not found, no access, sign in and invalid link. It replaces the page's content (the dataset
+ * not found, no access, sign in, invalid link, and a dataset that is busy (an import or a rescan runs). It replaces the page's content (the dataset
  * table of an organization, the panels of a dataset, a viewer), names what was asked for, says
  * why in plain words, and gives the ways out (SPA links): the page's own back target, Sign in
  * (back to this page afterwards; the way out of a visitor without a session, who has no
@@ -41,10 +45,11 @@ import { setTitle } from '@/libs/utils';
 import { homeLocation, loginLocation } from '@/libs/authRoutes';
 import { currentPath } from '@/libs/routeQuery';
 import { LoadErrorKind } from '@/libs/ddb/apiError';
+import { busyLabel, busyPageText } from '@/libs/dataset/busyReason';
 import { useAuthStore } from '@/stores/auth';
 
 const props = defineProps({
-    /** A LoadErrorKind value: 'not-found', 'no-access', 'sign-in', 'invalid-link' */
+    /** A LoadErrorKind value: 'not-found', 'no-access', 'sign-in', 'invalid-link', 'busy' */
     kind: {
         type: String, required: true,
         validator: value => Object.values(LoadErrorKind).includes(String(value))
@@ -57,7 +62,9 @@ const props = defineProps({
     message: { type: String, default: '' },
     /** The page's own way back, first among the actions (a viewer: its dataset) */
     backTo: { type: [String, Object], default: null },
-    backLabel: { type: String, default: 'Back' }
+    backLabel: { type: String, default: 'Back' },
+    /** The busy state of a busy dataset ({ kind, taskId, progress }), for the 'busy' kind */
+    busy: { type: Object, default: null }
 });
 
 const headingId = useId();
@@ -73,6 +80,7 @@ const heading = computed(() => {
         case LoadErrorKind.NO_ACCESS: return `You do not have access to this ${noun}`;
         case LoadErrorKind.SIGN_IN: return `Sign in to open this ${noun}`;
         case LoadErrorKind.INVALID_LINK: return 'This link is not valid';
+        case LoadErrorKind.BUSY: return busyPageText(props.busy, props.name).heading;
         default: return `${noun.charAt(0).toUpperCase()}${noun.slice(1)} not found`;
     }
 });
@@ -95,6 +103,8 @@ const text = computed(() => {
             return `${quoted.value} is not public. Sign in to open it: you come back here afterwards.`;
         case LoadErrorKind.INVALID_LINK:
             return 'The address cannot be read. Check that the link was copied whole.';
+        case LoadErrorKind.BUSY:
+            return busyPageText(props.busy, props.name).text;
         default:
             return `${quoted.value} does not exist. ${NOT_FOUND_TEXT[props.resource] ?? NOT_FOUND_TEXT.page}`;
     }
@@ -103,7 +113,8 @@ const text = computed(() => {
 const icon = computed(() => ({
     [LoadErrorKind.NO_ACCESS]: 'fa-solid fa-lock',
     [LoadErrorKind.SIGN_IN]: 'fa-solid fa-right-to-bracket',
-    [LoadErrorKind.INVALID_LINK]: 'fa-solid fa-link-slash'
+    [LoadErrorKind.INVALID_LINK]: 'fa-solid fa-link-slash',
+    [LoadErrorKind.BUSY]: 'fa-solid fa-hourglass-half'
 })[props.kind] ?? 'fa-solid fa-magnifying-glass');
 
 // The organization of the user's own datasets (one-organization installs: that one)
@@ -181,6 +192,12 @@ watch(heading, value => setTitle(value), { immediate: true });
 
 .resource-state h1 {
     margin: 0;
+}
+
+.resource-state-progress {
+    margin: 0;
+    color: var(--ddb-text-secondary);
+    font-variant-numeric: tabular-nums;
 }
 
 .resource-state-text {

@@ -20,18 +20,22 @@
  *                    import that was cancelled or failed has rolled back and deleted it, FR-UPL-05,
  *                    D-004). Fires once, with { dataset, error }, and the dataset is not polled again.
  *                    The Hub never deletes the dataset: the page shows the not-found state.
- *   'importEnded'  - a background import (see "Background imports" below) ended: { dataset, task, gone }, with the
- *                    task as last listed (Succeeded or Failed), or `gone: true` when its dataset was deleted by the
- *                    rollback of a cancelled or failed import (the task is the last one seen, or null).
+ *   'busyEnded'    - a tracked task that keeps its dataset busy (see "Busy datasets" below) ended:
+ *                    { dataset, task, gone, kind }, with the task as last listed (Succeeded or Failed), or `gone: true`
+ *                    when its dataset was deleted (the rollback of a cancelled or failed import, or a delete while it ran;
+ *                    the task is the last one seen, or null), and `kind` the busy kind of the task ('importing', 'rescanning').
+ *   'importEnded'  - the same, for an import only: { dataset, task, gone } (the notices of libs/tasks/importNotices).
  * A gone dataset ends its tasks for every reader: isGone() says so, hasActiveTasks() is false, and
  * useHeavyTask rejects a task that it still saw running ("The dataset was deleted."). The last list
  * stays readable (getTasks, getTask), frozen.
  *
- * Background imports (FR-UPL-10, FR-XC-16): an import outlives the dialog that started it and the page that showed it, so
- * it is tracked here, in the scope of the app, not by a component: trackImport(dataset, taskId) keeps the dataset's
- * monitor acquired until that task ends (then 'importEnded', and the reference is released); findImports(dataset) asks the
- * dataset's task list once (after a reload) and tracks the imports it finds running; getImports(dataset) lists the running
- * imports the store holds, for the row and the banner that show "Importing… 40 %".
+ * Busy datasets: while an import or a rescan of the index runs (BUSY_TOOLS), the Registry refuses every request on the
+ * dataset but its delete and its tasks. Such a task outlives the dialog that started it and the page that showed it, so
+ * it is tracked here, in the scope of the app, not by a component: trackBusy(dataset, taskId, kind) keeps the dataset's
+ * monitor acquired until that task ends (then 'busyEnded', and the reference is released); getBusy(dataset) is what the
+ * store says the dataset is busy with ({ kind, taskId, progress }, as the dataset list of the Registry gives it), for the
+ * row and the page that show "Importing… 40 %"; forgetBusy(dataset) lets the tracks go without telling (the user deleted
+ * the dataset: nothing ended on its own).
  */
 import { nextPollDelay } from './pollingPolicy';
 import { openEventStream } from '@/libs/sse';
@@ -54,6 +58,30 @@ export { datasetKey };
 
 /** The tool of the import task, as the Registry names it (HeavyToolIds.ImportDataset). */
 export const IMPORT_TOOL_ID = 'import-dataset';
+
+/** The tool of the rescan of a dataset's index (HeavyToolIds.RescanIndex). */
+export const RESCAN_TOOL_ID = 'rescan-index';
+
+/**
+ * The tools whose task keeps its dataset busy, by tool id, with what the dataset is busy with (the `kind` of the busy
+ * state that the Registry gives in its dataset list and in its 409 answers).
+ */
+export const BUSY_TOOLS = Object.freeze({ [IMPORT_TOOL_ID]: 'importing', [RESCAN_TOOL_ID]: 'rescanning' });
+
+/** The busy kind of an import */
+const IMPORTING = BUSY_TOOLS[IMPORT_TOOL_ID];
+
+/**
+ * What a task keeps its dataset busy with, in the form of the Registry's busy state, or null for a task that does not
+ * (another tool, or one that ended).
+ * @param {{ taskId: string, toolId?: string, state?: string, progressPercent?: number | null } | null | undefined} task
+ * @returns {{ kind: string, taskId: string, progress: number | null } | null}
+ */
+export function busyOfTask(task) {
+    const kind = task ? BUSY_TOOLS[task.toolId] : undefined;
+    if (!kind || !isActiveState(task.state)) return null;
+    return { kind, taskId: task.taskId, progress: task.progressPercent ?? null };
+}
 
 const stores = new Map(); // datasetKey -> { tasks: Map, loaded, gone, timerId, dataset, refs, _started }
 
@@ -102,42 +130,43 @@ function computeSignature(ent) {
         .join('|');
 }
 
-// ----- background imports -----
+// ----- busy datasets -----
 
-// datasetKey -> { dataset, taskIds: Set<string>, last: Map<taskId, last listed summary> }
-const importTracks = new Map();
+// datasetKey -> { dataset, kinds: Map<taskId, busy kind or null>, last: Map<taskId, last listed summary> }
+const busyTracks = new Map();
 
-const isImport = t => t.toolId === IMPORT_TOOL_ID;
-
-// datasetKey|taskId of the tracked imports being asked for by id
+// datasetKey|taskId of the tracked tasks being asked for by id
 const lookingUp = new Set();
 
-// The tracked import ended: told once, and let go with the reference trackImport took when it was the last one
-function endImport(ent, track, taskId, task, gone) {
-    track.taskIds.delete(taskId);
-    emit('importEnded', { dataset: ent.dataset, task, gone });
-    if (track.taskIds.size === 0) {
-        importTracks.delete(datasetKey(ent.dataset));
+// The tracked task ended: told once, and let go with the reference trackBusy took when it was the last one
+function endBusy(ent, track, taskId, task, gone) {
+    const kind = track.kinds.get(taskId) || BUSY_TOOLS[task?.toolId] || null;
+    track.kinds.delete(taskId);
+    track.last.delete(taskId);
+    emit('busyEnded', { dataset: ent.dataset, task, gone, kind });
+    if (kind === IMPORTING) emit('importEnded', { dataset: ent.dataset, task, gone });
+    if (track.kinds.size === 0) {
+        busyTracks.delete(datasetKey(ent.dataset));
         TaskMonitor.release(ent.dataset);
     }
 }
 
-// The tracked imports of a dataset that ended (their task is terminal, or the dataset is gone) are told once, and let go.
-// A tracked import the list does not have (the list holds the newest TAKE tasks: many builds push it out) is asked for
+// The tracked tasks of a dataset that ended (their task is terminal, or the dataset is gone) are told once, and let go.
+// A tracked task the list does not have (the list holds the newest TAKE tasks: many builds push it out) is asked for
 // by id, so it is not followed for ever
-function settleImports(ent, gone = false) {
-    const track = importTracks.get(datasetKey(ent.dataset));
+function settleBusy(ent, gone = false) {
+    const track = busyTracks.get(datasetKey(ent.dataset));
     if (!track) return;
-    for (const taskId of [...track.taskIds]) {
+    for (const taskId of [...track.kinds.keys()]) {
         const task = ent.tasks.get(taskId) ?? null;
         if (task) track.last.set(taskId, task);
-        if (gone || (task && isTerminalState(task.state))) endImport(ent, track, taskId, task ?? track.last.get(taskId) ?? null, gone);
-        else if (!task) lookUpImport(ent, taskId);
+        if (gone || (task && isTerminalState(task.state))) endBusy(ent, track, taskId, task ?? track.last.get(taskId) ?? null, gone);
+        else if (!task) lookUpBusy(ent, taskId);
     }
 }
 
-// The tracked import `taskId` that the list left out, as GET /tasks/{id} says: ended when it is terminal or not found
-async function lookUpImport(ent, taskId) {
+// The tracked task `taskId` that the list left out, as GET /tasks/{id} says: ended when it is terminal or not found
+async function lookUpBusy(ent, taskId) {
     const ds = ent.dataset;
     const id = `${datasetKey(ds)}|${taskId}`;
     if (lookingUp.has(id) || typeof ds.getTask !== 'function') return;
@@ -151,17 +180,17 @@ async function lookUpImport(ent, taskId) {
     } finally {
         lookingUp.delete(id);
     }
-    const track = importTracks.get(datasetKey(ds));
-    if (!track?.taskIds.has(taskId) || ent.gone) return;
+    const track = busyTracks.get(datasetKey(ds));
+    if (!track?.kinds.has(taskId) || ent.gone) return;
     const last = track.last.get(taskId) ?? null;
     if (!status) {
         // The task is not found any more (removed): it ended as it was last seen
-        endImport(ent, track, taskId, last, false);
+        endBusy(ent, track, taskId, last, false);
         return;
     }
     const task = { ...last, ...status };
     track.last.set(taskId, task);
-    if (isTerminalState(task.state)) endImport(ent, track, taskId, task, false);
+    if (isTerminalState(task.state)) endBusy(ent, track, taskId, task, false);
 }
 
 // ----- core operations -----
@@ -175,7 +204,7 @@ async function _fetch(ent) {
         ent.tasks.clear();
         for (const t of arr) ent.tasks.set(t.taskId, t);
         ent.loaded = true;
-        settleImports(ent);
+        settleBusy(ent);
 
         // Notify generic listeners (e.g. the Tasks tab) when the snapshot changed.
         const sig = computeSignature(ent);
@@ -194,7 +223,7 @@ async function _fetch(ent) {
                 _clearTimer(ent);
                 _closeStream(ent);
                 emit('datasetGone', { dataset: ds, error: err });
-                settleImports(ent, true);
+                settleBusy(ent, true);
             }
             return;
         }
@@ -402,51 +431,60 @@ const TaskMonitor = {
     },
 
     /**
-     * Tracks a background import of `dataset` until it ends (FR-UPL-10, FR-XC-16): the dataset's monitor stays acquired
-     * while the task runs, whoever closes or leaves, and 'importEnded' tells when it is over. One task is tracked once.
+     * Tracks a task that keeps `dataset` busy (an import, a rescan) until it ends: the dataset's monitor stays acquired
+     * while the task runs, whoever closes or leaves, and 'busyEnded' tells when it is over. One task is tracked once.
+     * A store that is already followed and does not list the task yet asks for its list now, so the readers of getBusy
+     * see the task at once (a rescan just started).
      * @param {any} dataset
-     * @param {string} taskId
+     * @param {string | null | undefined} taskId
+     * @param {string | null} [kind]  the busy kind, when known ('importing', 'rescanning'); else read from the task
      */
-    trackImport(dataset, taskId) {
+    trackBusy(dataset, taskId, kind = null) {
         if (!taskId) return;
         const key = datasetKey(dataset);
-        let track = importTracks.get(key);
-        if (track?.taskIds.has(taskId)) return;
+        let track = busyTracks.get(key);
+        if (track?.kinds.has(taskId)) return;
+        const followed = peekStore(dataset)?._started === true;
         if (!track) {
-            track = { dataset, taskIds: new Set(), last: new Map() };
-            importTracks.set(key, track);
+            track = { dataset, kinds: new Map(), last: new Map() };
+            busyTracks.set(key, track);
             TaskMonitor.acquire(dataset);
         }
-        track.taskIds.add(taskId);
+        track.kinds.set(taskId, kind);
+        const ent = peekStore(dataset);
+        if (followed && ent && !ent.tasks.has(taskId)) _fetch(ent).then(() => { if (ent._started) _wake(ent); });
     },
 
     /**
-     * Reads the task list of `dataset` once (after a reload) and tracks the imports that run, so the page can say that the
-     * dataset is being imported. One list request, no polling unless an import runs. Returns the running imports.
+     * Stops tracking the busy tasks of `dataset` without telling that they ended, and lets the monitor go: the user
+     * deletes the dataset, which stops its task.
      * @param {any} dataset
-     * @returns {Promise<any[]>}
      */
-    async findImports(dataset) {
-        let tasks;
-        try {
-            tasks = await dataset.getTasks({ take: TAKE }) || [];
-        } catch {
-            // Not listed (no access, the dataset is gone): nothing to show
-            return [];
-        }
-        const running = tasks.filter(t => isImport(t) && isActiveState(t.state));
-        for (const task of running) TaskMonitor.trackImport(dataset, task.taskId);
-        return running;
+    forgetBusy(dataset) {
+        const key = datasetKey(dataset);
+        const track = busyTracks.get(key);
+        if (!track) return;
+        busyTracks.delete(key);
+        TaskMonitor.release(track.dataset);
     },
 
-    /** The imports of this dataset that run, as the store lists them (none for a dataset that is gone). */
-    getImports(dataset) {
+    /**
+     * What the store says `dataset` is busy with: the first task of its list that keeps it busy, as
+     * { kind, taskId, progress }, or null (none runs, the list is not loaded, the dataset is gone).
+     * @param {any} dataset
+     * @returns {{ kind: string, taskId: string, progress: number | null } | null}
+     */
+    getBusy(dataset) {
         const ent = peekStore(dataset);
-        if (!ent || ent.gone) return [];
-        return Array.from(ent.tasks.values()).filter(t => isImport(t) && isActiveState(t.state));
+        if (!ent || ent.gone) return null;
+        for (const task of ent.tasks.values()) {
+            const busy = busyOfTask(task);
+            if (busy) return busy;
+        }
+        return null;
     },
 
-    /** Subscribe to events (tasksUpdated, datasetGone, importEnded). */
+    /** Subscribe to events (tasksUpdated, datasetGone, busyEnded, importEnded). */
     on(event, fn) {
         (this._listeners[event] || (this._listeners[event] = [])).push(fn);
     },

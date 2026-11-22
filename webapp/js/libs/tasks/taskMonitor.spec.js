@@ -337,10 +337,10 @@ describe('datasetGone event (FR-UPL-05, D-004)', () => {
 });
 
 /**
- * Background imports (FR-UPL-10, FR-XC-16): the store tracks an import that outlives its dialog and page, tells once when it
- * ends, and lets the dataset's monitor go.
+ * Busy datasets: the store tracks a task that keeps its dataset busy (an import, a rescan) and outlives its dialog and page,
+ * tells once when it ends ('busyEnded', and 'importEnded' for an import), and lets the dataset's monitor go.
  */
-describe('background imports', () => {
+describe('busy datasets', () => {
     const listeners = [];
     afterEach(() => {
         for (const [evt, fn] of listeners.splice(0)) taskMonitor.off(evt, fn);
@@ -359,14 +359,14 @@ describe('background imports', () => {
         return dataset;
     }
 
-    it('keeps the dataset followed while the import runs, and lists it with its progress', async () => {
+    it('keeps the dataset followed while the import runs, and gives it as the busy state with its progress', async () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
 
-        taskMonitor.trackImport(dataset, 'imp1');
-        await vi.waitFor(() => expect(taskMonitor.getImports(dataset)).toHaveLength(1));
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
+        await vi.waitFor(() => expect(taskMonitor.getBusy(dataset)).not.toBeNull());
 
-        expect(taskMonitor.getImports(dataset)[0]).toMatchObject({ taskId: 'imp1', progressPercent: 40 });
+        expect(taskMonitor.getBusy(dataset)).toEqual({ kind: 'importing', taskId: 'imp1', progress: 40 });
         list.tasks = [importTask({ state: 'Succeeded', progressPercent: 100 })];
         await taskMonitor.forceRefresh(dataset);
     });
@@ -375,7 +375,7 @@ describe('background imports', () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
         const ended = watch('importEnded');
-        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
         await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
         expect(ended).toHaveLength(0);
 
@@ -386,15 +386,15 @@ describe('background imports', () => {
         expect(ended).toHaveLength(1);
         expect(ended[0]).toMatchObject({ dataset, gone: false, task: { taskId: 'imp1', state: 'Succeeded' } });
         // The reference of the track is released: with no other holder the store is dropped
-        expect(taskMonitor.getImports(dataset)).toEqual([]);
+        expect(taskMonitor.getBusy(dataset)).toBeNull();
     });
 
     it('says a failed import ended, and tracks one task once', async () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
         const ended = watch('importEnded');
-        taskMonitor.trackImport(dataset, 'imp1');
-        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
         await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
 
         list.tasks = [importTask({ state: 'Failed' })];
@@ -409,7 +409,7 @@ describe('background imports', () => {
         const list = { tasks: [importTask()] };
         const dataset = datasetWith(list);
         const ended = watch('importEnded');
-        taskMonitor.trackImport(dataset, 'imp1');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
         await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
 
         dataset.getTasks.mockRejectedValue(new ApiError('not found', 404));
@@ -417,21 +417,6 @@ describe('background imports', () => {
 
         expect(ended).toHaveLength(1);
         expect(ended[0]).toMatchObject({ gone: true, task: { taskId: 'imp1' } });
-    });
-
-    it('finds the imports that run after a reload with one task-list request, and tracks them', async () => {
-        const list = { tasks: [makeTask({ taskId: 'b1', state: 'Succeeded' }), importTask(), importTask({ taskId: 'old', state: 'Succeeded' })] };
-        const dataset = datasetWith(list);
-        const ended = watch('importEnded');
-
-        const running = await taskMonitor.findImports(dataset);
-
-        expect(running.map(t => t.taskId)).toEqual(['imp1']);
-        expect(dataset.getTasks.mock.calls.length).toBeGreaterThanOrEqual(1);
-        await vi.waitFor(() => expect(taskMonitor.getImports(dataset)).toHaveLength(1));
-        list.tasks = [importTask({ state: 'Succeeded' })];
-        await taskMonitor.forceRefresh(dataset);
-        expect(ended).toHaveLength(1);
     });
 
     // The list holds the newest 200 tasks: a run with many builds pushes the import out of it
@@ -443,7 +428,7 @@ describe('background imports', () => {
             const dataset = datasetWith(list);
             dataset.getTask = vi.fn(async () => ({ taskId: 'imp1', toolId: 'import-dataset', state: 'Succeeded', progress: { percent: 100 } }));
             const ended = watch('importEnded');
-            taskMonitor.trackImport(dataset, 'imp1');
+            taskMonitor.trackBusy(dataset, 'imp1', 'importing');
             await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
             expect(dataset.getTask).not.toHaveBeenCalled();
 
@@ -463,7 +448,7 @@ describe('background imports', () => {
             const dataset = datasetWith(list);
             dataset.getTask = vi.fn(async () => ({ taskId: 'imp1', toolId: 'import-dataset', state: 'Processing' }));
             const ended = watch('importEnded');
-            taskMonitor.trackImport(dataset, 'imp1');
+            taskMonitor.trackBusy(dataset, 'imp1', 'importing');
             await vi.waitFor(() => expect(dataset.getTask).toHaveBeenCalledTimes(1));
             await Promise.resolve();
             expect(ended).toHaveLength(0);
@@ -479,7 +464,7 @@ describe('background imports', () => {
             const dataset = datasetWith(list);
             dataset.getTask = vi.fn(async () => { throw new ApiError('Not found', 404); });
             const ended = watch('importEnded');
-            taskMonitor.trackImport(dataset, 'imp1');
+            taskMonitor.trackBusy(dataset, 'imp1', 'importing');
             await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
 
             list.tasks = builds(3);
@@ -493,7 +478,7 @@ describe('background imports', () => {
             const dataset = datasetWith(list);
             dataset.getTask = vi.fn(async () => { throw new ApiError('Server error', 500); });
             const ended = watch('importEnded');
-            taskMonitor.trackImport(dataset, 'imp1');
+            taskMonitor.trackBusy(dataset, 'imp1', 'importing');
             await vi.waitFor(() => expect(dataset.getTask).toHaveBeenCalledTimes(1));
 
             dataset.getTask.mockResolvedValue({ taskId: 'imp1', state: 'Succeeded' });
@@ -503,13 +488,79 @@ describe('background imports', () => {
         });
     });
 
-    it('finds nothing, and tracks nothing, for a dataset with no import running or whose list cannot be read', async () => {
-        const quiet = datasetWith({ tasks: [importTask({ state: 'Succeeded' })] });
-        expect(await taskMonitor.findImports(quiet)).toEqual([]);
-        expect(quiet.getTasks).toHaveBeenCalledTimes(1);
+    it('says a rescan ended with busyEnded and its kind, and gives no importEnded for it', async () => {
+        const list = { tasks: [importTask({ taskId: 'r1', toolId: 'rescan-index', progressPercent: null })] };
+        const dataset = datasetWith(list);
+        const busyEnded = watch('busyEnded');
+        const importEnded = watch('importEnded');
+        taskMonitor.trackBusy(dataset, 'r1', 'rescanning');
+        await vi.waitFor(() => expect(taskMonitor.getBusy(dataset)).toEqual({ kind: 'rescanning', taskId: 'r1', progress: null }));
 
-        const broken = makeDataset();
-        broken.getTasks.mockRejectedValue(new Error('offline'));
-        expect(await taskMonitor.findImports(broken)).toEqual([]);
+        list.tasks = [importTask({ taskId: 'r1', toolId: 'rescan-index', state: 'Succeeded' })];
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(busyEnded).toHaveLength(1);
+        expect(busyEnded[0]).toMatchObject({ dataset, gone: false, kind: 'rescanning', task: { taskId: 'r1', state: 'Succeeded' } });
+        expect(importEnded).toHaveLength(0);
+    });
+
+    it('reads the kind from the tool of the task when the caller does not know it', async () => {
+        const list = { tasks: [importTask()] };
+        const dataset = datasetWith(list);
+        const busyEnded = watch('busyEnded');
+        const importEnded = watch('importEnded');
+        taskMonitor.trackBusy(dataset, 'imp1');
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+        list.tasks = [importTask({ state: 'Failed' })];
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(busyEnded[0].kind).toBe('importing');
+        expect(importEnded).toHaveLength(1);
+    });
+
+    it('asks a store that is already followed for its list at once, so a task just started shows as busy', async () => {
+        const list = { tasks: [] };
+        const dataset = datasetWith(list);
+        taskMonitor.acquire(dataset);
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+        const asked = dataset.getTasks.mock.calls.length;
+
+        list.tasks = [importTask({ taskId: 'r2', toolId: 'rescan-index', progressPercent: 0 })];
+        taskMonitor.trackBusy(dataset, 'r2', 'rescanning');
+        await vi.waitFor(() => expect(taskMonitor.getBusy(dataset)).toMatchObject({ kind: 'rescanning', taskId: 'r2' }));
+
+        expect(dataset.getTasks.mock.calls.length).toBe(asked + 1);
+        list.tasks = [importTask({ taskId: 'r2', toolId: 'rescan-index', state: 'Succeeded' })];
+        await taskMonitor.forceRefresh(dataset);
+        taskMonitor.release(dataset);
+    });
+
+    it('lets the tracks of a dataset go without telling (its delete stops the task), and releases the monitor', async () => {
+        const list = { tasks: [importTask()] };
+        const dataset = datasetWith(list);
+        const busyEnded = watch('busyEnded');
+        const importEnded = watch('importEnded');
+        taskMonitor.trackBusy(dataset, 'imp1', 'importing');
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+        taskMonitor.forgetBusy(dataset);
+        taskMonitor.forgetBusy(dataset);
+
+        expect(taskMonitor.isLoaded(dataset)).toBe(false);
+        expect(busyEnded).toHaveLength(0);
+        expect(importEnded).toHaveLength(0);
+    });
+
+    it('gives no busy state for the other tools, for tasks that ended, or for a dataset it does not follow', async () => {
+        const list = { tasks: [makeTask({ taskId: 'b1', state: 'Processing' }), importTask({ taskId: 'old', state: 'Succeeded' }),
+            makeTask({ taskId: 'f1', toolId: 'import-file', state: 'Processing' })] };
+        const dataset = datasetWith(list);
+        taskMonitor.acquire(dataset);
+        await vi.waitFor(() => expect(taskMonitor.isLoaded(dataset)).toBe(true));
+
+        expect(taskMonitor.getBusy(dataset)).toBeNull();
+        expect(taskMonitor.getBusy(makeDataset())).toBeNull();
+        taskMonitor.release(dataset);
     });
 });

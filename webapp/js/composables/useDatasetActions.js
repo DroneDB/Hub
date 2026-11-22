@@ -15,6 +15,7 @@ import { clone } from '@/libs/utils';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { renameDataset } from '@/libs/api/registryUtils';
 import BuildManager from '@/libs/build/buildManager';
+import taskMonitor, { BUSY_TOOLS, RESCAN_TOOL_ID } from '@/libs/tasks/taskMonitor';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import { itemFor } from '@/libs/dataset/explorerItems';
 import { CONFIRM_RESCAN, CONFIRM_REBUILD, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
@@ -427,9 +428,10 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         if (settingsDialog) settingsDialog.close();
         await withBusy(async () => {
             try {
-                // A heavy task: progress in the Tasks tab
-                await dataset.submitTask('rescan-index', { params: { stopOnError: false }, force: true });
-                notify.info('The dataset index rescan is running. Check the Tasks tab for progress.', { summary: 'Rescan Started', life: 'long' });
+                // A heavy task that keeps the dataset busy: the store follows it, and the page shows the busy state until it ends
+                const submitted = await dataset.submitTask(RESCAN_TOOL_ID, { params: { stopOnError: false }, force: true });
+                taskMonitor.trackBusy(dataset, submitted?.taskId, BUSY_TOOLS[RESCAN_TOOL_ID]);
+                notify.info('The dataset opens again when the rescan ends.', { summary: 'Rescan Started', life: 'long' });
             } catch (e) {
                 showError(e.message, 'Rescan Error');
             }

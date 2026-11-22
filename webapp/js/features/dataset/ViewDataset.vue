@@ -1,8 +1,10 @@
 <template>
     <div id="browser" class="cui app">
         <Message v-model="error" />
-        <!-- The dataset is not there, not for this user, or needs a sign-in: the page state in place of the panels -->
-        <ResourceState v-if="loadKind" :kind="loadKind" resource="dataset" :name="params.ds" />
+        <!-- The dataset is not there, not for this user, or needs a sign-in, or is busy (an import or a rescan runs): the page
+             state in place of the panels. The panels come back, and load again, when the busy task ends -->
+        <ResourceState v-if="pageState" :kind="pageState" resource="dataset" :name="params.ds" :busy="datasetBusy"
+                       v-bind="datasetBusy && !loadKind ? BACK_TO_DATASETS : {}" />
         <!-- One layout decision, from the window's width (phoneLayout, below sm): the panel hides its first pane and the
              tabs get Browser and Properties; the tabs (the second pane) are never rendered again when it changes -->
         <Panel v-else split="vertical" class="main" amount="23.6%" first-size="var(--ddb-panel-tree-width)" tablet-amount="30%" storage-key="dataset" :mobile-collapsed="phoneLayout">
@@ -29,12 +31,6 @@
                     </template>
                     <template #explorer>
                         <div class="explorer-tab">
-                            <!-- An import into this dataset runs (FR-UPL-10): the page says so with its progress, and links to the Tasks tab -->
-                            <div v-if="runningImport" class="import-banner" role="status">
-                                <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true" />
-                                <span>{{ importBannerText }}</span>
-                                <Button label="View in Tasks" severity="secondary" size="small" text @click="tabs.activateTab('tasks')" />
-                            </div>
                             <div class="detail-layout">
                                 <div class="detail-main" :class="{ 'with-detail': showDetail }">
                                     <Explorer v-if="viewMode === 'grid'" ref="explorer" v-bind="explorerProps" :tile-size="tileSize" v-on="fileEvents" />
@@ -82,13 +78,12 @@ import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import icons from '@/libs/icons';
 import { setTitle } from '@/libs/utils';
-import { formatNumber } from '@/libs/format';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { Features } from '@/libs/features';
 import { PREF } from '@/libs/preferences';
 import { permissionsOf } from '@/libs/datasetPermissions';
 import { isDroneDB } from '@/libs/entryTypes';
-import { loadErrorKind } from '@/libs/ddb/apiError';
+import { loadErrorKind, datasetBusyOf, LoadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { buildDownloadNote } from '@/libs/build/buildDownloads';
 import BuildManager from '@/libs/build/buildManager';
@@ -161,6 +156,12 @@ const busy = ref(false);
 // The dataset did not load (not found, no access, sign in): ResourceState replaces the panels
 const loadError = shallowRef(null);
 const loadKind = computed(() => loadErrorKind(loadError.value));
+// The dataset is busy ({ kind, taskId, progress }): an import or a rescan runs, and the Registry refuses every request on it
+// but its delete and its tasks. ResourceState replaces the panels until the task ends
+const datasetBusy = shallowRef(null);
+// The page state in place of the panels: a dataset that did not load (it wins: one deleted while busy is not there), else busy
+const pageState = computed(() => loadKind.value ?? (datasetBusy.value ? LoadErrorKind.BUSY : null));
+const BACK_TO_DATASETS = Object.freeze({ backTo: { name: 'Datasets', params: { org: params.org } }, backLabel: 'Back to datasets' });
 // A dataset opened after one that did not load starts with the toolbar's actions
 session.setUnavailable(false);
 // Nor does it start with the root entry of the page before it (a viewer of another dataset, whose answer came late): the
@@ -519,7 +520,10 @@ async function reloadRoot() {
         const entries = await dataset.info({ signal: requestSignal });
         if (entries.length) applyRootEntry(entries[0]);
     } catch (e) {
-        if (!isAbort(e)) console.warn('Could not read the dataset again:', e);
+        if (isAbort(e)) return;
+        const busy = datasetBusyOf(e);
+        if (busy) enterBusy(busy);
+        else console.warn('Could not read the dataset again:', e);
     }
 }
 
@@ -557,6 +561,12 @@ async function rootNodes() {
     } catch (e) {
         // Left while loading
         if (isAbort(e)) return [];
+        // An import or a rescan runs: the busy state, until it ends
+        const busy = datasetBusyOf(e);
+        if (busy) {
+            enterBusy(busy);
+            return [];
+        }
         // Not there, not for this user, or sign in (with a session, a 401 has already sent the user
         // to Login): the page state, and the header offers nothing on the dataset
         if (loadErrorKind(e)) {
@@ -670,7 +680,7 @@ const tools = computed(() => explorerTools(toolbarContext));
 const folderTools = computed(() => locationTools(toolbarContext));
 const explorerProps = computed(() => ({
     files: listing.files.value, tools: tools.value, locationTools: folderTools.value, currentPath: listing.currentPath.value, dataset,
-    canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value, importing: !!runningImport.value
+    canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value
 }));
 
 // ---- Session and lifecycle -------------------------------------------------------------
@@ -689,27 +699,53 @@ function onDatasetGone({ dataset: gone, error: e }) {
     session.setUnavailable(true);
 }
 
-// An import into this dataset runs (FR-UPL-10, FR-XC-16): read from the background-task store, which the page follows through
-// the BuildManager (the dataset's task list) and which an import started on another page keeps alive. When it ends the
-// files it brought join the list.
-const runningImport = ref(null);
-const importBannerText = computed(() => {
-    const percent = Math.round(runningImport.value?.progressPercent ?? 0);
-    return `${percent > 0 ? `Importing\u2026 ${formatNumber(percent, 0)} %` : 'Importing\u2026'} \u2014 the files appear here when the import ends.`;
-});
-function syncRunningImport() {
-    const next = taskMonitor.getImports(dataset)[0] ?? null;
-    const ended = runningImport.value && !next && !loadError.value;
-    runningImport.value = next;
-    if (ended) listing.reload();
+// ---- Busy dataset ----------------------------------------------------------------------
+
+/**
+ * The dataset is busy: the 409 of a request said so, or the task store lists a task that keeps it busy (a rescan just
+ * started from Settings, an import or a rescan another user started). The panels go, the header offers nothing on the
+ * dataset, and the store follows the task until it ends. Called again, it updates the progress.
+ * @param {{ kind: string, taskId: string | null, progress: number | null }} busy
+ */
+function enterBusy(busy) {
+    const known = datasetBusy.value;
+    // The 409 does not carry the progress: keep the one the store gave for the same task
+    datasetBusy.value = busy.progress == null && known?.taskId === busy.taskId ? { ...busy, progress: known.progress } : busy;
+    session.setUnavailable(true);
+    if (busy.taskId) taskMonitor.trackBusy(dataset, busy.taskId, busy.kind);
 }
+
+// The task ended: the panels come back and read the dataset again (the tree asks for its root, the builds and the views
+// are read again). A dataset deleted meanwhile is not there: 'datasetGone' gives that state
+function leaveBusy() {
+    datasetBusy.value = null;
+    session.setUnavailable(!!loadKind.value);
+    if (loadKind.value) return;
+    loadViews({ fresh: true });
+    BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
+}
+
+const isThisDataset = changed => !!changed && datasetKey(changed) === datasetKey(dataset);
+
+// The store's list of the tasks changed: a task that keeps the dataset busy runs now, or its progress moved
 function onTasksUpdated({ dataset: changed }) {
-    if (changed && datasetKey(changed) === datasetKey(dataset)) syncRunningImport();
+    if (!isThisDataset(changed) || loadKind.value) return;
+    const busy = taskMonitor.getBusy(dataset);
+    if (busy) enterBusy(busy);
+}
+
+// A task that kept the dataset busy ended: the page opens, unless another one runs
+function onBusyEnded({ dataset: changed }) {
+    if (!isThisDataset(changed) || !datasetBusy.value) return;
+    const still = taskMonitor.getBusy(dataset);
+    if (still) enterBusy(still);
+    else leaveBusy();
 }
 
 onMounted(() => {
     taskMonitor.on('datasetGone', onDatasetGone);
     taskMonitor.on('tasksUpdated', onTasksUpdated);
+    taskMonitor.on('busyEnded', onBusyEnded);
     document.getElementById('app').classList.add('fullpage');
     setTitle(params.ds);
     loadViews();
@@ -733,6 +769,7 @@ async function loadCreationDate() {
 onBeforeUnmount(() => {
     taskMonitor.off('datasetGone', onDatasetGone);
     taskMonitor.off('tasksUpdated', onTasksUpdated);
+    taskMonitor.off('busyEnded', onBusyEnded);
     document.getElementById('app').classList.remove('fullpage');
     BuildManager.unregisterDataset(dataset);
     session.setUnavailable(false);
@@ -742,21 +779,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* The Files tab: the import banner above the list and the detail panel */
+/* The Files tab: the list and the detail panel, the README under them */
 .explorer-tab {
     display: flex;
     flex-direction: column;
     height: 100%;
-}
-
-.import-banner {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: var(--ddb-spacing-sm);
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
-    background: var(--ddb-info-bg);
-    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
 }
 
 .explorer-tab > .detail-layout {

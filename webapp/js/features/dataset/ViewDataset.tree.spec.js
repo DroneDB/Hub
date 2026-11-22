@@ -21,7 +21,7 @@ vi.mock('@/libs/api/sharedRegistry', () => ({
         features: { value: () => null, get: () => false }
     }
 }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getImports: () => [] }, datasetKey: ds => ds.baseApi }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getBusy: () => null }, datasetKey: ds => ds.baseApi }));
 vi.mock('@/libs/build/buildManager', () => ({
     default: { registerDataset: vi.fn(), unregisterDataset: vi.fn(), loadBuilds: () => Promise.resolve(), on: vi.fn(), off: vi.fn(), onFilesAdded: vi.fn() }
 }));

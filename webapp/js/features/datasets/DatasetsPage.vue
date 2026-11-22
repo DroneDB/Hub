@@ -104,7 +104,7 @@
             <DataTable v-else ref="table" :value="datasets" :paginator="false" striped-rows
                        row-hover class="ds-table" scrollable scroll-height="flex"
                        :sort-field="sortColumn" :sort-order="sortOrderPrimevue"
-                       :pt="{ bodyRow: { style: 'cursor: pointer' } }" @row-click="onRowClick" @row-contextmenu="onRowContextMenu"
+                       :row-class="rowClass" @row-click="onRowClick" @row-contextmenu="onRowContextMenu"
                        @sort="onSort">
                 <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
@@ -123,14 +123,18 @@
                         <span class="ds-name-line">
                             <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none"
                                role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
-                            <router-link :to="{ name: 'ViewDataset', params: { org: $route.params.org, ds: slotProps.data.slug } }"
+                            <!-- A busy dataset (an import or a rescan runs) does not open: its name is text -->
+                            <span v-if="slotProps.data.busy" class="ds-name ds-name-busy">
+                                {{ slotProps.data.name || slotProps.data.slug }}
+                            </span>
+                            <router-link v-else :to="{ name: 'ViewDataset', params: { org: $route.params.org, ds: slotProps.data.slug } }"
                                          class="ds-name stretched-link" @keydown="onNameKeydown($event, slotProps.data)">
                                 {{ slotProps.data.name || slotProps.data.slug }}
                             </router-link>
-                            <!-- An import runs: the row says so, with its progress, from the background-task store (FR-UPL-10) -->
-                            <Tag v-if="slotProps.data.slug in importProgress" severity="info" rounded class="ds-importing" role="status"
+                            <!-- What keeps it busy, with its progress, from the list and then from the task store -->
+                            <Tag v-if="slotProps.data.busy" severity="info" rounded class="ds-busy" role="status"
                                  icon="fa-solid fa-circle-notch fa-spin">
-                                {{ importingText(slotProps.data.slug) }}
+                                {{ busyLabel(slotProps.data.busy) }}
                             </Tag>
                         </span>
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
@@ -172,10 +176,11 @@
                 </Column>
                 <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center; white-space: nowrap' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7rem;">
                     <template #body="slotProps">
-                        <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
-                                severity="secondary" outlined size="small" :loading="slotProps.data.editing"
-                                :disabled="slotProps.data.editing || slotProps.data.deleting" icon="fa-solid fa-pencil"
-                                aria-label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
+                        <ActionButton v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
+                                      severity="secondary" outlined size="small" :loading="slotProps.data.editing"
+                                      :disabled="slotProps.data.editing || slotProps.data.deleting || !!slotProps.data.busy"
+                                      :disabled-reason="busyBlockReason(slotProps.data.busy) || ''" icon="fa-solid fa-pencil"
+                                      label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
                         <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
                                 severity="danger" text size="small" :loading="slotProps.data.deleting"
@@ -230,6 +235,7 @@
 
 <script>
 import EmptyState from '@/components/EmptyState.vue';
+import ActionButton from '@/components/ActionButton.vue';
 import ResourceState from '@/components/ResourceState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
 import Message from '@/components/HubMessage.vue';
@@ -270,8 +276,9 @@ const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { visibilityLabel } from '@/libs/visibility';
-import { formatDateTime, formatNumber, countOf } from '@/libs/format';
-import taskMonitor from '@/libs/tasks/taskMonitor';
+import { formatDateTime, countOf } from '@/libs/format';
+import taskMonitor, { BUSY_TOOLS, IMPORT_TOOL_ID, datasetKey } from '@/libs/tasks/taskMonitor';
+import { busyLabel, busyBlockReason, busyDeleteWarning } from '@/libs/dataset/busyReason';
 import { isUnauthorized, loadErrorKind } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
 import { hasOpenOverlay } from '@/composables/useOverlay';
@@ -286,6 +293,7 @@ export default {
     name: 'DatasetsPage',
     components: {
         EmptyState,
+        ActionButton,
         ResourceState,
         Message,
         ViewSelect,
@@ -356,8 +364,6 @@ export default {
             dsDialogOpen: false,
 
             importDialogOpen: false,
-            // The imports that run, by dataset slug: their progress (0-100) from the background-task store (FR-UPL-10)
-            importProgress: {},
 
             orgEditDialogOpen: false,
             orgDialogModel: null,
@@ -433,15 +439,18 @@ export default {
             const ds = this.contextMenuDataset;
             if (!ds) return [];
 
+            // A busy dataset only deletes: Open and Edit are off, and say why
+            const reason = busyBlockReason(ds.busy);
+            const offWhileBusy = label => (reason ? { label: `${label} (${reason})`, disabled: true } : { label });
             const items = [{
-                label: 'Open',
+                ...offWhileBusy('Open'),
                 icon: 'fa-regular fa-folder-open',
                 command: () => { this.viewDataset(ds); }
             }];
 
             if (ds.permissions && ds.permissions.canWrite) {
                 items.push({
-                    label: 'Edit',
+                    ...offWhileBusy('Edit'),
                     icon: 'fa-solid fa-pencil',
                     command: () => { this.handleEdit(ds); }
                 });
@@ -539,15 +548,14 @@ export default {
         }
     },
     created() {
-        // The imports that run are in the store of the app: the row follows it, and the list reloads when one ends
-        // (FR-UPL-10, FR-XC-16). Not reactive on its own: the store tells when its tasks change
-        this._onTasksUpdated = () => this.refreshImports();
-        this._onImportEnded = ({ dataset }) => {
-            if (this.datasets.some(ds => this.org?.Dataset(ds.slug).baseApi === dataset.baseApi)) this.reloadDatasets();
-            this.refreshImports();
+        // The tasks that keep a dataset busy (an import, a rescan) are in the store of the app: the row follows it, and the
+        // list reloads when one ends. Not reactive on its own: the store tells when its tasks change
+        this._onTasksUpdated = () => this.refreshBusy();
+        this._onBusyEnded = ({ dataset }) => {
+            if (this.org && this.datasets.some(ds => datasetKey(this.org.Dataset(ds.slug)) === datasetKey(dataset))) this.reloadDatasets();
         };
         taskMonitor.on('tasksUpdated', this._onTasksUpdated);
-        taskMonitor.on('importEnded', this._onImportEnded);
+        taskMonitor.on('busyEnded', this._onBusyEnded);
         // The table settings follow the Preferences page, other tabs and the account; the watchers
         // above do not store them again (saveDatasetTablePreferences skips the values already stored)
         this._stopFollowingPreferences = followDatasetTablePreferences(prefs => {
@@ -585,7 +593,7 @@ export default {
     },
     beforeUnmount() {
         taskMonitor.off('tasksUpdated', this._onTasksUpdated);
-        taskMonitor.off('importEnded', this._onImportEnded);
+        taskMonitor.off('busyEnded', this._onBusyEnded);
         this._stopFollowingPreferences?.();
         clearTimeout(this._searchTimer);
         this._listRequest?.abort();
@@ -628,11 +636,22 @@ export default {
         },
 
         handleDelete(ds) {
+            const dataset = this.org.Dataset(ds.slug);
             this.deleteEntity(ds, {
                 kind: 'dataset',
                 name: ds.name,
-                warning: 'All the files will be deleted too.',
-                remove: () => this.org.Dataset(ds.slug).delete(),
+                // A busy dataset deletes too: the Registry stops its import or rescan first
+                warning: busyDeleteWarning(ds.busy) ?? 'All the files will be deleted too.',
+                remove: async () => {
+                    // The task that keeps it busy ends because of this delete: no notice that it ended
+                    taskMonitor.forgetBusy(dataset);
+                    try {
+                        return await dataset.delete();
+                    } catch (e) {
+                        this.trackBusy(ds);
+                        throw e;
+                    }
+                },
                 // The next dataset moves into the page
                 done: () => this.reloadDatasets()
             });
@@ -697,7 +716,8 @@ export default {
                 thumbLoaded: false,
                 thumbUrl: '/images/dataset-placeholder.svg',
                 loading: true,
-                isTemporary: true
+                isTemporary: true,
+                busy: { kind: BUSY_TOOLS[IMPORT_TOOL_ID], taskId: payload.taskId ?? null, progress: null }
             });
         },
 
@@ -708,7 +728,7 @@ export default {
                 // Keep the dialog open and show the new dataset as importing. The store of the app follows the task from
                 // here on: it goes on when the dialog closes ("Run in background") or the page is left
                 this.addImportingEntry(payload);
-                if (payload.taskId) taskMonitor.trackImport(this.org.Dataset(payload.slug), payload.taskId);
+                if (payload.taskId) taskMonitor.trackBusy(this.org.Dataset(payload.slug), payload.taskId, BUSY_TOOLS[IMPORT_TOOL_ID]);
                 return;
             }
 
@@ -827,8 +847,8 @@ export default {
         },
 
         viewDataset(ds) {
-
-            if (ds.editing || ds.deleting) return;
+            // A busy dataset does not open (its page would only say that it is busy)
+            if (ds.editing || ds.deleting || ds.busy) return;
 
             this.$router.push({
                 name: "ViewDataset", params: {
@@ -929,41 +949,38 @@ export default {
                 // Past the last page (a dataset was deleted, the search narrowed): show the last one
                 if (this.datasets.length === 0 && total > 0 && this.currentPage > 1)
                     this.currentPage = Math.max(1, Math.ceil(total / this.itemsPerPage));
-                this.datasets.forEach(ds => this.preloadDatasetThumbnail(ds));
-                this.findImports(this.datasets, request.signal);
+                this.datasets.forEach(ds => {
+                    this.preloadDatasetThumbnail(ds);
+                    this.trackBusy(ds);
+                });
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 throw e;
             }
         },
 
-        // The imports that run in the datasets of the page, after a load or a reload (FR-UPL-10): one task-list request per
-        // row, and the store tracks the ones that run (no other poll); the rows show them as they are found
-        async findImports(rows, signal) {
-            try {
-                await Promise.all(rows.filter(ds => !ds.isTemporary && ds.permissions?.canRead !== false).map(async ds => {
-                    const running = await taskMonitor.findImports(this.org.Dataset(ds.slug));
-                    if (running.length && !signal?.aborted) this.refreshImports();
-                }));
-            } catch (e) {
-                // Best effort: the list is there without the tags
-                console.warn('Could not look for running imports:', e);
-            }
+        // A busy row (the list says so): the store follows its task, which tells the progress and when it ends
+        trackBusy(ds) {
+            if (ds.busy?.taskId) taskMonitor.trackBusy(this.org.Dataset(ds.slug), ds.busy.taskId, ds.busy.kind);
         },
 
-        // Which rows have an import running, and how far it is, from the store
-        refreshImports() {
-            const progress = {};
+        // The progress of the busy rows, from the store (a row it does not list as busy keeps what the list said, until the
+        // end of its task reloads the list)
+        refreshBusy() {
+            if (!this.org) return;
             for (const ds of this.datasets) {
-                const running = this.org ? taskMonitor.getImports(this.org.Dataset(ds.slug)) : [];
-                if (running.length) progress[ds.slug] = Math.round(running[0].progressPercent ?? 0);
+                if (!ds.busy) continue;
+                const busy = taskMonitor.getBusy(this.org.Dataset(ds.slug));
+                if (busy) ds.busy = busy;
             }
-            this.importProgress = progress;
         },
 
-        importingText(slug) {
-            const percent = this.importProgress[slug];
-            return percent > 0 ? `Importing\u2026 ${formatNumber(percent, 0)} %` : 'Importing\u2026';
+        busyLabel,
+        busyBlockReason,
+
+        // A row opens its dataset on a click, but a busy one
+        rowClass(ds) {
+            return ds.busy ? 'ds-row-busy' : 'ds-row-open';
         },
 
         // Where the datasets are, asked once for the visit to the organization (a dataset added,
@@ -999,6 +1016,8 @@ export default {
                 name: ds.properties?.meta?.name?.data,
                 tagline: ds.properties?.meta?.tagline?.data || '',
                 permissions: ds.permissions,
+                // An import or a rescan runs ({ kind, taskId, progress }): the row does not open, it only deletes
+                busy: ds.busy ?? null,
                 hasThumbnail: ds.hasThumbnail === true,
                 thumbError: false,
                 thumbLoaded: false,
@@ -1319,6 +1338,15 @@ export default {
         color: inherit;
         text-decoration: none;
         overflow-wrap: anywhere;
+    }
+
+    .ds-table :deep(tr.ds-row-open) {
+        cursor: pointer;
+    }
+
+    /* A busy dataset does not open: its name is not a link */
+    .ds-name-busy {
+        color: var(--ddb-text-secondary);
     }
 
     /* The stretched link of the name covers its cell */

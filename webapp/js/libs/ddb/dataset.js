@@ -642,11 +642,6 @@ export default class Dataset {
         return this.registry.postFormData(`${this.baseApi}/cad/crs`, formData);
     }
 
-    async rescan(stopOnError = false) {
-        const params = new URLSearchParams({ stopOnError: stopOnError.toString() });
-        return this.registry.postRequest(`${this.baseApi}/rescan?${params}`, {});
-    }
-
     // ---- Processing Platform tasks (heavy tools) --------------------------
 
     /**
