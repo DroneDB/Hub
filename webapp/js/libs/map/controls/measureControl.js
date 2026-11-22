@@ -71,16 +71,16 @@ class MeasureControls extends Control {
         const btnArea = controlButton('Measure Area', 'Click on the map to draw a polygon. Double-click, right-click or Enter to finish and calculate the area. Press ESC to cancel.', AREA_ICON);
         const btnErase = controlButton('Erase Measurement', 'Click on a measurement to delete it.', ERASE_ICON);
         const btnEdit = controlButton('Edit/Move Measurements', 'Click and drag measurement points to reposition them.', EDIT_VERTICES_ICON);
-        const btnStop = controlButton('Stop Measuring', 'Cancel the current measurement. Shortcut: ESC', STOP_ICON);
+        const btnStop = controlButton('Stop Measuring', 'Cancel the current measurement (ESC)', STOP_ICON);
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
 
         // Save/Load/Clear buttons (hidden until there is something to manage)
-        const btnSave = controlButton('Save Measurements', 'Save all current measurements to the dataset.', SAVE_ICON);
-        const btnClear = controlButton('Clear All Measurements', 'Remove all measurements from the map.', CLEAR_ALL_ICON);
-        const btnExport = controlButton('Export Measurements as GeoJSON', 'Download measurements as a GeoJSON file.', EXPORT_GEOJSON_ICON);
-        const btnExportCsv = controlButton('Export Measurements as CSV', 'Download measurements as a CSV table, in the units shown.', EXPORT_CSV_ICON);
-        const btnDelete = controlButton('Delete Saved Measurements', 'Permanently delete saved measurements from the dataset.', DELETE_ICON);
-        const btnList = controlButton('Measurement List', 'View and manage all measurements.', MEASUREMENT_LIST_ICON);
+        const btnSave = controlButton('Save Measurements', null, SAVE_ICON);
+        const btnClear = controlButton('Clear All Measurements', null, CLEAR_ALL_ICON);
+        const btnExport = controlButton('Export Measurements as GeoJSON', null, EXPORT_GEOJSON_ICON);
+        const btnExportCsv = controlButton('Export Measurements as CSV', null, EXPORT_CSV_ICON);
+        const btnDelete = controlButton('Delete Saved Measurements', null, DELETE_ICON);
+        const btnList = controlButton('Measurement List', null, MEASUREMENT_LIST_ICON);
         // Pressed: the callouts of the point annotations are always shown; released: each one shows while its point is
         // hovered (or tapped). Shown while the map has a point annotation; the account keeps the choice
         const btnCallouts = controlButton(CALLOUTS_LABEL, '', CALLOUTS_ICON);

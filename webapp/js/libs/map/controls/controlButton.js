@@ -23,7 +23,7 @@ export function controlButton(label, hint, icon) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.setAttribute('aria-label', label);
-    btn.title = `${label} - ${hint}`;
+    btn.title = hint ? `${label} - ${hint}` : label;
     if (icon) btn.appendChild(iconElement(icon));
     return btn;
 }
