@@ -106,6 +106,36 @@ describe('addEntry', () => {
         expect(listing.files.value[0].entry.size).toBe(99);
         expect(listing.files.value[0].selected).toBe(true);
     });
+
+    // The first photo of an annotation creates `annotations/` beside the measurement file
+    it('a file written into a folder the list does not have shows that folder in the list and the tree, as an upload does', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const { listing } = setup({ path: 'site/annotations/m1-1.jpg', type: 3, size: 5 });
+        listing.currentPath.value = 'site';
+        listing.files.value = [];
+        emitter.emit.mockClear();
+        await listing.addEntry('site/annotations/m1-1.jpg');
+        expect(listing.files.value.map(f => f.entry.path)).toEqual(['site/annotations']);
+        expect(listing.files.value[0].entry.type).toBe(1);
+        const sent = emitter.emit.mock.calls.filter(c => c[0] === 'addItems').map(c => c[1].map(i => i.entry.path));
+        expect(sent).toEqual([['site/annotations'], ['site/annotations/m1-1.jpg']]);
+    });
+
+    it('a file written into a folder the list has leaves that folder as it is (once, not replaced)', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const { dataset, listing } = setup({ path: 'annotations/m1-2.jpg', type: 3, size: 5 });
+        listing.put([itemFor(dataset, { path: 'annotations', type: 1, size: 7, mtime: 1 })]);
+        const folder = listing.files.value[0];
+        folder.selected = true;
+        emitter.emit.mockClear();
+        await listing.addEntry('annotations/m1-2.jpg');
+        expect(listing.files.value.map(f => f.entry.path)).toEqual(['annotations', 'ortho.tif']);
+        expect(listing.files.value[0]).toBe(folder);
+        expect(folder.entry).toMatchObject({ size: 7, mtime: 1 });
+        expect(folder.selected).toBe(true);
+        const sent = emitter.emit.mock.calls.filter(c => c[0] === 'addItems').map(c => c[1].map(i => i.entry.path));
+        expect(sent).toEqual([['annotations/m1-2.jpg']]);
+    });
 });
 
 describe('the tree hears of entries outside the folder on show (FR-EXP-36)', () => {

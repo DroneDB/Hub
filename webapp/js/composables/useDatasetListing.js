@@ -79,14 +79,24 @@ export function useDatasetListing(dataset) {
     }
 
     /**
-     * An entry created or rewritten on the server (merge, align output, the map's measurements, a README):
-     * the list shows it when it is in the folder, the tree shows it wherever it is (FR-EXP-36); an item
-     * already on show is replaced (its size and date follow) and stays selected.
+     * The entries the list shows for new entries that it does not show yet (entriesInView): an entry of the folder on
+     * show as itself, a deeper one as the folder below the folder on show that holds it.
+     */
+    const notShownInView = entries => entriesInView(entries, currentPath.value)
+        .filter(e => !files.value.some(f => f.entry.path === e.path));
+
+    /**
+     * An entry created or rewritten on the server (merge, align output, the map's measurements, a README, the photo of
+     * an annotation): the list shows it when it is in the folder, the tree shows it wherever it is (FR-EXP-36); an item
+     * already on show is replaced (its size and date follow) and stays selected. A file written into a folder the list
+     * does not have (the first photo of an annotation creates `annotations/`) brings that folder to the list and the
+     * tree, as an upload does; a folder the list has stays as it is.
      */
     async function addEntry(path) {
         const entry = await dataset.listOne(path);
         const shown = files.value.find(f => f.entry.path === entry.path);
-        added([itemFor(dataset, entry, shown ? { selected: shown.selected } : {})]);
+        const folders = notShownInView([entry]).filter(e => e !== entry).map(e => itemFor(dataset, e));
+        added([...folders, itemFor(dataset, entry, shown ? { selected: shown.selected } : {})]);
     }
 
     /**
@@ -122,9 +132,7 @@ export function useDatasetListing(dataset) {
      * event per parent folder, no entry twice (the top folder of the list stands in for a folder the entries do not name).
      */
     function uploaded(entries) {
-        const items = entriesInView(entries, currentPath.value)
-            .filter(e => !files.value.some(f => f.entry.path === e.path))
-            .map(e => itemFor(dataset, e));
+        const items = notShownInView(entries).map(e => itemFor(dataset, e));
         if (items.length) put(items.filter(i => inView(i.entry.path)));
         // The items of the list stand for their entries where they are the same entry (one object for list and tree)
         const forTree = new Map(items.map(i => [i.entry.path, i]));
