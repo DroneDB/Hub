@@ -1275,7 +1275,8 @@ export default {
     /* The columns take the width of their content, so the free width goes to the Dataset column and a row
        reads in one look on a wide screen (FR-ORG-24) */
     .ds-table :deep(.ds-col-date) { width: 11rem; }
-    .ds-table :deep(.ds-col-count) { width: 6rem; }
+    /* A count or a size is one value: "906,06 MB" does not break between the number and its unit */
+    .ds-table :deep(.ds-col-count) { width: 6rem; white-space: nowrap; }
     .ds-table :deep(.ds-col-visibility) { width: 8rem; }
 
     /* A header never wraps; the columns that do not fit leave the table instead */
