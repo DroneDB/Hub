@@ -61,7 +61,9 @@ describe('confirmRescanEntries', () => {
     it('says that a folder is rescanned with everything inside it', () => {
         const q = confirmRescanEntries([item('newdir', T.DIRECTORY)]);
         expect(q.title).toBe('Rescan 1 item');
-        expect(q.message).toContain('and everything inside the folders');
+        expect(q.message).toContain('and everything inside the folder?');
+        expect(confirmRescanEntries([item('a', T.DIRECTORY), item('b', T.DIRECTORY)]).message)
+            .toContain('and everything inside the folders?');
     });
 
     it('lists the first names and counts the rest', () => {

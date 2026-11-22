@@ -59,7 +59,8 @@ export function confirmRescanEntries(items) {
     const selection = describeSelection(items);
     const names = selection.names.map(name => `<li><strong>${escapeHtml(name)}</strong></li>`);
     if (selection.more) names.push(`<li>and ${selection.more} more</li>`);
-    const inside = selection.hasFolder ? ' and everything inside the folders' : '';
+    const inside = !selection.hasFolder ? ''
+        : selection.folders === 1 ? ' and everything inside the folder' : ' and everything inside the folders';
     return {
         title: `Rescan ${selection.countText}`,
         message: `<p><strong>Rescan ${selection.countText}${inside}?</strong></p><ul>${names.join('')}</ul>`
