@@ -4,7 +4,7 @@
  * - 'tasksUpdated' fires when a fetched snapshot changes, not when identical
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import taskMonitor, { datasetKey } from './taskMonitor';
+import taskMonitor, { datasetKey, toolOfBusy } from './taskMonitor';
 import { ApiError } from '@/libs/ddb/apiError';
 
 let dsSeq = 0;
@@ -45,6 +45,15 @@ describe('datasetKey', () => {
         const d2 = makeDataset();
         expect(typeof datasetKey(d1)).toBe('string');
         expect(datasetKey(d1)).not.toBe(datasetKey(d2));
+    });
+});
+
+describe('toolOfBusy', () => {
+    it('gives the tool of a busy kind, and null for a kind it does not know', () => {
+        expect(toolOfBusy('importing')).toBe('import-dataset');
+        expect(toolOfBusy('rescanning')).toBe('rescan-index');
+        expect(toolOfBusy('compacting')).toBeNull();
+        expect(toolOfBusy(null)).toBeNull();
     });
 });
 

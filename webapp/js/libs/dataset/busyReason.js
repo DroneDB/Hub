@@ -15,12 +15,12 @@ import { formatNumber } from '@/libs/format';
 
 /** The words of each kind */
 const KINDS = Object.freeze({
-    importing: { label: 'Importing', task: 'import', passive: 'imported' },
-    rescanning: { label: 'Rescanning', task: 'rescan', passive: 'rescanned' }
+    importing: { label: 'Importing', task: 'import', passive: 'imported', name: 'Dataset import' },
+    rescanning: { label: 'Rescanning', task: 'rescan', passive: 'rescanned', name: 'Index rescan' }
 });
 
 // A kind this Hub does not know (a newer Registry)
-const OTHER = Object.freeze({ label: 'Updating', task: 'task', passive: 'updated' });
+const OTHER = Object.freeze({ label: 'Updating', task: 'task', passive: 'updated', name: 'Task' });
 
 /** @param {DatasetBusy | null | undefined} busy */
 const wordsOf = busy => KINDS[/** @type {keyof typeof KINDS} */ (busy?.kind)] ?? OTHER;
@@ -54,6 +54,24 @@ export function busyDeleteWarning(busy) {
     if (!busy) return null;
     const task = wordsOf(busy).task;
     return `The ${task} stops first, then the dataset and all its files are deleted.`;
+}
+
+/**
+ * The action that stops what keeps the dataset busy: "Cancel import", "Cancel rescan".
+ * @param {DatasetBusy | null | undefined} busy
+ * @returns {string}
+ */
+export function busyCancelLabel(busy) {
+    return `Cancel ${wordsOf(busy).task}`;
+}
+
+/**
+ * The task that keeps the dataset busy, as the cancel question names it: "Dataset import", "Index rescan".
+ * @param {DatasetBusy | null | undefined} busy
+ * @returns {string}
+ */
+export function busyTaskName(busy) {
+    return wordsOf(busy).name;
 }
 
 /**

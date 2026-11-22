@@ -4,7 +4,7 @@
         <!-- The dataset is not there, not for this user, or needs a sign-in, or is busy (an import or a rescan runs): the page
              state in place of the panels. The panels come back, and load again, when the busy task ends -->
         <ResourceState v-if="pageState" :kind="pageState" resource="dataset" :name="params.ds" :busy="datasetBusy"
-                       v-bind="datasetBusy && !loadKind ? BACK_TO_DATASETS : {}" />
+                       v-bind="datasetBusy && !loadKind ? BACK_TO_DATASETS : {}" :actions="loadKind ? [] : busyActions" />
         <!-- One layout decision, from the window's width (phoneLayout, below sm): the panel hides its first pane and the
              tabs get Browser and Properties; the tabs (the second pane) are never rendered again when it changes -->
         <Panel v-else split="vertical" class="main" amount="23.6%" first-size="var(--ddb-panel-tree-width)" tablet-amount="30%" storage-key="dataset" :mobile-collapsed="phoneLayout">
@@ -87,7 +87,10 @@ import { loadErrorKind, datasetBusyOf, LoadErrorKind } from '@/libs/ddb/apiError
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { buildDownloadNote } from '@/libs/build/buildDownloads';
 import BuildManager from '@/libs/build/buildManager';
-import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
+import taskMonitor, { datasetKey, toolOfBusy, BUSY_TOOLS, IMPORT_TOOL_ID } from '@/libs/tasks/taskMonitor';
+import { busyCancelLabel, busyTaskName } from '@/libs/dataset/busyReason';
+import { offersAction, TaskAction } from '@/composables/useTaskActions';
+import { useHeavyTaskCancel } from '@/composables/useHeavyTaskCancel';
 import emitter from '@/libs/eventBus';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
@@ -161,7 +164,8 @@ const loadKind = computed(() => loadErrorKind(loadError.value));
 const datasetBusy = shallowRef(null);
 // The page state in place of the panels: a dataset that did not load (it wins: one deleted while busy is not there), else busy
 const pageState = computed(() => loadKind.value ?? (datasetBusy.value ? LoadErrorKind.BUSY : null));
-const BACK_TO_DATASETS = Object.freeze({ backTo: { name: 'Datasets', params: { org: params.org } }, backLabel: 'Back to datasets' });
+const DATASETS_LIST = Object.freeze({ name: 'Datasets', params: { org: params.org } });
+const BACK_TO_DATASETS = Object.freeze({ backTo: DATASETS_LIST, backLabel: 'Back to datasets' });
 // A dataset opened after one that did not load starts with the toolbar's actions
 session.setUnavailable(false);
 // Nor does it start with the root entry of the page before it (a viewer of another dataset, whose answer came late): the
@@ -725,6 +729,20 @@ function leaveBusy() {
     BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
 }
 
+// Cancel import / Cancel rescan: the Tasks tab is inside the dataset, so the busy state offers it. Shown when the Registry
+// offers the cancel of that task to this user (the `actions` of the task as the store lists it); the question and the
+// answer are those of every task cancel
+const { cancelHeavyTask, cancelling } = useHeavyTaskCancel(() => dataset, dialogs);
+const busyActions = computed(() => {
+    const busy = datasetBusy.value;
+    const task = busy?.taskId ? taskMonitor.getTask(dataset, busy.taskId) : null;
+    if (!offersAction(task, TaskAction.CANCEL)) return [];
+    return [{
+        label: busyCancelLabel(busy), icon: 'fa-solid fa-stop', disabled: cancelling.value,
+        run: () => cancelHeavyTask({ taskId: busy.taskId, toolId: toolOfBusy(busy.kind) }, busyTaskName(busy))
+    }];
+});
+
 const isThisDataset = changed => !!changed && datasetKey(changed) === datasetKey(dataset);
 
 // The store's list of the tasks changed: a task that keeps the dataset busy runs now, or its progress moved
@@ -734,11 +752,14 @@ function onTasksUpdated({ dataset: changed }) {
     if (busy) enterBusy(busy);
 }
 
-// A task that kept the dataset busy ended: the page opens, unless another one runs
-function onBusyEnded({ dataset: changed }) {
+// A task that kept the dataset busy ended: the page opens, unless another one runs. An import that did not succeed
+// (cancelled, failed) rolls back and deletes the dataset it created: the page goes back to the list, and the notice of
+// the import says how it ended
+function onBusyEnded({ dataset: changed, task, gone, kind }) {
     if (!isThisDataset(changed) || !datasetBusy.value) return;
     const still = taskMonitor.getBusy(dataset);
     if (still) enterBusy(still);
+    else if (kind === BUSY_TOOLS[IMPORT_TOOL_ID] && (gone || task?.state !== 'Succeeded')) void router.replace(DATASETS_LIST);
     else leaveBusy();
 }
 

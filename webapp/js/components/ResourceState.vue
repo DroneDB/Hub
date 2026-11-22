@@ -14,6 +14,11 @@
                         class="resource-state-action" :class="{ primary: i === 0 }">
                 <i :class="link.icon" /> {{ link.label }}
             </RouterLink>
+            <!-- The page's own actions on what it shows (a busy dataset: cancel its task) -->
+            <button v-for="action in actions" :key="action.label" type="button" class="resource-state-action"
+                    :disabled="action.disabled" @click="action.run()">
+                <i :class="action.icon" aria-hidden="true" /> {{ action.label }}
+            </button>
             <button v-if="signedInHere" type="button" class="resource-state-action" @click="signInAsAnotherUser($router)">
                 <i class="fa-solid fa-right-to-bracket" /> Sign in as another user
             </button>
@@ -64,7 +69,9 @@ const props = defineProps({
     backTo: { type: [String, Object], default: null },
     backLabel: { type: String, default: 'Back' },
     /** The busy state of a busy dataset ({ kind, taskId, progress }), for the 'busy' kind */
-    busy: { type: Object, default: null }
+    busy: { type: Object, default: null },
+    /** The page's own actions, after its links: { label, icon, run, disabled } (neutral buttons) */
+    actions: { type: Array, default: () => [] }
 });
 
 const headingId = useId();
@@ -229,7 +236,12 @@ watch(heading, value => setTitle(value), { immediate: true });
     cursor: pointer;
 }
 
-.resource-state-action:hover {
+.resource-state-action:disabled {
+    opacity: var(--p-disabled-opacity, 0.6);
+    cursor: default;
+}
+
+.resource-state-action:hover:not(:disabled) {
     background: var(--ddb-bg-hover);
 }
 

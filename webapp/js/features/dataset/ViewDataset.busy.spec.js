@@ -11,9 +11,11 @@ import { ref, h, defineComponent, onMounted } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
 
-const h_ = vi.hoisted(() => ({ dataset: null, busy: null, handlers: {}, tracked: [], showError: null, loadBuilds: null }));
+const h_ = vi.hoisted(() => ({ dataset: null, busy: null, tasks: {}, handlers: {}, tracked: [], showError: null, loadBuilds: null, replace: null, confirm: null }));
 
-vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'acme', ds: 'site' }, query: {}, hash: '' }), useRouter: () => ({ replace: vi.fn() }), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'acme', ds: 'site' }, query: {}, hash: '' }), useRouter: () => ({ replace: (...args) => h_.replace(...args) }), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }));
+// The question of the cancel: answered by the test (the dialog host is a stub)
+vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => options => h_.confirm(options) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
         Organization: () => ({ Dataset: () => h_.dataset, datasets: () => Promise.resolve([]) }),
@@ -24,15 +26,21 @@ vi.mock('@/libs/api/sharedRegistry', () => ({
 }));
 // The store of the app's tasks: what it lists for the dataset (getBusy) and its events are the subject here (its own spec
 // covers the store)
-vi.mock('@/libs/tasks/taskMonitor', () => ({
-    default: {
-        on: (event, fn) => { (h_.handlers[event] ||= []).push(fn); },
-        off: (event, fn) => { h_.handlers[event] = (h_.handlers[event] || []).filter(f => f !== fn); },
-        getBusy: () => h_.busy,
-        trackBusy: (...args) => h_.tracked.push(args)
-    },
-    datasetKey: ds => ds.baseApi
-}));
+vi.mock('@/libs/tasks/taskMonitor', async importOriginal => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        default: {
+            on: (event, fn) => { (h_.handlers[event] ||= []).push(fn); },
+            off: (event, fn) => { h_.handlers[event] = (h_.handlers[event] || []).filter(f => f !== fn); },
+            getBusy: () => h_.busy,
+            getTask: (_dataset, taskId) => h_.tasks[taskId] ?? null,
+            trackBusy: (...args) => h_.tracked.push(args),
+            forceRefresh: () => Promise.resolve()
+        },
+        datasetKey: ds => ds.baseApi
+    };
+});
 vi.mock('@/libs/build/buildManager', () => ({
     default: { registerDataset: vi.fn(), unregisterDataset: vi.fn(), loadBuilds: (...args) => h_.loadBuilds(...args) }
 }));
@@ -78,7 +86,10 @@ const emit = (event, payload) => (h_.handlers[event] || []).forEach(fn => fn({ d
 
 let wrapper;
 async function open(info) {
-    h_.dataset = { baseApi: 'acme/site', info, metaGet: vi.fn(() => Promise.resolve([])) };
+    h_.dataset = {
+        baseApi: 'acme/site', info, metaGet: vi.fn(() => Promise.resolve([])),
+        cancelTask: vi.fn(() => Promise.resolve({ deleted: true })), getTask: vi.fn()
+    };
     document.body.insertAdjacentHTML('beforeend', '<div id="app"></div>');
     wrapper = mount(ViewDataset, { global: { stubs, plugins: [createPinia(), PrimeVue] } });
     await flushPromises();
@@ -92,6 +103,9 @@ beforeEach(() => {
     h_.tracked = [];
     h_.showError = vi.fn();
     h_.loadBuilds = vi.fn(() => Promise.resolve());
+    h_.tasks = {};
+    h_.replace = vi.fn(() => Promise.resolve());
+    h_.confirm = vi.fn(() => Promise.resolve(true));
 });
 afterEach(() => {
     wrapper?.unmount();
@@ -178,5 +192,91 @@ describe('ViewDataset of a busy dataset', () => {
 
         expect(wrapper.find('h1').text()).toBe('Dataset not found');
         expect(useDatasetSessionStore().unavailable).toBe(true);
+    });
+
+    it('goes back to the datasets list when the import ends without success: its rollback deletes the dataset', async () => {
+        await open(vi.fn(() => Promise.reject(busyAnswer('importing'))));
+        emit('busyEnded', { task: { taskId: 'task-1', toolId: 'import-dataset', state: 'Deleted' }, gone: false, kind: 'importing' });
+        await flushPromises();
+
+        expect(h_.replace).toHaveBeenCalledWith({ name: 'Datasets', params: { org: 'acme' } });
+        expect(h_.dataset.info).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('Cancel on the busy state of a dataset', () => {
+    const offered = (taskId, toolId) => { h_.tasks[taskId] = { taskId, toolId, state: 'Processing', actions: ['viewLog', 'cancel'] }; };
+    const cancelButton = () => wrapper.findAll('button.resource-state-action').find(b => b.text().startsWith('Cancel'));
+
+    it('is offered when the Registry offers the cancel of the task to the user, and not otherwise', async () => {
+        await open(vi.fn(() => Promise.reject(busyAnswer('importing'))));
+        expect(cancelButton()).toBeUndefined();
+
+        h_.tasks['task-1'] = { taskId: 'task-1', toolId: 'import-dataset', state: 'Processing', actions: ['viewLog'] };
+        h_.busy = { kind: 'importing', taskId: 'task-1', progress: 10 };
+        emit('tasksUpdated');
+        await flushPromises();
+        expect(cancelButton()).toBeUndefined();
+
+        offered('task-1', 'import-dataset');
+        h_.busy = { kind: 'importing', taskId: 'task-1', progress: 11 };
+        emit('tasksUpdated');
+        await flushPromises();
+        expect(cancelButton().text()).toBe('Cancel import');
+        // A neutral action: not the primary one, nor a danger one
+        expect(cancelButton().classes()).not.toContain('primary');
+    });
+
+    it('asks, then cancels the import: the question says that the dataset it created is deleted, and the list follows', async () => {
+        offered('task-1', 'import-dataset');
+        await open(vi.fn(() => Promise.reject(busyAnswer('importing'))));
+
+        await cancelButton().trigger('click');
+        await flushPromises();
+
+        expect(h_.confirm).toHaveBeenCalledTimes(1);
+        const question = h_.confirm.mock.calls[0][0];
+        expect(question).toMatchObject({ title: 'Cancel Task', confirmText: 'Cancel Task' });
+        expect(question.message).toContain('<strong>Dataset import</strong> will be stopped.');
+        expect(question.warningMessage).toBe('The files imported so far are deleted, and so is the dataset that this import created.');
+        expect(h_.dataset.cancelTask).toHaveBeenCalledWith('task-1');
+
+        // The rollback deletes the dataset: the page goes back to the list
+        emit('datasetGone', { error: new ApiError('Not found', 404) });
+        emit('busyEnded', { task: { taskId: 'task-1', state: 'Processing' }, gone: true, kind: 'importing' });
+        await flushPromises();
+        expect(h_.replace).toHaveBeenCalledWith({ name: 'Datasets', params: { org: 'acme' } });
+    });
+
+    it('cancels nothing when the user does not confirm', async () => {
+        offered('task-1', 'import-dataset');
+        h_.confirm = vi.fn(() => Promise.resolve(false));
+        await open(vi.fn(() => Promise.reject(busyAnswer('importing'))));
+
+        await cancelButton().trigger('click');
+        await flushPromises();
+
+        expect(h_.dataset.cancelTask).not.toHaveBeenCalled();
+    });
+
+    it('cancels a rescan, and the dataset opens again when the task ends', async () => {
+        offered('task-1', 'rescan-index');
+        const info = vi.fn(() => Promise.reject(busyAnswer('rescanning')));
+        await open(info);
+        expect(cancelButton().text()).toBe('Cancel rescan');
+
+        await cancelButton().trigger('click');
+        await flushPromises();
+        expect(h_.confirm.mock.calls[0][0].message).toContain('<strong>Index rescan</strong> will be stopped.');
+        expect(h_.confirm.mock.calls[0][0].warningMessage).toBeUndefined();
+        expect(h_.dataset.cancelTask).toHaveBeenCalledWith('task-1');
+
+        info.mockImplementation(() => Promise.resolve(ROOT));
+        emit('busyEnded', { task: { taskId: 'task-1', toolId: 'rescan-index', state: 'Deleted' }, gone: false, kind: 'rescanning' });
+        await flushPromises();
+
+        expect(wrapper.find('.panel').exists()).toBe(true);
+        expect(info).toHaveBeenCalledTimes(2);
+        expect(h_.replace).not.toHaveBeenCalled();
     });
 });

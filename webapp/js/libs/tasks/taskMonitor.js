@@ -68,6 +68,15 @@ export const RESCAN_TOOL_ID = 'rescan-index';
  */
 export const BUSY_TOOLS = Object.freeze({ [IMPORT_TOOL_ID]: 'importing', [RESCAN_TOOL_ID]: 'rescanning' });
 
+/**
+ * The tool whose task keeps a dataset busy with `kind`, or null for a kind this Hub does not know.
+ * @param {string | null | undefined} kind
+ * @returns {string | null}
+ */
+export function toolOfBusy(kind) {
+    return Object.keys(BUSY_TOOLS).find(toolId => BUSY_TOOLS[toolId] === kind) ?? null;
+}
+
 /** The busy kind of an import */
 const IMPORTING = BUSY_TOOLS[IMPORT_TOOL_ID];
 

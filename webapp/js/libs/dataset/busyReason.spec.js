@@ -3,7 +3,7 @@
  * delete does first, and its page state.
  */
 import { describe, it, expect } from 'vitest';
-import { busyLabel, busyBlockReason, busyDeleteWarning, busyPageText } from './busyReason';
+import { busyLabel, busyBlockReason, busyDeleteWarning, busyPageText, busyCancelLabel, busyTaskName } from './busyReason';
 
 const importing = progress => ({ kind: 'importing', taskId: 't1', progress });
 const rescanning = progress => ({ kind: 'rescanning', taskId: 't2', progress });
@@ -37,10 +37,18 @@ describe('busyReason', () => {
         expect(busyPageText(rescanning(5), '').text).toBe('The dataset opens when the rescan ends. Until then it can only be deleted.');
     });
 
+    it('names the cancel of the task and the task itself', () => {
+        expect(busyCancelLabel(importing(1))).toBe('Cancel import');
+        expect(busyCancelLabel(rescanning(1))).toBe('Cancel rescan');
+        expect(busyTaskName(importing(1))).toBe('Dataset import');
+        expect(busyTaskName(rescanning(1))).toBe('Index rescan');
+    });
+
     it('has plain words for a kind this Hub does not know', () => {
         const other = { kind: 'compacting', taskId: 't3', progress: 10 };
         expect(busyLabel(other)).toBe('Updating… 10 %');
         expect(busyBlockReason(other)).toBe('The dataset is being updated');
         expect(busyDeleteWarning(other)).toBe('The task stops first, then the dataset and all its files are deleted.');
+        expect(busyCancelLabel(other)).toBe('Cancel task');
     });
 });
