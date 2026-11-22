@@ -422,6 +422,34 @@ describe('Dataset raster value calls', () => {
         expect(post.mock.calls[1][1]).not.toHaveProperty('nodata');
     });
 
+    // The photos that cover an annotation: a read sent as POST, which must not drop the cached reads
+    describe('findCoverage', () => {
+        const geometry = { type: 'Point', coordinates: [11.2, 45.1] };
+
+        it('posts the geometry and the limit to the coverage endpoint as a read, and returns the parsed answer', async () => {
+            const answer = [{ path: 'a.jpg', score: 0.1, overlap: 1, pixel: [10, 20] }, { path: 'b.jpg', score: 0.4, overlap: 1, pixel: null }];
+            const makeRequest = vi.fn(async () => answer);
+            const ds = new Dataset({ remote: 'h', secure: true, makeRequest }, 'my_org', 'my_ds');
+            expect(await ds.findCoverage(geometry)).toBe(answer);
+            expect(makeRequest).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/coverage',
+                { method: 'POST', body: { geometry, limit: 20 }, readOnly: true, signal: undefined });
+        });
+
+        it('sends the limit asked for and the signal that can abort it', async () => {
+            const makeRequest = vi.fn(async () => []);
+            const ds = new Dataset({ remote: 'h', secure: true, makeRequest }, 'my_org', 'my_ds');
+            const { signal } = new AbortController();
+            await ds.findCoverage(geometry, { limit: 5, signal });
+            expect(makeRequest.mock.calls[0][1]).toMatchObject({ body: { geometry, limit: 5 }, signal });
+        });
+
+        it('rejects with the error of the request when the Registry refuses', async () => {
+            const refused = Object.assign(new Error('The geometry has too many vertices'), { status: 400 });
+            const ds = new Dataset({ remote: 'h', secure: true, makeRequest: vi.fn(async () => { throw refused; }) }, 'my_org', 'my_ds');
+            await expect(ds.findCoverage(geometry)).rejects.toBe(refused);
+        });
+    });
+
     // D-022: the contours of a thermal layer are in its unit (levels, limits, labels), and they skip its NoData value
     it('contours send the NoData value and the thermal formula of the layer in the body', async () => {
         const { ds, post } = datasetGetting();

@@ -401,3 +401,44 @@ describe('coordinates typed in the dialog of a point', () => {
         control.disableEditMode();
     });
 });
+
+describe('the photos of a measurement in its dialog', () => {
+    const host = { dataset: { thumbUrl: () => '' }, measurementPath: 'a/b_measurements.geojson', readOnly: false };
+
+    function controlWith(getPhotoHost) {
+        control.setMap(null);
+        dialogs = [];
+        control = new MeasureControls({
+            openDialog: (component, props) => { dialogs.push({ ...props, component }); return { close: vi.fn() }; },
+            getPhotoHost
+        });
+        control.setMap(map);
+    }
+
+    it('are offered with the dataset and the file of the host, the id and the photos of the measurement, and its WGS84 geometry', () => {
+        controlWith(() => host);
+        const [point] = importSaved({ ...SAVED_POINT, properties: { ...SAVED_POINT.properties, id: 'p1', photos: [{ path: 'a.jpg', source: 'dataset' }] } });
+        control.openPropertiesDialog(point);
+        const { photoContext } = dialogs.at(-1);
+        expect(photoContext).toMatchObject({ dataset: host.dataset, measurementPath: 'a/b_measurements.geojson', readOnly: false, itemId: 'p1', photos: [{ path: 'a.jpg', source: 'dataset' }] });
+        expect(photoContext.geometry.type).toBe('Point');
+        expect(photoContext.geometry.coordinates[0]).toBeCloseTo(31.136198, 6);
+        expect(photoContext.geometry.coordinates[1]).toBeCloseTo(-23.939526, 6);
+    });
+
+    it('are not offered by a host that has none', () => {
+        const [point] = importSaved(SAVED_POINT);
+        control.openPropertiesDialog(point);
+        expect(dialogs.at(-1).photoContext).toBeNull();
+    });
+
+    it('are saved with the measurement: the saved photos are on its feature and in its GeoJSON', () => {
+        controlWith(() => host);
+        const [point] = importSaved(SAVED_POINT);
+        control.openPropertiesDialog(point);
+        const photos = [{ path: 'a.jpg', source: 'upload', caption: 'x' }];
+        dialogs.at(-1).onSave({ name: '', description: '', stroke: '#ffc107', groupId: '', photos });
+        expect(point.get('photos')).toEqual(photos);
+        expect(control.exportToGeoJSON('').features[0].properties.photos).toEqual(photos);
+    });
+});

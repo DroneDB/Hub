@@ -3,7 +3,7 @@
  * fields that apply to the geometry (a point has a colour and its coordinates, no width or fill), Delete for a
  * measurement that exists, Discard for a point just placed, and a save of the properties of the geometry only.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import Feature from 'ol/Feature';
@@ -233,5 +233,99 @@ describe('the annotation fields of a measurement', () => {
         await show(f, { schema });
         expect(dialog().textContent).toContain('Xylo');
         expect(document.getElementById('mp-severity')).toBeNull();
+    });
+});
+
+describe('the Photos tab of the dialog', () => {
+    const photo = (path, extra = {}) => ({ path, source: 'dataset', ...extra });
+    const dataset = () => ({
+        thumbUrl: (path) => `/thumb?path=${path}`,
+        findCoverage: vi.fn(async () => [{ path: 'images/a.jpg', score: 0.1, overlap: 1, pixel: null }]),
+        list: vi.fn(async () => []),
+        search: vi.fn(async () => []),
+        writeObj: vi.fn(async () => ({}))
+    });
+    const context = (extra = {}) => ({
+        dataset: dataset(), measurementPath: 'site/survey_measurements.geojson', itemId: 'id-1', readOnly: false,
+        geometry: { type: 'Point', coordinates: [11.2, 45.1] }, photos: [], ...extra
+    });
+    const tab = name => [...dialog().querySelectorAll('[role="tab"]')].find(t => t.textContent.includes(name));
+    const photosPanel = () => dialog().querySelector('.annotation-photos');
+
+    it('has no tabs and saves no photos without a photo context', async () => {
+        await show(line());
+        expect(dialog().querySelector('[role="tab"]')).toBeNull();
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0]).not.toHaveProperty('photos');
+    });
+
+    it('has a Details tab with the form and a Photos tab with the count of the photos', async () => {
+        await show(line(), { photoContext: context({ photos: [photo('a.jpg'), photo('b.jpg')] }) });
+        expect([...dialog().querySelectorAll('[role="tab"]')].map(t => t.textContent.trim())).toEqual(['Details', 'Photos (2)']);
+        expect(document.getElementById('mp-name')).toBeTruthy();
+    });
+
+    it('does not look for covering photos until the tab is opened', async () => {
+        const ctx = context();
+        await show(line(), { photoContext: ctx });
+        expect(ctx.dataset.findCoverage).not.toHaveBeenCalled();
+        expect(photosPanel()).toBeNull();
+        tab('Photos').click();
+        await flushPromises();
+        expect(ctx.dataset.findCoverage).toHaveBeenCalledTimes(1);
+        expect(photosPanel()).toBeTruthy();
+    });
+
+    it('saves the photos when they were changed, with the properties of the measurement', async () => {
+        const ctx = context({ photos: [photo('a.jpg')] });
+        await show(line(), { photoContext: ctx });
+        tab('Photos').click();
+        await flushPromises();
+        [...photosPanel().querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Remove a.jpg').click();
+        await flushPromises();
+        buttonNamed('Save').click();
+        const saved = wrapper.emitted('save')[0][0];
+        expect(saved).toHaveProperty('photos', undefined);
+        expect(saved.stroke).toBeTruthy();
+    });
+
+    it('leaves the photos out of the save when the tab did not change them', async () => {
+        await show(line(), { photoContext: context({ photos: [photo('a.jpg')] }) });
+        tab('Photos').click();
+        await flushPromises();
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0]).not.toHaveProperty('photos');
+    });
+
+    it('saves the photos pinned from the coverage, with the pixel', async () => {
+        const ctx = context();
+        ctx.dataset.findCoverage = vi.fn(async () => [{ path: 'images/a.jpg', score: 0.1, overlap: 1, pixel: [5, 6] }]);
+        await show(line(), { photoContext: ctx });
+        tab('Photos').click();
+        await flushPromises();
+        [...photosPanel().querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Add a.jpg to this annotation').click();
+        await flushPromises();
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0].photos).toEqual([{ path: 'images/a.jpg', source: 'coverage', pixel: [5, 6] }]);
+    });
+
+    it('does not keep the changes of the photos when the dialog is cancelled, and deletes no file', async () => {
+        const ctx = context({ photos: [photo('a.jpg')] });
+        ctx.dataset.deleteObj = vi.fn();
+        await show(line(), { photoContext: ctx });
+        tab('Photos').click();
+        await flushPromises();
+        [...photosPanel().querySelectorAll('button')].find(b => b.getAttribute('aria-label') === 'Remove a.jpg').click();
+        buttonNamed('Cancel').click();
+        expect(wrapper.emitted('save')).toBeUndefined();
+        expect(ctx.dataset.deleteObj).not.toHaveBeenCalled();
+    });
+
+    it('is read-only for a user who cannot change the annotation', async () => {
+        await show(line(), { photoContext: context({ readOnly: true, photos: [photo('a.jpg')] }) });
+        tab('Photos').click();
+        await flushPromises();
+        expect(photosPanel().querySelectorAll('input')).toHaveLength(0);
+        expect([...photosPanel().querySelectorAll('button')]).toHaveLength(0);
     });
 });

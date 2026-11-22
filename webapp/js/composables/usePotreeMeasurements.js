@@ -16,6 +16,7 @@ import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/Annotation
 import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, notifyRenumbered } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements, ensureProperties, applyRefs, viewerRefs, PROPERTY_BAG } from '@/libs/map/potreeMeasurementConverter';
 import { applyFields } from '@/libs/map/annotationIds';
+import { applyPhotos, documentFeatureGeometry } from '@/libs/reports/annotationPhotos';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { unstatedMeasurementCrs } from '@/libs/build/pointCloudCrs';
 import { createUndoStack } from '@/libs/undoStack';
@@ -109,6 +110,28 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         isRefTaken: ref => storageFor().refs.isTaken(ref, viewerRefs(viewer, target))
     });
 
+    // What the Photos tab of the dialog of a measure or an annotation needs: the dataset, the file it is saved in (the
+    // uploads go beside it), its id and photos, and its WGS84 geometry as the save would write it (none for a cloud with
+    // no CRS: such an item is not sent to the coverage query)
+    function photoContext(target) {
+        const { id, photos } = ensureProperties(target);
+        let geometry = null;
+        try {
+            geometry = documentFeatureGeometry(exportMeasurements(viewer, entry.value.path, coordinateSystem), id);
+        } catch (e) {
+            // The photos can still be edited: only the search for the photos that cover the item is left out
+            console.warn('The position of the item could not be worked out:', e);
+        }
+        return {
+            dataset: dataset.value,
+            measurementPath: storageFor().measurementPath,
+            readOnly: !canWrite.value,
+            itemId: id,
+            geometry,
+            photos: photos || []
+        };
+    }
+
     function openDialog(component, props) {
         if (dialog) dialog.close();
         dialog = dialogs.open(component, { ...props, onClose: () => { dialog = null; } });
@@ -131,10 +154,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     function editMeasure(measure) {
         openDialog(MeasurementPropertiesDialog, {
             ...fieldsContext(measure),
+            photoContext: photoContext(measure),
             feature: measureAsFeature(measure),
             geometryType: measure.showArea && measure.closed ? 'Polygon' : 'LineString',
             onSave: properties => {
                 assignMeasureProperties(measure, properties);
+                if ('photos' in properties) applyPhotos(ensureProperties(measure), properties.photos);
                 applyMeasureStyle(measure);
                 updateNameLabel(measure, labelCtx());
             }
@@ -144,10 +169,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     function editAnnotation(annotation) {
         openDialog(AnnotationPropertiesDialog, {
             ...fieldsContext(annotation),
+            photoContext: photoContext(annotation),
             annotation,
             showDelete: true,
             onSave: properties => {
                 applyFields(ensureProperties(annotation), properties);
+                if ('photos' in properties) applyPhotos(ensureProperties(annotation), properties.photos);
                 // Potree keeps both as HTML: the typed text is escaped on its way in
                 if (properties.name !== undefined) annotation.title = textToHtml(properties.name);
                 if (properties.description !== undefined) annotation.description = textToHtml(properties.description);

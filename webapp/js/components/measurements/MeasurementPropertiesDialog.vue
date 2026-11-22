@@ -1,59 +1,61 @@
 <template>
-    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel" @confirm="save">
+    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size :size-class="photoContext ? 'dialog-md' : 'dialog-sm'" @close="cancel" @confirm="save">
         <div class="measurement-properties-form">
-            <div class="mb-3">
-                <label for="mp-name" class="d-block mb-1 fw-semibold">Name</label>
-                <InputText id="mp-name" v-model="formData.name" placeholder="Optional" autocomplete="off" class="w-100" />
-            </div>
-
-            <div class="mb-3">
-                <label for="mp-description" class="d-block mb-1 fw-semibold">Description</label>
-                <Textarea id="mp-description" v-model="formData.description" placeholder="Optional" rows="3" :maxlength="FIELD_LIMITS.description" auto-resize class="w-100" />
-            </div>
-
-            <div class="mb-3">
-                <label for="mp-stroke" class="d-block mb-1 fw-semibold">{{ colorLabel }}</label>
-                <ColorSwatchPicker v-model="formData.stroke" input-id="mp-stroke" :label="colorLabel" />
-            </div>
-
-            <div v-if="isPolygon" class="mb-3">
-                <label for="mp-fill" class="d-block mb-1 fw-semibold">Fill color</label>
-                <ColorSwatchPicker v-model="formData.fill" input-id="mp-fill" label="Fill color" />
-            </div>
-
-            <div v-if="!isPoint" class="mb-3">
-                <label for="mp-stroke-width" class="d-block mb-1 fw-semibold">{{ widthLabel }}: {{ formData['stroke-width'] }} px</label>
-                <input id="mp-stroke-width" v-model.number="formData['stroke-width']" type="range" min="1" max="10" step="1" class="w-100">
-            </div>
-
-            <div v-if="isPolygon" class="mb-3">
-                <label for="mp-fill-opacity" class="d-block mb-1 fw-semibold">Fill opacity: {{ Math.round(formData['fill-opacity'] * 100) }}%</label>
-                <input id="mp-fill-opacity" v-model.number="formData['fill-opacity']" type="range" min="0" max="1" step="0.1" class="w-100">
-            </div>
-
-            <div v-if="isPoint" class="mb-3">
-                <label for="mp-coords" class="d-block mb-1 fw-semibold">Coordinates</label>
-                <div class="coords-field">
-                    <InputText id="mp-coords" v-model="coordsInput" autocomplete="off" spellcheck="false" class="coords-input"
-                               :invalid="!!located.error" :aria-invalid="located.error ? 'true' : undefined"
-                               :aria-describedby="located.error ? 'mp-coords-error' : 'mp-coords-help'" />
-                    <Button type="button" severity="secondary" text :icon="coordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"
-                            :title="coordsCopied ? 'Copied!' : 'Copy coordinates'" :aria-label="coordsCopied ? 'Copied!' : 'Copy coordinates'"
-                            :disabled="!!located.error" @click="copyCoords(latLonText(located.lat, located.lon))" />
+            <AnnotationTabs v-model:photos="photos" :photo-context="photoContext" :item-name="formData.name">
+                <div class="mb-3">
+                    <label for="mp-name" class="d-block mb-1 fw-semibold">Name</label>
+                    <InputText id="mp-name" v-model="formData.name" placeholder="Optional" autocomplete="off" class="w-100" />
                 </div>
-                <FieldError id="mp-coords-error" :message="located.error" />
-                <small v-if="!located.error" id="mp-coords-help" class="d-block mt-1 coords-help">
-                    Latitude, longitude. {{ latLonDmsText(located.lat, located.lon) }}
-                </small>
-            </div>
 
-            <div v-if="groups.length > 0" class="mb-3">
-                <label id="mp-group-label" for="mp-group" class="d-block mb-1 fw-semibold">Group</label>
-                <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
-                        option-label="label" option-value="value" class="w-100" />
-            </div>
+                <div class="mb-3">
+                    <label for="mp-description" class="d-block mb-1 fw-semibold">Description</label>
+                    <Textarea id="mp-description" v-model="formData.description" placeholder="Optional" rows="3" :maxlength="FIELD_LIMITS.description" auto-resize class="w-100" />
+                </div>
 
-            <AnnotationFields v-model="fields" id-prefix="mp" class="mb-3" :schema="schema" :is-ref-taken="isRefTaken" @update:valid="fieldsValid = $event" />
+                <div class="mb-3">
+                    <label for="mp-stroke" class="d-block mb-1 fw-semibold">{{ colorLabel }}</label>
+                    <ColorSwatchPicker v-model="formData.stroke" input-id="mp-stroke" :label="colorLabel" />
+                </div>
+
+                <div v-if="isPolygon" class="mb-3">
+                    <label for="mp-fill" class="d-block mb-1 fw-semibold">Fill color</label>
+                    <ColorSwatchPicker v-model="formData.fill" input-id="mp-fill" label="Fill color" />
+                </div>
+
+                <div v-if="!isPoint" class="mb-3">
+                    <label for="mp-stroke-width" class="d-block mb-1 fw-semibold">{{ widthLabel }}: {{ formData['stroke-width'] }} px</label>
+                    <input id="mp-stroke-width" v-model.number="formData['stroke-width']" type="range" min="1" max="10" step="1" class="w-100">
+                </div>
+
+                <div v-if="isPolygon" class="mb-3">
+                    <label for="mp-fill-opacity" class="d-block mb-1 fw-semibold">Fill opacity: {{ Math.round(formData['fill-opacity'] * 100) }}%</label>
+                    <input id="mp-fill-opacity" v-model.number="formData['fill-opacity']" type="range" min="0" max="1" step="0.1" class="w-100">
+                </div>
+
+                <div v-if="isPoint" class="mb-3">
+                    <label for="mp-coords" class="d-block mb-1 fw-semibold">Coordinates</label>
+                    <div class="coords-field">
+                        <InputText id="mp-coords" v-model="coordsInput" autocomplete="off" spellcheck="false" class="coords-input"
+                                   :invalid="!!located.error" :aria-invalid="located.error ? 'true' : undefined"
+                                   :aria-describedby="located.error ? 'mp-coords-error' : 'mp-coords-help'" />
+                        <Button type="button" severity="secondary" text :icon="coordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"
+                                :title="coordsCopied ? 'Copied!' : 'Copy coordinates'" :aria-label="coordsCopied ? 'Copied!' : 'Copy coordinates'"
+                                :disabled="!!located.error" @click="copyCoords(latLonText(located.lat, located.lon))" />
+                    </div>
+                    <FieldError id="mp-coords-error" :message="located.error" />
+                    <small v-if="!located.error" id="mp-coords-help" class="d-block mt-1 coords-help">
+                        Latitude, longitude. {{ latLonDmsText(located.lat, located.lon) }}
+                    </small>
+                </div>
+
+                <div v-if="groups.length > 0" class="mb-3">
+                    <label id="mp-group-label" for="mp-group" class="d-block mb-1 fw-semibold">Group</label>
+                    <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
+                            option-label="label" option-value="value" class="w-100" />
+                </div>
+
+                <AnnotationFields v-model="fields" id-prefix="mp" class="mb-3" :schema="schema" :is-ref-taken="isRefTaken" @update:valid="fieldsValid = $event" />
+            </AnnotationTabs>
         </div>
 
         <template #footer>
@@ -70,7 +72,7 @@
  * The properties of a measurement or a point annotation: its name, description and colours, the width of a line,
  * the fill of an area, the coordinates of a point (typed or pasted to move it: decimal degrees or DMS, see
  * parseLatLon), its group and the annotation fields (AnnotationFields: reference, category, severity, status, assignee,
- * due date, in reports). The one dialog of a measurement, however it is
+ * due date, in reports) and, when it is given a `photoContext`, its photos (AnnotationTabs). The one dialog of a measurement, however it is
  * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed).
  *
  * Emits `save` with the properties that apply to the geometry (a point has no width or fill; `coordinates`, its new
@@ -86,8 +88,10 @@ import Select from 'primevue/select';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import FieldError from '@/components/FieldError.vue';
 import AnnotationFields from '@/components/measurements/AnnotationFields.vue';
+import AnnotationTabs from '@/components/measurements/AnnotationTabs.vue';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_KEYS, FIELD_LIMITS, storedFields } from '@/libs/map/annotationIds';
+import { storedPhotos } from '@/libs/reports/annotationPhotos';
 import { toLonLat } from 'ol/proj';
 import { latLonText, latLonDmsText, parseLatLon } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
@@ -96,7 +100,7 @@ import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 export default {
     components: {
         Window, Button, InputText, Textarea, Select,
-        ColorSwatchPicker, FieldError, AnnotationFields
+        ColorSwatchPicker, FieldError, AnnotationFields, AnnotationTabs
     },
     props: {
         feature: {
@@ -131,6 +135,12 @@ export default {
         isRefTaken: {
             type: Function,
             default: () => false
+        },
+        // What the Photos tab needs ({ dataset, measurementPath, itemId, geometry, readOnly, photos }, see AnnotationTabs;
+        // photos: the ones the annotation has): without it the dialog has no Photos tab and saves none
+        photoContext: {
+            type: Object,
+            default: null
         }
     },
     emits: ['close', 'save', 'delete', 'discard'],
@@ -147,6 +157,9 @@ export default {
             // The annotation fields (reference, category, ...) and whether they can be saved
             fields: {},
             fieldsValid: true,
+            // The photos the annotation has (the Photos tab changes them), and what they were
+            photos: [],
+            savedPhotos: [],
             formData: {
                 name: '',
                 description: '',
@@ -206,6 +219,8 @@ export default {
         this.formData.groupId = get('groupId') || '';
         this.fields = Object.fromEntries(FIELD_KEYS.filter(key => get(key) !== undefined && get(key) !== null).map(key => [key, get(key)]));
         this.coordsInput = this.pointText;
+        this.photos = [...(this.photoContext?.photos || [])];
+        this.savedPhotos = this.photos;
     },
     methods: {
         latLonText,
@@ -230,6 +245,8 @@ export default {
             const { ref, ...fields } = storedFields(this.fields);
             Object.assign(properties, fields);
             if (ref !== undefined) properties.ref = ref;
+            // The photos only when the tab was used and they changed (an empty list clears them)
+            if (this.photoContext && this.photos !== this.savedPhotos) properties.photos = storedPhotos(this.photos);
             return properties;
         },
         save() {

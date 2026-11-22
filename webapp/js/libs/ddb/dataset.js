@@ -275,6 +275,21 @@ export default class Dataset {
         return this.registry.postRequest(`${this.baseApi}/raster-profile`, body);
     }
 
+    /**
+     * The images of the dataset whose footprint covers a WGS84 geometry, the best view first (the Registry asks libddb).
+     * Resolves to `[{ path, score, overlap, pixel }]`: `score` is the distance from the centre of the geometry to the
+     * centre of the footprint over the footprint's diagonal (smaller is better), `overlap` the share of the geometry the
+     * footprint covers, `pixel` the [x, y] of the centre of the geometry in the image, or null when the camera
+     * does not say. Rejects when the Registry refuses (a geometry it cannot use is a 400).
+     * A read sent as POST (the geometry can exceed the URL budget): it does not drop the cached reads.
+     * @param {{ type: string, coordinates: any }} geometry  a GeoJSON Point, LineString or Polygon in EPSG:4326
+     * @param {{ limit?: number, signal?: AbortSignal }} [options]  `limit`: 1 to 100 results (20 by default)
+     * @returns {Promise<{ path: string, score: number, overlap: number, pixel: [number, number] | null }[]>}
+     */
+    async findCoverage(geometry, { limit = 20, signal } = {}) {
+        return this.registry.makeRequest(`${this.baseApi}/coverage`, { method: 'POST', body: { geometry, limit }, readOnly: true, signal });
+    }
+
     async calculateStockpileVolume(path, polygonGeoJson, { baseMethod = BASE_METHOD.LOWEST_PERIMETER, flatElevation = 0 } = {}) {
         const body = {
             path,

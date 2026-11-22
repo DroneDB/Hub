@@ -570,6 +570,13 @@ describe('useMapMeasurements', () => {
             expect(m.hasUnsavedMeasurements.value).toBe(false);
         });
 
+        it('offer their photos the dataset and the file they are saved in, once it is known, and the write access of the user', async () => {
+            const m = startWithControls();
+            expect(controls.getPhotoHost()).toBeNull();
+            await m.loadSavedMeasurements();
+            expect(controls.getPhotoHost()).toEqual({ dataset, measurementPath: 'a/ortho_measurements.geojson', readOnly: false });
+        });
+
         it('name the file they are saved in, once it is known', async () => {
             const m = startWithControls();
             expect(m.measurementsFilePath.value).toBe('');

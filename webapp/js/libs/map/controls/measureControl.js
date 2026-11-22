@@ -23,6 +23,7 @@ import { exportMeasurements, importMeasurements, measurementSizeText, updateFeat
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import { showPointPopup, removeMeasureTooltip, setPointPopupShown, CALLOUTS_ON_HOVER_CLASS } from '@/libs/map/pointPopup';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { mapFeatureGeometry } from '@/libs/reports/annotationPhotos';
 import { latLonText, stockpileLabel } from '@/libs/format';
 import { colorToken, tokenRgba } from '@/libs/colorScheme';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
@@ -206,6 +207,9 @@ class MeasureControls extends Control {
         this.annotationSchema = DEFAULT_SCHEMA;
         // The refs this control issues: the storage's when the host gives it (it knows the file), else its own
         this.getRefSequence = options.getRefSequence || (() => null);
+        // What the Photos tab of the properties dialog needs of the host: { dataset, measurementPath, readOnly }, or null
+        // for a host that has no photos to offer
+        this.getPhotoHost = options.getPhotoHost || (() => null);
         this._ownRefs = new RefSequence();
 
         this.unitPref = unitPref;
@@ -1325,6 +1329,17 @@ class MeasureControls extends Control {
     }
 
     /**
+     * What the Photos tab of the dialog of a measurement needs: the host's dataset and measurement file, and the
+     * measurement's id, photos and WGS84 geometry. Null when the host has no photos to offer.
+     * @param {ol.Feature} feature
+     */
+    _photoContext(feature) {
+        const host = this.getPhotoHost();
+        if (!host) return null;
+        return { ...host, itemId: feature.get('id') || '', geometry: mapFeatureGeometry(feature), photos: feature.get('photos') || [] };
+    }
+
+    /**
      * The properties dialog of a measurement or a point annotation: the one dialog of a measurement, however it is
      * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed). A
      * measurement that exists has a Delete button; a point just placed has Discard, which removes it.
@@ -1344,6 +1359,7 @@ class MeasureControls extends Control {
             groups: this.getGroups(),
             schema: this.annotationSchema,
             isRefTaken: ref => this.isRefTaken(ref, feature),
+            photoContext: this._photoContext(feature),
             onSave: ({ groupId, coordinates, ...properties }) => {
                 Object.keys(properties).forEach(key => feature.set(key, properties[key]));
                 this.setMeasurementGroupId(feature, groupId);

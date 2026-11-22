@@ -10,6 +10,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
+import { UTM_18N_WKT } from '@/libs/map/measurementFormat.fixtures';
 
 vi.mock('@/composables/useMapAlerts', () => ({ flash: vi.fn() }));
 
@@ -52,15 +53,15 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
-async function start() {
-    stored = { [PATH]: JSON.stringify(FILE) };
+async function start({ file = FILE, coordinateSystem = { srs: null }, canWrite = true } = {}) {
+    stored = { [PATH]: JSON.stringify(file) };
     const dataset = {
         getFileContents: vi.fn(async path => stored[path]),
         writeObj: vi.fn(async (path, blob) => { stored[path] = await blob.text(); }),
         deleteObj: vi.fn()
     };
     const dialogs = { open: vi.fn(() => ({ close: vi.fn() })) };
-    const m = usePotreeMeasurements({ entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(true), error: ref(''), dialogs });
+    const m = usePotreeMeasurements({ entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(canWrite), error: ref(''), dialogs });
     const annotations = {
         id: 'annotations', children: [],
         add(a) { this.children.push(a); listeners.get('annotations:annotation_added')?.({ annotation: a }); },
@@ -72,7 +73,7 @@ async function start() {
         scene: { id: 'scene', measurements: [], annotations, addMeasurement() {}, removeMeasurement() {} },
         renderer: { domElement: Object.assign(document.createElement('canvas'), { id: 'canvas' }) }
     };
-    m.attach(viewer, session, { srs: null });
+    m.attach(viewer, session, coordinateSystem);
     await m.load();
     return { m, dialogs, annotation: annotations.children[0] };
 }
@@ -176,5 +177,55 @@ describe('the identity and the fields of an annotation', () => {
         input.dispatchEvent(new Event('input'));
         await flushPromises();
         expect(document.getElementById('ap-ref-error')).toBeNull();
+    });
+});
+
+describe('the photos of an annotation', () => {
+    const PHOTOS = [{ path: 'images/a.jpg', source: 'coverage', pixel: [10, 20], caption: 'Gate' }];
+    const withPhotos = { ...FILE, features: [{ ...FILE.features[0], properties: { ...FILE.features[0].properties, photos: PHOTOS } }] };
+
+    it('gives the dialog the dataset, the file the annotation is saved in, its id, its photos and whether the user can change them', async () => {
+        const { dialogs, annotation } = await start({ file: withPhotos });
+        const { photoContext } = openedDialog(dialogs, annotation);
+        expect(photoContext.measurementPath).toBe(PATH);
+        expect(photoContext.itemId).toMatch(/^[0-9a-f]{64}$/);
+        expect(photoContext.photos).toEqual(PHOTOS);
+        expect(photoContext.readOnly).toBe(false);
+        expect(photoContext.dataset.writeObj).toBeTypeOf('function');
+    });
+
+    it('says the user cannot change the photos when they cannot write', async () => {
+        const { dialogs, annotation } = await start({ canWrite: false });
+        expect(openedDialog(dialogs, annotation).photoContext.readOnly).toBe(true);
+    });
+
+    it('has no geometry to ask the coverage query about when the cloud has no CRS: such an item is not sent', async () => {
+        const { dialogs, annotation } = await start();
+        expect(openedDialog(dialogs, annotation).photoContext.geometry).toBeNull();
+    });
+
+    it('has the longitude and latitude of the annotation when the cloud has a CRS', async () => {
+        const { dialogs, annotation } = await start({ coordinateSystem: { srs: UTM_18N_WKT } });
+        const { geometry } = openedDialog(dialogs, annotation).photoContext;
+        expect(geometry.type).toBe('Point');
+        // zone 18N, 75 W: a point near the origin of the zone is near that meridian
+        expect(Math.abs(geometry.coordinates[0] + 79.5)).toBeLessThan(5);
+    });
+
+    it('is saved with the photos the dialog sets, keeps them when the dialog does not change them, and drops the key for none', async () => {
+        const { m, dialogs, annotation } = await start({ file: withPhotos });
+        const props = openedDialog(dialogs, annotation);
+        props.onSave({ name: 'Gate', description: '', ref: '1' });
+        await m.save();
+        expect(JSON.parse(stored[PATH]).features[0].properties.photos).toEqual(PHOTOS);
+
+        const more = [...PHOTOS, { path: 'annotations/x-1.jpg', source: 'upload' }];
+        props.onSave({ name: 'Gate', description: '', photos: more });
+        await m.save();
+        expect(JSON.parse(stored[PATH]).features[0].properties.photos).toEqual(more);
+
+        props.onSave({ name: 'Gate', description: '', photos: undefined });
+        await m.save();
+        expect(JSON.parse(stored[PATH]).features[0].properties).not.toHaveProperty('photos');
     });
 });
