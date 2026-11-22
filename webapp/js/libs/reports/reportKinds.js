@@ -19,10 +19,11 @@
  * | pointCloud | area                 | area      | area                          |
  * | pointCloud | circle, angle        | measure3d |                               |
  *
- * A 2D annotation is measured on its geometry (geodesic: libs/map/geodesic, the numbers of the map);
+ * A 2D annotation is measured on its geometry (geodesic: libs/map/geodesicCore, the numbers of the map,
+ * without the map library the model must not load);
  * a 3D one has the distance or the area it was saved with, in the unit of its point cloud's CRS.
  */
-import { geodesicLength, geodesicArea } from '@/libs/map/geodesic';
+import { lonLatLength, lonLatArea } from '@/libs/map/geodesicCore';
 import { VIEW, ownerOf } from '@/libs/map/measurementFormat';
 import { LINEAR_UNITS } from '@/libs/map/crsProjection';
 
@@ -130,10 +131,10 @@ const noMeasure = () => ({ length: null, area: null, perimeter: null, radius: nu
  */
 function measuredFromGeometry(geometry) {
     const measured = noMeasure();
-    if (geometry?.type === 'LineString') measured.length = geodesicLength(geometry.coordinates);
+    if (geometry?.type === 'LineString') measured.length = lonLatLength(geometry.coordinates);
     if (geometry?.type === 'Polygon') {
-        measured.area = geodesicArea(geometry.coordinates);
-        measured.perimeter = geodesicLength(geometry.coordinates[0]);
+        measured.area = lonLatArea(geometry.coordinates);
+        measured.perimeter = lonLatLength(geometry.coordinates[0]);
     }
     return measured;
 }

@@ -1,5 +1,5 @@
 /**
- * FR-MAP-15 / D-032: lengths and areas on the WGS84 ellipsoid. The expected values come from the
+ * Lengths and areas of map geometries on the WGS84 ellipsoid. The expected values come from the
  * construction of each shape in a transverse Mercator grid whose scale is 1 on the central meridian
  * (a UTM zone without the 0.9996 factor, as SWEREF99 is): a side of 100 grid metres is 100 ground
  * metres, so the shapes measure 100 m and 10,000 m2 whatever the latitude. These grids are named after
@@ -8,9 +8,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import proj4 from 'proj4';
-import { fromLonLat } from 'ol/proj';
+import { fromLonLat, toLonLat } from 'ol/proj';
 import { LineString, Polygon, Point, MultiPolygon } from 'ol/geom';
 import { geodesicLength, geodesicArea } from './geodesic';
+import { lonLatLength, lonLatArea } from './geodesicCore';
 
 /** Transverse Mercator, k = 1, on the UTM 32N central meridian (9°E) */
 const TM_32 = '+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=500000 +y_0=0 +ellps=WGS84 +units=m +no_defs';
@@ -262,5 +263,19 @@ describe('geodesicArea', () => {
         expect(geodesicArea(new Point(fromLonLat([9, 56])))).toBe(0);
         expect(geodesicArea(new LineString([fromLonLat([9, 56]), fromLonLat([9.001, 56])]))).toBe(0);
         expect(geodesicArea([[9, 56], [9.001, 56], [NaN, NaN]])).toBe(0);
+    });
+});
+
+describe('a map geometry and its longitude / latitude coordinates', () => {
+    // The report model measures the GeoJSON of a file with geodesicCore, the map its geometry: one number
+    it('measure the same with geodesicCore as with the map geometry', () => {
+        const [e, n] = originAt(TM_32, 56);
+        const rings = [squareAt(TM_32, [e, n]), squareAt(TM_32, [e + 25, n + 25], 50)];
+        const polygon = new Polygon(rings);
+        const lonLatRings = rings.map((ring) => ring.map((c) => toLonLat(c)));
+        expect(lonLatArea(lonLatRings)).toBeCloseTo(geodesicArea(polygon), 6);
+        expect(lonLatLength(lonLatRings)).toBeCloseTo(geodesicLength(polygon), 6);
+        const line = new LineString(rings[0]);
+        expect(lonLatLength(lonLatRings[0])).toBeCloseTo(geodesicLength(line), 6);
     });
 });
