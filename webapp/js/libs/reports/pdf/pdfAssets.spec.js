@@ -53,12 +53,16 @@ describe('logoRequest', () => {
     it('is the logo of the template, fetched with the session', () => {
         expect(logoRequest({ logo: { source: 'template', url: '/orgs/a/ds/b/report-settings/logo/x' } })).toEqual({ url: '/orgs/a/ds/b/report-settings/logo/x', api: true });
     });
-    it('is the logo the instance configures, fetched as a file of the site', () => {
-        expect(logoRequest({ logo: null }, { appLogo: '/images/acme.svg' })).toEqual({ url: '/images/acme.svg', api: false });
+    it('is the logo of the instance the model resolved, fetched as a file of the site', () => {
+        expect(logoRequest({ logo: { source: 'instance', url: '/images/acme.svg' } })).toEqual({ url: '/images/acme.svg', api: false });
     });
-    it('is none when the instance configures none', () => {
-        expect(logoRequest({ logo: null }, {})).toBeNull();
-        expect(logoRequest({ logo: null }, undefined)).toBeNull();
+    it('is none when the model has none, whatever the instance configures', () => {
+        globalThis.HubOptions = { appLogo: '/images/acme.svg' };
+        try {
+            expect(logoRequest({ logo: null })).toBeNull();
+        } finally {
+            delete globalThis.HubOptions;
+        }
     });
 });
 

@@ -61,18 +61,28 @@ describe('captureForReport', () => {
         expect(path).toBe('site/annotations/id-1-3d.webp');
         expect(blob).toBeInstanceOf(Blob);
         expect(options).toEqual({ overwrite: true });
-        expect(snapshot).toEqual({ path: 'site/annotations/id-1-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] } });
+        expect(snapshot).toEqual({ path: 'site/annotations/id-1-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] }, capturedAt: expect.any(String) });
+        expect(Number.isNaN(Date.parse(snapshot.capturedAt))).toBe(false);
         expect(item[PROPERTY_BAG].snapshot).toEqual(snapshot);
     });
 
     it('leaves the snapshot in the property bag that the next Save writes to the file, and a recapture writes the same path', async () => {
         const item = annotation('id-2');
         const ds = dataset();
-        await captureForReport({ viewer: viewerOf(), item, dataset: ds, measurementPath: 'm.geojson', wait });
-        await captureForReport({ viewer: viewerOf(), item, dataset: ds, measurementPath: 'm.geojson', wait });
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            vi.setSystemTime(new Date('2026-11-20T10:00:00Z'));
+            const first = await captureForReport({ viewer: viewerOf(), item, dataset: ds, measurementPath: 'm.geojson', wait });
+            vi.setSystemTime(new Date('2026-11-21T10:00:00Z'));
+            const second = await captureForReport({ viewer: viewerOf(), item, dataset: ds, measurementPath: 'm.geojson', wait });
+            // The same file, another capture: the time it stores tells the two apart (the address of the image has it)
+            expect([first.capturedAt, second.capturedAt]).toEqual(['2026-11-20T10:00:00.000Z', '2026-11-21T10:00:00.000Z']);
+        } finally {
+            vi.useRealTimers();
+        }
         expect(ds.writeObj.mock.calls.map(c => c[0])).toEqual(['annotations/id-2-3d.webp', 'annotations/id-2-3d.webp']);
         // The bag is what the converter writes (the keys of an annotation include the snapshot) and what an undo copies
-        expect(annotationProperties(item[PROPERTY_BAG]).snapshot).toEqual({ path: 'annotations/id-2-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] } });
+        expect(annotationProperties(item[PROPERTY_BAG]).snapshot).toEqual({ path: 'annotations/id-2-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] }, capturedAt: '2026-11-21T10:00:00.000Z' });
         expect(JSON.parse(JSON.stringify(item[PROPERTY_BAG])).snapshot.path).toBe('annotations/id-2-3d.webp');
     });
 

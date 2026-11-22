@@ -15,6 +15,7 @@ import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
 import { permissionsOf } from '@/libs/datasetPermissions';
 import { getPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { instanceLogoUrl } from '@/libs/hubBranding';
 import { absoluteUrl, itemAnchor, reportUrl } from '@/libs/views/viewLinks';
 import { listViews, usableView } from '@/libs/views/viewStore';
 import { listReports, NEWER_REPORT_TEXT } from '@/libs/reports/reportStore';
@@ -111,6 +112,7 @@ export function useReport({ org, ds, uid }) {
             definition, sources, settings, coverView: cover, layerInfo, datasetName,
             units: getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) === 'imperial' ? 'imperial' : 'metric',
             currency: getPref(PREF.CURRENCY, PREF_DEFAULTS[PREF.CURRENCY]),
+            brandingLogoUrl: instanceLogoUrl(),
             now: new Date(),
             links: {
                 reportUrl: pageUrl,

@@ -2,7 +2,8 @@
 /**
  * useReportPdf - the PDF actions of the live page: Download PDF and Publish PDF. One PDF at a time: while one is made
  * both are disabled, its progress shows (rendered items out of all of them) with Cancel, and a cancel ends with no file
- * downloaded or written. Publish is for writers; when the published copy is there it asks Replace or Cancel.
+ * downloaded or written. Publish is for writers; when the published copy is there it asks Replace or Cancel. Once the
+ * PDF is being written to the dataset a cancel could not take the write back, so the dialog offers none.
  *
  *   const pdf = useReportPdf({ model, dataset, uid, canWrite, dialogs });
  *   await pdf.run('download');
@@ -30,6 +31,7 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
 
     const mode = shallowRef(/** @type {'download' | 'publish' | null} */ (null));
     const progress = ref({ done: 0, total: 0 });
+    const writing = ref(false);
     const running = computed(() => mode.value !== null);
     /** @type {AbortController | null} */
     let controller = null;
@@ -52,6 +54,7 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
         controller = new AbortController();
         mode.value = requested;
         progress.value = { done: 0, total: 0 };
+        writing.value = false;
         /** @type {any} */
         let shown = null;
         try {
@@ -62,9 +65,10 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
                 dataset,
                 signal: controller.signal,
                 onProgress: next => { progress.value = next; },
+                onWriting: () => { writing.value = true; },
                 confirmReplace,
                 onGenerating: () => {
-                    shown = dialogs.open(ReportPdfProgressDialog, () => ({ mode: requested, done: progress.value.done, total: progress.value.total }));
+                    shown = dialogs.open(ReportPdfProgressDialog, () => ({ mode: requested, done: progress.value.done, total: progress.value.total, writing: writing.value }));
                     // Cancel, the close button and Escape all answer 'cancel'
                     shown.then((/** @type {string | undefined} */ answer) => { if (answer !== 'done') cancel(); });
                 }
@@ -76,9 +80,10 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
         } finally {
             shown?.close('done');
             mode.value = null;
+            writing.value = false;
             controller = null;
         }
     }
 
-    return { run, cancel, running, mode, progress };
+    return { run, cancel, running, mode, progress, writing };
 }

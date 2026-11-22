@@ -565,12 +565,12 @@ describe('useMapMeasurements', () => {
         let scope;
         afterEach(() => scope?.stop());
 
-        function startWithControls() {
+        function startWithControls(externals = {}) {
             const holder = shallowRef(null);
             scope = effectScope();
             const m = scope.run(() => useMapMeasurements({
                 measureControls: holder, files: () => files.value, dataset: () => dataset, canWrite: () => true, canDelete: () => true,
-                currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, choose: () => async () => 'confirm'
+                currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, choose: () => async () => 'confirm', ...externals
             }));
             m.createMeasureControls({ openDialog: () => {} });
             controls = holder.value;
@@ -596,7 +596,15 @@ describe('useMapMeasurements', () => {
             const m = startWithControls();
             expect(controls.getPhotoHost()).toBeNull();
             await m.loadSavedMeasurements();
-            expect(controls.getPhotoHost()).toEqual({ dataset, measurementPath: 'a/ortho_measurements.geojson', readOnly: false });
+            expect(controls.getPhotoHost()).toEqual({ dataset, measurementPath: 'a/ortho_measurements.geojson', readOnly: false, onWritten: expect.any(Function) });
+        });
+
+        it('tell of a photo their tab uploaded as of a file the map wrote, so the file list shows it', async () => {
+            const written = [];
+            const m = startWithControls({ onFileWritten: () => path => written.push(path) });
+            await m.loadSavedMeasurements();
+            controls.getPhotoHost().onWritten('a/annotations/m1-1.jpg');
+            expect(written).toEqual(['a/annotations/m1-1.jpg']);
         });
 
         it('name the file they are saved in, once it is known', async () => {

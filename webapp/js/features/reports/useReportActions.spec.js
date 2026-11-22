@@ -19,6 +19,7 @@ vi.mock('@/libs/reports/reportStore', async importOriginal => ({
 }));
 
 const { useReportActions, copyName } = await import('./useReportActions');
+const { NEWER_REPORT_TEXT } = await import('@/libs/reports/reportStore');
 
 const entry = { id: '1', uid: 'r_aaaaaaaa', name: 'Alpha "quoted"', data: { version: 1, uid: 'r_aaaaaaaa', name: 'Alpha "quoted"', sources: [] }, error: null };
 
@@ -101,6 +102,13 @@ describe('duplicate', () => {
         expect(definition).toEqual({ ...entry.data, name: 'Alpha "quoted" (copy)' });
         expect(options).toEqual({ user: 'jdoe' });
         expect(onChanged).toHaveBeenCalled();
+    });
+
+    it('refuses a report of a newer version, with the reason, and stores nothing', async () => {
+        expect(await actions.duplicate({ ...entry, newerVersion: true })).toBe(false);
+        expect(m.saveNewReport).not.toHaveBeenCalled();
+        expect(m.error).toHaveBeenCalledWith(NEWER_REPORT_TEXT, { summary: 'Cannot duplicate the report' });
+        expect(onChanged).not.toHaveBeenCalled();
     });
 
     it('shows the refusal of the store (100 reports) and stores nothing more', async () => {

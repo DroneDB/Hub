@@ -91,6 +91,17 @@ function applyFavicon(favicon) {
 }
 
 /**
+ * The logo the instance configures (HubOptions.appLogo), or null when it configures none: the banner the header shows
+ * when nothing is configured is the application's own, not the instance's.
+ * @param {{ appLogo?: unknown } | undefined} [hubOptions]
+ * @returns {string | null}
+ */
+export function instanceLogoUrl(hubOptions = /** @type {any} */ (globalThis).HubOptions) {
+    const logo = hubOptions?.appLogo;
+    return typeof logo === 'string' && logo ? logo : null;
+}
+
+/**
  * Loads the feature flags of `registry` and applies the branding they carry
  * (window.HubOptions, title, favicons). The endpoint is anonymous, so this also
  * works before sign-in. Never throws.

@@ -67,11 +67,26 @@ describe('useReportPdf', () => {
         expect(dialogs.opened).toHaveLength(1);
         expect(dialogs.opened[0].component).toBe(ReportPdfProgressDialog);
         pdf.requests[0].onProgress({ done: 2, total: 5 });
-        expect(dialogs.opened[0].props()).toEqual({ mode: 'download', done: 2, total: 5 });
+        expect(dialogs.opened[0].props()).toEqual({ mode: 'download', done: 2, total: 5, writing: false });
         pdf.finish({ status: 'downloaded', fileName: 'x.pdf' });
         await run;
         // the dialog was closed with 'done', which is not a cancel
         expect(await dialogs.opened[0].promise).toBe('done');
+    });
+
+    it('offers no Cancel once the PDF is being written to the dataset, where a cancel could not stop the write', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('publish');
+        await flush();
+        expect(dialogs.opened[0].props().writing).toBe(false);
+        pdf.requests[0].onWriting();
+        expect(dialogs.opened[0].props()).toMatchObject({ mode: 'publish', writing: true });
+        expect(actions.writing.value).toBe(true);
+        pdf.finish({ status: 'published', fileName: 'x.pdf', path: 'reports/x.pdf' });
+        await run;
+        expect(actions.writing.value).toBe(false);
+        expect(m.notify.success).toHaveBeenCalledWith('Published as reports/x.pdf', { summary: 'PDF published' });
     });
 
     it('is one PDF at a time: a second one asked for while one runs is not started', async () => {

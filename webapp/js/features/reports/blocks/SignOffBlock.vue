@@ -1,6 +1,6 @@
 <template>
     <div class="report-sign-off">
-        <p v-if="block.preparedBy" class="report-sign-off-by">Prepared by {{ block.preparedBy }}</p>
+        <p v-if="block.byline" class="report-sign-off-by">{{ block.byline }}</p>
         <div class="report-sign-off-lines">
             <div v-for="line in block.lines" :key="line.label" class="report-sign-off-line">
                 <span class="report-sign-off-rule" />
@@ -13,7 +13,7 @@
 <script setup>
 /** The sign-off block: the lines a reader fills in on paper (name, signature, date). */
 defineProps({
-    /** { preparedBy, lines: [{ label }] } */
+    /** { byline, lines: [{ label }] } */
     block: { type: Object, required: true }
 });
 </script>

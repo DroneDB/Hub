@@ -3,7 +3,7 @@
         <li v-for="photo in block.photos" :key="photo.path" class="report-photo">
             <!-- A photo that is no longer in the dataset says so, with its path -->
             <div v-if="missing(photo.path)" class="report-photo-missing">
-                <strong>Missing photo</strong>
+                <strong>{{ MISSING_PHOTO }}</strong>
                 <span class="report-photo-path">{{ photo.path }}</span>
             </div>
             <PhotoThumb v-else :dataset="context.dataset" :path="photo.path" :hash="entryOf(photo.path)?.hash" :pixel="photo.pixel"
@@ -21,6 +21,7 @@
  */
 import PhotoThumb from '@/components/measurements/PhotoThumb.vue';
 import { isDatasetPath, photoAlt } from '@/libs/reports/annotationPhotos';
+import { MISSING_PHOTO } from '@/libs/reports/reportSections';
 import { useReportContext } from '../reportContext';
 
 defineProps({

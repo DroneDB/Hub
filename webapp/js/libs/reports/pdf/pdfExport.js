@@ -3,7 +3,9 @@
  * "Download PDF" and "Publish PDF": what happens to the PDF of a report once the page asks for it. Both make the PDF
  * from the model the page shows (generateReportPdf) and name it `<slug>-<yyyy-mm-dd>.pdf`; a download saves it, a
  * publish writes it to `reports/` at the root of the dataset, asking Replace or Cancel when that file is there.
- * A cancel (the signal aborted) ends with no file saved or written.
+ * A cancel (the signal aborted) ends with no file saved or written. The write of a published copy cannot be taken back
+ * once it is sent (the Registry may have the file whatever the browser does), so the signal is checked before each
+ * write and before each question, and `onWriting` tells the page that from now on there is nothing left to cancel.
  */
 import { downloadBlob } from '@/libs/download';
 import { isNotFound, datasetBusyOf } from '@/libs/ddb/apiError';
@@ -34,6 +36,7 @@ export async function publishedCopyExists(dataset, fileName) {
  * @property {AbortSignal} signal
  * @property {(progress: import('./pdfAssets').Progress) => void} [onProgress]
  * @property {() => void} [onGenerating]  called when the PDF starts to be made (after the question about a published copy)
+ * @property {() => void} [onWriting]  called before a published copy is written: a cancel no longer stops anything
  * @property {(path: string) => Promise<boolean>} [confirmReplace]  asks whether to replace the published copy at that path
  * @property {Date} [now]
  * @property {typeof generateReportPdf} [generate]
@@ -44,7 +47,7 @@ export async function publishedCopyExists(dataset, fileName) {
  * @param {ExportRequest} request
  * @returns {Promise<{ status: 'downloaded' | 'published' | 'cancelled', fileName: string, path?: string }>}
  */
-export async function exportReportPdf({ mode, model, uid, dataset, signal, onProgress, onGenerating, confirmReplace = async () => false, now = new Date(), generate = generateReportPdf, save = downloadBlob }) {
+export async function exportReportPdf({ mode, model, uid, dataset, signal, onProgress, onGenerating, onWriting, confirmReplace = async () => false, now = new Date(), generate = generateReportPdf, save = downloadBlob }) {
     const fileName = pdfFileName({ name: model.name, uid }, now);
     const path = publishedPath(fileName);
     const cancelled = /** @type {const} */ ({ status: 'cancelled', fileName });
@@ -70,13 +73,20 @@ export async function exportReportPdf({ mode, model, uid, dataset, signal, onPro
         save(blob, fileName);
         return { status: 'downloaded', fileName };
     }
+    /** Writes the copy unless the user cancelled meanwhile. @param {boolean} overwrite @returns {Promise<boolean>} whether it was written */
+    const write = async overwrite => {
+        if (signal.aborted) return false;
+        onWriting?.();
+        await dataset.writeObj(path, blob, { overwrite });
+        return true;
+    };
     try {
-        await dataset.writeObj(path, blob, { overwrite: replace });
+        if (!await write(replace)) return cancelled;
     } catch (e) {
         // Another session published the same name while the PDF was made: the same question, answered once
         if (replace || /** @type {any} */ (e)?.status !== 409 || datasetBusyOf(e)) throw e;
-        if (!await confirmReplace(path)) return cancelled;
-        await dataset.writeObj(path, blob, { overwrite: true });
+        if (signal.aborted || !await confirmReplace(path)) return cancelled;
+        if (!await write(true)) return cancelled;
     }
     return { status: 'published', fileName, path };
 }

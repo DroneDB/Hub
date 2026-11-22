@@ -3,6 +3,7 @@ import { buildPdfDocument, CONTENTS_TITLE } from '@/libs/reports/pdf/pdfDocument
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
 import { qrCode } from '@/libs/qr';
 import { ORIGIN, REPORT_URL, JPEG_URL, fullAssets, nodesOf, noAssets, options, pdfModel, textOf, textsOf, threeItems } from '@/libs/reports/pdf/pdfDocument.fixtures';
+import { mapFeature } from '@/libs/reports/reportModel.fixtures';
 
 const build = (model, assets) => buildPdfDocument(model, options(model, assets));
 const headings = content => nodesOf(content).filter(n => ['h1', 'h2', 'h3', 'coverTitle', 'coverSubtitle'].includes(n.style));
@@ -147,8 +148,32 @@ describe('the sections and their values: the page and the PDF are the same repor
         const model = pdfModel();
         const summary = model.sections.find(s => s.kind === 'summary').blocks.find(b => b.type === 'summaryStats');
         const all = textsOf(build(model).content);
-        expect(all).toContain(`${summary.total.text}${summary.overdue.count ? ` (${summary.overdue.text} overdue)` : ''}`);
-        for (const count of summary.byStatus) expect(all).toContain(`${count.label}: ${count.count}`);
+        expect(all).toContain(summary.headline);
+        for (const group of summary.groups) {
+            expect(all).toContain(group.title);
+            for (const count of group.counts) expect(all).toContain(`${count.label}: ${count.count}`);
+        }
+    });
+
+    it('writes the titles of the summary groups, the headline and the sign-off the model gives, as they are', () => {
+        const model = pdfModel();
+        const blocks = model.sections.flatMap(s => s.blocks);
+        const summary = blocks.find(b => b.type === 'summaryStats');
+        const signOff = blocks.find(b => b.type === 'signOff');
+        const renamed = {
+            ...model,
+            sections: model.sections.map(section => ({
+                ...section,
+                blocks: section.blocks.map(b => (b === summary
+                    ? { ...b, headline: 'Three things', groups: b.groups.map(g => ({ ...g, title: `Per ${g.key}` })) }
+                    : b === signOff ? { ...b, byline: 'Signed for ACME' } : b))
+            }))
+        };
+        const all = textsOf(build(renamed).content);
+        expect(all).toContain('Three things');
+        expect(all).toContain('Per kind');
+        expect(all).not.toContain('By kind');
+        expect(all).toContain('Signed for ACME');
     });
 
     it('has the sections the model has, and none when the definition switches them off', () => {
@@ -256,6 +281,17 @@ describe('the images', () => {
         assets.figures.set(overview, { image: { dataUrl: JPEG_URL, width: 10, height: 5 }, note: 'Basemap not shown: provider does not allow export' });
         const texts = textsOf(build(model, assets).content);
         expect(texts).toContain(`${overview.alt} - ${overview.note} - Basemap not shown: provider does not allow export`);
+    });
+
+    it('print a note once when the renderer answers with the note of the model', () => {
+        const model = pdfModel({ features: [mapFeature('l1', '1', 'profile', { type: 'LineString', coordinates: [[11, 45], [11.001, 45]] })] });
+        const chart = model.sections.flatMap(s => s.blocks).find(b => b.type === 'chart');
+        expect(chart.note).toBe('No elevation layer in the cover view');
+        const assets = noAssets();
+        assets.figures.set(chart, { image: null, note: chart.note });
+        const texts = textsOf(build(model, assets).content);
+        expect(texts).toContain(`${chart.alt} - ${chart.note}`);
+        expect(texts).not.toContain(`${chart.note} - ${chart.note}`);
     });
 
     it('print the note of the model when the renderer has none', () => {

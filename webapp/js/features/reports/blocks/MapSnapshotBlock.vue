@@ -16,6 +16,7 @@ import FigureFrame from './FigureFrame.vue';
 import { useReportContext } from '../reportContext';
 import { renderMapSnapshot } from '@/libs/reports/snapshots';
 import { useRenderedImage } from '@/libs/reports/snapshots/useRenderedImage';
+import { figureCaption } from '@/libs/reports/reportSections';
 
 const props = defineProps({
     /** { kind: 'overview' | 'item', itemId, ref, items, extent, frame, layers, basemap, view, coverDeleted, legend, alt, note } */
@@ -27,5 +28,5 @@ const root = ref(null);
 const { url, note, error, state, retry } = useRenderedImage(() => root.value, signal => renderMapSnapshot(props.block, { dataset: context.dataset, signal }));
 watch(() => props.block, retry);
 
-const caption = computed(() => [props.block.alt, props.block.note, note.value].filter(Boolean).join(' - '));
+const caption = computed(() => figureCaption(props.block.alt, props.block.note, note.value));
 </script>

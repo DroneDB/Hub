@@ -38,16 +38,13 @@ export function planAssetWork(model) {
 }
 
 /**
- * The logo of the report: the one of its template (its own endpoint, with the session), else the instance's own, which
- * is a file of the site. None when the instance configures none: the bundled banner is not a report's.
+ * The logo of the report, as the model resolved it: the one of its template (its own endpoint, with the session), else
+ * the instance's own, which is a file of the site; none when the model has none.
  * @param {any} model
- * @param {{ appLogo?: string } | undefined} [hubOptions]  window.HubOptions
  * @returns {{ url: string, api: boolean } | null}
  */
-export function logoRequest(model, hubOptions = typeof window === 'undefined' ? undefined : /** @type {any} */ (window).HubOptions) {
-    if (model.logo) return { url: model.logo.url, api: model.logo.source === 'template' };
-    const instance = hubOptions?.appLogo;
-    return typeof instance === 'string' && instance ? { url: instance, api: false } : null;
+export function logoRequest(model) {
+    return model.logo ? { url: model.logo.url, api: model.logo.source === 'template' } : null;
 }
 
 /**

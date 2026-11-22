@@ -28,8 +28,8 @@ describe('capturePath', () => {
 describe('snapshotOf', () => {
     it('stores the path and the camera with its position and target', () => {
         const camera = { position: [1, 2, 3], target: [4, 5, 6] };
-        const snapshot = snapshotOf('a/annotations/x-3d.webp', camera);
-        expect(snapshot).toEqual({ path: 'a/annotations/x-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] } });
+        const snapshot = snapshotOf('a/annotations/x-3d.webp', camera, '2026-11-20T10:00:00.000Z');
+        expect(snapshot).toEqual({ path: 'a/annotations/x-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] }, capturedAt: '2026-11-20T10:00:00.000Z' });
         // A copy: what the camera does next does not change what is stored
         camera.position[0] = 99;
         expect(snapshot.camera.position[0]).toBe(1);
@@ -41,6 +41,19 @@ describe('capture3dImageUrl', () => {
 
     it('is the address of the stored image in the dataset', () => {
         expect(capture3dImageUrl({ path: 'a/annotations/x-3d.webp' }, dataset)).toBe('/dl/a/annotations/x-3d.webp?inline=1');
+    });
+
+    it('changes with each capture of the item, and is the same for two renders of one capture', () => {
+        const first = { path: 'a/annotations/x-3d.webp', capturedAt: '2026-11-20T10:00:00.000Z' };
+        const again = { path: 'a/annotations/x-3d.webp', capturedAt: '2026-11-21T09:30:00.000Z' };
+        expect(capture3dImageUrl(first, dataset)).toBe('/dl/a/annotations/x-3d.webp?inline=1&v=2026-11-20T10%3A00%3A00.000Z');
+        expect(capture3dImageUrl(first, dataset)).toBe(capture3dImageUrl({ ...first }, dataset));
+        expect(capture3dImageUrl(again, dataset)).not.toBe(capture3dImageUrl(first, dataset));
+    });
+
+    it('takes the time of the capture as a parameter of its own when the address has no query', () => {
+        const bare = { downloadUrl: path => `/dl/${path}` };
+        expect(capture3dImageUrl({ path: 'x-3d.webp', capturedAt: '2026-11-20' }, bare)).toBe('/dl/x-3d.webp?v=2026-11-20');
     });
 
     it('is null for an item with no capture and for a path that is not the dataset\'s', () => {

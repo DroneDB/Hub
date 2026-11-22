@@ -10,7 +10,6 @@
 import { layerValueOptions, rasterValueParts, ELEVATION_UNIT } from '@/libs/map/rasterUnit';
 import { profileRange, profileSamples, validProfileSamples } from '@/libs/map/profileSeries';
 import { formatLength } from '@/libs/format';
-import { getPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PRIMARY } from '@/libs/palette';
 import { NO_ELEVATION_LAYER } from '@/libs/reports/reportSections';
 import { canvasToBlob, releaseCanvas } from '@/libs/reports/snapshots/canvasImage';
@@ -38,8 +37,8 @@ const whiteBackground = {
 };
 
 /**
- * The chart.js configuration of a profile: distance along the line (in the user's units) against the value, a gap where
- * a sample has no value.
+ * The chart.js configuration of a profile: distance along the line (in the units of the report) against the value, a
+ * gap where a sample has no value.
  * @param {import('@/libs/map/profileSeries').RasterProfile} profile
  * @param {{ unit?: string, lengthUnits?: string }} [options]
  */
@@ -89,13 +88,13 @@ async function loadChartLibrary() {
 }
 
 /**
- * Renders a chart block.
+ * Renders a chart block. The distances are in the units of the block (the report's: its definition's, else the
+ * reader's), so the page, the PDF and the tables of the report agree.
  * @param {any} block  a `chart` block of the report model
- * @param {{ dataset: any, width?: number, height?: number, signal?: AbortSignal, units?: string }} options
- *   `units`: 'metric' or 'imperial' for the distances (the user's preference by default)
+ * @param {{ dataset: any, width?: number, height?: number, signal?: AbortSignal }} options
  * @returns {Promise<{ image: Blob | null, width: number, height: number, note: string | null }>}
  */
-export async function renderProfileChart(block, { dataset, width = PROFILE_SIZE.width, height = PROFILE_SIZE.height, signal, units } = /** @type {any} */ ({})) {
+export async function renderProfileChart(block, { dataset, width = PROFILE_SIZE.width, height = PROFILE_SIZE.height, signal } = /** @type {any} */ ({})) {
     throwIfAborted(signal);
     const size = { width, height };
     const layer = block.elevationLayer;
@@ -112,8 +111,7 @@ export async function renderProfileChart(block, { dataset, width = PROFILE_SIZE.
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    const lengthUnits = units || getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
-    const chart = new Chart(canvas, /** @type {any} */ (profileChartConfig(profile, { unit: profile.unit || ELEVATION_UNIT, lengthUnits })));
+    const chart = new Chart(canvas, /** @type {any} */ (profileChartConfig(profile, { unit: profile.unit || ELEVATION_UNIT, lengthUnits: block.units === 'imperial' ? 'imperial' : 'metric' })));
     try {
         return { image: await canvasToBlob(canvas), ...size, note: null };
     } finally {

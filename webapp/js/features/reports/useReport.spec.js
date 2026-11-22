@@ -108,6 +108,29 @@ describe('a report that opens', () => {
     });
 });
 
+describe('the logo', () => {
+    afterEach(() => { delete globalThis.HubOptions; });
+
+    it('is the logo the instance configures when the template has none', async () => {
+        globalThis.HubOptions = { appLogo: '/images/acme.svg' };
+        await open();
+        expect(report.model.value.logo).toEqual({ source: 'instance', url: '/images/acme.svg' });
+    });
+
+    it('is none when the instance configures none (the banner of the header is not the instance\'s)', async () => {
+        globalThis.HubOptions = {};
+        await open();
+        expect(report.model.value.logo).toBeNull();
+    });
+
+    it('is the logo of the template when it has one', async () => {
+        globalThis.HubOptions = { appLogo: '/images/acme.svg' };
+        m.settings.mockResolvedValue({ templates: [{ ...DEFAULT_TEMPLATE, logo: 'report-logo-standard.png' }], schema: DEFAULT_SCHEMA });
+        await open();
+        expect(report.model.value.logo.source).toBe('template');
+    });
+});
+
 describe('the links of the items', () => {
     it('are the report address with the item anchor, absolute, and the cover view with the item for the file the cover saves its measurements in', async () => {
         await open();

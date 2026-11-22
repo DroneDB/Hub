@@ -252,6 +252,19 @@ describe('the Photos tab of the dialog', () => {
     const tab = name => [...dialog().querySelectorAll('[role="tab"]')].find(t => t.textContent.includes(name));
     const photosPanel = () => dialog().querySelector('.annotation-photos');
 
+    it('tells the host of a photo it uploaded, so that the file list of the page shows it', async () => {
+        const ctx = context({ onWritten: vi.fn() });
+        await show(line(), { photoContext: ctx });
+        tab('Photos').click();
+        await flushPromises();
+        const input = photosPanel().querySelector('input[type="file"]');
+        Object.defineProperty(input, 'files', { value: [new File(['x'], 'IMG_1.JPG', { type: 'image/jpeg' })], configurable: true });
+        input.dispatchEvent(new Event('change'));
+        await flushPromises();
+        expect(ctx.dataset.writeObj).toHaveBeenCalledTimes(1);
+        expect(ctx.onWritten).toHaveBeenCalledWith('site/annotations/id-1-1.jpg');
+    });
+
     it('has no tabs and saves no photos without a photo context', async () => {
         await show(line());
         expect(dialog().querySelector('[role="tab"]')).toBeNull();

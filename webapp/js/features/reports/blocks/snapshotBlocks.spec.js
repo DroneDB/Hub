@@ -127,6 +127,15 @@ describe('the 3D capture block', () => {
         expect(img.attributes('alt')).toBe('3D snapshot of item 3');
     });
 
+    it('reads a new capture of the item from a new address, not the old image from the cache', async () => {
+        const block = { type: 'capture3d', itemId: 'c', ref: '3', path: 'site/annotations/c-3d.webp', camera: null, capturedAt: '2026-11-20T10:00:00.000Z', text: '3D snapshot of item 3' };
+        const wrapper = mountBlock(Capture3dBlock, block);
+        const first = wrapper.find('img').attributes('src');
+        expect(first).toContain('v=2026-11-20T10%3A00%3A00.000Z');
+        await wrapper.setProps({ block: { ...block, capturedAt: '2026-11-21T10:00:00.000Z' } });
+        expect(wrapper.find('img').attributes('src')).not.toBe(first);
+    });
+
     it('says "No 3D snapshot" for an item with none', () => {
         const wrapper = mountBlock(Capture3dBlock, { type: 'capture3d', itemId: 'c', ref: '3', path: null, camera: null, text: 'No 3D snapshot' });
         expect(wrapper.find('img').exists()).toBe(false);

@@ -231,7 +231,13 @@ describe('the 3D snapshot of an item', () => {
 
     it('is its capture with the camera it was taken from', () => {
         const snapshot = { path: 'survey/annotations/c1-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] } };
-        expect(capture({ snapshot })).toMatchObject({ itemId: 'c1', ref: '1', path: snapshot.path, camera: snapshot.camera });
+        expect(capture({ snapshot })).toMatchObject({ itemId: 'c1', ref: '1', path: snapshot.path, camera: snapshot.camera, capturedAt: null });
+    });
+
+    it('carries the time of the capture, for the address of its image', () => {
+        const snapshot = { path: 'survey/annotations/c1-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] }, capturedAt: '2026-11-20T10:00:00.000Z' };
+        expect(capture({ snapshot }).capturedAt).toBe('2026-11-20T10:00:00.000Z');
+        expect(capture({ snapshot: { ...snapshot, capturedAt: 42 } }).capturedAt).toBeNull();
     });
 
     it('says "No 3D snapshot" when it has none', () => {
@@ -313,6 +319,7 @@ describe('the totals', () => {
         expect(area.value).toBeCloseTo(measured2d + 50, 6);
         expect(area.text).toBe(formatArea(measured2d + 50, 'metric'));
         expect(area.text).toMatch(/^1[45]\d/);
+        expect(area.partsText).toBe(`${area.parts[0].text} 2D, ${area.parts[1].text} 3D`);
     });
 
     it('show the two areas in the Areas table, tagged 2D and 3D', () => {
@@ -326,6 +333,7 @@ describe('the totals', () => {
         const m = model();
         const length = stats(m).totals.find(t => t.key === 'length');
         expect(length.parts.map(p => [p.tag, p.count])).toEqual([['2D', 1]]);
+        expect(length.partsText).toBe('');
         expect(length.count).toBe(1);
         expect(tableOf(m, 'lengths').rows.map(r => [r.cells.ref, r.cells.measure, r.cells.length])).toEqual([
             ['3', 'Height', formatLength(8, 'metric')], ['5', 'Length', formatLength(length.value, 'metric')]
@@ -411,6 +419,12 @@ describe('the profile chart', () => {
         expect(snapshot.layers.map(l => [l.path, l.opacity])).toEqual([['ortho.tif', 0.8], ['dsm.tif', 0.5]]);
     });
 
+    it('is in the units of the report: those of the definition, else those of the reader', () => {
+        expect(chartOf(buildReportModel(inputOf(features, { units: 'imperial' }))).units).toBe('imperial');
+        expect(chartOf(buildReportModel(inputOf(features, { units: 'metric', definition: { ...inputOf([]).definition, units: 'imperial' } }))).units).toBe('imperial');
+        expect(chartOf(buildReportModel(inputOf(features))).units).toBe('metric');
+    });
+
     it('takes the first of several elevation layers, also one the view hides', () => {
         const state = coverState({ dsm: true });
         state.layers.unshift({ ...state.layers[1], path: 'dtm.tif', hash: 'h3', visible: false });
@@ -487,7 +501,7 @@ describe('the item pages', () => {
         const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT, { category: 'old', status: 'gone' })]));
         const rows = Object.fromEntries(blocksOf(model, 'items', 'keyValue')[0].rows.map(r => [r.label, r.value]));
         expect(rows).toMatchObject({ Category: 'Unknown (old)', Status: 'Unknown (gone)' });
-        expect(blocksOf(model, 'summary', 'summaryStats')[0].byCategory).toEqual([{ key: 'old', label: 'Unknown (old)', count: 1 }]);
+        expect(blocksOf(model, 'summary', 'summaryStats')[0].groups.find(g => g.key === 'category').counts).toEqual([{ key: 'old', label: 'Unknown (old)', count: 1 }]);
     });
 
     it('use the anchor and the viewer address the caller makes', () => {
@@ -537,19 +551,28 @@ describe('the summary', () => {
     ];
     const stats = () => blocksOf(buildReportModel(inputOf(features)), 'summary', 'summaryStats')[0];
 
-    it('counts the items by kind, category, status and severity, "Not set" for those with no value', () => {
+    it('counts the items by kind, category, severity and status, "Not set" for those with no value', () => {
         const s = stats();
+        const counts = Object.fromEntries(s.groups.map(g => [g.key, g.counts]));
         expect(s.total).toEqual({ count: 5, text: '5 items' });
-        expect(s.byKind).toEqual([{ key: 'point', label: 'Points', count: 2 }, { key: 'length', label: 'Lengths', count: 3 }]);
-        expect(s.byCategory).toEqual([{ key: 'defect', label: 'Defect', count: 2 }, { key: '', label: 'Not set', count: 3 }]);
-        expect(s.byStatus).toEqual([{ key: 'open', label: 'Open', count: 2 }, { key: 'in-progress', label: 'In progress', count: 1 }, { key: 'resolved', label: 'Resolved', count: 1 }, { key: '', label: 'Not set', count: 1 }]);
-        expect(s.bySeverity).toEqual([{ key: 'high', label: 'High', count: 1 }, { key: '', label: 'Not set', count: 4 }]);
+        expect(counts.kind).toEqual([{ key: 'point', label: 'Points', count: 2 }, { key: 'length', label: 'Lengths', count: 3 }]);
+        expect(counts.category).toEqual([{ key: 'defect', label: 'Defect', count: 2 }, { key: '', label: 'Not set', count: 3 }]);
+        expect(counts.status).toEqual([{ key: 'open', label: 'Open', count: 2 }, { key: 'in-progress', label: 'In progress', count: 1 }, { key: 'resolved', label: 'Resolved', count: 1 }, { key: '', label: 'Not set', count: 1 }]);
+        expect(counts.severity).toEqual([{ key: 'high', label: 'High', count: 1 }, { key: '', label: 'Not set', count: 4 }]);
+    });
+
+    it('titles the groups of counts, in their order, and leaves out a group that has none', () => {
+        expect(stats().groups.map(g => g.title)).toEqual(['By kind', 'By category', 'By severity', 'By status']);
+        const empty = blocksOf(buildReportModel(inputOf([])), 'summary', 'summaryStats')[0];
+        expect(empty.groups).toEqual([]);
+        expect(empty.headline).toBe('0 items');
     });
 
     it('counts the overdue items: not closed and a due date before the date of the report', () => {
         const model = buildReportModel(inputOf(features));
         expect(model.items.filter(i => i.overdue).map(i => i.id)).toEqual(['a']);
         expect(stats().overdue).toEqual({ count: 1, text: '1 item' });
+        expect(stats().headline).toBe('5 items (1 item overdue)');
     });
 
     it('counts a past due date as overdue when the schema has no closed status', () => {
@@ -626,6 +649,6 @@ describe('the notes section', () => {
         expect(blocks[3]).toMatchObject({ id: 'layers', rows: [{ cells: { name: 'Orthophoto', path: 'ortho.tif', built: formatDate(built) } }] });
         expect(blocks[4]).toMatchObject({ id: 'sourceRasters', rows: [{ cells: { name: 'dsm.tif', path: 'dsm.tif', built: EMPTY_CELL } }] });
         expect(blocks[5].text).toBe('Not for **legal** use');
-        expect(blocks[6]).toEqual({ type: 'signOff', preparedBy: 'J. Doe', lines: [{ label: 'Name' }, { label: 'Signature' }, { label: 'Date' }] });
+        expect(blocks[6]).toEqual({ type: 'signOff', byline: 'Prepared by J. Doe', lines: [{ label: 'Name' }, { label: 'Signature' }, { label: 'Date' }] });
     });
 });

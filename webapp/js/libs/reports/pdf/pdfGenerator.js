@@ -13,7 +13,7 @@ import { pageLayout } from '@/libs/reports/pdf/pdfLayout';
  * @typedef {object} PdfDependencies
  * @property {{ createPdf: (definition: any) => { getBlob: () => Promise<Blob> } }} pdfMake
  * @property {(text: string) => { size: number, path: string }} qr
- * @property {{ renderMapSnapshot: Function, renderProfileChart: Function, capture3dImageUrl: Function, sharedRenderQueue: { run: Function } }} renderers
+ * @property {{ renderMapSnapshot: Function, renderProfileChart: Function, capture3dImageUrl: Function, sharedRenderQueue: import('./pdfAssets').AssetDeps['queue'] }} renderers
  */
 
 /**

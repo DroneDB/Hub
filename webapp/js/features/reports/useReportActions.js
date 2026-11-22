@@ -13,7 +13,7 @@ import { useConfirm, useChoice } from '@/composables/useConfirm';
 import { useNotify } from '@/composables/useNotify';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
 import { absoluteUrl, openInNewTab, reportUrl } from '@/libs/views/viewLinks';
-import { deleteReport, deleteUnreadableReport, saveNewReport, MAX_REPORT_NAME_LENGTH } from '@/libs/reports/reportStore';
+import { deleteReport, deleteUnreadableReport, saveNewReport, MAX_REPORT_NAME_LENGTH, NEWER_REPORT_TEXT } from '@/libs/reports/reportStore';
 import { lazyComponent } from '@/libs/lazyComponent';
 
 // The editor's code loads the first time it opens, not with the dataset page or the map
@@ -82,10 +82,17 @@ export function useReportActions({ dataset, org, ds, dialogs, router, onChanged 
     /** @param {import('@/libs/metaList/metaListStore').MetaEntry} entry */
     const edit = entry => openEditor(entry);
 
-    /** A report of the same content under a new name. @param {import('@/libs/metaList/metaListStore').MetaEntry} entry */
+    /**
+     * A report of the same content under a new name. A report of a newer version is refused, as the editor refuses it:
+     * this application cannot tell what such a definition holds, so it cannot store a copy of it.
+     * @param {import('@/libs/metaList/metaListStore').MetaEntry} entry
+     */
     function duplicate(entry) {
-        // The store gives the copy its own uid and audit fields
-        return attempt('Cannot duplicate the report', () => saveNewReport(dataset, { ...entry.data, name: copyName(entry.name) }, { user: reg.getUsername() || '' }));
+        return attempt('Cannot duplicate the report', async () => {
+            if (entry.newerVersion) throw new Error(NEWER_REPORT_TEXT);
+            // The store gives the copy its own uid and audit fields
+            return saveNewReport(dataset, { ...entry.data, name: copyName(entry.name) }, { user: reg.getUsername() || '' });
+        });
     }
 
     /**

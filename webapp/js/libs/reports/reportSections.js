@@ -8,14 +8,15 @@
  *   table         { type, id, title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note }] }
  *   mapSnapshot   { type, kind: 'overview' | 'item', itemId, ref, items, extent, frame, layers, basemap, view,
  *                   coverDeleted, legend, alt, note }   a request: the renderer draws it
- *   chart         { type, chart: 'profile', itemId, ref, line, elevationLayer, note, alt }   a request too
- *   capture3d     { type, itemId, ref, path, camera, text }   the capture of a 3D item, or "No 3D snapshot"
+ *   chart         { type, chart: 'profile', itemId, ref, line, elevationLayer, units, note, alt }   a request too; units:
+ *                   the report's, for the distances along the line
+ *   capture3d     { type, itemId, ref, path, camera, capturedAt, text }   the capture of a 3D item, or "No 3D snapshot"
  *   photoGrid     { type, itemId, photos: [{ path, caption, source, pixel }] }
  *   markdown      { type, text }   markdown the renderer sanitises
- *   summaryStats  { type, total, byKind, byCategory, bySeverity, byStatus, overdue, totals }
+ *   summaryStats  { type, total, overdue, headline, totals, groups: [{ key, title, counts }] }   the groups that have counts
  *   qr            { type, url, label }
  *   note          { type, tone: 'info' | 'warning', text }
- *   signOff       { type, preparedBy, lines: [{ label }] }
+ *   signOff       { type, byline, lines: [{ label }] }   byline: "Prepared by <name>", or empty
  */
 import { EMPTY_CELL, formatDate } from '@/libs/format';
 import { SECTION_LABELS } from '@/libs/reports/reportDefaults';
@@ -27,6 +28,16 @@ export const NO_ELEVATION_LAYER = 'No elevation layer in the cover view';
 export const NO_3D_SNAPSHOT = 'No 3D snapshot';
 export const COVER_DELETED = 'The cover view was deleted';
 export const NO_ITEMS = 'No items match the filter of this report';
+/** What a photo of an item that cannot be shown is, on the page and in the PDF, with its path under it */
+export const MISSING_PHOTO = 'Missing photo';
+
+/**
+ * The caption of a figure: what it shows, then what is to be said of it: the note of the model (a deleted cover view,
+ * no elevation layer) and the note of the renderer (the basemap was left out, the render failed), each once (a renderer
+ * can answer with the model's note).
+ * @param {string} alt  @param {...(string | null | undefined)} notes
+ */
+export const figureCaption = (alt, ...notes) => [...new Set([alt, ...notes].filter(Boolean))].join(' - ');
 
 /**
  * @typedef {import('./reportItems').ReportItem} ReportItem
@@ -144,18 +155,23 @@ function coverSection(ctx) {
 function summarySection(ctx) {
     const { items, text } = ctx;
     const overdue = items.filter(i => i.overdue).length;
+    const total = itemCountText(items.length);
+    const groups = [
+        { key: 'kind', title: 'By kind', counts: countByKind(items) },
+        { key: 'category', title: 'By category', counts: countByChoice(items, 'category', text.schema.categories) },
+        { key: 'severity', title: 'By severity', counts: countByChoice(items, 'severity', text.schema.severities) },
+        { key: 'status', title: 'By status', counts: countByChoice(items, 'status', text.schema.statuses) }
+    ];
     return [
         heading(1, SECTION_LABELS.summary),
         ...problemNotes(ctx),
         {
             type: /** @type {const} */ ('summaryStats'),
-            total: { count: items.length, text: itemCountText(items.length) },
-            byKind: countByKind(items),
-            byCategory: countByChoice(items, 'category', text.schema.categories),
-            bySeverity: countByChoice(items, 'severity', text.schema.severities),
-            byStatus: countByChoice(items, 'status', text.schema.statuses),
+            total: { count: items.length, text: total },
             overdue: { count: overdue, text: itemCountText(overdue) },
-            totals: ctx.totals.totals
+            headline: overdue ? `${total} (${itemCountText(overdue)} overdue)` : total,
+            totals: ctx.totals.totals,
+            groups: groups.filter(group => group.counts.length)
         }
     ];
 }
@@ -184,13 +200,13 @@ function visualBlocks(ctx, item, drawn) {
     if (item.owner === 'pointCloud') {
         blocks.push({
             type: 'capture3d', itemId: item.id, ref: item.displayRef,
-            path: item.snapshot?.path ?? null, camera: item.snapshot?.camera ?? null, text: item.snapshot ? `3D snapshot of item ${item.displayRef}` : NO_3D_SNAPSHOT
+            path: item.snapshot?.path ?? null, camera: item.snapshot?.camera ?? null, capturedAt: item.snapshot?.capturedAt ?? null, text: item.snapshot ? `3D snapshot of item ${item.displayRef}` : NO_3D_SNAPSHOT
         });
     }
     if (item.kind === 'profile' && item.geometry?.type === 'LineString') {
         blocks.push({
             type: 'chart', chart: 'profile', itemId: item.id, ref: item.displayRef,
-            line: item.geometry.coordinates, elevationLayer: ctx.cover.elevation,
+            line: item.geometry.coordinates, elevationLayer: ctx.cover.elevation, units: ctx.text.units,
             note: ctx.cover.elevation ? null : NO_ELEVATION_LAYER,
             alt: `Elevation profile of item ${item.displayRef}`
         });
@@ -244,7 +260,7 @@ function notesSection(ctx) {
         ...(ctx.cover.layers.length ? [layersTable(ctx.cover.layers, ctx, 'layers', 'Report layers')] : []),
         ...(rasters.length ? [layersTable(rasters, ctx, 'sourceRasters', 'Stockpile source rasters')] : []),
         ...(template.disclaimer ? [{ type: /** @type {const} */ ('markdown'), text: template.disclaimer }] : []),
-        { type: /** @type {const} */ ('signOff'), preparedBy: definition.preparedBy || '', lines: [{ label: 'Name' }, { label: 'Signature' }, { label: 'Date' }] }
+        { type: /** @type {const} */ ('signOff'), byline: definition.preparedBy ? `Prepared by ${definition.preparedBy}` : '', lines: [{ label: 'Name' }, { label: 'Signature' }, { label: 'Date' }] }
     ];
 }
 

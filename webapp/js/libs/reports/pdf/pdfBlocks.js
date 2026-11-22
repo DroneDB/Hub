@@ -10,6 +10,7 @@ import { markdownToPdf } from '@/libs/reports/pdf/pdfMarkdown';
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
 import { qrSvg } from '@/libs/qr';
 import { isOriginUrl } from '@/libs/originUrl';
+import { MISSING_PHOTO, figureCaption } from '@/libs/reports/reportSections';
 
 export const INK = '#1f2937';
 export const MUTED = '#64748b';
@@ -41,24 +42,19 @@ const PHOTOS_PER_ROW = Object.freeze({ portrait: 2, landscape: 3 });
 const line = (text, style) => ({ text, style });
 
 /**
- * The notes under a figure: the model's own (a deleted cover view, no elevation layer) and the renderer's (the
- * basemap was left out, the render failed).
- * @param {any} block @param {{ note: string | null } | undefined} made
- */
-const notesOf = (block, made) => [block.note, made?.note].filter(Boolean).join(' - ') || null;
-
-/**
- * The figure of an image that was prepared: the image in its box, then its caption.
- * @param {import('./pdfAssets').PreparedImage | null} image
+ * The figure of an image that was prepared: the image in its box, then its caption (what it shows, the note of the
+ * model and the note of the renderer).
+ * @param {any} block
+ * @param {{ image: import('./pdfAssets').PreparedImage | null, note: string | null } | undefined} made
  * @param {{ widthPt: number, heightPt: number }} box
  * @param {string} alt  what it shows
- * @param {string | null} note
  */
-function figure(image, box, alt, note) {
+function figure(block, made, box, alt) {
+    const image = made?.image ?? null;
     return {
         stack: [
             ...(image ? [{ image: image.dataUrl, fit: [box.widthPt, box.heightPt], alignment: 'left' }] : []),
-            line([alt, note].filter(Boolean).join(' - '), 'caption')
+            line(figureCaption(alt, block.note, made?.note), 'caption')
         ],
         unbreakable: true,
         margin: [0, 0, 0, 8]
@@ -133,22 +129,16 @@ function table(block, ctx) {
     ];
 }
 
-/** The summary: the counts and totals, with the texts of the page. @param {any} block */
+/** The summary: the counts and totals, with the texts of the model. @param {any} block */
 function summaryStats(block) {
-    const groups = [
-        { title: 'By kind', counts: block.byKind },
-        { title: 'By category', counts: block.byCategory },
-        { title: 'By severity', counts: block.bySeverity },
-        { title: 'By status', counts: block.byStatus }
-    ].filter(group => group.counts.length);
     return [
-        { text: `${block.total.text}${block.overdue.count ? ` (${block.overdue.text} overdue)` : ''}`, bold: true, margin: [0, 0, 0, 6] },
+        { text: block.headline, bold: true, margin: [0, 0, 0, 6] },
         ...(block.totals.length ? [keyValue(block.totals.map((/** @type {any} */ total) => ({
             label: total.label,
-            value: `${total.text}${total.parts.length > 1 ? ` (${total.parts.map((/** @type {any} */ part) => `${part.text} ${part.tag}`).join(', ')})` : ''}`
+            value: total.partsText ? `${total.text} (${total.partsText})` : total.text
         })))] : []),
-        ...(groups.length ? [{
-            columns: groups.map(group => ({
+        ...(block.groups.length ? [{
+            columns: block.groups.map((/** @type {any} */ group) => ({
                 stack: [{ text: group.title, bold: true, fontSize: 9.5, margin: [0, 0, 0, 3] }, { ul: group.counts.map((/** @type {any} */ count) => ({ text: `${count.label}: ${count.count}`, fontSize: 9 })) }]
             })),
             columnGap: 12,
@@ -168,7 +158,7 @@ function photoGrid(block, ctx) {
                 image
                     ? { image: image.dataUrl, fit: [width, width * 0.75] }
                     // A photo the dataset no longer has (or one that could not be read) is said, with its path
-                    : { text: [{ text: 'Missing photo\n', bold: true }, { text: photo.path, fontSize: 8, color: MUTED }], fontSize: 9, margin: [0, 6, 0, 6] },
+                    : { text: [{ text: `${MISSING_PHOTO}\n`, bold: true }, { text: photo.path, fontSize: 8, color: MUTED }], fontSize: 9, margin: [0, 6, 0, 6] },
                 ...(photo.caption ? [{ text: photo.caption, style: 'caption' }] : [])
             ],
             unbreakable: true,
@@ -213,7 +203,7 @@ function note(block) {
 /** @param {any} block */
 function signOff(block) {
     return [
-        ...(block.preparedBy ? [{ text: `Prepared by ${block.preparedBy}`, margin: [0, 0, 0, 14] }] : []),
+        ...(block.byline ? [{ text: block.byline, margin: [0, 0, 0, 14] }] : []),
         {
             columns: block.lines.map((/** @type {{ label: string }} */ entry) => ({
                 stack: [
@@ -244,19 +234,10 @@ export function blockNodes(block, ctx) {
         case 'summaryStats': return summaryStats(block);
         case 'photoGrid': return photoGrid(block, ctx);
         case 'qr': return qr(block, ctx);
-        case 'mapSnapshot': {
-            const made = ctx.assets.figures.get(block);
-            return [figure(made?.image ?? null, figureBox(ctx.layout, block), block.alt, notesOf(block, made)), ...legendNodes(block.legend)];
-        }
-        case 'chart': {
-            const made = ctx.assets.figures.get(block);
-            return [figure(made?.image ?? null, figureBox(ctx.layout, block), block.alt, notesOf(block, made))];
-        }
-        case 'capture3d': {
-            const made = ctx.assets.figures.get(block);
-            // With no capture the model says so ("No 3D snapshot"); with one that could not be read, the note says why
-            return [figure(made?.image ?? null, figureBox(ctx.layout, block), block.text, notesOf(block, made))];
-        }
+        case 'mapSnapshot': return [figure(block, ctx.assets.figures.get(block), figureBox(ctx.layout, block), block.alt), ...legendNodes(block.legend)];
+        case 'chart': return [figure(block, ctx.assets.figures.get(block), figureBox(ctx.layout, block), block.alt)];
+        // With no capture the model says so ("No 3D snapshot"); with one that could not be read, the note says why
+        case 'capture3d': return [figure(block, ctx.assets.figures.get(block), figureBox(ctx.layout, block), block.text)];
         default: return [];
     }
 }

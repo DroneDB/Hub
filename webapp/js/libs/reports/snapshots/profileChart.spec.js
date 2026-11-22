@@ -16,13 +16,14 @@ vi.mock('chart.js', () => ({
 }));
 
 import { Chart } from 'chart.js';
+import { PREF, removePref, setPref } from '@/libs/preferences';
 import { renderProfileChart, profileChartConfig, NO_PROFILE_VALUES, PROFILE_SIZE } from './profileChart';
 
 const profile = (values, extra = {}) => ({ samples: values.map((value, i) => ({ distance: i * 10, value })), min: Math.min(...values.filter(v => v !== null)), max: Math.max(...values.filter(v => v !== null)), totalLength: (values.length - 1) * 10, ...extra });
 const block = (extra = {}) => ({
     type: 'chart', chart: 'profile', itemId: 'p', ref: '4', line: [[11, 45], [11.001, 45]],
     elevationLayer: { path: 'dsm.tif', hash: 'h', vizParams: { nodata: -9999, formula: 'NDVI' } },
-    note: null, alt: 'Elevation profile of item 4', ...extra
+    units: 'metric', note: null, alt: 'Elevation profile of item 4', ...extra
 });
 const fakeCanvas = () => {
     const original = document.createElement.bind(document);
@@ -55,7 +56,7 @@ describe('renderProfileChart', () => {
     it('samples the elevation layer of the block along the line of the item, with the options of its style', async () => {
         fakeCanvas();
         const dataset = { getRasterProfile: vi.fn(async () => profile([100, 101, 103])) };
-        const result = await renderProfileChart(block(), { dataset, units: 'metric' });
+        const result = await renderProfileChart(block(), { dataset });
         expect(dataset.getRasterProfile).toHaveBeenCalledTimes(1);
         const [path, line, samples, options] = dataset.getRasterProfile.mock.calls[0];
         expect(path).toBe('dsm.tif');
@@ -66,6 +67,21 @@ describe('renderProfileChart', () => {
         expect(result.note).toBeNull();
         expect(result.image).toBeInstanceOf(Blob);
         expect(result).toMatchObject(PROFILE_SIZE);
+    });
+
+    it('writes the distances in the units of the block (the report\'s), not in those of the reader\'s preference', async () => {
+        fakeCanvas();
+        const dataset = { getRasterProfile: vi.fn(async () => profile([100, 101, 103])) };
+        setPref(PREF.MEASURE_UNIT, 'metric');
+        try {
+            await renderProfileChart(block({ units: 'imperial' }), { dataset });
+            expect(charts[0].config.options.scales.x.ticks.callback(10)).toMatch(/ft/);
+            setPref(PREF.MEASURE_UNIT, 'imperial');
+            await renderProfileChart(block({ units: 'metric' }), { dataset });
+            expect(charts[1].config.options.scales.x.ticks.callback(10)).toMatch(/\bm$/);
+        } finally {
+            removePref(PREF.MEASURE_UNIT);
+        }
     });
 
     it('draws it with chart.js on a canvas of the size asked, offscreen, and destroys the chart', async () => {

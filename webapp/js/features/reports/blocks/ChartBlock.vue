@@ -16,6 +16,7 @@ import FigureFrame from './FigureFrame.vue';
 import { useReportContext } from '../reportContext';
 import { renderProfileChart } from '@/libs/reports/snapshots';
 import { useRenderedImage } from '@/libs/reports/snapshots/useRenderedImage';
+import { figureCaption } from '@/libs/reports/reportSections';
 
 const props = defineProps({
     /** { chart: 'profile', itemId, ref, line, elevationLayer, note, alt } */
@@ -28,5 +29,5 @@ const { url, note, error, state, retry } = useRenderedImage(() => root.value, si
 watch(() => props.block, retry);
 
 // The model's note ("No elevation layer in the cover view") is the first thing there is to say when there is no chart
-const caption = computed(() => [props.block.alt, props.block.note || note.value].filter(Boolean).join(' - '));
+const caption = computed(() => figureCaption(props.block.alt, props.block.note, note.value));
 </script>

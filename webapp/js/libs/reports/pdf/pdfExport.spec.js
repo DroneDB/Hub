@@ -132,6 +132,38 @@ describe('Publish PDF', () => {
         expect(dataset.writeObj).toHaveBeenLastCalledWith(`reports/${FILE}`, blob, { overwrite: true });
     });
 
+    it('writes nothing more when the user cancels while the second question is open, whatever its answer', async () => {
+        const { run, dataset, confirmReplace, controller } = setup();
+        dataset.writeObj.mockRejectedValueOnce(conflict());
+        confirmReplace.mockImplementation(async () => { controller.abort(); return true; });
+        expect((await run('publish')).status).toBe('cancelled');
+        expect(dataset.writeObj).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask again when the user cancelled while the refused write was sent', async () => {
+        const { run, dataset, confirmReplace, controller } = setup();
+        dataset.writeObj.mockImplementationOnce(async () => { controller.abort(); throw conflict(); });
+        expect((await run('publish')).status).toBe('cancelled');
+        expect(confirmReplace).not.toHaveBeenCalled();
+        expect(dataset.writeObj).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells when the write starts, after the PDF is made and before each write: from then on there is nothing to cancel', async () => {
+        const events = [];
+        const { run, dataset } = setup({ generate: vi.fn(async () => { events.push('generate'); return blob; }) });
+        dataset.writeObj.mockImplementationOnce(async () => { events.push('write'); throw conflict(); });
+        dataset.writeObj.mockImplementationOnce(async () => { events.push('write'); return {}; });
+        expect((await run('publish', { onWriting: () => events.push('writing') })).status).toBe('published');
+        expect(events).toEqual(['generate', 'writing', 'write', 'writing', 'write']);
+    });
+
+    it('does not tell of a write for a download', async () => {
+        const onWriting = vi.fn();
+        const { run } = setup();
+        await run('download', { onWriting });
+        expect(onWriting).not.toHaveBeenCalled();
+    });
+
     it('leaves the other file alone when the answer to that question is Cancel', async () => {
         const { run, dataset, confirmReplace } = setup();
         dataset.writeObj.mockRejectedValueOnce(conflict());

@@ -88,7 +88,7 @@ describe('Capture for report in the point cloud viewer', () => {
         const id = annotation.ddbProperties.id;
         expect(written).toEqual([{ path: `site/annotations/${id}-3d.webp`, options: { overwrite: true } }]);
         expect(viewer.zoomTo).toHaveBeenCalledTimes(1);
-        expect(annotation.ddbProperties.snapshot).toEqual({ path: `site/annotations/${id}-3d.webp`, camera: { position: [1, 2, 3], target: [4, 5, 6] } });
+        expect(annotation.ddbProperties.snapshot).toEqual({ path: `site/annotations/${id}-3d.webp`, camera: { position: [1, 2, 3], target: [4, 5, 6] }, capturedAt: expect.any(String) });
 
         // A new capture is written to the same path
         await props.capture.run();
@@ -97,6 +97,6 @@ describe('Capture for report in the point cloud viewer', () => {
         // Nothing is in the measurement file until Save
         expect(JSON.parse(stored[PATH]).features[0].properties.snapshot).toBeUndefined();
         await m.save();
-        expect(JSON.parse(stored[PATH]).features[0].properties.snapshot).toEqual({ path: `site/annotations/${id}-3d.webp`, camera: { position: [1, 2, 3], target: [4, 5, 6] } });
+        expect(JSON.parse(stored[PATH]).features[0].properties.snapshot).toEqual({ path: `site/annotations/${id}-3d.webp`, camera: { position: [1, 2, 3], target: [4, 5, 6] }, capturedAt: expect.any(String) });
     });
 });

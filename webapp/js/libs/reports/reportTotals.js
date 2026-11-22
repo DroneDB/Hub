@@ -28,12 +28,13 @@ export const NOT_SET = 'Not set';
  * @property {string} text
  * @property {number} count  the items that make it
  * @property {TotalPart[]} parts  the same by 2D and 3D, the owners that have items
+ * @property {string} partsText  the parts as the report writes them ("12 m 2D, 3 m 3D"); empty when there is one only
  */
 
 /**
  * @param {Map<string, { value: number, count: number }>} byOwner
  * @param {(value: number) => string} format
- * @returns {{ value: number, text: string, count: number, parts: TotalPart[] }}
+ * @returns {{ value: number, text: string, count: number, parts: TotalPart[], partsText: string }}
  */
 function partsOf(byOwner, format) {
     const parts = [VIEW.MAP, VIEW.POINT_CLOUD].filter(owner => byOwner.has(owner)).map(owner => {
@@ -41,7 +42,8 @@ function partsOf(byOwner, format) {
         return { owner, tag: /** @type {'2D' | '3D'} */ (OWNER_TAGS[owner]), value, text: format(value), count };
     });
     const value = parts.reduce((sum, p) => sum + p.value, 0);
-    return { value, text: format(value), count: parts.reduce((sum, p) => sum + p.count, 0), parts };
+    const partsText = parts.length > 1 ? parts.map(p => `${p.text} ${p.tag}`).join(', ') : '';
+    return { value, text: format(value), count: parts.reduce((sum, p) => sum + p.count, 0), parts, partsText };
 }
 
 /** @param {Map<string, { value: number, count: number }>} map @param {string} owner @param {number} value */

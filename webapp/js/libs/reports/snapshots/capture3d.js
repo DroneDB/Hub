@@ -23,22 +23,30 @@ export function capturePath(measurementPath, id) {
 }
 
 /**
- * What an item stores of its capture: the path of the image and the camera that framed it.
+ * What an item stores of its capture: the path of the image, the camera that framed it and when it was made. A new
+ * capture is written over the file of the old one, so `capturedAt` is what tells the two apart: the address of the
+ * image carries it, and a page or a PDF does not show the old image from the cache of the browser.
  * @param {string} path
  * @param {{ position: number[], target: number[] }} camera
- * @returns {{ path: string, camera: { position: number[], target: number[] } }}
+ * @param {string} [capturedAt]  ISO 8601; now by default
+ * @returns {{ path: string, camera: { position: number[], target: number[] }, capturedAt: string }}
  */
-export const snapshotOf = (path, camera) => ({ path, camera: { position: [...camera.position], target: [...camera.target] } });
+export const snapshotOf = (path, camera, capturedAt = new Date().toISOString()) => ({
+    path, camera: { position: [...camera.position], target: [...camera.target] }, capturedAt
+});
 
 /**
  * The address of the capture a `capture3d` block shows (the file in the dataset), or null when the item has none or the
- * path is not a path of this dataset.
- * @param {{ path?: string | null }} block
+ * path is not a path of this dataset. It changes with each capture (`v`, the time of the capture the item stores) and
+ * is the same between two renders of one capture; a capture stored without its time has none.
+ * @param {{ path?: string | null, capturedAt?: string | null }} block
  * @param {{ downloadUrl: (path: string, options?: { inline?: boolean }) => string }} dataset
  * @returns {string | null}
  */
 export function capture3dImageUrl(block, dataset) {
     const path = block && block.path;
     if (!path || !isDatasetPath(path)) return null;
-    return dataset.downloadUrl(path, { inline: true });
+    const url = dataset.downloadUrl(path, { inline: true });
+    if (!block.capturedAt) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}v=${encodeURIComponent(block.capturedAt)}`;
 }

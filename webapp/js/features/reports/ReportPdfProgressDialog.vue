@@ -1,11 +1,12 @@
 <template>
-    <Window id="reportPdfProgress" :title="title" modal fixed-size size-class="dialog-xs" @close="emit('close', 'cancel')">
+    <Window id="reportPdfProgress" :title="title" modal fixed-size size-class="dialog-xs" :busy="writing" @close="emit('close', 'cancel')">
         <div class="pdf-progress">
             <p class="pdf-progress-text" role="status" aria-live="polite">{{ text }}</p>
-            <ProgressBar :value="percent" :show-value="false" :aria-label="text" />
+            <ProgressBar v-if="writing" mode="indeterminate" :aria-label="text" />
+            <ProgressBar v-else :value="percent" :show-value="false" :aria-label="text" />
         </div>
         <template #footer>
-            <Button label="Cancel" severity="secondary" data-cancel @click="emit('close', 'cancel')" />
+            <Button label="Cancel" severity="secondary" :disabled="writing" data-cancel @click="emit('close', 'cancel')" />
         </template>
     </Window>
 </template>
@@ -13,7 +14,8 @@
 <script setup>
 /**
  * The progress of the PDF of a report: the items rendered out of all of them, and Cancel (also the close button and
- * Escape), which stops the work. The page closes it with 'done' when the PDF is made.
+ * Escape), which stops the work. While the PDF is written to the dataset (`writing`) a cancel cannot stop it, so none
+ * is offered: Cancel is disabled and the close button and Escape do nothing. The page closes it with 'done' at the end.
  */
 import { computed } from 'vue';
 import Button from 'primevue/button';
@@ -24,12 +26,17 @@ const props = defineProps({
     /** 'download' | 'publish' */
     mode: { type: String, default: 'download' },
     done: { type: Number, default: 0 },
-    total: { type: Number, default: 0 }
+    total: { type: Number, default: 0 },
+    /** The PDF is made and is being written to the dataset */
+    writing: { type: Boolean, default: false }
 });
 const emit = defineEmits(['close']);
 
 const title = computed(() => (props.mode === 'publish' ? 'Publishing the PDF' : 'Making the PDF'));
-const text = computed(() => (props.total ? `Rendered ${props.done} of ${props.total}` : 'Preparing the PDF'));
+const text = computed(() => {
+    if (props.writing) return 'Writing the PDF to the dataset';
+    return props.total ? `Rendered ${props.done} of ${props.total}` : 'Preparing the PDF';
+});
 const percent = computed(() => (props.total ? Math.round((props.done / props.total) * 100) : 0));
 </script>
 

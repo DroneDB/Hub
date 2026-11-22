@@ -10,7 +10,7 @@
                 <!-- Looks for the covering photos when the tab is first opened, not while the dialog is -->
                 <AnnotationPhotos v-if="visited" v-model="photos" :dataset="photoContext.dataset" :measurement-path="photoContext.measurementPath"
                                   :item-id="photoContext.itemId" :item-name="itemName" :geometry="photoContext.geometry"
-                                  :read-only="photoContext.readOnly" />
+                                  :read-only="photoContext.readOnly" @written="written" />
             </TabPanel>
         </TabPanels>
     </Tabs>
@@ -23,9 +23,10 @@
  * `photoContext`, a Photos tab (AnnotationPhotos). Without one the details are all there is, and no tab is drawn.
  *
  * `v-model:photos` is the annotation's photos; the dialog owns them and saves them with the rest.
- * `photoContext` is `{ dataset, measurementPath, itemId, geometry, readOnly }`: the dataset API client, the path of the
- * measurement file the annotation is saved in, its id, its WGS84 geometry (null: not georeferenced, no coverage
- * request) and whether the user cannot change it.
+ * `photoContext` is `{ dataset, measurementPath, itemId, geometry, readOnly, onWritten? }`: the dataset API client, the
+ * path of the measurement file the annotation is saved in, its id, its WGS84 geometry (null: not georeferenced, no
+ * coverage request), whether the user cannot change it, and what is told of a photo uploaded to the dataset (its path:
+ * the file list of the page that hosts the viewer shows it).
  */
 import { ref, watch } from 'vue';
 import Tab from 'primevue/tab';
@@ -35,7 +36,7 @@ import TabPanels from 'primevue/tabpanels';
 import Tabs from 'primevue/tabs';
 import AnnotationPhotos from '@/components/measurements/AnnotationPhotos.vue';
 
-defineProps({
+const props = defineProps({
     photoContext: { type: Object, default: null },
     /** The annotation's name, for the alternative texts of its photos */
     itemName: { type: String, default: '' }
@@ -46,6 +47,9 @@ const photos = defineModel('photos', { type: Array, default: () => [] });
 const active = ref('details');
 const visited = ref(false);
 watch(active, tab => { if (tab === 'photos') visited.value = true; });
+
+/** A photo uploaded to the dataset: the host is told, when it listens. @param {string} path */
+const written = path => props.photoContext?.onWritten?.(path);
 </script>
 
 <style scoped>

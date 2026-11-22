@@ -1,21 +1,19 @@
 <template>
     <div class="report-summary">
-        <p class="report-summary-total">{{ block.total.text }}<span v-if="block.overdue.count"> ({{ block.overdue.text }} overdue)</span></p>
+        <p class="report-summary-total">{{ block.headline }}</p>
 
         <dl v-if="block.totals.length" class="report-summary-totals">
             <div v-for="total in block.totals" :key="total.label" class="report-summary-total-row">
                 <dt>{{ total.label }}</dt>
                 <dd>
                     {{ total.text }}
-                    <span v-if="total.parts.length > 1" class="report-summary-parts">
-                        ({{ total.parts.map(part => `${part.text} ${part.tag}`).join(', ') }})
-                    </span>
+                    <span v-if="total.partsText" class="report-summary-parts">({{ total.partsText }})</span>
                 </dd>
             </div>
         </dl>
 
         <div class="report-summary-counts">
-            <section v-for="group in groups" :key="group.title" class="report-summary-group">
+            <section v-for="group in block.groups" :key="group.key" class="report-summary-group">
                 <h3 class="report-summary-group-title">{{ group.title }}</h3>
                 <ul>
                     <li v-for="count in group.counts" :key="count.key">{{ count.label }}: {{ count.count }}</li>
@@ -28,21 +26,13 @@
 <script setup>
 /**
  * The summary block: how many items there are (overdue ones apart), the totals the items add up to, and the counts by
- * kind, category, severity and status. A count says its name: no meaning is carried by colour.
+ * kind, category, severity and status. A count says its name: no meaning is carried by colour. Every text, the titles
+ * of the groups too, is the model's, so the PDF writes the same.
  */
-import { computed } from 'vue';
-
-const props = defineProps({
-    /** { total, overdue, totals, byKind, byCategory, bySeverity, byStatus } */
+defineProps({
+    /** { total, overdue, headline, totals, groups: [{ key, title, counts }] } */
     block: { type: Object, required: true }
 });
-
-const groups = computed(() => [
-    { title: 'By kind', counts: props.block.byKind },
-    { title: 'By category', counts: props.block.byCategory },
-    { title: 'By severity', counts: props.block.bySeverity },
-    { title: 'By status', counts: props.block.byStatus }
-].filter(group => group.counts.length));
 </script>
 
 <style scoped>

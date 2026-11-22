@@ -109,9 +109,10 @@ const definition = {
                 // The refs of the file the map shows: the ones it issues come after them
                 getRefSequence: () => (this.measurementStorage ? toRaw(this.measurementStorage).refs : null),
                 // The Photos tab of a measurement's dialog: the dataset, the file the measurement is saved in (the uploads go
-                // beside it), and whether the user cannot change photos
+                // beside it), whether the user cannot change photos, and where an uploaded photo is told (the file list
+                // shows it, as it shows the measurement file the map saves)
                 getPhotoHost: () => (this.measurementStorage && this.dataset
-                    ? { dataset: this.dataset, measurementPath: toRaw(this.measurementStorage).measurementPath, readOnly: !this.canWrite }
+                    ? { dataset: this.dataset, measurementPath: toRaw(this.measurementStorage).measurementPath, readOnly: !this.canWrite, onWritten: path => this.onFileWritten(path) }
                     : null),
                 onMeasurementDeleted: feature => {
                     if (!feature) return;

@@ -40,4 +40,16 @@ describe('ReportPdfProgressDialog', () => {
         await wrapper.vm.$nextTick();
         expect(wrapper.emitted('close')).toEqual([['cancel']]);
     });
+
+    it('offers no way to cancel while the PDF is written to the dataset: Cancel is disabled, the close button and Escape do nothing', async () => {
+        const wrapper = await render({ mode: 'publish', done: 2, total: 2, writing: true });
+        expect(text()).toContain('Writing the PDF to the dataset');
+        const cancel = document.querySelector('[data-cancel]');
+        expect(cancel.disabled).toBe(true);
+        cancel.click();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await wrapper.vm.$nextTick();
+        expect(document.querySelector('#reportPdfProgress [aria-label="Close"], #reportPdfProgress .p-dialog-close-button')).toBeNull();
+        expect(wrapper.emitted('close')).toBeUndefined();
+    });
 });

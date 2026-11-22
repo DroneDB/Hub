@@ -31,7 +31,7 @@
  * @property {boolean} georeferenced  it has a geometry in WGS84
  * @property {any} geometry  GeoJSON in WGS84 when georeferenced, else null
  * @property {{ path: string, source?: string, pixel?: number[], caption?: string }[]} photos
- * @property {{ path: string, camera?: any } | null} snapshot  the capture of a 3D item
+ * @property {{ path: string, camera?: any, capturedAt: string | null } | null} snapshot  the capture of a 3D item
  * @property {string | null} pointCloudFile  the point cloud of the file of a 3D item
  * @property {import('./reportKinds').Measured} measured
  * @property {Record<string, any>} properties  as the file stores them
@@ -91,7 +91,9 @@ function photosOf(photos) {
 }
 
 /** @param {any} snapshot */
-const snapshotOf = snapshot => (snapshot && typeof snapshot.path === 'string' && snapshot.path ? { path: snapshot.path, camera: snapshot.camera } : null);
+const snapshotOf = snapshot => (snapshot && typeof snapshot.path === 'string' && snapshot.path
+    ? { path: snapshot.path, camera: snapshot.camera, capturedAt: typeof snapshot.capturedAt === 'string' && snapshot.capturedAt ? snapshot.capturedAt : null }
+    : null);
 
 /**
  * @typedef {object} SourceInput
