@@ -17,7 +17,7 @@ const USERS = [
     { userName: 'dave', email: 'dave@x.org', roles: [], organizationCount: 1, datasetCount: 1, storageUsed: 52 * MB, storageQuota: 40 * MB },
     { userName: 'erin', email: 'erin@x.org', roles: ['deactivated'], organizationCount: 0, datasetCount: 0, storageUsed: 0, storageQuota: null }
 ];
-const reg = vi.hoisted(() => ({ admin: {}, limiter: true, features: { value: () => ['admin', 'deactivated'], get: name => name === 'storageLimiter' && reg.limiter } }));
+const reg = vi.hoisted(() => ({ admin: {}, limiter: true, signedIn: 'admin', getUsername: () => reg.signedIn, features: { value: () => ['admin', 'deactivated'], get: name => name === 'storageLimiter' && reg.limiter } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: UsersPage } = await import('./UsersPage.vue');
@@ -26,6 +26,7 @@ let wrapper;
 let notify;
 beforeEach(() => {
     reg.limiter = true;
+    reg.signedIn = 'admin';
     reg.admin.usersDetailed = vi.fn(() => Promise.resolve(USERS.map(u => ({ ...u }))));
     reg.admin.userRoles = () => Promise.resolve(['editor', 'viewer']);
     reg.admin.deleteUser = vi.fn(userName => Promise.resolve({ userName, organizationsDeleted: 1, datasetsDeleted: 2 }));
@@ -257,6 +258,21 @@ describe('UsersPage selection and bulk actions (FR-ADM-23)', () => {
         // erin is disabled already: only alice is disabled
         expect(reg.admin.disableUser.mock.calls).toEqual([['alice']]);
         expect(notify.success).toHaveBeenCalledWith('Disabled 1 user.', { summary: 'Users Disabled' });
+    });
+
+    it('leaves your own account out of Disable, and offers no Disable when it is the only active one selected', async () => {
+        reg.signedIn = 'alice';
+        await render();
+        await tick('alice');
+        await tick('erin');
+        expect(barButton('Disable')).toBeUndefined();
+        await tick('bob');
+        await barButton('Disable').trigger('click');
+        await flushPromises();
+        expect(dialog().textContent).toContain('Disable user “bob”');
+        confirmButton().click();
+        await flushPromises();
+        expect(reg.admin.disableUser.mock.calls).toEqual([['bob']]);
     });
 
     it('enables the disabled users that are selected, and reports the ones that failed', async () => {

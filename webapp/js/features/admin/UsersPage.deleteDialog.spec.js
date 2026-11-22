@@ -15,7 +15,7 @@ const USERS = [
     { userName: 'admin' },
     { userName: 'alice', organizationCount: 2, datasetCount: 5, storageUsed: 3 * 1024 * 1024 }
 ];
-const reg = vi.hoisted(() => ({ admin: {} }));
+const reg = vi.hoisted(() => ({ admin: {}, getUsername: () => 'admin' }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 reg.admin.usersDetailed = () => Promise.resolve(USERS.map(u => ({ ...u })));
 reg.admin.userRoles = () => Promise.resolve(['admin']);

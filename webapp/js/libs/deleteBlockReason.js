@@ -20,6 +20,18 @@ export function userDeleteBlockReason(user) {
 }
 
 /**
+ * Why a user cannot be disabled by the one signed in: nobody disables their own account, which would end the session
+ * that is doing it. The Registry refuses it as well (400); user names compare in any letter case, as it does.
+ * @param {{ userName?: string | null } | null | undefined} user
+ * @param {string | null | undefined} signedInUserName  the user name of the session
+ * @returns {string | null}  the reason the user cannot be disabled, or null when it can
+ */
+export function userDisableBlockReason(user, signedInUserName) {
+    const name = user?.userName?.toLowerCase();
+    return name && name === signedInUserName?.toLowerCase() ? 'You cannot disable your own account' : null;
+}
+
+/**
  * @param {{ slug?: string | null } | null | undefined} organization
  * @returns {string | null}  the reason the organization cannot be deleted, or null when it can
  */

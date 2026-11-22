@@ -136,11 +136,15 @@ describe('FR-EXP-39: the Markdown text and editor are centred columns', () => {
 });
 
 describe('FR-ADM-27: the widths of the admin tables', () => {
-    it('/admin/users is page-scroll-column, with no side padding of its own', () => {
-        expect(templateOf('js/features/admin/UsersPage.vue')).toMatch(/page-scroll page-scroll-column/);
+    it('/admin/users takes the whole width, with the side padding of the routed pages', () => {
+        const template = templateOf('js/features/admin/UsersPage.vue');
+        expect(template).toContain('class="page-scroll"');
+        expect(template).not.toMatch(/page-scroll-column|page-column/);
         const style = styleOf('js/features/admin/UsersPage.vue');
-        expect(blockAt(style, style.indexOf('#users {'))).toMatch(/padding-block: /);
-        expect(blockAt(style, style.indexOf('#users {'))).not.toMatch(/padding: /);
+        const rule = blockAt(style, style.indexOf('#users {'));
+        expect(rule).toMatch(/padding-block: /);
+        expect(rule).toContain('padding-inline: var(--ddb-page-padding-x);');
+        expect(rule).not.toMatch(/max-width/);
     });
 
     it('/admin/tasks takes the whole width, with the side padding of the routed pages', () => {
@@ -200,11 +204,10 @@ describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name
         expect(blockAt(styleOf(file), styleOf(file).indexOf('.task-actions {'))).toContain('flex-wrap: nowrap;');
     });
 
-    it('the files table has the width of its content from xwide, its Name column at most 40rem', () => {
+    it('the files table takes the whole width at every screen width', () => {
         const style = styleOf('js/features/dataset/explorer/TableView.vue');
-        const wide = blockAt(style, style.indexOf('@include xwide-up'));
-        expect(wide).toMatch(/\.p-datatable-table\) \{\s*width: auto;/);
-        expect(wide).toMatch(/\.file-name\) \{\s*display: block;\s*max-width: 40rem;/);
+        expect(style).not.toMatch(/xwide-up|wide-up/);
+        expect(style).not.toMatch(/\.p-datatable-table\) \{\s*width: auto;/);
     });
 
     it('a type name, a size and a date stay on one line', () => {

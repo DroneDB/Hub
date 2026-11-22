@@ -12,6 +12,7 @@ import PrimeVue from 'primevue/config';
 const h = vi.hoisted(() => ({ features: {} }));
 const reg = vi.hoisted(() => ({
     admin: {},
+    getUsername: () => 'admin',
     features: { value: name => h.features[name] ?? null, get: name => h.features[name] === true }
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
@@ -92,11 +93,23 @@ describe('UsersPage Disable and Enable', () => {
         expect(notify.success).toHaveBeenCalled();
     });
 
-    it('shows the server\'s reason when it refuses (your own account, the last admin)', async () => {
-        const reason = 'You cannot disable your own account';
+    it('keeps Disable off for your own account and says why, so a click asks nothing', async () => {
+        await render();
+        const own = rowOf('admin').find('button[aria-label="Disable User"]');
+        expect(own.attributes('aria-disabled')).toBe('true');
+        expect(own.attributes('title')).toBe('Disable User: You cannot disable your own account');
+        await own.trigger('click');
+        await flushPromises();
+        expect(confirmWindow()).toBeNull();
+        expect(reg.admin.disableUser).not.toHaveBeenCalled();
+        expect(rowOf('alice').find('button[aria-label="Disable User"]').attributes('aria-disabled')).toBeUndefined();
+    });
+
+    it('shows the server\'s reason when it refuses (the last active admin)', async () => {
+        const reason = 'Cannot disable the last active administrator: make another user an administrator first';
         reg.admin.disableUser = vi.fn(() => Promise.reject(new ApiError(reason, 400, { detail: reason })));
         await render();
-        await rowOf('admin').find('button[aria-label="Disable User"]').trigger('click');
+        await rowOf('alice').find('button[aria-label="Disable User"]').trigger('click');
         await flushPromises();
         await clickIn(confirmWindow(), '[data-confirm]');
         expect(wrapper.vm.error).toBe(reason);

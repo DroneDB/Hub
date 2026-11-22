@@ -1,5 +1,5 @@
 <template>
-    <div id="users" ref="page" class="page-scroll page-scroll-column">
+    <div id="users" ref="page" class="page-scroll">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
@@ -33,7 +33,7 @@
                 <span class="bulk-count" role="status">{{ countOf(selectedUsers.length, 'user') }} selected</span>
                 <Button severity="secondary" size="small" icon="fa-solid fa-user-tag" label="Add role" @click="bulkMode = 'role'" />
                 <Button severity="secondary" size="small" icon="fa-solid fa-building" label="Add to organization" @click="bulkMode = 'organization'" />
-                <Button v-if="canDisableUsers && activeSelected.length" severity="warn" size="small" icon="fa-solid fa-user-slash"
+                <Button v-if="canDisableUsers && disableTargets.length" severity="warn" size="small" icon="fa-solid fa-user-slash"
                         label="Disable" :disabled="bulkBusy" @click="bulkDisable" />
                 <Button v-if="canDisableUsers && disabledSelected.length" severity="secondary" size="small" icon="fa-solid fa-user-check"
                         label="Enable" :disabled="bulkBusy" @click="bulkEnable" />
@@ -135,10 +135,12 @@
                                         :loading="slotProps.data.switching" :disabled="slotProps.data.switching || slotProps.data.editing || slotProps.data.deleting"
                                         title="Enable User" aria-label="Enable User" icon="fa-solid fa-user-check"
                                         @click.stop="enableUser(slotProps.data)" />
-                                <Button v-else severity="warn" size="small"
-                                        :loading="slotProps.data.switching" :disabled="slotProps.data.switching || slotProps.data.editing || slotProps.data.deleting"
-                                        title="Disable User" aria-label="Disable User" icon="fa-solid fa-user-slash"
-                                        @click.stop="disableUser(slotProps.data)" />
+                                <!-- Off for your own account: the reason is what the button says -->
+                                <ActionButton v-else severity="warn" size="small" :loading="slotProps.data.switching" label="Disable User"
+                                              icon="fa-solid fa-user-slash"
+                                              :disabled="slotProps.data.switching || slotProps.data.editing || slotProps.data.deleting || !!disableBlockReason(slotProps.data)"
+                                              :disabled-reason="disableBlockReason(slotProps.data) ?? ''"
+                                              @click.stop="disableUser(slotProps.data)" />
                             </template>
                             <!-- Off while it is busy or the user cannot be deleted; the reason of the rule is what the button says -->
                             <ActionButton severity="danger" size="small" :loading="slotProps.data.deleting" label="Delete User"
@@ -262,7 +264,7 @@ import { formatDateTime, countOf, UNKNOWN } from '@/libs/format';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 import { storageUsage } from '@/libs/storageUsage';
 import { selectableUser, successorChoices, bulkSummary, sumDeleteResults } from '@/libs/userBulk';
-import { userDeleteBlockReason } from '@/libs/deleteBlockReason';
+import { userDeleteBlockReason, userDisableBlockReason } from '@/libs/deleteBlockReason';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
 import { useStackedLayout } from '@/composables/useStackedLayout';
@@ -345,6 +347,8 @@ export default {
             // The users the Delete question is about: one, or the selected ones
             usersToDelete: [],
             currentUser: null,
+            // The user name of the session: its own account cannot be disabled
+            signedInUserName: reg.getUsername(),
 
             // The user names ticked in the table (FR-ADM-23), and the bulk action that runs
             selected: [],
@@ -386,8 +390,9 @@ export default {
         selectedUsers() {
             return this.users.filter(user => this.selected.includes(user.userName));
         },
-        activeSelected() {
-            return this.selectedUsers.filter(user => !isDisabledUser(user));
+        // The selected users Disable acts on: the active ones, but your own account
+        disableTargets() {
+            return this.selectedUsers.filter(user => !isDisabledUser(user) && !this.disableBlockReason(user));
         },
         disabledSelected() {
             return this.selectedUsers.filter(isDisabledUser);
@@ -514,6 +519,10 @@ export default {
             this.showOrganizationsDialog = true;
         },
 
+        disableBlockReason(user) {
+            return userDisableBlockReason(user, this.signedInUserName);
+        },
+
         // Disable blocks sign-in at once: it asks first, as a destructive action
         async disableUser(user) {
             const confirmed = await this.confirm({
@@ -566,7 +575,7 @@ export default {
         // ---- bulk actions ----
 
         async bulkDisable() {
-            const targets = this.activeSelected;
+            const targets = this.disableTargets;
             const names = targets.map(user => user.userName);
             const confirmed = await this.confirm({
                 title: targets.length === 1 ? `Disable user “${names[0]}”` : `Disable ${targets.length} users`,
@@ -742,9 +751,10 @@ export default {
 </script>
 
 <style scoped>
-/* The side padding is .page-scroll-column's: the content keeps the width of --ddb-page-max-width (FR-ADM-27) */
+/* The table takes the whole width of the screen, with the side padding of the routed pages */
 #users {
     padding-block: 2.25rem var(--ddb-spacing-md);
+    padding-inline: var(--ddb-page-padding-x);
 }
 
 .search-col {
