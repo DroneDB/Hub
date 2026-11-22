@@ -16,7 +16,7 @@ import { Features } from '@/libs/features';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 vi.mock('@/libs/build/buildManager', () => ({ default: { getBuildState: () => null }, BUILD_STATES: {} }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {} }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {}, RESCAN_ENTRIES_TOOL_ID: 'rescan-entries' }));
 const flags = vi.hoisted(() => new Set());
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { isLoggedIn: () => true, features: { get: name => flags.has(name), value: () => null } } }));
 vi.mock('@/libs/build/buildHelpers', () => ({

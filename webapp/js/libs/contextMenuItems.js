@@ -18,7 +18,8 @@ import { MAX_LAYERS } from '@/libs/views/viewState';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { VIEWERS } from '@/libs/openItemDefaults';
 import { actionMenuItem } from '@/libs/dataset/explorerActions';
-import { COMPARE_ICON } from '@/libs/glyphs';
+import { COMPARE_ICON, RESCAN_ICON } from '@/libs/glyphs';
+import { RESCAN_ENTRIES_TOOL_ID } from '@/libs/tasks/taskMonitor';
 
 /**
  * The context menu of the file explorer (grid, table and tree). The actions that other surfaces
@@ -140,6 +141,23 @@ function transferItem(ctx) {
             return !sel.some(f => hasActiveBuild(ctx.dataset, f));
         },
         click: () => ctx.emit('transferSelectedItems')
+    };
+}
+
+/**
+ * Rescan: the selected files and folders read their metadata again and build again what can be built. Any selection
+ * that is not the dataset itself; an older Registry that has no such tool does not show it.
+ */
+function rescanItem(ctx) {
+    return {
+        label: 'Rescan',
+        icon: RESCAN_ICON,
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite && sel.length > 0 && !sel.some(f => isDroneDB(f.entry.type)) &&
+                taskToolOffered(RESCAN_ENTRIES_TOOL_ID);
+        },
+        click: () => ctx.emit('rescanEntries', ctx.getSelectedEntries())
     };
 }
 
@@ -386,6 +404,7 @@ function toolsItem(ctx) {
     const extract = extractItem(ctx);
     const setCrs = setCoordinateSystemItem(ctx);
     const build = buildItem(ctx);
+    const rescan = rescanItem(ctx);
     const transfer = transferItem(ctx);
 
     return {
@@ -404,6 +423,7 @@ function toolsItem(ctx) {
                     extract.isVisible() || setCrs.isVisible()
             },
             build,
+            rescan,
             transfer,
             {
                 type: 'separator',

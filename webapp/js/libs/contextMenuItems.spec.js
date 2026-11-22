@@ -6,9 +6,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import ddb from 'ddb';
 import { buildStandardContextMenu } from './contextMenuItems';
+import { RESCAN_ICON } from './glyphs';
 
 vi.mock('@/libs/build/buildManager', () => ({ default: { getBuildState: () => null }, BUILD_STATES: {} }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {} }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: {}, RESCAN_ENTRIES_TOOL_ID: 'rescan-entries' }));
+const taskToolOffered = vi.hoisted(() => vi.fn(() => true));
+vi.mock('@/libs/tasks/taskTools', () => ({ taskToolOffered }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { isLoggedIn: () => true, features: { get: () => false, value: () => null } } }));
 const canBuildFile = vi.hoisted(() => vi.fn(() => false));
 vi.mock('@/libs/build/buildHelpers', () => ({
@@ -18,9 +21,9 @@ vi.mock('@/libs/build/buildHelpers', () => ({
 const raster = path => ({ path: `ddb://h/org/ds/${path}`, entry: { path, type: ddb.entry.type.GEORASTER } });
 const selection = [{ path: 'a.jpg', entry: { path: 'a.jpg', type: ddb.entry.type.IMAGE } }];
 
-function menu(canWrite) {
+function menu(canWrite, selected = selection) {
     const emit = vi.fn();
-    const items = buildStandardContextMenu({ getSelectedEntries: () => selection, canWrite, dataset: null, emit });
+    const items = buildStandardContextMenu({ getSelectedEntries: () => selected, canWrite, dataset: null, emit });
     const all = items.flatMap(i => (i.items ? [i, ...i.items] : [i]));
     const byLabel = label => all.find(i => i.label === label);
     return { emit, all, byLabel, tools: items.find(i => i.label === 'Tools') };
@@ -70,6 +73,52 @@ describe('the context menu of a dataset the user can write', () => {
         expect(visible(byLabel('Transfer'))).toBe(true);
         expect(byLabel('Transfer').icon).toBe('fa-solid fa-right-left');
         expect(visible(byLabel('Cut'))).toBe(true);
+    });
+});
+
+describe('Rescan in the Tools menu', () => {
+    const folder = { path: 'ddb://h/org/ds/photos', entry: { path: 'photos', type: ddb.entry.type.DIRECTORY } };
+    const root = { path: 'ddb://h/org/ds', entry: { path: '', type: ddb.entry.type.DRONEDB } };
+    const rescan = (...args) => menu(...args).tools.items.find(i => i.label === 'Rescan');
+
+    beforeEach(() => {
+        setActivePinia(createPinia());
+        taskToolOffered.mockReturnValue(true);
+    });
+
+    it('is offered to a writer for a file, with the glyph of the dataset rescan, and is not a danger item', () => {
+        const item = rescan(true);
+        expect(visible(item)).toBe(true);
+        expect(item.icon).toBe(RESCAN_ICON);
+        expect(item.group).toBeUndefined();
+        expect(taskToolOffered).toHaveBeenCalledWith('rescan-entries');
+    });
+
+    it('is not offered to a reader', () => {
+        expect(visible(rescan(false))).toBe(false);
+    });
+
+    it('is offered for a folder and for a mixed selection, and emits the whole selection', () => {
+        const mixed = [...selection, folder];
+        const { tools, emit } = menu(true, mixed);
+        const item = tools.items.find(i => i.label === 'Rescan');
+        expect(visible(item)).toBe(true);
+        item.click();
+        expect(emit).toHaveBeenCalledWith('rescanEntries', mixed);
+    });
+
+    it('is not offered when the dataset itself is selected, alone or with others', () => {
+        expect(visible(rescan(true, [root]))).toBe(false);
+        expect(visible(rescan(true, [...selection, root]))).toBe(false);
+    });
+
+    it('is not offered for an empty selection', () => {
+        expect(visible(rescan(true, []))).toBe(false);
+    });
+
+    it('is hidden when the server does not offer the tool', () => {
+        taskToolOffered.mockReturnValue(false);
+        expect(visible(rescan(true))).toBe(false);
     });
 });
 

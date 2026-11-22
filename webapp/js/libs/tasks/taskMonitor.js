@@ -63,6 +63,9 @@ export const IMPORT_TOOL_ID = 'import-dataset';
 /** The tool of the rescan of a dataset's index (HeavyToolIds.RescanIndex). */
 export const RESCAN_TOOL_ID = 'rescan-index';
 
+/** The tool that rescans the entries selected in the explorer (HeavyToolIds.RescanEntries). It does not keep the dataset busy. */
+export const RESCAN_ENTRIES_TOOL_ID = 'rescan-entries';
+
 /**
  * The tools whose task keeps its dataset busy, by tool id, with what the dataset is busy with (the `kind` of the busy
  * state that the Registry gives in its dataset list and in its 409 answers).

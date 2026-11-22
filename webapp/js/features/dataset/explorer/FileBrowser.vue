@@ -79,7 +79,7 @@ export default {
             default: () => []
         }
     },
-    emits: ['upload', 'refresh', 'renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'refresh', 'renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
         return { countOf, requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },

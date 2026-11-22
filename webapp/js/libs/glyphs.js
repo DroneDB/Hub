@@ -57,6 +57,8 @@ export const SAVE_ICON = 'fa-solid fa-floppy-disk';
 export const ERASE_ICON = 'fa-solid fa-eraser';
 export const CLEAR_ALL_ICON = 'fa-solid fa-broom';
 export const DELETE_ICON = 'fa-solid fa-trash';
+// Rescan: read the metadata again, of the whole dataset (its Settings) and of the entries selected in the explorer
+export const RESCAN_ICON = 'fa-solid fa-rotate';
 // The two exports are a pair: a file marked with its format (braces, a table)
 export const EXPORT_GEOJSON_ICON = drawn('file-geojson');
 export const EXPORT_CSV_ICON = drawn('file-table');

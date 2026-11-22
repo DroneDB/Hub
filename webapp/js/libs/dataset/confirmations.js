@@ -7,6 +7,7 @@ import ddb from 'ddb';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { describeSelection, CALCULATING } from '@/libs/dataset/selection';
 import { formatBytes } from '@/libs/format';
+import { escapeHtml } from '@/libs/sanitize';
 
 /**
  * The question of deleting explorer items (FR-EXP-08, D-011): it names the items, says that a
@@ -31,17 +32,47 @@ export function deleteFilesConfirmation(files, { size = null, failed = false } =
     });
 }
 
+// What the two rescans say alike: the metadata is read again and replaces the one in the index
+const REREAD_METADATA = 'update their metadata (GPS coordinates, timestamps, thumbnails, etc.)';
+const METADATA_OVERWRITTEN = '<li>Existing metadata will be overwritten with newly extracted values</li>';
+const MAY_TAKE_LONG = what => `<li>The operation may take a long time for ${what}</li>`;
+
 export const CONFIRM_RESCAN = Object.freeze({
     title: 'Rescan Dataset',
     message: '<p><strong>Are you sure you want to rescan this dataset?</strong></p>'
-        + '<p>This operation will re-process all indexed files to update their metadata (GPS coordinates, timestamps, thumbnails, etc.).</p>'
+        + `<p>This operation will re-process all indexed files to ${REREAD_METADATA}.</p>`
         + '<strong>Side effects:</strong><ul>'
-        + '<li>Existing metadata will be overwritten with newly extracted values</li>'
+        + METADATA_OVERWRITTEN
         + '<li>All cached thumbnails, tiles and derived files will be deleted</li>'
-        + '<li>The operation may take a long time for large datasets</li></ul>',
+        + MAY_TAKE_LONG('large datasets') + '</ul>',
     confirmText: 'Rescan',
     danger: true
 });
+
+/**
+ * The question of rescanning explorer items: the metadata of the files (and of everything inside a folder) is read
+ * again, and what can be built (orthophotos, point clouds, models...) is built again. It runs as a task that does not
+ * lock the dataset, so the question is a plain one, not a danger one.
+ * @param {Array<any>} items  explorer items
+ */
+export function confirmRescanEntries(items) {
+    const selection = describeSelection(items);
+    const names = selection.names.map(name => `<li><strong>${escapeHtml(name)}</strong></li>`);
+    if (selection.more) names.push(`<li>and ${selection.more} more</li>`);
+    const inside = selection.hasFolder ? ' and everything inside the folders' : '';
+    return {
+        title: `Rescan ${selection.countText}`,
+        message: `<p><strong>Rescan ${selection.countText}${inside}?</strong></p><ul>${names.join('')}</ul>`
+            + `<p>This operation will re-process the files to ${REREAD_METADATA}, and rebuild the ones that can be built.</p>`
+            + '<strong>Side effects:</strong><ul>'
+            + METADATA_OVERWRITTEN
+            + '<li>Their cached thumbnails, tiles and derived files will be rebuilt</li>'
+            + MAY_TAKE_LONG('large files and folders')
+            + '<li>You can monitor progress in the <strong>Tasks</strong> tab</li></ul>',
+        confirmText: 'Rescan',
+        danger: false
+    };
+}
 
 export const CONFIRM_REBUILD = Object.freeze({
     title: 'Rebuild File',

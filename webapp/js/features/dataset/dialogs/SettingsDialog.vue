@@ -131,9 +131,9 @@
                 <h3 id="settings-maintenance" class="settings-group-title">Maintenance</h3>
 
                 <div class="settings-field">
-                    <span class="settings-label"><i class="fa-solid fa-rotate" aria-hidden="true" />Rescan</span>
+                    <span class="settings-label"><i :class="RESCAN_ICON" aria-hidden="true" />Rescan</span>
                     <div class="settings-control">
-                        <Button severity="secondary" icon="fa-solid fa-rotate" label="Rescan Dataset"
+                        <Button severity="secondary" :icon="RESCAN_ICON" label="Rescan Dataset"
                                 aria-describedby="settings-rescan-hint" @click="leaveFor('rescanRequested')" />
                         <small id="settings-rescan-hint" class="field-hint">
                             Reads the metadata of every file again (GPS position, timestamps, thumbnails).
@@ -172,6 +172,7 @@ import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY, visibilityDescription } from '@
 import { datasetThumbnailUrl } from '@/libs/optionalFile';
 import { slugProblem, slugDescription } from '@/libs/slug';
 import { displayNameLimits, displayNameLengthProblem } from '@/libs/nameRules';
+import { RESCAN_ICON } from '@/libs/glyphs';
 
 /**
  * The settings Save writes, in this order: the slug is last because a new slug takes the page to the new address.
@@ -247,6 +248,7 @@ export default {
             thumbnailUploading: false,
             thumbnailRemoving: false,
             Licenses,
+            RESCAN_ICON,
             visibilityOptions: VISIBILITY_OPTIONS
         }
     },

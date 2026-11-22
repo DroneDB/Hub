@@ -133,7 +133,7 @@ export default {
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
-    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         // One tab stop: the table holds the focus and names its active row (aria-activedescendant), FR-EXP-09

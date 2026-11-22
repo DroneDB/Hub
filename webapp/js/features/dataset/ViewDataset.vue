@@ -632,6 +632,7 @@ const commonEvents = items => ({
     openAsText: node => actions.editText(node.entry),
     mergeMultispectral: actions.mergeMultispectral,
     maskBorders: actions.maskBorders,
+    rescanEntries: actions.rescanEntries,
     alignGeoRaster: actions.align,
     extractItem: actions.extract,
     setCrs: actions.setCrs,

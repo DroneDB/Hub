@@ -15,10 +15,10 @@ import { clone } from '@/libs/utils';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { renameDataset } from '@/libs/api/registryUtils';
 import BuildManager from '@/libs/build/buildManager';
-import taskMonitor, { BUSY_TOOLS, RESCAN_TOOL_ID } from '@/libs/tasks/taskMonitor';
+import taskMonitor, { BUSY_TOOLS, RESCAN_TOOL_ID, RESCAN_ENTRIES_TOOL_ID } from '@/libs/tasks/taskMonitor';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import { itemFor } from '@/libs/dataset/explorerItems';
-import { CONFIRM_RESCAN, CONFIRM_REBUILD, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
+import { CONFIRM_RESCAN, CONFIRM_REBUILD, confirmRescanEntries, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { formatAlignResult } from '@/libs/dataset/alignResult';
@@ -625,6 +625,28 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         });
     }
 
+    /**
+     * Rescan of the selected files and folders: one heavy task that reads their metadata again and builds again what can
+     * be built. It does not lock the dataset, so the page stays usable; when the task ends the listing shows what
+     * changed: the entries that were rescanned, or the folder on show when a folder was in the selection.
+     */
+    async function rescanEntries(items) {
+        const selected = (items || []).filter(f => f?.entry);
+        const paths = entryPaths(selected);
+        if (!paths.length || !await confirm(confirmRescanEntries(selected))) return;
+        try {
+            await runHeavyTask(dataset, RESCAN_ENTRIES_TOOL_ID, {
+                params: { paths }, notify: false,
+                onSubmitted: () => notify.info(`Rescan started for ${countOf(paths.length, 'item')}...`, { summary: 'Rescan', life: 'normal' })
+            });
+            if (selected.some(f => ddb.entry.isDirectory(f.entry))) await listing.reload();
+            else await Promise.all(paths.map(path => listing.addEntry(path).catch(e => console.warn(`Could not refresh ${path} in the list:`, e))));
+            notify.success(`Rescan finished for ${countOf(paths.length, 'item')}`, { summary: 'Rescan', life: 'normal' });
+        } catch (e) {
+            notify.error(e.message, { summary: 'Rescan failed', life: 'long' });
+        }
+    }
+
     // ---- Documents -----------------------------------------------------------------------
 
     function editText(entry, readonly = false) {
@@ -642,6 +664,6 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     return {
         showError, upload, newFolder, remove, rename, move, transfer, properties, share, settings, confirmBuild,
-        setAsCover, mergeMultispectral, align, importFromUrl, setCrs, extract, exportSplatTrainingData, maskBorders, editText, viewPdf
+        setAsCover, mergeMultispectral, align, importFromUrl, setCrs, extract, exportSplatTrainingData, maskBorders, rescanEntries, editText, viewPdf
     };
 }

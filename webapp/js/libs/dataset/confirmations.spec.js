@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
-import { deleteFilesConfirmation } from './confirmations';
+import { deleteFilesConfirmation, confirmRescanEntries, CONFIRM_RESCAN } from './confirmations';
 
 const T = ddb.entry.type;
 const item = (path, type, size = 0) => ({ path: `ddb://h/o/d/${path}`, label: path, entry: { path, type, size } });
@@ -44,5 +44,46 @@ describe('deleteFilesConfirmation', () => {
         const q = deleteFilesConfirmation([item('<img src=x>.jpg', T.IMAGE, 1)]);
         expect(q.message).toContain('&lt;img src=x&gt;.jpg');
         expect(q.message).not.toContain('<img');
+    });
+});
+
+describe('confirmRescanEntries', () => {
+    it('names the items, says the metadata is read again and the buildable files are rebuilt, and is not a danger question', () => {
+        const q = confirmRescanEntries([item('a.jpg', T.IMAGE, 1), item('ortho.tif', T.GEORASTER, 2)]);
+        expect(q).toMatchObject({ title: 'Rescan 2 items', confirmText: 'Rescan', danger: false });
+        expect(q.message).toContain('<strong>a.jpg</strong>');
+        expect(q.message).toContain('<strong>ortho.tif</strong>');
+        expect(q.message).toContain('update their metadata');
+        expect(q.message).toContain('rebuild the ones that can be built');
+        expect(q.message).not.toContain('everything inside');
+    });
+
+    it('says that a folder is rescanned with everything inside it', () => {
+        const q = confirmRescanEntries([item('newdir', T.DIRECTORY)]);
+        expect(q.title).toBe('Rescan 1 item');
+        expect(q.message).toContain('and everything inside the folders');
+    });
+
+    it('lists the first names and counts the rest', () => {
+        const q = confirmRescanEntries(Array.from({ length: 8 }, (_, i) => item(`f${i}.jpg`, T.IMAGE, 1)));
+        expect(q.title).toBe('Rescan 8 items');
+        expect(q.message).toContain('and 3 more');
+        expect(q.message).not.toContain('f7.jpg');
+    });
+
+    it('escapes the names', () => {
+        const q = confirmRescanEntries([item('<img src=x>.jpg', T.IMAGE, 1)]);
+        expect(q.message).toContain('&lt;img src=x&gt;.jpg');
+        expect(q.message).not.toContain('<img');
+    });
+
+    it('shares its wording with the rescan of the dataset', () => {
+        const metadata = 'update their metadata (GPS coordinates, timestamps, thumbnails, etc.)';
+        const overwritten = 'Existing metadata will be overwritten with newly extracted values';
+        for (const message of [CONFIRM_RESCAN.message, confirmRescanEntries([item('a.jpg', T.IMAGE, 1)]).message]) {
+            expect(message).toContain(metadata);
+            expect(message).toContain(overwritten);
+        }
+        expect(CONFIRM_RESCAN.danger).toBe(true);
     });
 });

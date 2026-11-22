@@ -109,7 +109,7 @@ export default {
         // The size of the thumbnails: 's' (128 px), 'm' (192) or 'l' (256), FR-EXP-43
         tileSize: { type: String, default: 's' }
     },
-    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         // One tab stop: the list holds the focus and names its active tile (aria-activedescendant), FR-EXP-09

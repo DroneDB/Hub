@@ -20,10 +20,15 @@ vi.mock('@/libs/build/buildHelpers', () => ({
 
 const DatasetExplorer = (await import('./DatasetExplorer.vue')).default;
 const TableView = (await import('./TableView.vue')).default;
+const FileBrowser = (await import('./FileBrowser.vue')).default;
 
 describe('the events of the explorer views', () => {
     it.each([['DatasetExplorer', DatasetExplorer], ['TableView', TableView]])('%s declares alignGeoRaster', (name, component) => {
         expect(component.emits).toContain('alignGeoRaster');
+    });
+
+    it.each([['DatasetExplorer', DatasetExplorer], ['TableView', TableView], ['FileBrowser', FileBrowser]])('%s declares rescanEntries', (name, component) => {
+        expect(component.emits).toContain('rescanEntries');
     });
 
     it.each([['DatasetExplorer', DatasetExplorer], ['TableView', TableView]])('%s raises it from the context menu without a Vue warning', async (name, component) => {
