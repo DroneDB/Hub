@@ -13,29 +13,8 @@
                 Managing organizations for user: <strong>{{ user.userName }}</strong>
             </PrimeMessage>
 
-            <!-- Add organization section -->
-            <div v-if="!loading" class="add-org-section">
-                <h4>Add Organization</h4>
-                <div class="d-flex gap-3 flex-wrap align-items-end">
-                    <div class="flex-grow-1" style="min-width: min(12rem, 100%);">
-                        <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
-                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter filter-placeholder="Search organizations" :pt="{ pcFilter: { root: { 'aria-label': 'Search organizations' } } }" placeholder="Select an organization" class="w-100" />
-                    </div>
-                    <div style="min-width: min(10rem, 100%);">
-                        <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
-                        <Select v-model="newOrg.permissions" input-id="organizations-dialog-permissions" aria-labelledby="organizations-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
-                    </div>
-                    <div>
-                        <Button severity="primary" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" @click="addOrganization" />
-                    </div>
-                </div>
-            </div>
-
-            <Divider v-if="!loading" />
-
             <!-- User organizations table -->
-            <h4 v-if="!loading">User Organizations</h4>
-            <table v-if="!loading && userOrganizations.length > 0" class="ui celled table stacked-table">
+            <table v-if="!loading && userOrganizations.length > 0" class="ui celled table stacked-table mt-4">
                 <thead>
                     <tr>
                         <th>Organization</th>
@@ -80,11 +59,30 @@
                     </tr>
                 </tbody>
             </table>
-
             <div v-else-if="!loading">
                 <PrimeMessage severity="info" :closable="false">
                     This user is not a member of any organization.
                 </PrimeMessage>
+            </div>
+
+            <Divider v-if="!loading" />
+
+            <!-- Add organization section -->
+            <div v-if="!loading" class="add-org-section">
+                <h4 class="">Add Organization</h4>
+                <div class="d-flex gap-3 flex-wrap align-items-end">
+                    <div class="flex-grow-1" style="min-width: min(12rem, 100%);">
+                        <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
+                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter filter-placeholder="Search organizations" :pt="{ pcFilter: { root: { 'aria-label': 'Search organizations' } } }" placeholder="Select an organization" class="w-100" />
+                    </div>
+                    <div style="min-width: min(10rem, 100%);">
+                        <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
+                        <Select v-model="newOrg.permissions" input-id="organizations-dialog-permissions" aria-labelledby="organizations-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
+                    </div>
+                    <div>
+                        <Button severity="primary" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" @click="addOrganization" />
+                    </div>
+                </div>
             </div>
 
             <!-- Footer -->
