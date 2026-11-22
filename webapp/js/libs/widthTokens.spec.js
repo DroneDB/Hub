@@ -114,14 +114,15 @@ describe('FR-ORG-24: the organization and dataset lists take the whole width', (
         expect(grid).toMatch(/> :not\(\.org-card\) \{\s*grid-column: 1 \/ -1;/);
     });
 
-    it('the dataset table gives the dates 11rem, Files and Size 6rem, Visibility 8rem; Dataset takes the rest', () => {
+    it('the dataset table gives the dates 11rem, Files and Size 6rem without wrapping, Visibility 8rem; Dataset takes the rest', () => {
         const template = templateOf('js/features/datasets/DatasetsPage.vue');
         expect(template.match(/class="ds-col-date"/g)).toHaveLength(2);
         expect(template.match(/class="ds-col-count"/g)).toHaveLength(2);
         expect(template.match(/class="ds-col-visibility"/g)).toHaveLength(1);
         const style = styleOf('js/features/datasets/DatasetsPage.vue');
         expect(style).toContain('.ds-table :deep(.ds-col-date) { width: 11rem; }');
-        expect(style).toContain('.ds-table :deep(.ds-col-count) { width: 6rem; }');
+        // "906,06 MB" does not break between the number and its unit
+        expect(style).toContain('.ds-table :deep(.ds-col-count) { width: 6rem; white-space: nowrap; }');
         expect(style).toContain('.ds-table :deep(.ds-col-visibility) { width: 8rem; }');
     });
 });

@@ -23,7 +23,7 @@ vi.mock('@/composables/useConfirmReplace', async importOriginal => ({
 // The cancel question and what it reaches: answered by the test, the poller not asked
 const confirmCancel = vi.fn();
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
+vi.mock('@/libs/tasks/taskMonitor', () => import('@/specs/taskMonitorMock'));
 
 const WindowStub = { props: ['busy'], template: '<div><slot /><slot name="footer" /></div>' };
 const SOURCE = 'align/sheffield_shifted.tif';

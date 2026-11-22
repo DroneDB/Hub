@@ -26,10 +26,14 @@ async function render() {
     await flushPromises();
 }
 
+// The organization picker of the Add section, found by its input id: the rows of the table above it have selects too
+const organizationSelect = () => wrapper.findAllComponents(Select)
+    .find(select => select.props('inputId') === 'organizations-dialog-organization');
+
 describe('OrganizationsDialog organization select', () => {
     it('searches the organizations: filter on, a placeholder and an accessible name for the filter field', async () => {
         await render();
-        const select = wrapper.findAllComponents(Select)[0];
+        const select = organizationSelect();
         expect(select.props('filter')).toBe(true);
         expect(select.props('filterPlaceholder')).toBe('Search organizations');
         await select.find('.p-select-label').trigger('click');
@@ -41,7 +45,7 @@ describe('OrganizationsDialog organization select', () => {
 
     it('sets no width of its own on the list (the global overlay rule does)', async () => {
         await render();
-        const select = wrapper.findAllComponents(Select)[0];
+        const select = organizationSelect();
         expect(select.props('overlayStyle')).toBeNull();
         expect(select.props('overlayClass')).toBeNull();
     });

@@ -25,7 +25,7 @@ vi.mock('@/composables/useConfirmReplace', async importOriginal => ({
 // The cancel question and what it reaches: answered by the test, the poller not asked
 const confirmCancel = vi.fn();
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
+vi.mock('@/libs/tasks/taskMonitor', () => import('@/specs/taskMonitorMock'));
 
 const BANDS = ['IMG_0001_1.tif', 'IMG_0001_2.tif', 'IMG_0001_3.tif'];
 

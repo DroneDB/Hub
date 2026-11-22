@@ -12,7 +12,7 @@ vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTa
 // The cancel question and what it reaches: answered by the test, the poller not asked
 const confirmCancel = vi.fn();
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
+vi.mock('@/libs/tasks/taskMonitor', () => import('@/specs/taskMonitorMock'));
 vi.mock('@/libs/notify', () => ({ notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 const startFileDownload = vi.fn();
 vi.mock('@/features/viewers/splat/splatDownloads', () => ({ startFileDownload: (...args) => startFileDownload(...args) }));

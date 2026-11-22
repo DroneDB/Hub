@@ -17,7 +17,7 @@ vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTa
 // The cancel question and what it reaches: answered by the test, the poller not asked
 const confirmCancel = vi.fn();
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
+vi.mock('@/libs/tasks/taskMonitor', () => import('@/specs/taskMonitorMock'));
 
 const WindowStub = {
     props: ['confirmLabel', 'confirmDisabled', 'busy'],

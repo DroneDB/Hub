@@ -28,7 +28,7 @@ describe('PropsTable', () => {
         expect(link.exists()).toBe(true);
         expect(link.text()).toBe('');
         expect(link.find('.fa-circle-question').exists()).toBe(true);
-        expect(link.attributes('aria-label')).toBe('What is EPSG:4326? (opens epsg.io)');
+        expect(link.attributes('aria-label')).toBe('What is EPSG:4326?');
         expect(link.attributes('target')).toBe('_blank');
         expect(link.attributes('rel')).toContain('noopener');
         expect(wrapper.text()).toContain('EPSG:4326 11.2, 46.1, 300.00m');

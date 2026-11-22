@@ -15,7 +15,7 @@ const heavyTasks = ref({});
 vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask, heavyTasks }) }));
 const confirmCancel = vi.fn();
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => confirmCancel }));
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { forceRefresh: vi.fn().mockResolvedValue(undefined) } }));
+vi.mock('@/libs/tasks/taskMonitor', () => import('@/specs/taskMonitorMock'));
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() }));
 vi.mock('@/libs/notify', () => ({ notify }));
 const downloadBlob = vi.hoisted(() => vi.fn());
