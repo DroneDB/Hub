@@ -5,7 +5,10 @@
  * - a file in the map (`fileViewUrl`): /r/:org/:ds/view/:encodedPath/map, with entry parameters
  *   the viewer reads once (`add`, `pick`);
  * - a saved view (`savedViewUrl`): /r/:org/:ds/views/:uid;
- * - a file in another viewer (`viewerUrl`).
+ * - a file in another viewer (`viewerUrl`);
+ * - a report's live page (`reportUrl`), and an item of it (`itemAnchor`).
+ *
+ * The map and the point cloud viewer take `item=<id>` (`item`): the viewer frames and selects that annotation.
  *
  * A link opens in a new tab, like the other viewers, so the dataset page stays where it was.
  * Every link can ask for Viewer only (`embed=1`), always as the last query key.
@@ -18,6 +21,9 @@ export const VIEWER_ONLY_HELP = 'Hides the Hub header, the back button and the b
 
 /** @param {string} url @param {string[]} query  `key=value` pieces */
 const withQuery = (url, query) => (query.length ? `${url}?${query.join('&')}` : url);
+
+/** The annotation a viewer frames and selects, when given. @param {string|undefined} item */
+const itemQuery = item => (item ? [`item=${encodeURIComponent(item)}`] : []);
 
 /** @param {boolean} viewerOnly */
 const embedQuery = viewerOnly => (viewerOnly ? ['embed=1'] : []);
@@ -33,13 +39,15 @@ const datasetRoot = ({ org, ds }) => `/r/${encodeURIComponent(org)}/${encodeURIC
  * @param {object} [options]
  * @param {string[]} [options.add]  paths of other files to show with it, in order
  * @param {boolean} [options.pick]  open the file picker once the map shows
+ * @param {string} [options.item]  id of the annotation to frame and select
  * @param {boolean} [options.viewerOnly]  open without the Hub header and back button
  * @param {string} [options.baseUrl]  origin of the Hub, no trailing slash; empty for a path
  */
-export function fileViewUrl(dataset, path, { add = [], pick = false, viewerOnly = false, baseUrl = '' } = {}) {
+export function fileViewUrl(dataset, path, { add = [], pick = false, item, viewerOnly = false, baseUrl = '' } = {}) {
     const query = [
         ...add.map(p => `add=${b64urlEncode(p)}`),
         ...(pick ? ['pick=1'] : []),
+        ...itemQuery(item),
         ...embedQuery(viewerOnly)
     ];
     return withQuery(`${baseUrl}${datasetRoot(dataset)}/view/${b64encode(path)}/map`, query);
@@ -48,10 +56,33 @@ export function fileViewUrl(dataset, path, { add = [], pick = false, viewerOnly 
 /**
  * A saved view.
  * @param {{ org: string, ds: string }} dataset @param {string} uid
- * @param {{ viewerOnly?: boolean, baseUrl?: string }} [options]  see fileViewUrl
+ * @param {{ item?: string, viewerOnly?: boolean, baseUrl?: string }} [options]  see fileViewUrl
  */
-export function savedViewUrl(dataset, uid, { viewerOnly = false, baseUrl = '' } = {}) {
-    return withQuery(`${baseUrl}${datasetRoot(dataset)}/views/${encodeURIComponent(uid)}`, embedQuery(viewerOnly));
+export function savedViewUrl(dataset, uid, { item, viewerOnly = false, baseUrl = '' } = {}) {
+    return withQuery(`${baseUrl}${datasetRoot(dataset)}/views/${encodeURIComponent(uid)}`, [...itemQuery(item), ...embedQuery(viewerOnly)]);
+}
+
+/**
+ * The live page of a report.
+ * @param {{ org: string, ds: string }} dataset @param {string} uid
+ * @param {{ baseUrl?: string }} [options]  baseUrl: origin of the Hub, no trailing slash; empty for a path
+ */
+export function reportUrl(dataset, uid, { baseUrl = '' } = {}) {
+    return `${baseUrl}${datasetRoot(dataset)}/reports/${encodeURIComponent(uid)}`;
+}
+
+/** The anchor of an item on the live page of a report, with its `#`. @param {string} id */
+export const itemAnchor = id => `#item-${id}`;
+
+/** The id of the item an address hash names (`#item-<id>`), or null. @param {string} hash */
+export function itemOfAnchor(hash) {
+    const match = /^#item-(.+)$/.exec(hash || '');
+    if (!match) return null;
+    try {
+        return decodeURIComponent(match[1]);
+    } catch {
+        return match[1];
+    }
 }
 
 /**
@@ -62,10 +93,11 @@ export function savedViewUrl(dataset, uid, { viewerOnly = false, baseUrl = '' } 
  * @param {string} p.ds
  * @param {string} p.path  dataset-relative path of the file
  * @param {string} p.view  viewer of the route, e.g. "map"
+ * @param {string} [p.item]  id of the annotation the viewer frames and selects
  * @param {boolean} [p.viewerOnly]  open without the Hub header and back button
  */
-export function viewerUrl({ baseUrl, org, ds, path, view, viewerOnly = false }) {
-    return withQuery(`${baseUrl}${datasetRoot({ org, ds })}/view/${b64encode(path)}/${view}`, embedQuery(viewerOnly));
+export function viewerUrl({ baseUrl, org, ds, path, view, item, viewerOnly = false }) {
+    return withQuery(`${baseUrl}${datasetRoot({ org, ds })}/view/${b64encode(path)}/${view}`, [...itemQuery(item), ...embedQuery(viewerOnly)]);
 }
 
 /**

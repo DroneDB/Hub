@@ -21,6 +21,7 @@ const Model = () => import(/* webpackChunkName: "model" */ '@/features/viewers/m
 const UnifiedViewer = () => import(/* webpackChunkName: "unified" */ '@/features/viewers/unified/UnifiedViewer.vue');
 const Splat = () => import(/* webpackChunkName: "splat" */ '@/features/viewers/splat/SplatViewer.vue');
 const Panorama = () => import(/* webpackChunkName: "panorama" */ '@/features/viewers/panorama/PanoramaViewer.vue');
+const Report = () => import(/* webpackChunkName: "report" */ '@/features/reports/ReportPage.vue');
 const Markdown = () => import(/* webpackChunkName: "markdown" */ '@/features/viewers/markdown/MarkdownViewer.vue');
 
 // Header loaded eagerly (used on every page)
@@ -37,6 +38,8 @@ export function createAppRouter(embed = false) {
     const routes = [
         { path: '/r/:org/:ds', name: 'ViewDataset', components: viewsFor(ViewDataset), meta: { title: 'View Dataset' } },
         // The map viewer: a new view of a file, and a saved view
+        // The live page of a report: the sections of its model, drawn from the measurement files as they are now
+        { path: '/r/:org/:ds/reports/:uid', name: 'Report', components: viewsFor(Report), meta: { title: 'Report', viewer: true } },
         { path: '/r/:org/:ds/view/:encodedPath/map', name: 'MapViewer', components: viewsFor(MapViewer), meta: { title: 'Map', viewer: true } },
         { path: '/r/:org/:ds/views/:uid', name: 'SavedView', components: viewsFor(MapViewer), meta: { title: 'Map', viewer: true } },
         { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: 'PointCloud', components: viewsFor(Potree), meta: { title: 'Point Cloud', viewer: true } },

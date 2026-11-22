@@ -39,7 +39,7 @@ let choose;
 function start({ canWrite = true, answer = 'confirm' } = {}) {
     choose = vi.fn(async () => answer);
     controls = new MeasureControls({});
-    events = { written: [], removed: [] };
+    events = { written: [], removed: [], loaded: 0 };
     flashes = [];
     alerts = [];
     unitPref = ref('metric');
@@ -54,6 +54,7 @@ function start({ canWrite = true, answer = 'confirm' } = {}) {
         showFlash: () => (message, color) => flashes.push({ message, color }),
         onFileWritten: () => path => events.written.push(path),
         onFileRemoved: () => path => events.removed.push(path),
+        onMeasurementsLoaded: () => () => events.loaded++,
         choose: () => choose
     });
 }
@@ -79,6 +80,27 @@ beforeEach(() => {
 });
 
 describe('useMapMeasurements', () => {
+    it('tells the map when the measurements of the owner on show were read and are on the map, once per read', async () => {
+        const m = start();
+        await m.loadSavedMeasurements();
+        expect(events.loaded).toBe(1);
+        expect(onMap()).toEqual(['m1', 'm2']);
+        // The same owner is not read again
+        await m.loadSavedMeasurements();
+        expect(events.loaded).toBe(1);
+        // A file that is not there is read all the same: the map has nothing to show for it
+        files.value = [{ entry: { path: 'b/other.tif', type: T.GEORASTER } }];
+        await m.loadSavedMeasurements();
+        expect(events.loaded).toBe(2);
+    });
+
+    it('does not tell the map when the file could not be read', async () => {
+        dataset.getFileContents.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
+        const m = start();
+        await m.loadSavedMeasurements();
+        expect(events.loaded).toBe(0);
+    });
+
     it('reads the file once per owner: a change of the file list does not add the measurements again', async () => {
         const m = start();
         await m.loadSavedMeasurements();
@@ -608,7 +630,7 @@ describe('useMapMeasurements', () => {
             await m.loadSavedMeasurements();
             await m.deleteSavedMeasurements();
             expect(inFile()).toEqual(['v1']);
-            expect(events).toEqual({ written: ['a/cloud_measurements.geojson'], removed: [] });
+            expect(events).toMatchObject({ written: ['a/cloud_measurements.geojson'], removed: [] });
             expect(m.hasSavedMeasurements.value).toBe(false);
             expect(onMap()).toEqual([]);
         });

@@ -64,6 +64,13 @@ describe('the icons of the map, the viewers and the explorer', () => {
     });
 });
 
+describe('the glyphs of the annotation reports', () => {
+    it('are a page of lines for a report and a hash for the references of the annotations', () => {
+        expect(icons.REPORT_ICON).toBe('fa-solid fa-file-lines');
+        expect(icons.REFERENCES_ICON).toBe('fa-solid fa-hashtag');
+    });
+});
+
 describe('the glyphs drawn for the Hub', () => {
     it('have one drawing each, and no drawing is left without a meaning', () => {
         const files = readdirSync(path.resolve(WEBAPP, 'icons')).map(file => file.replace(/\.svg$/, '')).sort();
@@ -98,10 +105,10 @@ describe('the files that show a meaning', () => {
     it.each([
         ['the map toolbar', '../features/viewers/map/MapToolbar.vue',
             ['BACK_ICON', 'RESET_VIEW_ICON', 'useFullscreen', 'COPY_LINK_ICON', 'RASTER_ANALYSIS_ICON', 'STOCKPILE_ICON', 'DIRECTION_ICON',
-                'FLIGHT_PATH_ICON', 'COMPARE_ICON']],
+                'FLIGHT_PATH_ICON', 'COMPARE_ICON', 'REPORT_ICON']],
         ['the measure tools of the map', './map/controls/measureControl.js',
             ['POINT_ICON', 'LENGTH_ICON', 'AREA_ICON', 'ERASE_ICON', 'EDIT_VERTICES_ICON', 'STOP_ICON', 'MEASUREMENT_LIST_ICON', 'CALLOUTS_ICON',
-                'SAVE_ICON', 'CLEAR_ALL_ICON', 'EXPORT_GEOJSON_ICON', 'EXPORT_CSV_ICON', 'DELETE_ICON', 'MEASURE_ICON']],
+                'SAVE_ICON', 'CLEAR_ALL_ICON', 'EXPORT_GEOJSON_ICON', 'EXPORT_CSV_ICON', 'DELETE_ICON', 'MEASURE_ICON', 'REFERENCES_ICON']],
         ['the selection tools of the map', './map/controls/selectionControl.js', ['SELECT_RECTANGLE_ICON', 'SELECT_POLYGON_ICON', 'CLEAR_SELECTION_ICON']],
         ['the settings button of the map', './map/controls/settingsControl.js', ['SETTINGS_ICON']],
         ['the fullscreen buttons of the map and the viewers', '../composables/useFullscreen.js', ['FULLSCREEN_ICON', 'EXIT_FULLSCREEN_ICON']],
@@ -117,7 +124,9 @@ describe('the files that show a meaning', () => {
         ['the detail panel of a file', '../features/dataset/explorer/DetailPanel.vue', ['COMPARE_ICON']],
         ['the map of the datasets', '../features/datasets/DatasetLocationsMap.vue', ['RESET_VIEW_ICON']],
         ['the Preferences tab', '../features/account/PreferencesDialog.vue', ['STOCKPILE_ICON']],
-        ['the saved views of the explorer', '../features/dataset/explorer/SavedViews.vue', ['VIEWS_ICON']]
+        ['the saved views of the explorer', '../features/dataset/explorer/SavedViews.vue', ['VIEWS_ICON']],
+        ['the reports of the explorer', '../features/dataset/explorer/ReportsList.vue', ['REPORT_ICON']],
+        ['the bar of the report page', '../features/reports/ReportBar.vue', ['REPORT_ICON']]
     ])('%s takes its glyphs from the registry', (name, file, constants) => {
         const text = source(file);
         for (const constant of constants) expect(text).toContain(constant);

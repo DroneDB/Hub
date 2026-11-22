@@ -112,12 +112,13 @@
                            @basemap-changed="handleBasemapChanged" @units-changed="handleUnitsChanged" />
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" @dismiss="onFilePopupDismissed" />
         <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :copy-link="!!linkTarget && !!dataset"
+                    :report="canWrite && !embed && !!dataset"
                     :display-options="!standalone"
                     :split-toggle="!standalone || !!view"
                     :analysis-entry="analysisEntry" :raster-count="rasterLayerList.length"
                     :direction-indicators="showDirectionIndicators" :flight-path="showFlightPath"
                     :split-mode="splitMode" :can-compare="canCompare" :pick-to-compare="!view"
-                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen" @copy-link="toggleLinkPanel"
+                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen" @copy-link="toggleLinkPanel" @report="startReport"
                     @analysis="toggleAnalysisPanel"
                     @update:direction-indicators="setDirectionIndicators" @update:flight-path="setFlightPath"
                     @toggle-split="toggleSplit" @compare-to="compareTo" />
@@ -159,6 +160,11 @@ import { useTimerGroup } from '@/composables/useTimers';
 import { useMapSize } from '@/composables/useMapSize';
 import { useMapFeatures } from '@/composables/useMapFeatures';
 import { useMapViewState } from '@/composables/useMapViewState';
+import { useMapItemFocus } from '@/composables/useMapItemFocus';
+import { useMapReport } from '@/composables/useMapReport';
+import { useReportActions } from '@/features/reports/useReportActions';
+import { useChoice } from '@/composables/useConfirm';
+import { useRouter } from 'vue-router';
 import { usePreference } from '@/composables/usePreference';
 import { fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
 
@@ -284,6 +290,12 @@ export default {
         canSave: {
             type: Boolean,
             default: false
+        },
+        // The id of the annotation the map frames and selects once it has read its measurements (the `item` of the address
+        // of the viewer); one that no annotation has is told with a notice. The page reads it once: it is not the view's
+        focusItem: {
+            type: String,
+            default: ''
         }
     },
     emits: ['scrollTo', 'openItem', 'update:view', 'removeLayer', 'repick', 'addLayer', 'save', 'fileWritten', 'fileRemoved'],
@@ -291,12 +303,34 @@ export default {
         // The size class of the map's container: the panels over the map inject it
         const { size: mapSize, observe: observeMapSize } = useMapSize();
         provide('mapSize', mapSize);
+        let itemFocus = null;
         const features = useMapFeatures(props, {
             onFileWritten: path => emit('fileWritten', path),
-            onFileRemoved: path => emit('fileRemoved', path)
+            onFileRemoved: path => emit('fileRemoved', path),
+            onMeasurementsLoaded: () => itemFocus && itemFocus.onMeasurementsLoaded()
+        });
+        itemFocus = useMapItemFocus({ item: () => props.focusItem, measureControls: features.measureControls });
+        // "Report": a new report from this map's measurement file and view (the editor opens over it)
+        const router = useRouter();
+        const reportActions = props.dataset
+            ? useReportActions({ dataset: props.dataset, org: props.dataset.org, ds: props.dataset.ds, dialogs: features.dialogs, router })
+            : null;
+        const report = useMapReport({
+            actions: reportActions,
+            choose: useChoice(features.dialogs),
+            view: () => props.view,
+            files: () => props.files,
+            measurements: {
+                isDirty: () => features.hasUnsavedMeasurements.value,
+                hasSaved: () => features.hasSavedMeasurements.value,
+                filePath: () => features.measurementsFilePath.value,
+                save: () => features.saveMeasurements()
+            }
         });
         return {
             ...features,
+            ...report,
+            onFilesFitted: itemFocus.onFilesFitted,
             // Provided by the app: true on a map embedded in another page
             embed: inject('embed', false),
             ...useMapViewState({ ...features, view: () => props.view, emit }),
@@ -551,7 +585,10 @@ export default {
             // Zoom once every vector file's metadata is in (resolves at once without vectors). The layers of a build that
             // another build replaced meanwhile (another folder) are not added, and do not fit the map
             Promise.all(vectorFiles.map(f => this.addVectorLayer(f, generation))).then(() => {
-                if (generation === this.vectorGeneration && this.fitsToFiles()) this.zoomToFilesExtent();
+                if (generation !== this.vectorGeneration) return;
+                if (this.fitsToFiles()) this.zoomToFilesExtent();
+                // The first position is settled: the annotation the address asked for may frame the map now
+                this.onFilesFitted();
             });
             // The dataset map keeps the order the user gave the layers; a view's order is its state's
             this.syncRasterLayers(this.fileLayers.rasterSlots, { keepOrder: !this.view });

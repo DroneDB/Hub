@@ -18,18 +18,18 @@ import { geodesicArea, geodesicLength } from '@/libs/map/geodesic';
 import { startDrawingSession } from '@/libs/map/drawingSession';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat, fromLonLat } from 'ol/proj';
-import { containsCoordinate } from 'ol/extent';
+import { containsCoordinate, getHeight, getWidth } from 'ol/extent';
 import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import { showPointPopup, removeMeasureTooltip, setPointPopupShown, CALLOUTS_ON_HOVER_CLASS } from '@/libs/map/pointPopup';
-import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { MEASURE_COLOR, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
 import { mapFeatureGeometry } from '@/libs/reports/annotationPhotos';
 import { latLonText, stockpileLabel } from '@/libs/format';
 import { colorToken, tokenRgba } from '@/libs/colorScheme';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import {
     AREA_ICON, CALLOUTS_ICON, CLEAR_ALL_ICON, DELETE_ICON, EDIT_VERTICES_ICON, ERASE_ICON, EXPORT_CSV_ICON, EXPORT_GEOJSON_ICON, LENGTH_ICON,
-    MEASUREMENT_LIST_ICON, MEASURE_ICON, POINT_ICON, SAVE_ICON, STOP_ICON
+    MEASUREMENT_LIST_ICON, MEASURE_ICON, POINT_ICON, REFERENCES_ICON, SAVE_ICON, STOP_ICON
 } from '@/libs/glyphs';
 
 // Cursor shown over a measurement while the eraser tool is active: an eraser,
@@ -63,7 +63,6 @@ const CALLOUTS_LABEL = 'Always Show Point Callouts';
 
 /** The button that shows or hides the reference (`ref`) of each annotation on the map */
 const REFERENCES_LABEL = 'Show References';
-const REFERENCES_ICON = 'fa-solid fa-hashtag';
 
 class MeasureControls extends Control {
     /**
@@ -1214,6 +1213,25 @@ class MeasureControls extends Control {
         const callout = target instanceof Element ? target.closest('.ol-point-popup') : null;
         if (!callout) return null;
         return this.source.getFeatures().find(f => f.get('measureTooltipElement') === callout) || null;
+    }
+
+    /**
+     * Frames and selects the annotation with an id (the link of a report item): the map fits its extent (a point, which
+     * has none, to a close scale) and it is shown as the annotation under the pointer is, until the pointer moves to
+     * another one.
+     * @param {string} id
+     * @returns {boolean} false when no annotation of the map has that id
+     */
+    focusItem(id) {
+        const feature = this.source.getFeatures().find(f => f.get('measurementType') && f.get('id') === id);
+        const geometry = feature && feature.getGeometry();
+        const map = this.getMap();
+        if (!feature || !geometry || !map) return false;
+        const extent = geometry.getExtent();
+        const isPoint = getWidth(extent) === 0 && getHeight(extent) === 0;
+        map.getView().fit(extent, isPoint ? { ...FILE_FIT_OPTIONS, minResolution: POINT_FIT_MIN_RESOLUTION } : FILE_FIT_OPTIONS);
+        this._setHoveredFeature(feature);
+        return true;
     }
 
     /**

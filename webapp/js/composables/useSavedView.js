@@ -36,6 +36,7 @@ import { readHistoryState, writeHistoryState, replaceQueryKeys, currentLocation 
 import { validateState, workingState, defaultState, buildEntryState, sameView, MAX_NAME_LENGTH } from '@/libs/views/viewState';
 import { listViews, saveNewView, updateView, viewChange } from '@/libs/views/viewStore';
 import { fileViewUrl, savedViewUrl } from '@/libs/views/viewLinks';
+import { itemFromQuery } from '@/libs/views/itemQuery';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { askViewName } from '@/composables/useViewActions';
 import { useNotify } from '@/composables/useNotify';
@@ -133,6 +134,8 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
     const identity = ref(routeIdentity(route));
     // Whether the address asked for the file picker (and the page was not restored from history)
     const pickOnLoad = ref(false);
+    // The annotation the address asked the map to frame and select (`item`), read once like `add` and `pick`
+    const itemOnLoad = ref('');
 
     // A saved view names its base file in its data: read it first, the file follows
     /** @type {Promise<{ view: SavedView|null, problem: string|null }>|null} */
@@ -245,10 +248,21 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
     // Why the base file did not load, as useViewerEntry caught it
     const entryError = () => viewerEntry.loadError.value ?? new Error(viewerEntry.error.value);
 
+    /**
+     * Reads the `item` of the address (the annotation to frame) and takes it off, with the other keys that are read once:
+     * a reload or a shared address is then the view, not the framing.
+     * @param {Record<string, null>} [others]  the other keys to take off
+     */
+    function takeItemFromAddress(others = {}) {
+        itemOnLoad.value = itemFromQuery(route.query);
+        replaceQueryKeys({ ...others, item: null });
+    }
+
     async function loadSaved() {
         const { view, problem } = await /** @type {NonNullable<typeof savedLookup>} */ (savedLookup);
         if (!view || problem) throw new Error(problem ?? UNKNOWN_VIEW);
         if (!(await viewerEntry.entryLoaded)) throw entryError();
+        takeItemFromAddress();
         const restored = restoredState();
         saved.value = view;
         loadedId.value = restored?.savedId ?? view.id;
@@ -262,7 +276,7 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
         const add = addPathsOf(route.query.add);
         const pick = asList(route.query.pick).includes('1');
         // Read once: the address names the file, never the view
-        replaceQueryKeys({ add: null, pick: null });
+        takeItemFromAddress({ add: null, pick: null });
         const restored = restoredState({ baseIsGeoraster });
         state.value = restored ? restored.state : buildEntryState(base, add, { baseIsGeoraster });
         pickOnLoad.value = pick && !embed && !restored;
@@ -463,6 +477,6 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
 
     return {
         dataset, loading, error, loadError, loaded, canWrite, canDelete, state, setState, saved, isNew, dirty, shareNote, name, pageTitle, identity,
-        baseEntry, busy, pickOnLoad, linkTarget, save, saveAsNew
+        baseEntry, busy, pickOnLoad, itemOnLoad, linkTarget, save, saveAsNew
     };
 }

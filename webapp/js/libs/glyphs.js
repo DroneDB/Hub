@@ -37,6 +37,9 @@ export const DIRECTION_ICON = drawn('direction');
 export const FLIGHT_PATH_ICON = drawn('flight-path');
 export const COMPARE_ICON = drawn('compare');
 export const CALLOUTS_ICON = drawn('callouts');
+// The reference (`ref`) each annotation shows on the map, and the report made from the annotations of a map
+export const REFERENCES_ICON = 'fa-solid fa-hashtag';
+export const REPORT_ICON = 'fa-solid fa-file-lines';
 // The saved views of a dataset: a bookmark (not the split of "Compare")
 export const VIEWS_ICON = 'fa-solid fa-bookmark';
 // The analysis tools

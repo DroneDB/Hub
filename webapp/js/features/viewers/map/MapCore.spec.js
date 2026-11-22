@@ -29,14 +29,15 @@ const file = entry => ({ path: `ddb://acme/site/${entry.path}`, entry, selected:
 const Toolbar = defineComponent({
     name: 'MapToolbar',
     props: {
-        showBack: Boolean, copyLink: Boolean, analysisEntry: { type: Object, default: null }, splitToggle: Boolean,
+        showBack: Boolean, copyLink: Boolean, report: Boolean, analysisEntry: { type: Object, default: null }, splitToggle: Boolean,
         displayOptions: Boolean, splitMode: Boolean, canCompare: Boolean, rasterCount: { type: Number, default: 0 },
         pickToCompare: { type: Boolean, default: true }
     },
-    emits: ['back', 'copy-link', 'analysis', 'toggle-split', 'compare-to'],
+    emits: ['back', 'copy-link', 'report', 'analysis', 'toggle-split', 'compare-to'],
     setup(props, { emit }) {
         return () => h('div', { 'data-stub': 'toolbar' }, [
             h('button', { 'data-copy': '', onClick: () => emit('copy-link') }),
+            props.report ? h('button', { 'data-report': '', onClick: () => emit('report') }) : null,
             h('button', { 'data-split': '', onClick: () => emit(props.canCompare ? 'toggle-split' : 'compare-to') })
         ]);
     }
@@ -1089,3 +1090,80 @@ describe('the vector layers of a folder that was left', () => {
     });
 });
 
+
+describe('the Report button (a report from this map)', () => {
+    it('is offered to a user who can write on a map of a dataset, and not to a reader nor in Viewer only', async () => {
+        await mountView([MAIN]);
+        expect(toolbar().props('report')).toBe(true);
+        wrapper.unmount();
+        await mountView([MAIN], { extra: { canWrite: false } });
+        expect(toolbar().props('report')).toBe(false);
+        wrapper.unmount();
+        await mountView([MAIN], { provide: { embed: true } });
+        expect(toolbar().props('report')).toBe(false);
+    });
+
+    it('opens the report editor over the map with the measurement file as the source and the view as the cover', async () => {
+        const measurement = { type: 'Feature', id: 'a1', geometry: { type: 'Point', coordinates: [10.005, 45.005] }, properties: { id: 'a1', ref: '1', measurementType: 'point', name: 'Crack', createdAt: '2026-11-01T10:00:00.000Z' } };
+        dataset.getFileContents.mockImplementation(async path => {
+            if (path === 'dsm_measurements.geojson') return JSON.stringify({ type: 'FeatureCollection', metadata: { version: '3.0' }, features: [measurement] });
+            throw Object.assign(new Error('Not found'), { status: 404 });
+        });
+        try {
+            await mountView([MAIN]);
+            await wrapper.find('[data-report]').trigger('click');
+            await flushPromises();
+            const [open] = wrapper.vm.dialogs.stack.value;
+            expect(open.props.entry).toBeNull();
+            expect(open.props.initial.sources).toEqual(['dsm_measurements.geojson']);
+            expect(open.props.initial.cover.viewState.base.path).toBe('dsm.tif');
+        } finally {
+            dataset.getFileContents.mockImplementation(async () => { throw Object.assign(new Error('Not found'), { status: 404 }); });
+        }
+    });
+
+    it('opens it with no source when the map has no saved measurements', async () => {
+        await mountView([MAIN]);
+        await wrapper.find('[data-report]').trigger('click');
+        await flushPromises();
+        const [open] = wrapper.vm.dialogs.stack.value;
+        expect(open.props.initial.sources).toEqual([]);
+    });
+});
+
+describe('the item a link asks for (focusItem)', () => {
+    const point = id => ({ type: 'Feature', id, geometry: { type: 'Point', coordinates: [10.005, 45.005] }, properties: { id, ref: '1', measurementType: 'point', name: 'Crack', createdAt: '2026-11-01T10:00:00.000Z' } });
+    const withMeasurements = features => dataset.getFileContents.mockImplementation(async path => {
+        if (path === 'dsm_measurements.geojson') return JSON.stringify({ type: 'FeatureCollection', metadata: { version: '3.0' }, features });
+        throw Object.assign(new Error('Not found'), { status: 404 });
+    });
+    afterEach(() => {
+        dataset.getFileContents.mockImplementation(async () => { throw Object.assign(new Error('Not found'), { status: 404 }); });
+        vi.restoreAllMocks();
+    });
+
+    it('frames and selects the annotation once the map has read its measurements', async () => {
+        withMeasurements([point('a1')]);
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        await mountView([MAIN], { extra: { focusItem: 'a1' } });
+        expect(wrapper.vm.measureControls.source.getFeatures().map(f => f.get('id'))).toEqual(['a1']);
+        expect(wrapper.vm.measureControls._hoveredFeature.get('id')).toBe('a1');
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('says "This item no longer exists" and opens as usual when the map has no annotation with the id', async () => {
+        withMeasurements([point('a1')]);
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        await mountView([MAIN], { extra: { focusItem: 'gone' } });
+        expect(warn).toHaveBeenCalledWith('This item no longer exists', { summary: 'Item not found' });
+        expect(near(center(), mainCenter)).toBe(true);
+    });
+
+    it('says nothing when no item was asked for', async () => {
+        withMeasurements([point('a1')]);
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        await mountView([MAIN]);
+        expect(warn).not.toHaveBeenCalled();
+        expect(wrapper.vm.measureControls._hoveredFeature ?? null).toBeNull();
+    });
+});

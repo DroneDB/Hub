@@ -22,6 +22,10 @@
         <SavedViews v-if="views.length && dataset && !loading && searchStaticPaths == null" :views="views"
                     :dataset="dataset" :can-write="canWrite" @rename="v => $emit('renameView', v)"
                     @delete="v => $emit('deleteView', v)" />
+        <ReportsList v-if="(reports.length || unreadableReports.length || canWrite) && dataset && !loading && searchStaticPaths == null"
+                     :reports="reports" :unreadable="unreadableReports" :dataset="dataset" :can-write="canWrite"
+                     @new="$emit('newReport')" @edit="r => $emit('editReport', r)" @duplicate="r => $emit('duplicateReport', r)"
+                     @delete="r => $emit('deleteReport', r)" />
         <LoadingSpinner v-if="loading" />
         <EmptyState v-if="!loading && noResults" title="No files found" items="files" :query="filter || ''" @clear="clearSearch(); $refs.searchField?.focus()" />
     </div>
@@ -31,6 +35,7 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
 import SavedViews from './SavedViews.vue';
+import ReportsList from './ReportsList.vue';
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import SearchField from '@/components/SearchField.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -56,7 +61,7 @@ const isBlank = (text) => text == null || text.length === 0;
 export default {
     components: {
         LoadingSpinner,
-        TreeView, SavedViews, ContextMenu, SearchField, EmptyState, Button
+        TreeView, SavedViews, ReportsList, ContextMenu, SearchField, EmptyState, Button
     },
     // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
@@ -77,9 +82,18 @@ export default {
         views: {
             type: Array,
             default: () => []
+        },
+        // The dataset's reports, and the stored items that cannot be read as one, listed under the saved views
+        reports: {
+            type: Array,
+            default: () => []
+        },
+        unreadableReports: {
+            type: Array,
+            default: () => []
         }
     },
-    emits: ['upload', 'refresh', 'renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'refresh', 'renameView', 'deleteView', 'newReport', 'editReport', 'duplicateReport', 'deleteReport', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
         return { countOf, requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },

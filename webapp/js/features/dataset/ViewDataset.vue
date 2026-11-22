@@ -117,6 +117,8 @@ import { hasOpenModalOverlay, useOverlay } from '@/composables/useOverlay';
 import { TABLET_MEDIA_QUERY, XWIDE_MEDIA_QUERY } from '@/libs/responsiveColumns';
 import { tileSizeChoice } from './explorer/tileGeometry';
 import { listViews } from '@/libs/views/viewStore';
+import { listReports } from '@/libs/reports/reportStore';
+import { useReportActions } from '@/features/reports/useReportActions';
 import Button from 'primevue/button';
 import Message from '@/components/HubMessage.vue';
 import ResourceState from '@/components/ResourceState.vue';
@@ -209,6 +211,9 @@ const canWrite = computed(() => permissions.value.canWrite);
 const canDelete = computed(() => permissions.value.canDelete);
 // The saved views of the dataset, sorted by name (read with meta/get/views, not from the info)
 const views = ref([]);
+// The reports of the dataset (sorted by name), and the stored items that cannot be read as one (meta key `reports`)
+const reports = ref([]);
+const unreadableReports = ref([]);
 
 const tabs = ref(null);
 const explorer = ref(null);
@@ -597,18 +602,38 @@ async function loadViews({ fresh = false } = {}) {
     }
 }
 
+// Reports are read like the views: reads started later win, and a failed read keeps the list the page has
+let reportsRead = 0;
+async function loadReports({ fresh = false } = {}) {
+    const read = ++reportsRead;
+    try {
+        const loaded = await listReports(dataset, { fresh });
+        if (read !== reportsRead) return;
+        reports.value = loaded.reports;
+        unreadableReports.value = loaded.unreadable;
+    } catch (e) {
+        console.error('Cannot load the reports:', e);
+    }
+}
+
 // The views are read once the dataset answered (a busy one refuses them), and again when it opens after its busy state:
 // what the next read of the root asks for, null once asked
 let viewsWanted = { fresh: false };
 function loadViewsWhenOpen() {
     if (!viewsWanted) return;
     loadViews(viewsWanted);
+    loadReports(viewsWanted);
     viewsWanted = null;
 }
 
 // Views are saved in the map, another tab: the list catches up when this tab is back (not while the dataset is not open)
-useEventListener(window, 'focus', () => { if (!viewsWanted && !pageState.value) loadViews({ fresh: true }); });
+useEventListener(window, 'focus', () => {
+    if (viewsWanted || pageState.value) return;
+    loadViews({ fresh: true });
+    loadReports({ fresh: true });
+});
 const viewActions = useViewActions({ dataset, dialogs, onChanged: () => loadViews({ fresh: true }) });
+const reportActions = useReportActions({ dataset, org: String(route.params.org), ds: String(route.params.ds), dialogs, router, onChanged: () => loadReports({ fresh: true }) });
 
 // ---- Bindings --------------------------------------------------------------------------
 
@@ -651,7 +676,11 @@ const treeEvents = {
     selectAll: () => selectAll(true),
     error: e => actions.showError(e, 'Error'),
     renameView: viewActions.rename,
-    deleteView: viewActions.remove
+    deleteView: viewActions.remove,
+    newReport: () => reportActions.create(),
+    editReport: reportActions.edit,
+    duplicateReport: reportActions.duplicate,
+    deleteReport: reportActions.remove
 };
 const fileEvents = { ...commonEvents(() => listing.selected.value), selectionChanged: onSelectionChanged };
 const detailEvents = {
@@ -661,7 +690,7 @@ const detailEvents = {
     buildStarted: handleBuildStarted, buildError: handleBuildError
 };
 
-const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, views: views.value }));
+const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, views: views.value, reports: reports.value, unreadableReports: unreadableReports.value }));
 // The toolbar runs the actions of the registry with the handlers of the file list
 const toolbarEvents = {
     ...fileEvents,

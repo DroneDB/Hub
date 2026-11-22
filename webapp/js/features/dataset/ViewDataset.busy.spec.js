@@ -15,7 +15,9 @@ const h_ = vi.hoisted(() => ({ followed: null, dataset: null, busy: null, tasks:
 
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'acme', ds: 'site' }, query: {}, hash: '' }), useRouter: () => ({ replace: (...args) => h_.replace(...args) }), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }));
 // The question of the cancel: answered by the test (the dialog host is a stub)
-vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => options => h_.confirm(options) }));
+vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => options => h_.confirm(options), useChoice: () => options => h_.confirm(options) }));
+// The reports are read like the views: this spec follows the views
+vi.mock('@/libs/reports/reportStore', async importOriginal => ({ ...await importOriginal(), listReports: () => Promise.resolve({ reports: [], unreadable: [] }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
         Organization: () => ({ Dataset: () => h_.dataset, datasets: () => Promise.resolve([]) }),

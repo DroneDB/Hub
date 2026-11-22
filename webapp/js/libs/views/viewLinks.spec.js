@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { b64encode, b64urlEncode } from '@/libs/base64';
 import ddb from 'ddb';
-import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, notGeneratedAlternative, VIEWER_ONLY_HELP } from './viewLinks';
+import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, notGeneratedAlternative, reportUrl, itemAnchor, itemOfAnchor, VIEWER_ONLY_HELP } from './viewLinks';
 
 const ds = { org: 'acme', ds: 'site' };
 const filePath = `/r/acme/site/view/${b64encode('flights/ortho.tif')}/map`;
@@ -104,5 +104,48 @@ describe('openInNewTab', () => {
 describe('VIEWER_ONLY_HELP', () => {
     it('says what the option hides and that the dataset stays open', () => {
         expect(VIEWER_ONLY_HELP).toBe('Hides the Hub header, the back button and the buttons that add or remove layers. Anyone with the link can still open the rest of the dataset.');
+    });
+});
+
+describe('the item of a viewer link', () => {
+    it('is item=<id> on a file route, after the add and pick values and before embed=1', () => {
+        const url = fileViewUrl(ds, 'flights/ortho.tif', { add: ['x.tif'], pick: true, item: 'a1b2', viewerOnly: true });
+        expect(url).toBe(`${filePath}?add=${b64urlEncode('x.tif')}&pick=1&item=a1b2&embed=1`);
+        expect(fileViewUrl(ds, 'flights/ortho.tif', { item: 'a1b2' })).toBe(`${filePath}?item=a1b2`);
+    });
+
+    it('is item=<id> on a saved view and on another viewer, encoded', () => {
+        expect(savedViewUrl(ds, 'v_aaaaaaaa', { item: 'a b&c' })).toBe('/r/acme/site/views/v_aaaaaaaa?item=a%20b%26c');
+        expect(savedViewUrl(ds, 'v_aaaaaaaa', { item: 'x', viewerOnly: true })).toBe('/r/acme/site/views/v_aaaaaaaa?item=x&embed=1');
+        expect(viewerUrl({ baseUrl: '', org: 'acme', ds: 'site', path: 'cloud.laz', view: 'pointcloud', item: 'x' }))
+            .toBe(`/r/acme/site/view/${b64encode('cloud.laz')}/pointcloud?item=x`);
+    });
+
+    it('is left out when there is none', () => {
+        expect(fileViewUrl(ds, 'flights/ortho.tif', { item: '' })).toBe(filePath);
+        expect(savedViewUrl(ds, 'v_aaaaaaaa')).toBe('/r/acme/site/views/v_aaaaaaaa');
+    });
+});
+
+describe('reportUrl', () => {
+    it('is the live page route of the report, encoded, absolute with a base URL', () => {
+        expect(reportUrl(ds, 'r_k3x9q2m7')).toBe('/r/acme/site/reports/r_k3x9q2m7');
+        expect(reportUrl({ org: 'a b', ds: 'my/ds' }, 'r_k3x9q2m7', { baseUrl: 'https://hub.example.com' })).toBe('https://hub.example.com/r/a%20b/my%2Fds/reports/r_k3x9q2m7');
+    });
+});
+
+describe('the anchor of an item', () => {
+    it('is #item-<id>, and the id comes back from the hash of an address', () => {
+        expect(itemAnchor('a1b2')).toBe('#item-a1b2');
+        expect(itemOfAnchor('#item-a1b2')).toBe('a1b2');
+        expect(itemOfAnchor('#item-a1b2-2')).toBe('a1b2-2');
+        expect(itemOfAnchor(itemAnchor('x y'))).toBe('x y');
+    });
+
+    it('is none for any other hash', () => {
+        expect(itemOfAnchor('')).toBeNull();
+        expect(itemOfAnchor('#summary')).toBeNull();
+        expect(itemOfAnchor('#item-')).toBeNull();
+        expect(itemOfAnchor(undefined)).toBeNull();
     });
 });

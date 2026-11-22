@@ -32,8 +32,8 @@ import { useAnalysisTarget, ANALYSIS_PANELS } from '@/composables/useAnalysisTar
 /**
  * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, view?: any, savedLayers?: string[] }} props  `view`: the state of the view the map shows, null on the dataset map;
  *   `savedLayers`: the layers of the saved view, whose styles are the user's
- * @param {{ onFileWritten?: (path: string) => void, onFileRemoved?: (path: string) => void }} [fileEvents]
- *   told when the map writes or removes a file of the dataset (the measurements)
+ * @param {{ onFileWritten?: (path: string) => void, onFileRemoved?: (path: string) => void, onMeasurementsLoaded?: () => void }} [fileEvents]
+ *   told when the map writes or removes a file of the dataset (the measurements), and when it has read them
  */
 export function useMapFeatures(props, fileEvents = {}) {
     const map = shallowRef(null);
@@ -65,7 +65,8 @@ export function useMapFeatures(props, fileEvents = {}) {
         // Unsaved measurements are offered a Save before the map shows the measurements of other files
         choose: () => choose,
         onFileWritten: () => fileEvents.onFileWritten || (() => {}),
-        onFileRemoved: () => fileEvents.onFileRemoved || (() => {})
+        onFileRemoved: () => fileEvents.onFileRemoved || (() => {}),
+        onMeasurementsLoaded: () => fileEvents.onMeasurementsLoaded || (() => {})
     });
     // The layers of a saved view keep the style it records, none included: the map seeds no default on them (FR-RAS-01)
     const plantHealth = usePlantHealth({ dataset, rasterLayer, entry: () => null, savedLayers: () => props.savedLayers || [] });

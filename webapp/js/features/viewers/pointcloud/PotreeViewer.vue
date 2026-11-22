@@ -77,6 +77,9 @@ import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 import { cloudUnitsOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
 import { labelCircleRadii } from '@/libs/potree/circleRadiusLabel';
 import { notify } from '@/libs/notify';
+import { useRoute } from 'vue-router';
+import { replaceQueryKeys } from '@/libs/routeQuery';
+import { ITEM_GONE, itemFromQuery } from '@/libs/views/itemQuery';
 
 defineOptions({ name: 'PotreeViewer' });
 
@@ -207,6 +210,14 @@ async function addPointCloud(ddbEntry) {
     });
 }
 
+// The annotation the address asked for (`?item=<id>`, the link of a report item): framed once the measurements are in the
+// viewer, or told that it no longer exists. Read once, and taken off the address
+const wantedItem = itemFromQuery(useRoute()?.query);
+if (wantedItem) replaceQueryKeys({ item: null });
+function showRequestedItem() {
+    if (wantedItem && !m.focusItem(wantedItem)) notify.warn(ITEM_GONE, { summary: 'Item not found' });
+}
+
 async function loadViewer() {
     // A previous viewer of this component is released completely first
     stopScale();
@@ -265,6 +276,7 @@ async function loadViewer() {
     viewer.fitToScreen();
     await m.load();
     if (unmounted) return;
+    showRequestedItem();
     window.viewer = viewer;
 }
 

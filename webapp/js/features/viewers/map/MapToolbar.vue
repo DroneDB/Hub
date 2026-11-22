@@ -16,6 +16,10 @@
                     data-testid="copy-link-toolbar-btn" @click="emit('copy-link')">
                 <i :class="COPY_LINK_ICON" />
             </button>
+            <!-- A report of the measurements on this map (writers: a report is stored in the dataset) -->
+            <button v-if="report" title="Report" aria-label="Report" data-testid="report-toolbar-btn" @click="emit('report')">
+                <i :class="REPORT_ICON" />
+            </button>
             <template v-if="analysisEntry">
                 <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis"
                         data-testid="raster-analysis-toolbar-btn" @click="emit('analysis', 'rasterAnalysis')">
@@ -52,7 +56,7 @@
  * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
  * - top right: Back and Copy link (single-file map; an embedded map has neither: it has no Hub
- *   to go back to and its address is the host page's; a map narrower than `sm` has no Back, its viewer bar does), Reset view, Fullscreen, Raster Analysis, Stockpile;
+ *   to go back to and its address is the host page's; a map narrower than `sm` has no Back, its viewer bar does), Reset view, Fullscreen, Report (writers), Raster Analysis, Stockpile;
  * - top center: direction indicators and flight path (display options), compare: with two
  *   georasters or more it splits the map between them, with one (where `pickToCompare`) it asks
  *   for another to compare to.
@@ -61,7 +65,7 @@ import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
 import { useFullscreen } from '@/composables/useFullscreen';
 import {
-    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, RASTER_ANALYSIS_ICON, RESET_VIEW_ICON, STOCKPILE_ICON
+    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, RASTER_ANALYSIS_ICON, REPORT_ICON, RESET_VIEW_ICON, STOCKPILE_ICON
 } from '@/libs/glyphs';
 
 const props = defineProps({
@@ -70,6 +74,8 @@ const props = defineProps({
     showBack: { type: Boolean, default: false },
     /** The Copy link button (single-file map) */
     copyLink: { type: Boolean, default: false },
+    /** The Report button: a report of the measurements on the map (offered to those who can write) */
+    report: { type: Boolean, default: false },
     /** Direction indicators and flight path (hidden on the single-file map) */
     displayOptions: { type: Boolean, default: true },
     /** The compare button, shown while the map has a georaster */
@@ -89,7 +95,7 @@ const props = defineProps({
      */
     pickToCompare: { type: Boolean, default: true }
 });
-const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
+const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'report', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
 
 const canFullscreen = supportsFullScreen();
 // The button says what it does next: Fullscreen, then Exit fullscreen (Esc and the browser's controls leave it too)

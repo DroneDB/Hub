@@ -9,7 +9,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { ref, h, defineComponent, onMounted } from 'vue';
 import { createPinia } from 'pinia';
 
-const h_ = vi.hoisted(() => ({ dataset: null, actions: null }));
+const h_ = vi.hoisted(() => ({ dataset: null, actions: null, listReports: null, reportActions: null }));
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: vi.fn() }), useRoute: () => ({ params: { org: 'org', ds: 'ds' } }), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
@@ -41,6 +41,14 @@ vi.mock('@/composables/useViewActions', () => ({
         return h_.actions;
     }
 }));
+// The reports are read through their own store (the views spec follows the views' reads of the meta list)
+vi.mock('@/libs/reports/reportStore', async importOriginal => ({ ...await importOriginal(), listReports: (...args) => h_.listReports(...args) }));
+vi.mock('@/features/reports/useReportActions', () => ({
+    useReportActions: opts => {
+        h_.reportActions = { opts, create: vi.fn(), edit: vi.fn(), duplicate: vi.fn(), remove: vi.fn() };
+        return h_.reportActions;
+    }
+}));
 vi.mock('@/features/viewers/map/DatasetMap.vue', () => ({ default: { render: () => null } }));
 vi.mock('./TaskHistory.vue', () => ({ default: { render: () => null } }));
 
@@ -57,6 +65,8 @@ const item = (id, uid, name, path = 'ortho.tif') => ({
 const FileBrowserStub = defineComponent({
     props: {
         views: { type: Array, default: () => [] },
+        reports: { type: Array, default: () => [] },
+        unreadableReports: { type: Array, default: () => [] },
         canWrite: Boolean,
         dataset: { type: Object, default: null },
         rootNodes: { type: Function, default: null }
@@ -82,6 +92,7 @@ const shown = () => wrapper.findComponent(FileBrowserStub).props('views').map(v 
 
 beforeEach(() => {
     window.HubOptions = { appName: 'DroneDB' };
+    h_.listReports = vi.fn(() => Promise.resolve({ reports: [], unreadable: [] }));
     h_.dataset = {
         info: vi.fn(() => Promise.resolve([])),
         metaGet: vi.fn(() => Promise.resolve([item('1', 'v_bbbbbbbb', 'Beta'), item('2', 'v_aaaaaaaa', 'Alpha')]))
@@ -176,5 +187,57 @@ describe('ViewDataset saved views', () => {
         browser.vm.$emit('deleteView', { uid: 'v_aaaaaaaa' });
         expect(h_.actions.rename).toHaveBeenCalledWith({ uid: 'v_aaaaaaaa' });
         expect(h_.actions.remove).toHaveBeenCalledWith({ uid: 'v_aaaaaaaa' });
+    });
+});
+
+describe('ViewDataset reports', () => {
+    const report = (uid, name) => ({ id: uid, uid, name, data: {} });
+    const browser = () => wrapper.findComponent(FileBrowserStub);
+
+    it('reads them with the store of the reports once the dataset answered, and gives the tree the reports and the unreadable ones', async () => {
+        h_.listReports.mockResolvedValue({ reports: [report('r_aaaaaaaa', 'Alpha')], unreadable: [{ id: '9', uid: null, name: null, error: 'not an object' }] });
+        let answer;
+        h_.dataset.info = vi.fn(() => new Promise(resolve => { answer = resolve; }));
+        await mountPage();
+        expect(h_.listReports).not.toHaveBeenCalled();
+        answer([]);
+        await flushPromises();
+        expect(h_.listReports).toHaveBeenCalledTimes(1);
+        expect(browser().props('reports').map(r => r.name)).toEqual(['Alpha']);
+        expect(browser().props('unreadableReports')).toHaveLength(1);
+    });
+
+    it('reads them again from the server when the window is focused and after a change by the report actions', async () => {
+        await mountPage();
+        window.dispatchEvent(new Event('focus'));
+        await flushPromises();
+        expect(h_.listReports).toHaveBeenLastCalledWith(h_.dataset, { fresh: true });
+        h_.listReports.mockClear();
+        h_.reportActions.opts.onChanged();
+        await flushPromises();
+        expect(h_.listReports).toHaveBeenCalledWith(h_.dataset, { fresh: true });
+    });
+
+    it('keeps the last list when a read again fails, and logs', async () => {
+        h_.listReports.mockResolvedValueOnce({ reports: [report('r_aaaaaaaa', 'Alpha')], unreadable: [] });
+        await mountPage();
+        h_.listReports.mockRejectedValueOnce(new Error('offline'));
+        window.dispatchEvent(new Event('focus'));
+        await flushPromises();
+        expect(browser().props('reports').map(r => r.name)).toEqual(['Alpha']);
+        expect(console.error).toHaveBeenCalledWith('Cannot load the reports:', expect.any(Error));
+    });
+
+    it('gives the tree the new, edit, duplicate and delete of the report actions', async () => {
+        await mountPage();
+        const entry = report('r_aaaaaaaa', 'Alpha');
+        browser().vm.$emit('newReport');
+        browser().vm.$emit('editReport', entry);
+        browser().vm.$emit('duplicateReport', entry);
+        browser().vm.$emit('deleteReport', entry);
+        expect(h_.reportActions.create).toHaveBeenCalledWith();
+        expect(h_.reportActions.edit).toHaveBeenCalledWith(entry);
+        expect(h_.reportActions.duplicate).toHaveBeenCalledWith(entry);
+        expect(h_.reportActions.remove).toHaveBeenCalledWith(entry);
     });
 });

@@ -32,6 +32,9 @@ const shown = vi.hoisted(() => ({ error: null }));
 // What the user may do in the dataset, and the measurements of the viewer: refs the tests change
 const access = vi.hoisted(() => ({}));
 const measurements = vi.hoisted(() => ({}));
+// The query of the address of the viewer (`?item=`: the annotation to frame)
+const routing = vi.hoisted(() => ({ query: {}, found: true }));
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: routing.query }) }));
 vi.mock('@/composables/useViewerEntry', () => ({
     useViewerEntry: () => ({
         entry: ref({ path: 'cloud.laz' }),
@@ -44,7 +47,7 @@ vi.mock('@/composables/usePotreeMeasurements', () => ({
     usePotreeMeasurements: () => Object.assign(measurements, {
         hasMeasurements: ref(false), hasSavedMeasurements: ref(false), savingMeasurements: ref(false), deleteDialogOpen: ref(false),
         deleteToolActive: ref(false), canUndo: ref(false), canRedo: ref(false), undo: vi.fn(), redo: vi.fn(), toggleDeleteTool: vi.fn(),
-        save: vi.fn(), requestDelete: vi.fn(), onDeleteDialogClose() {}, discardMeasure() {}, attach: (_viewer, _session, coordinateSystem) => { calls.push(['attach', coordinateSystem]); }, load: async () => { calls.push(['load']); }, onGuiLoaded() {}
+        save: vi.fn(), requestDelete: vi.fn(), onDeleteDialogClose() {}, discardMeasure() {}, attach: (_viewer, _session, coordinateSystem) => { calls.push(['attach', coordinateSystem]); }, load: async () => { calls.push(['load']); }, focusItem: id => { calls.push(['focus', id]); return routing.found; }, onGuiLoaded() {}
     })
 }));
 // The scripts of Potree load when the test lets them
@@ -124,7 +127,7 @@ const button = id => wrapper.find(`[data-testid="${id}"]`);
 const tools = () => wrapper.find('[role="toolbar"][aria-label="Measure"]');
 const display = () => wrapper.find('[role="toolbar"][aria-label="Display"]');
 
-beforeEach(() => { calls.length = 0; lazy.gate = null; copcWkt.value = 'PROJCS["x"]'; stubPotree(); });
+beforeEach(() => { calls.length = 0; routing.query = {}; routing.found = true; lazy.gate = null; copcWkt.value = 'PROJCS["x"]'; stubPotree(); });
 afterEach(() => {
     wrapper?.unmount();
     delete globalThis.Potree;
@@ -557,5 +560,37 @@ describe('PotreeViewer with the heights in another unit than x and y', () => {
         } finally {
             warn.mockRestore();
         }
+    });
+});
+
+describe('PotreeViewer with ?item= (the link of a report item)', () => {
+    beforeEach(() => {
+        window.history.replaceState(null, '', '/r/o/d/view/x/pointcloud?item=a1b2&keep=1');
+        vi.spyOn(notify, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it('frames the item once the measurements are in the viewer, and takes item off the address', async () => {
+        routing.query = { item: 'a1b2' };
+        await mountViewer();
+        expect(calls.map(c => c[0])).toEqual(expect.arrayContaining(['attach', 'load', 'focus']));
+        expect(calls.findIndex(c => c[0] === 'focus')).toBeGreaterThan(calls.findIndex(c => c[0] === 'load'));
+        expect(calls.find(c => c[0] === 'focus')).toEqual(['focus', 'a1b2']);
+        expect(notify.warn).not.toHaveBeenCalled();
+        expect(window.location.search).toBe('?keep=1');
+    });
+
+    it('says "This item no longer exists" and opens as usual when the viewer has no item with the id', async () => {
+        routing.query = { item: 'gone' };
+        routing.found = false;
+        await mountViewer();
+        expect(notify.warn).toHaveBeenCalledWith('This item no longer exists', { summary: 'Item not found' });
+        expect(calls.map(c => c[0])).toContain('load');
+    });
+
+    it('asks nothing of the viewer when the address has no item', async () => {
+        await mountViewer();
+        expect(calls.map(c => c[0])).not.toContain('focus');
+        expect(notify.warn).not.toHaveBeenCalled();
     });
 });

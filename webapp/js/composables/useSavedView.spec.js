@@ -217,6 +217,31 @@ describe('useSavedView file route', () => {
         expect((await open(fileUrl('f/a.tif', '?pick=1&embed=1'), { embed: true })).view.pickOnLoad.value).toBe(false);
     });
 
+    it('reads item once, for the map to frame, and takes it off the address with add and pick', async () => {
+        const { view } = await open(fileUrl('f/a.tif', `?add=${enc('f/b.tif')}&item=a1b2&keep=1`, '#frag'));
+        expect(view.itemOnLoad.value).toBe('a1b2');
+        expect(window.location.search).toBe('?keep=1');
+        expect(window.location.hash).toBe('#frag');
+    });
+
+    it('has no item when the address asks for none', async () => {
+        expect((await open(fileUrl('f/a.tif'))).view.itemOnLoad.value).toBe('');
+    });
+
+    it('reads item of a saved view and takes it off its address', async () => {
+        const { view } = await open(viewUrl('v_1', '?item=a1b2'), { dataset: fakeDataset({ items: [savedItem('v_1', 'S', twoLayers())] }) });
+        expect(view.itemOnLoad.value).toBe('a1b2');
+        expect(window.location.pathname).toBe(viewUrl('v_1'));
+        expect(window.location.search).toBe('');
+    });
+
+    it('does not ask for the item again after a reload: the address no longer holds it', async () => {
+        await open(fileUrl('f/a.tif', '?item=a1b2'));
+        scope.stop();
+        const reloaded = await open(window.location.pathname + window.location.search, { history: held() });
+        expect(reloaded.view.itemOnLoad.value).toBe('');
+    });
+
     it('keeps the entry in the history entry, so a reload shows the same view', async () => {
         const { view } = await open(fileUrl('f/a.tif', `?add=${enc('f/b.tif')}`));
         expect(held()).toEqual({ identity: 'file:f/a.tif', state: view.state.value });

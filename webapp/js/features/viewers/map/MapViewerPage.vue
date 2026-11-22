@@ -11,7 +11,7 @@
                 <MapCore ref="mapCore" :files="layers.files.value" :view="state" :changed-paths="layers.changedPaths.value" :saved-layers="savedLayers" :dataset="dataset"
                          standalone :can-write="canWrite" :can-delete="!!canDelete"
                          can-add-layers :add-layer-disabled="layers.atLimit.value" :add-layer-title="layers.addTitle.value"
-                         :link-target="linkTarget" :share-note="shareNote" :can-save="canWrite && !embed"
+                         :link-target="linkTarget" :share-note="shareNote" :can-save="canWrite && !embed" :focus-item="itemOnLoad"
                          @update:view="onMapUpdate" @add-layer="layers.add"
                          @remove-layer="layers.remove" @repick="layers.repick" @save="save" @vue:mounted="pickOnMount" />
             </div>
@@ -51,7 +51,7 @@ const mapCore = ref(null);
 const hashOf = shallowRef(null);
 const {
     dataset, loading, error, loadError, canWrite, canDelete, state, setState, saved, dirty, shareNote, name, pageTitle, identity,
-    baseEntry, busy, pickOnLoad, linkTarget, save, saveAsNew
+    baseEntry, busy, pickOnLoad, itemOnLoad, linkTarget, save, saveAsNew
 } = useSavedView({
     route, router: useRouter(), dialogs, embed, hashOf,
     // The measurements on the map leave with the view: one question for the page when it is left

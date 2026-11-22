@@ -13,12 +13,13 @@
  *
  * Externals: measureControls, files, dataset, canWrite, canDelete, currentUnitPref,
  * showAlert, showFlash, choose(options) (a question as a promise of 'confirm' / 'secondary' / 'cancel'),
- * onFileWritten(path), onFileRemoved(path).
+ * onFileWritten(path), onFileRemoved(path), onMeasurementsLoaded() (the file of the owner on show was read and shown).
  */
 import { toRaw } from 'vue';
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
-import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, notifyRenumbered, isMeasurementFile } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, notifyRenumbered } from '@/libs/map/measurementStorage';
+import { measurementOwnerEntry } from '@/libs/map/measurementOwner';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
@@ -120,37 +121,13 @@ const definition = {
             return this.measureControls;
         },
 
-        // The path of a file on show: an entry, or the placeholder of a layer that cannot be drawn (yet)
-        _shownPath(file) {
-            return (file.entry && file.entry.path) || (file.placeholder && file.placeholder.path) || null;
-        },
-
-        /**
-         * The files the measurements are about: not the folders of a listing, nor the measurements files themselves
-         * (a Save adds one to the listing, which must not make the folder look like a different set of files).
-         */
-        _shownFiles() {
-            return this.files.filter(f => {
-                if (!f.entry) return !!f.placeholder;
-                return !ddb.entry.isDirectory(f.entry) && !isMeasurementFile(f.entry.path);
-            });
-        },
-
-        // measurements.geojson in the folder of the first file on show
-        standaloneMeasurementEntry() {
-            const first = this.files.find(f => this._shownPath(f));
-            const folder = first ? ddb.pathutils.getParentFolder(this._shownPath(first)) || '' : '';
-            return { path: folder ? `${folder}/measurements.geojson` : 'measurements.geojson' };
-        },
-
         /**
          * The entry the measurements belong to: the one file on show (its sidecar holds them), else the folder
          * (a folder's children, several files, a view with layers: the file of the folder of the first one).
+         * The rule is libs/map/measurementOwner, which a report's links use too.
          */
         measurementOwnerEntry() {
-            const shown = this._shownFiles();
-            if (shown.length !== 1) return this.standaloneMeasurementEntry();
-            return shown[0].entry || { path: this._shownPath(shown[0]) };
+            return measurementOwnerEntry(this.files);
         },
 
         // Whether the map still works on this storage (the state is reactive: its value is a proxy of the object)
@@ -229,6 +206,7 @@ const definition = {
             }
             this._setSaved(!!geojson);
             this._markSaved();
+            this.onMeasurementsLoaded();
         },
 
         // The organization's categories, severities and statuses, for the properties dialog (the default ones until they are read)
@@ -570,5 +548,5 @@ const definition = {
  */
 export function useMapMeasurements(externals) {
     const none = () => () => {};
-    return createFeatureScope({ ...definition, externals: { onFileWritten: none, onFileRemoved: none, ...externals } });
+    return createFeatureScope({ ...definition, externals: { onFileWritten: none, onFileRemoved: none, onMeasurementsLoaded: none, ...externals } });
 }

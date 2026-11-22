@@ -24,6 +24,7 @@ import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/
 import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/measureSnapshot';
 import { measureAt, annotationElement, updateNameLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
+import { focusItem as focusViewerItem } from '@/libs/potree/itemFocus';
 import { flash } from '@/composables/useMapAlerts';
 import { notify } from '@/libs/notify';
 import { textToHtml } from '@/libs/sanitize';
@@ -439,10 +440,17 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         }
     }
 
+    /**
+     * Frames the measure or annotation with an id (the `item` of the address).
+     * @param {string} id
+     * @returns {boolean} false when the viewer has none with that id
+     */
+    const focusItem = id => !!viewer && focusViewerItem(viewer, id);
+
     return {
         measurementCount, hasMeasurements: computed(() => measurementCount.value > 0),
         hasSavedMeasurements, savingMeasurements, deleteDialogOpen, deleteToolActive, canUndo, canRedo,
-        attach, onGuiLoaded, load, save, onDeleteDialogClose, undo, redo, toggleDeleteTool, discardMeasure,
+        attach, onGuiLoaded, load, save, onDeleteDialogClose, undo, redo, toggleDeleteTool, discardMeasure, focusItem,
         requestDelete: () => { deleteDialogOpen.value = true; }
     };
 }
