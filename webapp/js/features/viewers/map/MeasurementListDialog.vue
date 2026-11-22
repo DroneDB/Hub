@@ -168,6 +168,11 @@ export default {
             type: Array,
             default: () => []
         },
+        // The refs of the annotations of the same file that the map does not show (the 3D viewer's), repeats kept
+        otherRefs: {
+            type: Array,
+            default: () => []
+        },
         // The path of the file the measurements are saved in (empty: not known yet)
         savedPath: {
             type: String,
@@ -236,9 +241,10 @@ export default {
             return this.measurements.filter(m => (!this.categoryFilter || m.category === this.categoryFilter)
                 && (!this.statusFilter || m.status === this.statusFilter));
         },
-        // The references that more than one measurement has (a file edited outside the Hub can have them)
+        // The references that more than one annotation of the file has, of the map or of the 3D viewer (a file edited
+        // outside the Hub can have them)
         duplicates() {
-            return duplicateRefs(this.measurements.map(m => m.ref));
+            return duplicateRefs([...this.measurements.map(m => m.ref), ...this.otherRefs]);
         },
         duplicateText() {
             const refs = this.duplicates.join(', ');

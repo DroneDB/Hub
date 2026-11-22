@@ -155,6 +155,16 @@ describe('what can be saved', () => {
         expect(valid()).toBe(true);
     });
 
+    it('takes a numeric reference of a file another tool wrote as its text', async () => {
+        await show({ isRefTaken: ref => ref === '3' });
+        await wrapper.setProps({ modelValue: { ref: 5 } });
+        expect(field('ref').value).toBe('5');
+        expect(valid()).toBe(true);
+        await wrapper.setProps({ modelValue: { ref: 3 } });
+        expect(document.getElementById('x-ref-error').textContent).toBe('Reference 3 is already used');
+        expect(valid()).toBe(false);
+    });
+
     it('limits the assignee to 100 characters and the reference to 8 while typing', async () => {
         await show();
         expect(field('assignee').maxLength).toBe(100);

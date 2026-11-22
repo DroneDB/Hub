@@ -37,11 +37,16 @@ const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
 /** @param {any} feature @returns {string} the `id` of a feature, '' when it has none */
 export const idOf = feature => (typeof feature?.properties?.id === 'string' ? feature.properties.id : '');
 
+/**
+ * A stored `ref` as the text it is: a file written by another tool may hold a number (`"ref": 5`), which is the
+ * ref "5"; anything else that is not text is no ref.
+ * @param {any} ref
+ * @returns {string} '' when it is none
+ */
+export const refText = ref => (typeof ref === 'string' || (typeof ref === 'number' && Number.isFinite(ref)) ? String(ref) : '');
+
 /** @param {any} feature @returns {string} the `ref` of a feature, '' when it has none */
-export const refOf = feature => {
-    const ref = feature?.properties?.ref;
-    return typeof ref === 'string' || typeof ref === 'number' ? String(ref) : '';
-};
+export const refOf = feature => refText(feature?.properties?.ref);
 
 /** @param {string} ref  whether it is a reference the format allows */
 export const isValidRef = ref => REF_PATTERN.test(ref);
@@ -146,17 +151,18 @@ export function assignRefs(features, { lastRef = 0, fileOrder = (_feature, index
 }
 
 /**
- * The new features whose ref another feature of the file has (another session issued it first): each gets the
- * next ref instead. Only the features the caller says are new are changed: a saved one keeps its ref
- * (the same ref in two saved features is the file's, shown as a warning).
- * @param {any[]} features  all the features of the file
+ * The new features whose ref a feature already in the file has (another session issued or gave it first): each
+ * gets the next ref instead. Every feature that is not new counts, whichever view it belongs to: another session
+ * may have numbered a feature this view loaded without a ref, with the ref this view issued to a new one. Only the
+ * features the caller says are new are changed: a saved one keeps its ref (the same ref in two saved features is
+ * the file's, shown as a warning).
+ * @param {any[]} features  all the features of the file, with the refs the file holds for the saved ones
  * @param {(feature: any) => boolean} isNew  whether a feature was never saved
- * @param {(feature: any) => boolean} isOther  whether a feature belongs to the file as another session wrote it
  * @param {number} lastRef  the highest ref the file says was issued
  * @returns {{ features: any[], lastRef: number, changes: { id: string, from: string, to: string }[] }}
  */
-export function renumberTaken(features, isNew, isOther, lastRef) {
-    const used = new Set(features.filter(isOther).map(refOf).filter(Boolean));
+export function renumberTaken(features, isNew, lastRef) {
+    const used = new Set(features.filter(f => !isNew(f)).map(refOf).filter(Boolean));
     let counter = Math.max(lastRef, highestRef(refsOf(features)));
     /** @type {{ id: string, from: string, to: string }[]} */
     const changes = [];
@@ -198,7 +204,9 @@ export class RefSequence {
         this.floor = 0;
         /** What the file's own highest was when it was read (a ref issued after that can be taken back) */
         this._base = 0;
-        /** The refs of the features that the view does not own: the ones it neither shows nor saves */
+        /** The refs of the features that the view does not own (the ones it neither shows nor saves), in file order, repeats kept */
+        this.foreignRefs = /** @type {string[]} */ ([]);
+        /** The same refs as a set */
         this.foreign = new Set();
     }
 
@@ -213,7 +221,8 @@ export class RefSequence {
         const known = Math.max(Number.isFinite(lastRef) ? lastRef : 0, highestRef(refsOf(features)));
         this.floor = Math.max(this.floor, known);
         this._base = Math.max(this._base, known);
-        this.foreign = new Set(features.filter(isForeign).map(refOf).filter(Boolean));
+        this.foreignRefs = features.filter(isForeign).map(refOf).filter(Boolean);
+        this.foreign = new Set(this.foreignRefs);
     }
 
     /**
@@ -262,7 +271,7 @@ export function storedFields(values) {
     /** @param {any} v @returns {string | undefined} */
     const text = v => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
     return {
-        ref: text(values.ref),
+        ref: text(refText(values.ref)),
         category: text(values.category),
         severity: text(values.severity),
         status: text(values.status),
@@ -285,13 +294,16 @@ export function unknownProperties(properties, known) {
 
 /**
  * The properties of a feature that belong to its identity and fields, to carry from a loaded feature to the
- * object a view keeps and back (the photos and the snapshot included).
+ * object a view keeps and back (the photos and the snapshot included). The ref is its text (refText).
  * @param {Record<string, any> | null | undefined} properties
  * @returns {Record<string, any>}
  */
 export function annotationProperties(properties) {
     const source = isObject(properties) ? properties : {};
-    return Object.fromEntries(ANNOTATION_KEYS.filter(key => source[key] !== undefined && source[key] !== null).map(key => [key, source[key]]));
+    const ref = refText(source.ref);
+    return Object.fromEntries(ANNOTATION_KEYS
+        .filter(key => (key === 'ref' ? !!ref : source[key] !== undefined && source[key] !== null))
+        .map(key => [key, key === 'ref' ? ref : source[key]]));
 }
 
 /**

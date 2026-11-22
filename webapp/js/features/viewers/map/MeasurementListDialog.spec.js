@@ -210,6 +210,15 @@ describe('MeasurementListDialog annotation columns and filters', () => {
             .find('[data-testid="duplicate-refs"]').text()).toBe('References 4, 5 are used by more than one measurement.');
     });
 
+    it('warns of a reference that a measurement shares with an annotation of the 3D viewer in the same file', () => {
+        expect(mountList({ measurements: [item('A', { ref: '4' })], otherRefs: ['5'] }).find('[data-testid="duplicate-refs"]').exists()).toBe(false);
+        expect(mountList({ measurements: [item('A', { ref: '4' })], otherRefs: ['4'] })
+            .find('[data-testid="duplicate-refs"]').text()).toBe('Reference 4 is used by more than one measurement.');
+        // Two annotations of the 3D viewer with one reference are a duplicate of the file too
+        expect(mountList({ measurements: [item('A', { ref: '1' })], otherRefs: ['6', '6'] })
+            .find('[data-testid="duplicate-refs"]').text()).toBe('Reference 6 is used by more than one measurement.');
+    });
+
     it('shows the empty message when there is no measurement, not the filters', () => {
         const wrapper = mountList({ measurements: [] });
         expect(wrapper.text()).toContain('No measurements on the map.');

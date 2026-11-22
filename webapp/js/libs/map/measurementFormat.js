@@ -384,9 +384,8 @@ function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0
             const known = idOf(feature) ? saved.get(idOf(feature)) : undefined;
             return !refOf(feature) && known && known.ref ? withProperty(feature, 'ref', known.ref) : feature;
         });
-        const keptSet = new Set(kept);
         const ownSet = new Set(own);
-        ({ features, lastRef, changes: renumbered } = renumberTaken([...own, ...kept], f => ownSet.has(f) && !saved.has(idOf(f)), f => keptSet.has(f), lastRef));
+        ({ features, lastRef, changes: renumbered } = renumberTaken([...own, ...kept], f => ownSet.has(f) && !saved.has(idOf(f)), lastRef));
         ({ features, lastRef } = assignRefs(features, {
             lastRef,
             fileOrder: (feature, index) => saved.get(idOf(feature))?.index ?? previousFeatures.length + index
@@ -443,8 +442,9 @@ export function write(existing, view, ownFeatures, ownSection = {}) {
  *
  *  - a feature of the view without a `ref` that the file holds one for (by its `id`: another session numbered
  *    it) takes that one;
- *  - a feature of the view that was never saved (its `id` is not in the file) whose `ref` a feature of the other
- *    view has (that save came first) takes the next ref, and is listed in `renumbered`;
+ *  - a feature of the view that was never saved (its `id` is not in the file) whose `ref` a feature in the file
+ *    has, of either view (another save came first and issued it, or gave it to a feature this view loaded without
+ *    one), takes the next ref, and is listed in `renumbered`;
  *  - the features still without one get the next refs in creation order (annotationIds.assignRefs);
  *  - `metadata.lastRef` is the larger of the file's, `issued` (the highest the view issued) and the highest ref
  *    of the document.

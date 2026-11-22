@@ -92,7 +92,7 @@
         <ChangeUnitsDialog v-if="changeUnitsDialogOpen" :target-unit="changeUnitsTargetUnit"
                            :measurements-count="changeUnitsMeasurementsCount" @close="handleChangeUnitsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
-                               :groups="measurementGroups" :saved-path="measurementsFilePath"
+                               :groups="measurementGroups" :other-refs="measurementListOtherRefs" :saved-path="measurementsFilePath"
                                :can-work-on-stockpiles="!!analysisEntry"
                                @close="measurementListDialogOpen = false"
                                @work-on-stockpile="item => { measurementListDialogOpen = false; workOnStockpile(item.feature); }"

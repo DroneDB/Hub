@@ -211,6 +211,64 @@ describe('the refs of the annotations', () => {
         warn.mockRestore();
     });
 
+    // A view issued "1" to a new item of an unnumbered file; another session numbered the file first and gave "1" to a
+    // feature of that view that the view had loaded without a ref: the view's save takes the file's ref for the loaded
+    // feature and gives the new item the next one
+    const numberedFirstBy = {
+        'the other view': async (dataset, owner) => {
+            if (owner === MAP) {
+                const cloud = storageFor(dataset, POINT_CLOUD, { pointCloudCrs: UTM_18N_WKT });
+                const distance = (await cloud.load()).features[0];
+                await cloudSave(cloud, measureOf(bagOf(distance)));
+            } else {
+                const map = storageFor(dataset, MAP);
+                await mapSave(map, await mapShows(map));
+            }
+        },
+        'a report': dataset => numberMeasurementFile(dataset, 'cloud_measurements.geojson')
+    };
+    describe.each(Object.keys(numberedFirstBy))('when %s numbered the file after the view loaded it', firstSaver => {
+        it('the map gives its new item the next ref when the file gave its ref to a loaded area', async () => {
+            // The distance is the newest: the areas are 1 and 2 once numbered
+            const { dataset, file } = memoryDataset(oldFile({ extra: { createdAt: '2026-01-01T13:00:00.000Z' } }));
+            const map = storageFor(dataset, MAP);
+            const mapItems = await mapShows(map);
+            const mapNew = areaFeature({ id: 'map-new', ref: map.refs.issue(), createdAt: '2026-03-01T00:00:00.000Z' }, 0.5);
+            expect(mapNew.get('ref')).toBe('1');
+
+            await numberedFirstBy[firstSaver](dataset, MAP);
+            expect(byName(file(), 'Early').properties.ref).toBe('1');
+
+            const result = await mapSave(map, [...mapItems, mapNew]);
+            expect(result.renumbered).toEqual([{ id: 'map-new', from: '1', to: '4' }]);
+            const saved = file();
+            expect(byName(saved, 'Early').properties.ref).toBe('1');
+            expect(saved.features.find(f => f.properties.id === 'map-new').properties.ref).toBe('4');
+            expect(duplicateRefs(saved.features.map(f => f.properties.ref))).toEqual([]);
+            expect(saved.metadata.lastRef).toBe(4);
+        });
+
+        it('the 3D viewer gives its new item the next ref when the file gave its ref to a loaded distance', async () => {
+            const { dataset, file } = memoryDataset(oldFile());
+            const cloud = storageFor(dataset, POINT_CLOUD, { pointCloudCrs: UTM_18N_WKT });
+            const distance = (await cloud.load()).features[0];
+            const cloudNew = measureOf({ id: 'cloud-new', ref: cloud.refs.issue(), createdAt: '2026-03-01T00:00:00.000Z' }, [CLOUD.C.local, CLOUD.D.local]);
+            expect(cloudNew.ddbProperties.ref).toBe('1');
+
+            await numberedFirstBy[firstSaver](dataset, POINT_CLOUD);
+            const numberedDistance = file().features.find(f => f.properties.id === distance.properties.id);
+            expect(numberedDistance.properties.ref).toBe('1');
+
+            const result = await cloudSave(cloud, measureOf(bagOf(distance)), cloudNew);
+            expect(result.renumbered).toEqual([{ id: 'cloud-new', from: '1', to: '4' }]);
+            const saved = file();
+            expect(saved.features.find(f => f.properties.id === distance.properties.id).properties.ref).toBe('1');
+            expect(saved.features.find(f => f.properties.id === 'cloud-new').properties.ref).toBe('4');
+            expect(duplicateRefs(saved.features.map(f => f.properties.ref))).toEqual([]);
+            expect(saved.metadata.lastRef).toBe(4);
+        });
+    });
+
     it('keep a ref a saved item has even when another feature of the file has it (a file edited outside the Hub)', async () => {
         const doc = oldFile();
         doc.features[0].properties.ref = '2';

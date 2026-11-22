@@ -4,7 +4,7 @@
 
         <div class="mb-3">
             <label :for="`${idPrefix}-ref`" class="d-block mb-1 fw-semibold">Reference</label>
-            <InputText :id="`${idPrefix}-ref`" :model-value="values.ref ?? ''" :placeholder="refPlaceholder" maxlength="8" autocomplete="off"
+            <InputText :id="`${idPrefix}-ref`" :model-value="refText(values.ref)" :placeholder="refPlaceholder" maxlength="8" autocomplete="off"
                        class="w-100" :invalid="!!refError" :aria-invalid="refError ? 'true' : undefined"
                        :aria-describedby="refError ? `${idPrefix}-ref-error` : undefined" @update:model-value="set('ref', $event)" />
             <FieldError :id="`${idPrefix}-ref-error`" :message="refError" />
@@ -69,7 +69,7 @@ import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
 import Checkbox from 'primevue/checkbox';
 import FieldError from '@/components/FieldError.vue';
-import { FIELD_LIMITS, choiceLabel, isDueDate, isValidRef, refTakenMessage } from '@/libs/map/annotationIds';
+import { FIELD_LIMITS, choiceLabel, isDueDate, isValidRef, refTakenMessage, refText } from '@/libs/map/annotationIds';
 
 const props = defineProps({
     modelValue: { type: Object, default: () => ({}) },
@@ -101,7 +101,7 @@ const options = computed(() => ({
 }));
 
 const refError = computed(() => {
-    const ref = (values.value.ref ?? '').trim();
+    const ref = refText(values.value.ref).trim();
     if (!ref) return '';
     if (!isValidRef(ref)) return 'A reference has 1 to 8 letters, digits or dashes';
     return props.isRefTaken(ref) ? refTakenMessage(ref) : '';

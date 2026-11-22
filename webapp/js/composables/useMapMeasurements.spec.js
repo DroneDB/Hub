@@ -777,6 +777,26 @@ describe('useMapMeasurements', () => {
             }
         });
 
+        it('gives the measurement list the references of the 3D viewer\'s annotations of the file, after a load and after a save', async () => {
+            const cloudItem = (id, ref) => ({ type: 'Feature', geometry: null, properties: { measurementType: 'distance', localCoordinates: [[0, 0, 0]], id, ref } });
+            stored['a/ortho_measurements.geojson'] = JSON.stringify({
+                type: 'FeatureCollection', metadata: { version: '3.0', lastRef: 4 },
+                features: [{ ...lengthFeature('m1'), properties: { ...lengthFeature('m1').properties, id: 'i1', ref: '3' } }, cloudItem('c1', '3'), cloudItem('c2', '4')]
+            });
+            const m = startWired();
+            await m.loadSavedMeasurements();
+            m.openMeasurementListDialog();
+            expect(m.measurementListOtherRefs.value).toEqual(['3', '4']);
+            expect(m.measurementListItems.value.map(i => i.ref)).toEqual(['3']);
+
+            // The 3D viewer saved another annotation since: the map's save reads it
+            const doc = JSON.parse(stored['a/ortho_measurements.geojson']);
+            doc.features.push(cloudItem('c3', '9'));
+            stored['a/ortho_measurements.geojson'] = JSON.stringify(doc);
+            await m.saveMeasurements();
+            expect(m.measurementListOtherRefs.value).toEqual(['3', '4', '9']);
+        });
+
         it('gives the dialog of a measurement the organization\'s schema once it is read', async () => {
             const m = startWired();
             const schema = { categories: [{ id: 'c', name: 'C', colour: '#000000' }], severities: [], statuses: [{ id: 's', name: 'S', closed: false }] };

@@ -115,7 +115,7 @@ describe('renumberTaken', () => {
         const mine = area('t', { id: 'mine', ref: '4' });
         const saved = area('t', { id: 'saved', ref: '4' });
         const theirs = area('u', { id: 'theirs', ref: '4' });
-        const result = renumberTaken([mine, saved, theirs], f => f === mine, f => f === theirs, 4);
+        const result = renumberTaken([mine, saved, theirs], f => f === mine, 4);
         expect(result.changes).toEqual([{ id: 'mine', from: '4', to: '5' }]);
         expect(result.features.map(refOf)).toEqual(['5', '4', '4']);
         expect(result.lastRef).toBe(5);
@@ -124,9 +124,17 @@ describe('renumberTaken', () => {
 
     it('returns the same features when no new ref is taken', () => {
         const features = [area('t', { id: 'a', ref: '1' }), area('u', { id: 'b', ref: '2' })];
-        const result = renumberTaken(features, f => idOf(f) === 'a', f => idOf(f) === 'b', 2);
+        const result = renumberTaken(features, f => idOf(f) === 'a', 2);
         expect(result.features).toBe(features);
         expect(result.changes).toEqual([]);
+    });
+
+    it('counts the ref of every saved feature as taken, of the view that saves too (another session numbered it)', () => {
+        const loaded = area('t', { id: 'loaded', ref: '1' });
+        const mine = area('u', { id: 'mine', ref: '1' });
+        const result = renumberTaken([loaded, mine], f => f === mine, 2);
+        expect(result.changes).toEqual([{ id: 'mine', from: '1', to: '3' }]);
+        expect(result.features.map(refOf)).toEqual(['1', '3']);
     });
 });
 
@@ -222,5 +230,12 @@ describe('what a feature keeps', () => {
         expect(unknownProperties(properties, new Set(['name', ...Object.keys(annotationProperties(properties))]))).toEqual({ customKey: 5, category: null });
         expect(annotationProperties(properties)).toEqual({ id: 'i', ref: '1', photos: [{ path: 'a.jpg', source: 'dataset' }] });
         expect(unknownProperties(null, new Set())).toEqual({});
+    });
+
+    it('reads a numeric ref (a file another tool wrote) as its text, with the one rule of refOf, and stores it as text', () => {
+        expect(annotationProperties({ id: 'i', ref: 5 })).toEqual({ id: 'i', ref: '5' });
+        expect(annotationProperties({ id: 'i', ref: true })).toEqual({ id: 'i' });
+        expect(refOf({ properties: { ref: 5 } })).toBe('5');
+        expect(storedFields({ ref: 12 }).ref).toBe('12');
     });
 });

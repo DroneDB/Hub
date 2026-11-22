@@ -74,6 +74,13 @@ const definition = {
             return this._changeTick >= 0 && !!this.measureControls && this.measureControls.isDirty();
         },
 
+        // The refs of the annotations of the file that the map does not show (the 3D viewer's), repeats kept: the
+        // measurement list warns of a ref used twice in the whole file. The storage's sequence is not reactive: the
+        // tick says when to read it again (it changes with a load or a save)
+        measurementListOtherRefs() {
+            return this._changeTick >= 0 && this.measurementStorage ? [...toRaw(this.measurementStorage).refs.foreignRefs] : [];
+        },
+
         // Where the measurements of the map are saved (the file of its owner); '' before the first load
         measurementsFilePath() {
             return this.measurementStorage ? this.measurementStorage.measurementPath : '';
