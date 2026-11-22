@@ -1,6 +1,6 @@
 /**
- * The navigation of the header (FR-NAV-01, FR-NAV-03, FR-NAV-04): Organizations as a link with
- * aria-current on the page, the user named beside the avatar (and the role of an administrator), the user menu
+ * The navigation of the header (FR-NAV-01, FR-NAV-03, FR-NAV-04): Organizations as a link, left out on the
+ * page it leads to, the user named beside the avatar (and the role of an administrator), the user menu
  * in labelled groups, the breadcrumb of an organization and of a dataset, and the labels of Download and
  * Settings from md. A real router, so the links are real ones.
  */
@@ -84,7 +84,7 @@ afterEach(() => wrapper?.unmount());
 
 describe('the main navigation (FR-NAV-01)', () => {
     it('has Organizations as the link of a Main navigation, for a signed-in user; Upload is in the user menu', async () => {
-        await renderAt('/r');
+        await renderAt('/upload');
         const nav = wrapper.find('nav[aria-label="Main"]');
         expect(nav.exists()).toBe(true);
         expect(nav.findAll('a').map(a => a.text())).toEqual(['Organizations']);
@@ -92,9 +92,12 @@ describe('the main navigation (FR-NAV-01)', () => {
         expect(navLink('upload').exists()).toBe(false);
     });
 
-    it('marks the link of the page it is on with aria-current', async () => {
+    it('has no link to the page it is on, and has it again on another page', async () => {
         await renderAt('/r');
-        expect(navLink('organizations').attributes('aria-current')).toBe('page');
+        expect(wrapper.find('.primary-nav').exists()).toBe(false);
+        await router.push({ name: 'Organizations', query: { view: 'map' } });
+        await flushPromises();
+        expect(wrapper.find('.primary-nav').exists()).toBe(false);
         await router.push('/upload');
         await flushPromises();
         expect(navLink('organizations').attributes('aria-current')).toBeUndefined();
@@ -110,7 +113,7 @@ describe('the main navigation (FR-NAV-01)', () => {
 
     it('has no Upload in the user menu where datasets cannot be created', async () => {
         globalThis.HubOptions = { disableDatasetCreation: true };
-        await renderAt('/r');
+        await renderAt('/r/t-orgs-bulk');
         const all = wrapper.vm.userMenuItems.flatMap(i => i.items ?? [i]).map(i => i.label);
         expect(all).not.toContain('Upload');
         expect(navLink('organizations').exists()).toBe(true);

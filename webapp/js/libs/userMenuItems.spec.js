@@ -167,4 +167,17 @@ describe('primaryNavItems (FR-NAV-01)', () => {
     it('are none for a visitor', () => {
         expect(primaryNavItems({ loggedIn: false, home })).toEqual([]);
     });
+
+    it('leave out the link to the page the user is on, whatever its query', () => {
+        expect(primaryNavItems({ loggedIn: true, home, current: { name: 'Organizations', params: {} } })).toEqual([]);
+        const oneOrg = { name: 'Datasets', params: { org: 'acme' } };
+        expect(primaryNavItems({ loggedIn: true, home: oneOrg, current: { name: 'Datasets', params: { org: 'acme' } } })).toEqual([]);
+    });
+
+    it('keep the link on the other pages', () => {
+        expect(primaryNavItems({ loggedIn: true, home, current: { name: 'Datasets', params: { org: 'acme' } } })).toHaveLength(1);
+        const oneOrg = { name: 'Datasets', params: { org: 'acme' } };
+        expect(primaryNavItems({ loggedIn: true, home: oneOrg, current: { name: 'Datasets', params: { org: 'other' } } })).toHaveLength(1);
+        expect(primaryNavItems({ loggedIn: true, home: oneOrg, current: { name: 'ViewDataset', params: { org: 'acme', ds: 'x' } } })).toHaveLength(1);
+    });
 });

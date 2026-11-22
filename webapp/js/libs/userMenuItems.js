@@ -148,13 +148,26 @@ export function userMenuItems(state) {
  */
 
 /**
+ * Whether a route is the page a link leads to: the same name, and every parameter of the link has the route's
+ * value (the query, a map or list view, does not count).
+ * @param {{ name: string, params?: Record<string, string> }} to
+ * @param {{ name?: unknown, params?: Record<string, unknown> } | null | undefined} route
+ */
+function leadsTo(to, route) {
+    if (!route || route.name !== to.name) return false;
+    return Object.entries(to.params ?? {}).every(([key, value]) => String(route.params?.[key] ?? '') === String(value));
+}
+
+/**
  * The main destinations the header shows to a signed-in user, as links: Organizations (the datasets of the one
- * organization of a one-organization install, which is home there). Upload is in the user menu.
- * @param {{ loggedIn: boolean, home: { name: string, params?: Record<string, string> } }} state
+ * organization of a one-organization install, which is home there). Upload is in the user menu. A link to the page
+ * the user is on is left out: the page's title already says where they are.
+ * @param {{ loggedIn: boolean, home: { name: string, params?: Record<string, string> },
+ *   current?: { name?: unknown, params?: Record<string, unknown> } | null }} state  current: the route of the page
  * @returns {NavLink[]}
  */
-export function primaryNavItems({ loggedIn, home }) {
-    if (!loggedIn) return [];
+export function primaryNavItems({ loggedIn, home, current }) {
+    if (!loggedIn || leadsTo(home, current)) return [];
     return [{
         id: 'organizations',
         label: home.name === 'Organizations' ? 'Organizations' : 'Datasets',

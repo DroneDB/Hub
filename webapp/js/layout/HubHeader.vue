@@ -365,9 +365,9 @@ export default {
                 }
             });
         },
-        // Organizations, as a link of the header (Upload is in the user menu)
+        // Organizations, as a link of the header (Upload is in the user menu); not on the page it leads to
         primaryNav: function () {
-            return primaryNavItems({ loggedIn: this.loggedIn, home: this.homeTarget });
+            return primaryNavItems({ loggedIn: this.loggedIn, home: this.homeTarget, current: this.$route });
         }
     },
     watch: {
