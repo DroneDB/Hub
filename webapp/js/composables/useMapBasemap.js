@@ -21,7 +21,7 @@ import { get as getProjection } from 'ol/proj';
 import { getWidth } from 'ol/extent';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { EPSG } from '@/libs/constants';
-import { onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { getPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 import { watchPixelRatio } from '@/libs/pixelRatio';
 
@@ -33,21 +33,23 @@ const wantsRetina = () => (globalThis.devicePixelRatio || 1) > 1;
  * tiles are 512 px, tilePixelRatio 2) on a screen above ratio 1, and nothing at 1x; a URL without it stays at 1x.
  * @param {any} config
  * @param {boolean} retina
+ * @param {string | undefined} crossOrigin  how the tiles are fetched (see basemapTileLayer)
  */
-function customLayer(config, retina) {
+function customLayer(config, retina, crossOrigin) {
     const attributions = config.attribution ? [config.attribution] : [];
     if (config.sourceType !== 'wms') {
         const has2x = config.url.includes('{r}');
         const source = new XYZ({
             url: has2x ? config.url.replaceAll('{r}', retina ? '@2x' : '') : config.url,
             attributions,
+            crossOrigin,
             ...(has2x && retina ? { tilePixelRatio: 2 } : {})
         });
         return new TileLayer({ source });
     }
     const params = { LAYERS: config.layerName, TILED: true, STYLES: '' };
     if (config.defaultTime) params.TIME = config.defaultTime;
-    const options = { url: config.url, params, attributions };
+    const options = { url: config.url, params, attributions, crossOrigin };
     const tileSize = config.tileSize || 256;
     if (tileSize !== 256) {
         const extent = getProjection(EPSG.WEB_MERCATOR).getExtent();
@@ -59,6 +61,48 @@ function customLayer(config, retina) {
         });
     }
     return new TileLayer({ source: new TileWMS(options) });
+}
+
+/**
+ * The tile layer of a basemap: the named one, or the custom one when `name` is 'custom' and a configuration is stored.
+ * A custom selection without a usable configuration (cleared, or invalid) or an unknown name draws the default.
+ * The one factory of the interactive map and of a report snapshot.
+ *
+ * `crossOrigin` is how the tile images are fetched. The interactive map leaves it out: a provider that sends no CORS
+ * headers still draws its tiles then. A snapshot reads the pixels back from a canvas, which a tile fetched without it
+ * taints, so it asks for 'anonymous' (and a provider that sends no CORS headers loads no tile).
+ * @param {{ name: string, custom: any, retina: boolean, crossOrigin?: string }} options
+ */
+function basemapTileLayer({ name, custom, retina, crossOrigin }) {
+    if (name === 'custom' && custom) return customLayer(custom, retina, crossOrigin);
+    const chosen = Basemaps[name];
+    const basemap = chosen?.url ? chosen : Basemaps[PREF_DEFAULTS[PREF.BASEMAP]];
+    // 512 px tiles in 256 px slots on a screen above ratio 1, for a basemap that has them (FR-MAP-29)
+    const twice = retina && !!basemap.url2x;
+    return new TileLayer({
+        source: new XYZ({
+            url: twice ? basemap.url2x : basemap.url,
+            attributions: basemap.attributions,
+            crossOrigin,
+            ...(twice ? { tilePixelRatio: 2 } : {}),
+            ...(basemap.maxZoom != null ? { maxZoom: basemap.maxZoom } : {})
+        })
+    });
+}
+
+/**
+ * The basemap layer of a report snapshot: the one a view names (the user's own when it names none), with tiles fetched
+ * with `crossOrigin: 'anonymous'` so that the canvas it is drawn on can be exported, at 1x whatever the screen. The
+ * interactive map's basemap (useMapBasemap) is made by the same factory and has no such setting.
+ * @param {string | null | undefined} name
+ */
+export function createSnapshotBasemap(name) {
+    return basemapTileLayer({
+        name: name || getPref(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]),
+        custom: getCustomBasemapConfig(),
+        retina: false,
+        crossOrigin: 'anonymous'
+    });
 }
 
 /** @param {import('vue').ShallowRef<any>} map */
@@ -76,22 +120,8 @@ export function useMapBasemap(map) {
 
     /** Tile layer of the current selection. */
     function createBasemapLayer() {
-        const config = customBasemapConfig.value;
         const retina = retinaDrawn = wantsRetina();
-        if (selectedBasemap.value === 'custom' && config) return customLayer(config, retina);
-        // A custom selection without a usable configuration (cleared, or invalid) or an unknown name: the default
-        const chosen = Basemaps[selectedBasemap.value];
-        const basemap = chosen?.url ? chosen : Basemaps[PREF_DEFAULTS[PREF.BASEMAP]];
-        // 512 px tiles in 256 px slots on a screen above ratio 1, for a basemap that has them (FR-MAP-29)
-        const twice = retina && !!basemap.url2x;
-        return new TileLayer({
-            source: new XYZ({
-                url: twice ? basemap.url2x : basemap.url,
-                attributions: basemap.attributions,
-                ...(twice ? { tilePixelRatio: 2 } : {}),
-                ...(basemap.maxZoom != null ? { maxZoom: basemap.maxZoom } : {})
-            })
-        });
+        return basemapTileLayer({ name: selectedBasemap.value, custom: customBasemapConfig.value, retina });
     }
 
     /** Replaces the basemap (layer 0) with the current selection. */

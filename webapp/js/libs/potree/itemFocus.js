@@ -28,6 +28,35 @@ export function findItem(viewer, id) {
 }
 
 /**
+ * Zooms the camera onto the box of some positions, with a little room for a box that has no size.
+ * @param {any} viewer
+ * @param {any[]} positions  THREE.Vector3
+ * @param {number} animationMs  0 moves at once
+ * @returns {boolean} false when there is no box to frame
+ */
+function zoomToBoxOf(viewer, positions, animationMs) {
+    const box = new THREE.Box3().setFromPoints(positions);
+    if (box.isEmpty()) return false;
+    if (box.getSize(new THREE.Vector3()).length() === 0) box.expandByScalar(POINT_MARGIN);
+    const node = new THREE.Object3D();
+    /** @type {any} */ (node).boundingBox = box;
+    viewer.zoomTo(node, MEASURE_ZOOM, animationMs);
+    return true;
+}
+
+/**
+ * Moves the camera onto a measure or an annotation with no move to wait for (the capture of a report reads the very
+ * next frame): a measure is framed on the box of its points, an annotation on a box around its position.
+ * @param {any} viewer
+ * @param {any} item  a Potree.Measure or Potree.Annotation
+ * @returns {boolean} false when the item has no position to frame
+ */
+export function frameItemNow(viewer, item) {
+    const positions = Array.isArray(item.points) ? item.points.map((/** @type {any} */ p) => p.position) : item.position ? [item.position] : [];
+    return zoomToBoxOf(viewer, positions, 0);
+}
+
+/**
  * Frames the annotation with this id.
  * @param {any} viewer
  * @param {string} id
@@ -37,13 +66,8 @@ export function focusItem(viewer, id) {
     const item = findItem(viewer, id);
     if (!item) return false;
     if (Array.isArray(item.points)) {
-        // A measure: the box of its points, with a little room for a point that has no size
-        const box = new THREE.Box3().setFromPoints(item.points.map((/** @type {any} */ p) => p.position));
-        if (box.isEmpty()) return true;
-        if (box.getSize(new THREE.Vector3()).length() === 0) box.expandByScalar(POINT_MARGIN);
-        const node = new THREE.Object3D();
-        /** @type {any} */ (node).boundingBox = box;
-        viewer.zoomTo(node, MEASURE_ZOOM, ANIMATION_MS);
+        // A measure: the box of its points (one that has none is left where it is)
+        zoomToBoxOf(viewer, item.points.map((/** @type {any} */ p) => p.position), ANIMATION_MS);
     } else if (typeof item.moveHere === 'function') {
         item.moveHere(viewer.scene.getActiveCamera());
     }

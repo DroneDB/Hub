@@ -86,6 +86,7 @@
 import { downloadCsv, toCsv } from '@/libs/csv';
 import { formatLength } from '@/libs/format';
 import { rasterValueParts } from '@/libs/map/rasterUnit';
+import { profileSamples, profileRange } from '@/libs/map/profileSeries';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import Window from '@/components/HubWindow.vue';
@@ -148,21 +149,10 @@ export default {
         },
         chartWidth() { return this.width - this.padLeft - this.padRight; },
         chartHeight() { return this.height - this.padTop - this.padBottom; },
-        samples() { return (this.profile && this.profile.samples) || []; },
+        samples() { return profileSamples(this.profile); },
         hasSamples() { return this.samples.length > 0; },
-        validSamples() {
-            return this.samples.filter(s => s && s.value !== null && s.value !== undefined);
-        },
-        yMin() {
-            if (this.profile && this.profile.min !== null && this.profile.min !== undefined) return this.profile.min;
-            if (!this.validSamples.length) return 0;
-            return Math.min(...this.validSamples.map(s => s.value));
-        },
-        yMax() {
-            if (this.profile && this.profile.max !== null && this.profile.max !== undefined) return this.profile.max;
-            if (!this.validSamples.length) return 1;
-            return Math.max(...this.validSamples.map(s => s.value));
-        },
+        yMin() { return profileRange(this.profile).min; },
+        yMax() { return profileRange(this.profile).max; },
         yRange() {
             const r = this.yMax - this.yMin;
             return r === 0 ? 1 : r;

@@ -89,14 +89,16 @@ export function createRasterSource({ url, hash, native, retina, vizParams = null
  *   would leave the layer to go through every tile of the window at its coarsest zoom.
  * @param {{ path: string, entry: object }} file
  * @param {number[]} footprint
+ * @param {{ retina?: boolean, vizParams?: object|null }} [options]  the tiles' density (the screen's by default) and the
+ *   style they are made with (the plain tiles by default): a snapshot asks for the cover view's
  */
-export function createRasterTileLayer(file, footprint) {
+export function createRasterTileLayer(file, footprint, { retina = useRetinaTiles(), vizParams = null } = {}) {
     const native = computeNativeZoom(file.entry);
     const pointCloud = file.entry.type === ddb.entry.type.POINTCLOUD;
     const layer = new TileLayer({
         extent: pointCloud ? bufferExtent(footprint, POINT_CLOUD_EXTENT_PAD) : footprint,
         source: createRasterSource({
-            url: file.path, hash: file.entry.hash, native, retina: useRetinaTiles(), tileExtent: pointCloud ? footprint : null
+            url: file.path, hash: file.entry.hash, native, retina, vizParams, tileExtent: pointCloud ? footprint : null
         })
     });
     layer.set('rasterNativeZoom', native);

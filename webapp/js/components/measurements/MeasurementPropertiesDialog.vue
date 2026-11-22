@@ -56,11 +56,14 @@
 
                 <AnnotationFields v-model="fields" id-prefix="mp" class="mb-3" :schema="schema" :is-ref-taken="isRefTaken" @update:valid="fieldsValid = $event" />
             </AnnotationTabs>
+            <p v-if="captureAction.message.value" class="capture-message" role="status">{{ captureAction.message.value }}</p>
         </div>
 
         <template #footer>
             <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
                     :title="`Delete this ${isPoint ? 'annotation' : 'measurement'}`" @click="deleteMeasurement" />
+            <Button v-if="capture" label="Capture for report" icon="fa-solid fa-camera" severity="secondary" text
+                    :loading="captureAction.capturing.value" title="Frame this measurement and keep the 3D view as its picture in reports" @click="captureAction.run" />
             <Button :label="isNew ? 'Discard' : 'Cancel'" severity="secondary" @click="cancel" />
             <Button label="Save" data-confirm :disabled="!!located.error || !fieldsValid" @click="save" />
         </template>
@@ -92,6 +95,7 @@ import AnnotationTabs from '@/components/measurements/AnnotationTabs.vue';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_KEYS, FIELD_LIMITS, storedFields } from '@/libs/map/annotationIds';
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
+import { useCaptureAction } from '@/libs/reports/snapshots/useCaptureAction';
 import { toLonLat } from 'ol/proj';
 import { latLonText, latLonDmsText, parseLatLon } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
@@ -141,12 +145,18 @@ export default {
         photoContext: {
             type: Object,
             default: null
+        },
+        // { run } of the "Capture for report" button: the point cloud viewer's, for a writer (it writes the 3D view as the
+        // item's picture to the dataset and keeps it in the item). The map does not give one, and the dialog has no button
+        capture: {
+            type: Object,
+            default: null
         }
     },
     emits: ['close', 'save', 'delete', 'discard'],
-    setup() {
+    setup(props) {
         const { copy: copyCoords, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
-        return { copyCoords, coordsCopied, FIELD_LIMITS };
+        return { copyCoords, coordsCopied, FIELD_LIMITS, captureAction: useCaptureAction(() => props.capture) };
     },
     data() {
         return {
@@ -273,6 +283,11 @@ export default {
 .measurement-properties-form {
     padding: 1rem;
     min-width: min(18.75rem, var(--window-content-width, 100%));
+}
+
+.capture-message {
+    margin: 0;
+    font-size: var(--ddb-font-size-sm);
 }
 
 .coords-field {

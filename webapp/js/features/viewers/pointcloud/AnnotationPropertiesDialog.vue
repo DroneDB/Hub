@@ -16,11 +16,14 @@
 
                 <AnnotationFields v-model="fields" id-prefix="ap" class="mb-3" :schema="schema" :is-ref-taken="isRefTaken" @update:valid="fieldsValid = $event" />
             </AnnotationTabs>
+            <p v-if="captureAction.message.value" class="capture-message" role="status">{{ captureAction.message.value }}</p>
         </div>
 
         <template #footer>
             <Button v-if="showDelete" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
                     title="Delete this annotation" @click="deleteAnnotation" />
+            <Button v-if="capture" label="Capture for report" icon="fa-solid fa-camera" severity="secondary" text
+                    :loading="captureAction.capturing.value" title="Frame this annotation and keep the 3D view as its picture in reports" @click="captureAction.run" />
             <Button label="Cancel" severity="secondary" @click="cancel" />
             <Button label="Save" data-confirm :disabled="!fieldsValid" @click="save" />
         </template>
@@ -40,6 +43,7 @@ import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_LIMITS, storedFields } from '@/libs/map/annotationIds';
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
 import { annotationFieldsOf } from '@/libs/potree/measureStyle';
+import { useCaptureAction } from '@/libs/reports/snapshots/useCaptureAction';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
@@ -58,6 +62,8 @@ import { annotationFieldsOf } from '@/libs/potree/measureStyle';
  *   photoContext  - What the Photos tab needs ({ dataset, measurementPath, itemId, geometry, readOnly, photos }, see
  *                   AnnotationTabs). Without it the dialog has no Photos tab and saves none; with it `save` has `photos`
  *                   when they were changed (undefined for none left).
+ *   capture       - { run } of the "Capture for report" button (a writer's: it writes the 3D view as the annotation's picture
+ *                   to the dataset and keeps it in the annotation). Without it the dialog has no such button.
  */
 export default {
     components: {
@@ -83,11 +89,15 @@ export default {
         photoContext: {
             type: Object,
             default: null
+        },
+        capture: {
+            type: Object,
+            default: null
         }
     },
     emits: ['close', 'save', 'delete'],
-    setup() {
-        return { FIELD_LIMITS };
+    setup(props) {
+        return { FIELD_LIMITS, captureAction: useCaptureAction(() => props.capture) };
     },
     data() {
         return {
@@ -152,5 +162,10 @@ export default {
 .annotation-properties-form {
     padding: 1rem;
     min-width: min(18.75rem, var(--window-content-width, 100%));
+}
+
+.capture-message {
+    margin: 0;
+    font-size: var(--ddb-font-size-sm);
 }
 </style>

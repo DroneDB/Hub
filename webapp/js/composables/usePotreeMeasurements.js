@@ -25,6 +25,7 @@ import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/
 import { measureAt, annotationElement, updateNameLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { focusItem as focusViewerItem } from '@/libs/potree/itemFocus';
+import { captureForReport } from '@/libs/potree/captureForReport';
 import { flash } from '@/composables/useMapAlerts';
 import { notify } from '@/libs/notify';
 import { textToHtml } from '@/libs/sanitize';
@@ -133,6 +134,16 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         };
     }
 
+    // What the "Capture for report" button of the dialog of a measure or an annotation needs, for those who can write (the
+    // capture writes a file to the dataset): what runs it. The capture is the item's own: it is kept in its property bag,
+    // so Save writes it to the file with the rest.
+    function captureContext(target) {
+        if (!canWrite.value) return null;
+        return {
+            run: () => captureForReport({ viewer, item: target, dataset: dataset.value, measurementPath: storageFor().measurementPath })
+        };
+    }
+
     function openDialog(component, props) {
         if (dialog) dialog.close();
         dialog = dialogs.open(component, { ...props, onClose: () => { dialog = null; } });
@@ -156,6 +167,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         openDialog(MeasurementPropertiesDialog, {
             ...fieldsContext(measure),
             photoContext: photoContext(measure),
+            capture: captureContext(measure),
             feature: measureAsFeature(measure),
             geometryType: measure.showArea && measure.closed ? 'Polygon' : 'LineString',
             onSave: properties => {
@@ -171,6 +183,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         openDialog(AnnotationPropertiesDialog, {
             ...fieldsContext(annotation),
             photoContext: photoContext(annotation),
+            capture: captureContext(annotation),
             annotation,
             showDelete: true,
             onSave: properties => {
