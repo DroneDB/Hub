@@ -251,10 +251,11 @@ export default class Registry {
      * Performs a GET request and returns the response as raw text.
      * Useful for downloading file contents where automatic JSON parsing should be bypassed.
      * @param {string} endpoint - API endpoint starting with '/'
+     * @param {{ httpCache?: RequestCache }} [options] httpCache: the browser's HTTP cache mode of the fetch
      * @returns {Promise<string>} Response body as text
      */
-    async getRequestAsText(endpoint) {
-        return this.makeRequest(endpoint, "GET", null, null, 'text');
+    async getRequestAsText(endpoint, options = {}) {
+        return this.makeRequest(endpoint, { ...options, method: "GET", responseType: 'text' });
     }
 
     async postRequest(endpoint, body = {}) {

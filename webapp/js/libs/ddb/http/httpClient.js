@@ -191,6 +191,8 @@ function encodeBody(headers, body, contentType) {
  * @property {Record<string, string>} [headers]
  * @property {string} [etag]  sent as If-None-Match
  * @property {boolean} [withMeta]  resolve { value, etag, notModified } (request cache)
+ * @property {RequestCache} [httpCache]  the browser's HTTP cache mode of the fetch (`'no-store'`: past it, as the
+ *   range reads of libs/http/rangeRequests go); the browser's default when not given
  * @property {(headers: Headers) => void} [onHeaders]
  * @property {boolean} [skipUnauthorized]  a request the user did not start (a header look-up,
  *   an optional side file): its 401/403 rejects as usual but never reaches the unauthorized
@@ -250,7 +252,10 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
             if (options.etag) headers['If-None-Match'] = options.etag;
             const body = encodeBody(headers, options.body, options.contentType);
 
-            const response = await fetchRaw(endpoint, { method, headers, body, signal: options.signal });
+            const response = await fetchRaw(endpoint, {
+                method, headers, body, signal: options.signal,
+                ...(options.httpCache ? { cache: options.httpCache } : {})
+            });
             options.onHeaders?.(response.headers);
 
             if (options.withMeta) {

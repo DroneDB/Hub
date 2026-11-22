@@ -6,8 +6,9 @@
  * path raw into the query string, so the server saw the path truncated at the
  * ampersand), ',' (multi-path download transport), '#', '%' and spaces.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import Dataset from './dataset';
+import Registry from './registry';
 
 const NASTY = 'ortho & #25%, 100%slope (field) “café” #hash?.tif';
 
@@ -272,6 +273,33 @@ describe('Dataset file writes', () => {
             expect(names(formData)).toEqual(['path', 'overwrite', 'file']);
             expect(formData.get('overwrite')).toBe('true');
         }
+    });
+});
+
+// The download of a file answers with Last-Modified and no validator the browser must use, so it may keep it in its
+// HTTP cache: a read-merge-write (measurements, report numbering) or a report would then see an old version
+describe('Dataset.getFileContents', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('reads the file as it is now, past the HTTP cache of the browser, through the real transport', async () => {
+        const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response('{"type":"FeatureCollection"}', { status: 200, headers: { 'Content-Type': 'application/geo+json' } }));
+        const ds = new Dataset(new Registry('https://hub.example.com'), 'my_org', 'my_ds');
+        await expect(ds.getFileContents('site/measurements.geojson')).resolves.toBe('{"type":"FeatureCollection"}');
+        expect(fetch).toHaveBeenCalledTimes(1);
+        const [url, init] = fetch.mock.calls[0];
+        expect(url).toBe('https://hub.example.com/orgs/my_org/ds/my_ds/download/site/measurements.geojson?inline=1');
+        expect(init).toMatchObject({ method: 'GET', cache: 'no-store' });
+    });
+
+    it('reads it again on every call (no shared or remembered answer)', async () => {
+        const fetch = vi.spyOn(globalThis, 'fetch')
+            .mockImplementationOnce(async () => new Response('v1', { status: 200, headers: { 'Content-Type': 'text/plain' } }))
+            .mockImplementationOnce(async () => new Response('v2', { status: 200, headers: { 'Content-Type': 'text/plain' } }));
+        const ds = new Dataset(new Registry('https://hub.example.com'), 'my_org', 'my_ds');
+        expect(await ds.getFileContents('notes.md')).toBe('v1');
+        expect(await ds.getFileContents('notes.md')).toBe('v2');
+        expect(fetch).toHaveBeenCalledTimes(2);
     });
 });
 

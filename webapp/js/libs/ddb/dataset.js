@@ -424,14 +424,21 @@ export default class Dataset {
     }
 
     /**
-     * Gets the contents of a file as raw text.
+     * Gets the contents of a file as raw text, as the file is now.
      * Uses getRequestAsText to bypass automatic JSON parsing for file downloads.
+     *
+     * The read goes past the browser's HTTP cache (`no-store`): the download answers with Last-Modified and no
+     * Cache-Control, so the browser may keep it and serve it again for a while (a share of its age), and a file another
+     * session, or this one, wrote since would be read as it was. The callers read to merge and write back (measurements,
+     * report numbering, the text editor) or to show what the file says now (reports, readme, sidecars); an old version
+     * would be shown, or written over newer data. Not `no-cache`: its revalidation by If-Modified-Since has a resolution
+     * of one second, and two writes within that second would be answered 304 with the older body.
      * @param {string} path - Path to the file within the dataset
      * @returns {Promise<string>} File contents as text
      */
     async getFileContents(path) {
         const url = this.downloadUrl(path, { inline: true });
-        return this.registry.getRequestAsText(url);
+        return this.registry.getRequestAsText(url, { httpCache: 'no-store' });
     }
 
     /** @param {{signal?: AbortSignal}} [options] */
