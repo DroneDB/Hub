@@ -1,6 +1,7 @@
 <template>
-    <!-- Right clicks here are this list's: its menu stops them before the file browser's -->
     <div class="sidebar-group" data-no-file-shortcuts>
+        <!-- Right clicks here are this list's: its menu stops them before the file browser's. Inside the root: a class given
+             to the group (saved-views) lands on the one root element -->
         <ContextMenu :items="menu" />
         <ul role="tree" :aria-label="ariaLabel">
             <li role="treeitem" :aria-expanded="expanded" aria-selected="false">

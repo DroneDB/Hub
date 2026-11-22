@@ -1,5 +1,5 @@
 <template>
-    <SidebarGroup v-model:current="current" label="Views" aria-label="Saved views" :icon="VIEWS_ICON" :items="views" :menu="menu"
+    <SidebarGroup v-model:current="current" class="saved-views" label="Views" aria-label="Saved views" :icon="VIEWS_ICON" :items="views" :menu="menu"
                   :item-icon="() => 'fa-regular fa-map'" :item-title="v => `${v.name} (double-click to open)`" @open="open" />
 </template>
 

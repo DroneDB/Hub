@@ -36,6 +36,14 @@ const visibleLabels = w => menuItems(w).filter(i => i.label && (!i.isVisible || 
 const item = (w, label) => menuItems(w).find(i => i.label === label);
 
 describe('SavedViews', () => {
+    // The group keeps the class it had before it was a SidebarGroup: the end-to-end tests find the views by it
+    it('is the saved-views element of the page', () => {
+        const w = mountViews();
+        expect(w.classes()).toContain('saved-views');
+        expect(w.classes()).toContain('sidebar-group');
+        expect(w.find('ul[role="tree"]').attributes('aria-label')).toBe('Saved views');
+    });
+
     // FR-MAP-24: the Views group is a bookmark, not the split of Compare
     it('marks the Views group with a bookmark', () => {
         const w = mountViews();
