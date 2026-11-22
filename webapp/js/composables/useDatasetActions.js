@@ -636,7 +636,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         if (!paths.length || !await confirm(confirmRescanEntries(selected))) return;
         try {
             await runHeavyTask(dataset, RESCAN_ENTRIES_TOOL_ID, {
-                params: { paths }, notify: false,
+                // A rescan of the same selection runs again: no de-duplication with an earlier one
+                params: { paths }, force: true, notify: false,
                 onSubmitted: () => notify.info(`Rescan started for ${countOf(paths.length, 'item')}...`, { summary: 'Rescan', life: 'normal' })
             });
             if (selected.some(f => ddb.entry.isDirectory(f.entry))) await listing.reload();

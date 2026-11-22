@@ -60,7 +60,7 @@ describe('Rescan of the entries selected in the explorer', () => {
         const [ds, tool, options] = runHeavyTask.mock.calls[0];
         expect(ds).toBe(dataset);
         expect(tool).toBe('rescan-entries');
-        expect(options).toMatchObject({ params: { paths: ['a.jpg', 'sub/b.tif'] }, notify: false });
+        expect(options).toMatchObject({ params: { paths: ['a.jpg', 'sub/b.tif'] }, force: true, notify: false });
     });
 
     it('does not make the dataset busy', () => {
