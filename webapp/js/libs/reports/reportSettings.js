@@ -5,7 +5,8 @@
  *
  * This is the one client of the Registry endpoints, the defaults the Registry answers with for an
  * organization that has stored nothing (`DEFAULT_SCHEMA`, `DEFAULT_TEMPLATE`: a Registry that
- * does not have the endpoints yet gets the Hub's copy), and the pure rules the settings dialog
+ * does not have the endpoints yet gets the Hub's copy; they live in reportDefaults, which the
+ * report model imports without this client), and the pure rules the settings dialog
  * checks before it asks (the same limits the Registry enforces, so that a refusal at the field
  * comes without a request).
  *
@@ -18,41 +19,19 @@
 import { PRIMARY } from '@/libs/palette';
 import { slugFromName } from '@/libs/slug';
 import { SECTION_KINDS } from '@/libs/reports/reportDefinition';
+import { SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings } from '@/libs/reports/reportDefaults';
 
-export { SECTION_KINDS };
+export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings };
 
-/** @typedef {{ id: string, name: string, colour: string }} SchemaChoice  a category or a severity */
-/** @typedef {{ id: string, name: string, closed: boolean }} SchemaStatus */
-/** @typedef {{ categories: SchemaChoice[], severities: SchemaChoice[], statuses: SchemaStatus[] }} AnnotationSchema */
-/** @typedef {'cover' | 'summary' | 'overview' | 'tables' | 'items' | 'notes'} SectionKind */
-/**
- * @typedef {object} ReportTemplate
- * @property {string} id
- * @property {string} name
- * @property {string | null} logo  the asset name; only the logo endpoints set it
- * @property {string} primary
- * @property {string} accent
- * @property {'A4' | 'Letter'} paper
- * @property {'portrait' | 'landscape'} orientation
- * @property {string} headerText
- * @property {string} footerText
- * @property {string} disclaimer  markdown
- * @property {SectionKind[]} defaultSections
- */
+/** @typedef {import('./reportDefaults').SchemaChoice} SchemaChoice */
+/** @typedef {import('./reportDefaults').SchemaStatus} SchemaStatus */
+/** @typedef {import('./reportDefaults').AnnotationSchema} AnnotationSchema */
+/** @typedef {import('./reportDefaults').SectionKind} SectionKind */
+/** @typedef {import('./reportDefaults').ReportTemplate} ReportTemplate */
 /** @typedef {{ templates: ReportTemplate[], schema: AnnotationSchema }} ReportSettings */
 /** @typedef {{ templates: ReportTemplate[], schema: AnnotationSchema, version: number }} OrgReportSettings */
 /** @typedef {{ registry: any, org: string }} OrganizationRef  what `reg.Organization(slug)` is */
 /** @typedef {{ registry: any, baseApi: string }} DatasetRef  what `reg.Organization(org).Dataset(ds)` is */
-
-/** What the settings dialog and the report call the sections (their kinds and order are the definition's: SECTION_KINDS). */
-export const SECTION_LABELS = Object.freeze(/** @type {Record<SectionKind, string>} */ ({
-    cover: 'Cover',
-    summary: 'Summary',
-    overview: 'Overview map',
-    tables: 'Tables',
-    items: 'Items',
-    notes: 'Notes'
-}));
 
 /** The three lists of the schema, with the words the dialog uses for one entry of each. */
 export const SCHEMA_LISTS = Object.freeze([
@@ -98,62 +77,6 @@ export const REPORT_SWATCHES = Object.freeze([
     '#64748b', // slate
     '#1e293b'  // dark slate
 ]);
-
-/** @type {<T>(value: T) => T} */
-function deepFreeze(value) {
-    if (value && typeof value === 'object') {
-        for (const inner of Object.values(value)) deepFreeze(inner);
-        Object.freeze(value);
-    }
-    return value;
-}
-
-/** The schema of an organization that has stored none. */
-export const DEFAULT_SCHEMA = deepFreeze(/** @type {AnnotationSchema} */ ({
-    categories: [
-        { id: 'general', name: 'General', colour: '#64748b' },
-        { id: 'defect', name: 'Defect', colour: '#dc2626' },
-        { id: 'observation', name: 'Observation', colour: PRIMARY[500] },
-        { id: 'safety', name: 'Safety', colour: '#eab308' },
-        { id: 'stockpile', name: 'Stockpile', colour: '#7c3aed' }
-    ],
-    severities: [
-        { id: 'low', name: 'Low', colour: '#16a34a' },
-        { id: 'medium', name: 'Medium', colour: '#eab308' },
-        { id: 'high', name: 'High', colour: '#dc2626' },
-        { id: 'critical', name: 'Critical', colour: '#7f1d1d' }
-    ],
-    statuses: [
-        { id: 'open', name: 'Open', closed: false },
-        { id: 'in-progress', name: 'In progress', closed: false },
-        { id: 'resolved', name: 'Resolved', closed: true }
-    ]
-}));
-
-/** The template of an organization that has stored none (and the start of a new one). */
-export const DEFAULT_TEMPLATE = deepFreeze(/** @type {ReportTemplate} */ ({
-    id: 'standard',
-    name: 'Standard',
-    logo: null,
-    primary: PRIMARY[500],
-    accent: '#0891b2',
-    paper: 'A4',
-    orientation: 'portrait',
-    headerText: '',
-    footerText: '',
-    disclaimer: '',
-    defaultSections: [...SECTION_KINDS]
-}));
-
-/**
- * A copy that the caller can edit (the defaults are frozen).
- * @template T
- * @param {T} value
- * @returns {T}
- */
-export function cloneSettings(value) {
-    return JSON.parse(JSON.stringify(value));
-}
 
 /** @returns {ReportSettings} */
 function defaultSettings() {

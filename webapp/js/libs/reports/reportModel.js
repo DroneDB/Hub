@@ -10,7 +10,7 @@
  * reportFrames (where a snapshot looks).
  */
 import { formatDate } from '@/libs/format';
-import { DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
+import { DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportDefaults';
 import { isElevationRaster } from '@/libs/map/rasterUnit';
 import { buildItems, localDateKey } from '@/libs/reports/reportItems';
 import { computeTotals } from '@/libs/reports/reportTotals';

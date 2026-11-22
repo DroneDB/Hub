@@ -18,7 +18,7 @@
  *   signOff       { type, preparedBy, lines: [{ label }] }
  */
 import { EMPTY_CELL, formatDate } from '@/libs/format';
-import { SECTION_LABELS } from '@/libs/reports/reportSettings';
+import { SECTION_LABELS } from '@/libs/reports/reportDefaults';
 import { buildTables, itemRows } from '@/libs/reports/reportTables';
 import { countByKind, countByChoice, itemCountText } from '@/libs/reports/reportTotals';
 import { extentOf, frameOf } from '@/libs/reports/reportFrames';
