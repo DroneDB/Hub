@@ -9,13 +9,14 @@ import { fixedLengthParts, formatBytes, formatDateTime, formatNumber, formatSpee
 import { visibilityLabel } from '@/libs/visibility';
 import { Licenses } from '@/libs/licenses';
 import { VIEWS_KEY } from '@/libs/views/viewStore';
+import { REPORTS_KEY } from '@/libs/reports/reportStore';
 import { warningWordsOf } from '@/libs/build/buildWarnings';
 import { streamedInText } from '@/libs/build/pointCloudCrs';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
-// Meta keys that hold app data (saved map views are raw JSON), not something to show users.
-// A Registry that has not been updated still sends the views in the dataset's properties.
-export const HIDDEN_META_KEYS = [VIEWS_KEY];
+// Meta keys that hold app data (saved map views and report definitions are raw JSON), not something
+// to show users. A Registry that has not been updated still sends them in the dataset's properties.
+export const HIDDEN_META_KEYS = [VIEWS_KEY, REPORTS_KEY];
 
 /** The meta of an entry without the keys that are not for users to read. */
 export function visibleMeta(meta) {

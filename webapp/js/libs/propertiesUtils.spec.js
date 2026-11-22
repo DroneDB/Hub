@@ -248,7 +248,9 @@ describe('raw metadata rows', () => {
 
     it('visibleMeta drops every hidden key and tolerates no meta', () => {
         expect(HIDDEN_META_KEYS).toContain('views');
+        expect(HIDDEN_META_KEYS).toContain('reports');
         expect(visibleMeta({ license: 1, views: 2 })).toEqual({ license: 1 });
+        expect(visibleMeta({ license: 1, reports: [] })).toEqual({ license: 1 });
         expect(visibleMeta(undefined)).toEqual({});
     });
 });
