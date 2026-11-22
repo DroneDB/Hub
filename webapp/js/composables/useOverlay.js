@@ -157,10 +157,26 @@ function openerNow() {
     return active;
 }
 
-/** @returns {HTMLElement | null} the page's h1, else main (FR-XC-03) */
-function pageFocus() {
+/** @returns {HTMLElement | null} the page's h1, else main: where the focus goes when the opener cannot take it */
+function pageFocusTarget() {
     const heading = [...document.querySelectorAll('h1')].find(h => !h.closest('[role="dialog"]') && isVisible(h));
-    return focusable(/** @type {HTMLElement | null} */ (heading || document.querySelector('main')));
+    return /** @type {HTMLElement | null} */ (heading || document.querySelector('main'));
+}
+
+/** @returns {HTMLElement | null} the page's h1, else main (FR-XC-03), made focusable */
+function pageFocus() {
+    return focusable(pageFocusTarget());
+}
+
+/**
+ * Whether the focus is where a closed overlay leaves it when the control that opened it could not take it back (the
+ * page's h1 or main), or nowhere. A control disabled while the work of its overlay ran (a button that starts a long
+ * job) takes it back once it is enabled again, which an overlay cannot wait for; one the user went to keeps it.
+ * @returns {boolean}
+ */
+export function focusLeftToPage() {
+    const active = document.activeElement;
+    return !active || active === document.body || active === pageFocusTarget();
 }
 
 /**
