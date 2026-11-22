@@ -160,7 +160,7 @@ describe('Public organizations (D-003)', () => {
             { slug: 'open', name: 'Open', owner: 'bob', isPublic: true, permissions: readOnly }
         ]);
         expect(reg.orgs.getOrganizations).toHaveBeenCalledWith(true);
-        expect(actions('Mine')).toEqual(['Manage members', 'Edit organization', 'Delete organization']);
+        expect(actions('Mine')).toEqual(['Manage members', 'Report settings', 'Edit organization', 'Delete organization']);
         expect(actions('Open')).toEqual([]);
         expect(card('Open').text()).toContain('Public');
     });

@@ -115,6 +115,10 @@
                                 <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
                                         severity="secondary" outlined size="small" icon="fa-solid fa-users"
                                         title="Manage Members" aria-label="Manage members" @click.stop="openMembersDialog(org)" />
+                                <!-- Every member can look at the report settings; only an administrator edits them (the dialog says which) -->
+                                <Button v-if="isMemberOf(org)"
+                                        severity="secondary" outlined size="small" icon="fa-solid fa-file-lines"
+                                        title="Report settings" aria-label="Report settings" @click.stop="openReportSettings(org)" />
                                 <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
                                         severity="secondary" outlined size="small" :loading="org.editing"
                                         :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
@@ -154,6 +158,10 @@
                                    :can-manage-members="selectedOrgForMembers.permissions?.canManageMembers || false"
                                    @permissions-changed="onMembersPermissionsChanged"
                                    @close="closeMembersDialog" />
+        <ReportSettingsDialog v-if="reportSettingsOrg"
+                              :org-slug="reportSettingsOrg.slug"
+                              :can-edit="canEditReportSettings(reportSettingsOrg)"
+                              @close="reportSettingsOrg = null" />
 
     </div>
 </template>
@@ -174,6 +182,7 @@ import { useDialogs } from '@/composables/useDialogs';
 import { useEntityDelete } from '@/composables/useEntityDelete';
 import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
+import ReportSettingsDialog from './ReportSettingsDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
 import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
@@ -221,6 +230,7 @@ export default {
         MessageDialog,
         OrganizationDialog,
         OrganizationMembersDialog,
+        ReportSettingsDialog,
         Button,
         Card,
         Tag,
@@ -274,6 +284,9 @@ export default {
 
             membersDialogOpen: false,
             selectedOrgForMembers: null,
+
+            // The organization whose report settings are open
+            reportSettingsOrg: null,
 
             showAll: !settings.ownedOnly,
             searchQuery: '',
@@ -633,6 +646,22 @@ export default {
         closeMembersDialog() {
             this.membersDialogOpen = false;
             this.selectedOrgForMembers = null;
+        },
+
+        // The user is a member of the organization (or its owner, or an administrator of the instance). The count of datasets
+        // is the Registry's mark of one: it sends none to a visitor of a public organization
+        isMemberOf(org) {
+            return this.isAdmin || org.owner === this.userName || !!org.permissions?.canWrite
+                || !!org.permissions?.canManageMembers || org.datasetCount != null;
+        },
+
+        // The Registry refuses the writes of anyone but an administrator of the organization (or of the instance)
+        canEditReportSettings(org) {
+            return !this.readyOnly && (!!org.permissions?.canManageMembers || this.isAdmin);
+        },
+
+        openReportSettings(org) {
+            this.reportSettingsOrg = org;
         },
 
         // The user changed their own permissions: the list says what they may do now, and the
