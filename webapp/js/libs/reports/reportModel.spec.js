@@ -69,6 +69,19 @@ describe('the logo', () => {
         const input = inputOf([], { brandingLogoUrl: '/branding/logo.png' });
         expect(buildReportModel(input).logo).toEqual({ source: 'instance', url: '/branding/logo.png' });
     });
+
+    it('is the first block of the cover, named by the template whose logo it is', () => {
+        const withLogo = template({ name: 'ACME', logo: 'report-logo-standard.png' });
+        const model = buildReportModel(inputOf([], { settings: settings({ templates: [withLogo] }), links: { templateLogoUrl: t => `/logo/${t.id}` } }));
+        expect(blocksOf(model, 'cover')[0]).toEqual({ type: 'logo', source: 'template', url: '/logo/standard', alt: 'ACME logo' });
+        expect(blocksOf(model, 'cover')[1].type).toBe('heading');
+    });
+
+    it('is the logo of the instance on the cover when the template has none, and no block when there is no logo', () => {
+        const model = buildReportModel(inputOf([], { brandingLogoUrl: '/branding/logo.png' }));
+        expect(blocksOf(model, 'cover', 'logo')).toEqual([{ type: 'logo', source: 'instance', url: '/branding/logo.png', alt: 'Logo' }]);
+        expect(blocksOf(buildReportModel(inputOf([])), 'cover', 'logo')).toEqual([]);
+    });
 });
 
 describe('two sources', () => {

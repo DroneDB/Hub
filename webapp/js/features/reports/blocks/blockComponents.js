@@ -16,6 +16,7 @@ import MapSnapshotBlock from './MapSnapshotBlock.vue';
 import ChartBlock from './ChartBlock.vue';
 import Capture3dBlock from './Capture3dBlock.vue';
 import QrBlock from './QrBlock.vue';
+import LogoBlock from './LogoBlock.vue';
 
 export const BLOCK_COMPONENTS = Object.freeze({
     heading: HeadingBlock,
@@ -29,5 +30,6 @@ export const BLOCK_COMPONENTS = Object.freeze({
     mapSnapshot: MapSnapshotBlock,
     chart: ChartBlock,
     capture3d: Capture3dBlock,
-    qr: QrBlock
+    qr: QrBlock,
+    logo: LogoBlock
 });

@@ -83,3 +83,21 @@ describe('the texts of the summary and the sign-off', () => {
         expect(mount(SignOffBlock, { props: { block: blocks.find(b => b.type === 'signOff') } }).text()).toContain('Prepared by J. Doe');
     });
 });
+
+describe('the logo of the cover', () => {
+    it('is drawn on the page from the block of the model, with its alternative text', () => {
+        const model = buildReportModel(inputOf([], { brandingLogoUrl: '/images/acme.svg' }));
+        const block = model.sections.find(s => s.kind === 'cover').blocks[0];
+        const wrapper = mount(ReportBlock, { props: { block } });
+        const img = wrapper.find('img');
+        expect(img.attributes('src')).toBe('/images/acme.svg');
+        expect(img.attributes('alt')).toBe('Logo');
+    });
+
+    it('keeps its place and drops the image when the logo cannot be read', async () => {
+        const wrapper = mount(ReportBlock, { props: { block: { type: 'logo', source: 'template', url: '/logo/x', alt: 'ACME logo' } } });
+        await wrapper.find('img').trigger('error');
+        expect(wrapper.find('img').exists()).toBe(false);
+        expect(wrapper.find('[data-block="logo"]').exists()).toBe(true);
+    });
+});

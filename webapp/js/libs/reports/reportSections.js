@@ -3,6 +3,7 @@
  * The sections of a report model and their blocks. A block is plain data (text already formatted, nothing to
  * compute) that the live page and the PDF both draw:
  *
+ *   logo          { type, source: 'template' | 'instance', url, alt }   the logo of the report, first on the cover
  *   heading       { type, level 1-3, text, anchor: 'item-<id>' | null, itemId, viewerUrl }
  *   keyValue      { type, rows: [{ label, value }] }
  *   table         { type, id, title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note }] }
@@ -46,6 +47,7 @@ export const figureCaption = (alt, ...notes) => [...new Set([alt, ...notes].filt
  * @typedef {object} SectionContext
  * @property {any} definition
  * @property {import('./reportSettings').ReportTemplate} template
+ * @property {{ source: 'template' | 'instance', url: string } | null} logo  the logo of the report (resolveLogo)
  * @property {TextContext} text
  * @property {ReportItem[]} items
  * @property {{ totals: import('./reportTotals').Total[], unconverted: number }} totals
@@ -132,6 +134,15 @@ function problemNotes(ctx) {
     ];
 }
 
+/**
+ * The logo block of the cover: the logo of the template, named by the template, or the logo of the instance.
+ * @param {{ source: 'template' | 'instance', url: string }} logo @param {import('./reportSettings').ReportTemplate} template
+ */
+const logoBlock = (logo, template) => ({
+    type: /** @type {const} */ ('logo'), source: logo.source, url: logo.url,
+    alt: logo.source === 'template' && template.name ? `${template.name} logo` : 'Logo'
+});
+
 /** @param {SectionContext} ctx */
 function coverSection(ctx) {
     const { definition } = ctx;
@@ -142,6 +153,7 @@ function coverSection(ctx) {
         { label: 'Dataset', value: ctx.datasetName || EMPTY_CELL }
     ];
     return [
+        ...(ctx.logo ? [logoBlock(ctx.logo, ctx.template)] : []),
         heading(1, definition.title || definition.name),
         ...(definition.subtitle ? [heading(2, definition.subtitle)] : []),
         { type: /** @type {const} */ ('keyValue'), rows },

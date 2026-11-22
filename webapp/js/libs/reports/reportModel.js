@@ -106,9 +106,10 @@ export function buildReportModel(input) {
     const totals = computeTotals(items, units, currency);
     const cover = resolveCover(input.coverView, layerInfo);
     const text = { units, schema, currency, projection: input.projection ?? null };
+    const logo = resolveLogo(template, input.brandingLogoUrl, links);
 
     const sections = buildSections({
-        definition, template, text, items, totals, cover, failed, duplicates, links, layerInfo,
+        definition, template, logo, text, items, totals, cover, failed, duplicates, links, layerInfo,
         datasetName: input.datasetName ?? '', now
     });
 
@@ -126,7 +127,7 @@ export function buildReportModel(input) {
         template,
         templateMissing: missing,
         missingTemplateId: missing ? definition.templateId : null,
-        logo: resolveLogo(template, input.brandingLogoUrl, links),
+        logo,
         units,
         generatedAt: now.toISOString(),
         generatedDate: formatDate(now),

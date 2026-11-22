@@ -47,6 +47,19 @@ describe('the header and the footer', () => {
         expect(textsOf(header)).toEqual(['Inspection', 'ACME Surveys']);
     });
 
+    it('has the logo on the cover too, above the title, as the cover of the page has it', () => {
+        const model = pdfModel({ input: { brandingLogoUrl: '/images/acme.svg' } });
+        expect(model.sections[0].blocks[0].type).toBe('logo');
+        const content = build(model, fullAssets(model)).content;
+        const nodes = nodesOf(content);
+        const logo = nodes.findIndex(n => n.image === JPEG_URL);
+        const title = nodes.findIndex(n => n.style === 'coverTitle');
+        expect(logo).toBeGreaterThanOrEqual(0);
+        expect(logo).toBeLessThan(title);
+        // A logo that could not be read leaves the cover without one, and the PDF is still made
+        expect(nodesOf(build(model, noAssets()).content).some(n => n.image)).toBe(false);
+    });
+
     it('has no logo when the report has none, and no header text when the template has none', () => {
         const model = pdfModel({ templateExtra: { headerText: '' } });
         const header = build(model).header(1, 1);

@@ -19,6 +19,8 @@ const HEADER_FILL = '#f1f5f9';
 const INFO_FILL = '#e0f2fe';
 // The yellow of a warning, with dark text
 const WARNING_FILL = '#fef08a';
+/** The box of the logo on the cover, in points */
+const COVER_LOGO = Object.freeze({ width: 180, height: 60 });
 /** The side of a QR code on the page, in points */
 const QR_POINTS = 76;
 const PHOTO_GAP = 10;
@@ -225,6 +227,8 @@ function signOff(block) {
  */
 export function blockNodes(block, ctx) {
     switch (block.type) {
+        // The logo the assets prepared from the model's (the one of the header); none when it could not be read
+        case 'logo': return ctx.assets.logo ? [{ image: ctx.assets.logo.dataUrl, fit: [COVER_LOGO.width, COVER_LOGO.height], margin: [0, 20, 0, 0] }] : [];
         case 'heading': return [heading(block, ctx)];
         case 'keyValue': return [keyValue(block.rows)];
         case 'table': return table(block, ctx);
