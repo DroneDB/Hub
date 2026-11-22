@@ -46,11 +46,25 @@ export async function listViews(dataset, options) {
 }
 
 /**
+ * Whether a saved view can be drawn: it passes validation and is not of a later version. One that cannot is, for
+ * whatever names it (the cover of a report), as good as deleted.
+ * @param {SavedView} view
+ */
+export const isUsableView = view => !view.error && !view.newerVersion;
+
+/**
+ * The saved view of a uid, when it can be drawn (isUsableView); null when there is none or it cannot be.
+ * @param {SavedView[]} views @param {string} uid
+ * @returns {SavedView | null}
+ */
+export const usableView = (views, uid) => views.find(v => v.uid === uid && isUsableView(v)) ?? null;
+
+/**
  * The saved views that show a file, as a layer or as the base file.
  * @param {SavedView[]} views @param {string} path  dataset-relative
  */
 export function viewsUsing(views, path) {
-    return views.filter(v => !v.newerVersion && !v.error
+    return views.filter(v => isUsableView(v)
         && (v.data.base.path === path || v.data.layers.some(/** @param {any} l */ l => l.path === path)));
 }
 

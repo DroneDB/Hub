@@ -11,7 +11,7 @@ const m = vi.hoisted(() => ({
     settings: vi.fn(), listViews: vi.fn(), reportChange: vi.fn(), saveNewReport: vi.fn(), updateReport: vi.fn(), numberMeasurementFile: vi.fn(), loadReportSources: vi.fn()
 }));
 vi.mock('@/libs/reports/reportSettings', async importOriginal => ({ ...await importOriginal(), datasetReportSettings: (...a) => m.settings(...a) }));
-vi.mock('@/libs/views/viewStore', () => ({ listViews: (...a) => m.listViews(...a) }));
+vi.mock('@/libs/views/viewStore', async importOriginal => ({ ...await importOriginal(), listViews: (...a) => m.listViews(...a) }));
 vi.mock('@/libs/reports/reportStore', async importOriginal => ({
     ...await importOriginal(),
     reportChange: (...a) => m.reportChange(...a),
@@ -127,6 +127,52 @@ describe('the template of an edited report', () => {
         expect(editor.resolvedTemplate.value.id).toBe('standard');
         expect(editor.templateNotice.value).toBe(`Template deleted-one no longer exists; this report uses ${DEFAULT_TEMPLATE.name}`);
         expect(editor.draft.templateId).toBe('deleted-one');
+    });
+});
+
+describe('the template chosen', () => {
+    const enabled = editor => editor.draft.sections.filter(sec => sec.enabled).map(sec => sec.kind);
+
+    it('gives a new report the default sections of each template chosen while its sections are not changed', async () => {
+        const editor = make();
+        await editor.load();
+        expect(editor.draft.templateId).toBe('standard');
+        editor.chooseTemplate('compact');
+        expect(editor.draft.templateId).toBe('compact');
+        expect(enabled(editor)).toEqual(['cover', 'tables']);
+        editor.chooseTemplate('standard');
+        expect(editor.draft.sections).toEqual(editor.draft.sections.map(sec => ({ ...sec, enabled: true })));
+    });
+
+    it('leaves the sections of a new report as the user set them', async () => {
+        const editor = make();
+        await editor.load();
+        editor.chooseTemplate('compact');
+        editor.draft.sections.find(sec => sec.kind === 'tables').enabled = false;
+        editor.chooseTemplate('standard');
+        expect(editor.draft.templateId).toBe('standard');
+        expect(enabled(editor)).toEqual(['cover']);
+    });
+
+    it('never changes the sections of a stored report', async () => {
+        const editor = make({ entry: existing() });
+        await editor.load();
+        const before = JSON.stringify(editor.draft.sections);
+        editor.chooseTemplate('compact');
+        expect(editor.draft.templateId).toBe('compact');
+        expect(JSON.stringify(editor.draft.sections)).toBe(before);
+    });
+});
+
+describe('a report of a newer version', () => {
+    it('is refused: the editor says why and saves nothing', async () => {
+        const editor = make({ entry: { ...existing({ version: 99 }), newerVersion: true } });
+        editor.draft.name = 'North pit';
+        await editor.load();
+        expect(editor.loadError.value).toBe('This report was saved by a newer version of the application.');
+        expect(await editor.save()).toBeNull();
+        expect(m.updateReport).not.toHaveBeenCalled();
+        expect(m.saveNewReport).not.toHaveBeenCalled();
     });
 });
 

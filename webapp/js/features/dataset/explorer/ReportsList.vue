@@ -42,6 +42,8 @@ const current = ref(null);
 const open = r => { if (!r.unreadable) openInNewTab(reportUrl(props.dataset, r.uid)); };
 const has = () => !!current.value && !current.value.unreadable;
 const writable = () => !!current.value && props.canWrite;
+// A report of a later version is not edited or copied here: what this version does not know of it would be lost
+const editable = () => writable() && has() && !current.value.newerVersion;
 
 const copyLink = r => copyLinkWithNotice(absoluteUrl(reportUrl(props.dataset, r.uid)), notify, r.name);
 
@@ -49,8 +51,8 @@ const menu = [
     { label: 'Open', icon: 'fa-regular fa-folder-open', isVisible: has, click: () => open(current.value) },
     { label: 'Copy Link', icon: 'fa-solid fa-link', isVisible: has, click: () => copyLink(current.value) },
     { type: 'separator', isVisible: writable },
-    { label: 'Edit', icon: 'fa-solid fa-pen', isVisible: () => writable() && has(), click: () => emit('edit', current.value) },
-    { label: 'Duplicate', icon: 'fa-regular fa-copy', isVisible: () => writable() && has(), click: () => emit('duplicate', current.value) },
+    { label: 'Edit', icon: 'fa-solid fa-pen', isVisible: editable, click: () => emit('edit', current.value) },
+    { label: 'Duplicate', icon: 'fa-regular fa-copy', isVisible: editable, click: () => emit('duplicate', current.value) },
     { label: 'Delete', icon: 'fa-solid fa-trash', isVisible: writable, click: () => emit('delete', current.value) }
 ];
 </script>

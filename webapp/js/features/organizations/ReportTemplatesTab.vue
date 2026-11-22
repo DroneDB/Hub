@@ -118,7 +118,7 @@ import ReportSettingsField from './ReportSettingsField.vue';
 import ReportTemplatePreview from './ReportTemplatePreview.vue';
 import {
     LIMITS, LOGO_TYPES, ORIENTATIONS, PAPERS, REPORT_SWATCHES, SECTION_KINDS, SECTION_LABELS,
-    canAddEntry, canRemoveEntry, idFromName, logoProblem, newTemplate, problemAt
+    canAddEntry, canRemoveEntry, idFromName, logoProblem, newTemplate, problemAt, takenIds
 } from '@/libs/reports/reportSettings';
 
 const templates = defineModel({ type: Array, required: true });
@@ -169,7 +169,7 @@ const errorAt = field => problemAt(props.errors, `templates.${selected.value}.${
 
 function add() {
     if (!canAdd.value) return;
-    templates.value.push(newTemplate(templates.value));
+    templates.value.push(newTemplate(templates.value, undefined, props.savedIds));
     selected.value = templates.value.length - 1;
 }
 
@@ -181,7 +181,7 @@ function remove() {
 function rename(name) {
     const current = template.value;
     current.name = name;
-    if (!isSaved.value) current.id = idFromName(name, templates.value.filter(other => other !== current).map(other => other.id));
+    if (!isSaved.value) current.id = idFromName(name, takenIds(templates.value, props.savedIds, current));
 }
 
 function chooseLogo() {

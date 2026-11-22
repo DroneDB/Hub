@@ -16,8 +16,8 @@ import reg from '@/libs/api/sharedRegistry';
 import { permissionsOf } from '@/libs/datasetPermissions';
 import { getPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { absoluteUrl, itemAnchor, reportUrl } from '@/libs/views/viewLinks';
-import { listViews } from '@/libs/views/viewStore';
-import { listReports } from '@/libs/reports/reportStore';
+import { listViews, usableView } from '@/libs/views/viewStore';
+import { listReports, NEWER_REPORT_TEXT } from '@/libs/reports/reportStore';
 import { datasetReportSettings, datasetTemplateLogoUrl } from '@/libs/reports/reportSettings';
 import { loadReportSources } from '@/libs/reports/reportSources';
 import { buildReportModel } from '@/libs/reports/reportModel';
@@ -51,14 +51,15 @@ async function readLayerInfo(dataset, paths) {
 }
 
 /**
- * The cover view as the model wants it: the state, or `deleted`.
+ * The cover view as the model wants it: the state, or `deleted`. A saved view that is there and cannot be drawn (it
+ * cannot be read, or is of a later version) is a deleted one, as the editor has it (usableView).
  * @param {any} dataset @param {import('@/libs/reports/reportDefinition').ReportCover} cover
  * @returns {Promise<{ state: import('@/libs/views/viewState').ViewState | null, deleted: boolean }>}
  */
 async function readCover(dataset, cover) {
     if ('viewState' in cover) return { state: cover.viewState, deleted: false };
-    const view = (await listViews(dataset, { fresh: true })).find(v => v.uid === cover.viewId);
-    if (!view || view.error || view.newerVersion) return { state: null, deleted: !view };
+    const view = usableView(await listViews(dataset, { fresh: true }), cover.viewId);
+    if (!view) return { state: null, deleted: true };
     return { state: /** @type {import('@/libs/views/viewState').ViewState} */ (view.data), deleted: false };
 }
 
@@ -140,7 +141,7 @@ export function useReport({ org, ds, uid }) {
                 return;
             }
             if (entry.value.newerVersion) {
-                unreadable.value = 'This report was saved by a newer version of the application.';
+                unreadable.value = NEWER_REPORT_TEXT;
                 return;
             }
             await build();

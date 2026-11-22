@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
+import Select from 'primevue/select';
 import ddb from 'ddb';
 import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
@@ -15,7 +16,8 @@ vi.mock('@/libs/reports/reportSettings', async importOriginal => ({
     ...await importOriginal(),
     datasetReportSettings: (...a) => m.settings(...a)
 }));
-vi.mock('@/libs/views/viewStore', () => ({
+vi.mock('@/libs/views/viewStore', async importOriginal => ({
+    ...await importOriginal(),
     listViews: async () => [{ uid: 'v_cover123', name: 'Cover view', error: null, newerVersion: false }]
 }));
 vi.mock('@/libs/reports/reportSources', () => ({
@@ -128,6 +130,16 @@ describe('the fields', () => {
         expect(field('report-title').value).toBe('Inspection');
     });
 
+    it('give a new report the default sections of the template picked in the list', async () => {
+        m.settings.mockResolvedValue({ templates: [DEFAULT_TEMPLATE, { ...DEFAULT_TEMPLATE, id: 'compact', name: 'Compact', defaultSections: ['cover', 'tables'] }], schema: DEFAULT_SCHEMA });
+        await render();
+        const select = wrapper.findAllComponents(Select).find(c => c.props('inputId') === 'report-template');
+        select.vm.$emit('update:modelValue', 'compact');
+        await flushPromises();
+        const checked = [...body().querySelectorAll('input[id^="report-section-"]')].filter(i => i.checked).map(i => i.id);
+        expect(checked).toEqual(['report-section-cover', 'report-section-tables']);
+    });
+
     it('tell that the template of the report was deleted and which one it uses', async () => {
         await render({ entry: existing({ templateId: 'gone' }) });
         expect(body().querySelector('[data-testid="template-notice"]').textContent.trim()).toBe(`Template gone no longer exists; this report uses ${DEFAULT_TEMPLATE.name}`);
@@ -181,6 +193,38 @@ describe('save', () => {
         await click(confirmButton());
         expect(m.saveNewReport).toHaveBeenCalledOnce();
         expect(wrapper.emitted('close')).toEqual([[{ uid: 'r_newnewne' }]]);
+    });
+
+    it('offers Save again after a source could not be numbered and the report was changed: it updates the stored report and numbers again', async () => {
+        m.numberMeasurementFile.mockRejectedValueOnce(new Error('The file cannot be written'));
+        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await type('report-name', 'North pit');
+        await click(confirmButton());
+        expect(confirmButton().textContent.trim()).toBe('Open report');
+        await type('report-title', 'Inspection');
+        expect(confirmButton().textContent.trim()).toBe('Save');
+        await click(confirmButton());
+        expect(m.saveNewReport).toHaveBeenCalledOnce();
+        expect(m.updateReport).toHaveBeenCalledOnce();
+        expect(m.updateReport.mock.calls[0][1]).toBe('r_newnewne');
+        expect(m.updateReport.mock.calls[0][2].definition).toMatchObject({ title: 'Inspection' });
+        expect(m.numberMeasurementFile).toHaveBeenCalledTimes(2);
+        expect(wrapper.emitted('close')).toEqual([[{ uid: 'r_newnewne' }]]);
+    });
+
+    it('asks before closing a stored report with changes that are not saved, and closes with the stored report when they are discarded', async () => {
+        m.numberMeasurementFile.mockRejectedValue(new Error('The file cannot be written'));
+        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await type('report-name', 'North pit');
+        await click(confirmButton());
+        await type('report-title', 'Inspection');
+        await click(cancelButton());
+        const question = document.getElementById('confirmDialog');
+        expect(question.textContent).toContain('Discard the changes?');
+        expect(wrapper.emitted('close')).toBeUndefined();
+        await click(question.querySelector('button[data-confirm]'));
+        expect(wrapper.emitted('close')).toEqual([[{ uid: 'r_newnewne' }]]);
+        expect(m.updateReport).not.toHaveBeenCalled();
     });
 
     it('shows the refusal of the store at the top', async () => {

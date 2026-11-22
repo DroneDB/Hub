@@ -8,7 +8,10 @@
  * session's change asks to Overwrite or Save as new, its deletion to Save as new), then each source file gets the
  * numbering save, so the references the report shows are stored. A file that cannot be numbered does not undo the
  * definition: it is listed in `failures` with the reason, and the report shows that file's items without a reference
- * until a later save can number it.
+ * until a later save can number it. `dirty` says whether the draft differs from what was read or last stored.
+ *
+ * A report of a later version is not edited: the editor says why (`loadError`) and saves nothing, as what this version
+ * does not know of it would be lost.
  *
  *   const editor = useReportEditor({ dataset, user, entry, initial, choose });
  *   await editor.load();
@@ -19,12 +22,12 @@ import ddb from 'ddb';
 import { isMeasurementFile, numberMeasurementFile } from '@/libs/map/measurementStorage';
 import { sectionOf, VIEW } from '@/libs/map/measurementFormat';
 import { buildEntryState } from '@/libs/views/viewState';
-import { listViews } from '@/libs/views/viewStore';
+import { isUsableView, listViews } from '@/libs/views/viewStore';
 import {
     DEFINITION_VERSION, MAX_NOTES_LENGTH, MAX_TEXT_LENGTH, MAX_SOURCE_LABEL_LENGTH, MEASUREMENT_KINDS, OWNERS, SECTION_KINDS,
     addSource, newDefinition, sectionsFromTemplate
 } from '@/libs/reports/reportDefinition';
-import { reportChange, reportSaveProblem, saveNewReport, updateReport, MAX_REPORT_NAME_LENGTH } from '@/libs/reports/reportStore';
+import { reportChange, reportSaveProblem, saveNewReport, updateReport, MAX_REPORT_NAME_LENGTH, NEWER_REPORT_TEXT } from '@/libs/reports/reportStore';
 import { datasetReportSettings, DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
 import { resolveTemplate, templateMissingText } from '@/libs/reports/reportModel';
 import { loadReportSources } from '@/libs/reports/reportSources';
@@ -78,6 +81,9 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
     const storedUid = ref(entry ? entry.uid : '');
     /** @type {import('vue').Ref<{ file: string, reason: string }[]>} */
     const failures = ref([]);
+    // The text of the draft as it was read or last stored: nothing to save or to discard while it is the same
+    const baseline = ref('');
+    const dirty = computed(() => !!baseline.value && baseline.value !== JSON.stringify(draft));
     // The layers picked for a cover made of dataset layers
     const coverLayers = ref(/** @type {string[]} */ ([]));
     // The cover is made of picked layers (else a view state the editor was given or the report has)
@@ -104,6 +110,11 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
     async function load() {
         loading.value = true;
         loadError.value = '';
+        if (entry?.newerVersion) {
+            loadError.value = NEWER_REPORT_TEXT;
+            loading.value = false;
+            return;
+        }
         try {
             const [settings, allViews, files, rasters] = await Promise.all([
                 datasetReportSettings(dataset),
@@ -113,7 +124,8 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
             ]);
             templates.value = settings.templates?.length ? settings.templates : [DEFAULT_TEMPLATE];
             schema.value = settings.schema ?? DEFAULT_SCHEMA;
-            views.value = allViews.filter(v => !v.error && !v.newerVersion);
+            // A cover view that cannot be drawn is a deleted one (coverDeleted), as the live page has it
+            views.value = allViews.filter(isUsableView);
             measurementFiles.value = files.map(/** @param {any} f */ f => f.path).filter(isMeasurementFile).sort();
             georasters.value = rasters.map(/** @param {any} f */ f => ({ path: f.path, hash: f.hash || '' })).sort((a, b) => a.path.localeCompare(b.path));
             if (!entry) {
@@ -128,6 +140,7 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
             loadError.value = e instanceof Error ? e.message : String(e);
         } finally {
             loading.value = false;
+            baseline.value = JSON.stringify(draft);
         }
     }
 
@@ -158,6 +171,19 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
         // A filter on a group of a source that is gone would hide everything
         const gone = new Set((groupsByFile.value[removed.file] ?? []).map(g => g.id));
         draft.filter.groups = draft.filter.groups.filter(id => !gone.has(id));
+    }
+
+    /**
+     * Makes the report use a template. A report that is not stored yet takes the default sections of the new template
+     * while its sections are still those of the template it had (the user did not change them); a stored report keeps
+     * its sections, whatever the template says.
+     * @param {string} id
+     */
+    function chooseTemplate(id) {
+        const untouched = !storedUid.value
+            && JSON.stringify(draft.sections) === JSON.stringify(sectionsFromTemplate(resolved.value.template.defaultSections));
+        draft.templateId = id;
+        if (untouched) draft.sections = sectionsFromTemplate(resolved.value.template.defaultSections);
     }
 
     /** @param {string} viewId */
@@ -255,10 +281,15 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
      */
     async function save() {
         if (saving.value) return null;
+        if (entry?.newerVersion) {
+            formError.value = NEWER_REPORT_TEXT;
+            return null;
+        }
         showProblems.value = true;
         formError.value = '';
         if (firstProblem.value) return null;
         const data = definition();
+        const text = JSON.stringify(draft);
         const refused = reportSaveProblem(data.name, { ...data, uid: storedUid.value || PLACEHOLDER_UID });
         if (refused) {
             formError.value = refused;
@@ -273,6 +304,7 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
                 : await saveNewReport(dataset, data, { user });
             storedUid.value = stored.uid;
             loadedId.value = stored.id;
+            baseline.value = text;
             failures.value = await numberSources(data.sources.map(s => s.file));
             return { uid: stored.uid, failures: failures.value };
         } catch (e) {
@@ -285,10 +317,10 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
     }
 
     return {
-        draft, loading, loadError, saving, formError, showProblems, problems, firstProblem, failures,
+        draft, loading, loadError, saving, formError, showProblems, problems, firstProblem, failures, dirty,
         templates, schema, views, measurementFiles, georasters, groupOptions, coverLayers, coverKind, coverDeleted,
         resolvedTemplate: computed(() => resolved.value.template), templateNotice, storedUid,
-        load, add, removeSource, chooseView, chooseLayers, moveSection, save,
+        load, add, removeSource, chooseTemplate, chooseView, chooseLayers, moveSection, save,
         filterChoices: { kinds: MEASUREMENT_KINDS, owners: OWNERS, sections: SECTION_KINDS }
     };
 }

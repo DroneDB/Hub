@@ -43,13 +43,14 @@
  * filter, the cover view, the sections and the units of a report (what is edited is the definition; the report holds no
  * numbers). Saving stores the definition and then numbers the measurement files it reads, so that the references the
  * report shows are saved: see useReportEditor. When a file cannot be numbered the report is saved all the same and the
- * dialog stays open to say which file and why; its button then opens the report.
+ * dialog stays open to say which file and why; its button then opens the report, until the report is changed again:
+ * then it is Save (an update of the stored report, which numbers the files again), and leaving asks first.
  *
  * Props: dataset (the Registry's), entry (the report to edit; none for a new one), initial (what a new report starts
  * with: sources and cover), user, choose (the question of the change check). It closes with `{ uid }` of the report
  * that was stored, or with nothing.
  */
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Window from '@/components/HubWindow.vue';
@@ -77,17 +78,16 @@ const confirmDiscard = useConfirm(dialogs);
 const editor = useReportEditor({ dataset: props.dataset, user: props.user, entry: props.entry, initial: props.initial, choose: props.choose });
 provideReportEditor(editor);
 
-/** The text of the draft as it was after it was read: nothing to discard while it is the same. */
-const baseline = ref('');
-editor.load().then(() => { baseline.value = JSON.stringify(editor.draft); });
-const dirty = computed(() => !!baseline.value && baseline.value !== JSON.stringify(editor.draft));
+editor.load();
 
-// A report that is stored while the editor stays open (a file could not be numbered): its button opens the report
+// A report that is stored while the editor stays open (a file could not be numbered)
 const storedWithProblems = computed(() => !!editor.storedUid.value && editor.failures.value.length > 0);
-const confirmLabel = computed(() => (storedWithProblems.value ? 'Open report' : 'Save'));
+// Its button opens it while the draft is what was stored; a change is saved first
+const opensReport = computed(() => storedWithProblems.value && !editor.dirty.value);
+const confirmLabel = computed(() => (opensReport.value ? 'Open report' : 'Save'));
 
 async function confirm() {
-    if (storedWithProblems.value) {
+    if (opensReport.value) {
         emit('close', { uid: editor.storedUid.value });
         return;
     }
@@ -98,17 +98,13 @@ async function confirm() {
 
 async function requestClose() {
     if (editor.saving.value) return;
-    // The report is stored (a file could not be numbered): closing is leaving it as it is stored
-    if (storedWithProblems.value) {
-        emit('close', { uid: editor.storedUid.value });
-        return;
-    }
-    if (dirty.value && !await confirmDiscard({
+    if (editor.dirty.value && !await confirmDiscard({
         title: 'Discard the changes?',
         message: 'The report has changes that are not saved.',
         confirmText: 'Discard changes',
         danger: true
     })) return;
-    emit('close', null);
+    // A report stored here (a file could not be numbered) is left as it is stored
+    emit('close', storedWithProblems.value ? { uid: editor.storedUid.value } : null);
 }
 </script>

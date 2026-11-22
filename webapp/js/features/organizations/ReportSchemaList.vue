@@ -61,7 +61,7 @@ import Checkbox from 'primevue/checkbox';
 import InputText from 'primevue/inputtext';
 import ActionButton from '@/components/ActionButton.vue';
 import FieldError from '@/components/FieldError.vue';
-import { LIMITS, canAddEntry, canRemoveEntry, idFromName, newSchemaEntry, problemAt } from '@/libs/reports/reportSettings';
+import { LIMITS, canAddEntry, canRemoveEntry, idFromName, newSchemaEntry, problemAt, takenIds } from '@/libs/reports/reportSettings';
 
 const entries = defineModel({ type: Array, required: true });
 const props = defineProps({
@@ -101,7 +101,7 @@ function move(index, by) {
 function rename(entry, name) {
     entry.name = name;
     if (isSaved(entry)) return;
-    entry.id = idFromName(name, entries.value.filter(other => other !== entry).map(other => other.id));
+    entry.id = idFromName(name, takenIds(entries.value, props.savedIds, entry));
 }
 </script>
 

@@ -219,13 +219,27 @@ export function idFromName(name, taken = []) {
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
+ * The ids a new entry of a list, or one renamed before it is saved, may not take: those of the other entries of the
+ * list, and every stored one. A stored entry removed in the dialog keeps its id until the removal is saved: a new
+ * entry with that id would take over what the stored one has (the logo of a template, the annotations of a category).
+ * @param {{ id: string }[]} entries  the entries of the list now
+ * @param {Iterable<string>} savedIds  the ids of the list that are stored
+ * @param {{ id: string } | null} [except]  the entry the id is for
+ * @returns {string[]}
+ */
+export function takenIds(entries, savedIds, except = null) {
+    return [...savedIds, ...entries.filter(e => e !== except).map(e => e.id)];
+}
+
+/**
  * A new template: the defaults, a name and the id that name gives.
  * @param {ReportTemplate[]} templates  the templates there are
  * @param {string} [name]
+ * @param {Iterable<string>} [savedIds]  the ids of the stored templates (see takenIds)
  * @returns {ReportTemplate}
  */
-export function newTemplate(templates, name = 'New template') {
-    return { ...cloneSettings(DEFAULT_TEMPLATE), name, id: idFromName(name, templates.map(t => t.id)) };
+export function newTemplate(templates, name = 'New template', savedIds = []) {
+    return { ...cloneSettings(DEFAULT_TEMPLATE), name, id: idFromName(name, takenIds(templates, savedIds)) };
 }
 
 /**

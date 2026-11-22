@@ -39,6 +39,9 @@ const store = createMetaListStore({
     audit: { createdBy: 'createdBy', createdAt: 'createdAt', updatedBy: null, updatedAt: 'modifiedAt' }
 });
 
+/** Why a report of a later version is neither shown nor edited: this version does not know all it holds. */
+export const NEWER_REPORT_TEXT = 'This report was saved by a newer version of the application.';
+
 /**
  * The reports of the dataset, one per uid, sorted by name, and the items that cannot be shown as
  * a report. A report of a later version stays in `reports` with `newerVersion`.

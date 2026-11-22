@@ -203,6 +203,26 @@ describe('ReportSettingsDialog: templates', () => {
         expect(sentTemplates().map(t => t.id)).toEqual(['standard']);
     });
 
+    it('does not give a new template the id of a stored one deleted in the dialog: it would inherit its logo', async () => {
+        server.templates.push({ ...cloneSettings(DEFAULT_TEMPLATE), id: 'safety', name: 'Safety', logo: 'report-logo.png' },
+            { ...cloneSettings(DEFAULT_TEMPLATE), id: 'new-template', name: 'New template', logo: 'report-logo.png' });
+        await render();
+        const choose = async index => {
+            wrapper.findAllComponents(Select).find(c => c.props('inputId') === 'report-template-picker').vm.$emit('update:modelValue', index);
+            await flushPromises();
+        };
+        await choose(2);
+        await click(buttonNamed('Delete template'));
+        await choose(1);
+        await click(buttonNamed('Delete template'));
+        await click(buttonNamed('Add template'));
+        expect(body().textContent).toContain('new-template-2');
+        await type('report-template-name', 'Safety');
+        await save();
+        expect(sentTemplates().map(t => t.id)).toEqual(['standard', 'safety-2']);
+        expect(sentTemplates()[1].logo ?? null).toBeNull();
+    });
+
     it('shows the preview of the values being typed', async () => {
         await render();
         await type('report-template-header', 'Acme Quarries');
@@ -411,6 +431,21 @@ describe('ReportSettingsDialog: the annotation schema', () => {
         await type(category(added).querySelector('input[type="text"]').id, 'Fire');
         await save();
         expect(registry.putRequest.mock.calls[1][1].schema.categories.at(-1)).toMatchObject({ id: 'fire-hazard', name: 'Fire' });
+    });
+
+    it('does not give a new entry the id of a stored one removed in the dialog: it would take over its annotations', async () => {
+        await render();
+        await click(tab('Annotation schema'));
+        const ids = () => [...body().querySelectorAll('[data-test="schema-categories"] .schema-entry')].length;
+        const safety = [...body().querySelectorAll('[data-test="schema-categories"] .schema-entry')].findIndex(e => e.querySelector('input[type="text"]').value === 'Safety');
+        expect(safety).toBeGreaterThan(-1);
+        await click(category(safety).querySelector('button[aria-label^="Remove"]'));
+        await click(buttonNamed('Add category'));
+        await type(category(ids() - 1).querySelector('input[type="text"]').id, 'Safety');
+        await save();
+        const sent = registry.putRequest.mock.calls[0][1].schema.categories;
+        expect(sent.map(c => c.id)).not.toContain('safety');
+        expect(sent.at(-1)).toMatchObject({ id: 'safety-2', name: 'Safety' });
     });
 
     it('a new status has the closed flag, off', async () => {

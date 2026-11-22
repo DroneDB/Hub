@@ -106,6 +106,12 @@ describe('ReportsList', () => {
         expect(w.emitted('delete')[0][0]).toMatchObject({ uid: 'r_aaaaaaaa' });
     });
 
+    it('offers no Edit or Duplicate for a report of a newer version: saving it would lose what this version does not know', async () => {
+        const w = mountList({ canWrite: true, reports: [{ ...reports[0], newerVersion: true }] });
+        await rows(w)[0].trigger('contextmenu');
+        expect(visibleLabels(w)).toEqual(['Open', 'Copy Link', 'Delete']);
+    });
+
     it('lets a writer only delete a report that cannot be read', async () => {
         const w = mountList({ canWrite: true, unreadable });
         await rows(w)[2].trigger('contextmenu');

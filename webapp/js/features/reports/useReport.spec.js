@@ -16,8 +16,8 @@ const m = vi.hoisted(() => ({ dataset: null, listReports: vi.fn(), listViews: vi
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: { Organization: () => ({ Dataset: () => m.dataset, datasets: () => Promise.resolve([{ slug: 'site', name: 'North site' }]) }) }
 }));
-vi.mock('@/libs/reports/reportStore', () => ({ listReports: (...a) => m.listReports(...a) }));
-vi.mock('@/libs/views/viewStore', () => ({ listViews: (...a) => m.listViews(...a) }));
+vi.mock('@/libs/reports/reportStore', async importOriginal => ({ ...await importOriginal(), listReports: (...a) => m.listReports(...a) }));
+vi.mock('@/libs/views/viewStore', async importOriginal => ({ ...await importOriginal(), listViews: (...a) => m.listViews(...a) }));
 vi.mock('@/libs/reports/reportSettings', async importOriginal => ({ ...await importOriginal(), datasetReportSettings: (...a) => m.settings(...a) }));
 
 const { useReport } = await import('./useReport');
@@ -151,6 +151,17 @@ describe('what the report says is wrong', () => {
         await open();
         expect(report.model.value.coverDeleted).toBe(true);
         expect(report.model.value.notices.map(n => n.code)).toContain('coverDeleted');
+    });
+
+    it('treats a cover view that cannot be read, or is of a newer version, as a deleted one: the notice, and items on the basemap only', async () => {
+        for (const broken of [{ error: 'a layer path is not valid', newerVersion: false }, { error: null, newerVersion: true }]) {
+            m.listViews.mockResolvedValue([{ ...coverView(), ...broken }]);
+            await open();
+            expect(report.model.value.coverDeleted).toBe(true);
+            expect(report.model.value.notices.map(n => n.code)).toContain('coverDeleted');
+            wrapper.unmount();
+        }
+        wrapper = null;
     });
 
     it('uses the first template of the organization with the notice when its template was deleted', async () => {

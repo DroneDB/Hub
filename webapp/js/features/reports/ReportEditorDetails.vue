@@ -11,7 +11,7 @@
             <label id="report-template-label" for="report-template" class="d-block mb-1 fw-semibold">Template</label>
             <Select :model-value="editor.resolvedTemplate.value.id" input-id="report-template" aria-labelledby="report-template-label"
                     :options="editor.templates.value" option-label="name" option-value="id" class="w-100"
-                    @update:model-value="draft.templateId = $event" />
+                    @update:model-value="editor.chooseTemplate($event)" />
             <PrimeMessage v-if="editor.templateNotice.value" severity="info" :closable="false" class="mt-2" data-testid="template-notice">
                 {{ editor.templateNotice.value }}
             </PrimeMessage>
