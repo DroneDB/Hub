@@ -212,8 +212,14 @@ describe('the toolbar rail of a compact map (FR-MAP-12, FR-SHR-05)', () => {
         expect(hidden).toMatch(/display:\s*none\s*!important/);
     });
 
-    it('lets the rail of a compact map scroll when the open tools are taller than the map', () => {
-        expect(ruleOf(css, '.map-container.is-compact .ol-zone-top-right')).toMatch(/overflow-y:\s*auto/);
+    // The rail of a map that is not compact holds every button (the map's, the measure tools, the tools of the saved
+    // measurements): 18 of them on a 1280 x 720 window, more than the height of the map
+    it('lets the rail of any map scroll inside the map when its buttons are taller than the map, compact or not', () => {
+        const rail = ruleOf(css, '.ol-zone-top-right');
+        expect(rail).toMatch(/overflow-y:\s*auto/);
+        expect(rail).toMatch(/scrollbar-width:\s*none/);
+        expect(ruleOf(css, '.ol-zone')).toMatch(/max-height:\s*calc\(100% - 1rem\)/);
+        expect(css).not.toMatch(/\.is-compact \.ol-zone-top-right/);
     });
 
     it('turns the arrow of a popup below its point up', () => {

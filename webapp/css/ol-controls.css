@@ -147,10 +147,15 @@
     align-items: flex-start;
 }
 
+/* The rail: every button of the map, the measure tools and the tools of the saved measurements (18 with a report
+   and measurements) are taller than a map in a 1280 x 720 window, and a compact map's open tools than a small frame.
+   The zone stops at the bottom of the map (max-height) and its buttons scroll inside it, at any size of the map. */
 .ol-zone-top-right {
     top: 0.5rem;
     right: 0.5rem;
     align-items: flex-end;
+    overflow-y: auto;
+    scrollbar-width: none;
 }
 
 .ol-zone-top-center {
@@ -188,7 +193,7 @@
 /* A compact map (MapCore sets .is-compact from the size of the map itself: narrower than `sm`, or too low
    for the whole rail, as the default 600x400 frame of an embed is) keeps one button of the measure tools
    in the rail, 'Measure', and the tools open from it (FR-MAP-12, FR-SHR-05). The same rule serves a phone
-   and a small frame. The rail scrolls when the open tools are still taller than the map. */
+   and a small frame. The rail scrolls when the open tools are still taller than the map (.ol-zone-top-right). */
 .ol-measure-toggle {
     display: none;
 }
@@ -199,11 +204,6 @@
 
 .map-container.is-compact .ol-measure-control:not(.is-open) > .ol-control:not(.ol-measure-toggle) {
     display: none !important;
-}
-
-.map-container.is-compact .ol-zone-top-right {
-    overflow-y: auto;
-    scrollbar-width: none;
 }
 
 .ol-settings {
