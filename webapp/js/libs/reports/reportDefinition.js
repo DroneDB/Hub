@@ -19,7 +19,10 @@ import { validateState, isSafeLayerPath } from '@/libs/views/viewState';
 
 export const DEFINITION_VERSION = 1;
 
-export const SECTION_KINDS = Object.freeze(['cover', 'summary', 'overview', 'tables', 'items', 'notes']);
+/** The sections a report has, in the order of a new report. */
+export const SECTION_KINDS = Object.freeze(/** @type {import('./reportSettings').SectionKind[]} */ (['cover', 'summary', 'overview', 'tables', 'items', 'notes']));
+/** @param {unknown} kind @returns {kind is import('./reportSettings').SectionKind} */
+export const isSectionKind = kind => /** @type {readonly unknown[]} */ (SECTION_KINDS).includes(kind);
 /** The measurement kinds a report groups its items into. */
 export const MEASUREMENT_KINDS = Object.freeze(['point', 'length', 'area', 'volume', 'profile', 'measure3d']);
 /** Who owns an annotation: the 2D map or the point cloud viewer. */
@@ -110,7 +113,7 @@ export function addSource(sources, file) {
  */
 export function sectionsFromTemplate(defaultSections) {
     if (!Array.isArray(defaultSections)) return SECTION_KINDS.map(kind => ({ kind, enabled: true }));
-    const wanted = [...new Set(defaultSections.filter(k => SECTION_KINDS.includes(k)))];
+    const wanted = [...new Set(defaultSections.filter(isSectionKind))];
     return [
         ...wanted.map(kind => ({ kind, enabled: true })),
         ...SECTION_KINDS.filter(kind => !wanted.includes(kind)).map(kind => ({ kind, enabled: false }))
@@ -192,7 +195,7 @@ function sectionsProblem(sections) {
     if (!Array.isArray(sections)) return 'the sections are not a list';
     const kinds = new Set();
     for (const s of sections) {
-        if (!isObject(s) || typeof s.kind !== 'string' || !SECTION_KINDS.includes(s.kind)) return 'a section kind is not valid';
+        if (!isObject(s) || !isSectionKind(s.kind)) return 'a section kind is not valid';
         if (typeof s.enabled !== 'boolean') return 'a section is not switched on or off';
         if (kinds.has(s.kind)) return 'a section is listed twice';
         kinds.add(s.kind);

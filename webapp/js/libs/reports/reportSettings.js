@@ -17,6 +17,9 @@
  */
 import { PRIMARY } from '@/libs/palette';
 import { slugFromName } from '@/libs/slug';
+import { SECTION_KINDS } from '@/libs/reports/reportDefinition';
+
+export { SECTION_KINDS };
 
 /** @typedef {{ id: string, name: string, colour: string }} SchemaChoice  a category or a severity */
 /** @typedef {{ id: string, name: string, closed: boolean }} SchemaStatus */
@@ -41,8 +44,7 @@ import { slugFromName } from '@/libs/slug';
 /** @typedef {{ registry: any, org: string }} OrganizationRef  what `reg.Organization(slug)` is */
 /** @typedef {{ registry: any, baseApi: string }} DatasetRef  what `reg.Organization(org).Dataset(ds)` is */
 
-/** The sections a report has, in the order of the report, and what the settings dialog calls them. */
-export const SECTION_KINDS = Object.freeze(/** @type {SectionKind[]} */ (['cover', 'summary', 'overview', 'tables', 'items', 'notes']));
+/** What the settings dialog and the report call the sections (their kinds and order are the definition's: SECTION_KINDS). */
 export const SECTION_LABELS = Object.freeze(/** @type {Record<SectionKind, string>} */ ({
     cover: 'Cover',
     summary: 'Summary',
