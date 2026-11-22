@@ -53,9 +53,11 @@
     "markdown-it": "^14.1.0",
     "mitt": "^3.0.1",
     "ol": "^10.9.0",
+    "pdfmake": "0.3.15",
     "pinia": "^3.0.4",
     "primevue": "^4.3.0",
     "proj4": "^2.20.9",
+    "qrcode-generator": "2.0.4",
     "three": "^0.180.0",
     "vue": "^3.5.11",
     "vue-router": "^4.3.0"

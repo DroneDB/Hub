@@ -178,6 +178,20 @@ module.exports = {
                     chunks: 'async',
                     priority: 25
                 },
+                // The PDF of a report: pdfmake with the Roboto it embeds, and the QR encoder, load when a PDF is
+                // asked for (or a QR code shown), never with the page
+                pdf: {
+                    test: /[\\/]node_modules[\\/](pdfmake|pdfkit|fontkit|@pdfmake|@noble|brotli|dfa|linebreak|png-js|restructure|sax|unicode-properties|unicode-trie|xmldoc)[\\/]/,
+                    name: 'vendor-pdf',
+                    chunks: 'async',
+                    priority: 25
+                },
+                qr: {
+                    test: /[\\/]node_modules[\\/]qrcode-generator[\\/]/,
+                    name: 'vendor-qr',
+                    chunks: 'async',
+                    priority: 25
+                },
                 chartjs: {
                     test: /[\\/]node_modules[\\/]chart\.js[\\/]/,
                     name: 'vendor-chartjs',

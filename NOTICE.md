@@ -20,7 +20,8 @@ The licence covers only the work of Digipa S.R.L. Each component below keeps its
 | DOMPurify | MPL-2.0 or Apache-2.0 |
 | Font Awesome Free | CC-BY-4.0, OFL-1.1 and MIT |
 | Inter font | OFL-1.1 |
-| Other npm packages | MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, Zlib, Python-2.0, CC0-1.0 |
+| Roboto font (embedded in the PDF of a report, from pdfmake) | Apache-2.0 |
+| Other npm packages | MIT, ISC, BSD-2-Clause, BSD-3-Clause, Apache-2.0, BlueOak-1.0.0, Zlib, Python-2.0, CC0-1.0 |
 
 ## Trademarks
 

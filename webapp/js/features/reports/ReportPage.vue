@@ -1,8 +1,11 @@
 <template>
     <ViewerShell v-model:error="error" class="report-viewer" :loading="loading" :load-error="loadError" :name="model?.name || null">
         <template v-if="model" #bar>
-            <!-- The PDF actions go in the export slot of the bar -->
-            <ReportBar :name="model.name" :can-write="canWrite" @edit="edit" @delete="remove" />
+            <ReportBar :name="model.name" :can-write="canWrite" @edit="edit" @delete="remove">
+                <template #export>
+                    <ReportExport :model="model" :dataset="dataset" :uid="String(uid)" :can-write="canWrite" :dialogs="dialogs" />
+                </template>
+            </ReportBar>
         </template>
 
         <ResourceState v-if="missing" kind="not-found" resource="report" message="This report was deleted or the link is wrong."
@@ -48,6 +51,7 @@ import { loadErrorKind } from '@/libs/ddb/apiError';
 import { itemOfAnchor } from '@/libs/views/viewLinks';
 import { photoEntries } from '@/libs/reports/photoFiles';
 import ReportBar from './ReportBar.vue';
+import ReportExport from './ReportExport.vue';
 import ReportSection from './ReportSection.vue';
 import { provideReportContext } from './reportContext';
 import { useReport } from './useReport';
