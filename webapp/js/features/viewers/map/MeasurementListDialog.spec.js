@@ -140,3 +140,79 @@ describe('MeasurementListDialog piles', () => {
         expect(buttons(wrapper)).toHaveLength(1);
     });
 });
+
+describe('MeasurementListDialog annotation columns and filters', () => {
+    const item = (name, extra = {}) => ({ type: 'length', name, value: '1 m', feature: { ol_uid: name }, groupId: '', ref: '', category: '', status: '', ...extra });
+    const ITEMS = [
+        item('Crack', { ref: '1', category: 'defect', categoryLabel: 'Defect', status: 'open', statusLabel: 'Open' }),
+        item('Gate', { ref: '2', category: 'safety', categoryLabel: 'Safety', status: 'resolved', statusLabel: 'Resolved' }),
+        item('Fence', { ref: '3', category: 'defect', categoryLabel: 'Defect', status: 'resolved', statusLabel: 'Resolved' }),
+        item('Plain')
+    ];
+    const mountList = props => mount(MeasurementListDialog, {
+        props: { measurements: ITEMS, ...props },
+        global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+    });
+    const names = wrapper => wrapper.findAll('.measurement-name').map(n => n.text());
+
+    it('shows the reference, the category and the status of each measurement, in a group or not', () => {
+        const wrapper = mountList({ measurements: ITEMS.map(i => (i.name === 'Fence' ? { ...i, groupId: 'g1' } : i)), groups: [{ id: 'g1', name: 'Piles', color: '#f00', visible: true }] });
+        const rows = wrapper.findAll('.measurement-row');
+        expect(rows).toHaveLength(4);
+        const crack = rows.find(r => r.text().includes('Crack'));
+        expect(crack.find('[data-testid="annotation-ref"]').text()).toBe('1');
+        expect(crack.find('[data-testid="annotation-category"]').text()).toBe('Defect');
+        expect(crack.find('[data-testid="annotation-status"]').text()).toBe('Open');
+        const fence = rows.find(r => r.text().includes('Fence'));
+        expect(fence.find('[data-testid="annotation-ref"]').text()).toBe('3');
+        const plain = rows.find(r => r.text().includes('Plain'));
+        expect(plain.find('.annotation-chips').exists()).toBe(false);
+    });
+
+    it('filters by category and by status, each alone and both together, and shows all again', async () => {
+        const wrapper = mountList();
+        const category = wrapper.find('[data-testid="category-filter"]');
+        const status = wrapper.find('[data-testid="status-filter"]');
+        expect(category.findAll('option').map(o => o.text())).toEqual(['All', 'Defect', 'Safety']);
+        expect(status.findAll('option').map(o => o.text())).toEqual(['All', 'Open', 'Resolved']);
+
+        await category.setValue('defect');
+        expect(names(wrapper)).toEqual(['Crack', 'Fence']);
+        await status.setValue('resolved');
+        expect(names(wrapper)).toEqual(['Fence']);
+        await category.setValue('');
+        expect(names(wrapper)).toEqual(['Gate', 'Fence']);
+        await status.setValue('');
+        expect(names(wrapper)).toHaveLength(4);
+    });
+
+    it('says when no measurement matches, and keeps the filters to change them', async () => {
+        const wrapper = mountList();
+        await wrapper.find('[data-testid="category-filter"]').setValue('safety');
+        await wrapper.find('[data-testid="status-filter"]').setValue('open');
+        expect(wrapper.find('.measurement-row').exists()).toBe(false);
+        expect(wrapper.text()).toContain('No measurements match the filters.');
+        expect(wrapper.find('[data-testid="category-filter"]').exists()).toBe(true);
+    });
+
+    it('has labelled filters, and none while no measurement has a category or a status', () => {
+        const wrapper = mountList();
+        expect(wrapper.find('label[for="ml-category-filter"]').text()).toBe('Category');
+        expect(wrapper.find('label[for="ml-status-filter"]').text()).toBe('Status');
+        expect(mountList({ measurements: [item('Plain')] }).find('.measurement-filters').exists()).toBe(false);
+    });
+
+    it('warns of a reference that more than one measurement has, and not otherwise', () => {
+        expect(mountList().find('[data-testid="duplicate-refs"]').exists()).toBe(false);
+        const wrapper = mountList({ measurements: [item('A', { ref: '4' }), item('B', { ref: '4' }), item('C', { ref: '5' })] });
+        expect(wrapper.find('[data-testid="duplicate-refs"]').text()).toBe('Reference 4 is used by more than one measurement.');
+        expect(mountList({ measurements: [item('A', { ref: '4' }), item('B', { ref: '4' }), item('C', { ref: '5' }), item('D', { ref: '5' })] })
+            .find('[data-testid="duplicate-refs"]').text()).toBe('References 4, 5 are used by more than one measurement.');
+    });
+
+    it('shows the empty message when there is no measurement, not the filters', () => {
+        const wrapper = mountList({ measurements: [] });
+        expect(wrapper.text()).toContain('No measurements on the map.');
+        expect(wrapper.find('.measurement-filters').exists()).toBe(false);
+    });
+});

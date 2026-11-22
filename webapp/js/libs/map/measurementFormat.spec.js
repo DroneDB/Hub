@@ -15,6 +15,11 @@ import { WGS84_WKT } from './crs.fixtures';
 
 afterEach(() => vi.useRealTimers());
 
+// The features of a file as they were written, without the id that a read gives to a feature that has none
+const withoutIds = features => features.map(f => {
+    const { id, ...properties } = f.properties;
+    return { ...f, properties: id && !/^[0-9a-f]{64}(-\d+)?$/.test(id) ? f.properties : properties };
+});
 const byId = (doc, id) => doc.features.find(f => f.id === id || (f.properties && f.properties.id === id));
 const normalized = doc => ({
     ...doc,
@@ -37,7 +42,7 @@ describe('read: the 2D map\'s files', () => {
         expect(doc.metadata.views).toEqual({ map: { orthophotoFile: 'ortho.tif', unitPreference: 'metric' } });
         expect(doc.metadata.orthophotoFile).toBeUndefined();
         expect(doc.crs.properties.name).toBe('EPSG:4326');
-        expect(doc.features).toEqual(file.features);
+        expect(withoutIds(doc.features)).toEqual(file.features);
     });
 
     it('1.1: the groups move into the map\'s section', () => {
@@ -88,7 +93,7 @@ describe('read: the 3D viewer\'s files', () => {
         const file = pointCloudFileNoSrs();
         const doc = read(file);
         expect('crs' in doc).toBe(false);
-        expect(doc.features).toEqual(file.features);
+        expect(withoutIds(doc.features)).toEqual(file.features);
         expect(sectionOf(doc, VIEW.POINT_CLOUD)[LEGACY_GEOMETRY]).toBe(true);
         expect(doc.metadata.version).toBe(FORMAT_VERSION);
         expect(JSON.stringify(doc)).not.toContain('EPSG:4326');
@@ -201,12 +206,12 @@ describe('a pre-2.0 file with 3D features and no CRS, saved first by the 2D map'
     const disk = doc => JSON.parse(JSON.stringify(doc));
     const ctx = { pointCloudCrs: UTM_18N_WKT };
 
-    it('is written as 2.0 with the 3D features as they were; the 3D viewer\'s read corrects them; the third save changes nothing', () => {
+    it('is written as 3.0 with the 3D features as they were; the 3D viewer\'s read corrects them; the third save changes nothing', () => {
         const file = oldFile();
         const mapRead = read(file);
         const first = disk(write(mapRead, VIEW.MAP, mapOnly(mapRead), sectionOf(mapRead, VIEW.MAP)));
         expect(first.metadata.version).toBe(FORMAT_VERSION);
-        expect(cloudOnly(first)).toEqual(cloudOnly(file));
+        expect(withoutIds(cloudOnly(first))).toEqual(cloudOnly(file));
         expect(sectionOf(first, VIEW.POINT_CLOUD)).toEqual({ pointCloudFile: 'cloud.laz', [LEGACY_GEOMETRY]: true });
         expect('crs' in first).toBe(false);
         // Read again without a CRS (the map): nothing changes
@@ -261,8 +266,42 @@ describe('read: files of the stockpile panel and of other applications', () => {
         expect(() => read(foreign)).toThrow(/another application/);
         expect(() => read({ type: 'Feature', geometry: null })).toThrow(/not a GeoJSON FeatureCollection/);
         expect(() => read([])).toThrow(MeasurementFileError);
-        expect(() => read({ type: 'FeatureCollection', features: [], metadata: { version: '3.0' } })).toThrow(/newer format/);
+        expect(() => read({ type: 'FeatureCollection', features: [], metadata: { version: '4.0' } })).toThrow(/newer format/);
         try { read(foreign); } catch (e) { expect(e.code).toBe('foreign'); }
+    });
+});
+
+describe('read: format 3.0', () => {
+    const file3 = () => ({
+        type: 'FeatureCollection',
+        metadata: { version: '3.0', kind: 'measurements', application: 'DroneDB Registry', createdAt: CREATED, modifiedAt: MODIFIED, lastRef: 2, views: {} },
+        features: [
+            { type: 'Feature', id: 'i1', geometry: { type: 'Point', coordinates: [9.3, 45.3] }, properties: { measurementType: 'point', id: 'i1', ref: '1', createdAt: CREATED, customKey: 5 } },
+            { type: 'Feature', id: 'i2', geometry: { type: 'Point', coordinates: [9.4, 45.3] }, properties: { measurementType: 'point', id: 'i2', ref: '2', createdAt: CREATED } }
+        ]
+    });
+
+    it('is read as it is, with every feature keeping its id, ref and other properties', () => {
+        const file = file3();
+        const doc = read(file);
+        expect(doc.features).toEqual(file.features);
+        expect(doc.metadata.lastRef).toBe(2);
+        expect(doc.metadata.version).toBe('3.0');
+    });
+
+    it('is refused when it is of a higher major version, and 3.x is read', () => {
+        expect(() => read({ ...file3(), metadata: { ...file3().metadata, version: '4.0' } })).toThrow(/newer format/);
+        expect(read({ ...file3(), metadata: { ...file3().metadata, version: '3.1' } }).features).toHaveLength(2);
+        try { read({ ...file3(), metadata: { ...file3().metadata, version: '4.0' } }); } catch (e) { expect(e.code).toBe('unsupported'); }
+    });
+
+    it('is written by a write that keeps lastRef, never lowers it, and raises it to the highest ref', () => {
+        const existing = read(file3());
+        const kept = write(existing, VIEW.MAP, existing.features.slice(0, 1), {});
+        expect(kept.metadata.lastRef).toBe(2);
+        expect(write(null, VIEW.MAP, [], {}).metadata.lastRef).toBeUndefined();
+        const higher = write(existing, VIEW.MAP, [{ ...existing.features[0], properties: { ...existing.features[0].properties, ref: '9' } }], {});
+        expect(higher.metadata.lastRef).toBe(9);
     });
 });
 
@@ -278,10 +317,10 @@ describe('parse', () => {
 });
 
 describe('write', () => {
-    it('makes a 2.0 document of the view\'s features and section', () => {
+    it('makes a 3.0 document of the view\'s features and section', () => {
         const doc = write(null, VIEW.MAP, mapFile10().features, { orthophotoFile: 'ortho.tif', unitPreference: 'imperial', groups: GROUPS });
         expect(doc.type).toBe('FeatureCollection');
-        expect(doc.metadata).toMatchObject({ version: '2.0', kind: 'measurements', application: 'DroneDB Registry' });
+        expect(doc.metadata).toMatchObject({ version: '3.0', kind: 'measurements', application: 'DroneDB Registry' });
         expect(doc.metadata.createdAt).toBe(doc.metadata.modifiedAt);
         expect(doc.metadata.views).toEqual({ map: { orthophotoFile: 'ortho.tif', unitPreference: 'imperial', groups: GROUPS } });
         expect(doc.metadata.groups).toBeUndefined();

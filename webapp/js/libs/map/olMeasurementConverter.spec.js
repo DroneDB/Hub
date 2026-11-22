@@ -198,3 +198,57 @@ describe('measurements at 56°N on the ellipsoid (FR-MAP-15)', () => {
         expect(measurementSizeText(square(), 'area', 'imperial')).toBe('2.47 acres');
     });
 });
+
+describe('the identity, the fields and the properties of a measurement that the map does not know', () => {
+    const FIELDS = {
+        id: 'stable-id', ref: '7', category: 'defect', severity: 'high', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false,
+        photos: [{ path: 'a/photo.jpg', source: 'dataset', caption: 'Crack' }]
+    };
+    // A file loaded into the map and saved again
+    function roundTrip(feature, unitPref = 'metric') {
+        const source = new VectorSource();
+        importMeasurements({ type: 'FeatureCollection', features: [feature] }, source, unitPref, null);
+        return exportMeasurements(source, 'ortho.tif', unitPref).features[0];
+    }
+
+    it('keeps a property it does not know, of any value, for every kind of measurement', () => {
+        const extra = { customKey: 5, nested: { a: [1, { b: 2 }] }, flag: false, nothing: null };
+        const kinds = [
+            featureOf('Polygon', ROOF, { measurementType: 'area', ...extra }),
+            featureOf('LineString', LINE, { measurementType: 'length', ...extra }),
+            featureOf('Point', [9, 0], { measurementType: 'point', ...extra }),
+            featureOf('Polygon', ROOF, { measurementType: 'stockpile', id: 'p1', netVolume: 5, ...extra })
+        ];
+        kinds.forEach(kind => expect(roundTrip(kind).properties).toMatchObject(extra));
+    });
+
+    it('keeps the id, the ref, the fields and the photos, and writes the GeoJSON id as the id', () => {
+        const saved = roundTrip(featureOf('Polygon', ROOF, { measurementType: 'area', createdAt: 't0', ...FIELDS }));
+        expect(saved.properties).toMatchObject(FIELDS);
+        expect(saved.id).toBe('stable-id');
+    });
+
+    it('writes what the map computes, not what the file said: the size follows the geometry', () => {
+        const saved = roundTrip(featureOf('Polygon', ROOF, { measurementType: 'area', area: 1, displayValue: 'stale', areaValue: 1, unit: 'x' }));
+        expect(saved.properties.area).toBeGreaterThan(100);
+        expect(saved.properties.displayValue).not.toBe('stale');
+    });
+
+    it('lets the user clear a field and leaves nothing of it in the file', () => {
+        const source = new VectorSource();
+        importMeasurements({ type: 'FeatureCollection', features: [featureOf('Polygon', ROOF, { measurementType: 'area', ...FIELDS })] }, source, 'metric', null);
+        const [feature] = source.getFeatures();
+        feature.set('category', undefined);
+        feature.set('assignee', undefined);
+        const saved = exportMeasurements(source, 'ortho.tif', 'metric').features[0];
+        expect(saved.properties).not.toHaveProperty('category');
+        expect(saved.properties).not.toHaveProperty('assignee');
+        expect(saved.properties).toMatchObject({ status: 'open', ref: '7' });
+    });
+
+    it('does not make an id: a feature of the file that has none has none when saved (the format gives it one)', () => {
+        const saved = roundTrip(featureOf('LineString', LINE, { measurementType: 'length' }));
+        expect(saved.properties.id).toBeUndefined();
+        expect(saved.id).toBeUndefined();
+    });
+});

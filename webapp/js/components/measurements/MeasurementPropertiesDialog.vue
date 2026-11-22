@@ -8,7 +8,7 @@
 
             <div class="mb-3">
                 <label for="mp-description" class="d-block mb-1 fw-semibold">Description</label>
-                <Textarea id="mp-description" v-model="formData.description" placeholder="Optional" rows="3" auto-resize class="w-100" />
+                <Textarea id="mp-description" v-model="formData.description" placeholder="Optional" rows="3" :maxlength="FIELD_LIMITS.description" auto-resize class="w-100" />
             </div>
 
             <div class="mb-3">
@@ -52,13 +52,15 @@
                 <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
                         option-label="label" option-value="value" class="w-100" />
             </div>
+
+            <AnnotationFields v-model="fields" id-prefix="mp" class="mb-3" :schema="schema" :is-ref-taken="isRefTaken" @update:valid="fieldsValid = $event" />
         </div>
 
         <template #footer>
             <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
                     :title="`Delete this ${isPoint ? 'annotation' : 'measurement'}`" @click="deleteMeasurement" />
             <Button :label="isNew ? 'Discard' : 'Cancel'" severity="secondary" @click="cancel" />
-            <Button label="Save" data-confirm :disabled="!!located.error" @click="save" />
+            <Button label="Save" data-confirm :disabled="!!located.error || !fieldsValid" @click="save" />
         </template>
     </Window>
 </template>
@@ -67,11 +69,13 @@
 /**
  * The properties of a measurement or a point annotation: its name, description and colours, the width of a line,
  * the fill of an area, the coordinates of a point (typed or pasted to move it: decimal degrees or DMS, see
- * parseLatLon) and its group. The one dialog of a measurement, however it is
+ * parseLatLon), its group and the annotation fields (AnnotationFields: reference, category, severity, status, assignee,
+ * due date, in reports). The one dialog of a measurement, however it is
  * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed).
  *
  * Emits `save` with the properties that apply to the geometry (a point has no width or fill; `coordinates`, its new
- * [longitude, latitude], only when they were changed), `delete` from the
+ * [longitude, latitude], only when they were changed; the annotation fields as they are stored, a field with no value
+ * as undefined so that it is cleared, the `ref` only when there is one), `delete` from the
  * Delete button, and `discard` when a new point (`isNew`) is not kept: Discard, the close button or Esc.
  */
 import Window from '@/components/HubWindow.vue';
@@ -81,6 +85,9 @@ import Textarea from 'primevue/textarea';
 import Select from 'primevue/select';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import FieldError from '@/components/FieldError.vue';
+import AnnotationFields from '@/components/measurements/AnnotationFields.vue';
+import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
+import { FIELD_KEYS, FIELD_LIMITS, storedFields } from '@/libs/map/annotationIds';
 import { toLonLat } from 'ol/proj';
 import { latLonText, latLonDmsText, parseLatLon } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
@@ -89,7 +96,7 @@ import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 export default {
     components: {
         Window, Button, InputText, Textarea, Select,
-        ColorSwatchPicker, FieldError
+        ColorSwatchPicker, FieldError, AnnotationFields
     },
     props: {
         feature: {
@@ -114,12 +121,22 @@ export default {
         groups: {
             type: Array,
             default: () => []
+        },
+        // The organization's annotation schema: the categories, severities and statuses to choose from
+        schema: {
+            type: Object,
+            default: () => DEFAULT_SCHEMA
+        },
+        // Says whether another annotation of the file has a reference (the one edited does not count)
+        isRefTaken: {
+            type: Function,
+            default: () => false
         }
     },
     emits: ['close', 'save', 'delete', 'discard'],
     setup() {
         const { copy: copyCoords, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
-        return { copyCoords, coordsCopied };
+        return { copyCoords, coordsCopied, FIELD_LIMITS };
     },
     data() {
         return {
@@ -127,6 +144,9 @@ export default {
             coordsInput: '',
             // Set once Save or Delete is chosen: the close that follows is not a discard
             done: false,
+            // The annotation fields (reference, category, ...) and whether they can be saved
+            fields: {},
+            fieldsValid: true,
             formData: {
                 name: '',
                 description: '',
@@ -184,6 +204,7 @@ export default {
         this.formData.fill = get('fill') || MEASURE_COLOR;
         this.formData['fill-opacity'] = get('fill-opacity') !== undefined ? get('fill-opacity') : 0.2;
         this.formData.groupId = get('groupId') || '';
+        this.fields = Object.fromEntries(FIELD_KEYS.filter(key => get(key) !== undefined && get(key) !== null).map(key => [key, get(key)]));
         this.coordsInput = this.pointText;
     },
     methods: {
@@ -205,10 +226,14 @@ export default {
             // the 6 decimals shown, and saving it unchanged must not round the point to them
             const { lat, lon } = this.located;
             if (this.isPoint && latLonText(lat, lon) !== this.pointText) properties.coordinates = [lon, lat];
+            // An empty reference leaves the one it has (a measurement is never left without)
+            const { ref, ...fields } = storedFields(this.fields);
+            Object.assign(properties, fields);
+            if (ref !== undefined) properties.ref = ref;
             return properties;
         },
         save() {
-            if (this.located.error) return;
+            if (this.located.error || !this.fieldsValid) return;
             this.done = true;
             this.$emit('save', this.properties());
             this.$emit('close');

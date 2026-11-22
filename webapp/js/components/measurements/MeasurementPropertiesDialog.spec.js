@@ -31,6 +31,8 @@ afterEach(() => {
 
 const dialog = () => /** @type {HTMLElement} */ (document.querySelector('#measurement-properties'));
 const title = () => dialog().querySelector('.p-dialog-title').textContent.trim();
+// The annotation fields at the end of every form (AnnotationFields)
+const FIELDS = ['Inspection', 'Reference', 'Category', 'Severity', 'Status', 'Assignee', 'Due date', 'Include in reports'];
 const labels = () => [...dialog().querySelectorAll('label, .fw-semibold')].map(l => l.textContent.trim().replace(/:.*/, ''));
 const buttonNamed = name => [...dialog().querySelectorAll('button')].find(b => b.textContent.trim() === name);
 const point = (properties = {}) => new Feature({ geometry: new Point(fromLonLat([31.138658, -23.940176])), measurementType: 'point', ...properties });
@@ -41,7 +43,7 @@ describe('the properties dialog of a point annotation', () => {
     it('has a name, a description, a colour and the coordinates, and no width or fill', async () => {
         await show(point({ name: 'Pippo', description: 'Ciaone' }), { showDelete: true });
         expect(title()).toBe('Point Annotation');
-        expect(labels()).toEqual(['Name', 'Description', 'Color', 'Coordinates']);
+        expect(labels()).toEqual(['Name', 'Description', 'Color', 'Coordinates', ...FIELDS]);
         expect(document.getElementById('mp-name').value).toBe('Pippo');
         expect(document.getElementById('mp-description').value).toBe('Ciaone');
         expect(document.getElementById('mp-coords').value).toBe('-23.940176, 31.138658');
@@ -92,15 +94,15 @@ describe('the properties dialog of a measurement', () => {
     it('of an area: outline and fill colours, outline width and fill opacity, no coordinates', async () => {
         await show(area(), { showDelete: true });
         expect(title()).toBe('Measurement Properties');
-        expect(labels()).toEqual(['Name', 'Description', 'Outline color', 'Fill color', 'Outline width', 'Fill opacity']);
+        expect(labels()).toEqual(['Name', 'Description', 'Outline color', 'Fill color', 'Outline width', 'Fill opacity', ...FIELDS]);
         buttonNamed('Save').click();
         expect(Object.keys(wrapper.emitted('save')[0][0]).sort())
-            .toEqual(['description', 'fill', 'fill-opacity', 'groupId', 'name', 'stroke', 'stroke-opacity', 'stroke-width']);
+            .toEqual(['assignee', 'category', 'description', 'dueDate', 'fill', 'fill-opacity', 'groupId', 'name', 'report', 'severity', 'status', 'stroke', 'stroke-opacity', 'stroke-width']);
     });
 
     it('of a line: its colour and width, no fill', async () => {
         await show(line());
-        expect(labels()).toEqual(['Name', 'Description', 'Line color', 'Line width']);
+        expect(labels()).toEqual(['Name', 'Description', 'Line color', 'Line width', ...FIELDS]);
         buttonNamed('Save').click();
         expect(wrapper.emitted('save')[0][0]).not.toHaveProperty('fill');
     });
@@ -160,5 +162,76 @@ describe('the coordinates of a point', () => {
         expect(coords()).toBeNull();
         buttonNamed('Save').click();
         expect(wrapper.emitted('save')[0][0]).not.toHaveProperty('coordinates');
+    });
+});
+
+describe('the annotation fields of a measurement', () => {
+    const input = (id, value) => {
+        const el = document.getElementById(id);
+        el.value = value;
+        el.dispatchEvent(new Event('input'));
+        return flushPromises();
+    };
+
+    it('start from what the measurement has, and a new one has no category, severity or status', async () => {
+        await show(line());
+        expect(document.getElementById('mp-ref').value).toBe('');
+        expect(document.querySelectorAll('#measurement-properties .p-select-label.p-placeholder')).toHaveLength(3);
+        wrapper.unmount();
+
+        const f = line();
+        f.setProperties({ ref: '4', category: 'defect', assignee: 'Anna', dueDate: '2026-12-01', report: false });
+        await show(f);
+        expect(document.getElementById('mp-ref').value).toBe('4');
+        expect(document.getElementById('mp-assignee').value).toBe('Anna');
+        expect(document.getElementById('mp-due').value).toBe('2026-12-01');
+        expect(document.getElementById('mp-report').checked).toBe(false);
+    });
+
+    it('are saved with the properties: a cleared field is undefined so that the measurement loses it, and an empty ref leaves the ref', async () => {
+        const f = line();
+        f.setProperties({ ref: '4', category: 'defect', assignee: 'Anna' });
+        await show(f);
+        await input('mp-assignee', '');
+        await input('mp-due', '2026-12-01');
+        buttonNamed('Save').click();
+        const saved = wrapper.emitted('save')[0][0];
+        expect(saved).toMatchObject({ ref: '4', category: 'defect', dueDate: '2026-12-01' });
+        expect(saved).toHaveProperty('assignee', undefined);
+        expect(saved).toHaveProperty('severity', undefined);
+
+        wrapper.unmount();
+        await show(line());
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0]).not.toHaveProperty('ref');
+    });
+
+    it('refuse a ref another measurement has: the message, and no Save', async () => {
+        const f = line();
+        f.set('ref', '4');
+        await show(f, { isRefTaken: ref => ref === '5' });
+        await input('mp-ref', '5');
+        expect(document.getElementById('mp-ref-error').textContent).toBe('Reference 5 is already used');
+        expect(buttonNamed('Save').disabled).toBe(true);
+        wrapper.vm.save();
+        expect(wrapper.emitted('save')).toBeUndefined();
+        await input('mp-ref', '6');
+        expect(buttonNamed('Save').disabled).toBe(false);
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0].ref).toBe('6');
+    });
+
+    it('limit the description to 10000 characters', async () => {
+        await show(line());
+        expect(document.getElementById('mp-description').maxLength).toBe(10000);
+    });
+
+    it('offer the categories of the schema it is given', async () => {
+        const schema = { categories: [{ id: 'x', name: 'Xylo', colour: '#000000' }], severities: [], statuses: [{ id: 's', name: 'Seen', closed: false }] };
+        const f = line();
+        f.set('category', 'x');
+        await show(f, { schema });
+        expect(dialog().textContent).toContain('Xylo');
+        expect(document.getElementById('mp-severity')).toBeNull();
     });
 });

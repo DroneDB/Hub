@@ -18,7 +18,7 @@
 import { toRaw } from 'vue';
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
-import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, isMeasurementFile } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, notifyRenumbered, isMeasurementFile } from '@/libs/map/measurementStorage';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
@@ -98,6 +98,8 @@ const definition = {
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
                 onListOpen: () => { this.openMeasurementListDialog(); },
                 getGroups: () => this.measurementGroups,
+                // The refs of the file the map shows: the ones it issues come after them
+                getRefSequence: () => (this.measurementStorage ? toRaw(this.measurementStorage).refs : null),
                 onMeasurementDeleted: feature => {
                     if (!feature) return;
                     const id = feature.get && feature.get('id');
@@ -201,6 +203,7 @@ const definition = {
             this.measurementStorage = storage;
             this._setSaved(false);
             this._markSaved();
+            this._loadAnnotationSchema(storage);
 
             let geojson;
             try {
@@ -221,6 +224,12 @@ const definition = {
             }
             this._setSaved(!!geojson);
             this._markSaved();
+        },
+
+        // The organization's categories, severities and statuses, for the properties dialog (the default ones until they are read)
+        async _loadAnnotationSchema(storage) {
+            const schema = await storage.annotationSchema();
+            if (this.measureControls && this._isCurrentStorage(storage)) this.measureControls.setAnnotationSchema(schema);
         },
 
         /**
@@ -347,6 +356,10 @@ const definition = {
 
         // The file holds what the map shows now: the saved state, the file list and a message follow
         _afterFileChange(result) {
+            // The file numbered the measurements that had no reference (and renumbered the new ones whose reference
+            // another session had taken): the map shows what the file holds, and is not changed by it
+            this.measureControls.applyRefs(result.refs);
+            notifyRenumbered(result);
             this._setSaved(result.count > 0);
             this._markSaved();
             // The file mirrors the map, so the "logically deleted" IDs are no longer relevant

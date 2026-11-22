@@ -1,4 +1,7 @@
 import { createUndoStack } from '@/libs/undoStack';
+import { newId } from '@/libs/ids';
+import { RefSequence, choiceLabel } from '@/libs/map/annotationIds';
+import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { controlButton, controlGroup } from './controlButton';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
@@ -6,7 +9,7 @@ import Collection from 'ol/Collection';
 import Modify from 'ol/interaction/Modify';
 import Translate from 'ol/interaction/Translate';
 import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
-import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
+import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
 import { ANALYSIS_MEASUREMENT_TYPES, haloStyle } from '@/libs/map/analysisStyles';
 import { Vector as VectorLayer } from 'ol/layer';
@@ -57,6 +60,10 @@ function hoverLabelOf(feature) {
 /** The name of the button that switches the callouts of the point annotations between always and on hover */
 const CALLOUTS_LABEL = 'Always Show Point Callouts';
 
+/** The button that shows or hides the reference (`ref`) of each annotation on the map */
+const REFERENCES_LABEL = 'Show References';
+const REFERENCES_ICON = 'fa-solid fa-hashtag';
+
 class MeasureControls extends Control {
     /**
      * @param {Object} [opt_options] Control options.
@@ -84,7 +91,9 @@ class MeasureControls extends Control {
         // Pressed: the callouts of the point annotations are always shown; released: each one shows while its point is
         // hovered (or tapped). Shown while the map has a point annotation; the account keeps the choice
         const btnCallouts = controlButton(CALLOUTS_LABEL, '', CALLOUTS_ICON);
-        [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList, btnCallouts].forEach(btn => { btn.style.display = 'none'; });
+        // Pressed: the reference of each annotation is drawn next to it (on by default)
+        const btnReferences = controlButton(REFERENCES_LABEL, '', REFERENCES_ICON);
+        [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList, btnCallouts, btnReferences].forEach(btn => { btn.style.display = 'none'; });
 
         // The 'Measure' toggle: on a compact map (css/ol-controls.css: a phone, a small frame) it is the one button of the
         // measure tools in the rail, and the toolbars below open from it (FR-MAP-12). Elsewhere it is not shown
@@ -107,6 +116,7 @@ class MeasureControls extends Control {
         toolbar2.style.display = 'none';
         toolbar2.appendChild(btnList);
         toolbar2.appendChild(btnCallouts);
+        toolbar2.appendChild(btnReferences);
         toolbar2.appendChild(btnSave);
         toolbar2.appendChild(btnClear);
         toolbar2.appendChild(btnExport);
@@ -139,6 +149,7 @@ class MeasureControls extends Control {
         btnDelete.addEventListener('click', this.handleDeleteSaved.bind(this), false);
         btnList.addEventListener('click', this.handleListOpen.bind(this), false);
         btnCallouts.addEventListener('click', () => this.setPointCallouts(!this.showPointCallouts), false);
+        btnReferences.addEventListener('click', () => this.setShowReferences(!this.showReferences), false);
 
         this.selectedTool = null;
         // On a compact map the tools are shown from the Measure toggle (the class and the toggle's state)
@@ -171,6 +182,13 @@ class MeasureControls extends Control {
         this._dialog = null;
 
         this.source = new VectorSource();
+        // A measurement that another tool made (a profile) comes without an id: it gets its id and ref when it is added.
+        // One that was read from a file has its id already (measurementFormat), and a point is typed after it is added
+        // (its draw end identifies it)
+        // lifetime: owner (the control's own measurement source)
+        this.source.on('addfeature', evt => {
+            if (evt.feature && evt.feature.get('measurementType') && !evt.feature.get('id')) this.identify(evt.feature);
+        });
         // lifetime: owner (the control's own measurement source)
         this.source.on('removefeature', (evt) => {
             try { this.onMeasurementDeleted(evt.feature); } catch { /* noop */ }
@@ -179,6 +197,16 @@ class MeasureControls extends Control {
             source: this.source,
             style: (feature) => this.createFeatureStyle(feature),
         });
+
+        // The references of the annotations are drawn on the map unless the user turns them off
+        this.showReferences = true;
+        this.btnReferences = btnReferences;
+        this._syncReferencesButton();
+        // The categories, severities and statuses of the properties dialog (the organization's: setAnnotationSchema)
+        this.annotationSchema = DEFAULT_SCHEMA;
+        // The refs this control issues: the storage's when the host gives it (it knows the file), else its own
+        this.getRefSequence = options.getRefSequence || (() => null);
+        this._ownRefs = new RefSequence();
 
         this.unitPref = unitPref;
         this.btnCallouts = btnCallouts;
@@ -506,6 +534,7 @@ class MeasureControls extends Control {
         this.toolbar2.style.display = show(hasMeasurements || this.hasSaved);
         this.btnList.style.display = show(hasMeasurements);
         this.btnCallouts.style.display = show(this.source.getFeatures().some(f => f.get('measurementType') === 'point'));
+        this.btnReferences.style.display = show(hasMeasurements);
         this.btnSave.style.display = show((hasMeasurements || this.hasSaved) && this.canWrite);
         this.btnClear.style.display = show(hasMeasurements);
         this.btnExport.style.display = show(hasMeasurements);
@@ -554,7 +583,7 @@ class MeasureControls extends Control {
 
     /**
      * Get a list of all measurements with their details
-     * @returns {Array} Array of { name, type, value, feature, groupId }
+     * @returns {Array} Array of { name, type, value, feature, groupId, ref, category, severity, status } (and the name of each choice: categoryLabel, ...)
      */
     getMeasurementsList() {
         const features = this.source.getFeatures();
@@ -573,7 +602,16 @@ class MeasureControls extends Control {
                     // Otherwise the tooltip text, without its HTML tags
                     value = label ?? (f.get('tooltipText') || '').replace(/<[^>]*>/g, '');
                 }
-                return { name, type, value, feature: f, groupId: f.get('groupId') || '' };
+                return {
+                    name, type, value, feature: f, groupId: f.get('groupId') || '',
+                    ref: f.get('ref') ? String(f.get('ref')) : '',
+                    category: f.get('category') || '',
+                    categoryLabel: choiceLabel(this.annotationSchema.categories, f.get('category')),
+                    severity: f.get('severity') || '',
+                    severityLabel: choiceLabel(this.annotationSchema.severities, f.get('severity')),
+                    status: f.get('status') || '',
+                    statusLabel: choiceLabel(this.annotationSchema.statuses, f.get('status'))
+                };
             });
     }
 
@@ -693,9 +731,41 @@ class MeasureControls extends Control {
             }),
         });
         // A stockpile or a profile is an analysis overlay: a dark halo under its line
-        return ANALYSIS_MEASUREMENT_TYPES.includes(feature.get('measurementType'))
-            ? [haloStyle(effectiveStrokeWidth), style]
-            : style;
+        const reference = this._referenceStyle(feature, strokeColor);
+        if (ANALYSIS_MEASUREMENT_TYPES.includes(feature.get('measurementType'))) {
+            return reference ? [haloStyle(effectiveStrokeWidth), style, reference] : [haloStyle(effectiveStrokeWidth), style];
+        }
+        return reference ? [style, reference] : style;
+    }
+
+    /**
+     * The badge with the reference of an annotation, below its label (the size of an area or a line, the callout of
+     * a point are above it): the text on the tooltip colours, with the colour of the measurement as its border.
+     * @param {ol.Feature} feature
+     * @param {string} colour  the colour of the measurement
+     * @returns {Style | null} null when references are hidden or the annotation has none
+     */
+    _referenceStyle(feature, colour) {
+        const ref = feature.get('ref');
+        const geometry = feature.getGeometry();
+        if (!this.showReferences || !ref || !geometry) return null;
+        let anchor = null;
+        if (geometry instanceof Polygon) anchor = new Point(geometry.getInteriorPoint().getCoordinates().slice(0, 2));
+        else if (geometry instanceof LineString) anchor = new Point(geometry.getCoordinateAt(0.5));
+        else if (geometry instanceof Point) anchor = geometry;
+        if (!anchor) return null;
+        return new Style({
+            geometry: anchor,
+            text: new Text({
+                text: String(ref),
+                font: '600 12px sans-serif',
+                offsetY: 16,
+                padding: [2, 5, 2, 5],
+                fill: new Fill({ color: colorToken('--ddb-tooltip-text-dark') }),
+                backgroundFill: new Fill({ color: colorToken('--ddb-tooltip-bg-light') }),
+                backgroundStroke: new Stroke({ color: colour, width: 2 })
+            })
+        });
     }
 
     /**
@@ -1184,6 +1254,77 @@ class MeasureControls extends Control {
     }
 
     /**
+     * Shows the reference of each annotation on the map (true) or hides it (false).
+     * @param {boolean} show
+     */
+    setShowReferences(show) {
+        this.showReferences = show !== false;
+        this._syncReferencesButton();
+        if (this.vector) this.vector.changed();
+    }
+
+    _syncReferencesButton() {
+        const shown = this.showReferences;
+        this.btnReferences.classList.toggle('active', shown);
+        this.btnReferences.setAttribute('aria-pressed', String(shown));
+        this.btnReferences.title = `${REFERENCES_LABEL} - ${shown
+            ? 'The reference of each annotation is drawn next to it. Click to hide the references.'
+            : 'The references of the annotations are hidden. Click to draw the reference of each one next to it.'}`;
+    }
+
+    /** Sets the categories, severities and statuses that the properties dialog offers. @param {import('@/libs/reports/reportSettings').AnnotationSchema} schema */
+    setAnnotationSchema(schema) {
+        this.annotationSchema = schema || DEFAULT_SCHEMA;
+    }
+
+    /** The refs this control issues: the host's (the file's) when it has them, else its own. @returns {RefSequence} */
+    _refSequence() {
+        return this.getRefSequence() || this._ownRefs;
+    }
+
+    /** The refs that the measurements on the map have, except the one of `except`. @param {ol.Feature} [except] @returns {string[]} */
+    _refsOnMap(except) {
+        return this.source.getFeatures().filter(f => f !== except).map(f => f.get('ref')).filter(Boolean).map(String);
+    }
+
+    /**
+     * Whether a reference that the user typed is used by another annotation of the file: one of the map's, or one
+     * of the other view's that the file had when it was read.
+     * @param {string} ref
+     * @param {ol.Feature} [feature]  the annotation that has the dialog open (its own ref is not taken)
+     */
+    isRefTaken(ref, feature) {
+        return this._refSequence().isTaken(ref, this._refsOnMap(feature));
+    }
+
+    /**
+     * Gives a measurement that was just made its `id` and the next `ref` (the ones it has stay).
+     * @param {ol.Feature} feature
+     */
+    identify(feature) {
+        if (!feature.get('id')) feature.set('id', newId());
+        if (!feature.get('ref')) feature.set('ref', this._refSequence().issue(this._refsOnMap(feature)));
+    }
+
+    /** Takes back the ref of a measurement that is not kept (a point annotation that was discarded). @param {ol.Feature} feature */
+    _releaseRef(feature) {
+        const ref = feature.get('ref');
+        if (ref) this._refSequence().release(String(ref));
+    }
+
+    /**
+     * Gives the measurements the refs a save wrote for them (by id): the file numbered the ones that had no ref and
+     * gave the next one to those whose ref another session had taken.
+     * @param {Record<string, string>} [refs]
+     */
+    applyRefs(refs = {}) {
+        this.source.getFeatures().forEach(f => {
+            const ref = refs[f.get('id')];
+            if (ref && f.get('ref') !== ref) f.set('ref', ref);
+        });
+    }
+
+    /**
      * The properties dialog of a measurement or a point annotation: the one dialog of a measurement, however it is
      * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed). A
      * measurement that exists has a Delete button; a point just placed has Discard, which removes it.
@@ -1201,6 +1342,8 @@ class MeasureControls extends Control {
             isNew,
             showDelete: !isNew,
             groups: this.getGroups(),
+            schema: this.annotationSchema,
+            isRefTaken: ref => this.isRefTaken(ref, feature),
             onSave: ({ groupId, coordinates, ...properties }) => {
                 Object.keys(properties).forEach(key => feature.set(key, properties[key]));
                 this.setMeasurementGroupId(feature, groupId);
@@ -1225,6 +1368,7 @@ class MeasureControls extends Control {
             },
             // A point just placed and not kept
             onDiscard: () => {
+                this._releaseRef(feature);
                 this.source.removeFeature(feature);
                 this.refreshButtons();
             },
@@ -1420,6 +1564,7 @@ class MeasureControls extends Control {
                     setTimeout(() => {
                         feat.set('measurementType', 'point');
                         feat.set('createdAt', new Date().toISOString());
+                        self.identify(feat);
 
                         self.openPropertiesDialog(feat, { isNew: true });
                     }, 10);
@@ -1508,6 +1653,7 @@ class MeasureControls extends Control {
                     feat.set('tooltipText', self.measureTooltipElement.textContent);
                     feat.set('createdAt', new Date().toISOString());
                     feat.set('measurementType', tool);
+                    self.identify(feat);
 
                     // Create new measurement tooltip, save ref to existing one
                     self.measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';

@@ -2,9 +2,12 @@
  * Plain copies of Potree measurements, so a deleted measure
  * can be recreated by undo and found again by redo (a recreated measure has a new uuid).
  * A copy keeps what the user set on the measure: its points, kind (flags, maxMarkers), name and
- * description, and the look of the properties dialog (measureStyle.assignMeasureProperties).
+ * description, and the look of the properties dialog (measureStyle.assignMeasureProperties), and its
+ * property bag: the id and ref it has, the fields of the annotation and what its file said that the viewer
+ * does not know (a measure brought back by undo is the same feature, not a new one).
  */
 import { hexOf } from '@/libs/potree/measureStyle';
+import { PROPERTY_BAG } from '@/libs/map/potreeMeasurementConverter';
 
 const FLAGS = ['showDistances', 'showCoordinates', 'showArea', 'showAngles', 'showCircle', 'showHeight', 'showEdges', 'showAzimuth', 'closed'];
 // Flags Potree turns on by default
@@ -19,6 +22,8 @@ export function snapshotMeasure(measure) {
     FLAGS.forEach(flag => { data[flag] = measure[flag]; });
     VALUES.forEach(key => { if (measure[key] !== undefined && measure[key] !== null) data[key] = measure[key]; });
     if (measure.fillColor) data.fillColor = hexOf(measure.fillColor);
+    // A copy of plain JSON: the measure may be edited after, and the copy must not follow
+    if (measure[PROPERTY_BAG]) data.properties = JSON.parse(JSON.stringify(measure[PROPERTY_BAG]));
     return data;
 }
 
@@ -31,6 +36,7 @@ export function restoreMeasure(data) {
     if (data.color) measure.color = new THREE.Color(data.color);
     if (data.fillColor) measure.fillColor = new THREE.Color(data.fillColor);
     data.points.forEach(p => measure.addMarker({ position: new THREE.Vector3(p.x, p.y, p.z) }));
+    if (data.properties) measure[PROPERTY_BAG] = JSON.parse(JSON.stringify(data.properties));
     return measure;
 }
 

@@ -35,10 +35,10 @@ const groups = [{ id: 'g1', name: 'Site A' }];
 describe('measurementsToCsv', () => {
     it('writes one row per measurement with its group, value, unit and WKT', () => {
         const [header, point, length, area] = parse(measurementsToCsv(exported('metric'), groups, 'metric'));
-        expect(header).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,createdAt,length_m,area_m2');
-        expect(point).toMatch(/^Site A,"Gate, north",point,,,11\.25,43\.5,POINT \(11\.25\d* 43\.5\d*\),"Say ""open""",t0,,$/);
-        expect(length).toMatch(/^,Fence,length,(49\.9\d|50(\.0\d?)?),m,,,"LINESTRING \(0 0, 0\.000449\d* 0\)",,t1,(49\.9\d|50(\.0\d?)?),$/);
-        expect(area).toMatch(/^Site A,Field,area,9999\.06,m²,,,"POLYGON \(\(0 0, .*\)\)",,t2,,9999\.06$/);
+        expect(header).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,id,ref,category,severity,status,assignee,dueDate,photoCount,createdAt,length_m,area_m2');
+        expect(point).toMatch(/^Site A,"Gate, north",point,,,11\.25,43\.5,POINT \(11\.25\d* 43\.5\d*\),"Say ""open""",,,,,,,,0,t0,,$/);
+        expect(length).toMatch(/^,Fence,length,(49\.9\d|50(\.0\d?)?),m,,,"LINESTRING \(0 0, 0\.000449\d* 0\)",,,,,,,,,0,t1,(49\.9\d|50(\.0\d?)?),$/);
+        expect(area).toMatch(/^Site A,Field,area,9999\.06,m²,,,"POLYGON \(\(0 0, .*\)\)",,,,,,,,,0,t2,,9999\.06$/);
     });
 
     it('gives the values in the units the map shows: the same area scale as the labels', () => {
@@ -51,18 +51,30 @@ describe('measurementsToCsv', () => {
         const geojson = { features: [{ type: 'Feature', geometry: null,
             properties: { measurementType: 'stockpile', name: 'Pile', netVolume: 76.4554857984, materialName: 'Gravel' } }] };
         const [header, row] = parse(measurementsToCsv(geojson, [], 'imperial'));
-        expect(header).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,netVolume,materialName');
-        expect(row).toBe(',Pile,stockpile,100,yd³,,,,,76.4554857984,Gravel');
+        expect(header).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,id,ref,category,severity,status,assignee,dueDate,photoCount,netVolume,materialName');
+        expect(row).toBe(',Pile,stockpile,100,yd³,,,,,,,,,,,,0,76.4554857984,Gravel');
     });
 
     it('writes an object property as JSON in one field', () => {
         const geojson = { features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [1, 2] },
             properties: { measurementType: 'point', longitude: 1, latitude: 2, extra: { a: 1 } } }] };
-        expect(parse(measurementsToCsv(geojson))[1]).toBe(',,point,,,1,2,POINT (1 2),,"{""a"":1}"');
+        expect(parse(measurementsToCsv(geojson))[1]).toBe(',,point,,,1,2,POINT (1 2),,,,,,,,,0,"{""a"":1}"');
+    });
+
+    it('writes the id, ref and fields of an annotation, and how many photos it has', () => {
+        const geojson = { features: [
+            { type: 'Feature', geometry: null, properties: { measurementType: 'length', name: 'Crack', id: 'abc', ref: '7', category: 'defect', severity: 'high', status: 'open',
+                assignee: 'Anna, B.', dueDate: '2026-12-01', photos: [{ path: 'a.jpg', source: 'dataset' }, { path: 'b.jpg', source: 'upload' }], report: false } },
+            { type: 'Feature', geometry: null, properties: { measurementType: 'length', name: 'Plain' } }
+        ] };
+        const [header, crack, plain] = parse(measurementsToCsv(geojson));
+        expect(header).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,id,ref,category,severity,status,assignee,dueDate,photoCount,report');
+        expect(crack).toBe(',Crack,length,,,,,,,abc,7,defect,high,open,"Anna, B.",2026-12-01,2,false');
+        expect(plain).toBe(',Plain,length,,,,,,,,,,,,,,0,');
     });
 
     it('writes only the header when there is nothing to export', () => {
-        expect(measurementsToCsv({ features: [] })).toBe('group,name,type,value,unit,longitude,latitude,wkt,description\r\n');
+        expect(measurementsToCsv({ features: [] })).toBe('group,name,type,value,unit,longitude,latitude,wkt,description,id,ref,category,severity,status,assignee,dueDate,photoCount\r\n');
     });
 });
 

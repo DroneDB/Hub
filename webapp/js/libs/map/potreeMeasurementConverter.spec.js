@@ -23,8 +23,11 @@ class Vec {
 }
 const colour = hex => ({ getHexString: () => hex });
 
+// A measure of the viewer has the id its feature has in the file: the uuid is the one of the session, and these specs
+// name their measures by it
 function measure(overrides, locals) {
     return {
+        ddbProperties: { id: overrides?.uuid ?? 'm1' },
         uuid: 'm1', name: 'Measure', description: '', color: colour('ff0000'), strokeWidth: 2, strokeOpacity: 1, fillOpacity: 0.2,
         showDistances: true, showCoordinates: false, showArea: false, showAngles: false, showCircle: false, showHeight: false, showEdges: true, closed: false,
         points: locals.map(l => ({ position: new Vec(...l) })),
@@ -37,7 +40,7 @@ function viewerWith(measurements, annotations = []) {
 }
 
 const coordinateSystem = srs => ({ ...cloudCoordinateSystem(srs), scale: COPC_SCALE, offset: COPC_OFFSET });
-const annotation = (local, uuid = 'ann') => ({ uuid, title: 'Crack', description: '', position: new Vec(...local) });
+const annotation = (local, uuid = 'ann') => ({ uuid, ddbProperties: { id: uuid }, title: 'Crack', description: '', position: new Vec(...local) });
 // What a save puts in the file and a load reads back (through the format, as the storage does)
 const onDisk = doc => read(JSON.parse(JSON.stringify(doc)));
 
@@ -76,7 +79,7 @@ describe('exportMeasurements: a UTM 18N point', () => {
             measure({ uuid: 'height', showHeight: true }, [a, b].map(p => p.local)),
             measure({ uuid: 'circle', showCircle: true }, [a, b].map(p => p.local)),
             measure({ uuid: 'point' }, [d.local])
-        ], [{ uuid: 'ann', title: 'Crack', description: '', position: new Vec(...c.local) }]), 'cloud.laz', coordinateSystem('EPSG:32618'));
+        ], [annotation(c.local)]), 'cloud.laz', coordinateSystem('EPSG:32618'));
         const feature = id => doc.features.find(f => f.id === id);
         expect(feature('area').geometry.type).toBe('Polygon');
         expect(feature('area').geometry.coordinates[0]).toHaveLength(4);
@@ -89,9 +92,9 @@ describe('exportMeasurements: a UTM 18N point', () => {
         expect(feature('ann').properties.localCoordinates).toEqual(c.local);
     });
 
-    it('is the 3D viewer\'s document: 2.0, its features and its section', () => {
+    it('is the 3D viewer\'s document: 3.0, its features and its section', () => {
         const doc = exportMeasurements(viewerWith([measure({}, [CLOUD.A.local, CLOUD.B.local])]), 'cloud.laz', coordinateSystem('EPSG:32618'));
-        expect(doc.metadata).toMatchObject({ version: '2.0', application: 'DroneDB Registry' });
+        expect(doc.metadata).toMatchObject({ version: '3.0', application: 'DroneDB Registry' });
         expect(sectionOf(doc, VIEW.POINT_CLOUD)).toMatchObject({ pointCloudFile: 'cloud.laz' });
         expect(sectionOf(doc, VIEW.POINT_CLOUD).coordinateSystem.srs).toBe('EPSG:32618');
         expect(doc.metadata.groups).toBeUndefined();
@@ -436,5 +439,79 @@ describe('the title and the description of an annotation', () => {
         // and what the real annotation holds goes back to the file as it was written
         const doc = exportMeasurements(viewerWith([], [annotation]), 'cloud.laz', coordinateSystem('EPSG:32618'));
         expect(doc.features[0].properties.name).toBe('<img src=y onerror=1>');
+    });
+});
+
+describe('the identity and the properties of a feature that the viewer does not know', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    function stubPotree() {
+        const added = [];
+        class Measure {
+            constructor() { this.points = []; }
+            addMarker({ position }) { this.points.push(position); }
+        }
+        class Annotation { constructor(options) { Object.assign(this, options); } }
+        vi.stubGlobal('Potree', { Measure, Annotation });
+        vi.stubGlobal('THREE', { Vector3: Vec, Color: class { constructor(c) { this.c = c; } } });
+        return { viewer: { scene: { addMeasurement: m => added.push(m), annotations: { add: a => added.push(a) } } }, added };
+    }
+    const FIELDS = {
+        id: 'stable-id', ref: '7', category: 'defect', severity: 'high', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false,
+        photos: [{ path: 'a/photo.jpg', source: 'dataset', caption: 'Crack' }], snapshot: { path: 'annotations/stable-id-3d.webp', camera: { position: [1, 2, 3], target: [4, 5, 6] } }
+    };
+    const withProperties = (feature, extra) => ({ ...feature, properties: { ...feature.properties, ...extra } });
+    const exported = () => exportMeasurements(viewerWith([measure({}, [CLOUD.A.local, CLOUD.B.local])], [annotation(CLOUD.D.local)]), 'cloud.laz', coordinateSystem('EPSG:32618'));
+    // Saved by this Hub, edited by another tool, loaded into the viewer and saved again
+    function roundTrip(doc) {
+        const { viewer, added } = stubPotree();
+        importMeasurements(onDisk(doc), viewer, coordinateSystem('EPSG:32618'));
+        const [loadedMeasure, loadedNote] = added;
+        const savedAgain = measure({ ddbProperties: loadedMeasure.ddbProperties }, loadedMeasure.points.map(p => [p.x, p.y, p.z]));
+        const again = exportMeasurements(viewerWith([savedAgain], [{ ...annotation(CLOUD.D.local), ddbProperties: loadedNote.ddbProperties }]),
+            'cloud.laz', coordinateSystem('EPSG:32618'));
+        return { again, loadedMeasure, loadedNote };
+    }
+
+    it('writes the GeoJSON id of a feature as its id property, which is stable (not the uuid of the session)', () => {
+        // Made in the viewer: no bag yet, only the uuid Potree gives it
+        const bare = locals => { const m = measure({}, locals); delete m.ddbProperties; return m; };
+        const note = { ...annotation(CLOUD.D.local), ddbProperties: undefined };
+        const viewer = viewerWith([bare([CLOUD.A.local, CLOUD.B.local])], [note]);
+        const first = exportMeasurements(viewer, 'cloud.laz', coordinateSystem('EPSG:32618'));
+        first.features.forEach(f => {
+            expect(f.properties.id).toBeTruthy();
+            expect(f.id).toBe(f.properties.id);
+            expect(f.properties.createdAt).toBeTruthy();
+        });
+        expect(first.features.map(f => f.id)).not.toContain('m1');
+        expect(first.features.map(f => f.id)).not.toContain('ann');
+        expect(new Set(first.features.map(f => f.id)).size).toBe(2);
+        // The same measure gives the same id at every save: it is kept on the measure
+        const second = exportMeasurements(viewer, 'cloud.laz', coordinateSystem('EPSG:32618'));
+        expect(second.features.map(f => f.id)).toEqual(first.features.map(f => f.id));
+    });
+
+    it('keeps a property it does not know through a load and a save, on a measure and on an annotation', () => {
+        const [m, a] = exported().features;
+        const { again } = roundTrip({ ...exported(), features: [withProperties(m, { customKey: 5, nested: { a: [1] }, nothing: null }), withProperties(a, { customKey: 5 })] });
+        expect(again.features[0].properties).toMatchObject({ customKey: 5, nested: { a: [1] }, nothing: null });
+        expect(again.features[1].properties).toMatchObject({ customKey: 5 });
+    });
+
+    it('keeps the id, the ref, the fields, the photos and the snapshot, and the time it was created at', () => {
+        const [m, a] = exported().features;
+        const { again, loadedMeasure } = roundTrip({ ...exported(), features: [withProperties(m, { ...FIELDS, createdAt: '2026-01-01T00:00:00.000Z' }), withProperties(a, { id: 'note-id', ref: 'A-1' })] });
+        expect(again.features[0].properties).toMatchObject({ ...FIELDS, createdAt: '2026-01-01T00:00:00.000Z' });
+        expect(again.features[0].id).toBe('stable-id');
+        expect(again.features[1].properties).toMatchObject({ id: 'note-id', ref: 'A-1' });
+        expect(loadedMeasure.ddbProperties).toMatchObject({ id: 'stable-id', ref: '7', category: 'defect' });
+    });
+
+    it('does not give a time to a feature that had none', () => {
+        const [m] = exported().features;
+        const rest = Object.fromEntries(Object.entries(m.properties).filter(([key]) => key !== 'createdAt'));
+        const { again } = roundTrip({ ...exported(), features: [{ ...m, properties: rest }, exported().features[1]] });
+        expect(again.features[0].properties.createdAt).toBeUndefined();
     });
 });

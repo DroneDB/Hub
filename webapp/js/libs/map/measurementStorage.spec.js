@@ -124,7 +124,7 @@ describe('MeasurementStorage.save', () => {
         await storage.save(withSection([cloud('height', 'h3')], POINT_CLOUD, { pointCloudFile: 'cloud.laz' }));
         const file = await written();
         expect(ids(file)).toEqual(['h3', 'l1']);
-        expect(file.metadata).toMatchObject({ version: '2.0', application: 'DroneDB Registry' });
+        expect(file.metadata).toMatchObject({ version: '3.0', application: 'DroneDB Registry' });
         expect(file.metadata.views).toEqual({ map: { groups }, pointCloud: { pointCloudFile: 'cloud.laz' } });
         expect(file.metadata.groups).toBeUndefined();
     });
@@ -143,7 +143,7 @@ describe('MeasurementStorage.save', () => {
         const result = await storage.save(collection([]));
         expect(dataset.writeObj).not.toHaveBeenCalled();
         expect(dataset.deleteObj).toHaveBeenCalledWith('cloud_measurements.geojson');
-        expect(result).toEqual({ path: 'cloud_measurements.geojson', fileName: 'cloud_measurements.geojson', count: 0, deleted: true, owner: MAP });
+        expect(result).toEqual({ path: 'cloud_measurements.geojson', fileName: 'cloud_measurements.geojson', count: 0, deleted: true, owner: MAP, refs: {}, renumbered: [] });
     });
 
     it('an empty save without a file neither writes nor fails when the delete finds nothing', async () => {
@@ -235,6 +235,9 @@ const closeTo = (actual, expected) => {
     expect(actual[2]).toBeCloseTo(expected[2], 6);
 };
 const cloudFeaturesOf = file => file.features.filter(f => ownerOf(f) === POINT_CLOUD);
+// The features of a file without the id and the ref that the first save of either view gives them
+const omit = (object, keys) => Object.fromEntries(Object.entries(object).filter(([key]) => !keys.includes(key)));
+const withoutNumbers = features => features.map(f => ({ ...f, properties: omit(f.properties, ['id', 'ref']) }));
 
 // The 3D viewer with the measures of the fixture: the points the old file's features were measured at
 class Vec {
@@ -243,7 +246,7 @@ class Vec {
 }
 function cloudViewer() {
     const measure = (uuid, locals, flags = {}) => ({
-        uuid, name: uuid, color: { getHexString: () => 'ff0000' }, showDistances: true, showEdges: true, closed: false,
+        uuid, ddbProperties: { id: uuid }, name: uuid, color: { getHexString: () => 'ff0000' }, showDistances: true, showEdges: true, closed: false,
         points: locals.map(l => ({ position: new Vec(...l) })), ...flags
     });
     return {
@@ -252,7 +255,7 @@ function cloudViewer() {
                 measure('m-dist', [CLOUD.A.local, CLOUD.B.local]),
                 measure('m-area', [CLOUD.A.local, CLOUD.C.local, CLOUD.D.local], { showArea: true, closed: true })
             ],
-            annotations: { traverse: fn => fn({ uuid: 'a-1', title: 'Crack', position: new Vec(...CLOUD.D.local) }) }
+            annotations: { traverse: fn => fn({ uuid: 'a-1', ddbProperties: { id: 'a-1' }, title: 'Crack', position: new Vec(...CLOUD.D.local) }) }
         }
     };
 }
@@ -274,7 +277,7 @@ describe('a file written before 2.0', () => {
         const cloudView = await storageFor(dataset, POINT_CLOUD, { pointCloudCrs: cloudCoordinateSystem() }).load();
         expect(dataset.writeObj).not.toHaveBeenCalled();
         expect(state.content).toBe(before);
-        expect(mapView.metadata.version).toBe('2.0');
+        expect(mapView.metadata.version).toBe('3.0');
         expect(sectionOf(mapView, MAP).groups).toEqual(GROUPS);
         closeTo(cloudView.features.find(f => f.id === 'a-1').geometry.coordinates, CLOUD.D.geo);
     });
@@ -327,7 +330,7 @@ describe('a file written before 2.0', () => {
         const cloud = storageFor(dataset, POINT_CLOUD, { pointCloudCrs: cloudCoordinateSystem() });
         await cloud.save(exportCloud(cloudViewer(), 'cloud.laz', cloudCoordinateSystem()));
         const second = file();
-        expect(second.metadata.version).toBe('2.0');
+        expect(second.metadata.version).toBe('3.0');
         expect(second.features.filter(f => ownerOf(f) === MAP)).toHaveLength(3);
         expect(cloudFeaturesOf(second).map(f => f.id).sort()).toEqual(['a-1', 'm-area', 'm-dist']);
         const dist = cloudFeaturesOf(second).find(f => f.id === 'm-dist').geometry.coordinates;
@@ -357,7 +360,7 @@ describe('a file written before 2.0', () => {
         closeTo(cloudView.features.find(f => f.id === 'a-1').geometry.coordinates, CLOUD.D.geo);
         // The next save of the map writes 2.0 again, with the groups
         await mapSave(storageFor(dataset, MAP), await storageFor(dataset, MAP).load());
-        expect(file().metadata.version).toBe('2.0');
+        expect(file().metadata.version).toBe('3.0');
         expect(file().metadata.groups).toBeUndefined();
         expect(file().metadata.views.map.groups).toEqual(groups);
     });
@@ -494,8 +497,8 @@ describe('a 3D file the 2D map saves first, with no CRS for the cloud in it (the
         await mapSave(map, await map.load());
 
         const first = file();
-        expect(first.metadata.version).toBe('2.0');
-        expect(cloudFeaturesOf(first)).toEqual(cloudFeaturesOf(old));
+        expect(first.metadata.version).toBe('3.0');
+        expect(withoutNumbers(cloudFeaturesOf(first))).toEqual(cloudFeaturesOf(old));
         expect(first.metadata.views.pointCloud).toEqual({ pointCloudFile: 'cloud.laz', legacyGeometry: true });
         expect('crs' in first).toBe(false);
         // Another map save leaves the 3D features to the 3D viewer
@@ -589,7 +592,7 @@ describe('with the Registry client: a missing file is the client\'s 404, and the
         expect(error.message).toBe("Cannot find 'cloud_measurements.geojson'");
     });
 
-    it('the first save of the map writes a new 2.0 file; load before it is nothing', async () => {
+    it('the first save of the map writes a new 3.0 file; load before it is nothing', async () => {
         const { dataset, state, file } = registryDataset(null);
         const storage = storageFor(dataset, MAP);
         expect(await storage.load()).toBeNull();
@@ -597,7 +600,7 @@ describe('with the Registry client: a missing file is the client\'s 404, and the
         expect(result).toMatchObject({ count: 1, deleted: false });
         expect(state.posts).toHaveLength(1);
         expect(state.posts[0].overwrite).toBe('true');
-        expect(file().metadata).toMatchObject({ version: '2.0', application: 'DroneDB Registry' });
+        expect(file().metadata).toMatchObject({ version: '3.0', application: 'DroneDB Registry' });
         expect(ids(file())).toEqual(['l1']);
     });
 
@@ -653,7 +656,7 @@ describe('with the Registry client: a missing file is the client\'s 404, and the
 });
 
 describe('MeasurementStorage.exportToFile', () => {
-    it('downloads the 2.0 document of the view: version, application, its section and its groups', () => {
+    it('downloads the 3.0 document of the view: version, application, its section and its groups', () => {
         const source = new VectorSource();
         const { storage } = storageWith([feature('length', 'l1')]);
         importMap(mapFile11(), source, 'metric', null);
@@ -661,8 +664,35 @@ describe('MeasurementStorage.exportToFile', () => {
         const [text, name] = vi.mocked(downloadText).mock.calls.at(-1);
         const doc = JSON.parse(text);
         expect(name).toBe('m.geojson');
-        expect(doc.metadata).toMatchObject({ version: '2.0', application: 'DroneDB Registry' });
+        expect(doc.metadata).toMatchObject({ version: '3.0', application: 'DroneDB Registry' });
         expect(doc.metadata.views.map.groups).toEqual(GROUPS);
         expect(doc.metadata.groups).toBeUndefined();
     });
 });
+
+describe('MeasurementStorage.annotationSchema', () => {
+    const schema = { categories: [{ id: 'c', name: 'C', colour: '#000000' }], severities: [], statuses: [{ id: 's', name: 'S', closed: false }] };
+    const datasetWith = getRequest => ({ registry: { getRequest }, baseApi: '/orgs/o/ds/d' });
+
+    it('is the schema of the dataset\'s organization, read once', async () => {
+        const getRequest = vi.fn(async () => ({ templates: [], schema }));
+        const storage = new MeasurementStorage(datasetWith(getRequest), { path: 'a.laz' });
+        expect(await storage.annotationSchema()).toBe(schema);
+        expect(await storage.annotationSchema()).toBe(schema);
+        expect(getRequest).toHaveBeenCalledTimes(1);
+        expect(getRequest).toHaveBeenCalledWith('/orgs/o/ds/d/report-settings');
+    });
+
+    it('is the default schema when it cannot be read: the form has choices', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+            const storage = new MeasurementStorage(datasetWith(vi.fn(async () => { throw new Error('offline'); })), { path: 'a.laz' });
+            const result = await storage.annotationSchema();
+            expect(result.categories.map(c => c.id)).toContain('defect');
+            expect(result.statuses.map(c => c.id)).toEqual(['open', 'in-progress', 'resolved']);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+});
+

@@ -15,6 +15,28 @@ import { geodesicArea, geodesicLength } from './geodesic';
 import { STOCKPILE_PROPERTIES } from './stockpileStorage';
 import { write, sectionOf, VIEW } from './measurementFormat';
 import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
+import { ANNOTATION_KEYS, annotationProperties, unknownProperties } from './annotationIds';
+
+/**
+ * The property of a feature that holds what its file says that the map does not know: it is written back as it
+ * was, so a save does not lose what another tool (or a later version of the Hub) put in the file.
+ */
+const EXTRA_PROPERTIES = 'extraProperties';
+
+// What the map computes itself from the geometry when it writes a measurement
+const CALCULATED_PROPERTIES = ['area', 'areaValue', 'length', 'lengthValue', 'unit', 'displayValue', 'latitude', 'longitude'];
+
+// What the map reads and writes of every measurement; a feature may have more, which it keeps (unknownProperties)
+const KNOWN_PROPERTIES = new Set([
+    'measurementType', 'unitPreference', 'name', 'description', 'tooltipText', 'createdAt',
+    'stroke', 'stroke-width', 'stroke-opacity', 'fill', 'fill-opacity', 'groupId',
+    ...CALCULATED_PROPERTIES, ...ANNOTATION_KEYS
+]);
+// A stockpile has its own: its metrics, and the `notes` that an earlier version called its description
+const KNOWN_STOCKPILE_PROPERTIES = new Set([...KNOWN_PROPERTIES, ...STOCKPILE_PROPERTIES, 'notes']);
+
+/** @param {any} measurementType @returns {ReadonlySet<string>} the properties the map knows of a measurement of that type */
+const knownProperties = measurementType => (measurementType === 'stockpile' ? KNOWN_STOCKPILE_PROPERTIES : KNOWN_PROPERTIES);
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -109,6 +131,12 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
         groupId: feature.get('groupId') || null
     };
 
+    // The identity and the fields of the annotation (id, ref, category, ..., photos, snapshot)
+    ANNOTATION_KEYS.forEach(k => {
+        const v = feature.get(k);
+        if (v !== undefined && v !== null) properties[k] = v;
+    });
+
     // Stockpile features: persist all metadata fields without overwriting calculated values.
     if (measurementType === 'stockpile') {
         STOCKPILE_PROPERTIES.forEach(k => {
@@ -124,7 +152,10 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
         }
     });
 
-    geoJsonFeature.properties = properties;
+    // What the file said that the map does not know stays as it was (a value of null too), below what the map writes
+    geoJsonFeature.properties = { ...feature.get(EXTRA_PROPERTIES), ...properties };
+    // The GeoJSON id of a feature is its own, as the 3D viewer's are
+    if (properties.id) geoJsonFeature.id = properties.id;
 
     return geoJsonFeature;
 }
@@ -171,6 +202,11 @@ function geoJSONToFeature(geoJsonFeature, unitPref) {
     feature.set('measurementType', props.measurementType);
     feature.set('unitPreference', props.unitPreference);
     feature.set('createdAt', props.createdAt);
+
+    // Restore the identity and the fields of the annotation, and what the file says that the map does not know
+    Object.entries(annotationProperties(props)).forEach(([key, value]) => feature.set(key, value));
+    const extra = unknownProperties(props, knownProperties(props.measurementType));
+    if (Object.keys(extra).length) feature.set(EXTRA_PROPERTIES, extra);
 
     // Restore name and description
     if (props.name) feature.set('name', props.name);

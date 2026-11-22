@@ -2,7 +2,9 @@
 /**
  * The map's measurements as a CSV table, one row per measurement: its group, name, type, value
  * and unit (in the units the map shows), longitude and latitude (points), the geometry as WKT in
- * WGS84 (every measurement), the description, then every other property the measurements carry.
+ * WGS84 (every measurement), the description, the identity and the inspection fields of the annotation (id, ref,
+ * category, severity, status, assignee, due date and how many photos it has), then every other property the
+ * measurements carry.
  *
  * It reads the GeoJSON export of the map (exportMeasurements), so the values and the units are
  * those of the GeoJSON export and of the labels on the map.
@@ -10,11 +12,13 @@
 import { bulkUnits } from '@/libs/format';
 import { toCsv } from '@/libs/csv';
 
-const COLUMNS = ['group', 'name', 'type', 'value', 'unit', 'longitude', 'latitude', 'wkt', 'description'];
+const COLUMNS = ['group', 'name', 'type', 'value', 'unit', 'longitude', 'latitude', 'wkt', 'description',
+    'id', 'ref', 'category', 'severity', 'status', 'assignee', 'dueDate', 'photoCount'];
 
 // Properties that a column above already shows, or that only style the measurement on the map
 const SHOWN = new Set([
     'measurementType', 'name', 'description', 'groupId', 'latitude', 'longitude',
+    'id', 'ref', 'category', 'severity', 'status', 'assignee', 'dueDate', 'photos', 'snapshot',
     'areaValue', 'lengthValue', 'unit', 'displayValue', 'unitPreference', 'tooltipText',
     'stroke', 'stroke-width', 'stroke-opacity', 'fill', 'fill-opacity'
 ]);
@@ -95,6 +99,14 @@ export function measurementsToCsv(geojson, groups = [], units = 'metric') {
             isPoint ? p.latitude ?? f.geometry.coordinates[1] : null,
             geometryToWkt(f.geometry),
             p.description ?? '',
+            p.id ?? '',
+            p.ref ?? '',
+            p.category ?? '',
+            p.severity ?? '',
+            p.status ?? '',
+            p.assignee ?? '',
+            p.dueDate ?? '',
+            Array.isArray(p.photos) ? p.photos.length : 0,
             ...extra.map(k => {
                 const v = p[k];
                 return v !== null && typeof v === 'object' ? JSON.stringify(v) : v;

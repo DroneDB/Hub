@@ -4,100 +4,122 @@
             <div v-if="measurements.length === 0" class="no-measurements">
                 No measurements on the map.
             </div>
-            <div v-else class="measurement-tree">
-                <!-- Groups -->
-                <template v-for="group in groupedStructure.groups" :key="group.id">
-                    <!-- Group header row -->
-                    <div class="group-row" :style="{ borderLeftColor: group.color }">
-                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'"
-                                @click="toggleGroupCollapse(group.id)">
-                            <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
-                        </button>
-                        <button class="btn-icon btn-visibility" :title="group.visible ? 'Hide group' : 'Show group'" :aria-label="group.visible ? 'Hide group' : 'Show group'"
-                                @click="$emit('toggleGroupVisibility', group.id)">
-                            <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" />
-                        </button>
-                        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- double click is a shortcut for the Rename button -->
-                        <span class="group-name" @dblclick="startRenameGroup(group)">{{ group.name }}</span>
-                        <span class="group-count">({{ group.items.length }})</span>
-                        <div class="group-actions">
-                            <button class="btn-icon btn-rename" title="Rename group" aria-label="Rename group" @click="startRenameGroup(group)">
-                                <i class="fa-solid fa-pencil" />
+            <template v-else>
+                <PrimeMessage v-if="duplicates.length" severity="warn" :closable="false" class="duplicate-refs" data-testid="duplicate-refs">
+                    {{ duplicateText }}
+                </PrimeMessage>
+                <div v-if="filterable" class="measurement-filters">
+                    <label for="ml-category-filter">Category</label>
+                    <select id="ml-category-filter" v-model="categoryFilter" class="filter-select" data-testid="category-filter">
+                        <option value="">All</option>
+                        <option v-for="c in categoryOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
+                    </select>
+                    <label for="ml-status-filter">Status</label>
+                    <select id="ml-status-filter" v-model="statusFilter" class="filter-select" data-testid="status-filter">
+                        <option value="">All</option>
+                        <option v-for="c in statusOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
+                    </select>
+                </div>
+                <div v-if="!visibleMeasurements.length" class="no-measurements">
+                    No measurements match the filters.
+                </div>
+                <div v-else class="measurement-tree">
+                    <!-- Groups -->
+                    <template v-for="group in groupedStructure.groups" :key="group.id">
+                        <!-- Group header row -->
+                        <div class="group-row" :style="{ borderLeftColor: group.color }">
+                            <button class="btn-icon btn-collapse" :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'"
+                                    @click="toggleGroupCollapse(group.id)">
+                                <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                             </button>
-                            <button class="btn-icon btn-delete-group" title="Delete group and its measurements" aria-label="Delete group and its measurements" @click="confirmDeleteGroup(group)">
-                                <i class="fa-solid fa-trash" />
+                            <button class="btn-icon btn-visibility" :title="group.visible ? 'Hide group' : 'Show group'" :aria-label="group.visible ? 'Hide group' : 'Show group'"
+                                    @click="$emit('toggleGroupVisibility', group.id)">
+                                <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" />
                             </button>
-                        </div>
-                    </div>
-                    <!-- Group measurements -->
-                    <template v-if="!collapsedGroups.has(group.id)">
-                        <div v-for="m in group.items" :key="'g-' + group.id + '-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
-                             class="measurement-row measurement-row--nested">
-                            <i :class="typeIcon(m.type)" class="type-icon" />
-                            <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
-                            <span class="measurement-value">{{ m.value || '' }}</span>
-                            <div class="measurement-actions">
-                                <select class="group-select" :value="m.groupId || ''"
-                                        title="Move to group" aria-label="Move to group"
-                                        @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
-                                    <option value="">Ungrouped</option>
-                                    <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
-                                </select>
-                                <button v-if="canWorkOn(m)" class="btn-icon btn-stockpile" title="Work on this pile in Stockpile Volume"
-                                        aria-label="Work on this pile in Stockpile Volume" data-testid="measurement-work-on-stockpile"
-                                        @click="$emit('workOnStockpile', m)">
-                                    <i :class="stockpileIcon" />
-                                </button>
-                                <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
+                            <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- double click is a shortcut for the Rename button -->
+                            <span class="group-name" @dblclick="startRenameGroup(group)">{{ group.name }}</span>
+                            <span class="group-count">({{ group.items.length }})</span>
+                            <div class="group-actions">
+                                <button class="btn-icon btn-rename" title="Rename group" aria-label="Rename group" @click="startRenameGroup(group)">
                                     <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
+                                <button class="btn-icon btn-delete-group" title="Delete group and its measurements" aria-label="Delete group and its measurements" @click="confirmDeleteGroup(group)">
                                     <i class="fa-solid fa-trash" />
                                 </button>
                             </div>
                         </div>
+                        <!-- Group measurements -->
+                        <template v-if="!collapsedGroups.has(group.id)">
+                            <div v-for="m in group.items" :key="'g-' + group.id + '-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
+                                 class="measurement-row measurement-row--nested">
+                                <i :class="typeIcon(m.type)" class="type-icon" />
+                                <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
+                                <AnnotationChips :item="m" />
+                                <span class="measurement-value">{{ m.value || '' }}</span>
+                                <div class="measurement-actions">
+                                    <select class="group-select" :value="m.groupId || ''"
+                                            title="Move to group" aria-label="Move to group"
+                                            @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
+                                        <option value="">Ungrouped</option>
+                                        <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                    </select>
+                                    <button v-if="canWorkOn(m)" class="btn-icon btn-stockpile" title="Work on this pile in Stockpile Volume"
+                                            aria-label="Work on this pile in Stockpile Volume" data-testid="measurement-work-on-stockpile"
+                                            @click="$emit('workOnStockpile', m)">
+                                        <i :class="stockpileIcon" />
+                                    </button>
+                                    <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
+                                        <i class="fa-solid fa-pencil" />
+                                    </button>
+                                    <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
+                                        <i class="fa-solid fa-trash" />
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </template>
-                </template>
 
-                <!-- Ungrouped measurements -->
-                <template v-if="groupedStructure.ungrouped.length > 0">
-                    <div v-if="groups.length > 0" class="group-row group-row--ungrouped">
-                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'"
-                                @click="toggleGroupCollapse('__ungrouped__')">
-                            <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
-                        </button>
-                        <span class="group-name group-name--dim">Ungrouped</span>
-                        <span class="group-count">({{ groupedStructure.ungrouped.length }})</span>
-                    </div>
-                    <template v-if="!collapsedGroups.has('__ungrouped__') || groups.length === 0">
-                        <div v-for="m in groupedStructure.ungrouped" :key="'ung-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
-                             class="measurement-row" :class="{ 'measurement-row--nested': groups.length > 0 }">
-                            <i :class="typeIcon(m.type)" class="type-icon" />
-                            <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
-                            <span class="measurement-value">{{ m.value || '' }}</span>
-                            <div class="measurement-actions">
-                                <select v-if="groups.length > 0" class="group-select" :value="m.groupId || ''"
-                                        title="Move to group" aria-label="Move to group"
-                                        @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
-                                    <option value="">Ungrouped</option>
-                                    <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
-                                </select>
-                                <button v-if="canWorkOn(m)" class="btn-icon btn-stockpile" title="Work on this pile in Stockpile Volume"
-                                        aria-label="Work on this pile in Stockpile Volume" data-testid="measurement-work-on-stockpile"
-                                        @click="$emit('workOnStockpile', m)">
-                                    <i :class="stockpileIcon" />
-                                </button>
-                                <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
-                                    <i class="fa-solid fa-pencil" />
-                                </button>
-                                <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
-                                    <i class="fa-solid fa-trash" />
-                                </button>
-                            </div>
+                    <!-- Ungrouped measurements -->
+                    <template v-if="groupedStructure.ungrouped.length > 0">
+                        <div v-if="groups.length > 0" class="group-row group-row--ungrouped">
+                            <button class="btn-icon btn-collapse" :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'"
+                                    @click="toggleGroupCollapse('__ungrouped__')">
+                                <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
+                            </button>
+                            <span class="group-name group-name--dim">Ungrouped</span>
+                            <span class="group-count">({{ groupedStructure.ungrouped.length }})</span>
                         </div>
+                        <template v-if="!collapsedGroups.has('__ungrouped__') || groups.length === 0">
+                            <div v-for="m in groupedStructure.ungrouped" :key="'ung-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
+                                 class="measurement-row" :class="{ 'measurement-row--nested': groups.length > 0 }">
+                                <i :class="typeIcon(m.type)" class="type-icon" />
+                                <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
+                                <AnnotationChips :item="m" />
+                                <span class="measurement-value">{{ m.value || '' }}</span>
+                                <div class="measurement-actions">
+                                    <select v-if="groups.length > 0" class="group-select" :value="m.groupId || ''"
+                                            title="Move to group" aria-label="Move to group"
+                                            @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
+                                        <option value="">Ungrouped</option>
+                                        <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                    </select>
+                                    <button v-if="canWorkOn(m)" class="btn-icon btn-stockpile" title="Work on this pile in Stockpile Volume"
+                                            aria-label="Work on this pile in Stockpile Volume" data-testid="measurement-work-on-stockpile"
+                                            @click="$emit('workOnStockpile', m)">
+                                        <i :class="stockpileIcon" />
+                                    </button>
+                                    <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
+                                        <i class="fa-solid fa-pencil" />
+                                    </button>
+                                    <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
+                                        <i class="fa-solid fa-trash" />
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
                     </template>
-                </template>
-            </div>
+                </div>
+            </template>
         </div>
 
         <!-- Where the measurements go: the file of the one file on show, else of the folder -->
@@ -127,13 +149,16 @@
 <script>
 import Window from '@/components/HubWindow';
 import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import AnnotationChips from '@/components/measurements/AnnotationChips.vue';
+import { duplicateRefs } from '@/libs/map/annotationIds';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 import { countOf } from '@/libs/format';
 import { AREA_ICON, LENGTH_ICON, POINT_ICON, STOCKPILE_ICON } from '@/libs/glyphs';
 
 export default {
-    components: { Window, Button, ConfirmDialog },
+    components: { Window, Button, ConfirmDialog, PrimeMessage, AnnotationChips },
     props: {
         measurements: {
             type: Array,
@@ -173,7 +198,10 @@ export default {
             pendingDeleteItem: null,
             deleteGroupConfirmOpen: false,
             pendingDeleteGroup: null,
-            collapsedGroups: new Set()
+            collapsedGroups: new Set(),
+            // The filters of the list: a category or a status id, '' for all
+            categoryFilter: '',
+            statusFilter: ''
         };
     },
     computed: {
@@ -193,13 +221,36 @@ export default {
                 lost: [count === null ? 'all its measurements' : `its ${countOf(count, 'measurement')}`]
             });
         },
+        // The distinct categories and statuses the measurements have, for the filters
+        categoryOptions() {
+            return this.optionsOf('category', 'categoryLabel');
+        },
+        statusOptions() {
+            return this.optionsOf('status', 'statusLabel');
+        },
+        // A filter is useful once some measurement has a category or a status
+        filterable() {
+            return this.categoryOptions.length > 0 || this.statusOptions.length > 0;
+        },
+        visibleMeasurements() {
+            return this.measurements.filter(m => (!this.categoryFilter || m.category === this.categoryFilter)
+                && (!this.statusFilter || m.status === this.statusFilter));
+        },
+        // The references that more than one measurement has (a file edited outside the Hub can have them)
+        duplicates() {
+            return duplicateRefs(this.measurements.map(m => m.ref));
+        },
+        duplicateText() {
+            const refs = this.duplicates.join(', ');
+            return `${this.duplicates.length === 1 ? 'Reference' : 'References'} ${refs} ${this.duplicates.length === 1 ? 'is' : 'are'} used by more than one measurement.`;
+        },
         groupedStructure() {
             const groupMap = {};
             for (const g of this.groups) {
                 groupMap[g.id] = { ...g, items: [] };
             }
             const ungrouped = [];
-            for (const m of this.measurements) {
+            for (const m of this.visibleMeasurements) {
                 const gid = m.groupId;
                 if (gid && groupMap[gid]) {
                     groupMap[gid].items.push(m);
@@ -214,6 +265,12 @@ export default {
         }
     },
     methods: {
+        // The distinct values of a field of the measurements, with the name each is shown by
+        optionsOf(key, labelKey) {
+            const seen = new Map();
+            this.measurements.forEach(m => { if (m[key] && !seen.has(m[key])) seen.set(m[key], m[labelKey] || m[key]); });
+            return [...seen].map(([value, label]) => ({ value, label }));
+        },
         typeLabel(type) {
             switch (type) {
                 case 'point': return 'Point';
@@ -289,6 +346,29 @@ export default {
     font-size: 0.78rem;
     color: var(--ddb-text-muted);
     overflow-wrap: anywhere;
+}
+
+.measurement-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.filter-select {
+    font-size: 0.8rem;
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    padding: 0.15rem 0.3rem;
+    background: var(--ddb-bg-surface);
+    color: var(--ddb-text);
+    max-width: 10rem;
+}
+
+.duplicate-refs {
+    margin-bottom: 0.5rem;
 }
 
 .no-measurements {

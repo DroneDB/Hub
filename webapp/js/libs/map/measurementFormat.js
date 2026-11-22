@@ -3,15 +3,22 @@
  * The format of the measurements file (`<name>_measurements.geojson`): the one place that reads and
  * writes it, for the 2D map, the 3D point-cloud viewer and the stockpile panel (FR-XC-30, D-016).
  *
- * A file is a GeoJSON FeatureCollection whose `metadata` holds the format version (2.0; the writers
- * before it wrote 1.0 and 1.1), the application ('DroneDB Registry'), `createdAt` (kept by every save),
- * `modifiedAt` (set by every save) and `views`: what belongs to one view only, under the view's key
- * (`views.map`: groups, unitPreference, orthophotoFile; `views.pointCloud`: pointCloudFile,
- * coordinateSystem). The features of the two views are in the same list (see ownerOf).
+ * A file is a GeoJSON FeatureCollection whose `metadata` holds the format version (3.0; the writers
+ * before it wrote 1.0, 1.1 and 2.0), the application ('DroneDB Registry'), `createdAt` (kept by every save),
+ * `modifiedAt` (set by every save), `lastRef` (the highest reference the Hub issued: annotationIds) and
+ * `views`: what belongs to one view only, under the view's key (`views.map`: groups, unitPreference,
+ * orthophotoFile; `views.pointCloud`: pointCloudFile, coordinateSystem). The features of the two views are
+ * in the same list (see ownerOf), and each has an `id` and a `ref` (annotationIds).
  *
- *   read(json, ctx)                                the file as a 2.0 document, migrated in memory; never writes
- *   write(existing, view, ownFeatures, ownSection)  a 2.0 document: the view's features and section replaced,
+ * Version 3.0 is 2.0 plus the `id` and `ref` of every feature, the inspection fields and `lastRef`: a Hub
+ * that reads only major version 2 refuses a 3.0 file instead of saving it without them.
+ *
+ *   read(json, ctx)                                the file as a 3.0 document, migrated in memory; never writes.
+ *                                                  A feature with no `id` has the one annotationIds gives it
+ *   write(existing, view, ownFeatures, ownSection)  a 3.0 document: the view's features and section replaced,
  *                                                   the other view's kept
+ *   writeNumbered(...)                              the same, for a save: every feature without a `ref`, of
+ *                                                   either view, gets one (see its comment)
  *
  * Files before 2.0 are migrated on every read (the next save writes the result, a read never does):
  *  - the top-level `metadata.groups`, `orthophotoFile` and `unitPreference` are the map's (they move to
@@ -35,8 +42,11 @@
  */
 import { EPSG } from '@/libs/constants';
 import { projectorFor, geometryOf, localPointsOf, srsDefinitionOf, sameCrs } from '@/libs/map/pointCloudGeometry';
+import { backfillIds, assignRefs, renumberTaken, idOf, refOf, highestRef } from '@/libs/map/annotationIds';
 
-export const FORMAT_VERSION = '2.0';
+export const FORMAT_VERSION = '3.0';
+/** The newest major version this Hub reads: a file of a higher one is refused. */
+const MAX_MAJOR = 3;
 /** The application id of every file the Hub writes. */
 export const APPLICATION_ID = 'DroneDB Registry';
 /** What the files of the earlier writers say in `metadata.application`: the 3D viewer, the stockpile and orthophoto panels. */
@@ -131,8 +141,9 @@ function withCrs(doc) {
 }
 
 /**
- * The file as a 2.0 document, migrated in memory (the file itself is not touched). A 2.0 file marked
- * LEGACY_GEOMETRY gets its 3D geometry worked out here too, when a CRS is known.
+ * The file as a 3.0 document, migrated in memory (the file itself is not touched). A 2.0 or 3.0 file marked
+ * LEGACY_GEOMETRY gets its 3D geometry worked out here too, when a CRS is known. The features without an `id`
+ * get theirs first, from the file as it was written, before any geometry is worked out again.
  * @param {any} json  the parsed file
  * @param {{ pointCloudCrs?: any }} [ctx]  `pointCloudCrs`: the SRS (or the coordinate system) of the point cloud
  *   the file belongs to, used when the file states none that proj4 can use
@@ -148,14 +159,17 @@ export function read(json, ctx = {}) {
         throw new MeasurementFileError('foreign', `The file belongs to another application (${String(metadata.application)})`);
     }
     const [major] = versionOf(metadata.version);
-    if (major > 2) {
+    if (major > MAX_MAJOR) {
         throw new MeasurementFileError('unsupported', `The measurements file is of a newer format (${String(metadata.version)})`);
     }
-    if (major === 2) {
-        const doc = { ...json, metadata: { ...metadata, views: isObject(metadata.views) ? metadata.views : {} } };
+    // On the features as they were read: a later correction of their geometry must not change their ids
+    const identified = backfillIds(json.features, ownerOf);
+    const file = identified === json.features ? json : { ...json, features: identified };
+    if (major >= 2) {
+        const doc = { ...file, metadata: { ...metadata, views: isObject(metadata.views) ? metadata.views : {} } };
         return sectionOf(doc, VIEW.POINT_CLOUD)[LEGACY_GEOMETRY] ? withLegacyGeometryCorrected(doc, ctx) : doc;
     }
-    return migrate(json, metadata, ctx);
+    return migrate(file, metadata, ctx);
 }
 
 /**
@@ -191,7 +205,7 @@ function correctedGeometry(features, cloud, ctx) {
 }
 
 /**
- * A 2.0 document whose 3D features still have their old geometry (LEGACY_GEOMETRY): corrected when a
+ * A document whose 3D features still have their old geometry (LEGACY_GEOMETRY): corrected when a
  * CRS is known now, else as it is.
  * @param {Record<string, any>} doc
  * @param {{ pointCloudCrs?: any }} ctx
@@ -204,7 +218,7 @@ function withLegacyGeometryCorrected(doc, ctx) {
 }
 
 /**
- * A file before 2.0 as a 2.0 document.
+ * A file before 2.0 as a 3.0 document.
  * @param {Record<string, any>} json
  * @param {Record<string, any>} metadata
  * @param {{ pointCloudCrs?: any }} ctx
@@ -324,33 +338,68 @@ function cleanSection(section) {
 }
 
 /**
- * A 2.0 document: the view's features and section replaced by the given ones, everything of the other
- * view (its features and its section) kept, `createdAt` kept, `modifiedAt` now.
- * @param {Record<string, any> | null | undefined} existing  the file as `read` gives it, null for a new one
- * @param {string} view  a VIEW
- * @param {any[]} ownFeatures  the view's features, all of them (the ones of the file are replaced)
- * @param {Record<string, any>} [ownSection]  what belongs to the view only (a view with no features has no section)
- * @returns {Record<string, any>}
+ * @typedef {object} Written
+ * @property {Record<string, any>} document  the document to write
+ * @property {Record<string, string>} refs  the `ref` of each feature of the view, by `id`
+ * @property {{ id: string, from: string, to: string }[]} renumbered  the new features whose ref another session
+ *   had used: they were given the next one
  */
-export function write(existing, view, ownFeatures, ownSection = {}) {
-    // A document that is not 2.0 yet is migrated first, so nothing is written in an old shape
+
+/**
+ * The document that a view's features make with the rest of the file (see write and writeNumbered).
+ * @param {Record<string, any> | null | undefined} existing
+ * @param {string} view
+ * @param {any[]} ownFeatures
+ * @param {Record<string, any>} ownSection
+ * @param {{ numbered: boolean, issued?: number }} options
+ * @returns {Written}
+ */
+function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0 }) {
+    // A document that is not 3.0 yet is migrated first, so nothing is written in an old shape
     const previous = existing ? read(existing) : null;
     const previousMetadata = (previous && previous.metadata) || {};
     const previousFeatures = (previous && previous.features) || [];
     const members = without(previous || {}, ['type', 'crs', 'metadata', 'features']);
     const { createdAt, views: previousViews } = previousMetadata;
-    const others = without(previousMetadata, ['version', 'application', 'kind', 'createdAt', 'modifiedAt', 'views']);
+    const others = without(previousMetadata, ['version', 'application', 'kind', 'createdAt', 'modifiedAt', 'views', 'lastRef']);
     const now = new Date().toISOString();
 
-    const own = ownFeatures || [];
     const kept = previousFeatures.filter((/** @type {any} */ f) => ownerOf(f) !== view);
     /** @type {Record<string, any>} */
     const views = isObject(previousViews) ? { ...previousViews } : {};
     delete views[view];
-    const section = own.length ? cleanSection(ownSection) : {};
+    const section = (ownFeatures || []).length ? cleanSection(ownSection) : {};
     if (Object.keys(section).length) views[view] = section;
 
-    return withCrs({
+    let own = ownFeatures || [];
+    let features = [...own, ...kept];
+    let lastRef = Math.max(Number(previousMetadata.lastRef) || 0, issued, highestRef(features.map(refOf).filter(Boolean)));
+    /** @type {{ id: string, from: string, to: string }[]} */
+    let renumbered = [];
+
+    if (numbered) {
+        // What the file holds: the ref of a feature the view loaded without one, and which features are new
+        const saved = new Map(previousFeatures.map((/** @type {any} */ f, /** @type {number} */ i) => [idOf(f), { ref: refOf(f), index: i }]));
+        own = own.map(feature => {
+            const known = idOf(feature) ? saved.get(idOf(feature)) : undefined;
+            return !refOf(feature) && known && known.ref ? withProperty(feature, 'ref', known.ref) : feature;
+        });
+        const keptSet = new Set(kept);
+        const ownSet = new Set(own);
+        ({ features, lastRef, changes: renumbered } = renumberTaken([...own, ...kept], f => ownSet.has(f) && !saved.has(idOf(f)), f => keptSet.has(f), lastRef));
+        ({ features, lastRef } = assignRefs(features, {
+            lastRef,
+            fileOrder: (feature, index) => saved.get(idOf(feature))?.index ?? previousFeatures.length + index
+        }));
+    }
+
+    /** @type {Record<string, string>} */
+    const refs = {};
+    features.slice(0, own.length).forEach(feature => {
+        if (idOf(feature) && refOf(feature)) refs[idOf(feature)] = refOf(feature);
+    });
+
+    const document = withCrs({
         type: 'FeatureCollection',
         ...members,
         metadata: {
@@ -360,14 +409,78 @@ export function write(existing, view, ownFeatures, ownSection = {}) {
             createdAt: createdAt ?? now,
             modifiedAt: now,
             ...others,
+            ...(lastRef > 0 ? { lastRef } : {}),
             views
         },
-        features: [...own, ...kept]
+        features
     });
+    return { document, refs, renumbered };
 }
 
 /**
- * The content of a file as a 2.0 document.
+ * @param {any} feature @param {string} key @param {any} value
+ * @returns {any} the feature with one more property
+ */
+const withProperty = (feature, key, value) => ({ ...feature, properties: { ...(isObject(feature.properties) ? feature.properties : {}), [key]: value } });
+
+/**
+ * A 3.0 document: the view's features and section replaced by the given ones, everything of the other
+ * view (its features and its section) kept, `createdAt` kept, `modifiedAt` now. The features are written as
+ * they are (an export of what a view shows, a copy of the file): see writeNumbered for a save.
+ * @param {Record<string, any> | null | undefined} existing  the file as `read` gives it, null for a new one
+ * @param {string} view  a VIEW
+ * @param {any[]} ownFeatures  the view's features, all of them (the ones of the file are replaced)
+ * @param {Record<string, any>} [ownSection]  what belongs to the view only (a view with no features has no section)
+ * @returns {Record<string, any>}
+ */
+export function write(existing, view, ownFeatures, ownSection = {}) {
+    return compose(existing, view, ownFeatures, ownSection, { numbered: false }).document;
+}
+
+/**
+ * The document of a save: write, and the features without a `ref` get one, those of the other view too (the
+ * first save of either view numbers the whole file, and changes nothing else in the features of the other view).
+ *
+ *  - a feature of the view without a `ref` that the file holds one for (by its `id`: another session numbered
+ *    it) takes that one;
+ *  - a feature of the view that was never saved (its `id` is not in the file) whose `ref` a feature of the other
+ *    view has (that save came first) takes the next ref, and is listed in `renumbered`;
+ *  - the features still without one get the next refs in creation order (annotationIds.assignRefs);
+ *  - `metadata.lastRef` is the larger of the file's, `issued` (the highest the view issued) and the highest ref
+ *    of the document.
+ * The view takes `refs` back into its own features (it has no refs where the file gave it new ones) and tells
+ * the user about `renumbered`.
+ * @param {Record<string, any> | null | undefined} existing  the file as the storage reads it now, null for a new one
+ * @param {string} view  a VIEW
+ * @param {any[]} ownFeatures
+ * @param {Record<string, any>} [ownSection]
+ * @param {{ issued?: number }} [options]  `issued`: the highest ref the view issued
+ * @returns {Written}
+ */
+export function writeNumbered(existing, view, ownFeatures, ownSection = {}, { issued = 0 } = {}) {
+    return compose(existing, view, ownFeatures, ownSection, { numbered: true, issued });
+}
+
+/**
+ * The document that a numbering save writes: the file as it is with the `ref` every feature lacks (and the
+ * `id` of every feature, which a read gave them). The features keep their view and their order.
+ * @param {Record<string, any>} document  the file as `read` gives it
+ * @returns {{ document: Record<string, any>, numbered: boolean }}  `numbered`: whether any feature got a ref (a file
+ *   whose features all have both, and that is 3.0 already, needs no save)
+ */
+export function numberDocument(document) {
+    const { features, lastRef, assigned } = assignRefs(document.features, { lastRef: Number(document.metadata?.lastRef) || 0 });
+    const upToDate = !assigned && versionOf(document.metadata?.version)[0] >= MAX_MAJOR && document.features.every((/** @type {any} */ f) => idOf(f));
+    const next = {
+        ...document,
+        metadata: { ...without(document.metadata, ['version', 'modifiedAt']), version: FORMAT_VERSION, modifiedAt: new Date().toISOString(), ...(lastRef > 0 ? { lastRef } : {}) },
+        features
+    };
+    return { document: upToDate ? document : next, numbered: !upToDate };
+}
+
+/**
+ * The content of a file as a 3.0 document.
  * @param {any} content  what the dataset gives for the file: text or the parsed document
  * @param {{ pointCloudCrs?: any }} [ctx]
  * @returns {Record<string, any> | null}  null when the file is empty

@@ -8,10 +8,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, shallowRef, defineComponent, h, effectScope } from 'vue';
 import { mount } from '@vue/test-utils';
 import ddb from 'ddb';
+import Feature from 'ol/Feature';
+import { LineString } from 'ol/geom';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import * as csv from '@/libs/csv';
 import { notify } from '@/libs/notify';
 import { PREF, removePref } from '@/libs/preferences';
+import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { useMapMeasurements } from './useMapMeasurements';
 
 const T = ddb.entry.type;
@@ -67,7 +70,10 @@ beforeEach(() => {
             return stored[path];
         }),
         writeObj: vi.fn(async (path, blob) => { stored[path] = await blob.text(); }),
-        deleteObj: vi.fn(async path => { delete stored[path]; })
+        deleteObj: vi.fn(async path => { delete stored[path]; }),
+        // The organization's annotation schema (the default one when the Registry has stored none)
+        registry: { getRequest: vi.fn(async () => ({ templates: [], schema: DEFAULT_SCHEMA })) },
+        baseApi: '/orgs/o/ds/d'
     };
     files = ref([{ entry: { path: 'a/ortho.tif', type: T.GEORASTER } }]);
 });
@@ -657,6 +663,123 @@ describe('useMapMeasurements', () => {
             expect(unitPref.value).toBe('imperial');
             expect(dataset.writeObj).not.toHaveBeenCalled();
             expect(alerts).toEqual([]);
+        });
+    });
+
+    describe('the ids and the references of the measurements', () => {
+        let scope;
+        afterEach(() => scope?.stop());
+
+        function startWired() {
+            const holder = shallowRef(null);
+            scope = effectScope();
+            const m = scope.run(() => useMapMeasurements({
+                measureControls: holder, files: () => files.value, dataset: () => dataset, canWrite: () => true, canDelete: () => true,
+                currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => (message, color) => flashes.push({ message, color }),
+                choose: () => async () => 'confirm'
+            }));
+            flashes = [];
+            m.createMeasureControls({ openDialog: () => {} });
+            controls = holder.value;
+            return m;
+        }
+        const drawn = id => {
+            const feature = new Feature(new LineString([[0, 0], [100, 0]]));
+            feature.setProperties({ measurementType: 'length', name: id, createdAt: '2026-11-01T10:00:00.000Z' });
+            controls.source.addFeature(feature);
+            return feature;
+        };
+        const refOf = name => controls.source.getFeatures().find(f => f.get('name') === name).get('ref');
+
+        it('a file with none is loaded with ids and no references, and is not unsaved', async () => {
+            const m = startWired();
+            await m.loadSavedMeasurements();
+            controls.source.getFeatures().forEach(f => {
+                expect(f.get('id')).toMatch(/^[0-9a-f]{64}/);
+                expect(f.get('ref')).toBeUndefined();
+            });
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+        });
+
+        it('a save numbers them: the map shows the references the file gave, and is saved', async () => {
+            const m = startWired();
+            await m.loadSavedMeasurements();
+            await m.saveMeasurements();
+            expect(['m1', 'm2'].map(refOf).sort()).toEqual(['1', '2']);
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features.map(f => f.properties.ref).sort()).toEqual(['1', '2']);
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+        });
+
+        it('a new measurement has the next reference after the ones of the file, the other view\'s too', async () => {
+            stored['a/ortho_measurements.geojson'] = JSON.stringify({
+                type: 'FeatureCollection', metadata: { version: '3.0', lastRef: 6 },
+                features: [{ ...lengthFeature('m1'), properties: { ...lengthFeature('m1').properties, id: 'i1', ref: '2' } }]
+            });
+            const m = startWired();
+            await m.loadSavedMeasurements();
+            const added = drawn('n1');
+            controls.identify(added);
+            expect(added.get('ref')).toBe('7');
+            await m.saveMeasurements();
+            expect(refOf('n1')).toBe('7');
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).metadata.lastRef).toBe(7);
+        });
+
+        it('says so when a save finds the reference of a new measurement taken by another session, and the map shows the new one', async () => {
+            const m = startWired();
+            await m.loadSavedMeasurements();
+            const added = drawn('n1');
+            controls.identify(added);
+            expect(added.get('ref')).toBe('1');
+            // The 3D viewer saved an item with that reference since the map read the file
+            const doc = JSON.parse(stored['a/ortho_measurements.geojson']);
+            doc.features.push({ type: 'Feature', geometry: null, properties: { measurementType: 'distance', localCoordinates: [[0, 0, 0]], id: 'cloud-1', ref: '1' } });
+            stored['a/ortho_measurements.geojson'] = JSON.stringify(doc);
+            const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+            try {
+                await m.saveMeasurements();
+                expect(warn).toHaveBeenCalledWith('Reference 1 was taken; the item is now 2', expect.anything());
+                expect(refOf('n1')).not.toBe('1');
+                const refs = JSON.parse(stored['a/ortho_measurements.geojson']).features.map(f => f.properties.ref);
+                expect(new Set(refs).size).toBe(refs.length);
+                expect(m.hasUnsavedMeasurements.value).toBe(false);
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it('gives the dialog of a measurement the organization\'s schema once it is read', async () => {
+            const m = startWired();
+            const schema = { categories: [{ id: 'c', name: 'C', colour: '#000000' }], severities: [], statuses: [{ id: 's', name: 'S', closed: false }] };
+            dataset.registry.getRequest.mockResolvedValue({ templates: [], schema });
+            await m.loadSavedMeasurements();
+            await vi.waitFor(() => expect(controls.annotationSchema).toBe(schema));
+            expect(dataset.registry.getRequest).toHaveBeenCalledWith('/orgs/o/ds/d/report-settings');
+        });
+
+        it('exports the id, reference and fields of each measurement in the CSV', async () => {
+            const saved = vi.spyOn(csv, 'downloadCsv').mockImplementation(() => {});
+            try {
+                const m = startWired();
+                await m.loadSavedMeasurements();
+                await m.saveMeasurements();
+                controls.source.getFeatures().find(f => f.get('name') === 'm1').setProperties({ category: 'defect', status: 'open', assignee: 'Anna', dueDate: '2026-12-01' });
+                m.exportMeasurementsToCsv();
+                const [header, ...rows] = saved.mock.calls[0][0].trim().split('\r\n');
+                expect(header).toContain('id,ref,category,severity,status,assignee,dueDate,photoCount');
+                // The WKT of a line has commas: it is quoted
+                const fields = line => line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+                const columns = fields(header);
+                const row = fields(rows.find(r => fields(r)[1] === 'm1'));
+                expect(row[columns.indexOf('category')]).toBe('defect');
+                expect(row[columns.indexOf('status')]).toBe('open');
+                expect(row[columns.indexOf('assignee')]).toBe('Anna');
+                expect(row[columns.indexOf('dueDate')]).toBe('2026-12-01');
+                expect(row[columns.indexOf('ref')]).toMatch(/^[12]$/);
+                expect(row[columns.indexOf('photoCount')]).toBe('0');
+            } finally {
+                saved.mockRestore();
+            }
         });
     });
 });

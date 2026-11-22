@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { snapshotMeasure, restoreMeasure, matchesSnapshot } from './measureSnapshot';
-import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from './measureStyle';
+import { applyMeasureStyle, measureAsFeature, assignMeasureProperties, annotationFieldsOf } from './measureStyle';
 import { updateAnnotationTooltip } from './measureLabels';
 
 // Minimal stand-ins for the THREE / Potree globals the viewer loads
@@ -63,6 +63,26 @@ describe('measure snapshots', () => {
         expect(restored.lengthUnit).toBe(meter);
     });
 
+    it('keep the id, the ref, the fields and the properties of the file that the viewer does not know: undo brings back the same feature', () => {
+        const original = measure([[1, 2, 3], [4, 5, 6]], { name: 'Fence' });
+        original.ddbProperties = {
+            id: 'stable-id', ref: '7', category: 'defect', status: 'open', report: false, createdAt: '2026-01-01T00:00:00.000Z',
+            photos: [{ path: 'a.jpg', source: 'dataset' }], extra: { customKey: 5 }
+        };
+        const data = snapshotMeasure(original);
+        // The measure is edited after the copy was taken: the copy does not follow
+        original.ddbProperties.ref = '9';
+        original.ddbProperties.extra.customKey = 6;
+        const restored = restoreMeasure(data);
+        expect(restored.ddbProperties).toEqual({
+            id: 'stable-id', ref: '7', category: 'defect', status: 'open', report: false, createdAt: '2026-01-01T00:00:00.000Z',
+            photos: [{ path: 'a.jpg', source: 'dataset' }], extra: { customKey: 5 }
+        });
+        expect(restored.ddbProperties).not.toBe(data.properties);
+        // A measure made in the viewer has none yet: nothing is made up
+        expect(restoreMeasure(snapshotMeasure(measure([[0, 0, 0]]))).ddbProperties).toBeUndefined();
+    });
+
     it('leave what the measure did not have to Potree\'s defaults', () => {
         const restored = restoreMeasure(snapshotMeasure(measure([[0, 0, 0], [1, 0, 0]], { name: 'Plain' })));
         expect(restored.description).toBeUndefined();
@@ -88,6 +108,30 @@ describe('measure style', () => {
         expect(feature.get('name')).toBe('A');
         expect(feature.get('stroke')).toBe('#00ff00');
         expect(feature.get('unknown')).toBeNull();
+    });
+});
+
+describe('the annotation fields of a measure', () => {
+    it('are shown to the properties dialog as a feature has them, and set from what it saves, a missing value removing the field', () => {
+        const m = measure([[0, 0, 0], [1, 1, 1]], { name: 'A' });
+        m.ddbProperties = { id: 'i', ref: '3', category: 'defect', assignee: 'Anna', extra: { customKey: 5 } };
+        const feature = measureAsFeature(m);
+        expect(feature.get('ref')).toBe('3');
+        expect(feature.get('category')).toBe('defect');
+        expect(feature.get('status')).toBeNull();
+        expect(annotationFieldsOf(m)).toEqual({ ref: '3', category: 'defect', assignee: 'Anna' });
+
+        assignMeasureProperties(m, { name: 'B', category: undefined, status: 'open', report: false, dueDate: '2026-12-01' });
+        expect(m.ddbProperties).toEqual({ id: 'i', ref: '3', assignee: 'Anna', status: 'open', report: false, dueDate: '2026-12-01', extra: { customKey: 5 } });
+    });
+
+    it('make the id of a measure that has no properties yet, and keep it', () => {
+        const m = measure([[0, 0, 0]], { name: 'New' });
+        assignMeasureProperties(m, { status: 'open' });
+        const { id } = m.ddbProperties;
+        expect(id).toBeTruthy();
+        assignMeasureProperties(m, { status: 'resolved' });
+        expect(m.ddbProperties.id).toBe(id);
     });
 });
 

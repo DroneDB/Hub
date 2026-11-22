@@ -8,7 +8,9 @@ import { downloadText } from '@/libs/download';
 import { notify } from '@/libs/notify';
 import { isNotFound } from '@/libs/ddb/apiError';
 import { isListed } from '@/libs/optionalFile';
-import { VIEW, ownerOf, sectionOf, parse, write, MeasurementFileError } from '@/libs/map/measurementFormat';
+import { VIEW, ownerOf, sectionOf, parse, write, writeNumbered, numberDocument, MeasurementFileError } from '@/libs/map/measurementFormat';
+import { RefSequence, renumberedMessage } from '@/libs/map/annotationIds';
+import { DEFAULT_SCHEMA, datasetReportSettings } from '@/libs/reports/reportSettings';
 
 /** Whether a path is a measurements file (`<name>_measurements.geojson` or `measurements.geojson`). */
 export function isMeasurementFile(path) {
@@ -23,6 +25,17 @@ export const MeasurementOwner = VIEW;
 
 export { ownerOf };
 
+/**
+ * Numbers the annotations of a measurements file that have no ref (both views'): see MeasurementStorage.numberUnnumbered.
+ * @param {Dataset} dataset
+ * @param {string} path  the measurements file
+ * @returns {Promise<{ path: string, fileName: string, written: boolean }>}
+ * @throws when the file cannot be read, used or written
+ */
+export function numberMeasurementFile(dataset, path) {
+    return new MeasurementStorage(dataset, { path }).numberUnnumbered();
+}
+
 const OWNER_LABEL = Object.freeze({ [MeasurementOwner.MAP]: '2D map', [MeasurementOwner.POINT_CLOUD]: '3D viewer' });
 
 /**
@@ -34,6 +47,14 @@ export function saveResultMessage(result) {
     if (result.deleted) return `Removed "${result.fileName}": no measurements left`;
     const other = OWNER_LABEL[result.owner === MeasurementOwner.MAP ? MeasurementOwner.POINT_CLOUD : MeasurementOwner.MAP];
     return `Removed the ${OWNER_LABEL[result.owner]} measurements from "${result.fileName}" (the ${other} ones stay)`;
+}
+
+/**
+ * Tells the user of the annotations that a save gave another ref because another session had taken theirs.
+ * @param {{ renumbered?: { from: string, to: string }[] }} result  what a save returned
+ */
+export function notifyRenumbered(result) {
+    (result.renumbered || []).forEach(change => notify.warn(renumberedMessage(change), { summary: 'Reference changed', life: 'long' }));
 }
 
 /**
@@ -120,6 +141,27 @@ export class MeasurementStorage {
          * there are any, so the file keeps them.
          */
         this.unplaced = 0;
+        /** The refs this view issues and the ones of the file's other features it knows (annotationIds.RefSequence) */
+        this.refs = new RefSequence();
+        /** @type {Promise<any> | null} */
+        this._schema = null;
+    }
+
+    /**
+     * The annotation schema of the dataset's organization (the categories, severities and statuses an annotation takes
+     * its values from), read once. The default schema when it cannot be read: a form with no choices would be worse.
+     * @returns {Promise<import('@/libs/reports/reportSettings').AnnotationSchema>}
+     */
+    annotationSchema() {
+        if (!this._schema) {
+            this._schema = datasetReportSettings(this.dataset)
+                .then(settings => settings.schema || DEFAULT_SCHEMA)
+                .catch(e => {
+                    console.warn('The annotation schema could not be read:', e);
+                    return DEFAULT_SCHEMA;
+                });
+        }
+        return this._schema;
     }
 
     /**
@@ -161,7 +203,7 @@ export class MeasurementStorage {
     }
 
     /**
-     * The file as a 2.0 document, migrated in memory (a read never writes).
+     * The file as a 3.0 document, migrated in memory (a read never writes).
      * A file that is not there is the Registry's 404 (the client's ApiError with status 404, for a
      * missing file and for a folder that is not there either): the first save makes it. An empty file
      * (a 200 with no body) is a new file too. Any other failure (a network error, 401, 403, 5xx) is
@@ -209,8 +251,9 @@ export class MeasurementStorage {
         try {
             const previous = await this._read();
             const own = geojsonData.features || [];
-            const document = write(previous, this.owner, own, sectionOf(geojsonData, this.owner));
-            const result = { path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner };
+            // The first save of either view gives every feature of the file its ref (the other view's too)
+            const { document, refs, renumbered } = writeNumbered(previous, this.owner, own, sectionOf(geojsonData, this.owner), { issued: this.refs.floor });
+            const result = { path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner, refs, renumbered };
             if (!document.features.length) {
                 await this._deleteIfPresent();
                 this.loadState = 'loaded';
@@ -218,9 +261,7 @@ export class MeasurementStorage {
                 return { ...result, deleted: true };
             }
 
-            const blob = new Blob([JSON.stringify(document, null, 2)], { type: 'application/geo+json' });
-            // The measurement file of this view: merged above, replaced here
-            await this.dataset.writeObj(this.measurementPath, blob, { overwrite: true });
+            await this._writeDocument(document);
             this.loadState = 'loaded';
             // What the view did not show is gone from the file (a delete; a save is refused while there is any)
             this.unplaced = 0;
@@ -229,6 +270,34 @@ export class MeasurementStorage {
             console.error('Failed to save measurements:', error);
             throw new Error(`Failed to save measurements: ${error.message}`, { cause: error });
         }
+    }
+
+    /**
+     * Writes a document over the measurements file (the view's measurements are merged into it already), and takes
+     * the refs it holds as the ones this view knows.
+     */
+    async _writeDocument(document) {
+        const blob = new Blob([JSON.stringify(document, null, 2)], { type: 'application/geo+json' });
+        await this.dataset.writeObj(this.measurementPath, blob, { overwrite: true });
+        this.refs.observe(document, f => !this._owns(f));
+    }
+
+    /**
+     * Gives every annotation of the file that has no ref one, of both views, and writes the file when that changed
+     * anything: the save of a report does it so that the items it shows have refs. The file as the server holds it
+     * now is what is numbered, and nothing else of it changes (no feature is added, moved or removed). A file that is
+     * not there, or has nothing to number, is not written.
+     * @returns {Promise<{ path: string, fileName: string, written: boolean }>}
+     * @throws when the file cannot be read, used or written (it is not touched then)
+     */
+    async numberUnnumbered() {
+        const document = await this._read();
+        const base = { path: this.measurementPath, fileName: this._fileName() };
+        if (!document) return { ...base, written: false };
+        const { document: numbered, numbered: changed } = numberDocument(document);
+        if (!changed) return { ...base, written: false };
+        await this._writeDocument(numbered);
+        return { ...base, written: true };
     }
 
     /**
@@ -275,6 +344,8 @@ export class MeasurementStorage {
         }
         if (turn === this._loadTurn) this.loadState = 'loaded';
         if (!document) return null;
+        // The refs of the file: this view issues the ones after them, and tells a user which ones the other view has
+        this.refs.observe(document, f => !this._owns(f));
         const features = document.features.filter(f => this._owns(f));
         if (!features.length) return null;
         const views = { [this.owner]: sectionOf(document, this.owner) };
@@ -282,7 +353,7 @@ export class MeasurementStorage {
     }
 
     /**
-     * Export measurements as download: the 2.0 document of this view's measurements
+     * Export measurements as download: the 3.0 document of this view's measurements
      * @param {Object} geojsonData - GeoJSON FeatureCollection (see save)
      * @param {string} filename - Filename for download
      */

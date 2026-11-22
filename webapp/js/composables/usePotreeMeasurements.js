@@ -13,8 +13,10 @@
 import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
-import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused } from '@/libs/map/measurementStorage';
-import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefused, notifyRenumbered } from '@/libs/map/measurementStorage';
+import { exportMeasurements, importMeasurements, ensureProperties, applyRefs, viewerRefs, PROPERTY_BAG } from '@/libs/map/potreeMeasurementConverter';
+import { applyFields } from '@/libs/map/annotationIds';
+import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { unstatedMeasurementCrs } from '@/libs/build/pointCloudCrs';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
@@ -64,6 +66,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     let deleteTool = null;
     let storage = null;
     let dialog = null;
+    // The organization's categories, severities and statuses for the dialogs (the default ones until they are read)
+    let annotationSchema = DEFAULT_SCHEMA;
     // The measure of a history entry, whichever object stands for it now
     const refs = new WeakMap();
     // Undo, redo, load and clear change the scene themselves: their events are not history
@@ -98,13 +102,35 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         countMeasurements();
     }
 
+    // What the properties dialogs of a measure or an annotation need to offer its fields: the schema, and whether a
+    // reference the user types is one that another annotation of the file has
+    const fieldsContext = target => ({
+        schema: annotationSchema,
+        isRefTaken: ref => storageFor().refs.isTaken(ref, viewerRefs(viewer, target))
+    });
+
     function openDialog(component, props) {
         if (dialog) dialog.close();
         dialog = dialogs.open(component, { ...props, onClose: () => { dialog = null; } });
     }
 
+    // A measure or an annotation made in the viewer has an id and the next ref (one that was loaded has them already)
+    function identify(target) {
+        if (!target || target[PROPERTY_BAG]) return;
+        const properties = ensureProperties(target);
+        properties.ref = storageFor().refs.issue(viewerRefs(viewer, target));
+    }
+
+    // A drawing Potree takes back (one marker, never finished) is not kept: its ref is free again
+    const isUnfinished = measure => (measure.points || []).length < 2 && measure.maxMarkers > 1;
+    function releaseRef(measure) {
+        const ref = measure && isUnfinished(measure) && measure[PROPERTY_BAG] && measure[PROPERTY_BAG].ref;
+        if (ref) storageFor().refs.release(ref);
+    }
+
     function editMeasure(measure) {
         openDialog(MeasurementPropertiesDialog, {
+            ...fieldsContext(measure),
             feature: measureAsFeature(measure),
             geometryType: measure.showArea && measure.closed ? 'Polygon' : 'LineString',
             onSave: properties => {
@@ -117,9 +143,11 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
     function editAnnotation(annotation) {
         openDialog(AnnotationPropertiesDialog, {
+            ...fieldsContext(annotation),
             annotation,
             showDelete: true,
             onSave: properties => {
+                applyFields(ensureProperties(annotation), properties);
                 // Potree keeps both as HTML: the typed text is escaped on its way in
                 if (properties.name !== undefined) annotation.title = textToHtml(properties.name);
                 if (properties.description !== undefined) annotation.description = textToHtml(properties.description);
@@ -156,7 +184,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
     function recordRemoved(measure) {
         // A drawing Potree takes back (one marker, never finished) is nothing to restore
-        if (replaying || !measure || ((measure.points || []).length < 2 && measure.maxMarkers > 1)) return;
+        if (replaying || !measure || isUnfinished(measure)) return;
         const ref = refs.get(measure) || { measure };
         refs.set(measure, ref);
         history.push({ op: 'remove', ref, snapshot: snapshotMeasure(measure) });
@@ -258,14 +286,17 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
         session.track(scene, 'measurement_added', e => {
             countMeasurements();
+            if (!replaying) identify(e && e.measurement);
             recordAdded(e && e.measurement);
         });
         session.track(scene, 'measurement_removed', e => {
             countMeasurements();
+            releaseRef(e && e.measurement);
             recordRemoved(e && e.measurement);
         });
         session.track(scene.annotations, 'annotation_added', e => {
             countMeasurements();
+            if (e.annotation && e.annotation.position) identify(e.annotation);
             listenToAnnotation(e.annotation);
         });
         scene.annotations.traverse(listenToAnnotation);
@@ -303,6 +334,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     async function load() {
         try {
             const geojson = await storageFor().load();
+            storageFor().annotationSchema().then(schema => { annotationSchema = schema; });
             if (error.value === loadErrorText) error.value = '';
             if (!geojson) return;
             const { imported, unplaced } = replay(() => importMeasurements(geojson, viewer, coordinateSystem)) || { imported: [], unplaced: 0 };
@@ -360,6 +392,9 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
     // The file holds what the viewer shows now
     function afterFileChange(result) {
+        // The file numbered what had no ref (and renumbered a new one whose ref another session had taken)
+        applyRefs(viewer, result.refs);
+        notifyRenumbered(result);
         hasSavedMeasurements.value = result.count > 0;
         flash(saveResultMessage(result));
     }

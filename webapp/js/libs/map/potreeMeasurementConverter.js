@@ -11,6 +11,11 @@
  * can differ from the one it was saved in. Lengths, areas and radii are in the unit of length of that
  * CRS (metres, feet or US survey feet), or in metres when its heights are in another unit than its x and y
  * (cloudUnitsOf), and `unit` names it. A circle is the one through its three points, as Potree draws it.
+ *
+ * What a feature carries besides what Potree draws (its `id`, `ref`, the fields of the annotation, its creation time and
+ * every property the file has that the viewer does not know) is kept in the property bag of the measure or annotation
+ * (`ddbProperties`), and written back: a save loses none of it, and the id of a feature is the one the file gave it, not
+ * the session id Potree makes at each load.
  */
 
 import { write, VIEW, savedPositions } from '@/libs/map/measurementFormat';
@@ -18,6 +23,45 @@ import { projectorFor, geometryOf, srsDefinitionOf } from '@/libs/map/pointCloud
 import { cloudUnitsOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
 import { pathLength, groundArea, circumradius, angleAt, SAME_UNITS } from '@/libs/map/scaledGeometry';
 import { textToHtml, htmlToText } from '@/libs/sanitize';
+import { newId } from '@/libs/ids';
+import { ANNOTATION_KEYS, annotationProperties, unknownProperties } from '@/libs/map/annotationIds';
+
+/** The property of a measure or an annotation that holds the identity, the fields and the unknown properties of its feature. */
+export const PROPERTY_BAG = 'ddbProperties';
+
+// What the viewer reads and writes itself; a feature may have more, which it keeps (unknownProperties)
+const KNOWN_PROPERTIES = new Set([
+    'measurementType', 'name', 'description', 'color', 'stroke-width', 'stroke-opacity', 'fill', 'fill-opacity',
+    'showDistances', 'showCoordinates', 'showArea', 'showAngles', 'showCircle', 'showHeight', 'showEdges', 'closed',
+    'localCoordinates', 'groupId', 'area', 'perimeter', 'unit', 'distance', 'radius', 'circumference', 'angle', 'vertices',
+    'createdAt', ...ANNOTATION_KEYS
+]);
+
+/**
+ * The property bag of a feature that is loaded: its identity and fields, its creation time, and what is not the viewer's.
+ * @param {Record<string, any>} props  the properties of the feature
+ * @returns {Record<string, any>}
+ */
+export function propertyBagOf(props) {
+    const bag = annotationProperties(props);
+    if (typeof props.createdAt === 'string') bag.createdAt = props.createdAt;
+    const extra = unknownProperties(props, KNOWN_PROPERTIES);
+    if (Object.keys(extra).length) bag.extra = extra;
+    return bag;
+}
+
+/**
+ * The property bag of a measure or an annotation, with the `id` (and the creation time) a new one lacks. A measure
+ * made in the viewer gets them when it is added; a feature of an old file that was read by something else than
+ * measurementFormat gets an id here, once, so it keeps it.
+ * @param {any} target  a Potree.Measure or Potree.Annotation
+ * @returns {Record<string, any>}
+ */
+export function ensureProperties(target) {
+    const bag = target[PROPERTY_BAG] || (target[PROPERTY_BAG] = { createdAt: new Date().toISOString() });
+    if (!bag.id) bag.id = newId();
+    return bag;
+}
 
 /** @param {number} value  to 2 decimals */
 const rounded = value => parseFloat(value.toFixed(2));
@@ -31,6 +75,43 @@ const rounded = value => parseFloat(value.toFixed(2));
 function measurementFrame(srs) {
     const units = cloudUnitsOf(srs);
     return units.mixed ? { scale: units.metresPerAxis, unit: LINEAR_UNITS.METRE } : { scale: SAME_UNITS, unit: units.horizontal };
+}
+
+/**
+ * The measures and the annotations of the viewer that a save writes.
+ * @param {any} viewer  a Potree.Viewer
+ * @returns {any[]}
+ */
+function savedObjects(viewer) {
+    const objects = [...(viewer.scene.measurements || [])];
+    viewer.scene.annotations.traverse((/** @type {any} */ annotation) => {
+        if (annotation && annotation.position) objects.push(annotation);
+    });
+    return objects;
+}
+
+/**
+ * The refs that the measures and annotations of the viewer have.
+ * @param {any} viewer
+ * @param {any} [except]  a measure or annotation to leave out (the one a dialog is editing)
+ * @returns {string[]}
+ */
+export const viewerRefs = (viewer, except) => savedObjects(viewer)
+    .filter(object => object !== except)
+    .map(object => object[PROPERTY_BAG]?.ref)
+    .filter(Boolean);
+
+/**
+ * Gives the measures and annotations the refs a save wrote for them (by id): the file numbered the ones that had no
+ * ref, and gave a new one to those whose ref another session had taken.
+ * @param {any} viewer
+ * @param {Record<string, string>} refs  the ref of each feature of the view, by id
+ */
+export function applyRefs(viewer, refs) {
+    savedObjects(viewer).forEach(object => {
+        const bag = object[PROPERTY_BAG];
+        if (bag && bag.id && refs[bag.id]) bag.ref = refs[bag.id];
+    });
 }
 
 /**
@@ -108,11 +189,23 @@ function measureToGeoJSON(measure, projector, { scale, unit }) {
         properties.vertices = measure.points.map(p => [p.position.x, p.position.y, p.position.z]);
     }
 
+    return featureOf(measure, geometry, properties);
+}
+
+/**
+ * The GeoJSON feature of a measure or an annotation: its viewer properties under those of its bag, and its `id` as the
+ * id of the feature.
+ * @param {any} target
+ * @param {Record<string, any>} geometry
+ * @param {Record<string, any>} properties
+ */
+function featureOf(target, geometry, properties) {
+    const { extra, createdAt, ...fields } = ensureProperties(target);
     return {
         type: 'Feature',
-        id: measure.uuid || measure.name,
-        geometry: geometry,
-        properties: properties
+        id: fields.id,
+        geometry,
+        properties: { ...extra, ...properties, ...(createdAt ? { createdAt } : {}), ...fields }
     };
 }
 
@@ -161,6 +254,9 @@ function geoJSONToMeasure(feature, positions) {
         const position = new THREE.Vector3(coord[0], coord[1], coord[2]);
         measure.addMarker({ position: position });
     });
+
+    // Its identity and fields, and the properties of the file that the viewer does not know
+    measure[PROPERTY_BAG] = propertyBagOf(props);
 
     return measure;
 }
@@ -216,20 +312,12 @@ function annotationToGeoJSON(annotation, projector) {
 
     const coords = projector.toGeographic(annotation.position);
 
-    return {
-        type: 'Feature',
-        id: annotation.uuid || annotation.title,
-        geometry: {
-            type: 'Point',
-            coordinates: coords
-        },
-        properties: {
-            measurementType: 'annotation',
-            name: htmlToText(annotation.title) || 'Annotation',
-            description: htmlToText(annotation.description),
-            localCoordinates: [annotation.position.x, annotation.position.y, annotation.position.z]
-        }
-    };
+    return featureOf(annotation, { type: 'Point', coordinates: coords }, {
+        measurementType: 'annotation',
+        name: htmlToText(annotation.title) || 'Annotation',
+        description: htmlToText(annotation.description),
+        localCoordinates: [annotation.position.x, annotation.position.y, annotation.position.z]
+    });
 }
 
 /**
@@ -246,6 +334,7 @@ function geoJSONToAnnotation(feature, positions) {
         title: textToHtml(props.name || 'Annotation'),
         description: textToHtml(props.description)
     });
+    annotation[PROPERTY_BAG] = propertyBagOf(props);
 
     return annotation;
 }

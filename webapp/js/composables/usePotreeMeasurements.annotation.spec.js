@@ -13,6 +13,12 @@ import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/Annotation
 
 vi.mock('@/composables/useMapAlerts', () => ({ flash: vi.fn() }));
 
+// The organization's schema comes from the Registry: the default one here
+vi.mock('@/libs/reports/reportSettings', async importOriginal => {
+    const actual = await importOriginal();
+    return { ...actual, datasetReportSettings: async () => ({ templates: [actual.DEFAULT_TEMPLATE], schema: actual.DEFAULT_SCHEMA }) };
+});
+
 const { usePotreeMeasurements } = await import('./usePotreeMeasurements');
 
 const PATH = 'a/cloud_measurements.geojson';
@@ -20,7 +26,7 @@ const FILE = {
     type: 'FeatureCollection',
     features: [{
         type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] },
-        properties: { measurementType: 'annotation', name: "Gate A & B's", description: 'first\nsecond', localCoordinates: [1, 2, 3] }
+        properties: { measurementType: 'annotation', name: "Gate A & B's", description: 'first\nsecond', localCoordinates: [1, 2, 3], customKey: 5 }
     }]
 };
 
@@ -122,5 +128,53 @@ describe('the annotation dialog', () => {
         expect(tooltip.innerHTML).toBe('Tom &amp; Jerry &lt;3<br>second');
         expect(tooltip.textContent).toBe('Tom & Jerry <3second');
         expect(tooltip.querySelectorAll('br')).toHaveLength(1);
+    });
+});
+
+describe('the identity and the fields of an annotation', () => {
+    it('keeps a property of the file that it does not know, and has an id and a ref after its first save', async () => {
+        const { m } = await start();
+        await m.save();
+        const saved = JSON.parse(stored[PATH]);
+        expect(saved.metadata).toMatchObject({ version: '3.0', lastRef: 1 });
+        expect(saved.features[0].properties).toMatchObject({ customKey: 5, ref: '1', name: "Gate A & B's" });
+        expect(saved.features[0].properties.id).toMatch(/^[0-9a-f]{64}$/);
+        expect(saved.features[0].id).toBe(saved.features[0].properties.id);
+    });
+
+    it('is saved with the fields the dialog sets, and the dialog shows them next time', async () => {
+        const { m, dialogs, annotation } = await start();
+        const props = openedDialog(dialogs, annotation);
+        expect(props.schema.statuses.map(s => s.id)).toContain('open');
+        props.onSave({ name: 'Gate', description: '', ref: 'G-1', category: 'defect', severity: 'high', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false });
+        await m.save();
+        expect(JSON.parse(stored[PATH]).features[0].properties).toMatchObject({
+            ref: 'G-1', category: 'defect', severity: 'high', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false, customKey: 5
+        });
+
+        wrapper = mount(AnnotationPropertiesDialog, { props: { annotation, schema: props.schema }, attachTo: document.body, global: { plugins: [PrimeVue] } });
+        await flushPromises();
+        expect(document.getElementById('ap-ref').value).toBe('G-1');
+        expect(document.getElementById('ap-assignee').value).toBe('Anna');
+        expect(document.getElementById('ap-due').value).toBe('2026-12-01');
+        expect(document.querySelector('#ap-category .p-select-label, [id="ap-category"]').textContent).toContain('Defect');
+    });
+
+    it('refuses a ref another annotation has, in the dialog, with its message', async () => {
+        const { dialogs, annotation } = await start();
+        const props = openedDialog(dialogs, annotation);
+        expect(props.isRefTaken('1')).toBe(false);
+        wrapper = mount(AnnotationPropertiesDialog, { props: { annotation, schema: props.schema, isRefTaken: ref => ref === '3' }, attachTo: document.body, global: { plugins: [PrimeVue] } });
+        await flushPromises();
+        const input = document.getElementById('ap-ref');
+        input.value = '3';
+        input.dispatchEvent(new Event('input'));
+        await flushPromises();
+        expect(document.getElementById('ap-ref-error').textContent).toBe('Reference 3 is already used');
+        expect([...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save').disabled).toBe(true);
+        input.value = '4';
+        input.dispatchEvent(new Event('input'));
+        await flushPromises();
+        expect(document.getElementById('ap-ref-error')).toBeNull();
     });
 });

@@ -1,0 +1,323 @@
+// @ts-check
+/**
+ * The identity of an annotation in a measurements file: its `id` (never changes), its `ref` (the short
+ * reference people say aloud: "item 7") and the inspection fields that go with them. One module for the
+ * 2D map, the 3D viewer and the report, so that they all give the same id and the same ref to the same
+ * feature (measurementFormat uses it when it reads and writes a file).
+ *
+ * `id`: a feature saved by this Hub has one (libs/ids.newId). A feature of an older file has none: every
+ * reader gives it the same one, made from what the file says of it (backfillIds), so two views that load
+ * the file before either has saved it agree on it, and a view that loaded it before another one saved it
+ * finds the id that save wrote.
+ *
+ * `ref`: a string of 1 to 8 letters, digits and dashes. The Hub issues the integers 1, 2, 3 ... and never
+ * issues one twice in a file, also after the annotation that had it is deleted: `metadata.lastRef` keeps
+ * the highest one, and the next is 1 plus the larger of that and the highest integer ref in the file.
+ * An annotation keeps its ref when others are added, deleted or reordered. A feature without one is given
+ * one by the first save of either view (assignRefs).
+ */
+import { sha256Hex } from '@/libs/sha256';
+
+/** What a reference is made of: 1 to 8 letters, digits and dashes. */
+export const REF_PATTERN = /^[A-Za-z0-9-]{1,8}$/;
+/** The limits of the fields of an annotation. */
+export const FIELD_LIMITS = Object.freeze({ assignee: 100, description: 10000, photos: 12, caption: 200 });
+/** The fields of an annotation that the properties dialogs edit besides its name, description and look. */
+export const FIELD_KEYS = Object.freeze(['ref', 'category', 'severity', 'status', 'assignee', 'dueDate', 'report']);
+/**
+ * Everything an annotation carries besides what the views keep in their own objects: the identity, the
+ * fields, the photos and the snapshot (their UI is the photos tab's and the report's, the file keeps them
+ * as they are).
+ */
+export const ANNOTATION_KEYS = Object.freeze(['id', 'ref', 'category', 'severity', 'status', 'assignee', 'dueDate', 'report', 'photos', 'snapshot']);
+
+/** @param {any} v @returns {v is Record<string, any>} */
+const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** @param {any} feature @returns {string} the `id` of a feature, '' when it has none */
+export const idOf = feature => (typeof feature?.properties?.id === 'string' ? feature.properties.id : '');
+
+/** @param {any} feature @returns {string} the `ref` of a feature, '' when it has none */
+export const refOf = feature => {
+    const ref = feature?.properties?.ref;
+    return typeof ref === 'string' || typeof ref === 'number' ? String(ref) : '';
+};
+
+/** @param {string} ref  whether it is a reference the format allows */
+export const isValidRef = ref => REF_PATTERN.test(ref);
+
+/** The message of a reference typed by the user that another annotation of the file uses. @param {string} ref */
+export const refTakenMessage = ref => `Reference ${ref} is already used`;
+
+/** The message of a save that found the reference of a new annotation taken by another session. @param {{ from: string, to: string }} change */
+export const renumberedMessage = ({ from, to }) => `Reference ${from} was taken; the item is now ${to}`;
+
+/** @param {string} ref @returns {number} the integer a ref is (digits only), or 0 */
+const integerRef = ref => (/^\d{1,8}$/.test(ref) ? Number(ref) : 0);
+
+/**
+ * The highest integer ref among some refs.
+ * @param {Iterable<string>} refs
+ * @returns {number} 0 when there is none
+ */
+export function highestRef(refs) {
+    let highest = 0;
+    for (const ref of refs) highest = Math.max(highest, integerRef(ref));
+    return highest;
+}
+
+/** @param {any[]} features @returns {string[]} the refs the features have */
+const refsOf = features => features.map(refOf).filter(Boolean);
+
+/**
+ * The features of a file with the `id` each one lacks: the lower-case hex SHA-256 of the JSON array
+ * `[owner, createdAt, geometry]` as the file stores them (`null` for a feature with no createdAt). When
+ * several features have the same hash the first keeps it and the next ones get the suffix `-2`, `-3` and
+ * higher, in file order. It must be given the features as they were read, before any correction of their
+ * geometry: a file read with and without the CRS of its point cloud must give the same ids.
+ * @param {any[]} features
+ * @param {(feature: any) => string} ownerOf  the view a feature belongs to
+ * @returns {any[]}  the same array when every feature has an id, else a new one
+ */
+export function backfillIds(features, ownerOf) {
+    if (features.every(f => !isObject(f) || idOf(f))) return features;
+    const taken = new Set(features.map(idOf).filter(Boolean));
+    /** @type {Map<string, number>} */
+    const seen = new Map();
+    return features.map(feature => {
+        if (!isObject(feature) || idOf(feature)) return feature;
+        const properties = isObject(feature.properties) ? feature.properties : {};
+        const hash = sha256Hex(JSON.stringify([ownerOf(feature), properties.createdAt ?? null, feature.geometry ?? null]));
+        let n = (seen.get(hash) ?? 0) + 1;
+        let id = n === 1 ? hash : `${hash}-${n}`;
+        while (taken.has(id)) id = `${hash}-${++n}`;
+        seen.set(hash, n);
+        taken.add(id);
+        return { ...feature, properties: { ...properties, id } };
+    });
+}
+
+/** @param {any} feature @returns {number} the time a feature was created at, NaN when it says none */
+const createdAtOf = feature => Date.parse(feature?.properties?.createdAt);
+
+/**
+ * The order in which unnumbered features get their refs: ascending `createdAt`; those with the same time, and
+ * those with none (they come after the ones with one), in the order of the file.
+ * @template {{ feature: any, index: number }} T
+ * @param {T[]} entries  the features with their position in the file
+ * @returns {T[]}
+ */
+export function inCreationOrder(entries) {
+    return [...entries].sort((a, b) => {
+        const ta = createdAtOf(a.feature);
+        const tb = createdAtOf(b.feature);
+        const hasA = !Number.isNaN(ta);
+        const hasB = !Number.isNaN(tb);
+        if (hasA !== hasB) return hasA ? -1 : 1;
+        if (hasA && ta !== tb) return ta - tb;
+        return a.index - b.index;
+    });
+}
+
+/**
+ * The features with the refs that were missing, and the highest ref issued. A feature without a ref gets the
+ * next one: 1 plus the larger of `lastRef` and the highest integer ref of the features. The ones without
+ * one are numbered in creation order (inCreationOrder), whichever view they belong to; every other feature
+ * and every other property stay as they are.
+ * @param {any[]} features  all the features of the file, in the order they will be written
+ * @param {{ lastRef?: number, fileOrder?: (feature: any, index: number) => number }} [options]  `lastRef`: the
+ *   highest ref the file says was issued; `fileOrder`: the position of a feature in the file it was read from
+ *   (its index in `features` by default), which breaks the ties of the creation time
+ * @returns {{ features: any[], lastRef: number, assigned: number }}  `assigned`: how many refs were issued
+ */
+export function assignRefs(features, { lastRef = 0, fileOrder = (_feature, index) => index } = {}) {
+    let counter = Math.max(lastRef, highestRef(refsOf(features)));
+    const missing = features
+        .map((feature, index) => ({ feature, index: fileOrder(feature, index), at: index }))
+        .filter(({ feature }) => isObject(feature) && !refOf(feature));
+    if (!missing.length) return { features, lastRef: Math.max(lastRef, counter), assigned: 0 };
+
+    const result = [...features];
+    for (const { feature, at } of inCreationOrder(missing)) {
+        counter++;
+        result[at] = { ...feature, properties: { ...(isObject(feature.properties) ? feature.properties : {}), ref: String(counter) } };
+    }
+    return { features: result, lastRef: counter, assigned: missing.length };
+}
+
+/**
+ * The new features whose ref another feature of the file has (another session issued it first): each gets the
+ * next ref instead. Only the features the caller says are new are changed: a saved one keeps its ref
+ * (the same ref in two saved features is the file's, shown as a warning).
+ * @param {any[]} features  all the features of the file
+ * @param {(feature: any) => boolean} isNew  whether a feature was never saved
+ * @param {(feature: any) => boolean} isOther  whether a feature belongs to the file as another session wrote it
+ * @param {number} lastRef  the highest ref the file says was issued
+ * @returns {{ features: any[], lastRef: number, changes: { id: string, from: string, to: string }[] }}
+ */
+export function renumberTaken(features, isNew, isOther, lastRef) {
+    const used = new Set(features.filter(isOther).map(refOf).filter(Boolean));
+    let counter = Math.max(lastRef, highestRef(refsOf(features)));
+    /** @type {{ id: string, from: string, to: string }[]} */
+    const changes = [];
+    const result = features.map(feature => {
+        const ref = refOf(feature);
+        if (!ref || !isNew(feature) || !used.has(ref)) return feature;
+        const to = String(++counter);
+        changes.push({ id: idOf(feature), from: ref, to });
+        return { ...feature, properties: { ...feature.properties, ref: to } };
+    });
+    return { features: changes.length ? result : features, lastRef: Math.max(lastRef, counter), changes };
+}
+
+/**
+ * The refs that more than one feature has.
+ * @param {Iterable<string>} refs
+ * @returns {string[]}
+ */
+export function duplicateRefs(refs) {
+    const seen = new Set();
+    const repeated = new Set();
+    for (const ref of refs) {
+        if (!ref) continue;
+        if (seen.has(ref)) repeated.add(ref);
+        seen.add(ref);
+    }
+    return [...repeated];
+}
+
+/**
+ * The refs a view issues while it is open, and the refs it knows other features have. A view reads the
+ * file (observe), issues a ref to each annotation made in it (issue: the next after every ref it knows
+ * and every ref it issued, so a deleted annotation's ref is not issued again), and tells a user who types a
+ * ref whether the file already uses it (isTaken). The save decides in the end (renumberTaken).
+ */
+export class RefSequence {
+    constructor() {
+        /** The highest ref known: the file's `lastRef`, its highest ref and what the view issued */
+        this.floor = 0;
+        /** What the file's own highest was when it was read (a ref issued after that can be taken back) */
+        this._base = 0;
+        /** The refs of the features that the view does not own: the ones it neither shows nor saves */
+        this.foreign = new Set();
+    }
+
+    /**
+     * Takes the file as it is now.
+     * @param {{ metadata?: any, features?: any[] } | null | undefined} document  as measurementFormat reads it
+     * @param {(feature: any) => boolean} isForeign  whether the view leaves the feature alone
+     */
+    observe(document, isForeign) {
+        const features = Array.isArray(document?.features) ? document.features : [];
+        const lastRef = Number(document?.metadata?.lastRef);
+        const known = Math.max(Number.isFinite(lastRef) ? lastRef : 0, highestRef(refsOf(features)));
+        this.floor = Math.max(this.floor, known);
+        this._base = Math.max(this._base, known);
+        this.foreign = new Set(features.filter(isForeign).map(refOf).filter(Boolean));
+    }
+
+    /**
+     * The next ref.
+     * @param {Iterable<string>} [inUse]  the refs of the annotations of the view that are not in the file yet
+     * @returns {string}
+     */
+    issue(inUse = []) {
+        this.floor = Math.max(this.floor, highestRef(inUse)) + 1;
+        return String(this.floor);
+    }
+
+    /** Takes back the ref just issued when the annotation it was for is not kept (a point that was discarded). @param {string} ref */
+    release(ref) {
+        if (integerRef(ref) === this.floor && this.floor > this._base) this.floor--;
+    }
+
+    /**
+     * Whether a ref is one a feature of the file or of the view has.
+     * @param {string} ref
+     * @param {Iterable<string>} [own]  the refs of the other annotations of the view
+     */
+    isTaken(ref, own = []) {
+        return this.foreign.has(ref) || [...own].includes(ref);
+    }
+}
+
+/**
+ * Whether a text is a calendar date, `YYYY-MM-DD`.
+ * @param {any} value
+ */
+export function isDueDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/**
+ * The fields of an annotation as they are stored: a field without a value is absent (undefined), an
+ * assignee is a trimmed text of 1 to 100 characters, a due date a calendar date, `report` is stored only when
+ * it is false (absent means true).
+ * @param {Record<string, any>} values
+ * @returns {Record<string, string | boolean | undefined>}
+ */
+export function storedFields(values) {
+    /** @param {any} v @returns {string | undefined} */
+    const text = v => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+    return {
+        ref: text(values.ref),
+        category: text(values.category),
+        severity: text(values.severity),
+        status: text(values.status),
+        assignee: text(values.assignee)?.slice(0, FIELD_LIMITS.assignee),
+        dueDate: isDueDate(values.dueDate) ? values.dueDate : undefined,
+        report: values.report === false ? false : undefined
+    };
+}
+
+/**
+ * The properties of a feature that no view knows, to keep when it is saved again (a loaded file may have been
+ * written by another tool or a newer Hub).
+ * @param {Record<string, any> | null | undefined} properties
+ * @param {ReadonlySet<string>} known  the keys the converter reads and writes itself
+ * @returns {Record<string, any>}
+ */
+export function unknownProperties(properties, known) {
+    return Object.fromEntries(Object.entries(isObject(properties) ? properties : {}).filter(([key]) => !known.has(key)));
+}
+
+/**
+ * The properties of a feature that belong to its identity and fields, to carry from a loaded feature to the
+ * object a view keeps and back (the photos and the snapshot included).
+ * @param {Record<string, any> | null | undefined} properties
+ * @returns {Record<string, any>}
+ */
+export function annotationProperties(properties) {
+    const source = isObject(properties) ? properties : {};
+    return Object.fromEntries(ANNOTATION_KEYS.filter(key => source[key] !== undefined && source[key] !== null).map(key => [key, source[key]]));
+}
+
+/**
+ * Sets the fields of an annotation (FIELD_KEYS) on the object that holds them: a value of undefined removes the
+ * field, a key the values do not have leaves it as it is.
+ * @param {Record<string, any>} target
+ * @param {Record<string, any>} values
+ * @returns {Record<string, any>} the target
+ */
+export function applyFields(target, values) {
+    for (const key of FIELD_KEYS) {
+        if (!(key in values)) continue;
+        if (values[key] === undefined || values[key] === null) delete target[key];
+        else target[key] = values[key];
+    }
+    return target;
+}
+
+/**
+ * The name of a category, severity or status: its name in the schema, `Unknown (<id>)` for an id the schema does
+ * not have (the schema changed, or the file came from another organization), '' for no value.
+ * @param {{ id: string, name: string }[] | undefined} choices  the entries of one list of the schema
+ * @param {string | undefined | null} id
+ * @returns {string}
+ */
+export function choiceLabel(choices, id) {
+    if (!id) return '';
+    return (choices || []).find(choice => choice.id === id)?.name ?? `Unknown (${id})`;
+}

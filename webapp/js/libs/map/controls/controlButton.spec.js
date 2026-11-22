@@ -67,6 +67,7 @@ describe('map controls', () => {
             'Stop Measuring': glyph(icons.STOP_ICON),
             'Measurement List': glyph(icons.MEASUREMENT_LIST_ICON),
             'Always Show Point Callouts': glyph(icons.CALLOUTS_ICON),
+            'Show References': glyph('fa-solid fa-hashtag'),
             'Save Measurements': glyph(icons.SAVE_ICON),
             'Clear All Measurements': glyph(icons.CLEAR_ALL_ICON),
             'Export Measurements as GeoJSON': glyph(icons.EXPORT_GEOJSON_ICON),

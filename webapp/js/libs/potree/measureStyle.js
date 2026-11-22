@@ -6,6 +6,8 @@
  */
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 import { textToHtml, htmlToText } from '@/libs/sanitize';
+import { FIELD_KEYS, applyFields } from '@/libs/map/annotationIds';
+import { PROPERTY_BAG, ensureProperties } from '@/libs/map/potreeMeasurementConverter';
 
 /** '#rrggbb' of a THREE.Color, or the fallback. */
 export const hexOf = (color, fallback = MEASURE_COLOR) => (color ? '#' + color.getHexString() : fallback);
@@ -49,11 +51,23 @@ function applyAreaFill(measure) {
 }
 
 /**
+ * The fields of an annotation that a measure or an annotation of the viewer has, as the properties dialogs read them
+ * (`ref`, `category`, ..., see FIELD_KEYS).
+ * @param {any} target  a Potree.Measure or Potree.Annotation
+ * @returns {Record<string, any>}
+ */
+export function annotationFieldsOf(target) {
+    const bag = target[PROPERTY_BAG] || {};
+    return Object.fromEntries(FIELD_KEYS.filter(key => bag[key] !== undefined).map(key => [key, bag[key]]));
+}
+
+/**
  * The measure as the map's MeasurementPropertiesDialog reads a feature (`get(prop)`).
  * @param {any} measure
  */
 export function measureAsFeature(measure) {
     const values = {
+        ...annotationFieldsOf(measure),
         name: htmlToText(measure.name),
         description: measure.description || '',
         stroke: hexOf(measure.color),
@@ -66,7 +80,8 @@ export function measureAsFeature(measure) {
 }
 
 /**
- * Copies the dialog's properties onto the measure (then applyMeasureStyle draws them).
+ * Copies the dialog's properties onto the measure (then applyMeasureStyle draws them); the fields of the
+ * annotation go to its property bag.
  * @param {any} measure
  * @param {Record<string, any>} p
  */
@@ -78,4 +93,5 @@ export function assignMeasureProperties(measure, p) {
     if (p['stroke-opacity'] !== undefined) measure.strokeOpacity = p['stroke-opacity'];
     if (p['fill-opacity'] !== undefined) measure.fillOpacity = p['fill-opacity'];
     if (p.fill) measure.fillColor = new THREE.Color(p.fill);
+    applyFields(ensureProperties(measure), p);
 }

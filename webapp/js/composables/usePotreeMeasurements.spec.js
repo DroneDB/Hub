@@ -18,12 +18,14 @@ vi.mock('@/libs/potree/measureLabels', () => ({
     updateAnnotationTooltip: vi.fn()
 }));
 // The viewer's measures are plain objects here: the converter writes and reads them as features
-vi.mock('@/libs/map/potreeMeasurementConverter', () => ({
+vi.mock('@/libs/map/potreeMeasurementConverter', async importOriginal => ({
+    // The property bag helpers are the real ones: a measure made in the viewer gets its id and ref
+    ...(await importOriginal()),
     exportMeasurements: viewer => ({
         type: 'FeatureCollection',
         metadata: {},
         features: viewer.scene.measurements.map(m => ({ type: 'Feature', geometry: null,
-            properties: { name: m.name, measurementType: 'distance', localCoordinates: [[0, 0, 0]] } }))
+            properties: { name: m.name, measurementType: 'distance', localCoordinates: [[0, 0, 0]], ...(m.ddbProperties ? { id: m.ddbProperties.id, ref: m.ddbProperties.ref } : {}) } }))
     }),
     // A feature marked `unplaced` stands for one in a CRS that cannot be converted to the cloud's: it is left out
     importMeasurements: (geojson, viewer) => {
@@ -36,6 +38,12 @@ vi.mock('@/libs/map/potreeMeasurementConverter', () => ({
         return { imported, unplaced: geojson.features.length - placed.length };
     }
 }));
+
+// The organization's schema comes from the Registry: the default one here
+vi.mock('@/libs/reports/reportSettings', async importOriginal => {
+    const actual = await importOriginal();
+    return { ...actual, datasetReportSettings: async () => ({ templates: [actual.DEFAULT_TEMPLATE], schema: actual.DEFAULT_SCHEMA }) };
+});
 
 const { usePotreeMeasurements } = await import('./usePotreeMeasurements');
 const { updateNameLabel } = await import('@/libs/potree/measureLabels');
@@ -548,5 +556,108 @@ describe('usePotreeMeasurements', () => {
             listeners.get('other:dblclick')(new MouseEvent('dblclick'));
             expect(dialogs.open).toHaveBeenCalledTimes(1);
         });
+    });
+});
+
+describe('the id and the ref of the measures of the viewer', () => {
+    const pointsOf = (...xs) => xs.map(x => ({ position: { x, y: 0, z: 0 } }));
+    const startDrawing = name => {
+        const measure = Object.assign(new Measure(), { name, restored: false, points: pointsOf(0), spheres: [{}], maxMarkers: 2 });
+        viewer.scene.addMeasurement(measure);
+        return measure;
+    };
+    const finishDrawing = (measure, ...xs) => { measure.points = pointsOf(0, ...xs); viewer.inputHandler = {}; };
+
+    it('a measure made in the viewer has an id and the next ref, which no other measure has', async () => {
+        const m = start();
+        await m.load();
+        const first = startDrawing('d1');
+        finishDrawing(first, 5);
+        const second = startDrawing('d2');
+        finishDrawing(second, 6);
+        expect(first.ddbProperties).toMatchObject({ ref: '1' });
+        expect(second.ddbProperties).toMatchObject({ ref: '2' });
+        expect(first.ddbProperties.id).toBeTruthy();
+        expect(first.ddbProperties.id).not.toBe(second.ddbProperties.id);
+        expect(first.ddbProperties.createdAt).toBeTruthy();
+    });
+
+    it('a ref is issued after the ones the file has, the map\'s too', async () => {
+        stored[PATH] = JSON.stringify({ type: 'FeatureCollection', metadata: { lastRef: 7 }, features: [{ ...mapFeature('m1'), properties: { ...mapFeature('m1').properties, id: 'm1', ref: '3' } }] });
+        const m = start();
+        await m.load();
+        const measure = startDrawing('d1');
+        expect(measure.ddbProperties.ref).toBe('8');
+    });
+
+    it('a drawing that Potree takes back (never finished) gives its ref back; a measure that was kept and deleted does not', async () => {
+        const m = start();
+        await m.load();
+        const drawing = startDrawing('d1');
+        expect(drawing.ddbProperties.ref).toBe('1');
+        viewer.scene.removeMeasurement(drawing);
+        const kept = startDrawing('d2');
+        expect(kept.ddbProperties.ref).toBe('1');
+        finishDrawing(kept, 5);
+        viewer.scene.removeMeasurement(kept);
+        const next = startDrawing('d3');
+        expect(next.ddbProperties.ref).toBe('2');
+    });
+
+    it('undo brings a deleted measure back with its id and its ref and its fields, not new ones', async () => {
+        const m = start();
+        await m.load();
+        const measure = startDrawing('d1');
+        finishDrawing(measure, 5);
+        measure.ddbProperties.category = 'defect';
+        measure.ddbProperties.extra = { customKey: 5 };
+        const before = JSON.parse(JSON.stringify(measure.ddbProperties));
+        viewer.scene.removeMeasurement(measure);
+        m.undo();
+        const copy = viewer.scene.measurements.find(x => x.name === 'd1');
+        expect(copy).toBeTruthy();
+        expect(copy).not.toBe(measure);
+        expect(copy.ddbProperties).toEqual(before);
+        // The ref of the copy is not issued again
+        const other = startDrawing('d2');
+        expect(other.ddbProperties.ref).toBe('2');
+    });
+
+    it('the properties dialog is given the schema, a check of the refs of the other measures, and sets the fields on save', async () => {
+        const m = start();
+        await m.load();
+        const one = startDrawing('d1');
+        finishDrawing(one, 5);
+        const two = startDrawing('d2');
+        finishDrawing(two, 6);
+        labels.measureAt = () => one;
+        listeners.get('other:dblclick')(new MouseEvent('dblclick'));
+        const props = dialogs.open.mock.calls.at(-1)[1];
+        expect(props.schema.categories.length).toBeGreaterThan(0);
+        expect(props.isRefTaken('2')).toBe(true);
+        expect(props.isRefTaken('1')).toBe(false);
+        props.onSave({ name: 'First', category: 'defect', status: 'open', ref: '9' });
+        expect(one.ddbProperties).toMatchObject({ category: 'defect', status: 'open', ref: '9' });
+        // The ref the dialog frees is free again for the dialog to check
+        expect(props.isRefTaken('9')).toBe(false);
+    });
+
+    it('a save takes the refs the file wrote, and says so when a new measure\'s ref was taken by another session', async () => {
+        const m = start();
+        await m.load();
+        const measure = startDrawing('d1');
+        finishDrawing(measure, 5);
+        expect(measure.ddbProperties.ref).toBe('1');
+        // Another session of the map saved an item with the same ref meanwhile
+        stored[PATH] = JSON.stringify({ type: 'FeatureCollection', metadata: { lastRef: 1 }, features: [{ ...mapFeature('theirs'), properties: { ...mapFeature('theirs').properties, id: 'theirs', ref: '1' } }] });
+        const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
+        try {
+            await m.save();
+            expect(measure.ddbProperties.ref).toBe('2');
+            expect(warn).toHaveBeenCalledWith('Reference 1 was taken; the item is now 2', expect.anything());
+            expect(JSON.parse(stored[PATH]).features.find(f => f.properties.id === measure.ddbProperties.id).properties.ref).toBe('2');
+        } finally {
+            warn.mockRestore();
+        }
     });
 });
