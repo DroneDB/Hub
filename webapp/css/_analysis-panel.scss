@@ -390,9 +390,24 @@
         line-height: 1.2;
         white-space: nowrap;
 
+        // Centring the boxes puts the middle of an icon on the middle of the capitals, which is above the middle of the
+        // lowercase letters most of a label is made of: the label looked lower than its icon. The icon goes down to
+        // between the two (about 0.7px). A relative offset, not a transform, so a spinning icon keeps it
         i {
             flex: none;
+            position: relative;
+            top: 0.05em;
             font-size: 0.95rem;
+        }
+
+        // Font Awesome draws its chevrons 1/16 em off the middle of the glyph box, toward where they point; this puts
+        // them on the line of the other icons
+        i.fa-chevron-up {
+            top: 0.1125em;
+        }
+
+        i.fa-chevron-down {
+            top: -0.0125em;
         }
     }
 
