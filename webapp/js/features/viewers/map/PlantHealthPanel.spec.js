@@ -719,3 +719,84 @@ describe('PlantHealthPanel layout', () => {
         expect(wrapper.get('#plant-health-panel-formula').attributes('aria-describedby')).toBe(hint.attributes('id'));
     });
 });
+
+describe('PlantHealthPanel formulas while the raster metadata loads', () => {
+    // A promise the test settles: the first read of a large raster computes its statistics and takes minutes
+    function deferred() {
+        let resolve;
+        let reject;
+        const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+        return { promise, resolve, reject };
+    }
+    function mountPending(getRasterMetadata, props = {}) {
+        dataset = {
+            getRasterInfo: vi.fn(async () => ({ bands: [{}, {}, {}] })),
+            getRasterMetadata,
+            getRasterValueInfo: vi.fn(async () => ({ bandCount: 3, dataType: 'Byte', isThermal: false, unit: '' }))
+        };
+        wrapper = mount(PlantHealthPanel, {
+            props: { visible: true, dataset, filePath: 'ortho.tif', ...props },
+            global: { stubs: { PlantHealthFormulasDialog: true, ColormapDropdown: true, BandSelector: true, Chart: true }, mocks: { $notify: notify } }
+        });
+        return wrapper;
+    }
+    const select = () => wrapper.get('[data-testid="plant-health-formula"]');
+    const dialogState = () => wrapper.findComponent({ name: 'PlantHealthFormulasDialog' }).props('state');
+
+    it('says that it reads the statistics, with the select off, until the formulas come', async () => {
+        const meta = deferred();
+        mountPending(vi.fn(() => meta.promise));
+        await flushPromises();
+        expect(wrapper.find('[data-testid="plant-health-formulas-loading"]').text()).toContain('Reading the statistics of the raster');
+        expect(select().attributes('disabled')).toBeDefined();
+        expect(select().attributes('aria-describedby')).toBe('plant-health-panel-formula-status');
+        expect(dialogState()).toBe('loading');
+
+        meta.resolve({ algorithms: ALGORITHMS, statistics: { 1: { min: 0, max: 1, mean: 0.5, std: 0.1 } } });
+        await flushPromises();
+        expect(wrapper.find('[data-testid="plant-health-formulas-loading"]').exists()).toBe(false);
+        expect(select().attributes('disabled')).toBeUndefined();
+        expect(select().findAll('option').map(o => o.attributes('value'))).toEqual(['', 'NDVI', 'EXG']);
+        expect(dialogState()).toBe('ready');
+    });
+
+    it('says why the formulas could not be read, and reads them again on Try again', async () => {
+        const getRasterMetadata = vi.fn()
+            .mockRejectedValueOnce(new Error('Gateway Timeout'))
+            .mockResolvedValueOnce({ algorithms: ALGORITHMS, statistics: {} });
+        mountPending(getRasterMetadata);
+        await flushPromises();
+        const failed = wrapper.get('[data-testid="plant-health-formulas-failed"]');
+        expect(failed.attributes('role')).toBe('alert');
+        expect(failed.text()).toContain('The formulas could not be read: Gateway Timeout');
+        expect(select().attributes('disabled')).toBeUndefined();
+        expect(dialogState()).toBe('failed');
+
+        await wrapper.get('[data-testid="plant-health-formulas-retry"]').trigger('click');
+        await flushPromises();
+        expect(getRasterMetadata).toHaveBeenCalledTimes(2);
+        expect(wrapper.find('[data-testid="plant-health-formulas-failed"]').exists()).toBe(false);
+        expect(select().findAll('option')).toHaveLength(3);
+    });
+
+    it('keeps the formulas of the raster shown when the metadata of the one before comes late', async () => {
+        const first = deferred();
+        const getRasterMetadata = vi.fn(path => (path === 'ortho.tif' ? first.promise
+            : Promise.resolve({ algorithms: [{ id: 'VARI', name: 'VARI' }], statistics: {} })));
+        mountPending(getRasterMetadata);
+        await flushPromises();
+        await wrapper.setProps({ filePath: 'other.tif' });
+        await flushPromises();
+        first.resolve({ algorithms: ALGORITHMS, statistics: {} });
+        await flushPromises();
+        expect(select().findAll('option').map(o => o.attributes('value'))).toEqual(['', 'VARI']);
+    });
+
+    it('says why the raster could not be read instead of loading for ever', async () => {
+        mountPending(vi.fn());
+        dataset.getRasterInfo.mockRejectedValueOnce(new Error('Not Found'));
+        await wrapper.setProps({ filePath: 'gone.tif' });
+        await flushPromises();
+        expect(wrapper.get('[data-testid="plant-health-info-failed"]').text()).toContain('The raster could not be read: Not Found');
+    });
+});

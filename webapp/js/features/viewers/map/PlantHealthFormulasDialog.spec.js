@@ -28,8 +28,8 @@ const SAMPLE = [
     ['KELVIN', 'Kelvin Temperature', ['Thermal']]
 ].map(([id, name, requiredBands]) => ({ id, name, expr: 'a / b', help: `Help of ${id}`, requiredBands }));
 
-const mountDialog = formulas => mount(PlantHealthFormulasDialog, {
-    props: { visible: true, formulas },
+const mountDialog = (formulas, state) => mount(PlantHealthFormulasDialog, {
+    props: { visible: true, formulas, ...(state ? { state } : {}) },
     global: { stubs: { Window: { template: '<div><slot /></div>' } } }
 });
 
@@ -85,5 +85,28 @@ describe('PlantHealthFormulasDialog', () => {
 
     it('says so when there is no formula', () => {
         expect(mountDialog([]).text()).toContain('No formulas are available for this raster.');
+    });
+});
+
+describe('PlantHealthFormulasDialog empty list', () => {
+    const emptyText = state => mountDialog([], state).find('[data-testid="formulas-empty"]').text();
+
+    it('says that a raster has no formula only once its list is read', () => {
+        expect(emptyText()).toBe('No formulas are available for this raster.');
+        expect(emptyText('ready')).toBe('No formulas are available for this raster.');
+    });
+
+    it('says that the formulas are loading while the statistics of the raster are read', () => {
+        expect(emptyText('loading')).toContain('still loading');
+    });
+
+    it('says that the formulas could not be read when the metadata failed', () => {
+        expect(emptyText('failed')).toContain('could not be read');
+    });
+
+    it('lists the formulas, with no empty text, whatever the state', () => {
+        const wrapper = mountDialog(SAMPLE, 'loading');
+        expect(wrapper.findAll('.formula-card')).toHaveLength(18);
+        expect(wrapper.find('[data-testid="formulas-empty"]').exists()).toBe(false);
     });
 });

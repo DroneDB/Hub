@@ -48,8 +48,10 @@ defineProps({
     margin: 0.5rem 0 0;
 }
 
+/* Next to text: a label that wraps reads from the start of its lines, as the text around it */
 .loading-spinner.inline {
     padding: 0;
+    text-align: start;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;

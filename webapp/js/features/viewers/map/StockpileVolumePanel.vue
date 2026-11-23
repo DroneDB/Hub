@@ -807,17 +807,6 @@ export default {
     color: var(--panel-text);
 }
 
-/* The label of Base, with the button that opens the guide beside it */
-.label-with-info {
-    display: flex;
-    align-items: center;
-    gap: 0.1rem;
-}
-
-.label-with-info .info-icon-btn {
-    margin-left: 0.2rem;
-}
-
 /* "Edit materials…" under the Material field, at the right */
 .materials-link {
     text-align: right;

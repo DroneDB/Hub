@@ -16,9 +16,10 @@
                 </select>
             </div>
 
-            <!-- Formula Selection: the guide button sits beside the label text, outside the label, so the select is not named after it -->
-            <div class="panel-row">
-                <span class="section-label">
+            <!-- Formula Selection: the guide button sits beside the label text, outside the label, so the select is not named after it.
+                 Stacked: the label and its button on one line, and the select, the main control of the panel, at the whole width -->
+            <div class="panel-row panel-row--stacked">
+                <span class="section-label label-with-info">
                     <label for="plant-health-panel-formula">Formula</label>
                     <button type="button" class="info-icon-btn"
                             title="Learn more about each vegetation index" aria-label="Learn more about each vegetation index"
@@ -29,7 +30,8 @@
                 </span>
                 <!-- The id first, so that the closed select reads "NDVI – ..." even when the name is cut (FR-RAS-32) -->
                 <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" data-testid="plant-health-formula"
-                        :aria-describedby="disabledCount ? 'plant-health-panel-formula-hint' : undefined" @change="onFormulaChange">
+                        :disabled="formulasState === 'loading'" :aria-busy="formulasState === 'loading'"
+                        :aria-describedby="formulaNoteId" @change="onFormulaChange">
                     <option value="">None (bands only)</option>
                     <option v-for="f in shownFormulas" :key="f.id" :value="f.id"
                             :disabled="f.disabled"
@@ -39,7 +41,18 @@
                 </select>
             </div>
             <!-- A disabled option cannot take the focus: the reason of every one is in the guide, and a select reads this hint (FR-XC-22) -->
-            <p v-if="disabledCount" id="plant-health-panel-formula-hint" class="panel-row-note" data-testid="plant-health-formula-hint">
+            <!-- The formulas come with the statistics of the raster: the first read of a large raster without them (one built
+                 before its COG kept them) reads every pixel and takes minutes, and the list must not look empty meanwhile -->
+            <div v-if="formulasState === 'loading'" id="plant-health-panel-formula-status" class="panel-row-note"
+                 data-testid="plant-health-formulas-loading">
+                <LoadingSpinner inline label="Reading the statistics of the raster. The first time, a large raster takes minutes." />
+            </div>
+            <div v-else-if="formulasState === 'failed'" id="plant-health-panel-formula-status" class="panel-row-note formulas-failed"
+                 role="alert" data-testid="plant-health-formulas-failed">
+                <span>The formulas could not be read: {{ formulasError }}</span>
+                <button type="button" class="panel-btn" data-testid="plant-health-formulas-retry" @click="loadFormulas">Try again</button>
+            </div>
+            <p v-else-if="disabledCount" id="plant-health-panel-formula-hint" class="panel-row-note" data-testid="plant-health-formula-hint">
                 ✗ {{ disabledCount === 1 ? '1 formula is' : `${disabledCount} formulas are` }} not available for this raster: it lacks
                 the bands. The guide (<i class="fas fa-info-circle" />) lists the bands each one needs.
             </p>
@@ -117,6 +130,13 @@
             </p>
         </div>
 
+        <div v-else-if="rasterInfoError" class="panel-body" role="alert" data-testid="plant-health-info-failed">
+            <div class="single-band-info">
+                <i class="fas fa-exclamation-triangle" />
+                <span>The raster could not be read: {{ rasterInfoError }}</span>
+            </div>
+            <button type="button" class="panel-btn info-retry" @click="loadRasterInfo">Try again</button>
+        </div>
         <div v-else class="panel-body loading">
             <LoadingSpinner inline label="Loading raster info..." />
         </div>
@@ -137,7 +157,7 @@
         </template>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
-                                   :formulas="shownFormulas" />
+                                   :formulas="shownFormulas" :state="formulasState" />
     </AnalysisPanel>
 </template>
 
@@ -189,7 +209,12 @@ export default {
     data() {
         return {
             rasterInfo: null,
+            // Why the raster info could not be read, '' while it loads or once it is read
+            rasterInfoError: '',
             metadata: null,
+            // The formulas of the raster metadata: 'loading', 'ready' or 'failed' (formulasError says why)
+            formulasState: 'loading',
+            formulasError: '',
             selectedPreset: '',
             selectedFormula: '',
             customBands: '',
@@ -255,6 +280,11 @@ export default {
             if (!this.selectedFormula) return false;
             const f = this.availableFormulas.find(x => x.id === this.selectedFormula);
             return f ? !!f.disabled : this.formulaError;
+        },
+        // The note that describes the formula select: the loading or failed state, else the hint of the disabled formulas
+        formulaNoteId() {
+            if (this.formulasState !== 'ready') return 'plant-health-panel-formula-status';
+            return this.disabledCount ? 'plant-health-panel-formula-hint' : undefined;
         },
         disabledCount() {
             return this.shownFormulas.filter(f => f.disabled).length;
@@ -355,13 +385,32 @@ export default {
 
     methods: {
         async loadRasterInfo() {
-            if (!this.filePath || !this.dataset) return;
+            const path = this.filePath;
+            if (!path || !this.dataset) return;
 
+            // Nothing of the raster before stays shown while this one is read
+            this.rasterInfo = null;
+            this.rasterInfoError = '';
             try {
-                this.rasterInfo = await this.dataset.getRasterInfo(this.filePath);
+                const info = await this.dataset.getRasterInfo(path);
+                if (path !== this.filePath) return; // another raster was chosen meanwhile
+                this.rasterInfo = info;
+            } catch (e) {
+                console.error('Failed to load raster info:', e);
+                if (path === this.filePath) this.rasterInfoError = e?.message || 'unknown error';
+                return;
+            }
+            await this.loadFormulas();
+        },
 
-                // Load formulas from raster metadata
-                const meta = await this.dataset.getRasterMetadata(this.filePath);
+        // The formulas, the colormaps and the statistics of the raster, then the style of the link or the layer
+        async loadFormulas() {
+            const path = this.filePath;
+            this.formulasState = 'loading';
+            this.formulasError = '';
+            try {
+                const meta = await this.dataset.getRasterMetadata(path);
+                if (path !== this.filePath) return;
                 this.metadata = meta;
                 if (meta.algorithms) {
                     this.availableFormulas = meta.algorithms;
@@ -372,6 +421,7 @@ export default {
                 if (meta.autoBands && typeof meta.autoBands === 'string') {
                     this.customBands = meta.autoBands;
                 }
+                this.formulasState = 'ready';
 
                 // Apply initial params from URL hash (if provided)
                 if (this.initialParams && !this._initialParamsApplied) {
@@ -388,7 +438,10 @@ export default {
                     this.apply();
                 }
             } catch (e) {
-                console.error('Failed to load raster info:', e);
+                console.error('Failed to load the raster metadata:', e);
+                if (path !== this.filePath) return;
+                this.formulasState = 'failed';
+                this.formulasError = e?.message || 'unknown error';
             }
         },
 
@@ -598,6 +651,18 @@ export default {
     border-radius: 4px;
     padding: 0.4rem 0.5rem;
     line-height: 1.3;
+}
+
+.formulas-failed {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--panel-text-soft);
+}
+
+.info-retry {
+    margin-top: 0.5rem;
 }
 
 .single-band-info i {
