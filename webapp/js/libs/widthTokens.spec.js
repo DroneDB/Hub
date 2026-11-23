@@ -104,14 +104,14 @@ describe('FR-ORG-24: the organization and dataset lists take the whole width', (
         expect(blockAt(style, style.indexOf(`#${id} {`))).not.toMatch(/margin: 0\.75rem/);
     });
 
-    it('the organization cards are 2 columns from xwide', () => {
-        const style = styleOf('js/features/organizations/OrganizationsPage.vue');
-        expect(style).toContain("@use '../../../css/breakpoints' as *;");
-        const grid = blockAt(style, style.indexOf('@include xwide-up'));
-        expect(grid).toContain('display: grid;');
-        expect(grid).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
-        // the empty state spans the row
-        expect(grid).toMatch(/> :not\(\.org-card\) \{\s*grid-column: 1 \/ -1;/);
+    it('the organization table fits every column to its content but the name, which takes the rest of the width', () => {
+        const template = templateOf('js/features/organizations/OrganizationsPage.vue');
+        const columns = template.match(/<Column\b[^>]*>/g);
+        expect(columns.length).toBeGreaterThan(1);
+        const [name, ...others] = columns;
+        expect(name).toContain('field="name"');
+        expect(name).not.toContain('col-fit');
+        for (const column of others) expect(column).toContain('class="col-fit"');
     });
 
     it('the dataset table gives the dates 11rem, Files and Size 6rem without wrapping, Visibility 8rem; Dataset takes the rest', () => {

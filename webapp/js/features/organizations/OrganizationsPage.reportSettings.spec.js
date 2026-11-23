@@ -45,7 +45,7 @@ async function render({ readOnlyOrgs = false } = {}) {
     });
     await flushPromises();
 }
-const card = slug => wrapper.findAll('.org-card').find(c => c.text().includes(slug));
+const card = slug => wrapper.findAll('.org-row').find(c => c.text().includes(slug));
 const reportButton = slug => card(slug).find('button[aria-label="Report settings"]');
 async function open(slug) {
     await reportButton(slug).trigger('click');

@@ -136,7 +136,7 @@ test('organization list: Enter on the delete question keeps it; the typed slug a
     const victim = `${DS}-org`;
     await api('POST', '/orgs', form({ slug: victim, name: victim }));
     await page.goto(`${URL_}/r`);
-    const card = page.locator('.org-card', { hasText: victim });
+    const card = page.locator('.org-row', { hasText: victim });
     await card.locator('button[aria-label="Delete organization"]').click({ timeout: 15000 });
     await page.waitForSelector(`.p-dialog >> text=Delete organization “${victim}”`, { timeout: 10000 });
     // The slug input has the focus: Enter before typing it deletes nothing (AC-004)
@@ -149,7 +149,7 @@ test('organization list: Enter on the delete question keeps it; the typed slug a
     await card.locator('button[aria-label="Delete organization"]').click();
     await page.fill('.p-dialog input', victim);
     await page.click('.p-dialog button[data-confirm]:has-text("Delete")');
-    await page.waitForSelector(`.org-card:has-text("${victim}")`, { state: 'detached', timeout: 15000 });
+    await page.waitForSelector(`.org-row:has-text("${victim}")`, { state: 'detached', timeout: 15000 });
 });
 
 test('dataset page lists the uploaded files', async () => {
@@ -566,13 +566,13 @@ test('organizations: a new member sees the organization at once; a non-member se
         await userPage.goto(`${URL_}/r`);
 
         // The default list (Show all off) holds the member organization and the Public one, on the first visit
-        const teamCard = userPage.locator('.org-card', { hasText: team });
-        const openCard = userPage.locator('.org-card', { hasText: open });
+        const teamCard = userPage.locator('.org-row', { hasText: team });
+        const openCard = userPage.locator('.org-row', { hasText: open });
         await teamCard.waitFor({ timeout: 15000 });
         await openCard.waitFor({ timeout: 15000 });
         assert.equal(await userPage.locator('#organizations-show-all').isChecked(), false);
         // Read-only: no edit, delete or members action on the Public organization
-        assert.equal(await openCard.locator('.org-card-actions button').count(), 0);
+        assert.equal(await openCard.locator('.org-row-actions button').count(), 0);
 
         // The Public organization opens for the non-member (GET /orgs/{org} answers, read-only)
         await openCard.locator('a.org-name').click();

@@ -52,7 +52,8 @@ async function render() {
     await flushPromises();
 }
 const shown = () => wrapper.findAll('.org-name').map(a => a.text());
-const stats = () => wrapper.findAll('.org-card-stats').map(s => s.text());
+// The count of datasets and when the organization was modified, per row
+const stats = () => wrapper.findAll('.org-row').map(row => [row.find('.org-col-datasets').text(), row.find('.org-col-modified').text()]);
 
 describe('OrganizationsPage sort', () => {
     it('lists by name, ascending, by default', async () => {
@@ -101,7 +102,7 @@ describe('OrganizationsPage sort', () => {
     });
 });
 
-describe('OrganizationsPage cards', () => {
+describe('OrganizationsPage rows', () => {
     it('shows the dataset count and when the organization was modified, and nothing for an unknown value', async () => {
         reg.orgs.getOrganizations = vi.fn(() => answer([
             dto('a', { datasetCount: 3, lastModified: new Date(Date.now() - 2 * 86400000).toISOString() }),
@@ -110,8 +111,37 @@ describe('OrganizationsPage cards', () => {
             dto('d')
         ]));
         await render();
-        expect(stats()).toEqual(['3 datasets·Modified 2 days ago', '1 dataset', '0 datasets']);
-        expect(wrapper.findAll('.org-card')).toHaveLength(4);
+        expect(stats()).toEqual([['3', '2 days ago'], ['1', ''], ['0', ''], ['', '']]);
+        expect(wrapper.findAll('.org-row')).toHaveLength(4);
+    });
+
+    it('sorts by the header of a column, as the sort select does, and stores it', async () => {
+        reg.orgs.getOrganizations = vi.fn(() => answer([dto('a', { datasetCount: 1 }), dto('b', { datasetCount: 5 }), dto('c', { datasetCount: 3 })]));
+        await render();
+        const header = () => wrapper.findAll('th').find(th => th.text().includes('Datasets'));
+        await header().trigger('click');
+        await flushPromises();
+        expect([wrapper.vm.sortColumn, wrapper.vm.sortDirection]).toEqual(['datasetCount', 'asc']);
+        expect(shown()).toEqual(['a', 'c', 'b']);
+        await header().trigger('click');
+        await flushPromises();
+        expect(shown()).toEqual(['b', 'c', 'a']);
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toMatchObject({ sortColumn: 'datasetCount', sortDirection: 'desc' });
+        // The header shows the sort the select chose (the direction stays descending)
+        wrapper.vm.sortColumn = 'name';
+        await flushPromises();
+        expect(wrapper.findAll('th').find(th => th.text().includes('Organization')).attributes('aria-sort')).toBe('descending');
+    });
+
+    it('opens the organization on a click on its row, but not on a click on a button', async () => {
+        reg.orgs.getOrganizations = vi.fn(() => answer([dto('a', { permissions: { canRead: true, canWrite: true } })]));
+        await render();
+        const push = wrapper.vm.$router.push;
+        await wrapper.find('.org-row .org-col-visibility').trigger('click');
+        expect(push).toHaveBeenCalledWith({ name: 'Datasets', params: { org: 'a' } });
+        push.mockClear();
+        await wrapper.find('.org-row-actions button[aria-label="Edit organization"]').trigger('click');
+        expect(push).not.toHaveBeenCalled();
     });
 });
 
@@ -135,7 +165,7 @@ describe('OrganizationsPage create', () => {
         expect(added.lastModified).toBe(Date.parse('2026-06-01T00:00:00Z'));
         expect(added.datasetCount).toBe(0);
         expect(added.permissions).toEqual({ canRead: true, canWrite: true, canDelete: true, canManageMembers: true });
-        expect(stats()[0]).toContain('0 datasets');
+        expect(stats()[0][0]).toBe('0');
     });
 
     it('uses the permissions and owner of the answer when it has them', async () => {

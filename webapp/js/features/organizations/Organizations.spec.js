@@ -149,8 +149,8 @@ describe('Public organizations (D-003)', () => {
         });
         await flushPromises();
     }
-    const card = slug => wrapper.findAll('.org-card').find(c => c.text().includes(slug));
-    const actions = slug => card(slug).findAll('.org-card-actions button').map(b => b.attributes('aria-label'));
+    const card = slug => wrapper.findAll('.org-row').find(c => c.text().includes(slug));
+    const actions = slug => card(slug).findAll('.org-row-actions button').map(b => b.attributes('aria-label'));
 
     it('shows no write action on a Public organization the user can only read', async () => {
         const readOnly = { canRead: true, canWrite: false, canDelete: false, canManageMembers: false };
@@ -200,7 +200,7 @@ describe('Public organizations (D-003)', () => {
         expect(wrapper.text()).not.toContain('No organizations');
         expect(wrapper.text()).not.toContain('Create Organization');
         expect(wrapper.find('[aria-label="Create organization"]').exists()).toBe(false);
-        expect(wrapper.find('.org-cards-area').exists()).toBe(false);
+        expect(wrapper.find('.org-list').exists()).toBe(false);
         const links = wrapper.findAll('a').map(a => [a.text(), JSON.parse(a.attributes('data-to'))]);
         expect(links).toEqual([['Sign in', { name: 'Login', query: { redirect: '/r' } }]]);
         window.history.replaceState({}, '', '/');

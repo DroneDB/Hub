@@ -45,28 +45,16 @@
             </template>
         </ListToolbar>
 
-        <!-- The list did not load: sign in (a visitor without a session), or no access; no header, cards or actions -->
+        <!-- The list did not load: sign in (a visitor without a session), or no access; no header, rows or actions -->
         <ResourceState v-if="loadKind" :kind="loadKind" resource="page" />
 
-        <!-- Skeleton loading state -->
-        <div v-else-if="showSkeleton" ref="cardsArea" class="org-cards-area">
-            <Card v-for="i in 4" :key="i" class="mb-3">
-                <template #content>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="flex-grow-1 d-flex align-items-center">
-                            <Skeleton shape="circle" size="1.5rem" class="me-3" />
-                            <Skeleton width="12rem" height="1.25rem" />
-                        </div>
-                        <div class="me-3">
-                            <Skeleton width="4.5rem" height="1.5rem" border-radius="1rem" />
-                        </div>
-                        <div class="d-flex gap-1">
-                            <Skeleton width="2rem" height="2rem" />
-                            <Skeleton width="2rem" height="2rem" />
-                        </div>
-                    </div>
-                </template>
-            </Card>
+        <!-- Placeholder rows while the list loads -->
+        <div v-else-if="showSkeleton" ref="listArea" class="org-list org-list-skeleton" aria-busy="true">
+            <div v-for="i in 4" :key="i" class="org-skeleton-row">
+                <Skeleton shape="circle" size="1.25rem" />
+                <Skeleton width="14rem" height="1.25rem" />
+                <Skeleton width="5rem" height="1.5rem" border-radius="1rem" class="ms-auto" />
+            </div>
         </div>
 
         <!-- The datasets of the filtered organizations on a map -->
@@ -76,8 +64,9 @@
             <DatasetLocationsMap :groups="locationGroups" :organizations="organizationSlugs" :loading="locationsLoading || loading" />
         </div>
 
-        <!-- Data loaded -->
-        <div v-else ref="cardsArea" class="org-cards-area">
+        <!-- Data loaded: a table, as the datasets of an organization. The columns take the width of their content and the
+             free width goes to the name, so a row reads in one look on a wide screen; on a phone each row is a card -->
+        <div v-else ref="listArea" class="org-list">
             <EmptyState v-if="paginatedOrganizations.length === 0" title="No organizations found" items="organizations" :query="searchQuery"
                         @clear="searchQuery = ''; $refs.searchField?.focus()">
                 <!-- The default list holds the organizations the user owns, belongs to, or that are Public (D-003) -->
@@ -86,53 +75,70 @@
                 <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization"
                         data-org-empty-create :loading="creatingOrganization" :disabled="creatingOrganization" @click.stop="handleNew()" />
             </EmptyState>
-            <div v-for="org in paginatedOrganizations" :key="org.slug" class="org-card">
-                <Card>
-                    <template #content>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="flex-grow-1 org-card-main">
-                                <div class="d-flex align-items-center gap-2">
-                                    <i class="fa-solid fa-sitemap" aria-hidden="true" />
-                                    <!-- The whole card opens the organization (stretched link) -->
-                                    <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link" :title="org.name ? org.name : org.slug">
-                                        {{ org.name ? org.name : org.slug }}
-                                    </router-link>
-                                </div>
-                                <div v-if="org.description" class="org-card-description mt-1" :title="org.description">{{ org.description }}</div>
-                                <div v-if="org.lastModified != null || org.datasetCount != null" class="org-card-stats mt-1">
-                                    <span v-if="org.datasetCount != null">{{ org.datasetCount }} {{ org.datasetCount === 1 ? 'dataset' : 'datasets' }}</span>
-                                    <span v-if="org.datasetCount != null && org.lastModified != null" aria-hidden="true">&middot;</span>
-                                    <span v-if="org.lastModified != null" :title="formatDateTime(org.lastModified)">Modified {{ formatTimeAgo(org.lastModified) }}</span>
-                                </div>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 ms-3 org-card-tags">
-                                <Tag v-if="org.owner" rounded severity="secondary" icon="fa-solid fa-user">
-                                    {{ org.owner }}
-                                </Tag>
-                                <VisibilityTag rounded :visibility="org.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
-                            </div>
-                            <div class="org-card-actions d-flex gap-1 ms-3">
-                                <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
-                                        severity="secondary" outlined size="small" icon="fa-solid fa-users"
-                                        title="Manage Members" aria-label="Manage members" @click.stop="openMembersDialog(org)" />
-                                <!-- Every member can look at the report settings; only an administrator edits them (the dialog says which) -->
-                                <Button v-if="isMemberOf(org)"
-                                        severity="secondary" outlined size="small" icon="fa-solid fa-file-lines"
-                                        title="Report settings" aria-label="Report settings" @click.stop="openReportSettings(org)" />
-                                <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
-                                        severity="secondary" outlined size="small" :loading="org.editing"
-                                        :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
-                                        title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
-                                <!-- Not solid: the delete of every card would dominate the list (FR-ORG-15) -->
-                                <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
-                                        severity="danger" text size="small" :loading="org.deleting"
-                                        :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
-                                        title="Delete" aria-label="Delete organization" @click.stop="handleDelete(org)" />
-                            </div>
+            <!-- lazy: the list is sorted by sortOrganizations before it is paged; a header only chooses the sort -->
+            <DataTable v-else :value="paginatedOrganizations" data-key="slug" lazy striped-rows row-hover
+                       :class="['org-table', STACKED_TABLE_CLASS]" :row-class="() => 'org-row'"
+                       :sort-field="sortColumn" :sort-order="sortDirection === 'desc' ? -1 : 1"
+                       @sort="onSort" @row-click="onRowClick">
+                <Column field="name" sortable v-bind="stackedColumn(undefined, undefined, { class: 'org-name-cell' }, sortableHeaderPt(stacked))">
+                    <template #header>
+                        <i class="fa-solid fa-sitemap" aria-hidden="true" /> Organization
+                    </template>
+                    <template #body="{ data: org }">
+                        <!-- The whole cell opens the organization (stretched link), and so does a click on the row -->
+                        <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link" :title="org.name ? org.name : org.slug">
+                            {{ org.name ? org.name : org.slug }}
+                        </router-link>
+                        <div v-if="org.description" class="org-description-line" :title="org.description">{{ org.description }}</div>
+                    </template>
+                </Column>
+                <Column header="Owner" class="col-fit" v-bind="stackedColumn('Owner', 'md', { class: 'org-col-owner' })">
+                    <template #body="{ data: org }">{{ org.owner }}</template>
+                </Column>
+                <Column header="Visibility" class="col-fit" v-bind="stackedColumn('Visibility', undefined, { class: 'org-col-visibility' })">
+                    <template #body="{ data: org }">
+                        <VisibilityTag rounded :visibility="org.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
+                    </template>
+                </Column>
+                <!-- Nothing for an organization the server tells no count or date of (the user is not a member) -->
+                <Column field="datasetCount" header="Datasets" sortable class="col-fit"
+                        v-bind="stackedColumn('Datasets', undefined, { class: 'org-col-datasets' }, { ...sortableHeaderPt(stacked), ...ALIGN_END })" />
+                <Column field="lastModified" header="Modified" sortable class="col-fit"
+                        v-bind="stackedColumn('Modified', 'lg', { class: 'org-col-modified' }, { ...sortableHeaderPt(stacked), ...ALIGN_END })">
+                    <template #body="{ data: org }">
+                        <span v-if="org.lastModified != null" :title="formatDateTime(org.lastModified)">{{ formatTimeAgo(org.lastModified) }}</span>
+                    </template>
+                </Column>
+                <Column field="creationDate" header="Created" sortable class="col-fit"
+                        v-bind="stackedColumn('Created', 'xxl', { class: 'org-col-created' }, { ...sortableHeaderPt(stacked), ...ALIGN_END })">
+                    <template #body="{ data: org }">
+                        <span v-if="org.creationDate != null" :title="formatDateTime(org.creationDate)">{{ formatTimeAgo(org.creationDate) }}</span>
+                    </template>
+                </Column>
+                <Column header="Actions" class="col-fit"
+                        v-bind="stackedColumn(undefined, undefined, { class: 'org-row-actions' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
+                    <template #body="{ data: org }">
+                        <div class="org-row-buttons">
+                            <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
+                                    severity="secondary" outlined size="small" icon="fa-solid fa-users"
+                                    title="Manage Members" aria-label="Manage members" @click.stop="openMembersDialog(org)" />
+                            <!-- Every member can look at the report settings; only an administrator edits them (the dialog says which) -->
+                            <Button v-if="isMemberOf(org)"
+                                    severity="secondary" outlined size="small" icon="fa-solid fa-file-lines"
+                                    title="Report settings" aria-label="Report settings" @click.stop="openReportSettings(org)" />
+                            <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
+                                    severity="secondary" outlined size="small" :loading="org.editing"
+                                    :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
+                                    title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
+                            <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
+                            <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
+                                    severity="danger" text size="small" :loading="org.deleting"
+                                    :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
+                                    title="Delete" aria-label="Delete organization" @click.stop="handleDelete(org)" />
                         </div>
                     </template>
-                </Card>
-            </div>
+                </Column>
+            </DataTable>
         </div>
 
         <!-- Sticky paginator -->
@@ -188,14 +194,15 @@ import { setTitle } from '@/libs/utils';
 import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
 import { ORG_SORT_OPTIONS, organizationRow, sortOrganizations } from '@/libs/organizationList';
 import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
-import { useMediaMatch } from '@/composables/useStackedLayout';
-import { XWIDE_MEDIA_QUERY } from '@/libs/responsiveColumns';
+import { useStackedLayout } from '@/composables/useStackedLayout';
+import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
 import { pageAfterResize } from '@/libs/pageSize';
 import { getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition } from '@/libs/storageUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Button from 'primevue/button';
-import Card from 'primevue/card';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
 import Tag from 'primevue/tag';
 import Skeleton from 'primevue/skeleton';
 import ToggleSwitch from 'primevue/toggleswitch';
@@ -206,6 +213,12 @@ import { Visibility } from 'ddb';
 
 // Typing in the search box asks the server once the user pauses
 const SEARCH_DELAY_MS = 300;
+
+// The px of a row before the rows are on the page (a name and a line of description)
+const ROW_HEIGHT = 57;
+
+// The header of a column of numbers or dates is at the end, above its values
+const ALIGN_END = Object.freeze({ columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } });
 
 // What the creator of an organization can do with it
 const CREATOR_PERMISSIONS = Object.freeze({ canRead: true, canWrite: true, canDelete: true, canManageMembers: true });
@@ -232,7 +245,8 @@ export default {
         OrganizationMembersDialog,
         ReportSettingsDialog,
         Button,
-        Card,
+        DataTable,
+        Column,
         Tag,
         VisibilityTag,
         Skeleton,
@@ -243,23 +257,18 @@ export default {
 
     setup() {
         const dialogs = useDialogs();
-        // A page holds the cards that fit the height until the user chooses a size, which the preferences keep (FR-XC-34).
-        // The cards are one column, two from xwide (the grid of .org-cards-area, FR-ORG-24): a page holds whole grid rows,
-        // the rows that fit times the cards in a row. The column change comes with a resize, which measures again
-        const cardsArea = ref(null);
+        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep (FR-XC-34)
+        const listArea = ref(null);
         const page = ref(null);
-        const twoColumns = useMediaMatch(XWIDE_MEDIA_QUERY);
         const sizing = usePageSize({
             height: () => visibleListHeight({
-                area: page.value, list: cardsArea.value,
-                reserved: () => heightOfFirst(page.value, '.org-pagination', 49)
+                area: page.value, list: listArea.value,
+                reserved: () => heightOfFirst(listArea.value, 'thead', 45) + heightOfFirst(page.value, '.org-pagination', 49)
             }),
-            rowHeight: () => averageRowHeight(cardsArea.value, ':scope > .org-card, :scope > .p-card', 100),
-            columns: () => (twoColumns.value ? 2 : 1),
+            rowHeight: () => averageRowHeight(listArea.value, 'tbody tr', ROW_HEIGHT),
             initial: getOrgPageSettings().itemsPerPage
         });
-        // The locations are many small objects the map reads whole: not made reactive
-        return { dialogs, deleteEntity: useEntityDelete(dialogs), ORG_SORT_OPTIONS, Visibility, formatDateTime, formatTimeAgo, locationGroups: shallowRef([]), ...sizing, cardsArea, page };
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), ORG_SORT_OPTIONS, Visibility, formatDateTime, formatTimeAgo, locationGroups: shallowRef([]), ...sizing, listArea, page, stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, ALIGN_END, stacked: useStackedLayout() };
     },
     data: function () {
         const settings = getOrgPageSettings();
@@ -296,7 +305,7 @@ export default {
             sortColumn: settings.sortColumn,
             sortDirection: settings.sortDirection,
 
-            // The cards or the map of where the datasets of the filtered organizations are
+            // The table or the map of where the datasets of the filtered organizations are
             view: settings.view,
             locationsLoading: false
         }
@@ -324,11 +333,11 @@ export default {
             });
             return sortOrganizations(matching, this.sortColumn, this.sortDirection);
         },
-        // The cards wait for the list; the map, once shown, stays while the list is asked again
+        // The rows wait for the list; the map, once shown, stays while the list is asked again
         showSkeleton() {
             return this.loading && (!this.loaded || this.view !== 'map');
         },
-        // Cards per page: the size the user chose, else the cards that fit the height (FR-XC-34)
+        // Rows per page: the size the user chose, else the rows that fit the height (FR-XC-34)
         itemsPerPage() {
             return this.pageSize;
         },
@@ -389,7 +398,7 @@ export default {
         },
         view: function (view) {
             this.saveSettings();
-            // The cards are back on the page: measure them
+            // The rows are back on the page: measure them
             if (view === 'list') this.$nextTick(() => this.measurePageSize());
             this.followLocations();
         },
@@ -417,8 +426,8 @@ export default {
     mounted: async function () {
         setTitle("Organizations");
         await this.fetchOrganizations();
-        // The cards are on the page: their height may differ from the one expected, and so the size that fits.
-        // The page the user left was counted in the cards of that size: it is shown once the size is known
+        // The rows are on the page: their height may differ from the one expected, and so the size that fits.
+        // The page the user left was counted in the rows of that size: it is shown once the size is known
         await this.$nextTick();
         this.measurePageSize();
         await this.$nextTick();
@@ -426,8 +435,8 @@ export default {
         if (currentPage > 1) this.currentPage = Math.min(currentPage, this.lastPage);
         if (scrollTop) {
             this.$nextTick(() => {
-                if (this.cardsArea) {
-                    this.cardsArea.scrollTop = scrollTop;
+                if (this.listArea) {
+                    this.listArea.scrollTop = scrollTop;
                 }
             });
         }
@@ -525,13 +534,27 @@ export default {
         },
 
         savePosition() {
-            saveOrgPagePosition(this.currentPage, this.cardsArea?.scrollTop ?? 0);
+            saveOrgPagePosition(this.currentPage, this.listArea?.scrollTop ?? 0);
         },
 
         // The watchers store what changed, and keep the page that holds the first card shown when a size is picked
         onPageChange(event) {
             if (event.rows !== this.itemsPerPage) this.choosePageSize(event.rows);
             else this.currentPage = event.page + 1;
+        },
+
+        // A header chooses the sort the toolbar shows (and the preferences keep)
+        onSort(event) {
+            this.sortColumn = event.sortField;
+            this.sortDirection = event.sortOrder === -1 ? 'desc' : 'asc';
+        },
+
+        // A click anywhere on a row opens the organization; the name link opens it itself (also in a new tab),
+        // and the buttons stop their click
+        onRowClick(event) {
+            const target = event.originalEvent?.target;
+            if (target instanceof Element && target.closest('a')) return;
+            this.$router.push({ name: 'Datasets', params: { org: event.data.slug } });
         },
 
         handleDelete(org) {
@@ -687,8 +710,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-@use '../../../css/breakpoints' as *;
-
 #organizations {
     /* The space around the page is its padding */
     padding: 0.75rem;
@@ -748,28 +769,20 @@ export default {
         white-space: nowrap;
     }
 
-    /* The focus ring of a card lies outside it: the box keeps the ring's reach clear above and beside
-       the cards, so it does not clip the ring of the first one (FR-ORG-07) */
-    /* The cards keep their height, so the paginator is right below the last one; the area shrinks and
-       scrolls its cards only when they are more than the screen holds (FR-ORG-25) */
-    .org-cards-area {
+    /* The rows keep their height, so the paginator is right below the last one; the area shrinks and
+       scrolls its rows only when they are more than the screen holds (FR-ORG-25) */
+    .org-list {
         flex: 0 1 auto;
         overflow-y: auto;
         min-height: 0;
-        padding: var(--ddb-focus-ring-reach) var(--ddb-focus-ring-reach) 0;
+    }
 
-        /* A 4K screen shows two columns of cards, not one card with its name and its buttons far apart; always two,
-           because the page size counts the cards of two columns */
-        @include xwide-up {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            column-gap: var(--ddb-spacing-md);
-            align-content: start;
-
-            > :not(.org-card) {
-                grid-column: 1 / -1;
-            }
-        }
+    .org-skeleton-row {
+        display: flex;
+        align-items: center;
+        gap: var(--ddb-spacing-md);
+        padding: var(--ddb-spacing-md);
+        border-bottom: 1px solid var(--p-content-border-color);
     }
 
     .org-map-area {
@@ -794,88 +807,68 @@ export default {
         padding: var(--ddb-spacing-xs) 0;
     }
 
-    .org-card {
-        position: relative;
-        margin-bottom: var(--ddb-spacing-sm);
-
-        /* Shrinks before the tags and the buttons, which would be pushed out of the card */
-        .org-card-main {
-            min-width: 0;
+    .org-table {
+        /* A header never wraps; the columns that do not fit leave the table instead */
+        :deep(th) {
+            white-space: nowrap;
         }
 
-        .org-name {
-            font-size: 1.25rem;
-            font-weight: bold;
-            color: inherit;
-            text-decoration: none;
-            overflow-wrap: anywhere;
-            /* A long name is two lines, the whole of it in the tooltip (FR-ORG-14) */
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            overflow: hidden;
+        :deep(tr.org-row) {
+            cursor: pointer;
         }
 
-        .org-name:focus-visible {
-            outline: none;
-        }
-
-        /* The ring of the Hub (the --ddb-focus-ring-* set) around the whole card */
-        &:has(.org-name:focus-visible) {
-            outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color);
-            outline-offset: var(--ddb-focus-ring-offset);
-            border-radius: var(--ddb-radius-sm);
-        }
-
-        .org-card-description {
-            color: var(--ddb-text-secondary);
-            font-size: var(--ddb-font-size-sm);
-            overflow-wrap: anywhere;
-            /* A long description is two lines, the whole of it in the tooltip (FR-ORG-14) */
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
-            overflow: hidden;
-        }
-
-        .org-card-stats {
-            display: flex;
-            flex-wrap: wrap;
-            column-gap: var(--ddb-spacing-sm);
-            color: var(--ddb-text-secondary);
-            font-size: var(--ddb-font-size-sm);
-        }
-
-        .org-card-tags {
-            flex-shrink: 0;
-        }
-
-        /* Above the stretched link */
-        .org-card-actions {
+        /* The stretched link of the name covers its cell */
+        :deep(.org-name-cell) {
             position: relative;
-            z-index: 2;
+        }
+
+        /* Numbers and dates line up at the end of their column; a phone card has its labelled lines */
+        @media screen and (min-width: 576px) {
+            :deep(.org-col-datasets),
+            :deep(.org-col-modified),
+            :deep(.org-col-created) {
+                text-align: end;
+            }
+        }
+
+        :deep(.org-col-owner),
+        :deep(.org-col-modified),
+        :deep(.org-col-created) {
+            color: var(--ddb-text-secondary);
+        }
+
+        /* The visibility tags are one width, so the column reads as one */
+        :deep(.org-col-visibility .p-tag) {
+            min-width: 6.5rem;
+            justify-content: center;
         }
     }
 
-    /* Responsive */
-    @media screen and (max-width: 767.98px) {
-        .org-card {
-            :deep(.p-card-body) {
-                padding: var(--ddb-spacing-sm);
-            }
+    /* No underline, also on hover (the hover rule of app.scss is :where(), so this one wins) */
+    .org-name {
+        font-weight: bold;
+        color: inherit;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+    }
 
-            .org-card-tags {
-                flex-direction: column;
-                align-items: flex-end;
-                gap: var(--ddb-spacing-xs);
-            }
+    /* A long description is two lines, the whole of it in the tooltip (FR-ORG-14) */
+    .org-description-line {
+        margin-top: var(--ddb-spacing-xs);
+        color: var(--ddb-text-secondary);
+        font-size: var(--ddb-font-size-sm);
+        overflow-wrap: anywhere;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+    }
 
-            .org-card-actions {
-                flex-direction: column;
-            }
-        }
+    .org-row-buttons {
+        display: flex;
+        justify-content: center;
+        gap: var(--ddb-spacing-xs);
     }
 }
 </style>

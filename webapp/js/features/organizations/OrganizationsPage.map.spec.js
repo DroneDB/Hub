@@ -86,10 +86,10 @@ const pending = () => requests.filter(r => !r.signal.aborted).map(r => r.slug);
 const found = (request, ...slugs) => request.resolve(slugs.map(slug => ({ slug, name: slug.toUpperCase(), bbox: place })));
 
 describe('OrganizationsPage map view', () => {
-    it('shows the map instead of the cards and the paginator, and hides the sort controls', async () => {
+    it('shows the map instead of the table and the paginator, and hides the sort controls', async () => {
         await render();
         expect(wrapper.find('.map-stub').exists()).toBe(true);
-        expect(wrapper.find('.org-card').exists()).toBe(false);
+        expect(wrapper.find('.org-row').exists()).toBe(false);
         expect(wrapper.find('.org-pagination').exists()).toBe(false);
         expect(wrapper.find('.list-toolbar .sort-select').exists()).toBe(false);
         expect(wrapper.find('.list-toolbar .view-select').exists()).toBe(true);
@@ -266,7 +266,7 @@ describe('OrganizationsPage map view', () => {
         expect(requests.every(r => r.signal.aborted)).toBe(true);
         expect(wrapper.vm.locationGroups).toEqual([]);
         expect(wrapper.vm.locationsLoading).toBe(false);
-        expect(wrapper.find('.org-card').exists()).toBe(true);
+        expect(wrapper.find('.org-row').exists()).toBe(true);
     });
 
     it('asks when the map is chosen, and not before', async () => {

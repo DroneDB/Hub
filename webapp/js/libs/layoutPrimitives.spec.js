@@ -42,6 +42,8 @@ describe('stacked cards', () => {
         expect(phoneBlock).toMatch(/tbody > tr > td\[data-label\] \{[\s\S]*content: attr\(data-label\);/);
         expect(phoneBlock).toMatch(/thead \{[^}]*clip: rect\(0, 0, 0, 0\);/);
         expect(phoneBlock).not.toMatch(/thead \{[^}]*display: none/);
+        // PrimeVue's DataTable sets position: sticky in the style attribute of its thead: only !important takes it out of the card
+        expect(phoneBlock).toMatch(/thead \{[^}]*position: absolute !important;/);
         // A Column's own width does not shrink a line of the card
         expect(phoneBlock).toMatch(/width: auto !important;/);
     });

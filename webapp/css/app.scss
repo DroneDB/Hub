@@ -276,9 +276,10 @@ $stacked-table: '.ui.table.stacked-table, .stacked-table.p-datatable .p-datatabl
         border: 0;
         background: transparent;
 
-        // Hidden, not removed: a screen reader still has the column names
+        // Hidden, not removed: a screen reader still has the column names. PrimeVue's DataTable puts
+        // position: sticky in the style attribute of its thead, which only !important overrides
         thead {
-            position: absolute;
+            position: absolute !important;
             width: 1px;
             height: 1px;
             overflow: hidden;

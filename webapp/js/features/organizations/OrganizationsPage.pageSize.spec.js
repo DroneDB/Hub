@@ -1,11 +1,11 @@
 /**
- * The organizations list: the page size follows the height (FR-XC-34, FR-ORG-25). A page holds the cards that fit
+ * The organizations list: the page size follows the height (FR-XC-34, FR-ORG-25). A page holds the rows that fit
  * until the user chooses a size; a size that the user chose is kept; when the size changes the list shows the page
  * that holds the first organization shown, and the page the user left is shown again at the size that fits.
  *
- * jsdom has no layout: the boxes come from a stub of getBoundingClientRect. The cards start at 200 px, the
- * paginator is 49 px and a card 100 px (what the page expects before its cards are there): a page 1700 px high
- * holds floor((1700 - 200 - 49) / 100) = 14 cards.
+ * jsdom has no layout: the boxes come from a stub of getBoundingClientRect. The rows start at 200 px, the header of
+ * the table is 45 px (the height expected when it measures 0), the paginator 49 px and a row 100 px: a page 1700 px
+ * high holds floor((1700 - 200 - 45 - 49) / 100) = 14 rows.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
@@ -50,7 +50,7 @@ const resize = async () => {
 // Heavy mounts under a parallel run: load the PrimeVue chunks once, with a long hook timeout, and give each test
 // (set on the describe below) 30 s instead of the 5 s default
 beforeAll(async () => {
-    await Promise.all(['primevue/paginator', 'primevue/select', 'primevue/card'].map(m => import(/* @vite-ignore */ m)));
+    await Promise.all(['primevue/paginator', 'primevue/select', 'primevue/datatable', 'primevue/column'].map(m => import(/* @vite-ignore */ m)));
 }, 60000);
 
 beforeEach(() => {
@@ -61,9 +61,9 @@ beforeEach(() => {
     pageHeight = 1700;
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
         if (this.id === 'organizations') return box(0, pageHeight);
-        if (this.classList.contains('org-cards-area')) return box(200, 0);
+        if (this.classList.contains('org-list')) return box(200, 0);
         if (this.classList.contains('org-pagination')) return box(0, 49);
-        if (this.classList.contains('org-card') || this.classList.contains('p-card')) return box(0, 100);
+        if (this.classList.contains('org-row')) return box(0, 100);
         return box(0, 0);
     });
 });
@@ -77,7 +77,7 @@ afterEach(() => {
 });
 
 describe('OrganizationsPage page size', { timeout: 30000 }, () => {
-    it('shows the cards that fit the height, and offers that size in the paginator', async () => {
+    it('shows the rows that fit the height, and offers that size in the paginator', async () => {
         await render();
         expect(wrapper.vm.pageSize).toBe(14);
         expect(shownNames()).toHaveLength(14);
@@ -107,7 +107,7 @@ describe('OrganizationsPage page size', { timeout: 30000 }, () => {
         wrapper.vm.currentPage = 3;
         await flushPromises();
         expect(shownNames()[0]).toBe('Org 028');
-        // floor((2600 - 249) / 100) = 23 cards: the organization 28 is on the page 2 of 23, which starts at 23
+        // floor((2600 - 294) / 100) = 23 rows: the organization 28 is on the page 2 of 23, which starts at 23
         pageHeight = 2600;
         await resize();
         expect(wrapper.vm.pageSize).toBe(23);
@@ -116,7 +116,7 @@ describe('OrganizationsPage page size', { timeout: 30000 }, () => {
         expect(stored()).toBeNull();
     });
 
-    it('reads the 10 that an older Hub stored with the other settings (no mark) as no choice: the cards that fit', async () => {
+    it('reads the 10 that an older Hub stored with the other settings (no mark) as no choice: the rows that fit', async () => {
         localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 10, sortColumn: 'x' }));
         await render();
         expect(wrapper.vm.pageChoice).toBeNull();

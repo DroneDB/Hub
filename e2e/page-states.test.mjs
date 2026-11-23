@@ -143,7 +143,7 @@ test('the organizations as anonymous show the sign-in state, with no Create', as
     assert.equal(await stateAt(page, '/r'), 'Sign in to open this page');
     assert.equal(new URL(page.url()).pathname, '/r');
     assert.equal(await page.locator('text=Create Organization').count(), 0);
-    assert.equal(await page.locator('.org-card').count(), 0);
+    assert.equal(await page.locator('.org-row').count(), 0);
 });
 
 test('an organization as a non-member shows the no access state, with no Create or Import (FR-ACC-02)', async () => {
