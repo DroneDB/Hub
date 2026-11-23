@@ -48,6 +48,8 @@ const definition = {
             // Group create/rename dialog
             measurementGroupDialogOpen: false,
             pendingGroupForRename: null,
+            // The measurements a new group is made of (the rows selected in the list when New group was pressed)
+            pendingGroupItems: [],
             // Units change confirmation (with measurements on the map)
             changeUnitsDialogOpen: false,
             changeUnitsTargetUnit: 'metric',
@@ -282,21 +284,29 @@ const definition = {
             if (this.canWrite) await this.saveMeasurements();
         },
 
-        openCreateGroupDialog() {
+        // A new group, of the measurements given (the rows selected in the list) or empty
+        openCreateGroupDialog(items = []) {
             this.pendingGroupForRename = null;
+            this.pendingGroupItems = items;
             this.measurementGroupDialogOpen = true;
         },
 
         openRenameGroupDialog(group) {
             this.pendingGroupForRename = group;
+            this.pendingGroupItems = [];
             this.measurementGroupDialogOpen = true;
+        },
+
+        closeGroupDialog() {
+            this.pendingGroupForRename = null;
+            this.pendingGroupItems = [];
+            this.measurementGroupDialogOpen = false;
         },
 
         handleGroupDialogSave(groupData) {
             if (this.pendingGroupForRename) this.renameGroup(this.pendingGroupForRename, groupData);
-            else this.createGroup(groupData);
-            this.pendingGroupForRename = null;
-            this.measurementGroupDialogOpen = false;
+            else this.createGroup(groupData, this.pendingGroupItems);
+            this.closeGroupDialog();
         },
 
         /**
@@ -360,12 +370,13 @@ const definition = {
             this.showFlash(saveResultMessage(result), 'positive');
         },
 
-        // The measurements to export, as GeoJSON; null (with a warning when there are none) otherwise
-        _exportableMeasurements() {
+        // The measurements to export (all, or the features of `only`), as GeoJSON; null (with a warning when there are
+        // none) otherwise
+        _exportableMeasurements(only = null) {
             const activeEntry = this.activeMeasurementEntry;
             if (!this.measureControls || !activeEntry) return null;
             const geojson = this.measureControls.hasMeasurements()
-                ? this.measureControls.exportToGeoJSON(activeEntry.path, this.measurementGroups)
+                ? this.measureControls.exportToGeoJSON(activeEntry.path, this.measurementGroups, only)
                 : null;
             if (!geojson || !geojson.features || geojson.features.length === 0) {
                 this.showAlert('Warning', 'No measurements to export');
@@ -374,15 +385,15 @@ const definition = {
             return geojson;
         },
 
-        /** Downloads the measurements as a GeoJSON file */
-        exportMeasurementsToFile() {
-            const geojson = this._exportableMeasurements();
+        /** Downloads the measurements (all, or the features of `only`) as a GeoJSON file */
+        exportMeasurementsToFile(only = null) {
+            const geojson = this._exportableMeasurements(only);
             if (geojson && this.measurementStorage) this.measurementStorage.exportToFile(geojson);
         },
 
-        /** Downloads the measurements as a CSV table, with the values in the units the map shows */
-        exportMeasurementsToCsv() {
-            const geojson = this._exportableMeasurements();
+        /** Downloads the measurements (all, or the features of `only`) as a CSV table, with the values in the units the map shows */
+        exportMeasurementsToCsv(only = null) {
+            const geojson = this._exportableMeasurements(only);
             if (!geojson) return;
             downloadCsv(measurementsToCsv(geojson, this.measurementGroups, this.measureControls.unitPref),
                 `measurements_${Date.now()}.csv`);
@@ -429,26 +440,71 @@ const definition = {
          */
         openMeasurementListDialog() {
             if (!this.measureControls) return;
+            // The list opens with nothing selected: the marks a Show on map left go
+            this.measureControls.setListSelection([]);
             this.measurementListItems = this.measureControls.getMeasurementsList();
             this.measurementListDialogOpen = true;
         },
 
+        // The list is closed: the measurements selected in it are no longer marked on the map
+        closeMeasurementListDialog() {
+            this.measurementListDialogOpen = false;
+            if (this.measureControls) this.measureControls.setListSelection([]);
+        },
+
+        // The rows selected in the list are marked on the map behind it
+        handleMeasurementListSelection(items) {
+            if (this.measureControls) this.measureControls.setListSelection(items.map(m => m.feature).filter(Boolean));
+        },
+
+        // The list after a change of the map's measurements; it closes when none is left
+        _refreshMeasurementList() {
+            this.measurementListItems = this.measureControls ? this.measureControls.getMeasurementsList() : [];
+            if (this.measurementListItems.length === 0) this.closeMeasurementListDialog();
+        },
+
         /**
-         * Delete a measurement from the list dialog
+         * Deletes measurements of the list (one, the selected rows, a group's), then refreshes the list once.
+         * @param {{ feature: ol.Feature }[]} items
          */
-        handleDeleteMeasurementFromList(item) {
-            if (!this.measureControls || !item.feature) return;
-            // Track the ID so persisted re-hydration logic (e.g. the Stockpile
-            // panel restoring the last saved pile) can filter it out until the
-            // next save/delete-saved.
-            const id = item.feature.get('id');
-            if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
-            this.measureControls.deleteMeasurement(item.feature);
-            // Refresh the list
-            this.measurementListItems = this.measureControls.getMeasurementsList();
-            if (this.measurementListItems.length === 0) {
-                this.measurementListDialogOpen = false;
+        deleteMeasurements(items) {
+            if (!this.measureControls) return;
+            for (const { feature } of items) {
+                if (!feature) continue;
+                // Track the ID so persisted re-hydration logic (e.g. the Stockpile
+                // panel restoring the last saved pile) can filter it out until the
+                // next save/delete-saved.
+                const id = feature.get('id');
+                if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
+                this.measureControls.deleteMeasurement(feature);
             }
+            this._refreshMeasurementList();
+        },
+
+        /**
+         * Shows measurements of the list on the map: the list closes, the map fits them and keeps them marked until the
+         * next click on the map (or until the list opens again).
+         * @param {{ feature: ol.Feature }[]} items
+         */
+        showMeasurementsOnMap(items) {
+            if (!this.measureControls) return;
+            const features = items.map(m => m.feature).filter(Boolean);
+            this.measurementListDialogOpen = false;
+            this.measureControls.setListSelection(features);
+            this.measureControls.fitFeatures(features);
+            const map = this.measureControls.getMap();
+            if (map) map.once('click', () => { if (!this.measurementListDialogOpen) this.measureControls?.setListSelection([]); });
+        },
+
+        /**
+         * Downloads measurements of the list.
+         * @param {{ feature: ol.Feature }[]} items
+         * @param {'geojson'|'csv'} format
+         */
+        exportMeasurementsOfList(items, format) {
+            const only = new Set(items.map(m => m.feature).filter(Boolean));
+            if (format === 'csv') this.exportMeasurementsToCsv(only);
+            else this.exportMeasurementsToFile(only);
         },
 
         /**
@@ -457,23 +513,26 @@ const definition = {
          */
         handleEditMeasurementFromList(item) {
             if (!this.measureControls || !item || !item.feature) return;
-            this.measurementListDialogOpen = false;
+            this.closeMeasurementListDialog();
             this.measureControls.openPropertiesDialog(item.feature);
         },
 
         // ── Group management ────────────────────────────────────────────
 
         /**
-         * Create a new group
+         * Create a new group, with the measurements given in it
          * @param {{ name: string, color: string }} groupData
+         * @param {{ feature: ol.Feature }[]} [items]
+         * @returns {string} the id of the group
          */
-        createGroup(groupData) {
+        createGroup(groupData, items = []) {
             const id = newId();
             this.measurementGroups = [
                 ...this.measurementGroups,
                 { id, name: groupData.name, color: groupData.color || GROUP_COLOR, visible: true, collapsed: false }
             ];
-            this.measurementListItems = this.measureControls ? this.measureControls.getMeasurementsList() : [];
+            this.moveMeasurementsToGroup(items, id);
+            return id;
         },
 
         /**
@@ -493,20 +552,9 @@ const definition = {
          */
         deleteGroup(group) {
             if (!this.measureControls) return;
-            // Delete all features belonging to this group
-            const items = this.measureControls.getMeasurementsList();
-            items.filter(m => m.groupId === group.id).forEach(m => {
-                const id = m.feature.get('id');
-                if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
-                this.measureControls.deleteMeasurement(m.feature);
-            });
-            // Remove the group itself
+            // Remove the group itself, then all features belonging to it
             this.measurementGroups = this.measurementGroups.filter(g => g.id !== group.id);
-            // Refresh list
-            this.measurementListItems = this.measureControls.getMeasurementsList();
-            if (this.measurementListItems.length === 0) {
-                this.measurementListDialogOpen = false;
-            }
+            this.deleteMeasurements(this.measureControls.getMeasurementsList().filter(m => m.groupId === group.id));
         },
 
         /**
@@ -526,15 +574,21 @@ const definition = {
         },
 
         /**
-         * Move a measurement to a different group (or ungroup it)
-         * @param {{ feature: ol.Feature }} item - Measurement item from the list
+         * Move measurements to a group (or ungroup them), then refresh the list once
+         * @param {{ feature: ol.Feature }[]} items - Measurement items from the list
          * @param {string} groupId - Target group ID, or '' to ungroup
          */
-        moveMeasurementToGroup(item, groupId) {
-            if (!this.measureControls || !item.feature) return;
-            this.measureControls.setMeasurementGroupId(item.feature, groupId);
-            // Refresh list
-            this.measurementListItems = this.measureControls.getMeasurementsList();
+        moveMeasurementsToGroup(items, groupId) {
+            if (!this.measureControls) return;
+            for (const { feature } of items) {
+                if (feature) this.measureControls.setMeasurementGroupId(feature, groupId);
+            }
+            // A measurement moved into a hidden group hides with it, one moved out of it shows
+            const group = this.measurementGroups.find(g => g.id === groupId);
+            for (const { feature } of items) {
+                if (feature) this.measureControls.setFeatureVisibility?.(feature, !group || group.visible !== false);
+            }
+            this._refreshMeasurementList();
         },
 
         /**

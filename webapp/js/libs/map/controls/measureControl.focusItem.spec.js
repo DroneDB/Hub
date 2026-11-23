@@ -81,3 +81,53 @@ describe('focusItem', () => {
         expect(control.focusItem('sketch')).toBe(false);
     });
 });
+
+describe('fitFeatures', () => {
+    it('fits the view to the extent of all the measurements given', () => {
+        const fit = vi.spyOn(map.getView(), 'fit');
+        const a = annotation('a1', new Polygon([[[1000, 1000], [3000, 1000], [3000, 2000], [1000, 2000], [1000, 1000]]]));
+        const p = annotation('p1', new Point([-500, 4000]), 'point');
+        expect(control.fitFeatures([a, p])).toBe(true);
+        expect(fit.mock.calls[0][0]).toEqual([-500, 1000, 3000, 4000]);
+        expect(fit.mock.calls[0][1]).toEqual(FILE_FIT_OPTIONS);
+    });
+
+    it('does nothing with no measurement', () => {
+        const fit = vi.spyOn(map.getView(), 'fit');
+        expect(control.fitFeatures([])).toBe(false);
+        expect(fit).not.toHaveBeenCalled();
+    });
+});
+
+describe('setListSelection', () => {
+    const strokeWidth = feature => {
+        const style = control.createFeatureStyle(feature);
+        return (Array.isArray(style) ? style[0] : style).getStroke().getWidth();
+    };
+
+    it('draws the measurements selected in the list as hovered ones, and the next call clears the others', () => {
+        const a = annotation('a1', new LineString([[0, 0], [10, 10]]), 'length');
+        const b = annotation('b1', new LineString([[0, 0], [20, 20]]), 'length');
+        const rest = strokeWidth(a);
+        control.setListSelection([a, b]);
+        expect(strokeWidth(a)).toBeGreaterThan(rest);
+        expect(strokeWidth(b)).toBeGreaterThan(rest);
+        control.setListSelection([b]);
+        expect(strokeWidth(a)).toBe(rest);
+        expect(strokeWidth(b)).toBeGreaterThan(rest);
+        control.setListSelection([]);
+        expect(strokeWidth(b)).toBe(rest);
+        // The mark is not a property: it is never saved
+        expect(Object.keys(b.getProperties())).not.toContain('_listSelected');
+    });
+});
+
+describe('setFeatureVisibility', () => {
+    it('hides one measurement and shows it again', () => {
+        const a = annotation('a1', new LineString([[0, 0], [10, 10]]), 'length');
+        control.setFeatureVisibility(a, false);
+        expect(a.getStyle()).toEqual([]);
+        control.setFeatureVisibility(a, true);
+        expect(a.getStyle()).toBeFalsy();
+    });
+});

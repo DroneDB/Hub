@@ -285,10 +285,17 @@ export function measurementTooltipHtml(name, text) {
  * @param {string} orthophotoPath - Orthophoto file path
  * @param {string} unitPref - Unit preference
  * @param {Array} [groups] - Measurement groups (optional, for serialization)
+ * @param {Set<ol.Feature>|null} [only] - Only these features (a part of the measurements downloaded on its own): the
+ *   groups are then the ones they belong to
  * @returns {Object} GeoJSON FeatureCollection
  */
-export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', groups = []) {
-    const features = source.getFeatures()
+export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', groups = [], only = null) {
+    const kept = only ? source.getFeatures().filter(f => only.has(f)) : source.getFeatures();
+    if (only) {
+        const used = new Set(kept.map(f => f.get('groupId')).filter(Boolean));
+        groups = groups.filter(g => used.has(g.id));
+    }
+    const features = kept
         .filter(f => {
             // Only export actual measurement features (not temporary draw features)
             const geom = f.getGeometry();

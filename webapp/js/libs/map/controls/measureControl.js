@@ -18,7 +18,7 @@ import { geodesicArea, geodesicLength } from '@/libs/map/geodesic';
 import { startDrawingSession } from '@/libs/map/drawingSession';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat, fromLonLat } from 'ol/proj';
-import { containsCoordinate, getHeight, getWidth } from 'ol/extent';
+import { containsCoordinate, createEmpty, extend, getHeight, getWidth } from 'ol/extent';
 import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import { showPointPopup, removeMeasureTooltip, setPointPopupShown, CALLOUTS_ON_HOVER_CLASS } from '@/libs/map/pointPopup';
@@ -638,21 +638,21 @@ class MeasureControls extends Control {
      * @param {boolean} visible - Whether the group should be visible
      */
     setGroupVisibility(groupId, visible) {
-        const features = this.source.getFeatures();
-        features.forEach(f => {
-            if (f.get('groupId') === groupId) {
-                if (visible) {
-                    f.setStyle(undefined); // Reset to default style
-                } else {
-                    f.setStyle([]); // Empty style = invisible
-                }
-                // Also toggle tooltip overlay
-                const tooltip = f.get('measureTooltip');
-                if (tooltip) {
-                    tooltip.getElement().style.display = visible ? '' : 'none';
-                }
-            }
+        this.source.getFeatures().forEach(f => {
+            if (f.get('groupId') === groupId) this.setFeatureVisibility(f, visible);
         });
+    }
+
+    /**
+     * Shows or hides one measurement (its shape and its label), as the visibility of its group says
+     * @param {ol.Feature} feature
+     * @param {boolean} visible
+     */
+    setFeatureVisibility(feature, visible) {
+        // Empty style = invisible; undefined = the layer's style
+        feature.setStyle(visible ? undefined : []);
+        const tooltip = feature.get('measureTooltip');
+        if (tooltip) tooltip.getElement().style.display = visible ? '' : 'none';
     }
 
     /**
@@ -696,7 +696,8 @@ class MeasureControls extends Control {
         // is the target of a double-click (which opens the detail dialog).
         // The flag is set on the OL Feature instance directly (not via
         // get/set) so it never bleeds into the persisted GeoJSON properties.
-        const hovered = feature._hovered === true;
+        // A measurement selected in the measurement list looks hovered too
+        const hovered = feature._hovered === true || feature._listSelected === true;
         const hoverStrokeBoost = hovered ? 2 : 0;
         const hoverFillBoost = hovered ? 0.15 : 0;
         const effectiveStrokeWidth = strokeWidth + hoverStrokeBoost;
@@ -789,10 +790,10 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Export measurements to GeoJSON
+     * Export measurements to GeoJSON: all of them, or only the features of `only` (a Set)
      */
-    exportToGeoJSON(orthophotoPath, groups = []) {
-        return exportMeasurements(this.source, orthophotoPath, this.unitPref, groups);
+    exportToGeoJSON(orthophotoPath, groups = [], only = null) {
+        return exportMeasurements(this.source, orthophotoPath, this.unitPref, groups, only);
     }
 
     /**
@@ -1224,14 +1225,46 @@ class MeasureControls extends Control {
      */
     focusItem(id) {
         const feature = this.source.getFeatures().find(f => f.get('measurementType') && f.get('id') === id);
-        const geometry = feature && feature.getGeometry();
-        const map = this.getMap();
-        if (!feature || !geometry || !map) return false;
-        const extent = geometry.getExtent();
-        const isPoint = getWidth(extent) === 0 && getHeight(extent) === 0;
-        map.getView().fit(extent, isPoint ? { ...FILE_FIT_OPTIONS, minResolution: POINT_FIT_MIN_RESOLUTION } : FILE_FIT_OPTIONS);
+        if (!feature || !this.fitFeatures([feature])) return false;
         this._setHoveredFeature(feature);
         return true;
+    }
+
+    /**
+     * Fits the map to the measurements: the extent of all of them; a single point (an extent of no size) is not zoomed
+     * in past POINT_FIT_MIN_RESOLUTION.
+     * @param {ol.Feature[]} features
+     * @returns {boolean} false when none has a geometry or there is no map
+     */
+    fitFeatures(features) {
+        const map = this.getMap();
+        const geometries = features.map(f => f && f.getGeometry()).filter(Boolean);
+        if (!map || !geometries.length) return false;
+        const extent = geometries.reduce((acc, g) => extend(acc, g.getExtent()), createEmpty());
+        const isPoint = getWidth(extent) === 0 && getHeight(extent) === 0;
+        map.getView().fit(extent, isPoint ? { ...FILE_FIT_OPTIONS, minResolution: POINT_FIT_MIN_RESOLUTION } : FILE_FIT_OPTIONS);
+        return true;
+    }
+
+    /**
+     * Marks the measurements selected in the measurement list: they are drawn as a hovered one is, until the next call
+     * (an empty list clears the marks). The mark is a flag on the feature, never one of its properties, so it is not
+     * saved.
+     * @param {ol.Feature[]} features
+     */
+    setListSelection(features) {
+        const next = new Set(features);
+        for (const f of this._listSelection || []) {
+            if (next.has(f)) continue;
+            f._listSelected = false;
+            try { f.changed(); } catch { /* noop */ }
+        }
+        for (const f of next) {
+            if (f._listSelected) continue;
+            f._listSelected = true;
+            try { f.changed(); } catch { /* noop */ }
+        }
+        this._listSelection = next;
     }
 
     /**

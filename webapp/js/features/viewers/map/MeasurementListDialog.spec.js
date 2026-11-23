@@ -6,17 +6,26 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { mount } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import DeleteSavedMeasurementsDialog from '@/components/measurements/DeleteSavedMeasurementsDialog.vue';
 
 const { deleteConfirmDialog, deleteGroupConfirmDialog } = MeasurementListDialog.computed;
-const typeLabel = MeasurementListDialog.methods.typeLabel;
+// Every mount of the list: PrimeVue (its search field) and the window as a plain box
+const GLOBAL = { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /></div>' } } };
 
 describe('MeasurementListDialog delete questions', () => {
     it('names a measurement (or its type) and its value', () => {
-        const props = deleteConfirmDialog.call({ pendingDeleteItem: { type: 'area', value: '12 m²' }, typeLabel });
+        const props = deleteConfirmDialog.call({ pendingDeleteItems: [{ type: 'area', value: '12 m²' }] });
         expect(props).toMatchObject({ title: 'Delete measurement “Area”', confirmText: 'Delete', cancelText: 'Cancel', confirmButtonClass: 'danger' });
         expect(props.message).toContain('<strong>Area</strong> (12 m²)');
+    });
+
+    it('asks once for several measurements, naming them', () => {
+        const props = deleteConfirmDialog.call({ pendingDeleteItems: [{ type: 'area', name: 'Roof', value: '12 m²' }, { type: 'length', name: 'Fence' }] });
+        expect(props.title).toBe('Delete 2 items');
+        expect(props.message).toContain('<strong>Roof</strong> (12 m²)');
+        expect(props.message).toContain('<strong>Fence</strong>');
     });
 
     it('names a group and counts its measurements', () => {
@@ -38,7 +47,9 @@ describe('DeleteSavedMeasurementsDialog', () => {
 // Edit, Delete or Move-to-group must see them. The rules are read from the component's own style block (the test
 // environment does not apply it), so the rule that shows the container of the focused control is the one tested.
 describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () => {
-    const style = readFileSync(path.resolve(__dirname, 'MeasurementListDialog.vue'), 'utf8').match(/<style[^>]*>([\s\S]*?)<\/style>/)[1].replace(/\/\*[\s\S]*?\*\//g, '');
+    // The rows of the measurements are MeasurementRow's, the group rows the list's
+    const styleOf = file => readFileSync(path.resolve(__dirname, file), 'utf8').match(/<style[^>]*>([\s\S]*?)<\/style>/)[1].replace(/\/\*[\s\S]*?\*\//g, '');
+    const style = styleOf('MeasurementListDialog.vue') + styleOf('MeasurementRow.vue');
 
     /** The declarations of the first rule whose selector list has `selector` (outside the media queries), or null */
     const ruleOf = selector => {
@@ -58,7 +69,7 @@ describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () =>
             ],
             groups: [{ id: 'g1', name: 'Piles', color: '#f00', visible: true }]
         },
-        global: { stubs: { Window: { template: '<div><slot /></div>' } } },
+        global: GLOBAL,
         attachTo: document.body
     });
 
@@ -73,7 +84,7 @@ describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () =>
         expect(ruleOf('.group-row:focus-within .group-actions')).toMatch(/opacity:\s*1/);
     });
 
-    it('has the Delete, Edit and Move-to-group controls in the container that the focus rule shows, for every row type', () => {
+    it('has the Delete and Edit controls in the container that the focus rule shows, for every row type', () => {
         const rowsWithActions = wrapper.findAll('.measurement-row');
         expect(rowsWithActions).toHaveLength(2);
         for (const row of rowsWithActions) {
@@ -84,7 +95,8 @@ describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () =>
             expect(del.closest('.measurement-actions').closest('.measurement-row')).toBe(row.element);
             expect(row.find('.measurement-actions button[aria-label="Edit"]').exists()).toBe(true);
         }
-        expect(wrapper.find('.measurement-row .measurement-actions select[aria-label="Move to group"]').exists()).toBe(true);
+        // A row is moved to a group by the selection's Move to, or by a drag: it has no group list of its own
+        expect(wrapper.find('.measurement-row select').exists()).toBe(false);
         const groupDelete = wrapper.find('.group-row button[aria-label^="Delete group"]').element;
         expect(groupDelete.closest('.group-actions').closest('.group-row')).toBe(wrapper.find('.group-row').element);
     });
@@ -98,7 +110,7 @@ describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () =>
 describe('MeasurementListDialog owner hint', () => {
     const mountWith = props => mount(MeasurementListDialog, {
         props: { measurements: [], ...props },
-        global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+        global: GLOBAL
     });
 
     it('says which file the measurements are saved in, also with none on the map', () => {
@@ -116,7 +128,7 @@ describe('MeasurementListDialog piles', () => {
     const AREA = { type: 'area', name: 'Area', value: '12 m²', feature: { ol_uid: 4 }, groupId: null };
     const mountWith = props => mount(MeasurementListDialog, {
         props: { measurements: [PILE, AREA], ...props },
-        global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+        global: GLOBAL
     });
     const buttons = wrapper => wrapper.findAll('[data-testid="measurement-work-on-stockpile"]');
 
@@ -151,7 +163,7 @@ describe('MeasurementListDialog annotation columns and filters', () => {
     ];
     const mountList = props => mount(MeasurementListDialog, {
         props: { measurements: ITEMS, ...props },
-        global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+        global: GLOBAL
     });
     const names = wrapper => wrapper.findAll('.measurement-name').map(n => n.text());
 
@@ -223,5 +235,235 @@ describe('MeasurementListDialog annotation columns and filters', () => {
         const wrapper = mountList({ measurements: [] });
         expect(wrapper.text()).toContain('No measurements on the map.');
         expect(wrapper.find('.measurement-filters').exists()).toBe(false);
+    });
+});
+
+describe('MeasurementListDialog selection', () => {
+    const GROUPS = [{ id: 'g1', name: 'Piles', color: '#f00', visible: true }, { id: 'g2', name: 'Roads', color: '#0f0', visible: true }];
+    const row = (name, extra = {}) => ({ type: 'length', name, value: '1 m', feature: { ol_uid: name, get: () => undefined }, groupId: '', ref: '', ...extra });
+    // On screen: Piles (A, B), Roads (C), Ungrouped (D, E)
+    const ITEMS = [row('A', { groupId: 'g1', ref: '6' }), row('B', { groupId: 'g1', ref: '7' }), row('C', { groupId: 'g2', type: 'area' }), row('D'), row('E', { type: 'point' })];
+    const mountList = props => mount(MeasurementListDialog, { props: { measurements: ITEMS, groups: GROUPS, ...props }, global: GLOBAL, attachTo: document.body });
+    const rows = w => w.findAll('.measurement-row');
+    const rowOf = (w, name) => rows(w).find(r => r.find('.measurement-name').text() === name);
+    const selectedNames = w => rows(w).filter(r => r.classes('measurement-row--selected')).map(r => r.find('.measurement-name').text());
+    const lastSelection = w => (w.emitted('selectionChange') || []).at(-1)?.[0].map(m => m.name);
+    const tree = w => w.find('[data-testid="measurement-tree"]');
+
+    it('a click selects one row, Ctrl or Cmd adds one, Shift takes the range on screen across groups', async () => {
+        const w = mountList();
+        await rowOf(w, 'B').trigger('click');
+        expect(selectedNames(w)).toEqual(['B']);
+        await rowOf(w, 'D').trigger('click', { ctrlKey: true });
+        expect(selectedNames(w)).toEqual(['B', 'D']);
+        await rowOf(w, 'A').trigger('click', { metaKey: true });
+        expect(selectedNames(w)).toEqual(['A', 'B', 'D']);
+        await rowOf(w, 'E').trigger('click', { shiftKey: true });
+        expect(selectedNames(w)).toEqual(['A', 'B', 'C', 'D', 'E']);
+        await rowOf(w, 'C').trigger('click');
+        expect(selectedNames(w)).toEqual(['C']);
+        expect(lastSelection(w)).toEqual(['C']);
+        w.unmount();
+    });
+
+    it('a check box toggles its row and keeps the others; a click on a row button does not select', async () => {
+        const w = mountList();
+        await rowOf(w, 'A').find('[data-testid="measurement-row-check"]').trigger('click');
+        await rowOf(w, 'D').find('[data-testid="measurement-row-check"]').trigger('click');
+        expect(selectedNames(w)).toEqual(['A', 'D']);
+        await rowOf(w, 'A').find('[data-testid="measurement-row-check"]').trigger('click');
+        expect(selectedNames(w)).toEqual(['D']);
+        await rowOf(w, 'B').find('button[aria-label="Edit"]').trigger('click');
+        expect(selectedNames(w)).toEqual(['D']);
+        expect(w.emitted('editMeasurement')[0][0].name).toBe('B');
+        w.unmount();
+    });
+
+    it('a group check box selects its rows, shows a part selected, and clears them when all were', async () => {
+        const w = mountList();
+        const check = () => w.find('[data-testid="measurement-group-g1"] [data-testid="measurement-group-check"]');
+        await rowOf(w, 'A').trigger('click');
+        expect(check().element.indeterminate).toBe(true);
+        await check().trigger('change');
+        expect(selectedNames(w)).toEqual(['A', 'B']);
+        expect(check().element.checked).toBe(true);
+        expect(check().element.indeterminate).toBe(false);
+        await check().trigger('change');
+        expect(selectedNames(w)).toEqual([]);
+        w.unmount();
+    });
+
+    it('Select all takes the rows the filters show, a collapsed group\'s too, and a filter drops the rows it hides', async () => {
+        const w = mountList();
+        await w.find('[data-testid="type-filter"]').setValue('length');
+        await w.find('.group-row .btn-collapse').trigger('click');
+        await w.find('[data-testid="measurement-select-all"]').trigger('change');
+        expect(lastSelection(w)).toEqual(['A', 'B', 'D']);
+        await w.find('[data-testid="type-filter"]').setValue('');
+        expect(lastSelection(w)).toEqual(['A', 'B', 'D']);
+        expect(w.find('[data-testid="measurement-select-all"]').element.indeterminate).toBe(true);
+        await w.find('[data-testid="measurement-search"] input').setValue('B');
+        expect(lastSelection(w)).toEqual(['B']);
+        w.unmount();
+    });
+
+    it('searches by name, or by the whole reference', async () => {
+        const w = mountList();
+        const names = () => rows(w).map(r => r.find('.measurement-name').text());
+        await w.find('[data-testid="measurement-search"] input').setValue('d');
+        expect(names()).toEqual(['D']);
+        await w.find('[data-testid="measurement-search"] input').setValue('7');
+        expect(names()).toEqual(['B']);
+        await w.find('[data-testid="measurement-search"] input').setValue('zz');
+        expect(w.text()).toContain('No measurements match the filters.');
+        w.unmount();
+    });
+
+    it('filters by type, with the types the list has', async () => {
+        const w = mountList();
+        const type = w.find('[data-testid="type-filter"]');
+        expect(type.findAll('option').map(o => o.text())).toEqual(['All', 'Length', 'Area', 'Point']);
+        await type.setValue('area');
+        expect(rows(w).map(r => r.find('.measurement-name').text())).toEqual(['C']);
+        w.unmount();
+    });
+
+    it('the keyboard: arrows move and select, Shift extends, Space toggles, Ctrl+A selects all, Escape clears, Delete asks', async () => {
+        const w = mountList();
+        await tree(w).trigger('keydown', { key: 'ArrowDown' });
+        expect(selectedNames(w)).toEqual(['A']);
+        await tree(w).trigger('keydown', { key: 'ArrowDown', shiftKey: true });
+        expect(selectedNames(w)).toEqual(['A', 'B']);
+        await tree(w).trigger('keydown', { key: 'End', ctrlKey: true });
+        await tree(w).trigger('keydown', { key: ' ' });
+        expect(selectedNames(w)).toEqual(['A', 'B', 'E']);
+        await tree(w).trigger('keydown', { key: 'Escape' });
+        expect(selectedNames(w)).toEqual([]);
+        await tree(w).trigger('keydown', { key: 'a', ctrlKey: true });
+        expect(selectedNames(w)).toHaveLength(5);
+        await tree(w).trigger('keydown', { key: 'Delete' });
+        expect(w.vm.pendingDeleteItems.map(m => m.name)).toEqual(['A', 'B', 'C', 'D', 'E']);
+        w.vm.handleDeleteConfirm('confirm');
+        expect(w.emitted('deleteMeasurements')[0][0].map(m => m.name)).toEqual(['A', 'B', 'C', 'D', 'E']);
+        w.unmount();
+    });
+
+    it('owns Escape only while something is selected, so the window closes on it otherwise', async () => {
+        const w = mountList();
+        expect(tree(w).attributes('data-owns-escape')).toBeUndefined();
+        await rowOf(w, 'A').trigger('click');
+        expect(tree(w).attributes('data-owns-escape')).toBe('');
+        w.unmount();
+    });
+
+    it('a delete that is cancelled deletes nothing', async () => {
+        const w = mountList();
+        await rowOf(w, 'A').trigger('click');
+        await w.find('[data-testid="measurement-delete-selected"]').trigger('click');
+        w.vm.handleDeleteConfirm('cancel');
+        expect(w.emitted('deleteMeasurements')).toBeUndefined();
+        w.unmount();
+    });
+
+    it('the selection bar counts the rows and moves, shows, exports and deletes them', async () => {
+        const w = mountList();
+        expect(w.find('[data-testid="measurement-selection-bar"]').exists()).toBe(false);
+        await rowOf(w, 'B').trigger('click');
+        await rowOf(w, 'D').trigger('click', { ctrlKey: true });
+        expect(w.find('[data-testid="measurement-selection-count"]').text()).toBe('2 measurements selected');
+        await w.find('[data-testid="measurement-move-to"]').trigger('click');
+        await w.find('[data-testid="measurement-move-to-g2"]').trigger('click');
+        expect(w.emitted('moveMeasurementsToGroup')[0][0].map(m => m.name)).toEqual(['B', 'D']);
+        expect(w.emitted('moveMeasurementsToGroup')[0][1]).toBe('g2');
+        await w.find('[data-testid="measurement-move-to"]').trigger('click');
+        await w.find('[data-testid="measurement-move-to-__ungrouped__"]').trigger('click');
+        expect(w.emitted('moveMeasurementsToGroup')[1][1]).toBe('');
+        await w.find('[data-testid="measurement-show-on-map"]').trigger('click');
+        expect(w.emitted('showOnMap')[0][0].map(m => m.name)).toEqual(['B', 'D']);
+        await w.find('[data-testid="measurement-export"]').trigger('click');
+        await w.find('[data-testid="measurement-export-csv"]').trigger('click');
+        expect(w.emitted('exportMeasurements')[0][1]).toBe('csv');
+        await w.find('[data-testid="measurement-selection-clear"]').trigger('click');
+        expect(selectedNames(w)).toEqual([]);
+        w.unmount();
+    });
+
+    it('New group takes the selected rows, or makes an empty group with none', async () => {
+        const w = mountList();
+        const button = () => w.find('[data-testid="measurement-new-group"]');
+        expect(button().text()).toBe('New group');
+        await button().trigger('click');
+        expect(w.emitted('createGroup')[0][0]).toEqual([]);
+        await rowOf(w, 'A').trigger('click');
+        await rowOf(w, 'E').trigger('click', { ctrlKey: true });
+        expect(button().text()).toBe('New group from 2 measurements');
+        await button().trigger('click');
+        expect(w.emitted('createGroup')[1][0].map(m => m.name)).toEqual(['A', 'E']);
+        w.unmount();
+    });
+
+    describe('drag and drop onto a group', () => {
+        const transfer = () => {
+            const data = {};
+            return { data, types: [], effectAllowed: '', dropEffect: '', setData(type, v) { data[type] = v; this.types.push(type); }, setDragImage() {} };
+        };
+        const block = (w, id) => w.find(`[data-testid="measurement-group-${id}"]`);
+
+        it('a selected row takes the selection; the rows already in the group stay out of the move', async () => {
+            const w = mountList();
+            await rowOf(w, 'A').trigger('click');
+            await rowOf(w, 'C').trigger('click', { ctrlKey: true });
+            const dataTransfer = transfer();
+            await rowOf(w, 'A').trigger('dragstart', { dataTransfer });
+            expect(dataTransfer.types).toEqual(['application/x-ddb-measurements']);
+            await block(w, 'g2').trigger('dragover', { dataTransfer });
+            expect(block(w, 'g2').classes()).toContain('group-block--drop');
+            await block(w, 'g2').trigger('drop', { dataTransfer });
+            expect(w.emitted('moveMeasurementsToGroup')).toEqual([[[ITEMS[0]], 'g2']]);
+            expect(block(w, 'g2').classes()).not.toContain('group-block--drop');
+            w.unmount();
+        });
+
+        it('an unselected row goes alone, also out of its group onto Ungrouped', async () => {
+            const w = mountList();
+            await rowOf(w, 'C').trigger('click');
+            const dataTransfer = transfer();
+            await rowOf(w, 'B').trigger('dragstart', { dataTransfer });
+            await block(w, 'ungrouped').trigger('dragover', { dataTransfer });
+            await block(w, 'ungrouped').trigger('drop', { dataTransfer });
+            expect(w.emitted('moveMeasurementsToGroup')).toEqual([[[ITEMS[1]], '']]);
+            w.unmount();
+        });
+
+        it('a drop on the group the rows are in, or of something else (a file), moves nothing', async () => {
+            const w = mountList();
+            const dataTransfer = transfer();
+            await rowOf(w, 'A').trigger('dragstart', { dataTransfer });
+            await block(w, 'g1').trigger('drop', { dataTransfer });
+            await rowOf(w, 'A').trigger('dragend');
+            const files = { types: ['Files'], dropEffect: '' };
+            await block(w, 'g2').trigger('dragover', { dataTransfer: files });
+            await block(w, 'g2').trigger('drop', { dataTransfer: files });
+            expect(w.emitted('moveMeasurementsToGroup')).toBeUndefined();
+            expect(block(w, 'g2').classes()).not.toContain('group-block--drop');
+            w.unmount();
+        });
+
+        it('rows cannot be dragged while there is no group to drop them on', () => {
+            const w = mountList({ groups: [], measurements: ITEMS.map(m => ({ ...m, groupId: '' })) });
+            expect(w.findAll('[data-testid="measurement-row"]').every(r => r.attributes('draggable') === 'false')).toBe(true);
+            w.unmount();
+        });
+    });
+});
+
+describe('MeasurementListDialog order', () => {
+    it('lists the numbered annotations by reference, then the others by name, numbers as numbers', () => {
+        const m = (name, ref = '') => ({ type: 'point', name, ref, value: '', feature: { ol_uid: name + ref }, groupId: '' });
+        const w = mount(MeasurementListDialog, {
+            props: { measurements: [m('Marker 10'), m('Crack', '10'), m('Marker 2'), m('Gate', '2'), m('Area')] },
+            global: GLOBAL
+        });
+        expect(w.findAll('.measurement-name').map(n => n.text())).toEqual(['Gate', 'Crack', 'Area', 'Marker 2', 'Marker 10']);
     });
 });

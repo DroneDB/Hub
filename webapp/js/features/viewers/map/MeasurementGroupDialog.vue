@@ -11,6 +11,9 @@
                 <label for="mg-color">Color</label>
                 <ColorSwatchPicker v-model="formColor" input-id="mg-color" />
             </div>
+            <p v-if="!isEdit && count" class="group-holds" data-testid="measurement-group-holds">
+                The group holds the {{ countOf(count, 'selected measurement') }}.
+            </p>
         </div>
     </Window>
 </template>
@@ -19,6 +22,7 @@
 import Window from '@/components/HubWindow.vue';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
+import { countOf } from '@/libs/format';
 
 export default {
     components: { Window, ColorSwatchPicker },
@@ -27,6 +31,11 @@ export default {
         group: {
             type: Object,
             default: null
+        },
+        // A new group made of the measurements selected in the list: how many go in it
+        count: {
+            type: Number,
+            default: 0
         }
     },
     emits: ['close', 'save'],
@@ -53,6 +62,7 @@ export default {
         });
     },
     methods: {
+        countOf,
         save() {
             const name = this.formName.trim();
             if (!name) return;
@@ -91,5 +101,9 @@ export default {
     font-size: var(--ddb-font-size-base);
     box-sizing: border-box;
 }
-
+.group-holds {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ddb-text-muted);
+}
 </style>

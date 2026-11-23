@@ -11,6 +11,7 @@ import LineString from 'ol/geom/LineString';
 import MeasureControls from './measureControl';
 import { _resetPrefListenersForTests } from '@/libs/preferences';
 import { mount } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
 import MeasurementListDialog from '@/features/viewers/map/MeasurementListDialog.vue';
 
 let control;
@@ -141,7 +142,7 @@ describe('a name or a material from a saved file is text on the map and in the l
         expect(items[0].value).toBe('8,097.19 m³ - <img src=x onerror=alert(1)> - 1.68 t/m³');
         const wrapper = mount(MeasurementListDialog, {
             props: { measurements: items },
-            global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+            global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /></div>' } } }
         });
         expect(wrapper.find('img').exists()).toBe(false);
         expect(wrapper.find('.measurement-name').text()).toBe(NAME);

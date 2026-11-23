@@ -116,7 +116,7 @@ describe('the files that show a meaning', () => {
         ['the zoom, north and attribution buttons', './map/controls/defaultControls.js',
             ['ZOOM_IN_ICON', 'ZOOM_OUT_ICON', 'NORTH_ICON', 'ATTRIBUTION_ICON', 'COLLAPSE_ICON']],
         ['the measure toolbar of the 3D viewers', '../components/MeasureToolbar.vue', ['POINT_ICON', 'LENGTH_ICON', 'HEIGHT_ICON', 'AREA_ICON', 'CLEAR_ALL_ICON']],
-        ['the Measurement List', '../features/viewers/map/MeasurementListDialog.vue', ['POINT_ICON', 'LENGTH_ICON', 'AREA_ICON', 'STOCKPILE_ICON']],
+        ['the Measurement List', './map/measurementTypes.js', ['POINT_ICON', 'LENGTH_ICON', 'AREA_ICON', 'STOCKPILE_ICON']],
         ['the Stockpile panel', '../features/viewers/map/StockpileVolumePanel.vue', ['STOCKPILE_ICON', 'AREA_ICON']],
         ['the Raster Analysis panel', '../features/viewers/map/RasterAnalysisControls.vue', ['RASTER_ANALYSIS_ICON']],
         ['the profile chart', '../features/viewers/map/RasterProfileChart.vue', ['EXPORT_CSV_ICON']],

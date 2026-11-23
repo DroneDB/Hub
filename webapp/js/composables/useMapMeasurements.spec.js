@@ -840,3 +840,88 @@ describe('useMapMeasurements', () => {
         });
     });
 });
+
+describe('useMapMeasurements: the selected rows of the measurement list', () => {
+    const list = m => m.measurementListItems.value;
+    const byName = (m, ...names) => list(m).filter(i => names.includes(i.name));
+    const open = async () => {
+        stored['a/ortho_measurements.geojson'] = fileOf('m1', 'm2', 'm3');
+        const m = start();
+        await m.loadSavedMeasurements();
+        m.openMeasurementListDialog();
+        return m;
+    };
+
+    it('deletes the selected measurements at once, keeps their ids out of a reload, and closes an empty list', async () => {
+        const m = await open();
+        controls.source.getFeatures().forEach(f => f.set('id', `id-${f.get('name')}`));
+        m.deleteMeasurements(byName(m, 'm1', 'm3'));
+        expect(onMap()).toEqual(['m2']);
+        expect(list(m).map(i => i.name)).toEqual(['m2']);
+        expect([...m.deletedMeasurementIds.value].sort()).toEqual(['id-m1', 'id-m3']);
+        expect(m.measurementListDialogOpen.value).toBe(true);
+        m.deleteMeasurements(list(m));
+        expect(m.measurementListDialogOpen.value).toBe(false);
+    });
+
+    it('a group is made of the selected measurements', async () => {
+        const m = await open();
+        m.openCreateGroupDialog(byName(m, 'm1', 'm2'));
+        m.handleGroupDialogSave({ name: 'North', color: '#123456' });
+        const [group] = m.measurementGroups.value;
+        expect(group.name).toBe('North');
+        expect(list(m).filter(i => i.groupId === group.id).map(i => i.name)).toEqual(['m1', 'm2']);
+        expect(m.measurementGroupDialogOpen.value).toBe(false);
+        expect(m.pendingGroupItems.value).toEqual([]);
+    });
+
+    it('moves the selected measurements; one moved into a hidden group hides, one moved out shows', async () => {
+        const m = await open();
+        const id = m.createGroup({ name: 'Hidden' });
+        m.toggleGroupVisibility(id);
+        m.moveMeasurementsToGroup(byName(m, 'm1', 'm2'), id);
+        const feature = name => controls.source.getFeatures().find(f => f.get('name') === name);
+        expect(feature('m1').get('groupId')).toBe(id);
+        expect(feature('m1').getStyle()).toEqual([]);
+        expect(feature('m3').getStyle()).toBeFalsy();
+        m.moveMeasurementsToGroup(byName(m, 'm1'), '');
+        expect(feature('m1').get('groupId')).toBeUndefined();
+        expect(feature('m1').getStyle()).toBeFalsy();
+    });
+
+    it('exports only the selected measurements, with only their groups', async () => {
+        const saved = vi.spyOn(csv, 'downloadCsv').mockImplementation(() => {});
+        try {
+            const m = await open();
+            m.createGroup({ name: 'Used' }, byName(m, 'm2'));
+            m.createGroup({ name: 'Unused' }, byName(m, 'm3'));
+            const exported = vi.spyOn(controls, 'exportToGeoJSON');
+            m.exportMeasurementsOfList(byName(m, 'm1', 'm2'), 'csv');
+            const rows = saved.mock.calls[0][0].trim().split('\r\n').slice(1);
+            expect(rows.map(r => r.split(',').slice(0, 2).join(','))).toEqual([',m1', 'Used,m2']);
+            expect(exported.mock.results[0].value.metadata.views.map.groups.map(g => g.name)).toEqual(['Used']);
+        } finally {
+            saved.mockRestore();
+        }
+    });
+
+    it('marks the selected rows on the map while the list is open, and not once it is closed', async () => {
+        const m = await open();
+        const marked = vi.spyOn(controls, 'setListSelection');
+        m.handleMeasurementListSelection(byName(m, 'm1'));
+        expect(marked.mock.calls.at(-1)[0].map(f => f.get('name'))).toEqual(['m1']);
+        m.closeMeasurementListDialog();
+        expect(marked.mock.calls.at(-1)[0]).toEqual([]);
+        expect(m.measurementListDialogOpen.value).toBe(false);
+    });
+
+    it('Show on map closes the list, fits the selection and keeps it marked', async () => {
+        const m = await open();
+        const fit = vi.spyOn(controls, 'fitFeatures').mockReturnValue(true);
+        const marked = vi.spyOn(controls, 'setListSelection');
+        m.showMeasurementsOnMap(byName(m, 'm2', 'm3'));
+        expect(m.measurementListDialogOpen.value).toBe(false);
+        expect(fit.mock.calls[0][0].map(f => f.get('name'))).toEqual(['m2', 'm3']);
+        expect(marked.mock.calls.at(-1)[0].map(f => f.get('name'))).toEqual(['m2', 'm3']);
+    });
+});
