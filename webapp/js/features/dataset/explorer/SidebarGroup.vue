@@ -27,7 +27,7 @@
                     <li v-if="!items.length && emptyText" role="none" class="empty-text" data-testid="group-empty">{{ emptyText }}</li>
                     <li v-if="actionLabel" role="none">
                         <button type="button" class="entry child" data-testid="group-action" @click="emit('action')">
-                            <i class="icon fa-solid fa-plus" aria-hidden="true" />
+                            <i class="icon" :class="GROUP_ACTION_ICONS.add" aria-hidden="true" />
                             <span class="text">{{ actionLabel }}</span>
                         </button>
                     </li>
@@ -48,6 +48,7 @@
  */
 import { ref } from 'vue';
 import InfoDialog from '@/components/InfoDialog.vue';
+import { GROUP_ACTION_ICONS } from '@/libs/datasetGroupInfo';
 import ContextMenu from './ContextMenu.vue';
 
 defineProps({

@@ -13,7 +13,7 @@
  */
 import { ref } from 'vue';
 import { VIEWS_ICON } from '@/libs/glyphs';
-import { SAVED_VIEWS_INFO } from '@/libs/datasetGroupInfo';
+import { SAVED_VIEWS_INFO, GROUP_ACTION_ICONS as ICONS } from '@/libs/datasetGroupInfo';
 import SidebarGroup from './SidebarGroup.vue';
 import { savedViewUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
@@ -40,10 +40,10 @@ const has = () => !!current.value;
 const copyLink = v => copyLinkWithNotice(absoluteUrl(savedViewUrl(props.dataset, v.uid)), notify, v.name);
 
 const menu = [
-    { label: 'Open', icon: 'fa-regular fa-folder-open', isVisible: has, click: () => open(current.value) },
-    { label: 'Copy Link', icon: 'fa-solid fa-link', isVisible: has, click: () => copyLink(current.value) },
+    { label: 'Open', icon: ICONS.open, isVisible: has, click: () => open(current.value) },
+    { label: 'Copy Link', icon: ICONS.copyLink, isVisible: has, click: () => copyLink(current.value) },
     { type: 'separator', isVisible: () => has() && props.canWrite },
-    { label: 'Rename', icon: 'fa-solid fa-pen', isVisible: () => has() && props.canWrite, click: () => emit('rename', current.value) },
-    { label: 'Delete', icon: 'fa-solid fa-trash', isVisible: () => has() && props.canWrite, click: () => emit('delete', current.value) }
+    { label: 'Rename', icon: ICONS.rename, isVisible: () => has() && props.canWrite, click: () => emit('rename', current.value) },
+    { label: 'Delete', icon: ICONS.delete, isVisible: () => has() && props.canWrite, click: () => emit('delete', current.value) }
 ];
 </script>

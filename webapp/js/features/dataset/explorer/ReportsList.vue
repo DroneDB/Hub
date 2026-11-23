@@ -14,7 +14,7 @@
  */
 import { computed, ref } from 'vue';
 import { REPORT_ICON } from '@/libs/glyphs';
-import { REPORTS_INFO } from '@/libs/datasetGroupInfo';
+import { REPORTS_INFO, GROUP_ACTION_ICONS as ICONS } from '@/libs/datasetGroupInfo';
 import SidebarGroup from './SidebarGroup.vue';
 import { reportUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
@@ -49,11 +49,11 @@ const editable = () => writable() && has() && !current.value.newerVersion;
 const copyLink = r => copyLinkWithNotice(absoluteUrl(reportUrl(props.dataset, r.uid)), notify, r.name);
 
 const menu = [
-    { label: 'Open', icon: 'fa-regular fa-folder-open', isVisible: has, click: () => open(current.value) },
-    { label: 'Copy Link', icon: 'fa-solid fa-link', isVisible: has, click: () => copyLink(current.value) },
+    { label: 'Open', icon: ICONS.open, isVisible: has, click: () => open(current.value) },
+    { label: 'Copy Link', icon: ICONS.copyLink, isVisible: has, click: () => copyLink(current.value) },
     { type: 'separator', isVisible: writable },
-    { label: 'Edit', icon: 'fa-solid fa-pen', isVisible: editable, click: () => emit('edit', current.value) },
-    { label: 'Duplicate', icon: 'fa-regular fa-copy', isVisible: editable, click: () => emit('duplicate', current.value) },
-    { label: 'Delete', icon: 'fa-solid fa-trash', isVisible: writable, click: () => emit('delete', current.value) }
+    { label: 'Edit', icon: ICONS.edit, isVisible: editable, click: () => emit('edit', current.value) },
+    { label: 'Duplicate', icon: ICONS.duplicate, isVisible: editable, click: () => emit('duplicate', current.value) },
+    { label: 'Delete', icon: ICONS.delete, isVisible: writable, click: () => emit('delete', current.value) }
 ];
 </script>
