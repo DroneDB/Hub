@@ -136,6 +136,7 @@
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import { ScaleLine } from 'ol/control';
+import { defaults as defaultInteractions } from 'ol/interaction/defaults';
 import { isEmpty as isEmptyExtent, extend as extendExtent, getWidth as extentWidth, getHeight as extentHeight, intersects as extentsIntersect } from 'ol/extent';
 import { inject, provide, shallowRef } from 'vue';
 
@@ -547,6 +548,10 @@ export default {
                 layers: [this.createBasemapLayer(), ...this.fileLayers.layers, this.measureControls.getLayer()],
                 view: new View({ center: [0, 0], zoom: 2 }),
                 controls: defaultMapControls(),
+                // Drag, wheel and keys act whether or not the map has the focus. OpenLayers waits for the focus when its
+                // element has a tabindex, and this one has (the photo popup gives the focus back to it): the first drag
+                // only focused the map, and the wheel did nothing until a click had
+                interactions: defaultInteractions({ onFocusOnly: false }),
                 // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042): OpenLayers would draw at the device ratio, uncapped
                 pixelRatio: appliedPixelRatio()
             });

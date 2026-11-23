@@ -12,6 +12,8 @@ import ddb from 'ddb';
 import { ScaleLine } from 'ol/control';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
+import MapBrowserEvent from 'ol/MapBrowserEvent';
+import { DragPan, MouseWheelZoom } from 'ol/interaction';
 import { b64encode } from '@/libs/base64';
 import { PREF, setPref } from '@/libs/preferences';
 import { notify } from '@/libs/notify';
@@ -244,6 +246,41 @@ describe('full screen', () => {
         await mountMap([MAIN]);
         wrapper.vm.toggleFullscreen();
         expect(asked).toEqual([wrapper.find('#map').element]);
+    });
+});
+
+describe('the first drag and wheel on the map', () => {
+    const interaction = type => wrapper.vm.map.getInteractions().getArray().find(i => i instanceof type);
+    /** A primary pointer event of the mouse, as the browser sends it */
+    const pointer = type => Object.assign(new MouseEvent(type, { button: 0, buttons: 1, bubbles: true, cancelable: true }), { pointerId: 1, isPrimary: true });
+    /** The event the map hands its interactions, with the pointer that is down */
+    const mapEvent = (type, event) => new MapBrowserEvent(type, wrapper.vm.map, event, false, undefined, type === 'pointerdown' ? [event] : []);
+
+    /** The map's element has a tabindex (a focus in the photo popup comes back to it), and the focus is elsewhere */
+    async function mountUnfocused() {
+        await mountMap([MAIN]);
+        // The size the map would have on the page (no layout here): where the pointer is reads it
+        wrapper.vm.map.setSize([800, 600]);
+        const target = wrapper.vm.map.getTargetElement();
+        expect(target.hasAttribute('tabindex')).toBe(true);
+        document.body.focus();
+        expect(target.contains(document.activeElement)).toBe(false);
+    }
+
+    it('pans on the first drag, before the map has the focus', async () => {
+        await mountUnfocused();
+        const pan = interaction(DragPan);
+        pan.handleEvent(mapEvent('pointerdown', pointer('pointerdown')));
+        expect(pan.handlingDownUpSequence).toBe(true);
+        pan.handleEvent(mapEvent('pointerup', pointer('pointerup')));
+    });
+
+    it('zooms on a wheel, which never gives the map the focus', async () => {
+        await mountUnfocused();
+        const wheel = new WheelEvent('wheel', { deltaY: 100, cancelable: true });
+        interaction(MouseWheelZoom).handleEvent(mapEvent('wheel', wheel));
+        // The wheel zoom takes the event (the page does not scroll): it acted on it
+        expect(wheel.defaultPrevented).toBe(true);
     });
 });
 
