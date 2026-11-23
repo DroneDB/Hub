@@ -31,6 +31,8 @@ const DS_PERF = `reperf-${RUN}`;
 const DS_MAP = `repmap-${RUN}`;
 const DS_MAP2 = `repmap2-${RUN}`;
 const DS_3D = `rep3d-${RUN}`;
+// A dataset with no saved view: a new report saves one of its map file
+const DS_NOVIEW = `repnov-${RUN}`;
 const READER = `rdr${RUN}`;
 const MEMBER = `mem${RUN}`;
 const OUTSIDER_PASS = 'password123';
@@ -128,11 +130,11 @@ function ageFile(ds, filePath) {
 const readFile = name => fs.readFileSync(path.join(DATA, 'images', name));
 
 /** `marker`: a file the e2e can find the dataset folder of on the disk of the Registry by (it would be a file on show of the map: the map datasets have none). */
-async function createDataset(slug, { images = IMAGES, isPublic = false, marker = true } = {}) {
+async function createDataset(slug, { images = IMAGES, isPublic = false, marker = true, view = true } = {}) {
     await call('POST', `/orgs/${USER}/ds`, form({ slug, name: slug }));
     for (const name of images) await upload(slug, `images/${name}`, readFile(name));
     if (marker) await upload(slug, `${slug}.marker`, 'e2e');
-    await addMeta(slug, 'views', coverView());
+    if (view) await addMeta(slug, 'views', coverView());
     if (isPublic) await call('POST', `/orgs/${USER}/ds/${slug}/meta/set`, form({ key: 'visibility', data: '2', path: '' }));
 }
 
@@ -173,8 +175,6 @@ async function openReport(page, ds, uid, name) {
     await page.waitForSelector(`h1:has-text("${name}")`, { timeout: 30000 });
 }
 const documentText = page => page.locator('.report-document').innerText();
-/** The refs of the Items section (the headings of the item pages), in the order the page shows them. */
-const itemHeadings = page => page.locator('.report-document h3, .report-document h2').allInnerTexts();
 
 /** Downloads the PDF of the open report into the temp folder. */
 async function downloadPdf(page, file = `report-${Date.now()}.pdf`) {
@@ -218,7 +218,7 @@ after(async () => {
     await browser?.close();
     // The settings of the organization as they were (a failed test may have left a template changed)
     try { await call('PUT', ORG_SETTINGS, { ...originalSettings, version: (await call('GET', ORG_SETTINGS)).version }); } catch { /* best effort */ }
-    for (const ds of [DS, DS_MAP, DS_MAP2, DS_3D, DS_PUBLIC, DS_PERF]) { try { await call('DELETE', `/orgs/${USER}/ds/${ds}`); } catch { /* best effort */ } }
+    for (const ds of [DS, DS_MAP, DS_MAP2, DS_3D, DS_PUBLIC, DS_PERF, DS_NOVIEW]) { try { await call('DELETE', `/orgs/${USER}/ds/${ds}`); } catch { /* best effort */ } }
     for (const u of [READER, MEMBER]) { try { await call('DELETE', `/users/${u}`); } catch { /* best effort */ } }
     fs.rmSync(TMP, { recursive: true, force: true });
 });
@@ -229,16 +229,19 @@ test('a new report on a 2.0 file numbers its items in the order they were made, 
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}`);
     await appReady(page);
-    await page.click('text=New report');
+    await page.click('[data-testid="group-action"]:has-text("New report")');
     await page.waitForSelector('#report-name');
+    // Filled in from the newest report of the dataset: its file and its view
+    await page.waitForSelector('.p-multiselect:has(#report-sources) :text("numbered/measurements.geojson")');
+    await page.waitForSelector('.p-select:has(#report-view) :text("Site cover")');
     await page.fill('#report-name', 'Numbered by the report');
-    await page.click('#report-source-add');
-    await page.click('.p-select-overlay [role=option]:has-text("legacy/measurements.geojson")');
-    await page.click('button:has-text("Add source")');
-    await page.click('#report-cover-view');
-    await page.click('.p-select-overlay [role=option]:has-text("Site cover")');
+    // This one reads the 2.0 file instead
+    await page.click('.p-multiselect:has(#report-sources)');
+    await page.click('.p-multiselect-overlay [role=option]:has-text("legacy/measurements.geojson")');
+    await page.click('.p-multiselect-overlay [role=option]:has-text("numbered/measurements.geojson")');
+    await page.keyboard.press('Escape');
     await shot(page, 'report-editor');
-    await Promise.all([page.waitForURL(/\/reports\/r_[a-z0-9]+$/, { timeout: 30000 }), page.click('.p-dialog button:has-text("Save")')]);
+    await Promise.all([page.waitForURL(/\/reports\/r_[a-z0-9]+$/, { timeout: 30000 }), page.click('.p-dialog button:has-text("Create report")')]);
     await page.waitForSelector('h1:has-text("Numbered by the report")');
     await page.waitForSelector('.report-document table', { timeout: 30000 });
 
@@ -264,6 +267,59 @@ test('a new report on a 2.0 file numbers its items in the order they were made, 
     for (const ref of ['1', '2', '3']) assert.ok(rows.some(r => r.split('\t')[0].trim() === ref), `a row has the ref ${ref}`);
     assert.ok(await page.locator('.report-document a[href*="#item-"]').count() >= 3, 'each item has an anchor');
     assert.ok(await page.locator('.report-document svg, .report-document canvas, .report-document img[alt*="QR" i]').count() >= 1, 'the QR code is drawn');
+    assert.deepEqual(errors, []);
+});
+
+test('the Report button of the map opens the editor filled in: Create report makes the report of the map\'s file on the saved view', async () => {
+    const { page, errors } = await newPage();
+    await page.goto(`${URL_}/r/${USER}/${DS_MAP}`);
+    await appReady(page);
+    await page.click('.tab-buttons-strip >> text=Map');
+    await page.click('[data-testid="report-toolbar-btn"]', { timeout: 30000 });
+    await page.waitForSelector('#report-name');
+    await page.waitForSelector('.p-select:has(#report-view) :text("Site cover")');
+    // The optional fields are behind More options, which shows what they hold
+    assert.equal(await page.locator('#report-title').isVisible(), false, 'More options is closed');
+    assert.match(await page.locator('[data-testid="options-summary"]').innerText(), /template/);
+    await shot(page, 'report-editor-from-map');
+    await Promise.all([page.waitForURL(/\/reports\/r_[a-z0-9]+$/, { timeout: 30000 }), page.click('.p-dialog button:has-text("Create report")')]);
+    const uid = page.url().split('/').pop();
+    const report = (await meta(DS_MAP, 'reports')).find(r => r.uid === uid);
+    assert.deepEqual(report.sources, [{ file: 'measurements.geojson', label: 'A' }]);
+    assert.deepEqual(report.cover, { viewId: 'v_cover001' });
+    assert.match(report.name, /^Site cover – /);
+    assert.equal(report.title, DS_MAP);
+    assert.deepEqual(errors, []);
+});
+
+test('a new report in a dataset with no saved view saves a view of its map file with it, which the Views group then lists', async () => {
+    await createDataset(DS_NOVIEW, { images: [], view: false });
+    await json(DS_NOVIEW, 'measurements.geojson', legacyDocument());
+    await json(DS_NOVIEW, 'zones.geojson', { type: 'FeatureCollection', crs: CRS, features: [{ type: 'Feature', geometry: square(-91.9942, 46.8427, 0.0003), properties: { name: 'Zone' } }] });
+    const { page, errors } = await newPage();
+    await page.goto(`${URL_}/r/${USER}/${DS_NOVIEW}`);
+    await appReady(page);
+    // A writer sees the Views group with no view, and how to make one
+    await page.waitForSelector('.saved-views [data-testid="group-empty"]');
+    await page.click('[data-testid="group-action"]:has-text("New report")');
+    await page.waitForSelector('#report-view-name');
+    assert.equal(await page.inputValue('#report-view-name'), 'zones.geojson');
+    await page.fill('#report-view-name', 'Zones');
+    await shot(page, 'report-editor-new-view');
+    await Promise.all([page.waitForURL(/\/reports\/r_[a-z0-9]+$/, { timeout: 30000 }), page.click('.p-dialog button:has-text("Create report")')]);
+    // The report opens on the view it saved
+    await page.waitForSelector('.report-document table', { timeout: 30000 });
+    const views = await meta(DS_NOVIEW, 'views');
+    assert.equal(views.length, 1, 'one view was saved');
+    assert.equal(views[0].name, 'Zones');
+    assert.equal(views[0].base.path, 'zones.geojson');
+    const uid = page.url().split('/').pop();
+    const report = (await meta(DS_NOVIEW, 'reports')).find(r => r.uid === uid);
+    assert.deepEqual(report.cover, { viewId: views[0].uid });
+    assert.deepEqual(report.sources, [{ file: 'measurements.geojson', label: 'A' }]);
+    await page.goto(`${URL_}/r/${USER}/${DS_NOVIEW}`);
+    await appReady(page);
+    await page.waitForSelector('.saved-views button:has-text("Zones")');
     assert.deepEqual(errors, []);
 });
 
@@ -634,7 +690,7 @@ test('a template that is deleted falls back to the first one with a notice, a se
     try {
         // The administrator drops the sections of the first template and deletes the template of the report
         const first = { ...original.templates[0], defaultSections: ['cover'] };
-        current = await call('PUT', ORG_SETTINGS, { templates: [first], schema: original.schema, version: current.version });
+        await call('PUT', ORG_SETTINGS, { templates: [first], schema: original.schema, version: current.version });
         const { page } = await newPage();
         await openReport(page, DS, 'r_tplgone8', 'Template report');
         await page.waitForSelector('.report-document table');

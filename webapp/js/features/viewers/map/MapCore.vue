@@ -113,12 +113,13 @@
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" @dismiss="onFilePopupDismissed" />
         <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :copy-link="!!linkTarget && !!dataset"
                     :report="canWrite && !embed && !!dataset"
+                    :save-view="!view && canWrite && !embed && !!dataset" :save-view-disabled="!rasterLayerList.length"
                     :display-options="!standalone"
                     :split-toggle="!standalone || !!view"
                     :analysis-entry="analysisEntry" :raster-count="rasterLayerList.length"
                     :direction-indicators="showDirectionIndicators" :flight-path="showFlightPath"
                     :split-mode="splitMode" :can-compare="canCompare" :pick-to-compare="!view"
-                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen" @copy-link="toggleLinkPanel" @report="startReport"
+                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen" @copy-link="toggleLinkPanel" @report="startReport" @save-view="saveMapAsView"
                     @analysis="toggleAnalysisPanel"
                     @update:direction-indicators="setDirectionIndicators" @update:flight-path="setFlightPath"
                     @toggle-split="toggleSplit" @compare-to="compareTo" />
@@ -162,6 +163,7 @@ import { useMapFeatures } from '@/composables/useMapFeatures';
 import { useMapViewState } from '@/composables/useMapViewState';
 import { useMapItemFocus } from '@/composables/useMapItemFocus';
 import { useMapReport } from '@/composables/useMapReport';
+import { useViewActions } from '@/composables/useViewActions';
 import { useReportActions } from '@/features/reports/useReportActions';
 import { useChoice } from '@/composables/useConfirm';
 import { useRouter } from 'vue-router';
@@ -250,6 +252,12 @@ export default {
             type: Object,
             default: null
         },
+        // The view on show in the map viewer: the uid of its saved view ('' for a new view of a file), its name and whether it
+        // has unsaved changes. A report from this map uses the saved view as it is, or saves the state on show as a new view
+        viewInfo: {
+            type: Object,
+            default: null
+        },
         // Paths of the layers of the saved view the map shows, as it was saved: the style the view records for them
         // (none included) is the user's, so the map gives them no default style (FR-RAS-01). Empty on a new view and on
         // the dataset map, whose rasters without a style get the default of their value info
@@ -298,7 +306,7 @@ export default {
             default: ''
         }
     },
-    emits: ['scrollTo', 'openItem', 'update:view', 'removeLayer', 'repick', 'addLayer', 'save', 'fileWritten', 'fileRemoved'],
+    emits: ['scrollTo', 'openItem', 'update:view', 'removeLayer', 'repick', 'addLayer', 'save', 'fileWritten', 'fileRemoved', 'viewSaved'],
     setup(props, { emit }) {
         // The size class of the map's container: the panels over the map inject it
         const { size: mapSize, observe: observeMapSize } = useMapSize();
@@ -315,11 +323,15 @@ export default {
         const reportActions = props.dataset
             ? useReportActions({ dataset: props.dataset, org: props.dataset.org, ds: props.dataset.ds, dialogs: features.dialogs, router })
             : null;
+        const viewBinding = useMapViewState({ ...features, view: () => props.view, emit });
+        const viewActions = props.dataset ? useViewActions({ dataset: props.dataset, dialogs: features.dialogs, onChanged: () => emit('viewSaved') }) : null;
+        // What the map shows as a view: the viewer's own, or the georasters of the dataset map
+        const shownState = () => props.view ?? viewBinding.datasetMapState();
         const report = useMapReport({
             actions: reportActions,
             choose: useChoice(features.dialogs),
-            view: () => props.view,
-            files: () => props.files,
+            state: shownState,
+            viewInfo: () => props.viewInfo,
             measurements: {
                 isDirty: () => features.hasUnsavedMeasurements.value,
                 hasSaved: () => features.hasSavedMeasurements.value,
@@ -333,7 +345,12 @@ export default {
             onFilesFitted: itemFocus.onFilesFitted,
             // Provided by the app: true on a map embedded in another page
             embed: inject('embed', false),
-            ...useMapViewState({ ...features, view: () => props.view, emit }),
+            ...viewBinding,
+            // "Save as view" of the dataset map: its georasters as a new saved view (the dataset page lists it: viewSaved)
+            saveMapAsView: async () => {
+                const state = viewBinding.datasetMapState();
+                if (state && viewActions) await viewActions.saveAsNew(state);
+            },
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
             // The units of the scale bar (FR-MAP-30): the measurement units, which the Preferences page and the measure tools change

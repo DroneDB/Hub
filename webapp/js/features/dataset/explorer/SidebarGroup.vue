@@ -18,6 +18,7 @@
                             <span class="text">{{ item.name }}</span>
                         </button>
                     </li>
+                    <li v-if="!items.length && emptyText" role="none" class="empty-text" data-testid="group-empty">{{ emptyText }}</li>
                     <li v-if="actionLabel" role="none">
                         <button type="button" class="entry child" data-testid="group-action" @click="emit('action')">
                             <i class="icon fa-solid fa-plus" aria-hidden="true" />
@@ -55,6 +56,8 @@ defineProps({
     itemIcon: { type: Function, required: true },
     /** The tooltip of an item, from the item */
     itemTitle: { type: Function, required: true },
+    /** What the group says when it has no item (how to make one); none leaves it empty */
+    emptyText: { type: String, default: '' },
     /** The label of the button that adds an item (a new report), after the rows; none when it is not offered */
     actionLabel: { type: String, default: '' },
     /** The items of the menu (ContextMenu items; their `isVisible` and `click` read the item in `current`) */
@@ -106,6 +109,13 @@ const current = defineModel('current', { type: Object, default: null });
     &.child {
         padding-left: 1.75rem;
     }
+}
+
+.empty-text {
+    padding: 0.25rem 0.25rem 0.25rem 1.75rem;
+    color: var(--ddb-text-muted);
+    font-size: 0.875em;
+    white-space: normal;
 }
 
 .icon {

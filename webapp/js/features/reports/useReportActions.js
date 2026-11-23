@@ -6,7 +6,7 @@
  * as HTML, so a name is in its title, never in its message.
  *
  *   const actions = useReportActions({ dataset, org, ds, dialogs, router, onChanged: reloadReports });
- *   await actions.create({ sources: ['survey/measurements.geojson'], cover: { viewState } });
+ *   await actions.create({ sources: ['survey/measurements.geojson'], view: { uid: 'v_k3x9q2m7' } });
  */
 import reg from '@/libs/api/sharedRegistry';
 import { useConfirm, useChoice } from '@/composables/useConfirm';
@@ -62,7 +62,7 @@ export function useReportActions({ dataset, org, ds, dialogs, router, onChanged 
      * The editor: a report is stored and, once the user has seen the result, the page moves to it (a new report) or
      * shows it again (an edited one).
      * @param {import('@/libs/metaList/metaListStore').MetaEntry | null} entry  the report to edit; none for a new one
-     * @param {{ sources?: string[], cover?: import('@/libs/reports/reportDefinition').ReportCover | null }} [initial]  what a new report starts with
+     * @param {{ sources?: string[], view?: import('@/composables/useMapReport').MapReportView | null }} [initial]  what a new report was opened with
      * @returns {Promise<{ uid: string } | null>}
      */
     async function openEditor(entry, initial) {
@@ -72,7 +72,10 @@ export function useReportActions({ dataset, org, ds, dialogs, router, onChanged 
         return saved;
     }
 
-    /** A new report, from the dataset page (nothing chosen) or the map (its file and view). @param {{ sources?: string[], cover?: any }} [initial] */
+    /**
+     * A new report, from the dataset page (nothing given: the editor fills it in) or the map (its file and view).
+     * @param {{ sources?: string[], view?: import('@/composables/useMapReport').MapReportView | null }} [initial]
+     */
     async function create(initial) {
         const saved = await openEditor(null, initial);
         if (saved) await router.push(urlOf(saved.uid));

@@ -22,6 +22,20 @@ import { isNotFound } from '@/libs/ddb/apiError';
 const UID_LENGTH = 8;
 
 /**
+ * `base`, else `base (2)`, `base (3)` ... : the first name not in `taken`, cut to `max` characters with its number (a
+ * name proposed for a new entry, which the user can change).
+ * @param {string} base @param {Iterable<string>} taken @param {number} max
+ */
+export function uniqueName(base, taken, max) {
+    const names = new Set(taken);
+    for (let n = 1; ; n++) {
+        const suffix = n === 1 ? '' : ` (${n})`;
+        const name = `${base.slice(0, max - suffix.length).trimEnd()}${suffix}`;
+        if (!names.has(name)) return name;
+    }
+}
+
+/**
  * @typedef {{ id: string, mtime: number, data: any }} MetaItem  data is the parsed JSON object
  * @typedef {{ id: string, uid: string, name: string, data: any, newerVersion: boolean, error: string|null }} MetaEntry
  *   `error` is why the entry cannot be opened (it fails `validate`), or null

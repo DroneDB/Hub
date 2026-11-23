@@ -27,7 +27,8 @@
                              :current-path="listing.currentPath.value" :loading="listing.isLoading.value" :active="activeTab === 'map'"
                              :can-write="canWrite" :can-delete="canDelete" @scroll-to="file => explorer && explorer.scrollTo && explorer.scrollTo(file)"
                              @show-folder="showFolder" @open-item="openItem" @vue:mounted="onMapMounted"
-                             @file-written="onMapFileWritten" @file-removed="path => listing.removed([path])" />
+                             @file-written="onMapFileWritten" @file-removed="path => listing.removed([path])"
+                             @view-saved="loadViews({ fresh: true })" />
                     </template>
                     <template #explorer>
                         <div class="explorer-tab">

@@ -29,15 +29,16 @@ const file = entry => ({ path: `ddb://acme/site/${entry.path}`, entry, selected:
 const Toolbar = defineComponent({
     name: 'MapToolbar',
     props: {
-        showBack: Boolean, copyLink: Boolean, report: Boolean, analysisEntry: { type: Object, default: null }, splitToggle: Boolean,
+        showBack: Boolean, copyLink: Boolean, report: Boolean, saveView: Boolean, saveViewDisabled: Boolean, analysisEntry: { type: Object, default: null }, splitToggle: Boolean,
         displayOptions: Boolean, splitMode: Boolean, canCompare: Boolean, rasterCount: { type: Number, default: 0 },
         pickToCompare: { type: Boolean, default: true }
     },
-    emits: ['back', 'copy-link', 'report', 'analysis', 'toggle-split', 'compare-to'],
+    emits: ['back', 'copy-link', 'report', 'save-view', 'analysis', 'toggle-split', 'compare-to'],
     setup(props, { emit }) {
         return () => h('div', { 'data-stub': 'toolbar' }, [
             h('button', { 'data-copy': '', onClick: () => emit('copy-link') }),
             props.report ? h('button', { 'data-report': '', onClick: () => emit('report') }) : null,
+            props.saveView ? h('button', { 'data-save-view': '', onClick: () => emit('save-view') }) : null,
             h('button', { 'data-split': '', onClick: () => emit(props.canCompare ? 'toggle-split' : 'compare-to') })
         ]);
     }
@@ -1103,7 +1104,7 @@ describe('the Report button (a report from this map)', () => {
         expect(toolbar().props('report')).toBe(false);
     });
 
-    it('opens the report editor over the map with the measurement file as the source and the view as the cover', async () => {
+    it('opens the report editor over the map with the measurement file as the source and the state on show as a new view', async () => {
         const measurement = { type: 'Feature', id: 'a1', geometry: { type: 'Point', coordinates: [10.005, 45.005] }, properties: { id: 'a1', ref: '1', measurementType: 'point', name: 'Crack', createdAt: '2026-11-01T10:00:00.000Z' } };
         dataset.getFileContents.mockImplementation(async path => {
             if (path === 'dsm_measurements.geojson') return JSON.stringify({ type: 'FeatureCollection', metadata: { version: '3.0' }, features: [measurement] });
@@ -1116,7 +1117,7 @@ describe('the Report button (a report from this map)', () => {
             const [open] = wrapper.vm.dialogs.stack.value;
             expect(open.props.entry).toBeNull();
             expect(open.props.initial.sources).toEqual(['dsm_measurements.geojson']);
-            expect(open.props.initial.cover.viewState.base.path).toBe('dsm.tif');
+            expect(open.props.initial.view.state.base.path).toBe('dsm.tif');
         } finally {
             dataset.getFileContents.mockImplementation(async () => { throw Object.assign(new Error('Not found'), { status: 404 }); });
         }
@@ -1128,6 +1129,54 @@ describe('the Report button (a report from this map)', () => {
         await flushPromises();
         const [open] = wrapper.vm.dialogs.stack.value;
         expect(open.props.initial.sources).toEqual([]);
+    });
+
+    it('gives the saved view on show when it has no unsaved change, and its state with its name when it has', async () => {
+        await mountView([MAIN], { extra: { viewInfo: { uid: 'v_aaaaaaaa', name: 'Site', dirty: false } } });
+        await wrapper.find('[data-report]').trigger('click');
+        await flushPromises();
+        expect(wrapper.vm.dialogs.stack.value[0].props.initial.view).toEqual({ uid: 'v_aaaaaaaa' });
+        wrapper.unmount();
+        await mountView([MAIN], { extra: { viewInfo: { uid: 'v_aaaaaaaa', name: 'Site', dirty: true } } });
+        await wrapper.find('[data-report]').trigger('click');
+        await flushPromises();
+        expect(wrapper.vm.dialogs.stack.value[0].props.initial.view).toMatchObject({ name: 'Site', state: { base: { path: 'dsm.tif' } } });
+    });
+
+    it('gives the georasters of the dataset map as a new view, the one drawn last on top', async () => {
+        await mountMap([file(MAIN), file(ADDED)], { standalone: false, canWrite: true });
+        await wrapper.find('[data-report]').trigger('click');
+        await flushPromises();
+        const { view } = wrapper.vm.dialogs.stack.value[0].props.initial;
+        expect(view.name).toBe('');
+        expect(view.state.base.path).toBe('ortho.tif');
+        expect(view.state.layers.map(l => l.path)).toEqual(['ortho.tif', 'dsm.tif']);
+    });
+});
+
+describe('Save as view (the dataset map)', () => {
+    it('is offered to a writer on the dataset map, not on a view, and says why it cannot save with no georaster', async () => {
+        await mountMap([file(MAIN)], { standalone: false, canWrite: true });
+        expect(toolbar().props('saveView')).toBe(true);
+        expect(toolbar().props('saveViewDisabled')).toBe(false);
+        wrapper.unmount();
+        await mountMap([file(ZONES)], { standalone: false, canWrite: true });
+        expect(toolbar().props('saveViewDisabled')).toBe(true);
+        wrapper.unmount();
+        await mountView([MAIN]);
+        expect(toolbar().props('saveView')).toBe(false);
+    });
+
+    it('asks for the name of the view, the name of its top georaster at first', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        await mountMap([file(MAIN), file(ADDED)], { standalone: false, canWrite: true });
+        await wrapper.find('[data-save-view]').trigger('click');
+        await flushPromises();
+        const [prompt] = wrapper.vm.dialogs.stack.value;
+        expect(prompt.props).toMatchObject({ title: 'Save as view', initialValue: 'ortho.tif' });
+        wrapper.vm.dialogs.close(prompt.id, null);
+        await flushPromises();
+        expect(wrapper.emitted('viewSaved')).toBeUndefined();
     });
 });
 

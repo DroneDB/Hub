@@ -199,3 +199,15 @@ export function sameView(a, b) {
 export function samePosition(a, b) {
     return JSON.stringify(rounded(a)) === JSON.stringify(rounded(b));
 }
+
+/**
+ * A view of georasters, the first one on top: it is the base (the map opens on it) and the others
+ * are layers below it, split on as for a file opened with added layers. Null with no georaster.
+ * @param {{ path: string, hash?: string }[]} rasters  top first
+ * @returns {ViewState|null}
+ */
+export function georasterState(rasters) {
+    if (!rasters.length) return null;
+    const [first, ...others] = rasters;
+    return buildEntryState({ path: first.path, hash: first.hash || '' }, others.map(r => r.path), { baseIsGeoraster: true });
+}

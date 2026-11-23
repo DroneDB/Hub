@@ -1,12 +1,5 @@
 <template>
     <div class="report-editor-details">
-        <ReportSettingsField id="report-name" label="Name" :error="shown('name')" :count="`${draft.name.length}/${MAX_REPORT_NAME_LENGTH}`">
-            <template #default="{ describedBy, invalid }">
-                <InputText id="report-name" v-model="draft.name" class="w-100" :maxlength="MAX_REPORT_NAME_LENGTH" autocomplete="off" data-autofocus
-                           :invalid="invalid" :aria-invalid="invalid ? 'true' : undefined" :aria-describedby="describedBy" required />
-            </template>
-        </ReportSettingsField>
-
         <div class="mb-3">
             <label id="report-template-label" for="report-template" class="d-block mb-1 fw-semibold">Template</label>
             <Select :model-value="editor.resolvedTemplate.value.id" input-id="report-template" aria-labelledby="report-template-label"
@@ -43,8 +36,8 @@
 
 <script setup>
 /**
- * The first part of the report editor: the name, the template, the texts of the cover, the notes and the units. A
- * field says what is wrong with it once a save was tried.
+ * The options of the report editor that have a value without the user: the template, the texts of the cover, the notes
+ * and the units. A field says what is wrong with it once a save was tried.
  */
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
@@ -52,19 +45,13 @@ import Select from 'primevue/select';
 import Textarea from 'primevue/textarea';
 import ReportSettingsField from '@/features/organizations/ReportSettingsField.vue';
 import { MAX_NOTES_LENGTH, MAX_TEXT_LENGTH } from '@/libs/reports/reportDefinition';
-import { MAX_REPORT_NAME_LENGTH } from '@/libs/reports/reportStore';
-import { injectReportEditor } from './useReportEditor';
+import { injectReportEditor, UNIT_OPTIONS } from './useReportEditor';
 
 const TEXT_FIELDS = [
     { key: 'title', label: 'Title' },
     { key: 'subtitle', label: 'Subtitle' },
     { key: 'preparedBy', label: 'Prepared by' },
     { key: 'preparedFor', label: 'Prepared for' }
-];
-const UNIT_OPTIONS = [
-    { value: '', label: 'The units each reader has chosen' },
-    { value: 'metric', label: 'Metric' },
-    { value: 'imperial', label: 'Imperial' }
 ];
 
 const editor = injectReportEditor();

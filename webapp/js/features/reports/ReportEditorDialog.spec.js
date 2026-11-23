@@ -1,5 +1,6 @@
 /**
- * The report editor dialog: its fields are labelled, a save that cannot be done says what is wrong at the fields, a
+ * The report editor dialog: what a report needs is on top and filled in, the rest is under a closed More options group
+ * that a problem in it opens, its fields are labelled, a save that cannot be done says what is wrong at the fields, a
  * saved report closes it with its uid, a source that could not be numbered keeps it open to name the file (the report is
  * stored all the same), a template that was deleted is said, and leaving with changes asks first.
  */
@@ -8,23 +9,25 @@ import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import Select from 'primevue/select';
 import ddb from 'ddb';
-import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
 
-const m = vi.hoisted(() => ({ saveNewReport: vi.fn(), updateReport: vi.fn(), reportChange: vi.fn(), numberMeasurementFile: vi.fn(), settings: vi.fn() }));
+const m = vi.hoisted(() => ({
+    saveNewReport: vi.fn(), updateReport: vi.fn(), reportChange: vi.fn(), numberMeasurementFile: vi.fn(), settings: vi.fn(), listViews: vi.fn(), listReports: vi.fn()
+}));
 vi.mock('@/libs/reports/reportSettings', async importOriginal => ({
     ...await importOriginal(),
     datasetReportSettings: (...a) => m.settings(...a)
 }));
 vi.mock('@/libs/views/viewStore', async importOriginal => ({
     ...await importOriginal(),
-    listViews: async () => [{ uid: 'v_cover123', name: 'Cover view', error: null, newerVersion: false }]
+    listViews: (...a) => m.listViews(...a)
 }));
 vi.mock('@/libs/reports/reportSources', () => ({
     loadReportSources: async (ds, sources) => sources.map(s => ({ label: s.label, file: s.file, document: { metadata: {}, features: [] } }))
 }));
 vi.mock('@/libs/reports/reportStore', async importOriginal => ({
     ...await importOriginal(),
+    listReports: (...a) => m.listReports(...a),
     saveNewReport: (...a) => m.saveNewReport(...a),
     updateReport: (...a) => m.updateReport(...a),
     reportChange: (...a) => m.reportChange(...a)
@@ -36,8 +39,10 @@ const { default: ReportEditorDialog } = await import('./ReportEditorDialog.vue')
 const searchDataset = async (pattern, options) => (options?.type === ddb.entry.type.GEORASTER
     ? [{ path: 'ortho.tif', hash: 'h1' }]
     : [{ path: 'a/measurements.geojson' }, { path: 'b/measurements.geojson' }]);
-const dataset = { search: vi.fn(searchDataset) };
-const coverState = () => defaultState({ path: 'ortho.tif', hash: 'h1' }, { baseIsGeoraster: true });
+const dataset = { ds: 'north-pit', info: async () => [{ properties: { meta: { name: { data: 'North pit survey' } } } }], search: vi.fn(searchDataset) };
+const VIEWS = [{ uid: 'v_cover123', name: 'Cover view', error: null, newerVersion: false }];
+// What the map gives: its measurement file and its saved view
+const FROM_MAP = { sources: ['a/measurements.geojson'], view: { uid: 'v_cover123' } };
 const existing = (extra = {}) => ({
     id: 'meta-7', uid: 'r_k3x9q2m7', name: 'North pit', newerVersion: false, error: null,
     data: {
@@ -72,6 +77,12 @@ async function click(element) {
     element.click();
     await flushPromises();
 }
+/** Whether an element is out of sight: it or a parent is not displayed (the closed More options). */
+const hidden = element => {
+    for (let e = element; e; e = e.parentElement) if (e.style?.display === 'none') return true;
+    return false;
+};
+const selectOf = inputId => wrapper.findAllComponents(Select).find(c => c.props('inputId') === inputId);
 
 beforeEach(() => {
     Object.values(m).forEach(fn => fn.mockReset());
@@ -80,6 +91,8 @@ beforeEach(() => {
     dataset.search.mockImplementation(searchDataset);
     m.settings.mockResolvedValue({ templates: [DEFAULT_TEMPLATE], schema: DEFAULT_SCHEMA });
     m.reportChange.mockResolvedValue(null);
+    m.listViews.mockResolvedValue(VIEWS);
+    m.listReports.mockResolvedValue({ reports: [], unreadable: [] });
     m.saveNewReport.mockImplementation(async (ds, definition) => ({ id: 'meta-9', uid: 'r_newnewne', name: definition.name, data: definition }));
     m.updateReport.mockImplementation(async (ds, uid, { definition }) => ({ id: 'meta-8', uid, name: definition.name, data: definition }));
     m.numberMeasurementFile.mockResolvedValue({ written: true });
@@ -93,7 +106,7 @@ afterEach(() => {
 
 describe('the fields', () => {
     it('are labelled: every input, select and text area of the form has a label that names it', async () => {
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await render({ initial: FROM_MAP });
         const controls = [...body().querySelectorAll('.report-editor input:not([type="hidden"]), .report-editor textarea')];
         expect(controls.length).toBeGreaterThan(8);
         for (const control of controls) {
@@ -103,25 +116,54 @@ describe('the fields', () => {
         }
     });
 
-    it('group the filter and the cover choices in fieldsets with a legend', async () => {
+    it('group the labels, the filter and the sections in fieldsets with a legend', async () => {
         await render();
         const legends = [...body().querySelectorAll('.report-editor legend')].map(l => l.textContent.trim());
-        expect(legends).toEqual(expect.arrayContaining(['Sources', 'Cover view', 'Filter', 'Sections', 'Categories', 'Statuses', 'Kinds', 'Made in']));
+        expect(legends).toEqual(expect.arrayContaining(['Labels of the measurement files', 'Filter', 'Sections', 'Categories', 'Statuses', 'Kinds', 'Made in']));
     });
 
-    it('start empty from the dataset page: a name to give, no source, no cover', async () => {
+    it('show the name, the measurement files and the view, and keep the other options under a closed More options with their summary', async () => {
         await render();
-        expect(field('report-name').value).toBe('');
-        expect(body().querySelectorAll('.report-source')).toHaveLength(0);
-        expect(body().textContent).toContain('Template');
-        expect(confirmButton().textContent.trim()).toBe('Save');
+        for (const id of ['report-name', 'report-sources', 'report-view']) expect(hidden(field(id)), id).toBe(false);
+        for (const id of ['report-template', 'report-title', 'report-notes', 'report-units']) expect(hidden(field(id)), id).toBe(true);
+        expect(body().querySelector('[data-testid="options-summary"]').textContent).toBe('Standard template · Units of each reader · All items · 6 sections');
+        await click(body().querySelector('[data-testid="more-options"]'));
+        expect(hidden(field('report-title'))).toBe(false);
     });
 
-    it('start from the map with its file as source A and its view as the cover', async () => {
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
-        expect(body().querySelectorAll('.report-source')).toHaveLength(1);
+    it('start filled in from the dataset page: a name, the only saved view, and Create report', async () => {
+        await render();
+        expect(field('report-name').value).toMatch(/^Cover view – /);
+        expect(field('report-title').value).toBe('North pit survey');
+        expect(field('report-preparedBy').value).toBe('jdoe');
+        expect(selectOf('report-view').props('modelValue')).toBe('saved:v_cover123');
+        expect(body().querySelectorAll('.report-source')).toHaveLength(0);
+        expect(confirmButton().textContent.trim()).toBe('Create report');
+    });
+
+    it('start from the map with its file as source A and its saved view: Create report saves it at once', async () => {
+        await render({ initial: FROM_MAP });
         expect(body().querySelector('.report-source input').value).toBe('A');
-        expect(body().querySelector('[data-testid="cover-state"]').textContent).toContain('The map as it is now: 1 layer');
+        expect(selectOf('report-view').props('modelValue')).toBe('saved:v_cover123');
+        await click(confirmButton());
+        expect(m.saveNewReport.mock.calls[0][1]).toMatchObject({ sources: [{ file: 'a/measurements.geojson', label: 'A' }], cover: { viewId: 'v_cover123' } });
+        expect(wrapper.emitted('close')).toEqual([[{ uid: 'r_newnewne' }]]);
+    });
+
+    it('offer a new view of a file, with its name, when the dataset has no saved view', async () => {
+        m.listViews.mockResolvedValue([]);
+        await render({ initial: { sources: ['a/measurements.geojson'] } });
+        expect(selectOf('report-view').props('modelValue')).toBe('fromFile');
+        expect(selectOf('report-view-file').props('modelValue')).toBe('ortho.tif');
+        expect(field('report-view-name').value).toBe('ortho.tif');
+        expect(body().textContent).toContain('This dataset has no saved views yet');
+    });
+
+    it('say how to make a view when the dataset has no saved view and no map file', async () => {
+        m.listViews.mockResolvedValue([]);
+        dataset.search.mockImplementation(async (pattern, options) => (options?.type ? [] : [{ path: 'a/measurements.geojson' }]));
+        await render();
+        expect(body().querySelector('[data-testid="no-view"]').textContent).toContain('use Save view first');
     });
 
     it('show the report being edited', async () => {
@@ -148,26 +190,38 @@ describe('the fields', () => {
     it('ask for another cover when the saved view of the report was deleted', async () => {
         await render({ entry: existing({ cover: { viewId: 'v_gone0000' } }) });
         await click(confirmButton());
-        expect(body().textContent).toContain('The cover view was deleted: choose another');
+        expect(body().textContent).toContain('This view was deleted: choose another');
         expect(m.updateReport).not.toHaveBeenCalled();
     });
 });
 
 describe('save', () => {
-    it('says what is wrong at the fields and stores nothing when the name, the source or the cover is missing', async () => {
+    it('says what is wrong at the fields and stores nothing when the name, the files or the view is missing', async () => {
+        m.listViews.mockResolvedValue([]);
+        dataset.search.mockImplementation(async (pattern, options) => (options?.type ? [] : [{ path: 'a/measurements.geojson' }, { path: 'b/measurements.geojson' }]));
         await render();
+        await type('report-name', '');
         await click(confirmButton());
         expect(body().querySelector('[data-testid="form-problems"]').textContent).toContain('cannot be saved yet');
         expect(field('report-name').getAttribute('aria-invalid')).toBe('true');
         expect(field('report-name-error').textContent).toContain('Give the report a name');
-        expect(body().textContent).toContain('Add at least one measurement file');
+        expect(body().textContent).toContain('Choose at least one measurement file');
         expect(body().textContent).toContain('Choose the view the report draws its maps on');
         expect(m.saveNewReport).not.toHaveBeenCalled();
         expect(wrapper.emitted('close')).toBeUndefined();
     });
 
+    it('opens More options when a problem is in it', async () => {
+        await render({ initial: FROM_MAP });
+        await type('report-source-label-0', 'a!');
+        await click(confirmButton());
+        expect(hidden(field('report-labels-error'))).toBe(false);
+        expect(field('report-labels-error').textContent).toContain('A to Z and 0 to 9');
+        expect(m.saveNewReport).not.toHaveBeenCalled();
+    });
+
     it('stores the report, numbers its source and closes with the uid', async () => {
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await render({ initial: FROM_MAP });
         await type('report-name', 'North pit');
         await type('report-title', 'Inspection');
         await click(confirmButton());
@@ -180,7 +234,7 @@ describe('save', () => {
 
     it('stays open when a source could not be numbered: it names the file and why, the report is stored, and Open report closes with it', async () => {
         m.numberMeasurementFile.mockRejectedValue(new Error('The file cannot be written'));
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await render({ initial: FROM_MAP });
         await type('report-name', 'North pit');
         await click(confirmButton());
         expect(m.saveNewReport).toHaveBeenCalledOnce();
@@ -197,7 +251,7 @@ describe('save', () => {
 
     it('offers Save again after a source could not be numbered and the report was changed: it updates the stored report and numbers again', async () => {
         m.numberMeasurementFile.mockRejectedValueOnce(new Error('The file cannot be written'));
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await render({ initial: FROM_MAP });
         await type('report-name', 'North pit');
         await click(confirmButton());
         expect(confirmButton().textContent.trim()).toBe('Open report');
@@ -214,7 +268,7 @@ describe('save', () => {
 
     it('asks before closing a stored report with changes that are not saved, and closes with the stored report when they are discarded', async () => {
         m.numberMeasurementFile.mockRejectedValue(new Error('The file cannot be written'));
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await render({ initial: FROM_MAP });
         await type('report-name', 'North pit');
         await click(confirmButton());
         await type('report-title', 'Inspection');
@@ -229,7 +283,7 @@ describe('save', () => {
 
     it('shows the refusal of the store at the top', async () => {
         m.saveNewReport.mockRejectedValue(new Error('This dataset has 100 reports. Delete one to save a new report.'));
-        await render({ initial: { sources: ['a/measurements.geojson'], cover: { viewState: coverState() } } });
+        await render({ initial: FROM_MAP });
         await type('report-name', 'North pit');
         await click(confirmButton());
         expect(body().querySelector('[data-testid="form-error"]').textContent.trim()).toBe('This dataset has 100 reports. Delete one to save a new report.');

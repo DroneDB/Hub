@@ -3,6 +3,8 @@
         <i class="fa-solid fa-map view-icon" aria-hidden="true" />
         <span class="view-name" :title="name">{{ name }}</span>
         <span v-if="dirty && canWrite" class="view-dirty">Unsaved changes</span>
+        <!-- A new view of a file: what Save view is for, as the name alone does not say it is not a saved view -->
+        <span v-else-if="!saved && canWrite" class="view-dirty" data-testid="view-not-saved" :title="SAVE_HELP">Not saved</span>
         <!-- A phone: the saves are in one menu, so the name keeps its room (FR-MAP-12) -->
         <template v-if="canWrite && stacked">
             <Button class="view-more" size="small" severity="secondary" text icon="fa-solid fa-ellipsis-vertical" aria-label="View actions"
@@ -12,7 +14,7 @@
         </template>
         <div v-else-if="canWrite" class="view-actions">
             <Button size="small" icon="fa-solid fa-floppy-disk" label="Save view" :disabled="busy" :loading="busy"
-                    :title="saved ? 'Save the changes to this view' : 'Save this view in the dataset'" @click="emit('save')" />
+                    :title="saved ? 'Save the changes to this view' : SAVE_HELP" @click="emit('save')" />
             <Button v-if="saved" size="small" severity="secondary" label="Save as new view" :disabled="busy" :loading="busy"
                     title="Save as a new view" @click="emit('saveAsNew')" />
         </div>
@@ -23,7 +25,7 @@
 /**
  * ViewBar - the content of the view bar of the map viewer (ViewerShell's bar, after the way back
  * to the dataset): the name of the view (the saved name, or
- * the name of the base file of a new view; always text), the mark of unsaved changes and, for a
+ * the name of the base file of a new view; always text), the mark of unsaved changes (or of a new view, not saved) and, for a
  * user who can save, Save view (a new or a saved view) and Save as new view (a saved view). A reader sees
  * the name only. ViewerShell has no bar in Viewer only.
  *
@@ -46,6 +48,8 @@ const props = defineProps({
     busy: { type: Boolean, default: false }
 });
 const emit = defineEmits(['save', 'saveAsNew']);
+
+const SAVE_HELP = 'Save this view in the dataset, to reuse it in links and reports';
 
 // Below `sm` (the window, the breakpoint of libs/responsiveColumns.js) Save view and Save as new view are the items of one menu
 const stacked = useStackedLayout();

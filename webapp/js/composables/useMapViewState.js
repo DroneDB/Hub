@@ -20,11 +20,14 @@
  * and the state, both ways, and never emits a state that matches the parent's. Nothing is
  * reported before the map shows the state's layers: until then what it shows is not a state.
  *
+ * The dataset map has no view of its own: `datasetMapState` is what it shows as a state (its georasters as the map draws
+ * them, the top one the base), for a view saved from it or a report made from it.
+ *
  *   const binding = useMapViewState({ view: () => props.view, emit, ...features });
  */
 import { watch, onScopeDispose } from 'vue';
 import { unByKey } from 'ol/Observable';
-import { VIEW_VERSION, sameView, samePosition } from '@/libs/views/viewState';
+import { MAX_LAYERS, VIEW_VERSION, georasterState, sameView, samePosition, splitFor } from '@/libs/views/viewState';
 import { sameVizParams } from '@/libs/map/rasterLayers';
 
 /** @typedef {import('@/libs/views/viewState').ViewState} ViewState */
@@ -231,5 +234,19 @@ export function useMapViewState(ctx) {
     }, { immediate: true });
     onScopeDispose(() => unByKey(moveKey));
 
-    return { applyView: apply };
+    /**
+     * What the dataset map shows, as a view: its georasters (at most the layers a view can have) with their settings, the
+     * position, the basemap and the elevation model; null when it shows no georaster.
+     * @returns {ViewState|null}
+     */
+    function datasetMapState() {
+        const target = georasterState(rasterLayerList.value.slice(0, MAX_LAYERS).map(r => ({ path: r.path })));
+        if (!target) return null;
+        const state = currentState(target);
+        state.layers = state.layers.slice(0, MAX_LAYERS);
+        if (state.split.positions.length !== state.layers.length - 1) state.split = splitFor(state.layers.length, state.split.enabled);
+        return state;
+    }
+
+    return { applyView: apply, datasetMapState };
 }

@@ -2,7 +2,7 @@
     <div class="dataset-map">
         <MapCore ref="core" :files="files" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" :defer-load="lazyload"
                  @scroll-to="file => emit('scrollTo', file)" @open-item="(file, view) => emit('openItem', file, view)"
-                 @file-written="path => emit('fileWritten', path)" @file-removed="path => emit('fileRemoved', path)">
+                 @file-written="path => emit('fileWritten', path)" @file-removed="path => emit('fileRemoved', path)" @view-saved="emit('viewSaved')">
             <!-- The folder has nothing for the map and a subfolder has (FR-MAP-10); over the map, clear of its controls -->
             <template #overlay>
                 <GeoSubfolderChip v-if="hint" :text="hint.text" :folder="hint.folder" @show="emit('showFolder', hint.path)" />
@@ -38,8 +38,8 @@ const props = defineProps({
     canDelete: { type: Boolean, default: true }
 });
 // fileWritten / fileRemoved: a path of the dataset the map saved or removed (the measurements); showFolder: the path of
-// the subfolder the user chose to see on the map
-const emit = defineEmits(['scrollTo', 'openItem', 'fileWritten', 'fileRemoved', 'showFolder']);
+// the subfolder the user chose to see on the map; viewSaved: Save as view saved a view of the dataset
+const emit = defineEmits(['scrollTo', 'openItem', 'fileWritten', 'fileRemoved', 'showFolder', 'viewSaved']);
 
 const { hint } = useGeoSubfolder({
     dataset: () => props.dataset,

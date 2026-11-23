@@ -19,7 +19,7 @@
         </div>
         <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
                   :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
-        <SavedViews v-if="views.length && dataset && !loading && searchStaticPaths == null" :views="views"
+        <SavedViews v-if="(views.length || canWrite) && dataset && !loading && searchStaticPaths == null" :views="views"
                     :dataset="dataset" :can-write="canWrite" @rename="v => $emit('renameView', v)"
                     @delete="v => $emit('deleteView', v)" />
         <ReportsList v-if="(reports.length || unreadableReports.length || canWrite) && dataset && !loading && searchStaticPaths == null"

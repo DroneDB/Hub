@@ -20,6 +20,11 @@
             <button v-if="report" title="Report" aria-label="Report" data-testid="report-toolbar-btn" @click="emit('report')">
                 <i :class="REPORT_ICON" />
             </button>
+            <!-- The georasters of the dataset map as a saved view (writers); a map with none has nothing a view can open on -->
+            <button v-if="saveView" :title="saveViewTitle" aria-label="Save as view" :aria-disabled="saveViewDisabled ? 'true' : undefined"
+                    :class="{ disabled: saveViewDisabled }" data-testid="save-view-toolbar-btn" @click="!saveViewDisabled && emit('save-view')">
+                <i :class="VIEWS_ICON" />
+            </button>
             <template v-if="analysisEntry">
                 <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis"
                         data-testid="raster-analysis-toolbar-btn" @click="emit('analysis', 'rasterAnalysis')">
@@ -56,7 +61,7 @@
  * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
  * - top right: Back and Copy link (single-file map; an embedded map has neither: it has no Hub
- *   to go back to and its address is the host page's; a map narrower than `sm` has no Back, its viewer bar does), Reset view, Fullscreen, Report (writers), Raster Analysis, Stockpile;
+ *   to go back to and its address is the host page's; a map narrower than `sm` has no Back, its viewer bar does), Reset view, Fullscreen, Report (writers), Save as view (writers, dataset map), Raster Analysis, Stockpile;
  * - top center: direction indicators and flight path (display options), compare: with two
  *   georasters or more it splits the map between them, with one (where `pickToCompare`) it asks
  *   for another to compare to.
@@ -65,7 +70,8 @@ import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
 import { useFullscreen } from '@/composables/useFullscreen';
 import {
-    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, RASTER_ANALYSIS_ICON, REPORT_ICON, RESET_VIEW_ICON, STOCKPILE_ICON
+    BACK_ICON, COMPARE_ICON, COPY_LINK_ICON, DIRECTION_ICON, FLIGHT_PATH_ICON, RASTER_ANALYSIS_ICON, REPORT_ICON, RESET_VIEW_ICON, STOCKPILE_ICON,
+    VIEWS_ICON
 } from '@/libs/glyphs';
 
 const props = defineProps({
@@ -76,6 +82,10 @@ const props = defineProps({
     copyLink: { type: Boolean, default: false },
     /** The Report button: a report of the measurements on the map (offered to those who can write) */
     report: { type: Boolean, default: false },
+    /** The Save as view button: the georasters of the dataset map as a saved view (offered to those who can write) */
+    saveView: { type: Boolean, default: false },
+    /** The map shows no georaster: Save as view says why it cannot save */
+    saveViewDisabled: { type: Boolean, default: false },
     /** Direction indicators and flight path (hidden on the single-file map) */
     displayOptions: { type: Boolean, default: true },
     /** The compare button, shown while the map has a georaster */
@@ -95,7 +105,7 @@ const props = defineProps({
      */
     pickToCompare: { type: Boolean, default: true }
 });
-const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'report', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
+const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'report', 'save-view', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
 
 const canFullscreen = supportsFullScreen();
 // The button says what it does next: Fullscreen, then Exit fullscreen (Esc and the browser's controls leave it too)
@@ -110,5 +120,16 @@ const mapSize = inject('mapSize', { narrow: false });
 const showCompare = computed(() => props.splitToggle && props.rasterCount > 0 && (props.canCompare || (props.pickToCompare && !embed)));
 const compareLabel = computed(() => (props.canCompare ? 'Compare georasters side by side' : 'Compare to another georaster'));
 // Split compare draws every raster opaque, which the tools cannot work with: a tool turns it off and opens
+const saveViewTitle = computed(() => (props.saveViewDisabled
+    ? 'Save as view: the map shows no georaster. Open a file on the map to save a view of it.'
+    : 'Save as view: keep these layers, the position and the basemap as a view of the dataset, to reuse in links and reports'));
 const analysisTitle = name => (props.splitMode ? `${name} (turns off split compare)` : name);
 </script>
+
+<style scoped>
+/* A button that cannot act now keeps its tooltip, which says why: it is dimmed, not disabled */
+.ol-map-buttons button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+</style>

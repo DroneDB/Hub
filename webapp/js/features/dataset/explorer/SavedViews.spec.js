@@ -1,6 +1,7 @@
 /**
  * The saved views under the folder tree: the "Views" group, one row per view in the order given,
- * opening in a new tab, Copy Link, and Rename / Delete for writers only. Names are text.
+ * opening in a new tab, Copy Link, and Rename / Delete for writers only. Names are text. A writer
+ * of a dataset with no view is told how to make one.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -36,6 +37,13 @@ const visibleLabels = w => menuItems(w).filter(i => i.label && (!i.isVisible || 
 const item = (w, label) => menuItems(w).find(i => i.label === label);
 
 describe('SavedViews', () => {
+    it('tells a writer of a dataset with no view how to make one, and says nothing to a reader nor with views', () => {
+        const empty = w => w.find('[data-testid="group-empty"]');
+        expect(empty(mountViews({ views: [], canWrite: true })).text()).toContain('use Save view');
+        expect(empty(mountViews({ views: [] })).exists()).toBe(false);
+        expect(empty(mountViews({ canWrite: true })).exists()).toBe(false);
+    });
+
     // The group keeps the class it had before it was a SidebarGroup: the end-to-end tests find the views by it
     it('is the saved-views element of the page', () => {
         const w = mountViews();

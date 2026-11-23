@@ -205,14 +205,22 @@ describe('FileBrowser saved views', () => {
         w.unmount();
     });
 
-    it('has no group without views, or without a dataset to link them to', async () => {
-        const none = mountBrowser({ views: [], dataset });
+    it('has no group without views for a reader, or without a dataset to link them to', async () => {
+        const none = mountBrowser({ views: [], dataset, canWrite: false });
         const noDataset = mountBrowser({ views });
         await flushPromises();
         expect(group(none).exists()).toBe(false);
         expect(group(noDataset).exists()).toBe(false);
         none.unmount();
         noDataset.unmount();
+    });
+
+    it('shows the group without views to a writer, who is told there how to make one', async () => {
+        const w = mountBrowser({ views: [], dataset, canWrite: true });
+        await flushPromises();
+        expect(group(w).exists()).toBe(true);
+        expect(group(w).props('canWrite')).toBe(true);
+        w.unmount();
     });
 
     it('hides the group while a search is shown and brings it back with the tree', async () => {

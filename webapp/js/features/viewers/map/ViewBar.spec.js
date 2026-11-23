@@ -26,11 +26,22 @@ describe('ViewBar', () => {
         expect(wrapper.attributes('aria-label')).toBe('View');
     });
 
-    it('a new view of a writer: the name and Save only', () => {
+    it('a new view of a writer: the name, the Not saved mark and Save only, which say what a saved view is for', () => {
         render({ canWrite: true });
         expect(wrapper.text()).toContain('Ortho over DSM');
         expect(buttons()).toEqual(['Save view']);
-        expect(button('Save view').attributes('title')).toBe('Save this view in the dataset');
+        expect(button('Save view').attributes('title')).toBe('Save this view in the dataset, to reuse it in links and reports');
+        const notSaved = wrapper.find('[data-testid="view-not-saved"]');
+        expect(notSaved.text()).toBe('Not saved');
+        expect(notSaved.attributes('title')).toBe('Save this view in the dataset, to reuse it in links and reports');
+    });
+
+    it('a saved view or a reader has no Not saved mark', () => {
+        render({ canWrite: true, saved: true });
+        expect(wrapper.find('[data-testid="view-not-saved"]').exists()).toBe(false);
+        wrapper.unmount();
+        render({});
+        expect(wrapper.find('[data-testid="view-not-saved"]').exists()).toBe(false);
     });
 
     it('a saved view of a writer: Save and Save as new', () => {

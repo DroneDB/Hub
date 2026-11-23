@@ -1,8 +1,13 @@
 // @ts-check
 /**
  * useReportEditor - what the report editor does, without its markup: the draft of a definition, what the dataset
- * offers to fill it from (the measurement files, the saved views, the georasters, the organization's templates and
- * schema, the groups of the sources), the problems of the draft, and the save.
+ * offers to fill it from (the measurement files, the saved views, the files a view can be made of, the organization's
+ * templates and schema, the groups of the sources), the view the report draws its maps on, the problems of the draft,
+ * and the save.
+ *
+ * A new report starts filled in (reportPrefill): what it was opened with, the newest report of the dataset and what the
+ * dataset has. Its view is a saved view, or a new one (the map the editor was opened from, or a file of the dataset)
+ * that the save stores as a saved view before the report, so that the user does not have to make a view first.
  *
  * The save: the definition is written (a new one, or the update of a stored one after the change check: another
  * session's change asks to Overwrite or Save as new, its deletion to Save as new), then each source file gets the
@@ -13,21 +18,24 @@
  * A report of a later version is not edited: the editor says why (`loadError`) and saves nothing, as what this version
  * does not know of it would be lost.
  *
- *   const editor = useReportEditor({ dataset, user, entry, initial, choose });
+ *   const editor = useReportEditor({ dataset, user, entry, initial: { sources, view }, choose });
  *   await editor.load();
  *   const saved = await editor.save();   // { uid, failures } or null (invalid, cancelled, refused: see `formError`)
  */
 import { computed, inject, provide, reactive, ref, shallowRef } from 'vue';
-import ddb from 'ddb';
+import ddb, { pathutils } from 'ddb';
 import { isMeasurementFile, numberMeasurementFile } from '@/libs/map/measurementStorage';
 import { sectionOf, VIEW } from '@/libs/map/measurementFormat';
-import { buildEntryState } from '@/libs/views/viewState';
-import { isUsableView, listViews } from '@/libs/views/viewStore';
+import { defaultState, MAX_NAME_LENGTH } from '@/libs/views/viewState';
+import { isUsableView, listViews, saveNewView } from '@/libs/views/viewStore';
 import {
     DEFINITION_VERSION, MAX_NOTES_LENGTH, MAX_TEXT_LENGTH, MAX_SOURCE_LABEL_LENGTH, MEASUREMENT_KINDS, OWNERS, SECTION_KINDS,
     addSource, newDefinition, sectionsFromTemplate
 } from '@/libs/reports/reportDefinition';
-import { reportChange, reportSaveProblem, saveNewReport, updateReport, MAX_REPORT_NAME_LENGTH, NEWER_REPORT_TEXT } from '@/libs/reports/reportStore';
+import {
+    listReports, reportChange, reportSaveProblem, saveNewReport, updateReport, MAX_REPORT_NAME_LENGTH, NEWER_REPORT_TEXT
+} from '@/libs/reports/reportStore';
+import { defaultBaseFile, freeName, newestReport, prefillReport } from '@/libs/reports/reportPrefill';
 import { datasetReportSettings, DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
 import { resolveTemplate, templateMissingText } from '@/libs/reports/reportModel';
 import { loadReportSources } from '@/libs/reports/reportSources';
@@ -35,6 +43,20 @@ import { loadReportSources } from '@/libs/reports/reportSources';
 const LABEL_PATTERN = /^[A-Z0-9]{1,3}$/;
 /** A uid that passes the rules, for the checks of a draft that has none yet. */
 const PLACEHOLDER_UID = 'r_00000000';
+/** The cover of a report whose view is saved with it, for the checks made before that view has its uid. */
+const PLACEHOLDER_COVER = Object.freeze({ viewId: 'v_00000000' });
+// The files a new view can be made of: the types that cover an area on the map (an image or a video covers too little)
+const BASE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR];
+
+/** The choices of the units of a report: none is the units each reader has chosen. */
+export const UNIT_OPTIONS = Object.freeze([
+    { value: '', label: 'The units each reader has chosen' },
+    { value: 'metric', label: 'Metric' },
+    { value: 'imperial', label: 'Imperial' }
+]);
+
+/** The fields of the draft that the editor shows under More options: a problem there opens it. */
+export const MORE_OPTIONS_FIELDS = Object.freeze(['title', 'subtitle', 'preparedBy', 'preparedFor', 'notes', 'labels']);
 
 /** The question the editor asks of a change made by another session. */
 export const CONFLICT_TEXT = {
@@ -46,11 +68,22 @@ export const CONFLICT_TEXT = {
 const clone = value => JSON.parse(JSON.stringify(value));
 
 /**
+ * The view choice of a stored report: its saved view, or the view state it keeps.
+ * @param {import('@/libs/reports/reportDefinition').ReportCover | null} cover
+ * @returns {import('@/libs/reports/reportPrefill').ViewChoice | null}
+ */
+function choiceOfCover(cover) {
+    if (!cover) return null;
+    return 'viewId' in cover ? { kind: 'saved', uid: cover.viewId } : { kind: 'kept' };
+}
+
+/**
  * @param {object} ctx
  * @param {any} ctx.dataset  reg.Organization(org).Dataset(ds)
  * @param {string} ctx.user  the user name the audit fields carry
  * @param {import('@/libs/metaList/metaListStore').MetaEntry | null} [ctx.entry]  the report being edited; none for a new one
- * @param {{ sources?: string[], cover?: import('@/libs/reports/reportDefinition').ReportCover | null }} [ctx.initial]  what a new report starts with
+ * @param {{ sources?: string[], view?: import('@/composables/useMapReport').MapReportView | null }} [ctx.initial]  what a new report was opened with:
+ *   the measurement files and the view of the map
  * @param {(options: { title: string, message: string, confirmText: string, secondaryText?: string }) => Promise<'confirm'|'secondary'|'cancel'>} ctx.choose
  */
 export function useReportEditor({ dataset, user, entry = null, initial = {}, choose }) {
@@ -67,37 +100,39 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
     const views = shallowRef([]);
     /** @type {import('vue').ShallowRef<string[]>} */
     const measurementFiles = shallowRef([]);
-    /** @type {import('vue').ShallowRef<{ path: string, hash: string }[]>} */
-    const georasters = shallowRef([]);
+    /** @type {import('vue').ShallowRef<import('@/libs/reports/reportPrefill').BaseFile[]>} */
+    const baseFiles = shallowRef([]);
     // The groups of each source, by file, as read from the files
     /** @type {import('vue').ShallowRef<Record<string, { id: string, name: string }[]>>} */
     const groupsByFile = shallowRef({});
 
     /** @type {import('@/libs/reports/reportDefinition').ReportDefinition} */
-    const draft = reactive(entry ? clone(entry.data) : newDefinition({ sources: initial.sources ?? [], cover: initial.cover ?? null }));
+    const draft = reactive(entry ? clone(entry.data) : newDefinition({ sources: initial.sources ?? [] }));
+    // The view state of the map the editor was opened from, which can be saved as a new view
+    const mapView = initial.view && 'state' in initial.view ? initial.view : null;
+    // The view state an existing report keeps, which it keeps until another view is chosen
+    const keptCover = entry && entry.data.cover && 'viewState' in entry.data.cover ? clone(entry.data.cover) : null;
+    /** @type {import('vue').Ref<import('@/libs/reports/reportPrefill').ViewChoice | null>} */
+    const viewChoice = ref(entry ? choiceOfCover(entry.data.cover) : null);
     // The meta item the draft was read from, for the check for another session's save
     const loadedId = ref(entry ? entry.id : '');
     // The report the draft is stored as: the one being edited, or the one this editor made on its first save
     const storedUid = ref(entry ? entry.uid : '');
     /** @type {import('vue').Ref<{ file: string, reason: string }[]>} */
     const failures = ref([]);
-    // The text of the draft as it was read or last stored: nothing to save or to discard while it is the same
+    // The text of the draft and its view as they were read or last stored: nothing to save or to discard while it is the same
     const baseline = ref('');
-    const dirty = computed(() => !!baseline.value && baseline.value !== JSON.stringify(draft));
-    // The layers picked for a cover made of dataset layers
-    const coverLayers = ref(/** @type {string[]} */ ([]));
-    // The cover is made of picked layers (else a view state the editor was given or the report has)
-    const layersMode = ref(false);
+    const snapshot = () => JSON.stringify({ draft, view: viewChoice.value });
+    const dirty = computed(() => !!baseline.value && baseline.value !== snapshot());
+    // The name the editor gave a new view of a file: a change of the file renames the view until the user names it
+    let autoViewName = '';
 
     const resolved = computed(() => resolveTemplate(templates.value, draft.templateId));
     const templateNotice = computed(() => (resolved.value.missing ? templateMissingText(draft.templateId, resolved.value.template.name) : ''));
-    // A cover that names a saved view that is no longer there: the editor asks for another one
-    const coverDeleted = computed(() => !!draft.cover && 'viewId' in draft.cover && !loading.value && !views.value.some(v => v.uid === /** @type {{ viewId: string }} */ (draft.cover).viewId));
-    /** What the cover is: 'none', a saved 'view', the 'layers' picked here, or a map 'state' (the one a map gave, or the report has). */
-    const coverKind = computed(() => {
-        if (!draft.cover) return 'none';
-        if ('viewId' in draft.cover) return 'view';
-        return layersMode.value ? 'layers' : 'state';
+    // A saved view that is no longer there: the editor asks for another one
+    const coverDeleted = computed(() => {
+        const choice = viewChoice.value;
+        return choice?.kind === 'saved' && !loading.value && !views.value.some(v => v.uid === choice.uid);
     });
 
     /** The groups of every source, with the label of the source: the choices of the group filter. */
@@ -105,7 +140,8 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
 
     /**
      * What the dataset offers: the organization's templates and schema, the saved views, the measurement files and the
-     * georasters. A failed read of the settings or of the views is the editor's error; the file pickers are best effort.
+     * files a new view can be made of, and what a new report is filled in from. A failed read of the settings or of the
+     * views is the editor's error; the rest is best effort.
      */
     async function load() {
         loading.value = true;
@@ -116,32 +152,77 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
             return;
         }
         try {
-            const [settings, allViews, files, rasters] = await Promise.all([
+            const [settings, allViews, files, bases, reports, datasetName] = await Promise.all([
                 datasetReportSettings(dataset),
                 listViews(dataset, { fresh: true }),
                 dataset.search('*measurements.geojson').catch(() => []),
-                dataset.search('*', { type: ddb.entry.type.GEORASTER }).catch(() => [])
+                readBaseFiles(),
+                // What a new report is filled in from: best effort, an empty form is still a form
+                entry ? null : listReports(dataset).then(r => r.reports, () => []),
+                entry ? '' : readDatasetName()
             ]);
             templates.value = settings.templates?.length ? settings.templates : [DEFAULT_TEMPLATE];
             schema.value = settings.schema ?? DEFAULT_SCHEMA;
             // A cover view that cannot be drawn is a deleted one (coverDeleted), as the live page has it
             views.value = allViews.filter(isUsableView);
             measurementFiles.value = files.map(/** @param {any} f */ f => f.path).filter(isMeasurementFile).sort();
-            georasters.value = rasters.map(/** @param {any} f */ f => ({ path: f.path, hash: f.hash || '' })).sort((a, b) => a.path.localeCompare(b.path));
-            if (!entry) {
-                // A new report starts from the first template of the organization: its id and its default sections
-                const [first] = templates.value;
-                draft.templateId = first.id;
-                draft.sections = sectionsFromTemplate(first.defaultSections);
-            }
+            baseFiles.value = bases;
+            if (!entry) prefill(reports ?? [], datasetName);
             await readGroups();
         } catch (e) {
             console.error('Cannot prepare the report editor:', e);
             loadError.value = e instanceof Error ? e.message : String(e);
         } finally {
             loading.value = false;
-            baseline.value = JSON.stringify(draft);
+            baseline.value = snapshot();
         }
+    }
+
+    /**
+     * The files of the dataset a new view can be made of, georasters first, each sorted by path; none when they cannot be
+     * read (the saved views are still there).
+     * @returns {Promise<import('@/libs/reports/reportPrefill').BaseFile[]>}
+     */
+    async function readBaseFiles() {
+        const found = await Promise.all(BASE_TYPES.map(type => dataset.search('*', { type }).catch(() => [])));
+        return found.flatMap((list, index) => list
+            .filter(/** @param {any} f */ f => !isMeasurementFile(f.path))
+            .map(/** @param {any} f */ f => ({ path: String(f.path), hash: f.hash || '', georaster: BASE_TYPES[index] === ddb.entry.type.GEORASTER }))
+            .sort((/** @type {{ path: string }} */ a, /** @type {{ path: string }} */ b) => a.path.localeCompare(b.path)));
+    }
+
+    /** The name of the dataset as its page shows it, else its slug. */
+    async function readDatasetName() {
+        try {
+            const [root] = await dataset.info();
+            const name = root?.properties?.meta?.name?.data;
+            if (typeof name === 'string' && name.trim()) return name.trim();
+        } catch (e) {
+            console.warn('Cannot read the name of the dataset:', e);
+        }
+        return String(dataset.ds ?? '');
+    }
+
+    /**
+     * Fills in a new report (reportPrefill).
+     * @param {import('@/libs/metaList/metaListStore').MetaEntry[]} reports @param {string} datasetName
+     */
+    function prefill(reports, datasetName) {
+        const { fields, view } = prefillReport({
+            initial,
+            lastReport: newestReport(reports)?.data ?? null,
+            views: views.value,
+            measurementFiles: measurementFiles.value,
+            baseFiles: baseFiles.value,
+            templates: templates.value,
+            user,
+            datasetName,
+            reportNames: reports.map(r => r.name),
+            dateText: new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date())
+        });
+        Object.assign(draft, fields);
+        if (view?.kind === 'fromFile') autoViewName = view.name;
+        setChoice(view);
     }
 
     /** Reads the groups of the files the draft has as sources (a file that cannot be read has none). */
@@ -157,12 +238,30 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
         groupsByFile.value = next;
     }
 
+    /** What More options holds, in one line: the template, the units, the filter and the sections. */
+    const optionsSummary = computed(() => {
+        const units = draft.units ? UNIT_OPTIONS.find(o => o.value === draft.units)?.label : 'Units of each reader';
+        const filtered = Object.values(draft.filter).some(list => list.length);
+        const sections = draft.sections.filter(s => s.enabled).length;
+        return [`${resolved.value.template.name} template`, units, filtered ? 'Filtered items' : 'All items', `${sections} ${sections === 1 ? 'section' : 'sections'}`].join(' · ');
+    });
+
     // ---- Changes the form makes ---------------------------------------------------------------
 
     /** Adds a measurement file as a source under the next free label. @param {string} file */
     function add(file) {
         draft.sources = addSource(draft.sources, file);
         void readGroups();
+    }
+
+    /**
+     * Makes these files the sources: the ones the draft has keep their labels and their place, the others come after under
+     * the next free labels.
+     * @param {string[]} files
+     */
+    function setSources(files) {
+        for (let i = draft.sources.length - 1; i >= 0; i--) if (!files.includes(draft.sources[i].file)) removeSource(i);
+        for (const file of files) add(file);
     }
 
     /** @param {number} index */
@@ -186,22 +285,48 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
         if (untouched) draft.sections = sectionsFromTemplate(resolved.value.template.defaultSections);
     }
 
-    /** @param {string} viewId */
-    function chooseView(viewId) {
-        layersMode.value = false;
-        draft.cover = { viewId };
+    /**
+     * The view choice, and the cover of the draft that goes with it: a saved view's uid, the kept state, or none until the
+     * save has stored the new view.
+     * @param {import('@/libs/reports/reportPrefill').ViewChoice | null} choice
+     */
+    function setChoice(choice) {
+        viewChoice.value = choice;
+        if (choice?.kind === 'saved') draft.cover = { viewId: choice.uid };
+        else if (choice?.kind === 'kept') draft.cover = clone(keptCover);
+        else draft.cover = null;
     }
 
-    /** The cover is made of these georasters, the first one the base (the map opens on it). @param {string[]} paths */
-    function chooseLayers(paths) {
-        coverLayers.value = paths;
-        layersMode.value = paths.length > 0;
-        if (!paths.length) {
-            draft.cover = null;
-            return;
-        }
-        const first = georasters.value.find(g => g.path === paths[0]);
-        draft.cover = { viewState: buildEntryState({ path: paths[0], hash: first?.hash ?? '' }, paths.slice(1), { baseIsGeoraster: true }) };
+    const viewNames = () => views.value.map(v => v.name);
+
+    /**
+     * Chooses where the maps of the report are drawn: a saved view (`uid`), the map the editor was opened from, a file of
+     * the dataset (the default one, see defaultBaseFile), or the view state the report keeps.
+     * @param {'saved'|'fromMap'|'fromFile'|'kept'} kind @param {string} [uid]
+     */
+    function chooseView(kind, uid = '') {
+        if (kind === 'saved') setChoice({ kind, uid });
+        else if (kind === 'fromMap' && mapView) setChoice({ kind, state: mapView.state, name: freeName(mapView.name || pathutils.basename(mapView.state.base.path), viewNames()) });
+        else if (kind === 'fromFile') {
+            const file = defaultBaseFile(baseFiles.value);
+            autoViewName = file ? freeName(pathutils.basename(file.path), viewNames()) : '';
+            setChoice({ kind, path: file?.path ?? '', name: autoViewName });
+        } else if (kind === 'kept' && keptCover) setChoice({ kind });
+    }
+
+    /** The file a new view is made of; the view is renamed after it while it has the name the editor gave it. @param {string} path */
+    function chooseFile(path) {
+        const choice = viewChoice.value;
+        if (choice?.kind !== 'fromFile') return;
+        const renamed = choice.name === autoViewName;
+        if (renamed) autoViewName = freeName(pathutils.basename(path), viewNames());
+        viewChoice.value = { ...choice, path, name: renamed ? autoViewName : choice.name };
+    }
+
+    /** Renames the new view. @param {string} name */
+    function nameView(name) {
+        const choice = viewChoice.value;
+        if (choice?.kind === 'fromMap' || choice?.kind === 'fromFile') viewChoice.value = { ...choice, name };
     }
 
     /** Moves a section one place up (-1) or down (1). @param {number} index @param {-1|1} by */
@@ -225,26 +350,57 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
             if (draft[field].length > MAX_TEXT_LENGTH) found[field] = `At most ${MAX_TEXT_LENGTH} characters`;
         }
         if (draft.notes.length > MAX_NOTES_LENGTH) found.notes = `At most ${MAX_NOTES_LENGTH} characters`;
-        if (!draft.sources.length) found.sources = 'Add at least one measurement file';
+        if (!draft.sources.length) found.sources = 'Choose at least one measurement file';
         else {
             const labels = draft.sources.map(s => s.label);
             const bad = draft.sources.findIndex(s => !LABEL_PATTERN.test(s.label));
-            if (bad >= 0) found.sources = `A label is 1 to ${MAX_SOURCE_LABEL_LENGTH} characters, A to Z and 0 to 9`;
-            else if (new Set(labels).size !== labels.length) found.sources = 'Each source needs its own label';
+            if (bad >= 0) found.labels = `A label is 1 to ${MAX_SOURCE_LABEL_LENGTH} characters, A to Z and 0 to 9`;
+            else if (new Set(labels).size !== labels.length) found.labels = 'Each measurement file needs its own label';
         }
-        if (!draft.cover) found.cover = 'Choose the view the report draws its maps on';
-        else if (coverDeleted.value) found.cover = 'The cover view was deleted: choose another';
+        const view = viewProblem();
+        if (view) found.view = view;
         return found;
     });
+
+    /** What is wrong with the view choice, or ''. */
+    function viewProblem() {
+        const choice = viewChoice.value;
+        if (!choice) return 'Choose the view the report draws its maps on';
+        if (choice.kind === 'saved') return coverDeleted.value ? 'This view was deleted: choose another' : '';
+        if (choice.kind === 'kept') return '';
+        if (choice.kind === 'fromFile' && !choice.path) return 'Choose the file the new view shows';
+        const name = choice.name.trim();
+        if (!name) return 'Give the new view a name';
+        return name.length > MAX_NAME_LENGTH ? `The name of the view can have at most ${MAX_NAME_LENGTH} characters` : '';
+    }
 
     /** Why the draft cannot be saved, or ''. */
     const firstProblem = computed(() => Object.values(problems.value)[0] ?? '');
 
     // ---- Save ---------------------------------------------------------------------------------
 
-    /** The draft as a definition to store (a plain copy, with its labels trimmed of nothing: they are checked as typed). */
+    /**
+     * The draft as a definition to store (a plain copy, with its labels trimmed of nothing: they are checked as typed). A
+     * new view has no uid before it is saved: its checks use a placeholder.
+     */
     function definition() {
-        return { ...clone(draft), version: DEFINITION_VERSION, name: draft.name.trim() };
+        return { ...clone(draft), cover: draft.cover ?? { ...PLACEHOLDER_COVER }, version: DEFINITION_VERSION, name: draft.name.trim() };
+    }
+
+    /**
+     * Stores the new view the report draws its maps on, when it has one, and makes it the report's saved view: a save
+     * that fails after this one (the report's) keeps it, and a second try uses it instead of saving another.
+     */
+    async function saveChosenView() {
+        const choice = viewChoice.value;
+        if (choice?.kind !== 'fromMap' && choice?.kind !== 'fromFile') return;
+        const base = choice.kind === 'fromFile' ? baseFiles.value.find(f => f.path === choice.path) : null;
+        const state = choice.kind === 'fromMap'
+            ? choice.state
+            : defaultState({ path: choice.path, hash: base?.hash ?? '' }, { baseIsGeoraster: !!base?.georaster });
+        const view = await saveNewView(dataset, state, { name: choice.name.trim(), user });
+        views.value = [...views.value, view].sort((a, b) => a.name.localeCompare(b.name));
+        setChoice({ kind: 'saved', uid: view.uid });
     }
 
     /**
@@ -288,9 +444,8 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
         showProblems.value = true;
         formError.value = '';
         if (firstProblem.value) return null;
-        const data = definition();
-        const text = JSON.stringify(draft);
-        const refused = reportSaveProblem(data.name, { ...data, uid: storedUid.value || PLACEHOLDER_UID });
+        const checked = definition();
+        const refused = reportSaveProblem(checked.name, { ...checked, uid: storedUid.value || PLACEHOLDER_UID });
         if (refused) {
             formError.value = refused;
             return null;
@@ -299,6 +454,9 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
         try {
             const how = await resolveConflict();
             if (how === 'cancel') return null;
+            await saveChosenView();
+            const data = definition();
+            const text = snapshot();
             const stored = how === 'update'
                 ? await updateReport(dataset, storedUid.value, { definition: data, user })
                 : await saveNewReport(dataset, data, { user });
@@ -318,9 +476,10 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
 
     return {
         draft, loading, loadError, saving, formError, showProblems, problems, firstProblem, failures, dirty,
-        templates, schema, views, measurementFiles, georasters, groupOptions, coverLayers, coverKind, coverDeleted,
+        templates, schema, views, measurementFiles, baseFiles, groupOptions, viewChoice, coverDeleted,
+        hasMapView: !!mapView, hasKeptView: !!keptCover, optionsSummary,
         resolvedTemplate: computed(() => resolved.value.template), templateNotice, storedUid,
-        load, add, removeSource, chooseTemplate, chooseView, chooseLayers, moveSection, save,
+        load, add, setSources, removeSource, chooseTemplate, chooseView, chooseFile, nameView, moveSection, save,
         filterChoices: { kinds: MEASUREMENT_KINDS, owners: OWNERS, sections: SECTION_KINDS }
     };
 }

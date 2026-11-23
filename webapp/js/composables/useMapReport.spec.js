@@ -1,39 +1,36 @@
 /**
- * The "Report" button of the map: the editor opens with the measurement file as source and the map's view as cover,
- * after the unsaved measurements were offered a Save; a map with no saved measurements opens it with no source.
+ * The "Report" button of the map: the editor opens with the measurement file as source and the map's view, after the
+ * unsaved measurements were offered a Save; a map with no saved measurements opens it with no source. A saved view
+ * shown as it was saved is the report's view; any other state on show is given to be saved as a new view.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ddb from 'ddb';
 import { defaultState, newLayer } from '@/libs/views/viewState';
-import { coverOfMap, useMapReport } from './useMapReport';
+import { viewOfMap, useMapReport } from './useMapReport';
 
-const T = ddb.entry.type;
-const raster = (path, hash = 'h') => ({ entry: { path, type: T.GEORASTER, hash } });
 const viewOf = (...paths) => {
     const state = defaultState({ path: paths[0], hash: 'h1' }, { baseIsGeoraster: true });
     state.layers = paths.map(p => newLayer(p, { hash: 'h1' }));
     return state;
 };
 
-describe('coverOfMap', () => {
-    it('is a copy of the view the map shows, with its position', () => {
+describe('viewOfMap', () => {
+    it('is the saved view on show when it has no unsaved change', () => {
+        expect(viewOfMap(viewOf('ortho.tif'), { uid: 'v_aaaaaaaa', name: 'Site', dirty: false })).toEqual({ uid: 'v_aaaaaaaa' });
+    });
+
+    it('is a copy of the state on show, with its name, for a saved view with changes or a new view of a file', () => {
         const view = viewOf('ortho.tif');
-        view.view = { center: [1, 2], zoom: 5 };
-        const cover = coverOfMap(view, []);
-        expect(cover).toEqual({ viewState: view });
-        expect(cover.viewState).not.toBe(view);
+        view.view = { center: [1, 2], zoom: 5, rotation: 0 };
+        const changed = viewOfMap(view, { uid: 'v_aaaaaaaa', name: 'Site', dirty: true });
+        expect(changed).toEqual({ state: view, name: 'Site' });
+        expect(changed.state).not.toBe(view);
+        expect(viewOfMap(view, { uid: '', name: 'ortho.tif', dirty: false })).toEqual({ state: view, name: 'ortho.tif' });
     });
 
-    it('is made of the georasters of the files of the dataset map, the one drawn last (on top) first', () => {
-        const files = [raster('a/dsm.tif', 'h2'), { entry: { path: 'a/notes.md', type: T.MARKDOWN } }, raster('a/ortho.tif', 'h1')];
-        const { viewState } = coverOfMap(null, files);
-        expect(viewState.base).toEqual({ path: 'a/ortho.tif', hash: 'h1' });
-        expect(viewState.layers.map(l => l.path)).toEqual(['a/ortho.tif', 'a/dsm.tif']);
-    });
-
-    it('is none for a dataset map that has no georaster', () => {
-        expect(coverOfMap(undefined, [{ entry: { path: 'a/cloud.laz', type: T.POINTCLOUD } }])).toBeNull();
-        expect(coverOfMap(undefined, [])).toBeNull();
+    it('is the state of the dataset map with no name (the editor names it after its base file), and none without a state', () => {
+        const view = viewOf('a/ortho.tif', 'a/dsm.tif');
+        expect(viewOfMap(view, null)).toEqual({ state: view, name: '' });
+        expect(viewOfMap(null, null)).toBeNull();
     });
 });
 
@@ -42,24 +39,32 @@ describe('useMapReport', () => {
     let choose;
     let measurements;
     let view;
-    const make = () => useMapReport({ actions, choose, view: () => view, files: () => [raster('ortho.tif')], measurements });
+    let info;
+    const make = () => useMapReport({ actions, choose, state: () => view, viewInfo: () => info, measurements });
     beforeEach(() => {
         actions = { create: vi.fn(async () => ({ uid: 'r_aaaaaaaa' })) };
         choose = vi.fn(async () => 'confirm');
         view = viewOf('ortho.tif');
+        info = { uid: 'v_aaaaaaaa', name: 'Site', dirty: false };
         measurements = { isDirty: vi.fn(() => false), hasSaved: vi.fn(() => true), filePath: vi.fn(() => 'ortho_measurements.geojson'), save: vi.fn(async () => {}) };
     });
 
-    it('opens the editor with the measurement file of the map as the source and the view as the cover', async () => {
+    it('opens the editor with the measurement file of the map as the source and its saved view', async () => {
         await make().startReport();
-        expect(actions.create).toHaveBeenCalledWith({ sources: ['ortho_measurements.geojson'], cover: { viewState: view } });
+        expect(actions.create).toHaveBeenCalledWith({ sources: ['ortho_measurements.geojson'], view: { uid: 'v_aaaaaaaa' } });
         expect(choose).not.toHaveBeenCalled();
     });
 
-    it('opens it with no source when the map has no saved measurements: the editor asks for one', async () => {
+    it('gives the state on show, to save as a new view, when the saved view has unsaved changes', async () => {
+        info.dirty = true;
+        await make().startReport();
+        expect(actions.create).toHaveBeenCalledWith({ sources: ['ortho_measurements.geojson'], view: { state: view, name: 'Site' } });
+    });
+
+    it('opens it with no source when the map has no saved measurements: the editor proposes one', async () => {
         measurements.hasSaved.mockReturnValue(false);
         await make().startReport();
-        expect(actions.create).toHaveBeenCalledWith({ sources: [], cover: { viewState: view } });
+        expect(actions.create).toHaveBeenCalledWith({ sources: [], view: { uid: 'v_aaaaaaaa' } });
     });
 
     it('offers unsaved measurements a Save first, and goes on once they are saved', async () => {

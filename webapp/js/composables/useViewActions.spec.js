@@ -3,11 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const notify = { warn: vi.fn(), error: vi.fn(), success: vi.fn() };
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => notify }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { getUsername: () => 'user' } }));
-vi.mock('@/libs/views/viewStore', () => ({ updateView: vi.fn(), deleteView: vi.fn() }));
+vi.mock('@/libs/views/viewStore', () => ({ updateView: vi.fn(), deleteView: vi.fn(), saveNewView: vi.fn(), listViews: vi.fn() }));
+vi.mock('@/libs/views/viewLinks', () => ({ openInNewTab: vi.fn(), savedViewUrl: (ds, uid) => `/r/acme/site/views/${uid}` }));
 vi.mock('@/components/TextPromptDialog.vue', () => ({ default: { name: 'TextPromptDialog' } }));
 vi.mock('@/components/ConfirmDialog.vue', () => ({ default: { name: 'ConfirmDialog' } }));
 
-const { updateView, deleteView } = await import('@/libs/views/viewStore');
+const { updateView, deleteView, saveNewView, listViews } = await import('@/libs/views/viewStore');
+const { openInNewTab } = await import('@/libs/views/viewLinks');
 const { askViewName, useViewActions } = await import('./useViewActions');
 
 const dataset = {};
@@ -37,6 +39,38 @@ describe('askViewName', () => {
         dialogs.open.mockResolvedValue(null);
         expect(await askViewName(dialogs, { title: 'Rename view', initialValue: 'x', confirmLabel: 'Rename' })).toBeNull();
         expect(dialogs.open.mock.calls[0][1]).toMatchObject({ initialValue: 'x', confirmLabel: 'Rename' });
+    });
+});
+
+describe('useViewActions saveAsNew', () => {
+    const state = { base: { path: 'odm/odm_orthophoto.tif', hash: 'h' }, layers: [] };
+
+    it('asks for a name, the base file\'s made free among the views, saves the view and offers to open it', async () => {
+        listViews.mockResolvedValue([{ name: 'odm_orthophoto.tif' }]);
+        dialogs.open.mockResolvedValue('Pit');
+        saveNewView.mockResolvedValue({ uid: 'v_new00000', name: 'Pit' });
+        expect(await actions.saveAsNew(state)).toBe(true);
+        expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save as view', initialValue: 'odm_orthophoto.tif (2)' });
+        expect(saveNewView).toHaveBeenCalledWith(dataset, state, { name: 'Pit', user: 'user' });
+        expect(onChanged).toHaveBeenCalledOnce();
+        const [text, { action }] = notify.success.mock.calls[0];
+        expect(text).toBe('View "Pit" saved');
+        action.run();
+        expect(openInNewTab).toHaveBeenCalledWith('/r/acme/site/views/v_new00000');
+    });
+
+    it('saves nothing when the name is cancelled, and shows a refused save', async () => {
+        listViews.mockRejectedValue(new Error('offline'));
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        dialogs.open.mockResolvedValue(null);
+        expect(await actions.saveAsNew(state)).toBe(false);
+        expect(dialogs.open.mock.calls[0][1].initialValue).toBe('odm_orthophoto.tif');
+        expect(saveNewView).not.toHaveBeenCalled();
+        dialogs.open.mockResolvedValue('Pit');
+        saveNewView.mockRejectedValue(new Error('This dataset has 100 views.'));
+        expect(await actions.saveAsNew(state)).toBe(false);
+        expect(notify.error).toHaveBeenCalledWith('This dataset has 100 views.', { summary: 'Cannot save the view' });
+        expect(onChanged).not.toHaveBeenCalled();
     });
 });
 

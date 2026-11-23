@@ -1,11 +1,12 @@
 <template>
     <SidebarGroup v-model:current="current" class="saved-views" label="Views" aria-label="Saved views" :icon="VIEWS_ICON" :items="views" :menu="menu"
+                  :empty-text="canWrite ? EMPTY_TEXT : ''"
                   :item-icon="() => 'fa-regular fa-map'" :item-title="v => `${v.name} (double-click to open)`" @open="open" />
 </template>
 
 <script setup>
 /**
- * SavedViews - the dataset's saved map views under the folder tree. They are not dataset
+ * SavedViews - the dataset's saved map views under the folder tree; a writer sees the group with none, and how to make one. They are not dataset
  * files: they open in the map (double click, Enter, Open) in a new tab and none of the file
  * operations apply to them; writers rename and delete them (the page does, `rename` /
  * `delete` events). Names are shown as text, whatever they contain.
@@ -24,6 +25,9 @@ const props = defineProps({
     canWrite: { type: Boolean, default: false }
 });
 const emit = defineEmits(['rename', 'delete']);
+
+// How a view is made, for a writer of a dataset that has none
+const EMPTY_TEXT = 'No saved views yet. Open a file on the map and use Save view, or use Save as view on the Map tab. A new report can save one too.';
 const notify = useNotify();
 
 // The view the menu acts on

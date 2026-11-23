@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * The actions on saved views that ask the user first: the name prompt (shared with the map
- * viewer's Save), rename and delete. Errors are shown; `onChanged` runs after a change.
+ * viewer's Save), a new view of what a map shows (the dataset map's Save as view), rename and
+ * delete. Errors are shown; `onChanged` runs after a change.
  *
  *   const actions = useViewActions({ dataset, dialogs, onChanged: () => reloadViews() });
  *   await actions.rename(view);
@@ -10,8 +11,11 @@
  * confirmation shows it in its title, never in the message (which a ConfirmDialog renders as
  * sanitised HTML).
  */
+import { pathutils } from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
-import { updateView, deleteView } from '@/libs/views/viewStore';
+import { updateView, deleteView, saveNewView, listViews } from '@/libs/views/viewStore';
+import { openInNewTab, savedViewUrl } from '@/libs/views/viewLinks';
+import { uniqueName } from '@/libs/metaList/metaListStore';
 import { MAX_NAME_LENGTH } from '@/libs/views/viewState';
 import { useConfirm } from '@/composables/useConfirm';
 import { useNotify } from '@/composables/useNotify';
@@ -39,10 +43,39 @@ export function useViewActions({ dataset, dialogs, onChanged = () => {} }) {
         try {
             await action();
             onChanged();
+            return true;
         } catch (/** @type {any} */ e) {
             console.error(`${summary}:`, e);
             notify.error(e.message || String(e), { summary });
+            return false;
         }
+    }
+
+    /**
+     * Saves what a map shows as a new view, under the name the user gives (the name of its base file at first, made
+     * unique among the views); the toast offers to open it.
+     * @param {import('@/libs/views/viewState').ViewState} state
+     * @returns {Promise<boolean>} whether a view was saved
+     */
+    async function saveAsNew(state) {
+        let taken = [];
+        try {
+            taken = (await listViews(dataset, { fresh: true })).map(v => v.name);
+        } catch (e) {
+            console.warn('Cannot read the saved views:', e);
+        }
+        const name = await askViewName(dialogs, { title: 'Save as view', initialValue: uniqueName(pathutils.basename(state.base.path), taken, MAX_NAME_LENGTH) });
+        if (!name) return false;
+        /** @type {any} */
+        let created = null;
+        const saved = await attempt('Cannot save the view', async () => {
+            created = await saveNewView(dataset, state, { name, user: reg.getUsername() || '' });
+        });
+        if (saved && created) {
+            const url = savedViewUrl(dataset, created.uid);
+            notify.success(`View "${created.name}" saved`, { action: { label: 'Open', run: () => openInNewTab(url) } });
+        }
+        return saved;
     }
 
     /** @param {{ uid: string, name: string }} view */
@@ -64,5 +97,5 @@ export function useViewActions({ dataset, dialogs, onChanged = () => {} }) {
         await attempt('Cannot delete the view', () => deleteView(dataset, view.uid));
     }
 
-    return { rename, remove };
+    return { saveAsNew, rename, remove };
 }
