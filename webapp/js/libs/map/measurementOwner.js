@@ -61,3 +61,15 @@ export function measurementOwnerEntry(files) {
 export function measurementFileOf(files) {
     return new MeasurementStorage(null, measurementOwnerEntry(files)).measurementPath;
 }
+
+/**
+ * The entry whose file holds the measurements a saved view shows: the files the map viewer shows for it (a base that
+ * is not one of its layers, then the layers, the bottom one first) under the rule of measurementOwnerEntry.
+ * @param {{ base: { path: string }, layers: { path: string }[] }} state  a view state
+ * @returns {{ path: string, type?: number }}
+ */
+export function viewMeasurementOwner(state) {
+    const layers = state.layers.map(l => l.path);
+    const paths = [...(layers.includes(state.base.path) ? [] : [state.base.path]), ...[...layers].reverse()];
+    return measurementOwnerEntry(paths.map(path => ({ placeholder: { path } })));
+}

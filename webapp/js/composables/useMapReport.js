@@ -10,6 +10,7 @@
  * editor saves as a new view with the report, so the report never points to a view that nobody can open.
  */
 import { toRaw } from 'vue';
+import { saveMeasurementsFirst } from '@/composables/saveMeasurementsFirst';
 
 /**
  * @typedef {{ uid: string } | { state: import('@/libs/views/viewState').ViewState, name: string }} MapReportView
@@ -39,21 +40,11 @@ export function viewOfMap(state, info) {
 export function useMapReport({ actions, choose, state, viewInfo = () => null, measurements }) {
     /** Whether the measurements are in their file, asking the user what to do when they are not: false when the report must not start. */
     async function measurementsSaved() {
-        if (!measurements.isDirty()) return true;
-        const answer = await choose({
-            title: 'Unsaved measurements',
+        return (await saveMeasurementsFirst(choose, measurements, {
             message: 'A report reads the saved measurements file. Save the measurements on the map first?',
             confirmText: 'Save and continue',
-            secondaryText: 'Continue without saving',
-            cancelText: 'Cancel'
-        });
-        if (answer === 'cancel') return false;
-        if (answer === 'confirm') {
-            await measurements.save();
-            // A save that did not save (its alert says why) leaves them dirty: the report waits
-            return !measurements.isDirty();
-        }
-        return true;
+            secondaryText: 'Continue without saving'
+        })) !== 'cancel';
     }
 
     async function startReport() {

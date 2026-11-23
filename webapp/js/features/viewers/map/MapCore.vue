@@ -164,6 +164,7 @@ import { useMapViewState } from '@/composables/useMapViewState';
 import { useMapItemFocus } from '@/composables/useMapItemFocus';
 import { useMapReport } from '@/composables/useMapReport';
 import { useViewActions } from '@/composables/useViewActions';
+import { useViewMeasurements } from '@/composables/useViewMeasurements';
 import { useReportActions } from '@/features/reports/useReportActions';
 import { useChoice } from '@/composables/useConfirm';
 import { useRouter } from 'vue-router';
@@ -325,6 +326,17 @@ export default {
             : null;
         const viewBinding = useMapViewState({ ...features, view: () => props.view, emit });
         const viewActions = props.dataset ? useViewActions({ dataset: props.dataset, dialogs: features.dialogs, onChanged: () => emit('viewSaved') }) : null;
+        const viewMeasurements = useViewMeasurements({
+            dataset: props.dataset,
+            choose: useChoice(features.dialogs),
+            measurements: {
+                isDirty: () => features.hasUnsavedMeasurements.value,
+                save: () => features.saveMeasurements(),
+                owner: () => features.activeMeasurementEntry.value,
+                count: () => features.measureControls.value?.getMeasurementsCount() ?? 0
+            },
+            onFileWritten: path => emit('fileWritten', path)
+        });
         // What the map shows as a view: the viewer's own, or the georasters of the dataset map
         const shownState = () => props.view ?? viewBinding.datasetMapState();
         const report = useMapReport({
@@ -347,9 +359,10 @@ export default {
             embed: inject('embed', false),
             ...viewBinding,
             // "Save as view" of the dataset map: its georasters as a new saved view (the dataset page lists it: viewSaved)
+            // The measurements of the map go with it (saved first, or copied into the file of the view)
             saveMapAsView: async () => {
                 const state = viewBinding.datasetMapState();
-                if (state && viewActions) await viewActions.saveAsNew(state);
+                if (state && viewActions && await viewMeasurements.include(state)) await viewActions.saveAsNew(state);
             },
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),

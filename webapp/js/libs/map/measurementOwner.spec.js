@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
-import { measuredFiles, measurementFileOf, measurementOwnerEntry, shownPath, standaloneMeasurementEntry } from './measurementOwner';
+import { measuredFiles, measurementFileOf, measurementOwnerEntry, shownPath, standaloneMeasurementEntry, viewMeasurementOwner } from './measurementOwner';
 
 const entry = (path, type = ddb.entry.type.GEORASTER) => ({ entry: { path, type } });
 const placeholder = path => ({ placeholder: { path } });
@@ -57,5 +57,19 @@ describe('measurementOwnerEntry', () => {
         const folder = entry('flights', ddb.entry.type.DIRECTORY);
         expect(measurementFileOf([folder])).toBe('measurements.geojson');
         expect(measurementFileOf([])).toBe('measurements.geojson');
+    });
+});
+
+describe('viewMeasurementOwner', () => {
+    const state = (base, layers) => ({ base: { path: base }, layers: layers.map(path => ({ path })) });
+
+    it('is the one georaster of a view: its sidecar holds the measurements', () => {
+        expect(viewMeasurementOwner(state('odm/ortho.tif', ['odm/ortho.tif']))).toEqual({ path: 'odm/ortho.tif' });
+    });
+
+    it('is the folder file of the bottom layer for a view of several layers, and of the base for a base that is not a layer', () => {
+        expect(viewMeasurementOwner(state('odm/ortho.tif', ['odm/ortho.tif', 'dsm/dsm.tif']))).toEqual({ path: 'dsm/measurements.geojson' });
+        expect(viewMeasurementOwner(state('zones.geojson', ['odm/ortho.tif']))).toEqual({ path: 'measurements.geojson' });
+        expect(viewMeasurementOwner(state('zones.geojson', []))).toEqual({ path: 'zones.geojson' });
     });
 });

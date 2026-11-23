@@ -41,6 +41,8 @@ import { useViewerEntry } from '@/composables/useViewerEntry';
 import { askViewName } from '@/composables/useViewActions';
 import { useNotify } from '@/composables/useNotify';
 import { useLeaveGuard } from '@/composables/useLeaveGuard';
+import { useChoice } from '@/composables/useConfirm';
+import { saveMeasurementsFirst } from '@/composables/saveMeasurementsFirst';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 /** @typedef {import('@/libs/views/viewState').ViewState} ViewState */
@@ -115,6 +117,7 @@ function openProblem(view) {
  */
 export function useSavedView({ route, router, dialogs, embed = false, hashOf, measurements = { isDirty: () => false, save: async () => {} } }) {
     const notify = useNotify();
+    const choose = useChoice(dialogs);
     const { org, ds, uid: routeUid } = route.params;
     const uid = routeUid ? String(routeUid) : null;
     const dataset = reg.Organization(String(org)).Dataset(String(ds));
@@ -390,9 +393,23 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
             : { title: 'Save view', initialValue: firstViewName() });
     }
 
+    /**
+     * The measurements on the map that are not saved: a view shows the measurements saved with its files, so they are
+     * offered a Save first, which puts them in the view. False when the user cancels (or the save did not save).
+     */
+    async function measurementsIncluded() {
+        return (await saveMeasurementsFirst(choose, { isDirty: measurementsDirty, save: async () => { await measurements.save(); } }, {
+            message: 'The view shows the measurements saved with its files. Save the measurements on the map and include them in the view?',
+            confirmText: 'Save and include',
+            secondaryText: 'Save the view only'
+        })) !== 'cancel';
+    }
+
     /** Save as new */
     function saveAsNew() {
-        return oneAtATime(createAsNew);
+        return oneAtATime(async () => {
+            if (await measurementsIncluded()) await createAsNew();
+        });
     }
 
     /** What happened to the saved view since it was loaded, or null; a failed check is shown and stops the save. */
@@ -407,7 +424,9 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
 
     /** Save: a new view is created; a saved view is replaced, after the check for another writer. */
     function save() {
-        return oneAtATime(saveOrReplace);
+        return oneAtATime(async () => {
+            if (await measurementsIncluded()) await saveOrReplace();
+        });
     }
 
     async function saveOrReplace() {
@@ -459,8 +478,9 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf, me
     useLeaveGuard({
         isDirty: () => !embed && canWrite.value && (dirty.value || measurements.isDirty()),
         save: async () => {
-            // The view first: when it is not saved (a cancelled question) the page stays, whatever the measurements
-            if (dirty.value) await save();
+            // The view first: when it is not saved (a cancelled question) the page stays, whatever the measurements.
+            // The question saves both: the view's own question about the measurements is not asked
+            if (dirty.value) await oneAtATime(saveOrReplace);
             if (!dirty.value && measurementsDirty()) await measurements.save();
         },
         dialogs,

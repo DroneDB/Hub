@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
-import { MeasurementStorage, MeasurementOwner, MeasurementNotLoadedError, MeasurementNotPlacedError, ownerOf, saveResultMessage } from './measurementStorage';
+import { MeasurementStorage, MeasurementOwner, MeasurementNotLoadedError, MeasurementNotPlacedError, ownerOf, saveResultMessage, copyMeasurements } from './measurementStorage';
 import { exportMeasurements as exportMap, importMeasurements as importMap } from './olMeasurementConverter';
 import { exportMeasurements as exportCloud } from './potreeMeasurementConverter';
 import { sectionOf } from './measurementFormat';
@@ -696,3 +696,53 @@ describe('MeasurementStorage.annotationSchema', () => {
     });
 });
 
+describe('copyMeasurements', () => {
+    /** A dataset of two files, by path: `files[path]` is a document, or none (404). */
+    function datasetOf(files) {
+        return {
+            getFileContents: vi.fn(async path => {
+                if (!files[path]) throw Object.assign(new Error('Not found'), { status: 404 });
+                return JSON.stringify(files[path]);
+            }),
+            writeObj: vi.fn(async () => {}),
+            deleteObj: vi.fn(async () => {})
+        };
+    }
+    const FOLDER = { path: 'odm/measurements.geojson' };
+    const ORTHO = { path: 'odm/ortho.tif' };
+    const written = async dataset => JSON.parse(await dataset.writeObj.mock.calls[0][1].text());
+    const refs = doc => Object.fromEntries(doc.features.map(f => [f.properties.id, f.properties.ref]));
+
+    it('writes the map measurements of a file into the file of another entry, with their groups, and leaves the 3D ones', async () => {
+        const dataset = datasetOf({
+            'odm/measurements.geojson': collection([feature('point', 'a', { ref: '1' }), feature('area', 'b', { ref: '2' }), cloud('distance', 'c')],
+                { version: '3.0', lastRef: 3, views: { map: { groups: [{ id: 'g1', name: 'Piles' }] } } })
+        });
+        expect(await copyMeasurements(dataset, FOLDER, ORTHO)).toBe(2);
+        expect(dataset.writeObj.mock.calls[0][0]).toBe('odm/ortho_measurements.geojson');
+        const doc = await written(dataset);
+        expect(refs(doc)).toEqual({ a: '1', b: '2' });
+        expect(sectionOf(doc, MAP).groups).toEqual([{ id: 'g1', name: 'Piles' }]);
+    });
+
+    it('keeps what the target holds, replaces a measurement of the same id, gives a copied one whose ref is taken the next ref, and keeps both groups', async () => {
+        const dataset = datasetOf({
+            'odm/measurements.geojson': collection([feature('point', 'a', { ref: '1', name: 'new' }), feature('point', 'b', { ref: '2' })],
+                { version: '3.0', lastRef: 2, views: { map: { groups: [{ id: 'g1', name: 'Piles' }] } } }),
+            'odm/ortho_measurements.geojson': collection([feature('point', 'a', { ref: '1', name: 'old' }), feature('length', 'x', { ref: '2' }), cloud('point', 'p')],
+                { version: '3.0', lastRef: 2, views: { map: { groups: [{ id: 'g2', name: 'Cracks' }] } } })
+        });
+        expect(await copyMeasurements(dataset, FOLDER, ORTHO)).toBe(2);
+        const doc = await written(dataset);
+        expect(doc.features.find(f => f.properties.id === 'a').properties.name).toBe('new');
+        expect(refs(doc)).toMatchObject({ a: '1', x: '2', b: '3' });
+        expect(doc.features.some(f => f.properties.id === 'p')).toBe(true);
+        expect(sectionOf(doc, MAP).groups.map(g => g.id)).toEqual(['g2', 'g1']);
+    });
+
+    it('writes nothing when the file has no map measurement', async () => {
+        const dataset = datasetOf({ 'odm/measurements.geojson': collection([cloud('point', 'p')], { version: '3.0' }) });
+        expect(await copyMeasurements(dataset, FOLDER, ORTHO)).toBe(0);
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+    });
+});

@@ -1163,6 +1163,56 @@ describe('useSavedView leaving with unsaved measurements on the map', () => {
         expect(dialogs.open.mock.calls[0][1].message).toBe('This view has changes that are not saved. Save them before you leave?');
     });
 
+    describe('Save view with unsaved measurements', () => {
+        /** The answers: `measurements` to the question about them, a name to the name prompt. */
+        const answer = measurementsAnswer => dialogs.open.mockImplementation(async (component, props) => {
+            if (props.title === 'Unsaved measurements') return measurementsAnswer;
+            return props.label === 'Name' ? 'Mine' : 'cancel';
+        });
+        const asked = () => dialogs.open.mock.calls.find(call => call[1].title === 'Unsaved measurements')?.[1];
+
+        it('asks to save them and include them in the view: Save and include saves them, then the view', async () => {
+            const measurements = unsavedMeasurements();
+            const { view, dataset } = await openNewView(measurements);
+            answer('confirm');
+            await view.save();
+            expect(asked()).toMatchObject({ confirmText: 'Save and include', secondaryText: 'Save the view only', cancelText: 'Cancel' });
+            expect(measurements.save).toHaveBeenCalledOnce();
+            expect(dataset.metaAdd).toHaveBeenCalledOnce();
+            expect(measurements.save.mock.invocationCallOrder[0]).toBeLessThan(dataset.metaAdd.mock.invocationCallOrder[0]);
+        });
+
+        it('saves the view alone on Save the view only, and nothing on Cancel', async () => {
+            const measurements = unsavedMeasurements();
+            const { view, dataset } = await openNewView(measurements);
+            answer('secondary');
+            await view.saveAsNew();
+            expect(measurements.save).not.toHaveBeenCalled();
+            expect(dataset.metaAdd).toHaveBeenCalledOnce();
+            answer('cancel');
+            await view.saveAsNew();
+            expect(dataset.metaAdd).toHaveBeenCalledOnce();
+        });
+
+        it('saves no view when the measurements could not be saved', async () => {
+            const measurements = unsavedMeasurements();
+            measurements.save.mockImplementation(async () => {});
+            const { view, dataset } = await openNewView(measurements);
+            answer('confirm');
+            await view.save();
+            expect(dataset.metaAdd).not.toHaveBeenCalled();
+        });
+
+        it('asks nothing when the measurements are saved', async () => {
+            const measurements = unsavedMeasurements();
+            measurements.dirty.value = false;
+            const { view } = await openNewView(measurements);
+            answer('confirm');
+            await view.save();
+            expect(asked()).toBeUndefined();
+        });
+    });
+
     it('asks nothing for a reader or Viewer only, whatever the map holds', async () => {
         await openNewView(unsavedMeasurements(), { dataset: { canWrite: false } });
         expect(await guards.leave(dsRoute, here())).toBe(true);

@@ -9,7 +9,7 @@ import { notify } from '@/libs/notify';
 import { isNotFound } from '@/libs/ddb/apiError';
 import { isListed } from '@/libs/optionalFile';
 import { VIEW, ownerOf, sectionOf, parse, write, writeNumbered, numberDocument, MeasurementFileError } from '@/libs/map/measurementFormat';
-import { RefSequence, renumberedMessage } from '@/libs/map/annotationIds';
+import { RefSequence, renumberedMessage, idOf } from '@/libs/map/annotationIds';
 import { DEFAULT_SCHEMA, datasetReportSettings } from '@/libs/reports/reportSettings';
 
 /** Whether a path is a measurements file (`<name>_measurements.geojson` or `measurements.geojson`). */
@@ -364,4 +364,38 @@ export class MeasurementStorage {
 
         console.log(`Measurements exported as: ${fname}`);
     }
+}
+
+/**
+ * Copies the measurements one view has in a file into the file of another entry, so that a map that reads that file
+ * shows them too (a saved view made on the dataset map whose layers have a file of their own). The measurements the
+ * target has keep their place; one with the id of a copied one is replaced by it, and a copied one whose ref the
+ * target uses for another takes the next ref there (the rule of a save). The groups of both are kept. The other view's
+ * measurements of either file are not touched.
+ * @param {Dataset} dataset
+ * @param {Entry} from  the entry whose file is copied
+ * @param {Entry} to  the entry whose file receives them
+ * @param {string} [owner]  the view whose measurements are copied
+ * @returns {Promise<number>}  the number of measurements copied (none: nothing is written)
+ * @throws when a file cannot be read or the target cannot be written
+ */
+export async function copyMeasurements(dataset, from, to, owner = MeasurementOwner.MAP) {
+    const source = await new MeasurementStorage(dataset, from, owner).load();
+    const copied = source ? source.features : [];
+    if (!copied.length) return 0;
+    const target = new MeasurementStorage(dataset, to, owner);
+    const existing = await target.load();
+    const ids = new Set(copied.map(idOf).filter(Boolean));
+    const kept = (existing ? existing.features : []).filter(f => !idOf(f) || !ids.has(idOf(f)));
+    const sourceSection = sectionOf(source, owner);
+    const targetSection = sectionOf(existing, owner);
+    const sourceGroups = Array.isArray(sourceSection.groups) ? sourceSection.groups : [];
+    const groupIds = new Set(sourceGroups.map(g => g && g.id));
+    const groups = [...(Array.isArray(targetSection.groups) ? targetSection.groups : []).filter(g => !groupIds.has(g && g.id)), ...sourceGroups];
+    await target.save({
+        type: 'FeatureCollection',
+        metadata: { views: { [owner]: { ...targetSection, ...sourceSection, groups } } },
+        features: [...kept, ...copied]
+    });
+    return copied.length;
 }
