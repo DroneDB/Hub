@@ -191,7 +191,7 @@ import MapDialogs from './MapDialogs.vue';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
-import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
+import MeasurementGroupDialog from '@/components/measurements/MeasurementGroupDialog.vue';
 import { onColorSchemeChange } from '@/libs/colorScheme';
 import { notify } from '@/libs/notify';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';

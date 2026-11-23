@@ -108,6 +108,7 @@ const definition = {
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
                 onListOpen: () => { this.openMeasurementListDialog(); },
                 getGroups: () => this.measurementGroups,
+                createGroup: groupData => this.createGroup(groupData),
                 // The refs of the file the map shows: the ones it issues come after them
                 getRefSequence: () => (this.measurementStorage ? toRaw(this.measurementStorage).refs : null),
                 // The Photos tab of a measurement's dialog: the dataset, the file the measurement is saved in (the uploads go

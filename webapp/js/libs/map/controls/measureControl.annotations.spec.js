@@ -291,6 +291,24 @@ describe('the properties dialog of an annotation', () => {
         expect(f.get('ref')).toBe('9');
         expect(f.get('assignee')).toBe('Anna');
     });
+
+    it('has New group only when the host can make a group', () => {
+        control.openPropertiesDialog(feature());
+        expect(dialogs.at(-1).canCreateGroup).toBe(false);
+        control.createGroup = vi.fn();
+        control.openPropertiesDialog(feature());
+        expect(dialogs.at(-1).canCreateGroup).toBe(true);
+    });
+
+    it('makes the group made in the dialog when the measurement is saved, and puts the measurement in it', () => {
+        control.createGroup = vi.fn(() => 'g-new');
+        const f = feature();
+        control.openPropertiesDialog(f);
+        dialogs.at(-1).onSave({ name: 'A', groupId: '', newGroup: { name: 'South', color: '#123456' } });
+        expect(control.createGroup).toHaveBeenCalledExactlyOnceWith({ name: 'South', color: '#123456' });
+        expect(f.get('groupId')).toBe('g-new');
+        expect(f.get('newGroup')).toBeUndefined();
+    });
 });
 
 describe('the list of measurements', () => {

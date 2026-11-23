@@ -115,6 +115,78 @@ describe('the properties dialog of a measurement', () => {
     });
 });
 
+describe('a new group made in the properties dialog', () => {
+    const newGroupButton = () => document.querySelector('[data-testid="mp-new-group"]');
+    const groupWindow = () => document.querySelector('#measurement-group');
+    const groupSelectText = () => dialog().querySelector('#mp-group').textContent.trim();
+    async function makeGroup(name) {
+        newGroupButton().click();
+        await flushPromises();
+        const input = /** @type {HTMLInputElement} */ (groupWindow().querySelector('#mg-name'));
+        input.value = name;
+        input.dispatchEvent(new Event('input'));
+        await flushPromises();
+        [...groupWindow().querySelectorAll('button')].find(b => b.textContent.trim() === 'Create').click();
+        await flushPromises();
+    }
+
+    it('has no Group field and no New group when the host has no groups and cannot make one', async () => {
+        await show(line());
+        expect(labels()).not.toContain('Group');
+        expect(newGroupButton()).toBeNull();
+    });
+
+    it('shows the Group field with New group when the host can make one, even with no group yet', async () => {
+        await show(line(), { canCreateGroup: true });
+        expect(labels()).toContain('Group');
+        expect(newGroupButton().textContent.trim()).toBe('New group');
+    });
+
+    it('chooses the group made and saves the measurement with it, to be made by the host', async () => {
+        await show(line(), { canCreateGroup: true, groups: [{ id: 'g1', name: 'North' }] });
+        await makeGroup('  South  ');
+        expect(groupWindow()).toBeNull();
+        expect(groupSelectText()).toBe('South (new)');
+        buttonNamed('Save').click();
+        const saved = wrapper.emitted('save')[0][0];
+        expect(saved.groupId).toBe('');
+        expect(saved.newGroup).toEqual({ name: 'South', color: expect.any(String) });
+    });
+
+    it('saves no new group when another group is chosen after it', async () => {
+        await show(line(), { canCreateGroup: true, groups: [{ id: 'g1', name: 'North' }] });
+        await makeGroup('South');
+        wrapper.vm.formData.groupId = 'g1';
+        buttonNamed('Save').click();
+        const saved = wrapper.emitted('save')[0][0];
+        expect(saved.groupId).toBe('g1');
+        expect(saved).not.toHaveProperty('newGroup');
+    });
+
+    it('replaces the group made by the next one made', async () => {
+        await show(line(), { canCreateGroup: true });
+        await makeGroup('South');
+        await makeGroup('East');
+        expect(wrapper.vm.groupOptions.map(o => o.label)).toEqual(['None (ungrouped)', 'East (new)']);
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0].newGroup.name).toBe('East');
+    });
+
+    it('keeps the group chosen when New group is cancelled, and makes nothing when the measurement is not saved', async () => {
+        await show(line(), { canCreateGroup: true, groups: [{ id: 'g1', name: 'North' }] });
+        wrapper.vm.formData.groupId = 'g1';
+        newGroupButton().click();
+        await flushPromises();
+        [...groupWindow().querySelectorAll('button')].find(b => b.textContent.trim() === 'Cancel').click();
+        await flushPromises();
+        expect(groupWindow()).toBeNull();
+        expect(wrapper.vm.formData.groupId).toBe('g1');
+        await makeGroup('South');
+        buttonNamed('Cancel').click();
+        expect(wrapper.emitted('save')).toBeUndefined();
+    });
+});
+
 describe('the coordinates of a point', () => {
     const coords = () => /** @type {HTMLInputElement} */ (document.getElementById('mp-coords'));
     async function type(value) {

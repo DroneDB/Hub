@@ -32,10 +32,14 @@
                     </small>
                 </div>
 
-                <div v-if="groups.length > 0" class="form-field">
+                <div v-if="groups.length > 0 || canCreateGroup" class="form-field">
                     <label id="mp-group-label" for="mp-group" class="d-block mb-1 fw-semibold">Group</label>
-                    <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
-                            option-label="label" option-value="value" placeholder="None (ungrouped)" class="w-100" />
+                    <div class="group-field">
+                        <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
+                                option-label="label" option-value="value" placeholder="None (ungrouped)" class="group-select" />
+                        <Button v-if="canCreateGroup" type="button" severity="secondary" outlined icon="fa-solid fa-folder-plus" label="New group"
+                                title="Make a group and put this measurement in it" data-testid="mp-new-group" @click="groupDialogOpen = true" />
+                    </div>
                 </div>
 
                 <!-- What is changed less often folds away; each closed part says what it holds -->
@@ -72,6 +76,7 @@
             </AnnotationTabs>
             <p v-if="captureAction.message.value" class="capture-message" role="status">{{ captureAction.message.value }}</p>
         </div>
+        <MeasurementGroupDialog v-if="groupDialogOpen" @save="chooseNewGroup" @close="groupDialogOpen = false" />
 
         <template #footer>
             <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
@@ -88,7 +93,7 @@
 /**
  * The properties of a measurement or a point annotation: its name and reference (AnnotationRefField) side by side,
  * its description, the coordinates of a point (typed or pasted to move it: decimal degrees or DMS, see parseLatLon),
- * its group, then two parts that fold away (FormSection), each saying what it holds when closed: Appearance (the
+ * its group (with New group when the host can make one: the group is made only when the measurement is saved), then two parts that fold away (FormSection), each saying what it holds when closed: Appearance (the
  * colours, the width of a line, the fill of an area) and Inspection (AnnotationFields: category, severity, status,
  * due date, assignee, in reports); and, when it is given a `photoContext`, its photos (AnnotationTabs). The parts stay
  * as the user left them (useFoldedSections); Inspection opens by itself when it has values or a field to fix. The one
@@ -97,7 +102,8 @@
  *
  * Emits `save` with the properties that apply to the geometry (a point has no width or fill; `coordinates`, its new
  * [longitude, latitude], only when they were changed; the annotation fields as they are stored, a field with no value
- * as undefined so that it is cleared, the `ref` only when there is one), `delete` from the
+ * as undefined so that it is cleared, the `ref` only when there is one; `newGroup`, { name, color }, when the measurement
+ * goes in a group made in the dialog: the host makes it and puts the measurement in it), `delete` from the
  * Delete button, and `discard` when a new point (`isNew`) is not kept: Discard, the close button or Esc.
  */
 import Window from '@/components/HubWindow.vue';
@@ -113,6 +119,7 @@ import AnnotationRefField from '@/components/measurements/AnnotationRefField.vue
 import FormSection from '@/components/FormSection.vue';
 import { useFoldedSections } from '@/composables/useFoldedSections';
 import AnnotationTabs from '@/components/measurements/AnnotationTabs.vue';
+import MeasurementGroupDialog from '@/components/measurements/MeasurementGroupDialog.vue';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_KEYS, FIELD_LIMITS, inspectionSummary, storedFields } from '@/libs/map/annotationIds';
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
@@ -122,13 +129,16 @@ import { latLonText, latLonDmsText, parseLatLon } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 
+/** The value of the group made in the dialog in the Group list: no group id, which a file can make up, can be it */
+const NEW_GROUP = Symbol('new group');
+
 /** The annotation fields a feature has (a field with no value is absent) */
 const fieldsOf = feature => Object.fromEntries(FIELD_KEYS.filter(key => feature.get(key) !== undefined && feature.get(key) !== null).map(key => [key, feature.get(key)]));
 
 export default {
     components: {
         Window, Button, InputText, Textarea, Select, Accordion,
-        ColorSwatchPicker, FieldError, AnnotationFields, AnnotationRefField, AnnotationTabs, FormSection
+        ColorSwatchPicker, FieldError, AnnotationFields, AnnotationRefField, AnnotationTabs, FormSection, MeasurementGroupDialog
     },
     props: {
         feature: {
@@ -153,6 +163,11 @@ export default {
         groups: {
             type: Array,
             default: () => []
+        },
+        // The host can make a group: the dialog has New group (a measurement saved in it comes with `newGroup`)
+        canCreateGroup: {
+            type: Boolean,
+            default: false
         },
         // The organization's annotation schema: the categories, severities and statuses to choose from
         schema: {
@@ -193,6 +208,9 @@ export default {
             coordsInput: '',
             // Set once Save or Delete is chosen: the close that follows is not a discard
             done: false,
+            // The New group dialog is open; the group it made ({ name, color }), offered until the measurement is saved
+            groupDialogOpen: false,
+            newGroup: null,
             // The annotation fields (reference, category, ...) and whether they can be saved
             fields: {},
             fieldsValid: true,
@@ -254,7 +272,9 @@ export default {
             return inspectionSummary(this.fields, this.schema) || 'Nothing set';
         },
         groupOptions() {
-            return [{ label: 'None (ungrouped)', value: '' }, ...this.groups.map(g => ({ label: g.name, value: g.id }))];
+            const options = [{ label: 'None (ungrouped)', value: '' }, ...this.groups.map(g => ({ label: g.name, value: g.id }))];
+            if (this.newGroup) options.push({ label: `${this.newGroup.name} (new)`, value: NEW_GROUP });
+            return options;
         }
     },
     watch: {
@@ -282,10 +302,17 @@ export default {
     methods: {
         latLonText,
         latLonDmsText,
+        // The group made with New group is the one chosen; another New group replaces it
+        chooseNewGroup(group) {
+            this.newGroup = group;
+            this.formData.groupId = NEW_GROUP;
+        },
         // The properties of this geometry: a point has no width or fill, a line no fill
         properties() {
-            const { name, description, stroke, groupId } = this.formData;
-            const properties = { name, description, stroke, groupId };
+            const { name, description, stroke } = this.formData;
+            const inNewGroup = this.formData.groupId === NEW_GROUP;
+            const properties = { name, description, stroke, groupId: inNewGroup ? '' : this.formData.groupId };
+            if (inNewGroup) properties.newGroup = this.newGroup;
             if (!this.isPoint) {
                 properties['stroke-width'] = this.formData['stroke-width'];
                 properties['stroke-opacity'] = this.formData['stroke-opacity'];
@@ -375,6 +402,17 @@ export default {
 .capture-message {
     margin: 0;
     font-size: var(--ddb-font-size-sm);
+}
+
+.group-field {
+    display: flex;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+}
+
+.group-select {
+    flex: 1;
+    min-width: 0;
 }
 
 .coords-field {

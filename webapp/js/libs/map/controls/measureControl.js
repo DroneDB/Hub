@@ -169,6 +169,8 @@ class MeasureControls extends Control {
         this.onListOpen = options.onListOpen || (() => { });
         // The measurement groups, offered by the properties dialog
         this.getGroups = options.getGroups || (() => []);
+        // Makes a group ({ name, color }) and returns its id: the properties dialog has New group when it is given
+        this.createGroup = options.createGroup || null;
         // Notified whenever a feature is removed from the measurement source
         // (eraser tool, deleteMeasurement, etc.). Consumers use this to keep
         // the deletedMeasurementIds tracking in sync so persisted features
@@ -1408,12 +1410,14 @@ class MeasureControls extends Control {
             isNew,
             showDelete: !isNew,
             groups: this.getGroups(),
+            canCreateGroup: !!this.createGroup,
             schema: this.annotationSchema,
             isRefTaken: ref => this.isRefTaken(ref, feature),
             photoContext: this._photoContext(feature),
-            onSave: ({ groupId, coordinates, ...properties }) => {
+            onSave: ({ groupId, newGroup, coordinates, ...properties }) => {
                 Object.keys(properties).forEach(key => feature.set(key, properties[key]));
-                this.setMeasurementGroupId(feature, groupId);
+                // A group made in the dialog is made now that the measurement is saved in it
+                this.setMeasurementGroupId(feature, newGroup ? this.createGroup(newGroup) : groupId);
                 // Coordinates typed in the dialog move the point
                 if (coordinates) this._relocatePoint(feature, fromLonLat(coordinates));
 

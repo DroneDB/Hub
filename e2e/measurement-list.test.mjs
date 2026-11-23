@@ -1,7 +1,8 @@
 /**
  * The measurement list of the map, end to end: rows are selected (click, Ctrl, Shift, check boxes, Select all, the
  * keyboard), and the selection is moved to a group (Move to, or dragged onto a group), made into a new group, deleted,
- * shown on the map and exported; a Save keeps the groups after a reload.
+ * shown on the map and exported; the properties dialog of a measurement makes a new group for it when it is saved; a Save
+ * keeps the groups after a reload.
  * Not part of `npm test` (needs a server). Same environment as smoke.test.mjs (HUB_URL, HUB_USER, HUB_PASS,
  * HUB_TEST_DATA, HUB_CHROME, HUB_HEADED):
  *
@@ -208,6 +209,38 @@ test('Show on map closes the list and shows the selection', async () => {
     }
 });
 
+test('New group of the properties dialog makes the group when the measurement is saved, not when it is cancelled', async () => {
+    const groupNamed = name => page.locator(`.group-block:has(.group-name:text-is("${name}"))`);
+    const properties = '.p-dialog:has(#mp-name)';
+    async function closeList() {
+        await page.keyboard.press('Escape');
+        await page.waitForSelector('[data-testid="measurement-tree"]', { state: 'detached', timeout: 5000 });
+    }
+    async function editWithNewGroup(name) {
+        await openList();
+        await row('Marker 7').locator('.btn-edit').click();
+        await page.waitForSelector(properties, { timeout: 5000 });
+        await page.click('[data-testid="mp-new-group"]');
+        await page.fill('#mg-name', name);
+        await page.keyboard.press('Enter');
+        await page.waitForSelector('#mg-name', { state: 'detached' });
+        assert.equal((await page.locator(`${properties} #mp-group`).textContent()).trim(), `${name} (new)`);
+    }
+    await editWithNewGroup('Surveyed');
+    await page.click(`${properties} button:has-text("Cancel")`);
+    await page.waitForSelector(properties, { state: 'detached' });
+    await openList();
+    assert.equal(await groupNamed('Surveyed').count(), 0);
+    await closeList();
+    await editWithNewGroup('Surveyed');
+    if (SHOTS) await page.locator(properties).screenshot({ path: path.join(SHOTS, 'measurement-properties-new-group.png') });
+    await page.click(`${properties} button:has-text("Save")`);
+    await page.waitForSelector(properties, { state: 'detached' });
+    await openList();
+    assert.equal(await groupNamed('Surveyed').locator('.group-count').textContent(), '(1)');
+    await closeList();
+});
+
 test('a Save keeps the groups and the moves after a reload', async () => {
     await page.click('button[title^="Save Measurements"]');
     await page.waitForSelector('.p-toast-message', { timeout: 15000 });
@@ -218,5 +251,7 @@ test('a Save keeps the groups and the moves after a reload', async () => {
     assert.equal(await groupCount('g-piles'), '(3)');
     const checked = page.locator('.group-block:has(.group-name:text-is("Checked"))');
     assert.equal(await checked.locator('.group-count').textContent(), '(2)');
+    const surveyed = page.locator('.group-block:has(.group-name:text-is("Surveyed"))');
+    assert.equal(await surveyed.locator('.group-count').textContent(), '(1)');
     assert.deepEqual(errors, []);
 });
