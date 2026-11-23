@@ -27,6 +27,8 @@ describe('docs links', () => {
     it('names the pages of the windows that link to the docs', () => {
         expect(DOCS.alignRaster).toBe('https://docs.dronedb.app/docs/hub-guide/processing/align-raster');
         expect(DOCS.maskBorders).toBe('https://docs.dronedb.app/docs/hub-guide/processing/mask-borders');
+        expect(DOCS.savedViews).toBe('https://docs.dronedb.app/docs/hub-guide/viewing/map-views');
+        expect(DOCS.reports).toBe('https://docs.dronedb.app/docs/hub-guide/measure/reports');
         expect(DOCS.largeUploads).toBe('https://docs.dronedb.app/docs/self-hosting/troubleshooting#tuning-the-reverse-proxy-for-large-uploads');
     });
 

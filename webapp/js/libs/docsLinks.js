@@ -20,5 +20,7 @@ export function docsUrl(page, anchor) {
 export const DOCS = Object.freeze({
     alignRaster: docsUrl('hub-guide/processing/align-raster'),
     maskBorders: docsUrl('hub-guide/processing/mask-borders'),
-    largeUploads: docsUrl('self-hosting/troubleshooting', 'tuning-the-reverse-proxy-for-large-uploads')
+    largeUploads: docsUrl('self-hosting/troubleshooting', 'tuning-the-reverse-proxy-for-large-uploads'),
+    savedViews: docsUrl('hub-guide/viewing/map-views'),
+    reports: docsUrl('hub-guide/measure/reports')
 });

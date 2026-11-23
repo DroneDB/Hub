@@ -5,11 +5,17 @@
         <ContextMenu :items="menu" />
         <ul role="tree" :aria-label="ariaLabel">
             <li role="treeitem" :aria-expanded="expanded" aria-selected="false">
-                <button type="button" class="entry group" :aria-expanded="expanded" @click="expanded = !expanded" @contextmenu="current = null">
-                    <i class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'" aria-hidden="true" />
-                    <i class="icon" :class="icon" aria-hidden="true" />
-                    <span class="text">{{ label }}</span>
-                </button>
+                <div class="group-header">
+                    <button type="button" class="entry group" :aria-expanded="expanded" @click="expanded = !expanded" @contextmenu="current = null">
+                        <i class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'" aria-hidden="true" />
+                        <i class="icon" :class="icon" aria-hidden="true" />
+                        <span class="text">{{ label }}</span>
+                    </button>
+                    <button v-if="info" type="button" class="group-info" data-testid="group-info" :title="info.title" :aria-label="info.title"
+                            @click="infoVisible = true" @contextmenu="current = null">
+                        <i class="fa-solid fa-circle-info" aria-hidden="true" />
+                    </button>
+                </div>
                 <ul v-show="expanded" role="group">
                     <li v-for="item in items" :key="item[itemKey]" role="treeitem" :aria-selected="current === item">
                         <button type="button" class="entry child" :class="{ selected: current === item }" :title="itemTitle(item)"
@@ -28,6 +34,8 @@
                 </ul>
             </li>
         </ul>
+        <InfoDialog v-if="infoVisible" :id="info.id" :title="info.title" :icon="info.icon"
+                    :summary="info.summary" :sections="info.sections" :docs-url="info.docsUrl" @close="infoVisible = false" />
     </div>
 </template>
 
@@ -36,9 +44,10 @@
  * SidebarGroup - a group of the dataset's own items under the folder tree (the saved views, the reports): a collapsible
  * heading and one row per item, in the order given. They are not dataset files: a double click or Enter opens one
  * (`open`), the `action` button adds one, and the menu (the page's ContextMenu items, which read `current`) offers what applies. Names are shown as
- * text, whatever they contain.
+ * text, whatever they contain. With `info`, an (i) button at the right of the heading opens a dialog that explains the group.
  */
 import { ref } from 'vue';
+import InfoDialog from '@/components/InfoDialog.vue';
 import ContextMenu from './ContextMenu.vue';
 
 defineProps({
@@ -61,11 +70,14 @@ defineProps({
     /** The label of the button that adds an item (a new report), after the rows; none when it is not offered */
     actionLabel: { type: String, default: '' },
     /** The items of the menu (ContextMenu items; their `isVisible` and `click` read the item in `current`) */
-    menu: { type: Array, required: true }
+    menu: { type: Array, required: true },
+    /** What the (i) button of the heading explains (libs/datasetGroupInfo: the dialog's id, title, icon, summary, sections, docsUrl); none shows no button */
+    info: { type: Object, default: null }
 });
 const emit = defineEmits(['open', 'action']);
 
 const expanded = ref(true);
+const infoVisible = ref(false);
 // The item the menu acts on
 const current = defineModel('current', { type: Object, default: null });
 </script>
@@ -108,6 +120,33 @@ const current = defineModel('current', { type: Object, default: null });
 
     &.child {
         padding-left: 1.75rem;
+    }
+}
+
+.group-header {
+    display: flex;
+    align-items: center;
+
+    .entry {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+.group-info {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: var(--ddb-radius-sm);
+    background: none;
+    color: var(--ddb-text-muted);
+    font: inherit;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--ddb-bg-hover);
+        color: inherit;
     }
 }
 

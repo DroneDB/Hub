@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { h } from 'vue';
+import { DOCS } from '@/libs/docsLinks';
 
 const m = vi.hoisted(() => ({ copyText: vi.fn(() => Promise.resolve()), success: vi.fn(), error: vi.fn() }));
 vi.mock('clipboard-copy', () => ({ default: m.copyText }));
@@ -125,5 +126,28 @@ describe('ReportsList', () => {
         await w.find('[data-testid="group-action"]').trigger('click');
         expect(w.find('[data-testid="group-action"]').text()).toBe('New report');
         expect(w.emitted('new')).toHaveLength(1);
+    });
+
+    it('has an (i) button at the right of the heading that opens the dialog about reports, for readers and writers', async () => {
+        const InfoDialogStub = { name: 'InfoDialog', props: ['id', 'title', 'icon', 'summary', 'sections', 'docsUrl'], template: '<div class="info-stub" />' };
+        for (const canWrite of [false, true]) {
+            const w = mount(ReportsList, {
+                props: { reports, dataset, canWrite },
+                global: { stubs: { ContextMenu: ContextMenuStub, InfoDialog: InfoDialogStub } }
+            });
+            const button = w.find('.group-header [data-testid="group-info"]');
+            expect(button.attributes('aria-label')).toBe('About reports');
+            expect(w.findComponent(InfoDialogStub).exists()).toBe(false);
+            await button.trigger('click');
+            const dialog = w.findComponent(InfoDialogStub);
+            expect(dialog.props('title')).toBe('About reports');
+            expect(dialog.props('summary')).toContain('A report turns the measurements');
+            expect(dialog.props('docsUrl')).toBe(DOCS.reports);
+            expect(dialog.props('sections').length).toBeGreaterThan(0);
+            await dialog.vm.$emit('close');
+            expect(w.findComponent(InfoDialogStub).exists()).toBe(false);
+            // The button is not a row of the group
+            expect(rows(w).every(r => r.attributes('data-testid') !== 'group-info')).toBe(true);
+        }
     });
 });

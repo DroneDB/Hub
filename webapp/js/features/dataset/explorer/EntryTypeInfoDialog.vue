@@ -1,45 +1,10 @@
 <template>
-    <Window id="entry-type-info" :title="title" modal fixed-size size-class="dialog-lg"
-            close-modal-on-click @close="$emit('close')" @confirm="$emit('close')">
-        <div v-if="info" class="type-info">
-            <p class="type-info-summary">
-                <i :class="icon" class="me-2" aria-hidden="true" />{{ info.summary }}
-            </p>
-
-            <h5>How DroneDB recognizes it</h5>
-            <p>{{ info.detection }}</p>
-
-            <h5>What its properties show</h5>
-            <ul>
-                <li v-for="line in info.contains" :key="line">{{ line }}</li>
-            </ul>
-
-            <h5>What you can do with it</h5>
-            <ul>
-                <li v-for="line in info.actions" :key="line">{{ line }}</li>
-            </ul>
-
-            <h5>Examples</h5>
-            <ul>
-                <li v-for="line in info.examples" :key="line">{{ line }}</li>
-            </ul>
-
-            <p v-if="info.docsUrl" class="type-info-docs">
-                <a :href="info.docsUrl" target="_blank" rel="noopener noreferrer">
-                    Learn more in the documentation <i class="fa-solid fa-arrow-up-right-from-square ms-1" aria-hidden="true" />
-                </a>
-            </p>
-        </div>
-
-        <template #footer>
-            <Button label="OK" icon="fa-solid fa-check" data-autofocus @click="$emit('close')" />
-        </template>
-    </Window>
+    <InfoDialog id="entry-type-info" :title="title" :icon="icon" :summary="info?.summary || 'This type has no description.'" :sections="sections"
+                :docs-url="info?.docsUrl || ''" @close="$emit('close')" />
 </template>
 
 <script>
-import Window from '@/components/HubWindow.vue';
-import Button from 'primevue/button';
+import InfoDialog from '@/components/InfoDialog.vue';
 import { getEntryTypeInfo } from '@/libs/entryTypeInfo';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import icons from '@/libs/icons';
@@ -53,7 +18,7 @@ import icons from '@/libs/icons';
  */
 export default {
     name: 'EntryTypeInfoDialog',
-    components: { Window, Button },
+    components: { InfoDialog },
     props: {
         type: { type: Number, required: true }
     },
@@ -67,32 +32,17 @@ export default {
         },
         icon() {
             return icons.getForType(this.type);
+        },
+        sections() {
+            if (!this.info) return [];
+            const { detection, contains, actions, examples } = this.info;
+            return [
+                { heading: 'How DroneDB recognizes it', text: detection },
+                { heading: 'What its properties show', items: contains },
+                { heading: 'What you can do with it', items: actions },
+                { heading: 'Examples', items: examples }
+            ];
         }
     }
 };
 </script>
-
-<style scoped>
-.type-info h5 {
-    margin: 0.85rem 0 0.25rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
-.type-info p,
-.type-info ul {
-    margin: 0;
-}
-
-.type-info ul {
-    padding-left: 1.25rem;
-}
-
-.type-info-summary {
-    font-size: 1.05rem;
-}
-
-.type-info-docs {
-    margin-top: 0.85rem !important;
-}
-</style>

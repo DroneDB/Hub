@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { h } from 'vue';
+import { DOCS } from '@/libs/docsLinks';
 
 const m = vi.hoisted(() => ({ copyText: vi.fn(() => Promise.resolve()), success: vi.fn(), error: vi.fn() }));
 // The clipboard: copyLinkWithNotice (useCopyText) copies through it
@@ -151,5 +152,28 @@ describe('SavedViews', () => {
         item(w, 'Delete').click();
         expect(w.emitted('rename')[0][0]).toEqual(views[1]);
         expect(w.emitted('delete')[0][0]).toEqual(views[1]);
+    });
+
+    it('has an (i) button at the right of the heading that opens the dialog about views, for readers and writers', async () => {
+        const InfoDialogStub = { name: 'InfoDialog', props: ['id', 'title', 'icon', 'summary', 'sections', 'docsUrl'], template: '<div class="info-stub" />' };
+        for (const canWrite of [false, true]) {
+            const w = mount(SavedViews, {
+                props: { views, dataset, canWrite },
+                global: { stubs: { ContextMenu: ContextMenuStub, InfoDialog: InfoDialogStub } }
+            });
+            const button = w.find('.group-header [data-testid="group-info"]');
+            expect(button.attributes('aria-label')).toBe('About views');
+            expect(w.findComponent(InfoDialogStub).exists()).toBe(false);
+            await button.trigger('click');
+            const dialog = w.findComponent(InfoDialogStub);
+            expect(dialog.props('title')).toBe('About views');
+            expect(dialog.props('summary')).toContain('A view is a map of this dataset');
+            expect(dialog.props('docsUrl')).toBe(DOCS.savedViews);
+            expect(dialog.props('sections').length).toBeGreaterThan(0);
+            await dialog.vm.$emit('close');
+            expect(w.findComponent(InfoDialogStub).exists()).toBe(false);
+            // The button is not a row of the group
+            expect(rows(w).every(r => r.attributes('data-testid') !== 'group-info')).toBe(true);
+        }
     });
 });

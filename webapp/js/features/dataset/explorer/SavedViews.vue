@@ -1,5 +1,5 @@
 <template>
-    <SidebarGroup v-model:current="current" class="saved-views" label="Views" aria-label="Saved views" :icon="VIEWS_ICON" :items="views" :menu="menu"
+    <SidebarGroup v-model:current="current" class="saved-views" label="Views" aria-label="Saved views" :icon="VIEWS_ICON" :items="views" :menu="menu" :info="SAVED_VIEWS_INFO"
                   :empty-text="canWrite ? EMPTY_TEXT : ''"
                   :item-icon="() => 'fa-regular fa-map'" :item-title="v => `${v.name} (double-click to open)`" @open="open" />
 </template>
@@ -9,10 +9,11 @@
  * SavedViews - the dataset's saved map views under the folder tree; a writer sees the group with none, and how to make one. They are not dataset
  * files: they open in the map (double click, Enter, Open) in a new tab and none of the file
  * operations apply to them; writers rename and delete them (the page does, `rename` /
- * `delete` events). Names are shown as text, whatever they contain.
+ * `delete` events). Names are shown as text, whatever they contain. The (i) button of the heading explains views.
  */
 import { ref } from 'vue';
 import { VIEWS_ICON } from '@/libs/glyphs';
+import { SAVED_VIEWS_INFO } from '@/libs/datasetGroupInfo';
 import SidebarGroup from './SidebarGroup.vue';
 import { savedViewUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyLinkWithNotice } from '@/composables/useCopyText';

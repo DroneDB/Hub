@@ -1,5 +1,5 @@
 <template>
-    <SidebarGroup v-model:current="current" label="Reports" aria-label="Reports" :icon="REPORT_ICON" item-key="key" :items="rows" :menu="menu"
+    <SidebarGroup v-model:current="current" label="Reports" aria-label="Reports" :icon="REPORT_ICON" item-key="key" :items="rows" :menu="menu" :info="REPORTS_INFO"
                   :item-icon="r => r.unreadable ? 'fa-solid fa-triangle-exclamation' : REPORT_ICON"
                   :item-title="r => r.unreadable ? `${r.name} cannot be read: ${r.error}` : `${r.name} (double-click to open)`" :action-label="canWrite ? 'New report' : ''"
                   @open="open" @action="emit('new')" />
@@ -10,10 +10,11 @@
  * ReportsList - the dataset's reports under the folder tree, next to the saved views. They are not dataset files: a
  * report opens (double click, Enter, Open) in a new tab, whoever can read the dataset can copy its link, and writers
  * edit, duplicate and delete it, and make a new one (the page does: `new`, `edit`, `duplicate`, `delete` events). A stored report that cannot be
- * read is listed as unreadable, and a writer can delete it. Names are shown as text, whatever they contain.
+ * read is listed as unreadable, and a writer can delete it. Names are shown as text, whatever they contain. The (i) button of the heading explains reports.
  */
 import { computed, ref } from 'vue';
 import { REPORT_ICON } from '@/libs/glyphs';
+import { REPORTS_INFO } from '@/libs/datasetGroupInfo';
 import SidebarGroup from './SidebarGroup.vue';
 import { reportUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
