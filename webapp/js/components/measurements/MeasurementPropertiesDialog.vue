@@ -37,7 +37,7 @@
                     <div class="group-field">
                         <Select v-model="formData.groupId" input-id="mp-group" aria-labelledby="mp-group-label" :options="groupOptions"
                                 option-label="label" option-value="value" placeholder="None (ungrouped)" class="group-select" />
-                        <Button v-if="canCreateGroup" type="button" severity="secondary" outlined icon="fa-solid fa-folder-plus" label="New group"
+                        <Button v-if="canCreateGroup" type="button" severity="secondary" outlined icon="fa-solid fa-folder-plus" label="New"
                                 title="Make a group and put this measurement in it" data-testid="mp-new-group" @click="groupDialogOpen = true" />
                     </div>
                 </div>
