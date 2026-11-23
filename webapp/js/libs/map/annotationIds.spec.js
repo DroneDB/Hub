@@ -239,3 +239,24 @@ describe('what a feature keeps', () => {
         expect(storedFields({ ref: 12 }).ref).toBe('12');
     });
 });
+
+describe('inspectionSummary', () => {
+    const schema = {
+        categories: [{ id: 'defect', name: 'Defect' }],
+        severities: [{ id: 'high', name: 'High' }],
+        statuses: [{ id: 'open', name: 'Open' }]
+    };
+
+    it('names each value that is set, in the order of the form, the reference left out', async () => {
+        const { inspectionSummary } = await import('./annotationIds');
+        expect(inspectionSummary({ ref: '4', category: 'defect', severity: 'high', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false }, schema))
+            .toBe('Defect · High · Open · Anna · due 2026-12-01 · not in reports');
+        expect(inspectionSummary({ status: 'gone' }, schema)).toBe('Unknown (gone)');
+    });
+
+    it('is empty when nothing is set (an annotation in reports is the default)', async () => {
+        const { inspectionSummary } = await import('./annotationIds');
+        expect(inspectionSummary({ ref: '4', report: true }, schema)).toBe('');
+        expect(inspectionSummary(undefined, schema)).toBe('');
+    });
+});

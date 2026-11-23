@@ -12,6 +12,7 @@ import Polygon from 'ol/geom/Polygon';
 import LineString from 'ol/geom/LineString';
 import { fromLonLat } from 'ol/proj';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
+import { _resetFoldedSectionsForTests } from '@/composables/useFoldedSections';
 
 let wrapper;
 async function show(feature, props = {}) {
@@ -24,6 +25,7 @@ async function show(feature, props = {}) {
     return wrapper;
 }
 afterEach(() => {
+    _resetFoldedSectionsForTests();
     wrapper?.unmount();
     wrapper = null;
     document.body.innerHTML = '';
@@ -31,8 +33,8 @@ afterEach(() => {
 
 const dialog = () => /** @type {HTMLElement} */ (document.querySelector('#measurement-properties'));
 const title = () => dialog().querySelector('.p-dialog-title').textContent.trim();
-// The annotation fields at the end of every form (AnnotationFields)
-const FIELDS = ['Inspection', 'Reference', 'Category', 'Severity', 'Status', 'Assignee', 'Due date', 'Include in reports'];
+// The Inspection part at the end of every form (AnnotationFields)
+const FIELDS = ['Inspection', 'Category', 'Severity', 'Status', 'Due date', 'Assignee', 'Include in reports'];
 const labels = () => [...dialog().querySelectorAll('label, .fw-semibold')].map(l => l.textContent.trim().replace(/:.*/, ''));
 const buttonNamed = name => [...dialog().querySelectorAll('button')].find(b => b.textContent.trim() === name);
 const point = (properties = {}) => new Feature({ geometry: new Point(fromLonLat([31.138658, -23.940176])), measurementType: 'point', ...properties });
@@ -43,7 +45,7 @@ describe('the properties dialog of a point annotation', () => {
     it('has a name, a description, a colour and the coordinates, and no width or fill', async () => {
         await show(point({ name: 'Pippo', description: 'Ciaone' }), { showDelete: true });
         expect(title()).toBe('Point Annotation');
-        expect(labels()).toEqual(['Name', 'Description', 'Color', 'Coordinates', ...FIELDS]);
+        expect(labels()).toEqual(['Name', 'Reference', 'Description', 'Coordinates', 'Appearance', 'Color', ...FIELDS]);
         expect(document.getElementById('mp-name').value).toBe('Pippo');
         expect(document.getElementById('mp-description').value).toBe('Ciaone');
         expect(document.getElementById('mp-coords').value).toBe('-23.940176, 31.138658');
@@ -94,7 +96,7 @@ describe('the properties dialog of a measurement', () => {
     it('of an area: outline and fill colours, outline width and fill opacity, no coordinates', async () => {
         await show(area(), { showDelete: true });
         expect(title()).toBe('Measurement Properties');
-        expect(labels()).toEqual(['Name', 'Description', 'Outline color', 'Fill color', 'Outline width', 'Fill opacity', ...FIELDS]);
+        expect(labels()).toEqual(['Name', 'Reference', 'Description', 'Appearance', 'Outline color', 'Fill color', 'Outline width', 'Fill opacity', ...FIELDS]);
         buttonNamed('Save').click();
         expect(Object.keys(wrapper.emitted('save')[0][0]).sort())
             .toEqual(['assignee', 'category', 'description', 'dueDate', 'fill', 'fill-opacity', 'groupId', 'name', 'report', 'severity', 'status', 'stroke', 'stroke-opacity', 'stroke-width']);
@@ -102,7 +104,7 @@ describe('the properties dialog of a measurement', () => {
 
     it('of a line: its colour and width, no fill', async () => {
         await show(line());
-        expect(labels()).toEqual(['Name', 'Description', 'Line color', 'Line width', ...FIELDS]);
+        expect(labels()).toEqual(['Name', 'Reference', 'Description', 'Appearance', 'Line color', 'Line width', ...FIELDS]);
         buttonNamed('Save').click();
         expect(wrapper.emitted('save')[0][0]).not.toHaveProperty('fill');
     });
@@ -340,5 +342,69 @@ describe('the Photos tab of the dialog', () => {
         await flushPromises();
         expect(photosPanel().querySelectorAll('input')).toHaveLength(0);
         expect([...photosPanel().querySelectorAll('button')]).toHaveLength(0);
+    });
+});
+
+describe('the parts that fold away', () => {
+    const header = id => /** @type {HTMLElement} */ (dialog().querySelector(`[data-testid="mp-${id}"]`));
+    const summary = id => dialog().querySelector(`[data-testid="mp-${id}-summary"]`).textContent.replace(/\s+/g, ' ').trim();
+    const isOpen = id => header(id).getAttribute('aria-expanded') === 'true';
+
+    it('are closed for a measurement with no inspection values, and say what they hold', async () => {
+        await show(area());
+        expect(isOpen('appearance')).toBe(false);
+        expect(isOpen('inspection')).toBe(false);
+        expect(summary('appearance')).toBe('Outline 2 px · fill 20%');
+        expect(summary('inspection')).toBe('Nothing set');
+        wrapper.unmount();
+        await show(line());
+        expect(summary('appearance')).toBe('Line 2 px');
+    });
+
+    it('open Inspection by itself when the measurement has values, and sum them up', async () => {
+        const f = line();
+        f.setProperties({ category: 'defect', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false });
+        await show(f);
+        expect(isOpen('inspection')).toBe(true);
+        expect(summary('inspection')).toBe('Defect · Open · Anna · due 2026-12-01 · not in reports');
+    });
+
+    it('stay as the user left them the next time the dialog opens', async () => {
+        await show(line());
+        header('appearance').click();
+        await flushPromises();
+        expect(isOpen('appearance')).toBe(true);
+        wrapper.unmount();
+        await show(area());
+        expect(isOpen('appearance')).toBe(true);
+        header('appearance').click();
+        await flushPromises();
+        wrapper.unmount();
+        await show(line());
+        expect(isOpen('appearance')).toBe(false);
+    });
+
+    it('open Inspection when a field in it cannot be saved, and Save waits for it', async () => {
+        await show(line());
+        expect(isOpen('inspection')).toBe(false);
+        const due = /** @type {HTMLInputElement} */ (document.getElementById('mp-due'));
+        Object.defineProperty(due, 'value', { value: '2026-02-30', configurable: true });
+        due.dispatchEvent(new Event('input'));
+        await flushPromises();
+        expect(isOpen('inspection')).toBe(true);
+        expect(buttonNamed('Save').disabled).toBe(true);
+        // Opened by the check, not by the user: the next dialog is closed again
+        wrapper.unmount();
+        await show(line());
+        expect(isOpen('inspection')).toBe(false);
+    });
+
+    it('a reference another annotation has keeps Save off', async () => {
+        await show(line(), { isRefTaken: ref => ref === '5' });
+        const ref = /** @type {HTMLInputElement} */ (document.getElementById('mp-ref'));
+        ref.value = '5';
+        ref.dispatchEvent(new Event('input'));
+        await flushPromises();
+        expect(buttonNamed('Save').disabled).toBe(true);
     });
 });

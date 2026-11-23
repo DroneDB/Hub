@@ -333,3 +333,23 @@ export function choiceLabel(choices, id) {
     if (!id) return '';
     return (choices || []).find(choice => choice.id === id)?.name ?? `Unknown (${id})`;
 }
+
+/**
+ * One line that sums up the inspection fields of an annotation, for the header of its folded Inspection section:
+ * "Defect · High · Open · Anna · due 2026-12-01 · not in reports"; '' when none is set (the reference is not one of
+ * them: it is shown next to the name).
+ * @param {Record<string, any>} values  the annotation fields (see FIELD_KEYS)
+ * @param {{ categories?: any[], severities?: any[], statuses?: any[] }} schema
+ * @returns {string}
+ */
+export function inspectionSummary(values, schema) {
+    const v = values || {};
+    return [
+        choiceLabel(schema?.categories, v.category),
+        choiceLabel(schema?.severities, v.severity),
+        choiceLabel(schema?.statuses, v.status),
+        v.assignee || '',
+        v.dueDate ? `due ${v.dueDate}` : '',
+        v.report === false ? 'not in reports' : ''
+    ].filter(Boolean).join(' · ');
+}

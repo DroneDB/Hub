@@ -30,19 +30,12 @@
 
                 <ReportEditorEssentials />
                 <Accordion v-model:value="openPanel" class="report-more-options">
-                    <AccordionPanel value="more">
-                        <AccordionHeader data-testid="more-options">
-                            <span class="report-more-header">
-                                <span class="fw-semibold">More options</span>
-                                <small class="text-muted report-more-summary" data-testid="options-summary">{{ editor.optionsSummary.value }}</small>
-                            </span>
-                        </AccordionHeader>
-                        <AccordionContent>
-                            <ReportEditorDetails />
-                            <ReportEditorLabels />
-                            <ReportEditorFilter />
-                        </AccordionContent>
-                    </AccordionPanel>
+                    <FormSection value="more" title="More options" :summary="editor.optionsSummary.value"
+                                 header-testid="more-options" summary-testid="options-summary">
+                        <ReportEditorDetails />
+                        <ReportEditorLabels />
+                        <ReportEditorFilter />
+                    </FormSection>
                 </Accordion>
             </template>
         </div>
@@ -66,9 +59,7 @@
  */
 import { computed, ref } from 'vue';
 import Accordion from 'primevue/accordion';
-import AccordionContent from 'primevue/accordioncontent';
-import AccordionHeader from 'primevue/accordionheader';
-import AccordionPanel from 'primevue/accordionpanel';
+import FormSection from '@/components/FormSection.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Window from '@/components/HubWindow.vue';
@@ -135,17 +126,3 @@ async function requestClose() {
 }
 </script>
 
-<style scoped>
-.report-more-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-    min-width: 0;
-}
-
-.report-more-summary {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-</style>

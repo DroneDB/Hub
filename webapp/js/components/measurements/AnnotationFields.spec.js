@@ -1,6 +1,6 @@
 /**
- * The annotation fields of the two properties dialogs: reference, category, severity, status, assignee, due date and
- * whether the annotation is in reports. Every field has a label; the choices are the schema's; a value the schema does
+ * The inspection fields of the two properties dialogs: category, severity, status, due date, assignee and whether the
+ * annotation is in reports (the reference is AnnotationRefField's). Every field has a label; the choices are the schema's; a value the schema does
  * not have stays selectable; the model is what is stored; the form says whether it can be saved.
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -43,10 +43,11 @@ async function choose(id, value) {
 }
 
 describe('the fields', () => {
-    it('are all there with a label: reference, category, severity, status, assignee, due date, in reports', async () => {
+    it('are all there with a label: category, severity, status, due date, assignee, in reports', async () => {
         await show();
-        expect(['ref', 'category', 'severity', 'status', 'assignee', 'due', 'report'].map(labelFor)).toEqual(
-            ['Reference', 'Category', 'Severity', 'Status', 'Assignee', 'Due date', 'Include in reports']);
+        expect(['category', 'severity', 'status', 'due', 'assignee', 'report'].map(labelFor)).toEqual(
+            ['Category', 'Severity', 'Status', 'Due date', 'Assignee', 'Include in reports']);
+        expect(field('ref')).toBeNull();
         expect(document.querySelector('legend').textContent).toBe('Inspection');
         // A select is named by its label too (the input of a select is not the control a screen reader reaches)
         ['category', 'severity', 'status'].forEach(id => expect(document.getElementById(`x-${id}-label`)).not.toBeNull());
@@ -54,7 +55,6 @@ describe('the fields', () => {
 
     it('show the values of the model, and nothing for a new annotation: no category, severity or status', async () => {
         await show();
-        expect(field('ref').value).toBe('');
         expect(field('assignee').value).toBe('');
         expect(field('due').value).toBe('');
         expect(field('report').checked).toBe(true);
@@ -62,7 +62,6 @@ describe('the fields', () => {
 
         wrapper.unmount();
         await show({ modelValue: { ref: '7', category: 'defect', status: 'open', assignee: 'Anna', dueDate: '2026-12-01', report: false } });
-        expect(field('ref').value).toBe('7');
         expect(field('assignee').value).toBe('Anna');
         expect(field('due').value).toBe('2026-12-01');
         expect(field('report').checked).toBe(false);
@@ -131,44 +130,9 @@ describe('the model', () => {
 });
 
 describe('what can be saved', () => {
-    it('is not a reference another annotation has: the message, the field marked and the form not valid', async () => {
-        await show({ isRefTaken: ref => ref === '3' });
-        expect(valid()).toBe(true);
-        await wrapper.setProps({ modelValue: { ref: '3' } });
-        expect(document.getElementById('x-ref-error').textContent).toBe('Reference 3 is already used');
-        expect(field('ref').getAttribute('aria-invalid')).toBe('true');
-        expect(field('ref').getAttribute('aria-describedby')).toBe('x-ref-error');
-        expect(valid()).toBe(false);
-        await wrapper.setProps({ modelValue: { ref: '4' } });
-        expect(document.getElementById('x-ref-error')).toBeNull();
-        expect(valid()).toBe(true);
-    });
-
-    it('is not a reference of more than 8 characters or with other characters than letters, digits and dashes', async () => {
-        await show();
-        for (const bad of ['123456789', 'a b', 'a_b']) {
-            await wrapper.setProps({ modelValue: { ref: bad } });
-            expect(valid()).toBe(false);
-            expect(document.getElementById('x-ref-error').textContent).toContain('1 to 8');
-        }
-        await wrapper.setProps({ modelValue: { ref: 'A-12' } });
-        expect(valid()).toBe(true);
-    });
-
-    it('takes a numeric reference of a file another tool wrote as its text', async () => {
-        await show({ isRefTaken: ref => ref === '3' });
-        await wrapper.setProps({ modelValue: { ref: 5 } });
-        expect(field('ref').value).toBe('5');
-        expect(valid()).toBe(true);
-        await wrapper.setProps({ modelValue: { ref: 3 } });
-        expect(document.getElementById('x-ref-error').textContent).toBe('Reference 3 is already used');
-        expect(valid()).toBe(false);
-    });
-
-    it('limits the assignee to 100 characters and the reference to 8 while typing', async () => {
+    it('limits the assignee to 100 characters while typing', async () => {
         await show();
         expect(field('assignee').maxLength).toBe(100);
-        expect(field('ref').maxLength).toBe(8);
     });
 
     it('is not a due date that is not a date', async () => {
