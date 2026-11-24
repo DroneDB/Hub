@@ -36,6 +36,10 @@ describe('the kind of an annotation', () => {
         expect(kindOfFeature(mapFeature('x', '1', 'whatever', POLYGON)).kind).toBe('area');
     });
 
+    it('is none for a contour line, which is no annotation', () => {
+        expect(kindOfFeature(mapFeature('x', '', 'contour', LINE))).toBeNull();
+    });
+
     it('is none for a geometry that is no point, line or polygon, and no feature', () => {
         expect(kindOfFeature(mapFeature('x', '1', undefined, { type: 'MultiPoint', coordinates: [[1, 2]] }))).toBeNull();
         expect(kindOfFeature(mapFeature('x', '1', undefined, null))).toBeNull();

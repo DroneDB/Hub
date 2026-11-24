@@ -13,6 +13,7 @@ import { areaParts, lengthParts, stockpileLabel } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
 import { geodesicArea, geodesicLength } from './geodesic';
 import { STOCKPILE_PROPERTIES } from './stockpileStorage';
+import { contourLevelText, CONTOUR_PROPERTIES, UNSAVED_FLAG } from './contourStorage';
 import { write, sectionOf, VIEW } from './measurementFormat';
 import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
 import { ANNOTATION_KEYS, annotationProperties, unknownProperties } from './annotationIds';
@@ -34,9 +35,14 @@ const KNOWN_PROPERTIES = new Set([
 ]);
 // A stockpile has its own: its metrics, and the `notes` that an earlier version called its description
 const KNOWN_STOCKPILE_PROPERTIES = new Set([...KNOWN_PROPERTIES, ...STOCKPILE_PROPERTIES, 'notes']);
+// A contour has its level and the unit of it, and the flag of one not saved yet, which a file never holds
+const KNOWN_CONTOUR_PROPERTIES = new Set([...KNOWN_PROPERTIES, ...CONTOUR_PROPERTIES, UNSAVED_FLAG]);
 
 /** @param {any} measurementType @returns {ReadonlySet<string>} the properties the map knows of a measurement of that type */
-const knownProperties = measurementType => (measurementType === 'stockpile' ? KNOWN_STOCKPILE_PROPERTIES : KNOWN_PROPERTIES);
+const knownProperties = measurementType => {
+    if (measurementType === 'stockpile') return KNOWN_STOCKPILE_PROPERTIES;
+    return measurementType === 'contour' ? KNOWN_CONTOUR_PROPERTIES : KNOWN_PROPERTIES;
+};
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -82,6 +88,13 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
 
     if (measurementType === 'stockpile') {
         // Stockpile features carry their own metrics; don't recompute geometry-derived values.
+    } else if (measurementType === 'contour') {
+        // A contour keeps its type and its level, in the unit of the raster (no length, whose unit would take its
+        // place); the flag of one not saved yet is not written: a file holds saved contours
+        CONTOUR_PROPERTIES.forEach(k => {
+            const v = feature.get(k);
+            if (v !== undefined) calculatedValues[k] = v;
+        });
     } else if (measurementType === 'profile') {
         // Raster profile: keep the type and the saved tooltip; reuse length
         // calculations so we still record the polyline length for export.
@@ -239,9 +252,10 @@ function geoJSONToFeature(geoJsonFeature, unitPref) {
 
     // An area or a length shows its size in today's units, not the text it was saved with (which
     // may be in other units or an older format); a stockpile builds its label from its stored metric
-    // properties in today's units; other measurements keep their text. A feature saved without text
-    // gets its size, as its geometry gives it.
+    // properties in today's units; a contour shows its level (an older Hub saved its length); other
+    // measurements keep their text. A feature saved without text gets its size, as its geometry gives it.
     const tooltipText = measurementSizeText(geometry, props.measurementType, unitPref)
+        || (props.measurementType === 'contour' ? contourLevelText(props) : null)
         || (props.measurementType === 'stockpile' && typeof props.netVolume === 'number' ? stockpileLabel(props, unitPref) : null)
         || props.tooltipText
         || measurementSizeText(geometry, sizeKind(geometry), unitPref);

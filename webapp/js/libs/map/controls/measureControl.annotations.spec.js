@@ -193,6 +193,19 @@ describe('a file that was loaded', () => {
         control.applyRefs();
         expect(a.get('ref')).toBe('5');
     });
+
+    it('takes away the reference of a contour line after a save, and gives none to one', () => {
+        const [a] = control.importFromGeoJSON(doc()).features;
+        a.set('measurementType', 'contour');
+        a.set('ref', '7');
+        control.applyRefs({ [a.get('id')]: '8' });
+        expect(a.get('ref')).toBeUndefined();
+        const drawn = new Feature(new LineString([[0, 0], [5, 0]]));
+        drawn.set('measurementType', 'contour');
+        control.identify(drawn);
+        expect(drawn.get('id')).toBeTruthy();
+        expect(drawn.get('ref')).toBeUndefined();
+    });
 });
 
 describe('the reference on the map', () => {
@@ -222,6 +235,12 @@ describe('the reference on the map', () => {
         profile.set('measurementType', 'profile');
         expect(styleOf(profile)).toHaveLength(3);
         expect(badge(profile).getText().getText()).toBe('4');
+    });
+
+    it('is not drawn for a contour line, which is no annotation (one that an older Hub numbered)', () => {
+        const contour = line('12');
+        contour.set('measurementType', 'contour');
+        expect(badge(contour)).toBeUndefined();
     });
 
     it('is on by default, and the button hides it and shows it again', () => {

@@ -42,7 +42,8 @@
  */
 import { EPSG } from '@/libs/constants';
 import { projectorFor, geometryOf, localPointsOf, srsDefinitionOf, sameCrs } from '@/libs/map/pointCloudGeometry';
-import { backfillIds, assignRefs, renumberTaken, idOf, refOf, highestRef } from '@/libs/map/annotationIds';
+import { backfillIds, assignRefs, renumberTaken, withoutStrayRefs, idOf, refOf, highestRef } from '@/libs/map/annotationIds';
+import { withSavedContours } from '@/libs/map/contourStorage';
 
 export const FORMAT_VERSION = '3.0';
 /** The newest major version this Hub reads: a file of a higher one is refused. */
@@ -143,7 +144,8 @@ function withCrs(doc) {
 /**
  * The file as a 3.0 document, migrated in memory (the file itself is not touched). A 2.0 or 3.0 file marked
  * LEGACY_GEOMETRY gets its 3D geometry worked out here too, when a CRS is known. The features without an `id`
- * get theirs first, from the file as it was written, before any geometry is worked out again.
+ * get theirs first, from the file as it was written, before any geometry is worked out again. A contour line
+ * is read as a saved contour (contourStorage.withSavedContours).
  * @param {any} json  the parsed file
  * @param {{ pointCloudCrs?: any }} [ctx]  `pointCloudCrs`: the SRS (or the coordinate system) of the point cloud
  *   the file belongs to, used when the file states none that proj4 can use
@@ -162,8 +164,9 @@ export function read(json, ctx = {}) {
     if (major > MAX_MAJOR) {
         throw new MeasurementFileError('unsupported', `The measurements file is of a newer format (${String(metadata.version)})`);
     }
-    // On the features as they were read: a later correction of their geometry must not change their ids
-    const identified = backfillIds(json.features, ownerOf);
+    // On the features as they were read: a later correction of their geometry must not change their ids. A contour
+    // that an older Hub saved as a length is a contour again
+    const identified = withSavedContours(backfillIds(json.features, ownerOf));
     const file = identified === json.features ? json : { ...json, features: identified };
     if (major >= 2) {
         const doc = { ...file, metadata: { ...metadata, views: isObject(metadata.views) ? metadata.views : {} } };
@@ -384,8 +387,10 @@ function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0
             const known = idOf(feature) ? saved.get(idOf(feature)) : undefined;
             return !refOf(feature) && known && known.ref ? withProperty(feature, 'ref', known.ref) : feature;
         });
+        // A feature that is no annotation (a contour an older Hub numbered) loses its ref; lastRef keeps it issued
+        own = withoutStrayRefs(own).features;
         const ownSet = new Set(own);
-        ({ features, lastRef, changes: renumbered } = renumberTaken([...own, ...kept], f => ownSet.has(f) && !saved.has(idOf(f)), lastRef));
+        ({ features, lastRef, changes: renumbered } = renumberTaken([...own, ...withoutStrayRefs(kept).features], f => ownSet.has(f) && !saved.has(idOf(f)), lastRef));
         ({ features, lastRef } = assignRefs(features, {
             lastRef,
             fileOrder: (feature, index) => saved.get(idOf(feature))?.index ?? previousFeatures.length + index
@@ -445,7 +450,8 @@ export function write(existing, view, ownFeatures, ownSection = {}) {
  *  - a feature of the view that was never saved (its `id` is not in the file) whose `ref` a feature in the file
  *    has, of either view (another save came first and issued it, or gave it to a feature this view loaded without
  *    one), takes the next ref, and is listed in `renumbered`;
- *  - the features still without one get the next refs in creation order (annotationIds.assignRefs);
+ *  - a feature that is no annotation (a contour) has no ref: one it was given is taken away (withoutStrayRefs);
+ *  - the annotations still without one get the next refs in creation order (annotationIds.assignRefs);
  *  - `metadata.lastRef` is the larger of the file's, `issued` (the highest the view issued) and the highest ref
  *    of the document.
  * The view takes `refs` back into its own features (it has no refs where the file gave it new ones) and tells
@@ -462,15 +468,17 @@ export function writeNumbered(existing, view, ownFeatures, ownSection = {}, { is
 }
 
 /**
- * The document that a numbering save writes: the file as it is with the `ref` every feature lacks (and the
- * `id` of every feature, which a read gave them). The features keep their view and their order.
+ * The document that a numbering save writes: the file as it is with the `ref` every annotation lacks (and the
+ * `id` of every feature, which a read gave them), and without the ref of a feature that is no annotation (its
+ * number stays issued: `lastRef`). The features keep their view and their order.
  * @param {Record<string, any>} document  the file as `read` gives it
  * @returns {{ document: Record<string, any>, numbered: boolean }}  `numbered`: whether any feature got a ref (a file
  *   whose features all have both, and that is 3.0 already, needs no save)
  */
 export function numberDocument(document) {
-    const { features, lastRef, assigned } = assignRefs(document.features, { lastRef: Number(document.metadata?.lastRef) || 0 });
-    const upToDate = !assigned && versionOf(document.metadata?.version)[0] >= MAX_MAJOR && document.features.every((/** @type {any} */ f) => idOf(f));
+    const { features: annotated, removed } = withoutStrayRefs(document.features);
+    const { features, lastRef, assigned } = assignRefs(annotated, { lastRef: Math.max(Number(document.metadata?.lastRef) || 0, highestRef(document.features.map(refOf).filter(Boolean))) });
+    const upToDate = !assigned && !removed && versionOf(document.metadata?.version)[0] >= MAX_MAJOR && document.features.every((/** @type {any} */ f) => idOf(f));
     const next = {
         ...document,
         metadata: { ...without(document.metadata, ['version', 'modifiedAt']), version: FORMAT_VERSION, modifiedAt: new Date().toISOString(), ...(lastRef > 0 ? { lastRef } : {}) },

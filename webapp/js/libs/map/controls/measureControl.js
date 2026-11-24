@@ -1,6 +1,6 @@
 import { createUndoStack } from '@/libs/undoStack';
 import { newId } from '@/libs/ids';
-import { RefSequence, choiceLabel } from '@/libs/map/annotationIds';
+import { RefSequence, choiceLabel, isAnnotationType } from '@/libs/map/annotationIds';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { controlButton, controlGroup } from './controlButton';
 import { Control } from 'ol/control';
@@ -749,12 +749,13 @@ class MeasureControls extends Control {
      * a point are above it): the text on the tooltip colours, with the colour of the measurement as its border.
      * @param {ol.Feature} feature
      * @param {string} colour  the colour of the measurement
-     * @returns {Style | null} null when references are hidden or the annotation has none
+     * @returns {Style | null} null when references are hidden, the annotation has none or the measurement is no
+     *   annotation (a contour of a file an older Hub numbered, until it is saved)
      */
     _referenceStyle(feature, colour) {
         const ref = feature.get('ref');
         const geometry = feature.getGeometry();
-        if (!this.showReferences || !ref || !geometry) return null;
+        if (!this.showReferences || !ref || !geometry || !isAnnotationType(feature.get('measurementType'))) return null;
         let anchor = null;
         if (geometry instanceof Polygon) anchor = new Point(geometry.getInteriorPoint().getCoordinates().slice(0, 2));
         else if (geometry instanceof LineString) anchor = new Point(geometry.getCoordinateAt(0.5));
@@ -1355,12 +1356,12 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Gives a measurement that was just made its `id` and the next `ref` (the ones it has stay).
+     * Gives a measurement that was just made its `id` and, when it is an annotation, the next `ref` (the ones it has stay).
      * @param {ol.Feature} feature
      */
     identify(feature) {
         if (!feature.get('id')) feature.set('id', newId());
-        if (!feature.get('ref')) feature.set('ref', this._refSequence().issue(this._refsOnMap(feature)));
+        if (!feature.get('ref') && isAnnotationType(feature.get('measurementType'))) feature.set('ref', this._refSequence().issue(this._refsOnMap(feature)));
     }
 
     /** Takes back the ref of a measurement that is not kept (a point annotation that was discarded). @param {ol.Feature} feature */
@@ -1371,11 +1372,16 @@ class MeasureControls extends Control {
 
     /**
      * Gives the measurements the refs a save wrote for them (by id): the file numbered the ones that had no ref and
-     * gave the next one to those whose ref another session had taken.
+     * gave the next one to those whose ref another session had taken. A measurement that is no annotation (a contour)
+     * has no ref in the file the save wrote, and none on the map either.
      * @param {Record<string, string>} [refs]
      */
     applyRefs(refs = {}) {
         this.source.getFeatures().forEach(f => {
+            if (!isAnnotationType(f.get('measurementType'))) {
+                if (f.get('ref') !== undefined) f.unset('ref');
+                return;
+            }
             const ref = refs[f.get('id')];
             if (ref && f.get('ref') !== ref) f.set('ref', ref);
         });

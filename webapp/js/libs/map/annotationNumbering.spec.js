@@ -389,3 +389,80 @@ describe('numberMeasurementFile (the save of a report)', () => {
         await expect(numberMeasurementFile(memoryDataset(doc).dataset, 'cloud_measurements.geojson')).rejects.toThrow(/newer format/);
     });
 });
+
+describe('contour lines', () => {
+    // Contours as the Contours tool makes them: many lines of one level, with an id and no ref
+    const contour = (id, extra = {}) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[9.2, 45.2], [9.201, 45.2005]] },
+        properties: { id, measurementType: 'contour', name: 'Contour 162.0 m', elev: 162, unit: 'm', createdAt: OLD[0].time, ...extra }
+    });
+    const areaOf = (id, extra = {}) => ({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[[9.3, 45.3], [9.301, 45.3], [9.301, 45.301], [9.3, 45.3]]] },
+        properties: { id, measurementType: 'area', createdAt: OLD[1].time, ...extra }
+    });
+    const file3 = (features, lastRef) => ({
+        type: 'FeatureCollection',
+        metadata: { version: '3.0', kind: 'measurements', application: 'DroneDB Registry', createdAt: CREATED, modifiedAt: MODIFIED, ...(lastRef ? { lastRef } : {}), views: {} },
+        features
+    });
+    const refsById = doc => Object.fromEntries(doc.features.map(f => [f.properties.id, f.properties.ref]));
+
+    it('get no ref when the map saves them: the area beside them is numbered', async () => {
+        const { dataset, file } = memoryDataset(file3([contour('c1'), contour('c2'), areaOf('a')]));
+        const storage = storageFor(dataset, MAP);
+        const result = await mapSave(storage, await mapShows(storage));
+        expect(refsById(file())).toEqual({ c1: undefined, c2: undefined, a: '1' });
+        expect(file().metadata.lastRef).toBe(1);
+        expect(result.refs).toEqual({ a: '1' });
+    });
+
+    it('lose the refs an older Hub gave them, and the numbers stay issued: the next annotation is after them', async () => {
+        const { dataset, file } = memoryDataset(file3([areaOf('a', { ref: '1' }), contour('c1', { ref: '2' }), contour('c2', { ref: '3' })], 3));
+        const storage = storageFor(dataset, MAP);
+        const shown = await mapShows(storage);
+        const added = areaFeature({ id: 'new', createdAt: '2026-02-01T00:00:00.000Z' }, 0.02);
+        await mapSave(storage, [...shown, added]);
+        expect(refsById(file())).toEqual({ a: '1', c1: undefined, c2: undefined, new: '4' });
+        expect(file().metadata.lastRef).toBe(4);
+        // The contours keep everything else
+        expect(file().features.find(f => f.properties.id === 'c1').properties).toMatchObject({ elev: 162, unit: 'm', name: 'Contour 162.0 m' });
+    });
+
+    it('saved as lengths by an older Hub are contours again: no ref, no unsaved flag, their level kept; a length stays one', async () => {
+        const olderSave = (id, ref) => ({
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [[9.2, 45.2], [9.201, 45.2005]] },
+            properties: {
+                id, ref, measurementType: 'length', elev: 162, interval: 1, isMajor: false, unsaved: true, unit: 'm',
+                length: 119.98, lengthValue: 119.98, displayValue: '119.98 m', tooltipText: '119.98 m', name: 'Contour 162.0', createdAt: OLD[0].time
+            }
+        });
+        const drawn = {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: [[9.3, 45.3], [9.301, 45.3]] },
+            properties: { id: 'l', ref: '3', measurementType: 'length', createdAt: OLD[1].time }
+        };
+        const { dataset, file } = memoryDataset(file3([olderSave('c1', '1'), olderSave('c2', '2'), drawn], 3));
+        const storage = storageFor(dataset, MAP);
+        const shown = await mapShows(storage);
+        expect(shown.map(f => f.get('measurementType')).sort()).toEqual(['contour', 'contour', 'length']);
+        await mapSave(storage, shown);
+        expect(refsById(file())).toEqual({ c1: undefined, c2: undefined, l: '3' });
+        const saved = file().features.find(f => f.properties.id === 'c1').properties;
+        expect(saved).toMatchObject({ measurementType: 'contour', elev: 162, interval: 1, isMajor: false, unit: 'm', name: 'Contour 162.0' });
+        expect(saved).not.toHaveProperty('unsaved');
+        expect(saved).not.toHaveProperty('length');
+        expect(file().features.find(f => f.properties.id === 'l').properties.measurementType).toBe('length');
+    });
+
+    it('lose their refs when a report numbers the file, without being numbered', async () => {
+        const { dataset, file } = memoryDataset(file3([contour('c1', { ref: '7' }), contour('c2'), areaOf('a')], 7));
+        expect((await numberMeasurementFile(dataset, 'cloud_measurements.geojson')).written).toBe(true);
+        expect(refsById(file())).toEqual({ c1: undefined, c2: undefined, a: '8' });
+        expect(file().metadata.lastRef).toBe(8);
+        // Nothing left to do: no second write
+        expect((await numberMeasurementFile(dataset, 'cloud_measurements.geojson')).written).toBe(false);
+    });
+});

@@ -12,6 +12,7 @@
  * | map        | area                 | area      | area                          |
  * | map        | profile              | profile   |                               |
  * | map        | stockpile            | volume    | net volume, weight, cost      |
+ * | map        | contour              | none: no annotation (annotationIds.isAnnotation), in no report |
  * | map        | missing or unknown   | by geometry (point, length, area), adding as that kind |
  * | pointCloud | point, annotation    | point     |                               |
  * | pointCloud | distance             | length    | length                        |
@@ -25,6 +26,7 @@
  */
 import { lonLatLength, lonLatArea } from '@/libs/map/geodesicCore';
 import { VIEW, ownerOf } from '@/libs/map/measurementFormat';
+import { isAnnotation } from '@/libs/map/annotationIds';
 import { LINEAR_UNITS } from '@/libs/map/crsProjection';
 
 /** @typedef {'point' | 'length' | 'area' | 'volume' | 'profile' | 'measure3d'} MeasurementKind */
@@ -67,12 +69,13 @@ const KIND_BY_GEOMETRY = { Point: 'point', LineString: 'length', Polygon: 'area'
 
 /**
  * The owner, the kind and the measurement type of a feature of a measurements file; null for one that is
- * no measurement a report knows (a geometry that is no point, line or polygon, and no type that says more).
+ * no measurement a report knows (a geometry that is no point, line or polygon, and no type that says more) and
+ * for one that is no annotation (a contour line).
  * @param {any} feature
  * @returns {{ owner: string, kind: MeasurementKind, measurementType: string } | null}
  */
 export function kindOfFeature(feature) {
-    if (!feature || typeof feature !== 'object') return null;
+    if (!feature || typeof feature !== 'object' || !isAnnotation(feature)) return null;
     const owner = ownerOf(feature);
     const type = typeof feature.properties?.measurementType === 'string' ? feature.properties.measurementType : '';
     const kind = KIND_BY_TYPE[owner][type] ?? KIND_BY_GEOMETRY[feature.geometry?.type];

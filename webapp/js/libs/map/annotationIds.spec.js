@@ -6,7 +6,8 @@ import { describe, it, expect } from 'vitest';
 import { sha256Hex } from '@/libs/sha256';
 import {
     backfillIds, assignRefs, renumberTaken, duplicateRefs, highestRef, RefSequence, storedFields, isDueDate, isValidRef,
-    unknownProperties, annotationProperties, choiceLabel, applyFields, inCreationOrder, refTakenMessage, renumberedMessage, idOf, refOf
+    unknownProperties, annotationProperties, choiceLabel, applyFields, inCreationOrder, refTakenMessage, renumberedMessage, idOf, refOf,
+    isAnnotationType, isAnnotation, withoutStrayRefs
 } from './annotationIds';
 
 const ownerOf = f => (f.properties?.localCoordinates ? 'pointCloud' : 'map');
@@ -94,6 +95,13 @@ describe('assignRefs', () => {
         expect(result.assigned).toBe(0);
         const [numbered] = assignRefs([area('t', { id: 'a', customKey: 5, name: 'X' })]).features;
         expect(numbered.properties).toEqual({ measurementType: 'area', createdAt: 't', id: 'a', customKey: 5, name: 'X', ref: '1' });
+    });
+
+    it('gives no ref to a feature that is no annotation (a contour line)', () => {
+        const contour = { ...area('t', { id: 'c' }), properties: { measurementType: 'contour', createdAt: 't', id: 'c' } };
+        const { features, lastRef, assigned } = assignRefs([contour, area('u', { id: 'a' })]);
+        expect(features.map(refOf)).toEqual(['', '1']);
+        expect([lastRef, assigned]).toEqual([1, 1]);
     });
 
     it('breaks the ties of the creation time with the position the file gives', () => {
@@ -258,5 +266,26 @@ describe('inspectionSummary', () => {
         const { inspectionSummary } = await import('./annotationIds');
         expect(inspectionSummary({ ref: '4', report: true }, schema)).toBe('');
         expect(inspectionSummary(undefined, schema)).toBe('');
+    });
+});
+
+describe('the features that are no annotation', () => {
+    const contour = extra => ({ type: 'Feature', geometry: null, properties: { measurementType: 'contour', id: 'c', ...extra } });
+
+    it('are the contour lines: every other type, and a feature without one, is an annotation', () => {
+        expect(isAnnotationType('contour')).toBe(false);
+        ['point', 'length', 'area', 'profile', 'stockpile', 'distance', 'annotation', undefined, ''].forEach(t => expect(isAnnotationType(t)).toBe(true));
+        expect(isAnnotation(contour())).toBe(false);
+        expect(isAnnotation(area('t'))).toBe(true);
+    });
+
+    it('lose a ref they were given, and keep everything else; the array is the same when none has one', () => {
+        const features = [contour({ ref: '4', elev: 162 }), area('t', { id: 'a', ref: '5' })];
+        const { features: cleaned, removed } = withoutStrayRefs(features);
+        expect(removed).toBe(1);
+        expect(cleaned[0].properties).toEqual({ measurementType: 'contour', id: 'c', elev: 162 });
+        expect(cleaned[1]).toBe(features[1]);
+        const clean = [contour(), area('t', { id: 'a', ref: '5' })];
+        expect(withoutStrayRefs(clean)).toEqual({ features: clean, removed: 0 });
     });
 });

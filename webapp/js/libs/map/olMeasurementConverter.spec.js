@@ -73,6 +73,31 @@ describe('importMeasurements tooltip text', () => {
     });
 });
 
+describe('contour lines', () => {
+    const contourOf = extra => featureOf('LineString', LINE, {
+        id: 'c', measurementType: 'contour', name: 'Contour 162.0 m', elev: 162, unit: 'm', interval: 1, isMajor: false, ...extra
+    });
+
+    it('show their level in the unit of the raster, not their length (an older Hub saved the length as their text)', () => {
+        expect(importOne(contourOf({ tooltipText: '119.98 m' }), 'metric').get('tooltipText')).toBe('162.00 m');
+        // In imperial too: the level is in the unit of the raster, which the map does not convert
+        expect(importOne(contourOf(), 'imperial').get('tooltipText')).toBe('162.00 m');
+        expect(importOne(contourOf({ elev: 29.14, unit: '°C' }), 'metric').get('tooltipText')).toBe('29.1 °C');
+        // A level without a unit is written as a value
+        expect(importOne(contourOf({ unit: undefined }), 'metric').get('tooltipText')).toBe('162');
+    });
+
+    it('are saved as contours, with their level and its unit, without a length and without the unsaved flag', () => {
+        const source = new VectorSource();
+        importMeasurements({ type: 'FeatureCollection', features: [contourOf({ unsaved: true, elev: 29.1, unit: '°C' })] }, source, 'imperial', null);
+        const [saved] = exportMeasurements(source, 'dsm.tif', 'imperial').features;
+        expect(saved.properties).toMatchObject({ measurementType: 'contour', elev: 29.1, unit: '°C', interval: 1, isMajor: false, tooltipText: '29.1 °C' });
+        expect(saved.properties).not.toHaveProperty('unsaved');
+        expect(saved.properties).not.toHaveProperty('length');
+        expect(saved.properties).not.toHaveProperty('displayValue');
+    });
+});
+
 describe('the labels of measurements from a saved file are text, not HTML', () => {
     const NAME = '<img src=x onerror=alert(1)>';
     let map;
