@@ -452,6 +452,12 @@ describe('RasterAnalysisControls Contours button wording', () => {
         await contours().trigger('click');
         expect(wrapper.emitted('openContourDialog')[0][0]).toMatchObject({ bandCount: 2, dataType: 'UInt16' });
     });
+
+    it('passes on the unit the panel shows: metres for an elevation model whose band has no unit type', async () => {
+        await render();
+        await contours().trigger('click');
+        expect(wrapper.emitted('openContourDialog')[0][0].unit).toBe('m');
+    });
 });
 
 // FR-RAS-23: the action grid is the footer of the panel, not part of the body that scrolls

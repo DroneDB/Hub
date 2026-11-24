@@ -643,9 +643,9 @@ export default {
         },
 
         onGenerateContoursClick() {
-            // Forward the raster info upward so the host's contour composable
-            // can pre-fill the dialog with min/max/unit hints.
-            this.$emit('openContourDialog', this.rasterInfo);
+            // Forward the raster info upward so the host's contour composable can pre-fill the dialog with min/max hints,
+            // with the unit the panel shows (the file's band may have none: an elevation model is in metres)
+            this.$emit('openContourDialog', this.rasterInfo ? { ...this.rasterInfo, unit: this.dataUnit } : null);
         },
 
         clearProfile() {

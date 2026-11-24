@@ -21,7 +21,7 @@
  */
 import { buildContourFeature, colorForElevation } from '@/libs/map/contourStorage';
 import { CONTOUR_TOOL_ID, contourTaskParams, contourTruncation } from '@/libs/map/contourTask';
-import { isElevationRaster, layerValueOptions } from '@/libs/map/rasterUnit';
+import { isElevationRaster, layerValueOptions, rasterUnitSymbol } from '@/libs/map/rasterUnit';
 import { createFeatureScope } from '@/composables/featureScope';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { formatNumber } from '@/libs/format';
@@ -82,7 +82,8 @@ const definition = {
                 if (typeof rasterInfoLike.valueMax === 'number') {
                     this.contourRasterMax = rasterInfoLike.valueMax;
                 }
-                if (rasterInfoLike.unit) this.contourUnit = rasterInfoLike.unit;
+                // The unit the panel shows (an elevation model without a unit type is in metres): the one of the labels
+                this.contourUnit = rasterInfoLike.unit || '';
                 this.contourElevation = isElevationRaster(rasterInfoLike);
             }
             this.contourError = null;
@@ -237,6 +238,8 @@ const definition = {
                 }
             }
 
+            // The unit of the levels: the one ddb answered in (a thermal formula's), else the one the panel shows
+            const unit = rasterUnitSymbol(fc.unit || this.contourUnit);
             const features = [];
             for (const raw of fc.features) {
                 if (!raw || !raw.geometry) continue;
@@ -254,14 +257,14 @@ const definition = {
 
                 if (raw.geometry.type === 'LineString') {
                     features.push(buildContourFeature(raw.geometry, elev, {
-                        interval, isMajor, unit: fc.unit || '', stroke
+                        interval, isMajor, unit, stroke
                     }));
                 } else if (raw.geometry.type === 'MultiLineString') {
                     for (const coords of raw.geometry.coordinates) {
                         features.push(buildContourFeature(
                             { type: 'LineString', coordinates: coords },
                             elev,
-                            { interval, isMajor, unit: fc.unit || '', stroke }));
+                            { interval, isMajor, unit, stroke }));
                     }
                 }
             }

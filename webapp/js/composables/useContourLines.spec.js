@@ -226,6 +226,18 @@ describe('useContourLines as a task', () => {
         expect(contours.contourRasterMin.value).toBe(10.85);
     });
 
+    it('names the levels in the unit the panel shows when the answer has none (an elevation model without a unit type)', async () => {
+        const { contours, measureControls } = setup({ result: resultOf({ unit: '' }) });
+        contours.openContourDialog({ valueMin: 5, valueMax: 25, bandCount: 1, dataType: 'Float32', isThermal: false, unit: 'm' });
+        await contours.generateContourLines({ interval: 10 });
+        const imported = measureControls.importFromGeoJSON.mock.calls[0][0];
+        expect(imported.features.map(f => [f.properties.name, f.properties.unit])).toEqual([['Contour 10.00 m', 'm'], ['Contour 20.00 m', 'm']]);
+
+        // Another raster with no unit: no unit is left over from the first
+        contours.openContourDialog({ valueMin: 5, valueMax: 25, bandCount: 2, dataType: 'UInt16', isThermal: false, unit: '' });
+        expect(contours.contourUnit.value).toBe('');
+    });
+
     it('sends no formula for a layer styled with an index, nor for a layer without style', async () => {
         const index = setup({ vizParams: { [PATH]: { formula: 'NDVI', colormap: 'rdylgn' } } });
         await index.contours.generateContourLines({ interval: 5 });
