@@ -139,7 +139,7 @@ describe('a new group made in the properties dialog', () => {
     it('shows the Group field with New group when the host can make one, even with no group yet', async () => {
         await show(line(), { canCreateGroup: true });
         expect(labels()).toContain('Group');
-        expect(newGroupButton().textContent.trim()).toBe('New group');
+        expect(newGroupButton().textContent.trim()).toBe('New');
     });
 
     it('chooses the group made and saves the measurement with it, to be made by the host', async () => {

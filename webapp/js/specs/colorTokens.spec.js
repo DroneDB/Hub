@@ -280,12 +280,15 @@ describe('the findings drawn with the tokens', () => {
         expect(ol).toMatch(/\.ol-control button:focus:not\(:focus-visible\)\s*\{\s*outline:\s*none !important;/);
     });
 
-    it('FR-ORG-07: the list of organizations keeps the reach of the ring clear, and the card takes the ring of the tokens', () => {
+    // The list of organizations is a table: the name of an organization is a link in its cell, which takes the ring of
+    // every focusable element (FR-NAV-05) inside the padding of the cell, so no edge of the list cuts it
+    it('FR-ORG-07: the name of an organization takes the ring of the tokens, and the page does not take it away', () => {
         const page = readSource(JS, 'features/organizations/OrganizationsPage.vue');
-        expect(ruleOf(page, '.org-cards-area')).toMatch(/padding:\s*var\(--ddb-focus-ring-reach\) var\(--ddb-focus-ring-reach\) 0;/);
-        const card = ruleOf(page, '&:has(.org-name:focus-visible)');
-        expect(card).toMatch(RING);
-        expect(card).toMatch(/outline-offset:\s*var\(--ddb-focus-ring-offset\)/);
+        expect(page).toMatch(/<router-link [^>]*class="org-name stretched-link"/);
+        const name = ruleOf(page, '.org-name');
+        expect(name).toMatch(/font-weight:\s*bold/);
+        expect(name).not.toMatch(/outline/);
+        expect(page).not.toMatch(/\.org-name[^{]*:focus(-visible)?[^{]*\{[^}]*outline:\s*(none|0)/);
     });
 
     it.each([
