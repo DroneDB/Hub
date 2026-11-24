@@ -30,8 +30,7 @@
                 </span>
                 <!-- The id first, so that the closed select reads "NDVI – ..." even when the name is cut (FR-RAS-32) -->
                 <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" data-testid="plant-health-formula"
-                        :disabled="formulasState === 'loading'" :aria-busy="formulasState === 'loading'"
-                        :aria-describedby="formulaNoteId" @change="onFormulaChange">
+                        :aria-describedby="disabledCount ? 'plant-health-panel-formula-hint' : undefined" @change="onFormulaChange">
                     <option value="">None (bands only)</option>
                     <option v-for="f in shownFormulas" :key="f.id" :value="f.id"
                             :disabled="f.disabled"
@@ -41,18 +40,7 @@
                 </select>
             </div>
             <!-- A disabled option cannot take the focus: the reason of every one is in the guide, and a select reads this hint (FR-XC-22) -->
-            <!-- The formulas come with the statistics of the raster: the first read of a large raster without them (one built
-                 before its COG kept them) reads every pixel and takes minutes, and the list must not look empty meanwhile -->
-            <div v-if="formulasState === 'loading'" id="plant-health-panel-formula-status" class="panel-row-note"
-                 data-testid="plant-health-formulas-loading">
-                <LoadingSpinner inline label="Reading the statistics of the raster. The first time, a large raster takes minutes." />
-            </div>
-            <div v-else-if="formulasState === 'failed'" id="plant-health-panel-formula-status" class="panel-row-note formulas-failed"
-                 role="alert" data-testid="plant-health-formulas-failed">
-                <span>The formulas could not be read: {{ formulasError }}</span>
-                <button type="button" class="panel-btn" data-testid="plant-health-formulas-retry" @click="loadFormulas">Try again</button>
-            </div>
-            <p v-else-if="disabledCount" id="plant-health-panel-formula-hint" class="panel-row-note" data-testid="plant-health-formula-hint">
+            <p v-if="disabledCount" id="plant-health-panel-formula-hint" class="panel-row-note" data-testid="plant-health-formula-hint">
                 ✗ {{ disabledCount === 1 ? '1 formula is' : `${disabledCount} formulas are` }} not available for this raster: it lacks
                 the bands. The guide (<i class="fas fa-info-circle" />) lists the bands each one needs.
             </p>
@@ -124,8 +112,17 @@
                 <p v-if="histogramNote" class="histogram-note" data-testid="plant-health-histogram-note">{{ histogramNote }}</p>
             </div>
 
-            <!-- Statistics: one muted line -->
-            <p v-if="metadata && metadata.statistics" class="stats-line" data-testid="plant-health-stats">
+            <!-- Statistics: one muted line. The formulas come with the raster info; only these wait for a pass over the
+                 pixels of a raster that has none kept (a COG built before its build kept them) -->
+            <div v-if="statisticsState === 'loading'" class="stats-line" data-testid="plant-health-stats-loading">
+                <LoadingSpinner inline label="Reading the statistics of the raster…" />
+            </div>
+            <div v-else-if="statisticsState === 'failed'" class="stats-line statistics-failed" role="alert"
+                 data-testid="plant-health-stats-failed">
+                <span>The statistics could not be read: {{ statisticsError }}</span>
+                <button type="button" class="panel-btn" data-testid="plant-health-stats-retry" @click="loadMetadata">Try again</button>
+            </div>
+            <p v-else-if="metadata && metadata.statistics" class="stats-line" data-testid="plant-health-stats">
                 Min {{ formatNum(firstBandStats.min) }} · Max {{ formatNum(firstBandStats.max) }} · Mean {{ formatNum(firstBandStats.mean) }} · σ {{ formatNum(firstBandStats.stddev || firstBandStats.std) }}
             </p>
         </div>
@@ -157,7 +154,7 @@
         </template>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
-                                   :formulas="shownFormulas" :state="formulasState" />
+                                   :formulas="shownFormulas" />
     </AnalysisPanel>
 </template>
 
@@ -212,9 +209,10 @@ export default {
             // Why the raster info could not be read, '' while it loads or once it is read
             rasterInfoError: '',
             metadata: null,
-            // The formulas of the raster metadata: 'loading', 'ready' or 'failed' (formulasError says why)
-            formulasState: 'loading',
-            formulasError: '',
+            // The statistics (and histogram) of the raster or of the formula: 'loading', 'ready' or 'failed'
+            // (statisticsError says why)
+            statisticsState: 'ready',
+            statisticsError: '',
             selectedPreset: '',
             selectedFormula: '',
             customBands: '',
@@ -280,11 +278,6 @@ export default {
             if (!this.selectedFormula) return false;
             const f = this.availableFormulas.find(x => x.id === this.selectedFormula);
             return f ? !!f.disabled : this.formulaError;
-        },
-        // The note that describes the formula select: the loading or failed state, else the hint of the disabled formulas
-        formulaNoteId() {
-            if (this.formulasState !== 'ready') return 'plant-health-panel-formula-status';
-            return this.disabledCount ? 'plant-health-panel-formula-hint' : undefined;
         },
         disabledCount() {
             return this.shownFormulas.filter(f => f.disabled).length;
@@ -391,6 +384,7 @@ export default {
             // Nothing of the raster before stays shown while this one is read
             this.rasterInfo = null;
             this.rasterInfoError = '';
+            this.metadata = null;
             try {
                 const info = await this.dataset.getRasterInfo(path);
                 if (path !== this.filePath) return; // another raster was chosen meanwhile
@@ -400,48 +394,57 @@ export default {
                 if (path === this.filePath) this.rasterInfoError = e?.message || 'unknown error';
                 return;
             }
-            await this.loadFormulas();
+            this.takeStyleChoices(this.rasterInfo);
+
+            // The style of the link or the layer (from the URL hash)
+            const initial = this.initialParams && !this._initialParamsApplied ? this.initialParams : null;
+            if (initial) {
+                this._initialParamsApplied = true;
+                if (initial.preset) this.selectedPreset = initial.preset;
+                if (initial.formula) this.selectedFormula = initial.formula;
+                if (initial.bands) this.customBands = initial.bands;
+                if (initial.colormap) this.selectedColormap = initial.colormap;
+                if (initial.rescale) this.rescale = initial.rescale;
+                if (initial.stretch) this.selectedStretch = initial.stretch;
+            }
+            // The statistics of the formula of the link (a bounded read), else of the bands
+            await this.loadFormulaData();
+            if (initial) {
+                // The range of the link or the layer is the user's: only a style without one takes the default
+                if (!initial.rescale) this.computeRescaleFromStretch();
+                this.apply();
+            }
         },
 
-        // The formulas, the colormaps and the statistics of the raster, then the style of the link or the layer
-        async loadFormulas() {
-            const path = this.filePath;
-            this.formulasState = 'loading';
-            this.formulasError = '';
-            try {
-                const meta = await this.dataset.getRasterMetadata(path);
-                if (path !== this.filePath) return;
-                this.metadata = meta;
-                if (meta.algorithms) {
-                    this.availableFormulas = meta.algorithms;
-                }
-                if (meta.colormaps) {
-                    this.availableColormaps = meta.colormaps;
-                }
-                if (meta.autoBands && typeof meta.autoBands === 'string') {
-                    this.customBands = meta.autoBands;
-                }
-                this.formulasState = 'ready';
+        // The formulas, the colormaps and the bands found for them, from the raster info (or the metadata of a server
+        // that sends them only there)
+        takeStyleChoices(doc) {
+            if (!doc) return;
+            if (Array.isArray(doc.algorithms)) this.availableFormulas = doc.algorithms;
+            if (Array.isArray(doc.colormaps)) this.availableColormaps = doc.colormaps;
+            if (doc.autoBands && typeof doc.autoBands === 'string') this.customBands = doc.autoBands;
+        },
 
-                // Apply initial params from URL hash (if provided)
-                if (this.initialParams && !this._initialParamsApplied) {
-                    this._initialParamsApplied = true;
-                    if (this.initialParams.preset) this.selectedPreset = this.initialParams.preset;
-                    if (this.initialParams.formula) this.selectedFormula = this.initialParams.formula;
-                    if (this.initialParams.bands) this.customBands = this.initialParams.bands;
-                    if (this.initialParams.colormap) this.selectedColormap = this.initialParams.colormap;
-                    if (this.initialParams.rescale) this.rescale = this.initialParams.rescale;
-                    if (this.initialParams.stretch) this.selectedStretch = this.initialParams.stretch;
-                    if (this.selectedFormula) await this.loadFormulaData();
-                    // The range of the link or the layer is the user's: only a style without one takes the default
-                    if (!this.initialParams.rescale) this.computeRescaleFromStretch();
-                    this.apply();
-                }
+        // The statistics and histogram of the selected formula (a bounded read), or of every band of the raster (a pass
+        // over its pixels when it has none kept)
+        async loadMetadata() {
+            const path = this.filePath;
+            const formula = this.selectedFormula;
+            if (!path || !this.dataset) return;
+            this.statisticsState = 'loading';
+            this.statisticsError = '';
+            try {
+                const meta = await this.dataset.getRasterMetadata(path, formula || undefined);
+                // Another raster or formula was chosen while it was read
+                if (path !== this.filePath || formula !== this.selectedFormula) return;
+                this.metadata = meta;
+                if (!this.availableFormulas.length) this.takeStyleChoices(meta);
+                this.statisticsState = 'ready';
             } catch (e) {
                 console.error('Failed to load the raster metadata:', e);
-                if (path !== this.filePath) return;
-                this.formulasState = 'failed';
-                this.formulasError = e?.message || 'unknown error';
+                if (path !== this.filePath || formula !== this.selectedFormula) return;
+                this.statisticsState = 'failed';
+                this.statisticsError = e?.message || 'unknown error';
             }
         },
 
@@ -473,16 +476,7 @@ export default {
 
         // The statistics and histogram of the selected index (or of the raster without one), and its default stretch
         async loadFormulaData() {
-            await Promise.all([
-                (async () => {
-                    try {
-                        this.metadata = await this.dataset.getRasterMetadata(this.filePath, this.selectedFormula || undefined);
-                    } catch (e) {
-                        console.error('Failed to load formula metadata:', e);
-                    }
-                })(),
-                this.loadIndexStretch()
-            ]);
+            await Promise.all([this.loadMetadata(), this.loadIndexStretch()]);
         },
 
         // The default stretch of the selected index comes from ddb, read with the formula (D-041, FR-XC-24): the Hub
@@ -539,16 +533,9 @@ export default {
             this.originalView = false;
             this.$emit('vizParamsChanged', {});
 
-            // Reload base metadata (statistics, histogram) for the original raster
-            if (this.filePath && this.dataset) {
-                try {
-                    const meta = await this.dataset.getRasterMetadata(this.filePath);
-                    this.metadata = meta;
-                    if (meta.autoBands && typeof meta.autoBands === 'string') this.customBands = meta.autoBands;
-                } catch (e) {
-                    console.error('Failed to reload metadata after reset:', e);
-                }
-            }
+            // The statistics of the bands again, and the bands the raster info found for the formulas
+            this.takeStyleChoices(this.rasterInfo);
+            await this.loadMetadata();
         },
 
         // Closing the panel keeps the layer's style (FR-RAS-01): only an edit or Reset changes it
@@ -653,7 +640,7 @@ export default {
     line-height: 1.3;
 }
 
-.formulas-failed {
+.statistics-failed {
     display: flex;
     flex-wrap: wrap;
     align-items: center;

@@ -27,7 +27,7 @@
             </div>
 
             <p v-if="entries.length === 0" class="empty-hint" data-testid="formulas-empty">
-                {{ emptyText }}
+                No formulas are available for this raster.
             </p>
         </div>
 
@@ -120,18 +120,10 @@ export default {
     components: { Window },
     props: {
         visible: { type: Boolean, default: false },
-        formulas: { type: Array, default: () => [] },
-        // The state of the list in the panel: 'loading' while the raster metadata is read, 'failed' when it could not be
-        state: { type: String, default: 'ready', validator: v => ['loading', 'ready', 'failed'].includes(v) }
+        formulas: { type: Array, default: () => [] }
     },
     emits: ['update:visible'],
     computed: {
-        // Why the list is empty: an empty list while it loads, or after it failed, is not a raster without formulas
-        emptyText() {
-            if (this.state === 'loading') return 'The formulas are still loading: the statistics of the raster are being read.';
-            if (this.state === 'failed') return 'The formulas could not be read. Try again from the panel.';
-            return 'No formulas are available for this raster.';
-        },
         entries() {
             return (this.formulas || []).map(f => {
                 const id = f.id || f.name || '';
