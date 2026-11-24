@@ -8,6 +8,10 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { ref } from 'vue';
 import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
+import { useTestScope } from '@/composables/testScope.fixtures';
+
+// The composable's scope ends with each test: its timers never fire after the test environment is torn down
+const inTestScope = useTestScope();
 
 vi.mock('@/composables/useMapAlerts', () => ({ flash: vi.fn() }));
 vi.mock('@/libs/reports/reportSettings', async importOriginal => {
@@ -47,7 +51,7 @@ async function start({ canWrite = true } = {}) {
         deleteObj: vi.fn()
     };
     const dialogs = { open: vi.fn(() => ({ close: vi.fn() })) };
-    const m = usePotreeMeasurements({ entry: ref({ path: 'site/cloud.laz' }), dataset: ref(dataset), canWrite: ref(canWrite), error: ref(''), dialogs });
+    const m = inTestScope(() => usePotreeMeasurements({ entry: ref({ path: 'site/cloud.laz' }), dataset: ref(dataset), canWrite: ref(canWrite), error: ref(''), dialogs }));
     const annotations = {
         id: 'annotations', children: [],
         add(a) { this.children.push(a); listeners.get('annotations:annotation_added')?.({ annotation: a }); },

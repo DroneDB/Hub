@@ -6,6 +6,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { ref, effectScope } from 'vue';
 import { notify } from '@/libs/notify';
+import { useTestScope } from '@/composables/testScope.fixtures';
+
+// The composable's scope ends with each test: its timers never fire after the test environment is torn down
+const inTestScope = useTestScope();
 
 const flash = vi.fn();
 vi.mock('@/composables/useMapAlerts', () => ({ flash: (...args) => flash(...args) }));
@@ -106,9 +110,9 @@ const removeAll = () => [...viewer.scene.measurements].forEach(x => viewer.scene
 let dialogs;
 function start(error = ref('')) {
     dialogs = { open: vi.fn(() => ({ close: vi.fn() })) };
-    const m = usePotreeMeasurements({
+    const m = inTestScope(() => usePotreeMeasurements({
         entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(true), error, dialogs
-    });
+    }));
     viewer = fakeViewer();
     m.attach(viewer, session, {});
     return m;

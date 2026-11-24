@@ -11,6 +11,10 @@ import PrimeVue from 'primevue/config';
 import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
 import { UTM_18N_WKT } from '@/libs/map/measurementFormat.fixtures';
+import { useTestScope } from '@/composables/testScope.fixtures';
+
+// The composable's scope ends with each test: its timers never fire after the test environment is torn down
+const inTestScope = useTestScope();
 
 vi.mock('@/composables/useMapAlerts', () => ({ flash: vi.fn() }));
 
@@ -61,7 +65,7 @@ async function start({ file = FILE, coordinateSystem = { srs: null }, canWrite =
         deleteObj: vi.fn()
     };
     const dialogs = { open: vi.fn(() => ({ close: vi.fn() })) };
-    const m = usePotreeMeasurements({ entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(canWrite), error: ref(''), dialogs });
+    const m = inTestScope(() => usePotreeMeasurements({ entry: ref({ path: 'a/cloud.laz' }), dataset: ref(dataset), canWrite: ref(canWrite), error: ref(''), dialogs }));
     const annotations = {
         id: 'annotations', children: [],
         add(a) { this.children.push(a); listeners.get('annotations:annotation_added')?.({ annotation: a }); },
