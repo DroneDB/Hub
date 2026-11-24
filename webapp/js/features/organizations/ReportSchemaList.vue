@@ -119,7 +119,6 @@ function rename(entry, name) {
 
 .schema-entry {
     padding: var(--ddb-spacing-xs) 0;
-    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
 }
 
 .schema-colour {
