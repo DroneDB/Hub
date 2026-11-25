@@ -8,7 +8,8 @@
  *   keyValue      { type, rows: [{ label, value }] }
  *   table         { type, id, title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note }] }
  *   mapSnapshot   { type, kind: 'overview' | 'item', itemId, ref, items, extent, frame, layers, basemap, view,
- *                   coverDeleted, legend, alt, note }   a request: the renderer draws it
+ *                   coverDeleted, legend, alt, note }   a request: the renderer draws it; the cover and the overview have
+ *                   none when no item is drawn and the cover view has no layer (it would be the whole world)
  *   chart         { type, chart: 'profile', itemId, ref, line, elevationLayer, units, note, alt }   a request too; units:
  *                   the report's, for the distances along the line
  *   capture3d     { type, itemId, ref, path, camera, capturedAt, text }   the capture of a 3D item, or "No 3D snapshot"
@@ -29,6 +30,10 @@ export const NO_ELEVATION_LAYER = 'No elevation layer in the cover view';
 export const NO_3D_SNAPSHOT = 'No 3D snapshot';
 export const COVER_DELETED = 'The cover view was deleted';
 export const NO_ITEMS = 'No items match the filter of this report';
+/** Why a report has no overview map: nothing of it has a place on the earth */
+export const NO_MAP = 'No item of this report has a position on the earth, so there is no map';
+/** The coordinate system of a report whose items all have local coordinates only */
+export const NOT_GEOREFERENCED = 'None: the items are not georeferenced';
 /** What a photo of an item that cannot be shown is, on the page and in the PDF, with its path under it */
 export const MISSING_PHOTO = 'Missing photo';
 
@@ -122,6 +127,19 @@ function mapSnapshot(ctx, drawn, item) {
     };
 }
 
+/**
+ * Whether the overview map has something on the earth to show: an item drawn on it, or a layer of the cover view.
+ * Without either it would be the basemap of the whole world, so it is left out.
+ * @param {SectionContext} ctx @param {any[]} drawn  drawnItems
+ */
+const hasMap = (ctx, drawn) => drawn.length > 0 || ctx.cover.layers.length > 0;
+
+/** The overview map of the items, or none when it would show nothing on the earth (hasMap). @param {SectionContext} ctx */
+function overviewMap(ctx) {
+    const drawn = drawnItems(ctx);
+    return hasMap(ctx, drawn) ? [mapSnapshot(ctx, drawn, null)] : [];
+}
+
 /** @param {number} level @param {string} text */
 const heading = (level, text) => ({ type: /** @type {const} */ ('heading'), level: /** @type {1 | 2 | 3} */ (level), text, anchor: null, itemId: null, viewerUrl: null });
 
@@ -158,7 +176,7 @@ function coverSection(ctx) {
         ...(definition.subtitle ? [heading(2, definition.subtitle)] : []),
         { type: /** @type {const} */ ('keyValue'), rows },
         ...(ctx.cover.deleted ? [warning(COVER_DELETED)] : []),
-        mapSnapshot(ctx, drawnItems(ctx), null),
+        ...overviewMap(ctx),
         ...(ctx.links.reportUrl ? [{ type: /** @type {const} */ ('qr'), url: ctx.links.reportUrl, label: 'Open the live report' }] : [])
     ];
 }
@@ -190,11 +208,11 @@ function summarySection(ctx) {
 
 /** @param {SectionContext} ctx */
 function overviewSection(ctx) {
-    const drawn = drawnItems(ctx);
+    const map = overviewMap(ctx);
     return [
         heading(1, SECTION_LABELS.overview),
         ...(ctx.cover.deleted ? [warning(COVER_DELETED)] : []),
-        mapSnapshot(ctx, drawn, null)
+        ...(map.length ? map : [{ type: /** @type {const} */ ('note'), tone: /** @type {const} */ ('info'), text: NO_MAP }])
     ];
 }
 
@@ -264,7 +282,8 @@ function layersTable(paths, ctx, id, title) {
 function notesSection(ctx) {
     const { definition, template } = ctx;
     const rasters = [...new Set(ctx.items.filter(i => i.kind === 'volume').map(i => i.properties.sourceRaster).filter(r => typeof r === 'string' && r))].map(path => ({ path }));
-    const crs = ctx.text.projection?.name ?? 'WGS84';
+    const located = ctx.items.length === 0 || ctx.items.some(i => i.georeferenced);
+    const crs = located ? ctx.text.projection?.name ?? 'WGS84' : NOT_GEOREFERENCED;
     return [
         heading(1, SECTION_LABELS.notes),
         ...(definition.notes ? [{ type: /** @type {const} */ ('markdown'), text: definition.notes }] : []),

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PROPERTY_BAG } from '@/libs/map/potreeMeasurementConverter';
-import { findItem, focusItem } from './itemFocus';
+import { CAPTURE_FRAMING, findItem, focusItem, frameItemNow } from './itemFocus';
 
 class Vector3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
@@ -77,7 +77,7 @@ describe('focusItem', () => {
         viewer = viewerOf([measure('m1', [5, 5, 5])], []);
         expect(focusItem(viewer, 'm1')).toBe(true);
         const box = viewer.zoomTo.mock.calls[0][0].boundingBox;
-        expect(box.max.x - box.min.x).toBeGreaterThan(0);
+        expect(box.max.x - box.min.x).toBe(10);
     });
 
     it('moves the camera to an annotation the way Potree does', () => {
@@ -91,6 +91,41 @@ describe('focusItem', () => {
     it('is false when the viewer has no item with the id', () => {
         viewer = viewerOf([measure('m1', [0, 0, 0], [1, 1, 1])], []);
         expect(focusItem(viewer, 'gone')).toBe(false);
+        expect(viewer.zoomTo).not.toHaveBeenCalled();
+    });
+});
+
+describe('frameItemNow (the capture for a report)', () => {
+    it('frames a lone point close, at once: a box of 4 units around it, with little room', () => {
+        const point = measure('m1', [5, 5, 5]);
+        viewer = viewerOf([point], []);
+        expect(frameItemNow(viewer, point)).toBe(true);
+        const [node, factor, duration] = viewer.zoomTo.mock.calls[0];
+        expect(node.boundingBox.max.x - node.boundingBox.min.x).toBe(2 * CAPTURE_FRAMING.pointMargin);
+        expect(node.boundingBox.min.x).toBe(3);
+        expect(factor).toBe(CAPTURE_FRAMING.zoom);
+        expect(duration).toBe(0);
+        // Potree stands the camera radius / sin(fov / 2) x the factor away: a 60° view is about 8 units from the point,
+        // where a link's framing (a 10 unit box, twice as far) is about 35
+        const distance = (radius, zoom) => (radius / Math.sin(Math.PI / 6)) * zoom;
+        expect(distance(Math.sqrt(3) * CAPTURE_FRAMING.pointMargin, CAPTURE_FRAMING.zoom)).toBeLessThan(9);
+        expect(distance(Math.sqrt(3) * 5, 2)).toBeGreaterThan(34);
+    });
+
+    it('frames a measure on the box of its points and an annotation around its position', () => {
+        const line = measure('m1', [0, 0, 0], [10, 0, 0]);
+        const annotation = note('n1');
+        annotation.position = new Vector3(1, 2, 3);
+        viewer = viewerOf([line], [annotation]);
+        expect(frameItemNow(viewer, line)).toBe(true);
+        expect(viewer.zoomTo.mock.calls[0][0].boundingBox.max.x).toBe(10);
+        expect(frameItemNow(viewer, annotation)).toBe(true);
+        expect(viewer.zoomTo.mock.calls[1][0].boundingBox.min.x).toBe(1 - CAPTURE_FRAMING.pointMargin);
+    });
+
+    it('is false for an item with no position', () => {
+        viewer = viewerOf([], []);
+        expect(frameItemNow(viewer, { points: [] })).toBe(false);
         expect(viewer.zoomTo).not.toHaveBeenCalled();
     });
 });

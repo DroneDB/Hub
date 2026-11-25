@@ -5,6 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildReportModel, resolveTemplate, resolveLogo, resolveCover, templateMissingText } from './reportModel';
 import { newDefinition } from './reportDefinition';
+import { NO_MAP, NOT_GEOREFERENCED } from './reportSections';
+import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_TEMPLATE, DEFAULT_SCHEMA, cloneSettings } from './reportSettings';
 import { formatArea, formatLength, formatDate, EMPTY_CELL } from '@/libs/format';
 import { geodesicArea } from '@/libs/map/geodesic';
@@ -229,6 +231,29 @@ describe('a point cloud without a usable CRS', () => {
     it('is the same for a file whose geometry is still the old one', () => {
         const model = make({ crs: true, legacyGeometry: true });
         expect(model.items.filter(i => !i.georeferenced).map(i => i.id)).toEqual(['c1', 'c2']);
+    });
+
+    it('has no overview map when no item is on the earth and the cover view has no layer: it would be the whole world', () => {
+        const cloudOnly = features.slice(1);
+        const cover = defaultState({ path: 'cloud.laz', hash: 'h' }, { baseIsGeoraster: false });
+        const model = buildReportModel({
+            ...inputOf([], { coverView: { state: cover } }),
+            sources: [{ file: 'a.geojson', document: documentOf(cloudOnly, { crs: false }) }]
+        });
+        expect(blocksOf(model, 'cover', 'mapSnapshot')).toEqual([]);
+        expect(blocksOf(model, 'cover').map(b => b.type)).toEqual(['heading', 'keyValue', 'qr']);
+        expect(blocksOf(model, 'overview').map(b => b.type)).toEqual(['heading', 'note']);
+        expect(blocksOf(model, 'overview', 'note')[0]).toMatchObject({ tone: 'info', text: NO_MAP });
+        expect(blocksOf(model, 'items', 'mapSnapshot')).toEqual([]);
+        expect(blocksOf(model, 'notes', 'keyValue')[0].rows).toContainEqual({ label: 'Coordinate system', value: NOT_GEOREFERENCED });
+    });
+
+    it('keeps the overview map of a cover view with layers, and the coordinate system, while one item is on the earth', () => {
+        const unlocated = buildReportModel({ ...inputOf([]), sources: [{ file: 'a.geojson', document: documentOf(features.slice(1), { crs: false }) }] });
+        expect(blocksOf(unlocated, 'overview', 'mapSnapshot')).toHaveLength(1);
+        expect(blocksOf(unlocated, 'overview', 'mapSnapshot')[0].items).toEqual([]);
+        const mixed = make();
+        expect(blocksOf(mixed, 'notes', 'keyValue')[0].rows).toContainEqual({ label: 'Coordinate system', value: 'WGS84' });
     });
 
     it('is georeferenced with a CRS, and then is on the snapshots', () => {

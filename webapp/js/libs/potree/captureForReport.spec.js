@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PROPERTY_BAG } from '@/libs/map/potreeMeasurementConverter';
 import { annotationProperties } from '@/libs/map/annotationIds';
 import { captureForReport, cameraOf, readFrame, settle, CAPTURE_MAX_SIDE } from './captureForReport';
+import { CAPTURE_FRAMING } from './itemFocus';
 
 class Vector3 {
     constructor(x = 0, y = 0, z = 0) { Object.assign(this, { x, y, z }); }
@@ -55,7 +56,7 @@ describe('captureForReport', () => {
         const item = measure('id-1');
         const ds = dataset();
         const snapshot = await captureForReport({ viewer, item, dataset: ds, measurementPath: 'site/cloud_measurements.geojson', wait });
-        expect(viewer.zoomTo).toHaveBeenCalledWith(expect.any(Object3D), 2, 0);
+        expect(viewer.zoomTo).toHaveBeenCalledWith(expect.any(Object3D), CAPTURE_FRAMING.zoom, 0);
         expect(ds.writeObj).toHaveBeenCalledTimes(1);
         const [path, blob, options] = ds.writeObj.mock.calls[0];
         expect(path).toBe('site/annotations/id-1-3d.webp');
