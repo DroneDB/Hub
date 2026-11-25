@@ -80,6 +80,18 @@ describe('Publish PDF', () => {
         expect(save).not.toHaveBeenCalled();
     });
 
+    it('gives back the hash of the entry the Registry wrote', async () => {
+        const { run } = setup({ dataset: { writeObj: vi.fn(async () => ({ path: `reports/${FILE}`, hash: 'ab12' })) } });
+        expect(await run('publish')).toMatchObject({ status: 'published', hash: 'ab12' });
+    });
+
+    it('gives back the hash of the second write when the first was refused with a conflict', async () => {
+        const writeObj = vi.fn(async () => ({ hash: 'second' }));
+        writeObj.mockRejectedValueOnce(conflict());
+        const { run } = setup({ dataset: { writeObj } });
+        expect((await run('publish')).hash).toBe('second');
+    });
+
     it('publishes when the reports folder is not there yet', async () => {
         const { run, dataset } = setup({ dataset: { list: vi.fn(async () => { throw Object.assign(new Error('nf'), { status: 404 }); }) } });
         expect((await run('publish')).status).toBe('published');

@@ -118,7 +118,7 @@ export const REPORTS_INFO = Object.freeze({
                 ['Right-click a report for ', ui('Open', I.open), ', ', ui('Copy Link', I.copyLink), ', ', ui('Edit', I.edit), ', ',
                     ui('Duplicate', I.duplicate), ' and ', ui('Delete', I.delete), '.'],
                 ['On the report page, ', ui('Download PDF', B.downloadPdf), ' saves a PDF and ', ui('Publish PDF', B.publishPdf),
-                    ' writes it in the reports folder of the dataset.'],
+                    ' writes it in the reports folder of the dataset and opens it in a new tab.'],
                 'Deleting a report does not delete its measurement files or its published PDFs.'
             ]
         },

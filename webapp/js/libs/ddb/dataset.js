@@ -93,6 +93,9 @@ export default class Dataset {
         }
 
         if (options.inline) q.set("inline", "1");
+        // The hash of the entry, when known: a file written again under the same name gets another URL, so the
+        // browser does not show the copy it kept of the old one (the download answers with no Cache-Control)
+        if (options.version) q.set("v", options.version);
         const qs = q.toString();
         if (qs) url += `?${qs}`;
 

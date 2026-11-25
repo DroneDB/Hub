@@ -6,6 +6,7 @@
  * A cancel (the signal aborted) ends with no file saved or written. The write of a published copy cannot be taken back
  * once it is sent (the Registry may have the file whatever the browser does), so the signal is checked before each
  * write and before each question, and `onWriting` tells the page that from now on there is nothing left to cancel.
+ * A published copy comes back with the hash of the entry the Registry wrote, which names that version of the file.
  */
 import { downloadBlob } from '@/libs/download';
 import { isNotFound, datasetBusyOf } from '@/libs/ddb/apiError';
@@ -45,7 +46,7 @@ export async function publishedCopyExists(dataset, fileName) {
 
 /**
  * @param {ExportRequest} request
- * @returns {Promise<{ status: 'downloaded' | 'published' | 'cancelled', fileName: string, path?: string }>}
+ * @returns {Promise<{ status: 'downloaded' | 'published' | 'cancelled', fileName: string, path?: string, hash?: string }>}
  */
 export async function exportReportPdf({ mode, model, uid, dataset, signal, onProgress, onGenerating, onWriting, confirmReplace = async () => false, now = new Date(), generate = generateReportPdf, save = downloadBlob }) {
     const fileName = pdfFileName({ name: model.name, uid }, now);
@@ -73,11 +74,13 @@ export async function exportReportPdf({ mode, model, uid, dataset, signal, onPro
         save(blob, fileName);
         return { status: 'downloaded', fileName };
     }
+    /** @type {string | undefined} */
+    let hash;
     /** Writes the copy unless the user cancelled meanwhile. @param {boolean} overwrite @returns {Promise<boolean>} whether it was written */
     const write = async overwrite => {
         if (signal.aborted) return false;
         onWriting?.();
-        await dataset.writeObj(path, blob, { overwrite });
+        hash = (await dataset.writeObj(path, blob, { overwrite }))?.hash || undefined;
         return true;
     };
     try {
@@ -88,5 +91,5 @@ export async function exportReportPdf({ mode, model, uid, dataset, signal, onPro
         if (signal.aborted || !await confirmReplace(path)) return cancelled;
         if (!await write(true)) return cancelled;
     }
-    return { status: 'published', fileName, path };
+    return { status: 'published', fileName, path, hash };
 }

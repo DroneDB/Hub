@@ -128,3 +128,18 @@ export const absoluteUrl = url => new URL(url, window.location.origin).toString(
 export function openInNewTab(url) {
     window.open(url, '_blank', 'noopener');
 }
+
+/**
+ * Opens a link in a new tab when the browser lets the page do it, and tells whether it did. A browser opens a tab
+ * without asking only within a few seconds of a click: after a longer task it blocks the pop-up, and the page must
+ * offer a link to click instead. Not with the 'noopener' feature, which makes window.open answer null whatever happened:
+ * the opener of the new tab is taken away after.
+ * @param {string} url
+ * @returns {boolean}
+ */
+export function openInNewTabIfAllowed(url) {
+    const tab = window.open(url, '_blank');
+    if (!tab) return false;
+    tab.opener = null;
+    return true;
+}

@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 
-const m = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn() } }));
+const m = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn() }, openInNewTab: vi.fn(), openInNewTabIfAllowed: vi.fn(() => true) }));
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => m.notify }));
+vi.mock('@/libs/views/viewLinks', () => ({ openInNewTab: m.openInNewTab, openInNewTabIfAllowed: m.openInNewTabIfAllowed }));
 
 const { useReportPdf } = await import('./useReportPdf');
 const { default: ReportPdfProgressDialog } = await import('./ReportPdfProgressDialog.vue');
@@ -37,14 +38,21 @@ function pendingExport() {
 
 let dialogs;
 const make = (exportPdf, { canWrite = true } = {}) => useReportPdf({
-    model: ref({ name: 'North pit' }), dataset: { id: 'ds' }, uid: ref('r_1'), canWrite: ref(canWrite), dialogs, exportPdf
+    model: ref({ name: 'North pit' }), dataset: DATASET, uid: ref('r_1'), canWrite: ref(canWrite), dialogs, exportPdf
 });
+/** The dataset of the page: its download URL as dataset.js makes it, for the published copy. */
+const DATASET = {
+    id: 'ds',
+    downloadUrl: (/** @type {string} */ path, /** @type {any} */ { inline, version } = {}) => `/download/${path}?inline=${inline ? 1 : 0}&v=${version}`
+};
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => {
     dialogs = fakeDialogs();
     m.notify.success.mockReset();
     m.notify.error.mockReset();
+    m.openInNewTab.mockReset();
+    m.openInNewTabIfAllowed.mockReset().mockReturnValue(true);
 });
 
 describe('useReportPdf', () => {
@@ -53,7 +61,7 @@ describe('useReportPdf', () => {
         const actions = make(pdf.fn);
         const run = actions.run('download');
         await flush();
-        expect(pdf.requests[0]).toMatchObject({ mode: 'download', model: { name: 'North pit' }, uid: 'r_1', dataset: { id: 'ds' } });
+        expect(pdf.requests[0]).toMatchObject({ mode: 'download', model: { name: 'North pit' }, uid: 'r_1', dataset: DATASET });
         pdf.finish({ status: 'downloaded', fileName: 'x.pdf' });
         await run;
         expect(actions.running.value).toBe(false);
@@ -158,6 +166,47 @@ describe('useReportPdf', () => {
         pdf.finish({ status: 'published', fileName: 'x.pdf', path: 'reports/x.pdf' });
         await run;
         expect(m.notify.success).toHaveBeenCalledWith('Published as reports/x.pdf', { summary: 'PDF published' });
+    });
+
+    it('opens the published copy in a new tab, shown in place, its URL naming the version written', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('publish');
+        await flush();
+        pdf.finish({ status: 'published', fileName: 'x.pdf', path: 'reports/x.pdf', hash: 'ab12' });
+        await run;
+        expect(m.openInNewTabIfAllowed).toHaveBeenCalledWith('/download/reports/x.pdf?inline=1&v=ab12');
+        // the tab opened: the message has no Open PDF
+        expect(m.notify.success).toHaveBeenCalledWith('Published as reports/x.pdf', { summary: 'PDF published' });
+    });
+
+    it('offers Open PDF in the message when the browser blocked the tab, which opens it on a click', async () => {
+        m.openInNewTabIfAllowed.mockReturnValue(false);
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('publish');
+        await flush();
+        pdf.finish({ status: 'published', fileName: 'x.pdf', path: 'reports/x.pdf', hash: 'ab12' });
+        await run;
+        const [message, options] = m.notify.success.mock.calls[0];
+        expect(message).toBe('Published as reports/x.pdf');
+        expect(options).toMatchObject({ summary: 'PDF published', action: { label: 'Open PDF' } });
+        expect(m.openInNewTab).not.toHaveBeenCalled();
+        options.action.run();
+        expect(m.openInNewTab).toHaveBeenCalledWith('/download/reports/x.pdf?inline=1&v=ab12');
+    });
+
+    it('opens no tab for a download, nor for a publish that was cancelled', async () => {
+        for (const [mode, result] of /** @type {const} */ ([['download', { status: 'downloaded', fileName: 'x.pdf' }], ['publish', { status: 'cancelled', fileName: 'x.pdf' }]])) {
+            const pdf = pendingExport();
+            const actions = make(pdf.fn);
+            const run = actions.run(mode);
+            await flush();
+            pdf.finish(result);
+            await run;
+        }
+        expect(m.openInNewTabIfAllowed).not.toHaveBeenCalled();
+        expect(m.notify.success).not.toHaveBeenCalled();
     });
 
     it('says what went wrong, and is free again', async () => {

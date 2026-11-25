@@ -82,6 +82,11 @@ describe('Dataset URL builders — special characters in paths', () => {
         expect(url).toBe(`${base}/download/p%20%26%20q.tif?inline=1`);
     });
 
+    it('downloadUrl single path: the version (the hash of the entry) is a v param, absent when unknown', () => {
+        expect(ds.downloadUrl('reports/a.pdf', { inline: true, version: 'ab12' })).toBe(`${base}/download/reports/a.pdf?inline=1&v=ab12`);
+        expect(ds.downloadUrl('reports/a.pdf', { inline: true, version: undefined })).toBe(`${base}/download/reports/a.pdf?inline=1`);
+    });
+
     it('downloadUrl multi path: one repeated path= param per file, commas encoded', () => {
         const url = ds.downloadUrl(['a,one.tif', 'b & two.tif']);
         expect(url.startsWith(`${base}/download?`)).toBe(true);

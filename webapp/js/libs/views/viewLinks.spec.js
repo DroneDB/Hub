@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { b64encode, b64urlEncode } from '@/libs/base64';
 import ddb from 'ddb';
-import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, notGeneratedAlternative, reportUrl, itemAnchor, itemOfAnchor, VIEWER_ONLY_HELP } from './viewLinks';
+import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, openInNewTabIfAllowed, notGeneratedAlternative, reportUrl, itemAnchor, itemOfAnchor, VIEWER_ONLY_HELP } from './viewLinks';
 
 const ds = { org: 'acme', ds: 'site' };
 const filePath = `/r/acme/site/view/${b64encode('flights/ortho.tif')}/map`;
@@ -98,6 +98,24 @@ describe('openInNewTab', () => {
         const open = vi.spyOn(window, 'open').mockImplementation(() => null);
         openInNewTab('/r/acme/site/views/v_1');
         expect(open).toHaveBeenCalledWith('/r/acme/site/views/v_1', '_blank', 'noopener');
+    });
+});
+
+describe('openInNewTabIfAllowed', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('opens a new tab, takes its opener away and says it did', () => {
+        const tab = { opener: window };
+        const open = vi.spyOn(window, 'open').mockImplementation(() => /** @type {any} */ (tab));
+        expect(openInNewTabIfAllowed('/orgs/acme/ds/site/download/reports/a.pdf?inline=1')).toBe(true);
+        // Without 'noopener', which would make window.open answer null even when the tab opened
+        expect(open).toHaveBeenCalledWith('/orgs/acme/ds/site/download/reports/a.pdf?inline=1', '_blank');
+        expect(tab.opener).toBeNull();
+    });
+
+    it('says it did not when the browser blocked the tab', () => {
+        vi.spyOn(window, 'open').mockImplementation(() => null);
+        expect(openInNewTabIfAllowed('/x')).toBe(false);
     });
 });
 
