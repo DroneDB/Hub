@@ -586,15 +586,15 @@ describe('the id and the ref of the measures of the viewer', () => {
         expect(first.ddbProperties.createdAt).toBeTruthy();
     });
 
-    it('a ref is issued after the ones the file has, the map\'s too', async () => {
+    it('a ref is issued after the ones the file has, the map\'s too, whatever counter an older file kept', async () => {
         stored[PATH] = JSON.stringify({ type: 'FeatureCollection', metadata: { lastRef: 7 }, features: [{ ...mapFeature('m1'), properties: { ...mapFeature('m1').properties, id: 'm1', ref: '3' } }] });
         const m = start();
         await m.load();
         const measure = startDrawing('d1');
-        expect(measure.ddbProperties.ref).toBe('8');
+        expect(measure.ddbProperties.ref).toBe('4');
     });
 
-    it('a drawing that Potree takes back (never finished) gives its ref back; a measure that was kept and deleted does not', async () => {
+    it('the ref of a measure that is gone and was never saved is the next one again, a drawing taken back or a measure deleted', async () => {
         const m = start();
         await m.load();
         const drawing = startDrawing('d1');
@@ -605,7 +605,7 @@ describe('the id and the ref of the measures of the viewer', () => {
         finishDrawing(kept, 5);
         viewer.scene.removeMeasurement(kept);
         const next = startDrawing('d3');
-        expect(next.ddbProperties.ref).toBe('2');
+        expect(next.ddbProperties.ref).toBe('1');
     });
 
     it('undo brings a deleted measure back with its id and its ref and its fields, not new ones', async () => {

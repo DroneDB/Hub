@@ -1,8 +1,9 @@
 /**
  * The ids and the refs of the annotations of a measurements file, through the storage that reads and writes it:
  * a new file is 3.0 with the first ref, an older file is numbered by the first save of either view (the same ids
- * and refs whichever view saves first), a ref is never issued twice, and two views that issue the same ref
- * settle it when the second one saves.
+ * and refs whichever view saves first), the next ref is 1 plus the highest ref of the annotations (no counter is
+ * kept: the `lastRef` of an older file is dropped), and two views that issue the same ref settle it when the second
+ * one saves.
  */
 import { describe, it, expect, vi } from 'vitest';
 import Feature from 'ol/Feature';
@@ -90,13 +91,14 @@ const omit = (object, keys) => Object.fromEntries(Object.entries(object).filter(
 const byName = (file, name) => file.features.find(f => f.properties.name === name);
 
 describe('a new file', () => {
-    it('is 3.0, with lastRef and the first annotation having an id and ref "1"', async () => {
+    it('is 3.0, with the first annotation having an id and ref "1", and no counter', async () => {
         const { dataset, file } = memoryDataset();
         const storage = storageFor(dataset, MAP);
         expect(await storage.load()).toBeNull();
         const feature = areaFeature({ createdAt: '2026-02-01T00:00:00.000Z', id: 'new-id', ref: storage.refs.issue() });
         const result = await mapSave(storage, [feature]);
-        expect(file().metadata).toMatchObject({ version: FORMAT_VERSION, lastRef: 1 });
+        expect(file().metadata).toMatchObject({ version: FORMAT_VERSION });
+        expect(file().metadata).not.toHaveProperty('lastRef');
         expect(FORMAT_VERSION).toBe('3.0');
         expect(file().features[0].properties).toMatchObject({ id: 'new-id', ref: '1' });
         expect(file().features[0].id).toBe('new-id');
@@ -126,7 +128,7 @@ describe('a 2.0 file read by the map', () => {
         expect(pile.properties.ref).toBe('1');
         expect(field.properties).toMatchObject({ description: 'Wheat', stroke: '#112233', createdAt: OLD[1].time, name: 'Field', measurementType: 'area' });
         expect(pile.properties).toMatchObject({ title: 'North pile', netVolume: 8097.19, materialDensity: 1.8 });
-        expect(saved.metadata.lastRef).toBe(2);
+        expect(saved.metadata).not.toHaveProperty('lastRef');
     });
 
     it('is not changed by being loaded: what the map shows is the saved state, with ids and without refs', async () => {
@@ -144,7 +146,7 @@ describe('a 2.0 file read by the map', () => {
 });
 
 describe('the refs of the annotations', () => {
-    it('are never issued twice: 1, 2, 3, delete 2 and add: 4, delete 4 and add: 5; the others keep theirs', async () => {
+    it('are 1 plus the highest ref of the file and of the view: a deleted ref comes back only when it was the highest', async () => {
         const { dataset, file } = memoryDataset();
         const storage = storageFor(dataset, MAP);
         await storage.load();
@@ -153,26 +155,30 @@ describe('the refs of the annotations', () => {
         await mapSave(storage, items);
         expect(file().features.map(f => f.properties.ref).sort()).toEqual(['1', '2', '3']);
 
+        // 2 is deleted: it is not the highest, the next is 4
         const four = item(4, storage.refs.issue(['1', '3']));
         await mapSave(storage, [items[0], items[2], four]);
         expect(Object.fromEntries(file().features.map(f => [f.properties.id, f.properties.ref]))).toEqual({ i1: '1', i3: '3', i4: '4' });
 
-        // Another session of the same view loaded the file: its next ref is after lastRef
-        const five = item(5, storage.refs.issue(['1', '3']));
-        await mapSave(storage, [items[0], items[2], five]);
-        expect(Object.fromEntries(file().features.map(f => [f.properties.id, f.properties.ref]))).toEqual({ i1: '1', i3: '3', i5: '5' });
-        expect(file().metadata.lastRef).toBe(5);
+        // 4 is deleted on the map but still in the file: the next is 5 until the file loses it
+        expect(storage.refs.issue(['1', '3'])).toBe('5');
+        await mapSave(storage, [items[0], items[2]]);
+        const again = item(5, storage.refs.issue(['1', '3']));
+        expect(again.get('ref')).toBe('4');
+        await mapSave(storage, [items[0], items[2], again]);
+        expect(Object.fromEntries(file().features.map(f => [f.properties.id, f.properties.ref]))).toEqual({ i1: '1', i3: '3', i5: '4' });
+        expect(file().metadata).not.toHaveProperty('lastRef');
     });
 
-    it('are never issued again after a reload either: lastRef keeps the highest', async () => {
-        const { dataset } = memoryDataset();
-        const first = storageFor(dataset, MAP);
-        await first.load();
-        await mapSave(first, [areaFeature({ id: 'a', ref: first.refs.issue() }), areaFeature({ id: 'b', ref: first.refs.issue(['1']) }, 0.01)]);
-        await mapSave(first, [areaFeature({ id: 'a', ref: '1' })]);
-        const second = storageFor(dataset, MAP);
-        await second.load();
-        expect(second.refs.issue(['1'])).toBe('3');
+    it('are worked out from the file after a reload, whatever counter an older file kept', async () => {
+        const { dataset } = memoryDataset({
+            type: 'FeatureCollection',
+            metadata: { version: '3.0', kind: 'measurements', application: 'DroneDB Registry', createdAt: CREATED, modifiedAt: MODIFIED, lastRef: 457, views: {} },
+            features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[9.2, 45.2], [9.201, 45.2], [9.201, 45.201], [9.2, 45.2]]] }, properties: { id: 'a', ref: '2', measurementType: 'area' } }]
+        });
+        const storage = storageFor(dataset, MAP);
+        await storage.load();
+        expect(storage.refs.issue(['2'])).toBe('3');
     });
 
     it('settles a ref that two views issued: the second save gives its new item the next one and says so', async () => {
@@ -180,7 +186,7 @@ describe('the refs of the annotations', () => {
         const { dataset, file } = memoryDataset(start);
         // Number the file: 1 the distance, 2 and 3 the areas
         await mapSave(storageFor(dataset, MAP), await mapShows(storageFor(dataset, MAP)));
-        expect(file().metadata.lastRef).toBe(3);
+        expect(file().features.map(f => f.properties.ref).sort()).toEqual(['1', '2', '3']);
 
         const map = storageFor(dataset, MAP);
         const cloud = storageFor(dataset, POINT_CLOUD, { pointCloudCrs: UTM_18N_WKT });
@@ -203,7 +209,6 @@ describe('the refs of the annotations', () => {
         const saved = file();
         expect(saved.features.find(f => f.properties.id === 'map-new').properties.ref).toBe('5');
         expect(saved.features.find(f => f.properties.id === 'cloud-new').properties.ref).toBe('4');
-        expect(saved.metadata.lastRef).toBe(5);
 
         const warn = vi.spyOn(notify, 'warn').mockImplementation(() => {});
         notifyRenumbered(result);
@@ -245,7 +250,6 @@ describe('the refs of the annotations', () => {
             expect(byName(saved, 'Early').properties.ref).toBe('1');
             expect(saved.features.find(f => f.properties.id === 'map-new').properties.ref).toBe('4');
             expect(duplicateRefs(saved.features.map(f => f.properties.ref))).toEqual([]);
-            expect(saved.metadata.lastRef).toBe(4);
         });
 
         it('the 3D viewer gives its new item the next ref when the file gave its ref to a loaded distance', async () => {
@@ -265,7 +269,6 @@ describe('the refs of the annotations', () => {
             expect(saved.features.find(f => f.properties.id === distance.properties.id).properties.ref).toBe('1');
             expect(saved.features.find(f => f.properties.id === 'cloud-new').properties.ref).toBe('4');
             expect(duplicateRefs(saved.features.map(f => f.properties.ref))).toEqual([]);
-            expect(saved.metadata.lastRef).toBe(4);
         });
     });
 
@@ -321,7 +324,6 @@ describe('the first save of either view', () => {
         const same = afterCloud.features.find(f => f.properties.measurementType === 'distance');
         expect(same.properties.id).toBe(idInCloud);
         expect(same.properties.ref).toBe('1');
-        expect(afterCloud.metadata.lastRef).toBe(3);
         expect(afterCloud.features.filter(f => f.properties.measurementType === 'area').map(f => f.properties.ref).sort()).toEqual(['2', '3']);
         expect(result.refs[idInCloud]).toBe('1');
     });
@@ -357,7 +359,8 @@ describe('numberMeasurementFile (the save of a report)', () => {
         const result = await numberMeasurementFile(dataset, 'cloud_measurements.geojson');
         expect(result).toMatchObject({ path: 'cloud_measurements.geojson', written: true });
         const saved = file();
-        expect(saved.metadata).toMatchObject({ version: '3.0', lastRef: 3 });
+        expect(saved.metadata).toMatchObject({ version: '3.0' });
+        expect(saved.metadata).not.toHaveProperty('lastRef');
         expect(saved.features.map(f => f.properties.ref)).toEqual(['1', '3', '2']);
         saved.features.forEach((f, i) => {
             expect(f.properties.id).toMatch(/^[0-9a-f]{64}$/);
@@ -414,18 +417,17 @@ describe('contour lines', () => {
         const storage = storageFor(dataset, MAP);
         const result = await mapSave(storage, await mapShows(storage));
         expect(refsById(file())).toEqual({ c1: undefined, c2: undefined, a: '1' });
-        expect(file().metadata.lastRef).toBe(1);
         expect(result.refs).toEqual({ a: '1' });
     });
 
-    it('lose the refs an older Hub gave them, and the numbers stay issued: the next annotation is after them', async () => {
+    it('lose the refs an older Hub gave them, which do not count: the next annotation is after the annotations', async () => {
         const { dataset, file } = memoryDataset(file3([areaOf('a', { ref: '1' }), contour('c1', { ref: '2' }), contour('c2', { ref: '3' })], 3));
         const storage = storageFor(dataset, MAP);
         const shown = await mapShows(storage);
         const added = areaFeature({ id: 'new', createdAt: '2026-02-01T00:00:00.000Z' }, 0.02);
         await mapSave(storage, [...shown, added]);
-        expect(refsById(file())).toEqual({ a: '1', c1: undefined, c2: undefined, new: '4' });
-        expect(file().metadata.lastRef).toBe(4);
+        expect(refsById(file())).toEqual({ a: '1', c1: undefined, c2: undefined, new: '2' });
+        expect(file().metadata).not.toHaveProperty('lastRef');
         // The contours keep everything else
         expect(file().features.find(f => f.properties.id === 'c1').properties).toMatchObject({ elev: 162, unit: 'm', name: 'Contour 162.0 m' });
     });
@@ -460,9 +462,20 @@ describe('contour lines', () => {
     it('lose their refs when a report numbers the file, without being numbered', async () => {
         const { dataset, file } = memoryDataset(file3([contour('c1', { ref: '7' }), contour('c2'), areaOf('a')], 7));
         expect((await numberMeasurementFile(dataset, 'cloud_measurements.geojson')).written).toBe(true);
-        expect(refsById(file())).toEqual({ c1: undefined, c2: undefined, a: '8' });
-        expect(file().metadata.lastRef).toBe(8);
+        expect(refsById(file())).toEqual({ c1: undefined, c2: undefined, a: '1' });
+        expect(file().metadata).not.toHaveProperty('lastRef');
         // Nothing left to do: no second write
         expect((await numberMeasurementFile(dataset, 'cloud_measurements.geojson')).written).toBe(false);
+    });
+
+    // The file of the report: 165 contours an older Hub numbered up to 457, then stripped, and the counter left behind
+    it('leave no counter behind: a report drops the lastRef of an older file once, and the next point is 1', async () => {
+        const { dataset, file } = memoryDataset(file3([contour('c1'), contour('c2')], 457));
+        expect((await numberMeasurementFile(dataset, 'cloud_measurements.geojson')).written).toBe(true);
+        expect(file().metadata).not.toHaveProperty('lastRef');
+        expect((await numberMeasurementFile(dataset, 'cloud_measurements.geojson')).written).toBe(false);
+        const storage = storageFor(dataset, MAP);
+        await storage.load();
+        expect(storage.refs.issue()).toBe('1');
     });
 });

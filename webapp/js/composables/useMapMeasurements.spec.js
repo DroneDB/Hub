@@ -749,17 +749,21 @@ describe('useMapMeasurements', () => {
 
         it('a new measurement has the next reference after the ones of the file, the other view\'s too', async () => {
             stored['a/ortho_measurements.geojson'] = JSON.stringify({
-                type: 'FeatureCollection', metadata: { version: '3.0', lastRef: 6 },
-                features: [{ ...lengthFeature('m1'), properties: { ...lengthFeature('m1').properties, id: 'i1', ref: '2' } }]
+                type: 'FeatureCollection', metadata: { version: '3.0', lastRef: 457 },
+                features: [
+                    { ...lengthFeature('m1'), properties: { ...lengthFeature('m1').properties, id: 'i1', ref: '2' } },
+                    { type: 'Feature', geometry: null, properties: { measurementType: 'distance', localCoordinates: [[0, 0, 0]], id: 'cloud-1', ref: '6' } }
+                ]
             });
             const m = startWired();
             await m.loadSavedMeasurements();
             const added = drawn('n1');
             controls.identify(added);
+            // The counter an older file kept does not count
             expect(added.get('ref')).toBe('7');
             await m.saveMeasurements();
             expect(refOf('n1')).toBe('7');
-            expect(JSON.parse(stored['a/ortho_measurements.geojson']).metadata.lastRef).toBe(7);
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).metadata).not.toHaveProperty('lastRef');
         });
 
         it('says so when a save finds the reference of a new measurement taken by another session, and the map shows the new one', async () => {

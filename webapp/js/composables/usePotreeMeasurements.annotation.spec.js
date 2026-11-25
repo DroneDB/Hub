@@ -141,7 +141,8 @@ describe('the identity and the fields of an annotation', () => {
         const { m } = await start();
         await m.save();
         const saved = JSON.parse(stored[PATH]);
-        expect(saved.metadata).toMatchObject({ version: '3.0', lastRef: 1 });
+        expect(saved.metadata).toMatchObject({ version: '3.0' });
+        expect(saved.metadata).not.toHaveProperty('lastRef');
         expect(saved.features[0].properties).toMatchObject({ customKey: 5, ref: '1', name: "Gate A & B's" });
         expect(saved.features[0].properties.id).toMatch(/^[0-9a-f]{64}$/);
         expect(saved.features[0].id).toBe(saved.features[0].properties.id);

@@ -1,6 +1,6 @@
 /**
  * The identity of an annotation: the id a feature without one is given (the same for every reader), the refs that
- * are issued and never issued twice, and the rules of the fields.
+ * are issued (1 plus the highest ref of the annotations, worked out every time), and the rules of the fields.
  */
 import { describe, it, expect } from 'vitest';
 import { sha256Hex } from '@/libs/sha256';
@@ -71,21 +71,22 @@ describe('assignRefs', () => {
             area('2026-01-02T00:00:00Z', { id: 'b2' }),
             area(undefined, { id: 'n2' })
         ];
-        const { features: numbered, lastRef, assigned } = assignRefs(features);
+        const { features: numbered, assigned } = assignRefs(features);
         const refs = Object.fromEntries(numbered.map(f => [f.properties.id, f.properties.ref]));
         expect(refs).toEqual({ a: '1', b: '2', b2: '3', c: '4', n1: '5', n2: '6' });
-        expect(lastRef).toBe(6);
         expect(assigned).toBe(6);
         // Order of the file is kept
         expect(numbered.map(idOf)).toEqual(features.map(idOf));
     });
 
-    it('starts after the larger of lastRef and the highest integer ref, never reusing a ref', () => {
+    it('starts after the highest integer ref of the annotations, whatever counter the file kept', () => {
         const features = [area('t', { id: 'a', ref: '7' }), area('u', { id: 'b' })];
-        expect(assignRefs(features, { lastRef: 3 }).features[1].properties.ref).toBe('8');
-        expect(assignRefs(features, { lastRef: 12 }).features[1].properties.ref).toBe('13');
+        expect(assignRefs(features).features[1].properties.ref).toBe('8');
         // A ref that is not an integer does not count
         expect(assignRefs([area('t', { id: 'a', ref: 'A-1' }), area('u', { id: 'b' })]).features[1].properties.ref).toBe('1');
+        // Nor the ref an older Hub gave a contour: it is no annotation's
+        const contour = { type: 'Feature', geometry: null, properties: { measurementType: 'contour', id: 'c', ref: '457' } };
+        expect(assignRefs([contour, area('u', { id: 'b' })]).features[1].properties.ref).toBe('1');
     });
 
     it('changes nothing else of a feature, and nothing in a file where every feature has a ref', () => {
@@ -99,9 +100,9 @@ describe('assignRefs', () => {
 
     it('gives no ref to a feature that is no annotation (a contour line)', () => {
         const contour = { ...area('t', { id: 'c' }), properties: { measurementType: 'contour', createdAt: 't', id: 'c' } };
-        const { features, lastRef, assigned } = assignRefs([contour, area('u', { id: 'a' })]);
+        const { features, assigned } = assignRefs([contour, area('u', { id: 'a' })]);
         expect(features.map(refOf)).toEqual(['', '1']);
-        expect([lastRef, assigned]).toEqual([1, 1]);
+        expect(assigned).toBe(1);
     });
 
     it('breaks the ties of the creation time with the position the file gives', () => {
@@ -123,16 +124,15 @@ describe('renumberTaken', () => {
         const mine = area('t', { id: 'mine', ref: '4' });
         const saved = area('t', { id: 'saved', ref: '4' });
         const theirs = area('u', { id: 'theirs', ref: '4' });
-        const result = renumberTaken([mine, saved, theirs], f => f === mine, 4);
+        const result = renumberTaken([mine, saved, theirs], f => f === mine);
         expect(result.changes).toEqual([{ id: 'mine', from: '4', to: '5' }]);
         expect(result.features.map(refOf)).toEqual(['5', '4', '4']);
-        expect(result.lastRef).toBe(5);
         expect(renumberedMessage(result.changes[0])).toBe('Reference 4 was taken; the item is now 5');
     });
 
     it('returns the same features when no new ref is taken', () => {
         const features = [area('t', { id: 'a', ref: '1' }), area('u', { id: 'b', ref: '2' })];
-        const result = renumberTaken(features, f => idOf(f) === 'a', 2);
+        const result = renumberTaken(features, f => idOf(f) === 'a');
         expect(result.features).toBe(features);
         expect(result.changes).toEqual([]);
     });
@@ -140,9 +140,9 @@ describe('renumberTaken', () => {
     it('counts the ref of every saved feature as taken, of the view that saves too (another session numbered it)', () => {
         const loaded = area('t', { id: 'loaded', ref: '1' });
         const mine = area('u', { id: 'mine', ref: '1' });
-        const result = renumberTaken([loaded, mine], f => f === mine, 2);
-        expect(result.changes).toEqual([{ id: 'mine', from: '1', to: '3' }]);
-        expect(result.features.map(refOf)).toEqual(['1', '3']);
+        const result = renumberTaken([loaded, mine], f => f === mine);
+        expect(result.changes).toEqual([{ id: 'mine', from: '1', to: '2' }]);
+        expect(result.features.map(refOf)).toEqual(['1', '2']);
     });
 });
 
@@ -161,43 +161,44 @@ describe('refs', () => {
 });
 
 describe('RefSequence', () => {
-    const doc = (lastRef, features) => ({ metadata: { lastRef }, features });
+    const doc = (features, metadata = {}) => ({ metadata, features });
     const mapOnly = f => ownerOf(f) === 'pointCloud';
+    const contour = (ref) => ({ type: 'Feature', geometry: null, properties: { measurementType: 'contour', id: `c${ref}`, ref } });
 
-    it('issues the next ref after the file\'s lastRef, its highest ref and what it issued, deleted or not', () => {
+    it('issues 1 plus the highest ref of the file and of the view, worked out again every time', () => {
         const sequence = new RefSequence();
-        sequence.observe(doc(2, [area('t', { id: 'a', ref: '1' }), area('t', { id: 'b', ref: '3' })]), mapOnly);
+        sequence.observe(doc([area('t', { id: 'a', ref: '1' }), area('t', { id: 'b', ref: '3' })]), mapOnly);
         expect(sequence.issue()).toBe('4');
         expect(sequence.issue(['4'])).toBe('5');
-        // The annotation of 5 is deleted: the ref is not issued again
-        expect(sequence.issue(['4'])).toBe('6');
+        // The annotation of 5 is deleted before it was saved: 5 is the next one again
+        expect(sequence.issue(['4'])).toBe('5');
+        expect(sequence.issue(['4', '5'])).toBe('6');
+    });
+
+    it('does not count the lastRef counter of an older file, nor the refs an older Hub gave the contours', () => {
+        const sequence = new RefSequence();
+        sequence.observe(doc([contour('456'), contour('457')], { lastRef: 457 }), mapOnly);
+        expect(sequence.issue()).toBe('1');
+        expect(sequence.isTaken('457')).toBe(false);
+    });
+
+    it('gives a ref no annotation of the file or of the view has', () => {
+        const sequence = new RefSequence();
+        const cloud = { type: 'Feature', geometry: null, properties: { id: 'c', ref: '7', localCoordinates: [[0, 0, 0]] } };
+        sequence.observe(doc([cloud, area('t', { id: 'a', ref: '2' })]), mapOnly);
+        const own = ['2', '3'];
+        const ref = sequence.issue(own);
+        expect(ref).toBe('8');
+        expect(sequence.isTaken(ref, own)).toBe(false);
     });
 
     it('knows the refs of the features the view leaves alone, for the refs a user types', () => {
         const sequence = new RefSequence();
         const cloud = { type: 'Feature', geometry: null, properties: { id: 'c', ref: 'P-1', localCoordinates: [[0, 0, 0]] } };
-        sequence.observe(doc(0, [cloud, area('t', { id: 'a', ref: '1' })]), mapOnly);
+        sequence.observe(doc([cloud, area('t', { id: 'a', ref: '1' })]), mapOnly);
         expect(sequence.isTaken('P-1')).toBe(true);
         expect(sequence.isTaken('1')).toBe(false);
         expect(sequence.isTaken('1', ['1'])).toBe(true);
-    });
-
-    it('takes back the ref just issued, not one the file had', () => {
-        const sequence = new RefSequence();
-        sequence.observe(doc(3, []), mapOnly);
-        const ref = sequence.issue();
-        sequence.release(ref);
-        expect(sequence.issue()).toBe('4');
-        sequence.release('3');
-        expect(sequence.issue()).toBe('5');
-    });
-
-    it('does not take back a ref that is not the last one issued', () => {
-        const sequence = new RefSequence();
-        const first = sequence.issue();
-        sequence.issue([first]);
-        sequence.release(first);
-        expect(sequence.issue()).toBe('3');
     });
 });
 

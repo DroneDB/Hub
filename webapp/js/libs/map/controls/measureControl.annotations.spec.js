@@ -63,17 +63,35 @@ describe('a measurement that is made', () => {
 
     it('takes its reference from the sequence of the file the host gives, which knows the refs of the other view', () => {
         sequence = new RefSequence();
-        sequence.observe({ metadata: { lastRef: 5 }, features: [] }, () => false);
+        const distance = { type: 'Feature', geometry: null, properties: { measurementType: 'distance', id: 'd', ref: '5' } };
+        // The counter an older file kept does not count
+        sequence.observe({ metadata: { lastRef: 457 }, features: [distance] }, () => true);
         drawLine();
         expect(refs()).toEqual(['6']);
     });
 
-    it('is not given a reference twice after the annotation that had it is deleted', () => {
+    it('is 1 plus the highest reference: the one of a deleted annotation comes back only when it was the highest', () => {
         drawLine();
         drawLine();
         control.deleteMeasurement(control.source.getFeatures().find(f => f.get('ref') === '2'));
         drawLine();
-        expect(refs()).toEqual(['1', '3']);
+        expect(refs()).toEqual(['1', '2']);
+        control.deleteMeasurement(control.source.getFeatures().find(f => f.get('ref') === '1'));
+        drawLine();
+        expect(refs()).toEqual(['2', '3']);
+    });
+
+    // A file an older Hub saved: its contours were numbered up to 457, and the map shows them with those refs until
+    // its next save takes them away
+    it('does not count the reference of a contour line, and never gets one that is used', () => {
+        const contour = new Feature(new LineString([[0, 0], [10, 0]]));
+        contour.setProperties({ measurementType: 'contour', id: 'c1', ref: '457' });
+        control.source.addFeature(contour);
+        drawLine();
+        const line = control.source.getFeatures().find(f => f.get('measurementType') === 'length');
+        expect(line.get('ref')).toBe('1');
+        expect(control.isRefTaken('1', line)).toBe(false);
+        expect(control.isRefTaken('457', line)).toBe(false);
     });
 });
 
@@ -118,7 +136,7 @@ describe('the reference of a point annotation just placed', () => {
         expect(point().get('ref')).toBe('1');
     });
 
-    it('is not given again when a measurement that was kept is deleted', () => {
+    it('is given again when the measurement that had it is deleted before it was saved', () => {
         const kept = new Feature(new Point([0, 0]));
         kept.set('measurementType', 'point');
         control.source.addFeature(kept);
@@ -128,7 +146,46 @@ describe('the reference of a point annotation just placed', () => {
         next.set('measurementType', 'point');
         control.source.addFeature(next);
         control.identify(next);
-        expect(next.get('ref')).toBe('2');
+        expect(next.get('ref')).toBe('1');
+    });
+
+    it('is not kept when a second point is placed before its dialog was answered: only the second one stays', () => {
+        vi.useFakeTimers();
+        try {
+            control.btnPoint.click();
+            const place = at => {
+                const feature = new Feature(new Point(at));
+                control.source.addFeature(feature);
+                control.draw.dispatchEvent({ type: 'drawend', feature });
+                return feature;
+            };
+            // A double click: both points are placed before the first dialog opens
+            const first = place([0, 0]);
+            const second = place([1, 1]);
+            vi.advanceTimersByTime(20);
+            expect(control.source.getFeatures()).toEqual([second]);
+            // Numbered once the first was gone: no gap
+            expect(second.get('ref')).toBe('1');
+            expect(dialogs.at(-1)).toMatchObject({ isNew: true, feature: second });
+            expect(dialogs.at(-1).isRefTaken('1')).toBe(false);
+            expect(first.get('ref')).toBe('1');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('stays when its dialog was saved, and a dialog of another measurement opens after it', () => {
+        const point = new Feature(new Point([0, 0]));
+        point.set('measurementType', 'point');
+        control.source.addFeature(point);
+        control.identify(point);
+        control.openPropertiesDialog(point, { isNew: true });
+        dialogs.at(-1).onSave({ name: 'Gate' });
+        const line = new Feature(new LineString([[0, 0], [10, 0]]));
+        line.setProperties({ measurementType: 'length', id: 'l1', ref: '2' });
+        control.source.addFeature(line);
+        control.openPropertiesDialog(line);
+        expect(control.source.getFeatures()).toContain(point);
     });
 });
 

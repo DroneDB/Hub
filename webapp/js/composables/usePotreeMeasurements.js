@@ -156,12 +156,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         properties.ref = storageFor().refs.issue(viewerRefs(viewer, target));
     }
 
-    // A drawing Potree takes back (one marker, never finished) is not kept: its ref is free again
+    // A drawing Potree takes back: one marker, never finished
     const isUnfinished = measure => (measure.points || []).length < 2 && measure.maxMarkers > 1;
-    function releaseRef(measure) {
-        const ref = measure && isUnfinished(measure) && measure[PROPERTY_BAG] && measure[PROPERTY_BAG].ref;
-        if (ref) storageFor().refs.release(ref);
-    }
 
     function editMeasure(measure) {
         openDialog(MeasurementPropertiesDialog, {
@@ -332,7 +328,6 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         });
         session.track(scene, 'measurement_removed', e => {
             countMeasurements();
-            releaseRef(e && e.measurement);
             recordRemoved(e && e.measurement);
         });
         session.track(scene.annotations, 'annotation_added', e => {

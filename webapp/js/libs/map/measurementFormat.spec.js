@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-    read, write, parse, sectionOf, ownerOf, VIEW, FORMAT_VERSION, APPLICATION_ID, MeasurementFileError, LEGACY_GEOMETRY
+    read, write, writeNumbered, parse, sectionOf, ownerOf, VIEW, FORMAT_VERSION, APPLICATION_ID, MeasurementFileError, LEGACY_GEOMETRY
 } from './measurementFormat';
 import {
     mapFile10, mapFile11, pointCloudFile10, pointCloudFile11, pointCloudFileNoSrs, mixedFile,
@@ -285,7 +285,6 @@ describe('read: format 3.0', () => {
         const file = file3();
         const doc = read(file);
         expect(doc.features).toEqual(file.features);
-        expect(doc.metadata.lastRef).toBe(2);
         expect(doc.metadata.version).toBe('3.0');
     });
 
@@ -295,13 +294,12 @@ describe('read: format 3.0', () => {
         try { read({ ...file3(), metadata: { ...file3().metadata, version: '4.0' } }); } catch (e) { expect(e.code).toBe('unsupported'); }
     });
 
-    it('is written by a write that keeps lastRef, never lowers it, and raises it to the highest ref', () => {
+    it('is written without the lastRef counter an earlier writer kept (the next ref is worked out from the refs)', () => {
         const existing = read(file3());
         const kept = write(existing, VIEW.MAP, existing.features.slice(0, 1), {});
-        expect(kept.metadata.lastRef).toBe(2);
-        expect(write(null, VIEW.MAP, [], {}).metadata.lastRef).toBeUndefined();
-        const higher = write(existing, VIEW.MAP, [{ ...existing.features[0], properties: { ...existing.features[0].properties, ref: '9' } }], {});
-        expect(higher.metadata.lastRef).toBe(9);
+        expect(kept.metadata).not.toHaveProperty('lastRef');
+        expect(write(null, VIEW.MAP, [], {}).metadata).not.toHaveProperty('lastRef');
+        expect(writeNumbered(existing, VIEW.MAP, existing.features, {}).document.metadata).not.toHaveProperty('lastRef');
     });
 });
 

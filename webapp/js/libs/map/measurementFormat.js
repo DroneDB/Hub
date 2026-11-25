@@ -5,13 +5,14 @@
  *
  * A file is a GeoJSON FeatureCollection whose `metadata` holds the format version (3.0; the writers
  * before it wrote 1.0, 1.1 and 2.0), the application ('DroneDB Registry'), `createdAt` (kept by every save),
- * `modifiedAt` (set by every save), `lastRef` (the highest reference the Hub issued: annotationIds) and
- * `views`: what belongs to one view only, under the view's key (`views.map`: groups, unitPreference,
+ * `modifiedAt` (set by every save) and `views`: what belongs to one view only, under the view's key (`views.map`: groups, unitPreference,
  * orthophotoFile; `views.pointCloud`: pointCloudFile, coordinateSystem). The features of the two views are
  * in the same list (see ownerOf), and each has an `id` and a `ref` (annotationIds).
  *
- * Version 3.0 is 2.0 plus the `id` and `ref` of every feature, the inspection fields and `lastRef`: a Hub
- * that reads only major version 2 refuses a 3.0 file instead of saving it without them.
+ * Version 3.0 is 2.0 plus the `id` and `ref` of every feature and the inspection fields: a Hub that reads only
+ * major version 2 refuses a 3.0 file instead of saving it without them. The next ref is worked out from the refs
+ * of the file (annotationIds): the `metadata.lastRef` counter that earlier 3.0 writers kept is not read, and every
+ * write leaves it out.
  *
  *   read(json, ctx)                                the file as a 3.0 document, migrated in memory; never writes.
  *                                                  A feature with no `id` has the one annotationIds gives it
@@ -42,7 +43,7 @@
  */
 import { EPSG } from '@/libs/constants';
 import { projectorFor, geometryOf, localPointsOf, srsDefinitionOf, sameCrs } from '@/libs/map/pointCloudGeometry';
-import { backfillIds, assignRefs, renumberTaken, withoutStrayRefs, idOf, refOf, highestRef } from '@/libs/map/annotationIds';
+import { backfillIds, assignRefs, renumberTaken, withoutStrayRefs, idOf, refOf } from '@/libs/map/annotationIds';
 import { withSavedContours } from '@/libs/map/contourStorage';
 
 export const FORMAT_VERSION = '3.0';
@@ -354,16 +355,17 @@ function cleanSection(section) {
  * @param {string} view
  * @param {any[]} ownFeatures
  * @param {Record<string, any>} ownSection
- * @param {{ numbered: boolean, issued?: number }} options
+ * @param {{ numbered: boolean }} options
  * @returns {Written}
  */
-function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0 }) {
+function compose(existing, view, ownFeatures, ownSection, { numbered }) {
     // A document that is not 3.0 yet is migrated first, so nothing is written in an old shape
     const previous = existing ? read(existing) : null;
     const previousMetadata = (previous && previous.metadata) || {};
     const previousFeatures = (previous && previous.features) || [];
     const members = without(previous || {}, ['type', 'crs', 'metadata', 'features']);
     const { createdAt, views: previousViews } = previousMetadata;
+    // `lastRef`: the counter of earlier writers, which no reader uses
     const others = without(previousMetadata, ['version', 'application', 'kind', 'createdAt', 'modifiedAt', 'views', 'lastRef']);
     const now = new Date().toISOString();
 
@@ -376,7 +378,6 @@ function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0
 
     let own = ownFeatures || [];
     let features = [...own, ...kept];
-    let lastRef = Math.max(Number(previousMetadata.lastRef) || 0, issued, highestRef(features.map(refOf).filter(Boolean)));
     /** @type {{ id: string, from: string, to: string }[]} */
     let renumbered = [];
 
@@ -387,12 +388,11 @@ function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0
             const known = idOf(feature) ? saved.get(idOf(feature)) : undefined;
             return !refOf(feature) && known && known.ref ? withProperty(feature, 'ref', known.ref) : feature;
         });
-        // A feature that is no annotation (a contour an older Hub numbered) loses its ref; lastRef keeps it issued
+        // A feature that is no annotation (a contour an older Hub numbered) loses its ref
         own = withoutStrayRefs(own).features;
         const ownSet = new Set(own);
-        ({ features, lastRef, changes: renumbered } = renumberTaken([...own, ...withoutStrayRefs(kept).features], f => ownSet.has(f) && !saved.has(idOf(f)), lastRef));
-        ({ features, lastRef } = assignRefs(features, {
-            lastRef,
+        ({ features, changes: renumbered } = renumberTaken([...own, ...withoutStrayRefs(kept).features], f => ownSet.has(f) && !saved.has(idOf(f))));
+        ({ features } = assignRefs(features, {
             fileOrder: (feature, index) => saved.get(idOf(feature))?.index ?? previousFeatures.length + index
         }));
     }
@@ -413,7 +413,6 @@ function compose(existing, view, ownFeatures, ownSection, { numbered, issued = 0
             createdAt: createdAt ?? now,
             modifiedAt: now,
             ...others,
-            ...(lastRef > 0 ? { lastRef } : {}),
             views
         },
         features
@@ -451,37 +450,36 @@ export function write(existing, view, ownFeatures, ownSection = {}) {
  *    has, of either view (another save came first and issued it, or gave it to a feature this view loaded without
  *    one), takes the next ref, and is listed in `renumbered`;
  *  - a feature that is no annotation (a contour) has no ref: one it was given is taken away (withoutStrayRefs);
- *  - the annotations still without one get the next refs in creation order (annotationIds.assignRefs);
- *  - `metadata.lastRef` is the larger of the file's, `issued` (the highest the view issued) and the highest ref
- *    of the document.
+ *  - the annotations still without one get the next refs in creation order (annotationIds.assignRefs).
  * The view takes `refs` back into its own features (it has no refs where the file gave it new ones) and tells
  * the user about `renumbered`.
  * @param {Record<string, any> | null | undefined} existing  the file as the storage reads it now, null for a new one
  * @param {string} view  a VIEW
  * @param {any[]} ownFeatures
  * @param {Record<string, any>} [ownSection]
- * @param {{ issued?: number }} [options]  `issued`: the highest ref the view issued
  * @returns {Written}
  */
-export function writeNumbered(existing, view, ownFeatures, ownSection = {}, { issued = 0 } = {}) {
-    return compose(existing, view, ownFeatures, ownSection, { numbered: true, issued });
+export function writeNumbered(existing, view, ownFeatures, ownSection = {}) {
+    return compose(existing, view, ownFeatures, ownSection, { numbered: true });
 }
 
 /**
  * The document that a numbering save writes: the file as it is with the `ref` every annotation lacks (and the
- * `id` of every feature, which a read gave them), and without the ref of a feature that is no annotation (its
- * number stays issued: `lastRef`). The features keep their view and their order.
+ * `id` of every feature, which a read gave them), without the ref of a feature that is no annotation, and without
+ * the `lastRef` counter of earlier writers. The features keep their view and their order.
  * @param {Record<string, any>} document  the file as `read` gives it
- * @returns {{ document: Record<string, any>, numbered: boolean }}  `numbered`: whether any feature got a ref (a file
- *   whose features all have both, and that is 3.0 already, needs no save)
+ * @returns {{ document: Record<string, any>, numbered: boolean }}  `numbered`: whether the file changed (a file
+ *   whose features all have both, that is 3.0 already and has no counter, needs no save)
  */
 export function numberDocument(document) {
     const { features: annotated, removed } = withoutStrayRefs(document.features);
-    const { features, lastRef, assigned } = assignRefs(annotated, { lastRef: Math.max(Number(document.metadata?.lastRef) || 0, highestRef(document.features.map(refOf).filter(Boolean))) });
-    const upToDate = !assigned && !removed && versionOf(document.metadata?.version)[0] >= MAX_MAJOR && document.features.every((/** @type {any} */ f) => idOf(f));
+    const { features, assigned } = assignRefs(annotated);
+    const metadata = isObject(document.metadata) ? document.metadata : {};
+    const upToDate = !assigned && !removed && !('lastRef' in metadata) && versionOf(metadata.version)[0] >= MAX_MAJOR
+        && document.features.every((/** @type {any} */ f) => idOf(f));
     const next = {
         ...document,
-        metadata: { ...without(document.metadata, ['version', 'modifiedAt']), version: FORMAT_VERSION, modifiedAt: new Date().toISOString(), ...(lastRef > 0 ? { lastRef } : {}) },
+        metadata: { ...without(metadata, ['version', 'modifiedAt', 'lastRef']), version: FORMAT_VERSION, modifiedAt: new Date().toISOString() },
         features
     };
     return { document: upToDate ? document : next, numbered: !upToDate };

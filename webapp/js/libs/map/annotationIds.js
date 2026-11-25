@@ -10,10 +10,10 @@
  * the file before either has saved it agree on it, and a view that loaded it before another one saved it
  * finds the id that save wrote.
  *
- * `ref`: a string of 1 to 8 letters, digits and dashes. The Hub issues the integers 1, 2, 3 ... and never
- * issues one twice in a file, also after the annotation that had it is deleted: `metadata.lastRef` keeps
- * the highest one, and the next is 1 plus the larger of that and the highest integer ref in the file.
- * An annotation keeps its ref when others are added, deleted or reordered. A feature without one is given
+ * `ref`: a string of 1 to 8 letters, digits and dashes. The Hub issues the integers 1, 2, 3 ...: the next
+ * ref is always worked out again, 1 plus the highest integer ref of the annotations (those of the file and those
+ * the view has made), and no counter is kept. A deleted annotation's ref comes back only when it was the highest
+ * one. An annotation keeps its ref when others are added, deleted or reordered. A feature without one is given
  * one by the first save of either view (assignRefs).
  *
  * Not every feature of a file is an annotation: the lines a tool generates by the hundred (the contours of a
@@ -110,8 +110,13 @@ export function withoutStrayRefs(features) {
     };
 }
 
-/** @param {any[]} features @returns {string[]} the refs the features have */
-const refsOf = features => features.map(refOf).filter(Boolean);
+/**
+ * The refs of the features that are annotations: the ones the next ref comes after (a ref an older Hub gave a
+ * contour is no annotation's).
+ * @param {any[]} features
+ * @returns {string[]}
+ */
+const annotationRefsOf = features => features.filter(f => isObject(f) && isAnnotation(f)).map(refOf).filter(Boolean);
 
 /**
  * The features of a file with the `id` each one lacks: the lower-case hex SHA-256 of the JSON array
@@ -164,29 +169,29 @@ export function inCreationOrder(entries) {
 }
 
 /**
- * The features with the refs that were missing, and the highest ref issued. A feature without a ref gets the
- * next one: 1 plus the larger of `lastRef` and the highest integer ref of the features. The ones without
- * one are numbered in creation order (inCreationOrder), whichever view they belong to; a feature that is
- * no annotation (isAnnotation) gets none. Every other feature and every other property stay as they are.
+ * The features with the refs that were missing. A feature without a ref gets the next one: 1 plus the highest
+ * integer ref of the annotations. The ones without one are numbered in creation order (inCreationOrder),
+ * whichever view they belong to; a feature that is no annotation (isAnnotation) gets none. Every other feature
+ * and every other property stay as they are.
  * @param {any[]} features  all the features of the file, in the order they will be written
- * @param {{ lastRef?: number, fileOrder?: (feature: any, index: number) => number }} [options]  `lastRef`: the
- *   highest ref the file says was issued; `fileOrder`: the position of a feature in the file it was read from
- *   (its index in `features` by default), which breaks the ties of the creation time
- * @returns {{ features: any[], lastRef: number, assigned: number }}  `assigned`: how many refs were issued
+ * @param {{ fileOrder?: (feature: any, index: number) => number }} [options]  `fileOrder`: the position of a
+ *   feature in the file it was read from (its index in `features` by default), which breaks the ties of the
+ *   creation time
+ * @returns {{ features: any[], assigned: number }}  `assigned`: how many refs were issued
  */
-export function assignRefs(features, { lastRef = 0, fileOrder = (_feature, index) => index } = {}) {
-    let counter = Math.max(lastRef, highestRef(refsOf(features)));
+export function assignRefs(features, { fileOrder = (_feature, index) => index } = {}) {
+    let counter = highestRef(annotationRefsOf(features));
     const missing = features
         .map((feature, index) => ({ feature, index: fileOrder(feature, index), at: index }))
         .filter(({ feature }) => isObject(feature) && isAnnotation(feature) && !refOf(feature));
-    if (!missing.length) return { features, lastRef: Math.max(lastRef, counter), assigned: 0 };
+    if (!missing.length) return { features, assigned: 0 };
 
     const result = [...features];
     for (const { feature, at } of inCreationOrder(missing)) {
         counter++;
         result[at] = { ...feature, properties: { ...(isObject(feature.properties) ? feature.properties : {}), ref: String(counter) } };
     }
-    return { features: result, lastRef: counter, assigned: missing.length };
+    return { features: result, assigned: missing.length };
 }
 
 /**
@@ -197,12 +202,11 @@ export function assignRefs(features, { lastRef = 0, fileOrder = (_feature, index
  * the file's, shown as a warning).
  * @param {any[]} features  all the features of the file, with the refs the file holds for the saved ones
  * @param {(feature: any) => boolean} isNew  whether a feature was never saved
- * @param {number} lastRef  the highest ref the file says was issued
- * @returns {{ features: any[], lastRef: number, changes: { id: string, from: string, to: string }[] }}
+ * @returns {{ features: any[], changes: { id: string, from: string, to: string }[] }}
  */
-export function renumberTaken(features, isNew, lastRef) {
+export function renumberTaken(features, isNew) {
     const used = new Set(features.filter(f => !isNew(f)).map(refOf).filter(Boolean));
-    let counter = Math.max(lastRef, highestRef(refsOf(features)));
+    let counter = highestRef(annotationRefsOf(features));
     /** @type {{ id: string, from: string, to: string }[]} */
     const changes = [];
     const result = features.map(feature => {
@@ -212,7 +216,7 @@ export function renumberTaken(features, isNew, lastRef) {
         changes.push({ id: idOf(feature), from: ref, to });
         return { ...feature, properties: { ...feature.properties, ref: to } };
     });
-    return { features: changes.length ? result : features, lastRef: Math.max(lastRef, counter), changes };
+    return { features: changes.length ? result : features, changes };
 }
 
 /**
@@ -232,18 +236,16 @@ export function duplicateRefs(refs) {
 }
 
 /**
- * The refs a view issues while it is open, and the refs it knows other features have. A view reads the
- * file (observe), issues a ref to each annotation made in it (issue: the next after every ref it knows
- * and every ref it issued, so a deleted annotation's ref is not issued again), and tells a user who types a
- * ref whether the file already uses it (isTaken). The save decides in the end (renumberTaken).
+ * The refs of the file a view shows, as it last read or wrote it. A view issues a ref to each annotation made in
+ * it (issue: 1 plus the highest ref of the file's annotations and of the view's, worked out again every time),
+ * and tells a user who types a ref whether another annotation uses it (isTaken). The save decides in the end
+ * (renumberTaken).
  */
 export class RefSequence {
     constructor() {
-        /** The highest ref known: the file's `lastRef`, its highest ref and what the view issued */
-        this.floor = 0;
-        /** What the file's own highest was when it was read (a ref issued after that can be taken back) */
-        this._base = 0;
-        /** The refs of the features that the view does not own (the ones it neither shows nor saves), in file order, repeats kept */
+        /** The refs of the file's annotations, of both views, as the file was last read or written */
+        this.fileRefs = /** @type {string[]} */ ([]);
+        /** The refs of the annotations that the view does not own (the ones it neither shows nor saves), in file order, repeats kept */
         this.foreignRefs = /** @type {string[]} */ ([]);
         /** The same refs as a set */
         this.foreign = new Set();
@@ -251,32 +253,23 @@ export class RefSequence {
 
     /**
      * Takes the file as it is now.
-     * @param {{ metadata?: any, features?: any[] } | null | undefined} document  as measurementFormat reads it
+     * @param {{ features?: any[] } | null | undefined} document  as measurementFormat reads it
      * @param {(feature: any) => boolean} isForeign  whether the view leaves the feature alone
      */
     observe(document, isForeign) {
         const features = Array.isArray(document?.features) ? document.features : [];
-        const lastRef = Number(document?.metadata?.lastRef);
-        const known = Math.max(Number.isFinite(lastRef) ? lastRef : 0, highestRef(refsOf(features)));
-        this.floor = Math.max(this.floor, known);
-        this._base = Math.max(this._base, known);
-        this.foreignRefs = features.filter(isForeign).map(refOf).filter(Boolean);
+        this.fileRefs = annotationRefsOf(features);
+        this.foreignRefs = annotationRefsOf(features.filter(isForeign));
         this.foreign = new Set(this.foreignRefs);
     }
 
     /**
-     * The next ref.
-     * @param {Iterable<string>} [inUse]  the refs of the annotations of the view that are not in the file yet
+     * The next ref: 1 plus the highest integer ref of the file's annotations and of `inUse`.
+     * @param {Iterable<string>} [inUse]  the refs of the view's annotations (the ones it shows, saved or not)
      * @returns {string}
      */
     issue(inUse = []) {
-        this.floor = Math.max(this.floor, highestRef(inUse)) + 1;
-        return String(this.floor);
-    }
-
-    /** Takes back the ref just issued when the annotation it was for is not kept (a point that was discarded). @param {string} ref */
-    release(ref) {
-        if (integerRef(ref) === this.floor && this.floor > this._base) this.floor--;
+        return String(Math.max(highestRef(this.fileRefs), highestRef(inUse)) + 1);
     }
 
     /**

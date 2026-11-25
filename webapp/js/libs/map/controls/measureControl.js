@@ -182,6 +182,8 @@ class MeasureControls extends Control {
         // Renders a dialog inside the app (useDialogs().open) and returns its handle
         this.openDialog = options.openDialog;
         this._dialog = null;
+        // The point just placed whose dialog is open: it is not kept until its dialog is saved
+        this._unkeptPoint = null;
 
         this.source = new VectorSource();
         // A measurement that another tool made (a profile) comes without an id: it gets its id and ref when it is added.
@@ -1340,9 +1342,16 @@ class MeasureControls extends Control {
         return this.getRefSequence() || this._ownRefs;
     }
 
-    /** The refs that the measurements on the map have, except the one of `except`. @param {ol.Feature} [except] @returns {string[]} */
+    /**
+     * The refs that the annotations on the map have, except the one of `except` (a contour of a file an older Hub
+     * numbered keeps its ref until it is saved, and it is no annotation's).
+     * @param {ol.Feature} [except]
+     * @returns {string[]}
+     */
     _refsOnMap(except) {
-        return this.source.getFeatures().filter(f => f !== except).map(f => f.get('ref')).filter(Boolean).map(String);
+        return this.source.getFeatures()
+            .filter(f => f !== except && isAnnotationType(f.get('measurementType')))
+            .map(f => f.get('ref')).filter(Boolean).map(String);
     }
 
     /**
@@ -1362,12 +1371,6 @@ class MeasureControls extends Control {
     identify(feature) {
         if (!feature.get('id')) feature.set('id', newId());
         if (!feature.get('ref') && isAnnotationType(feature.get('measurementType'))) feature.set('ref', this._refSequence().issue(this._refsOnMap(feature)));
-    }
-
-    /** Takes back the ref of a measurement that is not kept (a point annotation that was discarded). @param {ol.Feature} feature */
-    _releaseRef(feature) {
-        const ref = feature.get('ref');
-        if (ref) this._refSequence().release(String(ref));
     }
 
     /**
@@ -1401,12 +1404,15 @@ class MeasureControls extends Control {
     /**
      * The properties dialog of a measurement or a point annotation: the one dialog of a measurement, however it is
      * opened (a double click, the edit button of a point's callout, the measurement list, a point just placed). A
-     * measurement that exists has a Delete button; a point just placed has Discard, which removes it.
+     * measurement that exists has a Delete button; a point just placed has Discard, which removes it, as any other
+     * close of its dialog does (closePropertiesDialog).
      * @param {ol.Feature} feature - The measurement feature to edit.
      * @param {{ isNew?: boolean }} [options] isNew: a point just placed
      */
     openPropertiesDialog(feature, { isNew = false } = {}) {
         this.closePropertiesDialog();
+        if (isNew) this._unkeptPoint = feature;
+        const settle = () => { if (this._unkeptPoint === feature) this._unkeptPoint = null; };
 
         const geometry = feature.getGeometry();
         const isPoint = feature.get('measurementType') === 'point';
@@ -1421,6 +1427,7 @@ class MeasureControls extends Control {
             isRefTaken: ref => this.isRefTaken(ref, feature),
             photoContext: this._photoContext(feature),
             onSave: ({ groupId, newGroup, coordinates, ...properties }) => {
+                settle();
                 Object.keys(properties).forEach(key => feature.set(key, properties[key]));
                 // A group made in the dialog is made now that the measurement is saved in it
                 this.setMeasurementGroupId(feature, newGroup ? this.createGroup(newGroup) : groupId);
@@ -1445,9 +1452,8 @@ class MeasureControls extends Control {
             },
             // A point just placed and not kept
             onDiscard: () => {
-                this._releaseRef(feature);
-                this.source.removeFeature(feature);
-                this.refreshButtons();
+                settle();
+                this._discardPoint(feature);
             },
             onClose: () => {
                 this._dialog = null;
@@ -1456,13 +1462,23 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Close properties dialog
+     * Closes the properties dialog. A point just placed whose dialog was not saved is not kept: a second click of the
+     * point tool before its dialog was answered leaves no point the user never confirmed.
      */
     closePropertiesDialog() {
+        const unkept = this._unkeptPoint;
+        this._unkeptPoint = null;
         if (this._dialog) {
             this._dialog.close();
             this._dialog = null;
         }
+        if (unkept) this._discardPoint(unkept);
+    }
+
+    /** Removes a point just placed that is not kept. @param {ol.Feature} feature */
+    _discardPoint(feature) {
+        if (this.source.hasFeature(feature)) this.source.removeFeature(feature);
+        this.refreshButtons();
     }
 
     deselectCurrent() {
@@ -1641,6 +1657,9 @@ class MeasureControls extends Control {
                     setTimeout(() => {
                         feat.set('measurementType', 'point');
                         feat.set('createdAt', new Date().toISOString());
+                        // A point placed before it (a double click) whose dialog was not answered goes first, so
+                        // that this one is numbered without it
+                        self.closePropertiesDialog();
                         self.identify(feat);
 
                         self.openPropertiesDialog(feat, { isNew: true });

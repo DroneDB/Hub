@@ -141,7 +141,7 @@ export class MeasurementStorage {
          * there are any, so the file keeps them.
          */
         this.unplaced = 0;
-        /** The refs this view issues and the ones of the file's other features it knows (annotationIds.RefSequence) */
+        /** The refs of the file, which the refs this view issues come after (annotationIds.RefSequence) */
         this.refs = new RefSequence();
         /** @type {Promise<any> | null} */
         this._schema = null;
@@ -252,7 +252,7 @@ export class MeasurementStorage {
             const previous = await this._read();
             const own = geojsonData.features || [];
             // The first save of either view gives every feature of the file its ref (the other view's too)
-            const { document, refs, renumbered } = writeNumbered(previous, this.owner, own, sectionOf(geojsonData, this.owner), { issued: this.refs.floor });
+            const { document, refs, renumbered } = writeNumbered(previous, this.owner, own, sectionOf(geojsonData, this.owner));
             const result = { path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner, refs, renumbered };
             if (!document.features.length) {
                 await this._deleteIfPresent();
