@@ -1,7 +1,8 @@
 <template>
     <Window id="annotation-properties" title="Annotation" modal fixed-size size-class="dialog-lg" @close="cancel" @confirm="save">
         <div class="annotation-properties-form">
-            <AnnotationTabs v-model:photos="photos" :photo-context="photoContext" :item-name="formData.name">
+            <AnnotationTabs v-model:photos="photos" v-model:tab="tab" :photo-context="photoContext"
+                            :item-name="formData.name" :snapshot="captureAction.snapshot.value" :can-capture="!!capture">
                 <!-- What names the item: its name and its reference, side by side -->
                 <div class="name-row">
                     <div>
@@ -55,7 +56,7 @@ import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_LIMITS, inspectionSummary, storedFields } from '@/libs/map/annotationIds';
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
 import { annotationFieldsOf } from '@/libs/potree/measureStyle';
-import { useCaptureAction } from '@/libs/reports/snapshots/useCaptureAction';
+import { useDialogCapture } from '@/libs/reports/snapshots/useCaptureAction';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
@@ -72,7 +73,7 @@ import { useCaptureAction } from '@/libs/reports/snapshots/useCaptureAction';
  *   showDelete    - Whether to show the Delete button (default: true).
  *   schema        - The organization's annotation schema (categories, severities, statuses).
  *   isRefTaken    - Says whether another annotation of the file has a reference (the one edited does not count).
- *   photoContext  - What the Photos tab needs ({ dataset, measurementPath, itemId, geometry, readOnly, photos }, see
+ *   photoContext  - What the Photos tab needs ({ dataset, measurementPath, itemId, geometry, readOnly, photos, snapshot }, see
  *                   AnnotationTabs). Without it the dialog has no Photos tab and saves none; with it `save` has `photos`
  *                   when they were changed (undefined for none left).
  *   capture       - { run } of the "Capture for report" button (a writer's: it writes the 3D view as the annotation's picture
@@ -114,7 +115,7 @@ export default {
         const sections = useFoldedSections('annotation-properties', {
             opened: () => (props.annotation && inspectionSummary(annotationFieldsOf(props.annotation), props.schema) ? ['inspection'] : [])
         });
-        return { FIELD_LIMITS, sections, captureAction: useCaptureAction(() => props.capture) };
+        return { FIELD_LIMITS, sections, ...useDialogCapture(props) };
     },
     data() {
         return {

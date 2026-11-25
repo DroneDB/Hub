@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { loadPotree } from './potreeLibs.fixtures';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
-import { updateNameLabel } from './measureLabels';
+import { updateItemLabel } from './measureLabels';
 import { measureAsFeature, assignMeasureProperties } from './measureStyle';
 
 const NAME = 'Gate A & B <img src=x onerror=alert(1)>';
@@ -19,9 +19,8 @@ const context2d = new Proxy({}, {
     set: (target, key, value) => { target[key] = value; return true; }
 });
 
-let Potree;
 beforeAll(() => {
-    Potree = loadPotree();
+    loadPotree();
     const original = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (type, ...args) { return type === '2d' ? context2d : original.call(this, type, ...args); };
 });
@@ -103,31 +102,20 @@ describe('the name of a measure', () => {
 
     it('is shown in its label and its tooltip as the text, & once', () => {
         const THREE = globalThis.THREE;
-        const sprites = [];
-        const real = Potree.TextSprite;
-        Potree.TextSprite = class extends THREE.Object3D {
-            constructor(text) {
-                super();
-                sprites.push(text);
-                this.material = {};
-                Object.assign(this, { setTextColor() {}, setBorderColor() {}, setBackgroundColor() {} });
-            }
-        };
-        try {
-            const measure = Object.assign(new THREE.Object3D(), {
-                name: 'Tom &amp; Jerry &lt;3', description: 'a & b', points: [{ position: new THREE.Vector3(1, 2, 3) }]
-            });
-            const viewer = { scene: { getActiveCamera: () => ({ position: new THREE.Vector3() }) }, renderer: { domElement: document.createElement('canvas') } };
-            const session = { track: vi.fn(), untrack: vi.fn(), adopt: el => el };
+        const measure = Object.assign(new THREE.Object3D(), {
+            name: 'Tom &amp; Jerry &lt;3', description: 'a & b', points: [{ position: new THREE.Vector3(1, 2, 3) }, { position: new THREE.Vector3(4, 5, 6) }]
+        });
+        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+        camera.position.set(0, 0, 50);
+        camera.updateMatrixWorld();
+        const viewer = { scene: { getActiveCamera: () => camera }, renderer: { domElement: document.createElement('canvas') } };
+        const session = { track: vi.fn(), untrack: vi.fn(), adopt: el => el };
 
-            updateNameLabel(measure, { viewer, session });
+        updateItemLabel(measure, { viewer, session });
 
-            expect(sprites).toEqual(['Tom & Jerry <3']);
-            expect(measure._nameLabelTooltip.querySelector('strong').textContent).toBe('Tom & Jerry <3');
-            expect(measure._nameLabelTooltip.innerHTML).toBe('<strong>Tom &amp; Jerry &lt;3</strong><br>a &amp; b');
-        } finally {
-            Potree.TextSprite = real;
-        }
+        expect(measure._itemLabel.lines).toEqual([{ text: 'Tom & Jerry <3', kind: 'name' }, { text: 'a & b', kind: 'description' }]);
+        expect(measure._itemLabelTooltip.querySelector('strong').textContent).toBe('Tom & Jerry <3');
+        expect(measure._itemLabelTooltip.innerHTML).toBe('<strong>Tom &amp; Jerry &lt;3</strong><br>a &amp; b');
     });
 });
 

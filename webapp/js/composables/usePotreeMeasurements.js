@@ -22,7 +22,7 @@ import { unstatedMeasurementCrs } from '@/libs/build/pointCloudCrs';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
 import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/measureSnapshot';
-import { measureAt, annotationElement, updateNameLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
+import { measureAt, annotationElement, updateItemLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { focusItem as focusViewerItem } from '@/libs/potree/itemFocus';
 import { captureForReport } from '@/libs/potree/captureForReport';
@@ -80,7 +80,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         try { return fn(); } finally { replaying--; }
     };
 
-    const labelCtx = () => ({ viewer, session });
+    // The labels name the category and the severity of an item from the organization's schema
+    const labelCtx = () => ({ viewer, session, schema: () => annotationSchema });
     // The file's migration needs the CRS of the cloud's coordinates when the file states none: the COPC's when it was
     // written, which is the file's for a COPC built since in another CRS
     const storageFor = () => storage
@@ -113,10 +114,10 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     });
 
     // What the Photos tab of the dialog of a measure or an annotation needs: the dataset, the file it is saved in (the
-    // uploads go beside it), its id and photos, and its WGS84 geometry as the save would write it (none for a cloud with
+    // uploads go beside it), its id, photos and capture, and its WGS84 geometry as the save would write it (none for a cloud with
     // no CRS: such an item is not sent to the coverage query)
     function photoContext(target) {
-        const { id, photos } = ensureProperties(target);
+        const { id, photos, snapshot } = ensureProperties(target);
         let geometry = null;
         try {
             geometry = documentFeatureGeometry(exportMeasurements(viewer, entry.value.path, coordinateSystem), id);
@@ -130,7 +131,9 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             readOnly: !canWrite.value,
             itemId: id,
             geometry,
-            photos: photos || []
+            photos: photos || [],
+            // The capture of the item for reports, shown above its photos
+            snapshot: snapshot || null
         };
     }
 
@@ -170,7 +173,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
                 assignMeasureProperties(measure, properties);
                 if ('photos' in properties) applyPhotos(ensureProperties(measure), properties.photos);
                 applyMeasureStyle(measure);
-                updateNameLabel(measure, labelCtx());
+                updateItemLabel(measure, labelCtx());
             }
         });
     }
@@ -256,7 +259,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         measure.lengthUnitDisplay = viewer.lengthUnitDisplay;
         measure.update();
         applyMeasureStyle(measure);
-        updateNameLabel(measure, labelCtx());
+        updateItemLabel(measure, labelCtx());
     }
 
     function addCopy(entry) {
@@ -370,7 +373,11 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     async function load() {
         try {
             const geojson = await storageFor().load();
-            storageFor().annotationSchema().then(schema => { annotationSchema = schema; });
+            storageFor().annotationSchema().then(schema => {
+                annotationSchema = schema;
+                // The labels drawn before the schema came show its names and colours now
+                if (alive && viewer) (viewer.scene.measurements || []).forEach(measure => updateItemLabel(measure, labelCtx()));
+            });
             if (error.value === loadErrorText) error.value = '';
             if (!geojson) return;
             const { imported, unplaced } = replay(() => importMeasurements(geojson, viewer, coordinateSystem)) || { imported: [], unplaced: 0 };

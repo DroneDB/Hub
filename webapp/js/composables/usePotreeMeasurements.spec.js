@@ -18,7 +18,7 @@ const labels = vi.hoisted(() => ({ measureAt: null }));
 vi.mock('@/libs/potree/measureLabels', () => ({
     measureAt: vi.fn((...args) => (labels.measureAt ? labels.measureAt(...args) : null)),
     annotationElement: () => null,
-    updateNameLabel: vi.fn(),
+    updateItemLabel: vi.fn(),
     updateAnnotationTooltip: vi.fn()
 }));
 // The viewer's measures are plain objects here: the converter writes and reads them as features
@@ -50,7 +50,7 @@ vi.mock('@/libs/reports/reportSettings', async importOriginal => {
 });
 
 const { usePotreeMeasurements } = await import('./usePotreeMeasurements');
-const { updateNameLabel } = await import('@/libs/potree/measureLabels');
+const { updateItemLabel } = await import('@/libs/potree/measureLabels');
 
 // Minimal stand-ins for the THREE / Potree globals the viewer loads: a restored measure is a new
 // Potree.Measure, with Potree's defaults (maxMarkers has no limit)
@@ -121,7 +121,7 @@ const inFile = () => (PATH in stored ? JSON.parse(stored[PATH]).features.map(f =
 
 beforeEach(() => {
     flash.mockClear();
-    updateNameLabel.mockClear();
+    updateItemLabel.mockClear();
     labels.measureAt = null;
     stored = { [PATH]: JSON.stringify({ type: 'FeatureCollection', features: [mapFeature('m1'), viewerFeature('v1')] }) };
     dataset = {
@@ -520,7 +520,7 @@ describe('usePotreeMeasurements', () => {
             expect(copy.update).toHaveBeenCalled();
             expect(copy.edges[0].material.linewidth).toBe(4);
             expect(copy.spheres[0].material.color.getHexString()).toBe('00ff00');
-            expect(updateNameLabel).toHaveBeenCalledWith(copy, expect.anything());
+            expect(updateItemLabel).toHaveBeenCalledWith(copy, expect.anything());
         });
 
         it('keeps the description and the look of a deleted measure brought back by undo', () => {

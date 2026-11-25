@@ -1,11 +1,14 @@
 /**
  * Picking and labels of Potree measurements: the measure under
- * the pointer, a name label that keeps its screen size, and the description tooltips of
- * measures and annotations. Listeners and body-level nodes go through the viewer's
+ * the pointer, the label of a measure (its name, category, severity and description: itemLabel) that keeps its screen
+ * size, and the description tooltips of measures and annotations. Listeners and body-level nodes go through the viewer's
  * PotreeSession, so they are released with the viewer. Names and descriptions come from
  * saved files: they are escaped before they reach innerHTML.
  */
 import { escapeHtml, textToHtml, htmlToText } from '@/libs/sanitize';
+import { measureLabelFactor } from '@/libs/measureScale';
+import { annotationFieldsOf } from '@/libs/potree/measureStyle';
+import { itemLabelClass, itemLabelLines } from '@/libs/potree/itemLabel';
 
 /** A raycaster from the camera through the pointer. */
 function pointerRaycaster(viewer, event) {
@@ -49,7 +52,7 @@ const placeAt = (tooltip, x, y) => {
     tooltip.style.top = (y - 10) + 'px';
 };
 
-/** Where a measure's name goes: area centroid, beside a point, beside a line's middle. */
+/** Where a measure's label goes: area centroid, beside a point, beside a line's middle. */
 function labelPosition(measure) {
     const points = measure.points;
     const position = new THREE.Vector3();
@@ -71,52 +74,120 @@ function labelPosition(measure) {
     return position.add(offset);
 }
 
-/** Removes a measure's name label, its tooltip and their listeners. */
-function clearNameLabel(measure, { viewer, session }) {
-    if (measure._nameLabel) measure.remove(measure._nameLabel);
-    if (measure._nameLabelTooltip) measure._nameLabelTooltip.remove();
+/** Removes a measure's label, its tooltip and their listeners. */
+function clearItemLabel(measure, { viewer, session }) {
+    if (measure._itemLabel) {
+        measure.remove(measure._itemLabel);
+        measure._itemLabel.dispose?.();
+    }
+    if (measure._itemLabelTooltip) measure._itemLabelTooltip.remove();
     if (measure._labelUpdateHandler) session.untrack(viewer, 'update', measure._labelUpdateHandler);
     if (measure._tooltipHoverHandler) session.untrack(viewer.renderer.domElement, 'mousemove', measure._tooltipHoverHandler);
-    measure._nameLabel = measure._nameLabelTooltip = measure._labelUpdateHandler = measure._tooltipHoverHandler = null;
+    measure._itemLabel = measure._itemLabelTooltip = measure._labelUpdateHandler = measure._tooltipHoverHandler = null;
+}
+
+/** How far above its point the label of a point stands, in CSS px. */
+const POINT_LABEL_GAP_PX = 12;
+/** Potree's rule for the screen size of its labels: 70 over the projected radius of one unit (see its MeasuringTool). */
+const POTREE_LABEL_SIZE = 70;
+
+/** The size of the view in CSS px. */
+const viewSize = viewer => ({ width: viewer.renderer.domElement.clientWidth || 1, height: viewer.renderer.domElement.clientHeight || 1 });
+
+/**
+ * The point `px` CSS px above `world` on the screen, at the same distance from the camera.
+ * @param {any} camera
+ * @param {any} world  a Vector3
+ * @param {number} px
+ * @param {number} height  the height of the view in CSS px
+ */
+function aboveOnScreen(camera, world, px, height) {
+    const distance = camera.position.distanceTo(world);
+    const ndc = world.clone().project(camera);
+    ndc.y += (2 * px) / height;
+    const point = ndc.unproject(camera);
+    if (!camera.isPerspectiveCamera) return point;
+    return point.sub(camera.position).normalize().multiplyScalar(distance).add(camera.position);
 }
 
 /**
- * (Re)draws the measure's name as a sprite of constant screen size, with its description
- * in a tooltip while the pointer is over it. No name: no label.
- * @param {any} measure
- * @param {{ viewer: any, session: import('@/libs/potree/potreeSession').PotreeSession }} ctx
+ * How many CSS px one unit of the scene is at this distance from the camera (Potree's Utils.projectedRadius of 1).
+ * @param {any} camera
+ * @param {number} distance
+ * @param {{ width: number, height: number }} size
  */
-export function updateNameLabel(measure, ctx) {
-    const { viewer, session } = ctx;
-    clearNameLabel(measure, ctx);
-    // Potree holds the name as HTML: the label and the tooltip show its text
-    const name = htmlToText(measure.name);
-    if (!name.trim() || !measure.points || !measure.points.length) return;
+function pixelsPerUnit(camera, distance, { width, height }) {
+    if (camera.isOrthographicCamera) return (camera.projectionMatrix.elements[0] * width) / 2;
+    return height / (2 * Math.tan((camera.fov * Math.PI) / 360) * Math.max(distance, 1e-6));
+}
 
-    const label = new Potree.TextSprite(name);
-    label.setTextColor({ r: 255, g: 255, b: 255, a: 1.0 });
-    label.setBorderColor({ r: 0, g: 0, b: 0, a: 1.0 });
-    label.setBackgroundColor({ r: 0, g: 0, b: 0, a: 0.7 });
-    label.fontsize = 16;
+/**
+ * The scale that gives a label the screen size Potree gives its own at this distance, times the factor of a large view.
+ * @param {any} camera
+ * @param {number} distance
+ * @param {{ width: number, height: number }} size
+ */
+function labelScale(camera, distance, size) {
+    return (POTREE_LABEL_SIZE / pixelsPerUnit(camera, distance, size)) * measureLabelFactor(size.height);
+}
+
+/**
+ * The text of an item of the viewer, as its label shows it: its name and description as text, and its category and
+ * severity.
+ * @param {any} measure
+ */
+const labelItemOf = measure => {
+    const { category, severity } = annotationFieldsOf(measure);
+    return { name: htmlToText(measure.name), description: measure.description || '', category, severity };
+};
+
+/**
+ * (Re)draws the label of a measure (itemLabel: its name, its category and severity, its description) as a sprite of
+ * constant screen size, with the whole description in a tooltip while the pointer is over it. A point shows the label
+ * above it instead of its coordinates. An item with nothing to show has no label (and a point its coordinates).
+ * @param {any} measure
+ * @param {{ viewer: any, session: import('@/libs/potree/potreeSession').PotreeSession, schema?: () => any }} ctx
+ *   schema: the organization's categories and severities, for their names and the colour of a severity
+ */
+export function updateItemLabel(measure, ctx) {
+    const { viewer, session } = ctx;
+    clearItemLabel(measure, ctx);
+    const item = labelItemOf(measure);
+    const lines = itemLabelLines(item, ctx.schema?.());
+    if (!lines.length || !measure.points || !measure.points.length) return;
+
+    const ItemLabel = itemLabelClass(Potree);
+    const label = new ItemLabel('');
     label.material.depthTest = false;
     label.material.opacity = 1;
+    label.setLines(lines);
+    const isPoint = measure.points.length === 1;
+    // A point's label stands above it: its bottom edge is the anchor
+    if (isPoint && label.sprite?.center) label.sprite.center.set(0.5, 0);
     label.position.copy(labelPosition(measure));
 
-    // Constant screen size: scale with the camera distance
-    const rescale = () => {
-        const scale = viewer.scene.getActiveCamera().position.distanceTo(label.position) * 0.30 * 0.02;
+    // Each frame, after Potree's measuring tool placed and sized its own labels: the place and the screen size, and a
+    // point's coordinates hidden (Potree shows them again at each update of the measure)
+    const place = () => {
+        const camera = viewer.scene.getActiveCamera();
+        const size = viewSize(viewer);
+        if (isPoint && measure.points[0]) {
+            label.position.copy(aboveOnScreen(camera, measure.points[0].position, POINT_LABEL_GAP_PX, size.height));
+            (measure.coordinateLabels || []).forEach(coordinates => { coordinates.visible = false; });
+        }
+        const scale = labelScale(camera, camera.position.distanceTo(label.position), size);
         label.scale.set(scale, scale, scale);
     };
-    rescale();
-    measure._labelUpdateHandler = rescale;
-    session.track(viewer, 'update', rescale);
-    measure._nameLabel = label;
+    place();
+    measure._labelUpdateHandler = place;
+    session.track(viewer, 'update', place);
+    measure._itemLabel = label;
     measure.add(label);
 
-    if (!measure.description || !measure.description.trim()) return;
+    if (!item.description.trim()) return;
     const tooltip = bodyTooltip(session, 'potree-measurement-tooltip',
-        `<strong>${escapeHtml(name)}</strong><br>${escapeHtml(measure.description)}`);
-    measure._nameLabelTooltip = tooltip;
+        `${item.name.trim() ? `<strong>${escapeHtml(item.name)}</strong><br>` : ''}${escapeHtml(item.description)}`);
+    measure._itemLabelTooltip = tooltip;
     const dom = viewer.renderer.domElement;
     measure._tooltipHoverHandler = event => {
         if (pointerRaycaster(viewer, event).intersectObject(label, true).length > 0) {

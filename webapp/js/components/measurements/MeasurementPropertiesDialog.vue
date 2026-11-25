@@ -1,7 +1,8 @@
 <template>
     <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-lg" @close="cancel" @confirm="save">
         <div class="measurement-properties-form">
-            <AnnotationTabs v-model:photos="photos" :photo-context="photoContext" :item-name="formData.name">
+            <AnnotationTabs v-model:photos="photos" v-model:tab="tab" :photo-context="photoContext"
+                            :item-name="formData.name" :snapshot="captureAction.snapshot.value" :can-capture="!!capture">
                 <!-- What names the item: its name and its reference, side by side -->
                 <div class="name-row">
                     <div class="name-field">
@@ -123,7 +124,7 @@ import MeasurementGroupDialog from '@/components/measurements/MeasurementGroupDi
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_KEYS, FIELD_LIMITS, inspectionSummary, storedFields } from '@/libs/map/annotationIds';
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
-import { useCaptureAction } from '@/libs/reports/snapshots/useCaptureAction';
+import { useDialogCapture } from '@/libs/reports/snapshots/useCaptureAction';
 import { toLonLat } from 'ol/proj';
 import { latLonText, latLonDmsText, parseLatLon } from '@/libs/format';
 import { useCopyText } from '@/composables/useCopyText';
@@ -179,8 +180,8 @@ export default {
             type: Function,
             default: () => false
         },
-        // What the Photos tab needs ({ dataset, measurementPath, itemId, geometry, readOnly, photos }, see AnnotationTabs;
-        // photos: the ones the annotation has): without it the dialog has no Photos tab and saves none
+        // What the Photos tab needs ({ dataset, measurementPath, itemId, geometry, readOnly, photos, snapshot }, see AnnotationTabs;
+        // photos: the ones the annotation has, snapshot: its capture for reports): without it the dialog has no Photos tab and saves none
         photoContext: {
             type: Object,
             default: null
@@ -200,7 +201,7 @@ export default {
         const sections = useFoldedSections('annotation-properties', {
             opened: () => (inspectionSummary(fieldsOf(props.feature), props.schema) ? ['inspection'] : [])
         });
-        return { copyCoords, coordsCopied, FIELD_LIMITS, sections, captureAction: useCaptureAction(() => props.capture) };
+        return { copyCoords, coordsCopied, FIELD_LIMITS, sections, ...useDialogCapture(props) };
     },
     data() {
         return {
