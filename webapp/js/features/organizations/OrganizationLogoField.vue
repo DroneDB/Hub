@@ -11,7 +11,7 @@
         </div>
         <input ref="fileInput" type="file" hidden accept="image/*" aria-label="Logo file" @change="onFileChosen">
         <small v-if="busy" class="d-block mt-1 text-muted" role="status">Preparing and sending the logo…</small>
-        <small class="d-block mt-1 text-muted">PNG, JPEG, WebP, GIF, BMP, AVIF or SVG, up to {{ LOGO_MAX_INPUT_BYTES / (1024 * 1024) }} MB. Hub shrinks a large image to {{ LOGO_MAX_EDGE }} pixels and saves it as WebP (an SVG stays an SVG, an animation keeps its first picture), at most {{ ORG_LOGO_BYTES / 1024 }} KB. It shows beside the name of the organization.</small>
+        <small class="d-block mt-1 text-muted">Any image or SVG, up to {{ LOGO_MAX_INPUT_BYTES / (1024 * 1024) }} MB.</small>
         <FieldError id="organization-logo-error" :message="error" />
 
         <ConfirmDialog v-if="removalOpen"
@@ -38,7 +38,7 @@ import OrgLogo from '@/components/OrgLogo.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { ORG_LOGO_BYTES, orgLogoProblem } from '@/libs/ddb/organizationsApi';
 import { formMessageOf } from '@/libs/forms/serverErrors';
-import { LOGO_MAX_EDGE, LOGO_MAX_INPUT_BYTES, describeLogo, prepareLogo } from '@/libs/logoImage';
+import { LOGO_MAX_INPUT_BYTES, describeLogo, prepareLogo } from '@/libs/logoImage';
 import { notify } from '@/libs/notify';
 import { escapeHtml } from '@/libs/sanitize';
 

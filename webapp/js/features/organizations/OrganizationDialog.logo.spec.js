@@ -116,14 +116,11 @@ describe('OrganizationDialog: upload', () => {
         expect(hoisted.notify.success).toHaveBeenCalledWith('Saved as SVG, 3 KB', { summary: 'Logo saved' });
     });
 
-    it('accepts any image for the file chooser, and says what Hub does with it', async () => {
+    it('accepts any image for the file chooser, and gives the size limit', async () => {
         await render();
         expect(body().querySelector('input[type="file"]').getAttribute('accept')).toBe('image/*');
         const hint = body().querySelector('.logo-field').textContent;
-        expect(hint).toContain('PNG, JPEG, WebP, GIF, BMP, AVIF or SVG, up to 20 MB');
-        expect(hint).toContain('shrinks a large image to 512 pixels and saves it as WebP');
-        expect(hint).toContain('an SVG stays an SVG');
-        expect(hint).toContain('at most 256 KB');
+        expect(hint).toContain('Any image or SVG, up to 20 MB.');
     });
 
     it('starts from the logo the organization has, and offers Replace and Remove', async () => {
