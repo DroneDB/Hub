@@ -449,8 +449,11 @@ export default {
 }
 
 /* A name wraps at its words (inside one only when it is longer than the tile) and stops after two lines.
-   It always takes two lines, in em so that they follow the font size: the tile height is fixed. */
+   It always takes two lines, in em so that they follow the font size: the tile height is fixed.
+   It keeps clear of the sides of the tile, where the outline of a selected or focused tile is drawn inside it:
+   a name that fills its line (broken inside a word) ran under the outline. */
 .thumbnail .thumbnail-label {
+    padding-inline: var(--tile-spacing);
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: var(--tile-label-lines);
