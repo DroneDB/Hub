@@ -1,6 +1,6 @@
 /** orgLogo: the initials of an organization and the look they take on its colour. */
 import { describe, it, expect } from 'vitest';
-import { colourChannels, initialsLook, orgInitials } from './orgLogo';
+import { ORG_LOGO_FILLS, initialsLook, orgInitials } from './orgLogo';
 
 describe('orgInitials', () => {
     it('takes the first letters of the first two words of the name, in capitals', () => {
@@ -26,25 +26,64 @@ describe('orgInitials', () => {
     });
 });
 
-describe('colourChannels', () => {
-    it('reads the rgba and the hsla the maps hand out, and nothing else', () => {
-        expect(colourChannels('rgba(66, 133, 244, 0.8)')).toEqual([66, 133, 244]);
-        expect(colourChannels('hsla(0, 100%, 50%, 0.8)')).toEqual([255, 0, 0]);
-        expect(colourChannels('hsla(120, 100%, 25%, 1)')).toEqual([0, 128, 0]);
-        expect(colourChannels('var(--x)')).toBeNull();
-    });
-});
+/** The hue, 0-360, of a #rrggbb colour. */
+function hueOf(hex) {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const max = Math.max(r, g, b);
+    const d = max - Math.min(r, g, b);
+    if (d === 0) return 0;
+    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+}
+
+/** WCAG contrast of two #rrggbb colours (the dark text and the fill; white is #fff). */
+function contrast(a, b) {
+    const lum = hex => {
+        const [r, g, bl] = [1, 3, 5].map(i => {
+            const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+    };
+    const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+}
 
 describe('initialsLook', () => {
-    it('is an opaque fill with white text on a dark colour', () => {
-        expect(initialsLook('rgba(171, 71, 188, 0.8)')).toEqual({ background: 'rgb(171, 71, 188)', color: '#ffffff' });
+    it('is the same fill for the same slug, whatever the name', () => {
+        expect(initialsLook('acme')).toEqual(initialsLook('acme'));
+        expect(initialsLook('acme').background).toBe(initialsLook('acme').background);
     });
 
-    it('takes the dark text on a light colour (the yellow of the palette)', () => {
-        expect(initialsLook('rgba(253, 216, 53, 0.8)')).toEqual({ background: 'rgb(253, 216, 53)', color: '#111827' });
+    it('spreads the slugs over the fills', () => {
+        const used = new Set(Array.from({ length: 200 }, (_, i) => initialsLook(`org-${i}`).background));
+        expect(used.size).toBe(ORG_LOGO_FILLS.length);
     });
 
-    it('keeps a colour it cannot read, with white text', () => {
-        expect(initialsLook('tomato')).toEqual({ background: 'tomato', color: '#ffffff' });
+    it('never gives an orange, a red or a yellow (hue 0-60 and 330-360), for any of many slugs', () => {
+        const slugs = ['', 'a', 'acme', 'survey-team', 'public', ...Array.from({ length: 2000 }, (_, i) => `org-${i}-${(i * 7919).toString(36)}`)];
+        for (const slug of slugs) {
+            const { background } = initialsLook(slug);
+            const hue = hueOf(background);
+            expect(hue > 60 && hue < 330, `${slug} -> ${background} has hue ${Math.round(hue)}`).toBe(true);
+        }
+        for (const fill of ORG_LOGO_FILLS) {
+            // Slate has hardly any hue: grey is not a warm colour either
+            const hue = hueOf(fill);
+            expect(hue > 60 && hue < 330, fill).toBe(true);
+        }
+    });
+
+    it('gives each fill a text that reads on it (4.5:1), white or the dark text', () => {
+        for (const fill of ORG_LOGO_FILLS) {
+            const { background, color } = initialsLook([...Array(500).keys()].map(i => `s${i}`).find(slug => initialsLook(slug).background === fill));
+            expect(['#ffffff', '#111827']).toContain(color);
+            expect(contrast(background, color), `${color} on ${fill}`).toBeGreaterThanOrEqual(4.5);
+        }
+    });
+
+    it('does not depend on the theme: it names no theme token', () => {
+        const { background, color } = initialsLook('acme');
+        expect(`${background}${color}`).not.toMatch(/var\(/);
     });
 });

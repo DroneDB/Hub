@@ -11,15 +11,13 @@
  * OrgLogo - the logo of an organization, in the one tile every page draws it in (the header of the organization, the
  * list, the breadcrumb, the pickers, the legend of the map). The image is the organization's `logoUrl` (a versioned
  * address of the Registry, so a new logo is a new address); an organization without one, and one whose image fails to
- * load, shows its initials on its colour (the colour the map gives it, `organizationColour`).
+ * load, shows its initials on a fill its slug gives (`initialsLook`: one of a few blues, greens and purples, never orange,
+ * red or yellow, the same in both themes).
  *
  *   <OrgLogo :org="org" size="lg" />
  *   <OrgLogo :org="org" decorative />   next to the name, which says it already
- *
- * `colour` overrides the colour of the initials: the legend of the map passes the colour of its pin.
  */
 import { computed, ref, watch } from 'vue';
-import { organizationColour } from '@/libs/map/vectorColours';
 import { initialsLook, orgInitials } from '@/libs/orgLogo';
 
 defineOptions({ name: 'OrgLogo' });
@@ -30,9 +28,7 @@ const props = defineProps({
     /** sm (the line of text), md (a row of a list), lg (the header of a page) */
     size: { type: String, default: 'md', validator: value => ['sm', 'md', 'lg'].includes(value) },
     /** The name is written next to the logo: the logo is for the eye only (no alternative text) */
-    decorative: { type: Boolean, default: false },
-    /** The colour of the initials; the organization's own when none is given */
-    colour: { type: String, default: '' }
+    decorative: { type: Boolean, default: false }
 });
 
 // The address that failed to load: a new logo (a new address) is tried again
@@ -46,7 +42,7 @@ watch(() => props.org?.logoUrl, () => { failedSrc.value = ''; });
 const sizeClass = computed(() => `org-logo-${props.size}`);
 const label = computed(() => `Logo of ${props.org?.name || props.org?.slug || 'the organization'}`);
 const initials = computed(() => orgInitials(props.org));
-const look = computed(() => initialsLook(props.colour || organizationColour(props.org?.slug ?? '')));
+const look = computed(() => initialsLook(props.org?.slug ?? ''));
 </script>
 
 <style scoped>

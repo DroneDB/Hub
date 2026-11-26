@@ -1,12 +1,10 @@
 /**
- * OrgLogo: the image of the organization when it has a logo; its initials on the colour of its slug when it has none or
- * when the image does not load, the colour of the map's legend when one is given; alternative text unless the name is
- * beside it.
+ * OrgLogo: the image of the organization when it has a logo; its initials on the fill of its slug when it has none or
+ * when the image does not load; alternative text unless the name is beside it.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import OrgLogo from './OrgLogo.vue';
-import { organizationColour } from '@/libs/map/vectorColours';
 import { initialsLook } from '@/libs/orgLogo';
 
 let wrapper;
@@ -31,7 +29,7 @@ describe('OrgLogo', () => {
         expect(tile.text()).toBe('AD');
         expect(tile.attributes('role')).toBe('img');
         expect(tile.attributes('aria-label')).toBe('Logo of Acme Drone Lab');
-        const look = initialsLook(organizationColour('acme'));
+        const look = initialsLook('acme');
         expect(tile.element.style.background).toBe(look.background);
         expect(tile.element.style.color).toBe(look.color);
     });
@@ -49,13 +47,9 @@ describe('OrgLogo', () => {
     it('has the same colour for the same slug, and another for another slug', () => {
         const colourOf = org => { render({ org: { ...org, logoUrl: null } }); const c = wrapper.find('.org-logo-initials').element.style.background; wrapper.unmount(); return c; };
         expect(colourOf({ slug: 'acme', name: 'One' })).toBe(colourOf({ slug: 'acme', name: 'Two' }));
-        expect(colourOf({ slug: 'acme', name: 'x' })).not.toBe(colourOf({ slug: 'survey-team', name: 'x' }));
-    });
-
-    it('takes the colour it is given (the one of the pin in the legend of the map)', () => {
-        render({ org: { ...acme, logoUrl: null }, colour: 'rgba(171, 71, 188, 0.8)' });
-        expect(wrapper.find('.org-logo-initials').element.style.background).toBe('rgb(171, 71, 188)');
-        expect(wrapper.find('.org-logo-initials').element.style.color).toBe('#ffffff');
+        // A few fills are shared by many slugs: the slugs do not all get one
+        const others = new Set(['survey-team', 'drone-lab', 'alice', 'roof', 'north', 'east'].map(slug => colourOf({ slug, name: 'x' })));
+        expect(others.size).toBeGreaterThan(1);
     });
 
     it('names the slug when the organization has no name, and says what it is when it has neither', () => {

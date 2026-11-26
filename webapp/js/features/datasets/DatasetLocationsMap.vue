@@ -27,8 +27,8 @@
             <ul v-if="multiOrg" class="dlm-legend" aria-label="Organizations">
                 <li v-for="entry in legend" :key="entry.org">
                     <span class="dlm-swatch" :style="{ background: entry.colour }" aria-hidden="true" />
-                    <!-- Only a logo: the swatch is the colour of the organization, which initials would say again -->
-                    <OrgLogo v-if="entry.logoUrl" :org="{ slug: entry.org, name: entry.orgName, logoUrl: entry.logoUrl }" :colour="entry.colour" size="sm" decorative />
+                    <!-- Only a logo: the swatch is the colour of the organization on the map, which initials would not match -->
+                    <OrgLogo v-if="entry.logoUrl" :org="{ slug: entry.org, name: entry.orgName, logoUrl: entry.logoUrl }" size="sm" decorative />
                     <span class="dlm-legend-name">{{ entry.orgName }}</span>
                 </li>
             </ul>
@@ -44,7 +44,7 @@
                             <div class="dlm-popup-text">
                                 <div class="dlm-popup-name">{{ pin.name }}</div>
                                 <div class="dlm-popup-org">
-                                    <OrgLogo v-if="pin.logoUrl" :org="{ slug: pin.org, name: pin.orgName, logoUrl: pin.logoUrl }" :colour="pin.colour" size="sm" decorative />
+                                    <OrgLogo v-if="pin.logoUrl" :org="{ slug: pin.org, name: pin.orgName, logoUrl: pin.logoUrl }" size="sm" decorative />
                                     <span class="dlm-popup-org-name">{{ pin.orgName }}</span>
                                 </div>
                             </div>
