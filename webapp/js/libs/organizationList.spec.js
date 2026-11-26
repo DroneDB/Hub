@@ -117,10 +117,16 @@ describe('organizationRow', () => {
 
     it('maps the dates to milliseconds and keeps the count', () => {
         expect(organizationRow(dto)).toEqual({
-            slug: 'acme', name: 'Acme', description: 'd', editing: false, deleting: false,
+            slug: 'acme', name: 'Acme', description: 'd', logoUrl: null, editing: false, deleting: false,
             creationDate: Date.parse('2026-01-02T03:04:05Z'), lastModified: Date.parse('2026-03-04T05:06:07Z'),
             datasetCount: 3, owner: 'ann', isPublic: true, permissions: { canRead: true }
         });
+    });
+
+    it('keeps the versioned address of the logo, and null for an organization without one', () => {
+        expect(organizationRow({ ...dto, logoUrl: '/orgs/acme/logo?v=639012345678901234' }).logoUrl).toBe('/orgs/acme/logo?v=639012345678901234');
+        expect(organizationRow({ ...dto, logoUrl: null }).logoUrl).toBeNull();
+        expect(organizationRow(dto).logoUrl).toBeNull();
     });
 
     it('keeps an unknown date and count unknown (null), and a count of 0', () => {

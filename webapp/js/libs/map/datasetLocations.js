@@ -10,7 +10,8 @@
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import { getCenter } from 'ol/extent';
-import { getVectorColor, bboxExtent } from '@/libs/map/mapUtils';
+import { bboxExtent } from '@/libs/map/mapUtils';
+import { getVectorColor, organizationColour } from '@/libs/map/vectorColours';
 import { datasetName, groupName, isUsableBbox } from '@/libs/map/datasetPlaces';
 
 /** @typedef {import('./datasetPlaces').LocationGroup} LocationGroup */
@@ -59,29 +60,30 @@ export function organizationColours(slugs) {
  * @param {Record<string, string>} [colours]
  * @returns {{
  *   features: Feature<Point>[],
- *   legend: Array<{org: string, orgName: string, colour: string}>
+ *   legend: Array<{org: string, orgName: string, logoUrl: string|null, colour: string}>
  * }}
  */
 export function buildLocations(groups, colours = organizationColours(groups.map(group => group.org))) {
     /** @type {Feature<Point>[]} */
     const features = [];
-    /** @type {Array<{org: string, orgName: string, colour: string}>} */
+    /** @type {Array<{org: string, orgName: string, logoUrl: string|null, colour: string}>} */
     const legend = [];
 
     for (const group of groups) {
         const orgName = groupName(group);
-        const colour = colours[group.org] ?? getVectorColor(group.org, Number.POSITIVE_INFINITY, {});
+        const logoUrl = group.logoUrl ?? null;
+        const colour = organizationColour(group.org, colours);
         let pinned = 0;
         for (const dataset of group.datasets ?? []) {
             if (!isUsableBbox(dataset.bbox)) continue;
             const name = datasetName(dataset);
             const feature = new Feature(new Point(pinCoordinate({ bbox: dataset.bbox, point: dataset.point })));
             feature.setId(`${group.org}/${dataset.slug}`);
-            feature.setProperties({ org: group.org, orgName, slug: dataset.slug, name, bbox: dataset.bbox, colour });
+            feature.setProperties({ org: group.org, orgName, logoUrl, slug: dataset.slug, name, bbox: dataset.bbox, colour });
             features.push(feature);
             pinned++;
         }
-        if (pinned > 0) legend.push({ org: group.org, orgName, colour });
+        if (pinned > 0) legend.push({ org: group.org, orgName, logoUrl, colour });
     }
     return { features, legend };
 }

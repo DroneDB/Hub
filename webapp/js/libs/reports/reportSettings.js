@@ -20,8 +20,10 @@ import { PRIMARY } from '@/libs/palette';
 import { slugFromName } from '@/libs/slug';
 import { SECTION_KINDS } from '@/libs/reports/reportDefinition';
 import { SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings } from '@/libs/reports/reportDefaults';
+import { DARK_TEXT, readableTextOnChannels } from '@/libs/readableText';
+import { LOGO_TYPES, logoProblem as logoFileProblem } from '@/libs/logoCheck';
 
-export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings };
+export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings, LOGO_TYPES };
 
 /** @typedef {import('./reportDefaults').SchemaChoice} SchemaChoice */
 /** @typedef {import('./reportDefaults').SchemaStatus} SchemaStatus */
@@ -60,8 +62,6 @@ const ID_MAX = 32;
 const COLOUR_PATTERN = /^#[0-9a-f]{6}$/i;
 export const PAPERS = Object.freeze(['A4', 'Letter']);
 export const ORIENTATIONS = Object.freeze(['portrait', 'landscape']);
-/** The image types a logo can have: the same list the logo upload offers and the Registry accepts. */
-export const LOGO_TYPES = Object.freeze(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']);
 
 /**
  * The colours the settings offer: none of them is orange (the Hub has no orange), and each one reads
@@ -284,14 +284,8 @@ export const isColour = value => typeof value === 'string' && COLOUR_PATTERN.tes
  * @returns {'#ffffff' | '#111827'}
  */
 export function readableTextOn(colour) {
-    if (!isColour(colour)) return '#111827';
-    const [r, g, b] = [1, 3, 5].map(i => {
-        const c = parseInt(colour.slice(i, i + 2), 16) / 255;
-        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    // The crossover where white and the dark text have the same contrast
-    return luminance > 0.179 ? '#111827' : '#ffffff';
+    if (!isColour(colour)) return DARK_TEXT;
+    return readableTextOnChannels([1, 3, 5].map(i => parseInt(colour.slice(i, i + 2), 16)));
 }
 
 /** @param {string} noun @param {unknown} value @param {number} min @param {number} max */
@@ -308,17 +302,12 @@ function textProblem(value, max, label) {
 }
 
 /**
- * What is wrong with a logo file, or null: its type and its size (the Registry checks both again, and reads the
- * content, not the type the browser reports).
+ * What is wrong with the logo file of a template, or null: its type and its size (`LIMITS.logoBytes`; the Registry
+ * checks both again, and reads the content, not the type the browser reports).
  * @param {{ type?: string, size?: number } | null | undefined} file
  * @returns {string | null}
  */
-export function logoProblem(file) {
-    if (!file) return 'Choose an image';
-    if (!LOGO_TYPES.includes(file.type ?? '')) return 'The logo is a PNG, JPEG, WebP or SVG image';
-    if ((file.size ?? 0) > LIMITS.logoBytes) return `The logo is at most ${LIMITS.logoBytes / 1024} KB`;
-    return null;
-}
+export const logoProblem = file => logoFileProblem(file, LIMITS.logoBytes);
 
 /** @param {Record<string, string>} errors @param {string} path @param {string | null} message */
 function put(errors, path, message) {

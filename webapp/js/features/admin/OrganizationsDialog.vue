@@ -73,7 +73,7 @@
                 <div class="d-flex gap-3 flex-wrap align-items-end">
                     <div class="flex-grow-1" style="min-width: min(12rem, 100%);">
                         <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
-                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter filter-placeholder="Search organizations" :pt="{ pcFilter: { root: { 'aria-label': 'Search organizations' } } }" placeholder="Select an organization" class="w-100" />
+                        <OrgSelect v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :organizations="availableOrganizations" filter filter-placeholder="Search organizations" :pt="{ pcFilter: { root: { 'aria-label': 'Search organizations' } } }" placeholder="Select an organization" class="w-100" />
                     </div>
                     <div style="min-width: min(10rem, 100%);">
                         <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
@@ -105,6 +105,7 @@
 import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Select from 'primevue/select';
+import OrgSelect from '@/components/OrgSelect.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Divider from 'primevue/divider';
@@ -115,7 +116,7 @@ import { escapeHtml } from '@/libs/sanitize';
 import { stackedFrom, stackedCell } from '@/libs/responsiveColumns';
 
 export default {
-    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider, Tag },
+    components: { Window, ConfirmDialog, Select, OrgSelect, Button, PrimeMessage, Divider, Tag },
 
     props: {
         user: {
@@ -164,8 +165,7 @@ export default {
                 .filter(o =>
                     o.slug.toLowerCase() !== 'public' &&
                     !userOrgSlugs.includes(o.slug.toLowerCase())
-                )
-                .map(o => ({ ...o, displayName: o.name || o.slug }));
+                );
         }
     },
 

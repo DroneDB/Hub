@@ -4,6 +4,9 @@
 import { transformExtent } from 'ol/proj';
 import { PRIMARY, ANALYSIS_YELLOW } from '@/libs/palette';
 import { EPSG } from '@/libs/constants';
+import { getVectorColor } from '@/libs/map/vectorColours';
+
+export { getVectorColor };
 
 /**
  * How a map fits its view to an extent (View.fit options): room around it, a short animation, and
@@ -78,38 +81,6 @@ export const MEASUREMENT_SWATCHES = Object.freeze([
 ]);
 
 /**
- * Color palette for vector layers - bright, distinct colors with good contrast
- */
-const colorPalette = [
-    'rgba(66, 133, 244, 0.8)',    // Blue
-    'rgba(219, 68, 55, 0.8)',     // Red
-    'rgba(15, 157, 88, 0.8)',     // Green
-    'rgba(244, 160, 0, 0.8)',     // Yellow
-    'rgba(171, 71, 188, 0.8)',    // Purple
-    'rgba(255, 87, 34, 0.8)',     // Deep Orange
-    'rgba(3, 169, 244, 0.8)',     // Light Blue
-    'rgba(0, 150, 136, 0.8)',     // Teal
-    'rgba(124, 77, 255, 0.8)',    // Deep Purple
-    'rgba(229, 57, 53, 0.8)',     // Red
-    'rgba(0, 200, 83, 0.8)',      // Green
-    'rgba(253, 216, 53, 0.8)'     // Yellow
-];
-
-/**
- * Generate a numeric hash from a string
- * @param {string} str
- * @returns {number}
- */
-function stringToHashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i);
-        hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash);
-}
-
-/**
  * Find the vector layer that contains a given feature
  * @param {import('ol/Feature').default} feature
  * @param {Array} vectorLayers
@@ -128,34 +99,6 @@ export function findVectorLayerForFeature(feature, vectorLayers) {
         }
     }
     return null;
-}
-
-/**
- * Generate a unique color based on a path string and index.
- * Uses the colorPalette for small indices, or HSL hash-based color for larger ones.
- * @param {string} path - The path to use as key
- * @param {number} index - The index in the layer list
- * @param {Object} colorCache - Mutable cache object for storing assigned colors
- * @returns {string} CSS color string
- */
-export function getVectorColor(path, index, colorCache) {
-    if (colorCache[path]) {
-        return colorCache[path];
-    }
-
-    let color;
-    if (index < colorPalette.length) {
-        color = colorPalette[index];
-    } else {
-        const hash = stringToHashCode(path);
-        const hue = hash % 360;
-        const saturation = 80;
-        const lightness = 45;
-        color = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`;
-    }
-
-    colorCache[path] = color;
-    return color;
 }
 
 /**

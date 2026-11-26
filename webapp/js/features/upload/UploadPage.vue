@@ -6,16 +6,16 @@
 
         <!-- Where the files go, before the upload starts (FR-UPL-02): organization, name, visibility -->
         <form v-if="!batchOpen" class="upload-form form-column" novalidate @submit.prevent="startUpload">
-            <div v-if="orgsLoaded && organizationOptions.length === 0" class="field">
+            <div v-if="orgsLoaded && organizations.length === 0" class="field">
                 <Message :model-value="NO_WRITABLE_ORG" no-dismiss />
             </div>
 
             <div class="field">
                 <label id="upload-org-label" for="upload-org" class="field-label">Organization</label>
-                <Select v-model="orgSlug" input-id="upload-org" aria-labelledby="upload-org-label"
-                        :options="organizationOptions" option-label="label" option-value="value"
-                        :loading="!orgsLoaded" :disabled="starting || organizationOptions.length === 0"
-                        placeholder="Select an organization" class="w-100" />
+                <OrgSelect v-model="orgSlug" input-id="upload-org" aria-labelledby="upload-org-label"
+                           :organizations="organizations"
+                           :loading="!orgsLoaded" :disabled="starting || organizations.length === 0"
+                           placeholder="Select an organization" class="w-100" />
             </div>
 
             <div class="field">
@@ -78,6 +78,7 @@ import Message from '@/components/HubMessage.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select from 'primevue/select';
+import OrgSelect from '@/components/OrgSelect.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import UploadQueueView from '@/features/dataset/upload/UploadQueueView.vue';
 import { bytesToSize } from '@/libs/utils';
@@ -116,7 +117,7 @@ const pathOf = file => file.fullPath || file.webkitRelativePath || file.name;
  */
 export default {
     name: 'UploadPage',
-    components: { LoadingSpinner, Message, Button, InputText, Select, DialogHost, UploadQueueView },
+    components: { LoadingSpinner, Message, Button, InputText, Select, OrgSelect, DialogHost, UploadQueueView },
     setup() {
         const dialogs = useDialogs();
         return { dialogs, confirm: useConfirm(dialogs) };
@@ -151,9 +152,6 @@ export default {
         }
     },
     computed: {
-        organizationOptions() {
-            return this.organizations.map(org => ({ value: org.slug, label: org.name || org.slug }));
-        },
         canUpload() {
             return !this.starting && this.staged.length > 0 && !!this.orgSlug && this.datasetName.trim().length > 0;
         },

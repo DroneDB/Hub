@@ -116,7 +116,7 @@ describe('OrganizationsPage map view', () => {
         found(requests[2], 'x');
         await flushPromises();
         expect(shownOrgs()).toEqual(['org02']);
-        expect(mapProps().groups[0]).toEqual({ org: 'org02', orgName: 'org02', datasets: [{ slug: 'x', name: 'X', bbox: place }] });
+        expect(mapProps().groups[0]).toEqual({ org: 'org02', orgName: 'org02', logoUrl: null, datasets: [{ slug: 'x', name: 'X', bbox: place }] });
         expect(mapProps().loading).toBe(true);
     });
 

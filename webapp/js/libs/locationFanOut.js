@@ -18,12 +18,13 @@ export const LOCATION_REQUESTS = 4;
  * @typedef {object} LocationGroupFound
  * @property {string} org
  * @property {string} orgName
+ * @property {string|null} logoUrl  the versioned address of the logo of the organization, null without one
  * @property {Array<{slug: string, name: string|null, bbox: number[]|null}>} datasets
  *
  * @typedef {object} LocationFanOut
- * @property {(orgs: Array<{slug: string, name?: string|null}>) => void} update
+ * @property {(orgs: Array<{slug: string, name?: string|null, logoUrl?: string|null}>) => void} update
  *   makes `orgs` the set: asks for those not asked yet, drops the others
- * @property {(orgs: Array<{slug: string, name?: string|null}>) => void} keepOnly
+ * @property {(orgs: Array<{slug: string, name?: string|null, logoUrl?: string|null}>) => void} keepOnly
  *   drops the organizations not in `orgs`, and asks for none
  * @property {() => void} stop  drops every organization
  * @property {readonly LocationGroupFound[]} groups  the answers of the set, in the order they arrived
@@ -52,7 +53,7 @@ export function createLocationFanOut({ fetchLocations, onChange, limit = LOCATIO
         unanswered--;
     };
 
-    /** @param {{slug: string, name?: string|null}} org */
+    /** @param {{slug: string, name?: string|null, logoUrl?: string|null}} org */
     function ask(org) {
         const controller = new AbortController();
         const { signal } = controller;
@@ -64,7 +65,7 @@ export function createLocationFanOut({ fetchLocations, onChange, limit = LOCATIO
             /** @type {LocationGroupFound|null} */
             let group = null;
             try {
-                group = { org: org.slug, orgName: org.name || org.slug, datasets: await fetchLocations(org.slug, { signal }) };
+                group = { org: org.slug, orgName: org.name || org.slug, logoUrl: org.logoUrl ?? null, datasets: await fetchLocations(org.slug, { signal }) };
             } catch (e) {
                 // An organization the user cannot read (403, 404) or that fails does not stop the others
                 if (!signal.aborted && !isAbort(e)) {

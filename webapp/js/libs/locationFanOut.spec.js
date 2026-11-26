@@ -46,12 +46,23 @@ describe('createLocationFanOut', () => {
         pending[1].resolve([{ slug: 'x', name: null, bbox: [1, 2, 3, 4] }]);
         await tick();
         expect(onChange).toHaveBeenCalledTimes(1);
-        expect(run.groups).toEqual([{ org: 'o1', orgName: 'Org 1', datasets: [{ slug: 'x', name: null, bbox: [1, 2, 3, 4] }] }]);
+        expect(run.groups).toEqual([{ org: 'o1', orgName: 'Org 1', logoUrl: null, datasets: [{ slug: 'x', name: null, bbox: [1, 2, 3, 4] }] }]);
         expect(run.loading).toBe(true);
         pending[0].resolve([]);
         await tick();
         expect(run.groups.map(g => g.orgName)).toEqual(['Org 1', 'o0']);
         expect(run.loading).toBe(false);
+    });
+
+    it('carries the logo of the organization with its answer, null when it has none', async () => {
+        const { fetchLocations, pending } = manualFetch();
+        const run = fanOut(fetchLocations);
+        run.update([{ slug: 'a', name: 'A', logoUrl: '/orgs/a/logo?v=1' }, { slug: 'b', name: 'B' }]);
+        await tick();
+        pending[0].resolve([]);
+        pending[1].resolve([]);
+        await tick();
+        expect(Object.fromEntries(run.groups.map(g => [g.org, g.logoUrl]))).toEqual({ a: '/orgs/a/logo?v=1', b: null });
     });
 
     it('skips an organization that fails, quietly, and goes on with the others', async () => {
@@ -182,7 +193,7 @@ describe('createLocationFanOut', () => {
 
         second.resolve([{ slug: 'new', name: 'New', bbox: [3, 3, 4, 4] }]);
         await tick();
-        expect(run.groups).toEqual([{ org: 'a', orgName: 'a', datasets: [{ slug: 'new', name: 'New', bbox: [3, 3, 4, 4] }] }]);
+        expect(run.groups).toEqual([{ org: 'a', orgName: 'a', logoUrl: null, datasets: [{ slug: 'new', name: 'New', bbox: [3, 3, 4, 4] }] }]);
         expect(run.loading).toBe(false);
         expect(second.signal.aborted).toBe(false);
     });

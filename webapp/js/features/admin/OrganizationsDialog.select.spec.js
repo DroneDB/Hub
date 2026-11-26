@@ -19,9 +19,9 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
-async function render() {
+async function render(organizations = [{ slug: 't-admin-long', name: 'x'.repeat(200) }]) {
     reg.admin.getUserOrganizations = vi.fn(() => Promise.resolve([{ slug: 'acme', name: 'Acme', permissions: 1, grantedAt: '2026-01-02T00:00:00Z' }]));
-    reg.orgs.getOrganizations = vi.fn(() => Promise.resolve([{ org: { slug: 't-admin-long', name: 'x'.repeat(200) } }]));
+    reg.orgs.getOrganizations = vi.fn(() => Promise.resolve(organizations.map(org => ({ org }))));
     wrapper = mount(OrganizationsDialog, { props: { user: { userName: 'alice' } }, attachTo: document.body, global: { plugins: [PrimeVue] } });
     await flushPromises();
 }
@@ -41,6 +41,18 @@ describe('OrganizationsDialog organization select', () => {
         const filter = document.querySelector('.p-select-overlay input[role="searchbox"]');
         expect(filter.getAttribute('placeholder')).toBe('Search organizations');
         expect(filter.getAttribute('aria-label')).toBe('Search organizations');
+    });
+
+    it('shows the logo of each organization in its list, and the initials of one without a logo', async () => {
+        await render([
+            { slug: 'with-logo', name: 'With logo', logoUrl: '/orgs/with-logo/logo?v=1' },
+            { slug: 'plain', name: 'Plain', logoUrl: null }
+        ]);
+        await organizationSelect().find('.p-select-label').trigger('click');
+        await flushPromises();
+        const [first, second] = document.querySelectorAll('.p-select-overlay .p-select-option');
+        expect(first.querySelector('img').getAttribute('src')).toBe('/orgs/with-logo/logo?v=1');
+        expect(second.querySelector('.org-logo-initials').textContent).toBe('P');
     });
 
     it('sets no width of its own on the list (the global overlay rule does)', async () => {

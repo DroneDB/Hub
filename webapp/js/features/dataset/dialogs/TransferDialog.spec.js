@@ -80,10 +80,18 @@ describe('TransferDialog', () => {
             { org: { slug: 'bare', name: 'Bare' } }
         ]);
         const w = await open({});
-        expect(w.vm.organizationOptions).toEqual([
-            { label: 'Mine', value: 'mine' },
-            { label: 'Team', value: 'team' }
+        expect(w.vm.organizations.map(org => org.slug)).toEqual(['mine', 'team']);
+    });
+
+    it('shows the logo of the destination organization in its picker', async () => {
+        getOrganizations.mockResolvedValueOnce([
+            { org: { slug: 'dest', name: 'Dest', permissions: writable, logoUrl: '/orgs/dest/logo?v=1' } },
+            { org: { slug: 'other', name: 'Other', permissions: writable } }
         ]);
+        const w = await open({});
+        const label = w.find('.p-select-label');
+        expect(label.find('img').attributes('src')).toBe('/orgs/dest/logo?v=1');
+        expect(label.text()).toBe('Dest');
     });
 
     it('starts in the current organization, with its datasets loaded (EXP-13)', async () => {

@@ -27,6 +27,8 @@
             <ul v-if="multiOrg" class="dlm-legend" aria-label="Organizations">
                 <li v-for="entry in legend" :key="entry.org">
                     <span class="dlm-swatch" :style="{ background: entry.colour }" aria-hidden="true" />
+                    <!-- Only a logo: the swatch is the colour of the organization, which initials would say again -->
+                    <OrgLogo v-if="entry.logoUrl" :org="{ slug: entry.org, name: entry.orgName, logoUrl: entry.logoUrl }" :colour="entry.colour" size="sm" decorative />
                     <span class="dlm-legend-name">{{ entry.orgName }}</span>
                 </li>
             </ul>
@@ -41,7 +43,10 @@
                         <li v-for="pin in popup.pins" :key="pin.org + '/' + pin.slug" class="dlm-popup-item">
                             <div class="dlm-popup-text">
                                 <div class="dlm-popup-name">{{ pin.name }}</div>
-                                <div class="dlm-popup-org">{{ pin.orgName }}</div>
+                                <div class="dlm-popup-org">
+                                    <OrgLogo v-if="pin.logoUrl" :org="{ slug: pin.org, name: pin.orgName, logoUrl: pin.logoUrl }" :colour="pin.colour" size="sm" decorative />
+                                    <span class="dlm-popup-org-name">{{ pin.orgName }}</span>
+                                </div>
                             </div>
                             <Button size="small" label="Open" icon="fa-regular fa-folder-open" @click="openDataset(pin)" />
                         </li>
@@ -81,6 +86,7 @@ import { createEmpty, extend as extendExtent, isEmpty as isEmptyExtent } from 'o
 import Button from 'primevue/button';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 import EmptyState from '@/components/EmptyState.vue';
+import OrgLogo from '@/components/OrgLogo.vue';
 import { useMapBasemap } from '@/composables/useMapBasemap';
 import { useListenerBag } from '@/composables/useEventListener';
 import { buildLocations, organizationColours } from '@/libs/map/datasetLocations';
@@ -150,8 +156,8 @@ let followPins = true;
 
 /** The data of a pin feature. @param {Feature} feature */
 function pinData(feature) {
-    const { org, orgName, slug, name, bbox, colour } = feature.getProperties();
-    return { org, orgName, slug, name, bbox, colour };
+    const { org, orgName, logoUrl, slug, name, bbox, colour } = feature.getProperties();
+    return { org, orgName, logoUrl, slug, name, bbox, colour };
 }
 
 /** The box shown: that of the dataset in the popup, else of the pin under the pointer. */
@@ -391,6 +397,10 @@ onBeforeUnmount(() => {
     gap: var(--ddb-spacing-xs);
 }
 
+.dlm-legend li + li {
+    margin-top: var(--ddb-spacing-xs);
+}
+
 .dlm-swatch {
     flex-shrink: 0;
     width: 0.75rem;
@@ -466,8 +476,15 @@ onBeforeUnmount(() => {
 }
 
 .dlm-popup-org {
+    display: flex;
+    align-items: center;
+    gap: var(--ddb-spacing-xs);
     color: var(--ddb-text-secondary);
     font-size: var(--ddb-font-size-sm);
+}
+
+.dlm-popup-org-name {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { transformExtent } from 'ol/proj';
 import { buildLocations, organizationColours, pinCoordinate } from './datasetLocations';
 import { bboxExtent } from './mapUtils';
+import { organizationColour } from './vectorColours';
 
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const dataset = (slug, bbox, name) => ({ slug, name, bbox });
@@ -46,6 +47,20 @@ describe('buildLocations', () => {
         expect(typeof pin.get('colour')).toBe('string');
     });
 
+    it('carries the logo of the organization to its pins and its legend entry', () => {
+        const { features, legend } = buildLocations([
+            { ...group('a', [dataset('a1', [1, 1, 2, 2])]), logoUrl: '/orgs/a/logo?v=1' },
+            group('b', [dataset('b1', [5, 5, 6, 6])])
+        ]);
+        expect(features.map(f => f.get('logoUrl'))).toEqual(['/orgs/a/logo?v=1', null]);
+        expect(legend.map(entry => entry.logoUrl)).toEqual(['/orgs/a/logo?v=1', null]);
+    });
+
+    it('colours an organization missing from the given colours as organizationColour does', () => {
+        const { features } = buildLocations([group('z', [dataset('z1', [1, 1, 2, 2])])], {});
+        expect(features[0].get('colour')).toBe(organizationColour('z'));
+    });
+
     it('names a dataset by its slug and an organization by its slug when they have no name', () => {
         const { features } = buildLocations([group('acme', [dataset('a', [1, 1, 2, 2], null)])]);
         expect(features[0].get('name')).toBe('a');
@@ -71,7 +86,7 @@ describe('buildLocations', () => {
         const colour = slug => features.find(f => f.get('slug') === slug).get('colour');
         expect(colour('a1')).toBe(colour('a2'));
         expect(colour('a1')).not.toBe(colour('b1'));
-        expect(legend).toEqual([{ org: 'a', orgName: 'a', colour: colour('a1') }, { org: 'b', orgName: 'b', colour: colour('b1') }]);
+        expect(legend).toEqual([{ org: 'a', orgName: 'a', logoUrl: null, colour: colour('a1') }, { org: 'b', orgName: 'b', logoUrl: null, colour: colour('b1') }]);
     });
 
     it('gives an organization the same colour whatever order the groups arrive in', () => {

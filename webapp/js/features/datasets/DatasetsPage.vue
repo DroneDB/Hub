@@ -13,9 +13,9 @@
                     <!-- Left: identity -->
                     <div class="org-identity">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="org-icon-wrapper d-flex align-items-center justify-content-center">
-                                <i class="fa-solid fa-sitemap" />
-                            </div>
+                            <!-- Its logo, or its initials; the name beside it says it -->
+                            <Skeleton v-if="loading && !orgInfo" width="3.5rem" height="3.5rem" border-radius="var(--ddb-radius-md)" class="org-logo-skeleton" />
+                            <OrgLogo v-else :org="headerOrg" size="lg" decorative />
                             <div>
                                 <div class="org-title-row">
                                     <!-- The pencil follows the last word of the name, whatever the lines it takes (FR-ORG-21) -->
@@ -223,7 +223,7 @@
                              @close="handleImportClose" />
 
         <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel" :save="saveOrganization"
-                            @close="handleOrgDialogClose" />
+                            :can-manage-logo="canManageOrg" @logo-changed="onLogoChanged" @close="handleOrgDialogClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="$route.params.org"
                                    :can-manage-members="orgInfo?.permissions?.canManageMembers || false"
@@ -238,6 +238,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import ActionButton from '@/components/ActionButton.vue';
 import ResourceState from '@/components/ResourceState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
+import OrgLogo from '@/components/OrgLogo.vue';
 import Message from '@/components/HubMessage.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import ListToolbar from '@/components/ListToolbar.vue';
@@ -314,6 +315,7 @@ export default {
         Select,
         Tag,
         VisibilityTag,
+        OrgLogo,
         
         ProgressSpinner,
         Skeleton,
@@ -397,6 +399,10 @@ export default {
         },
         canDeleteGlobal: function () {
             return !HubOptions.disableDatasetCreation;
+        },
+        // What the logo of the header shows of the organization: its name (the slug until it is known) and its logo
+        headerOrg: function () {
+            return { slug: this.$route.params.org, name: this.orgName, logoUrl: this.orgInfo?.logoUrl ?? null };
         },
         canManageOrg: function () {
             return this.orgInfo?.permissions?.canManageMembers || false;
@@ -1031,7 +1037,7 @@ export default {
             try {
                 const datasets = await this.org.datasetLocations({ signal: request.signal });
                 if (request.signal.aborted) return;
-                this.locationGroups = [{ org: this.$route.params.org, orgName: this.orgName, datasets }];
+                this.locationGroups = [{ org: this.$route.params.org, orgName: this.orgName, logoUrl: this.orgInfo?.logoUrl ?? null, datasets }];
                 this._locationsLoaded = true;
             } catch (e) {
                 if (request.signal.aborted || e.name === 'AbortError') return;
@@ -1130,7 +1136,8 @@ export default {
                 slug: this.$route.params.org,
                 name: this.orgInfo?.name || this.orgName,
                 description: this.orgInfo?.description || '',
-                isPublic: this.orgInfo?.isPublic || false
+                isPublic: this.orgInfo?.isPublic || false,
+                logoUrl: this.orgInfo?.logoUrl ?? null
             };
             this.orgEditDialogOpen = true;
         },
@@ -1154,6 +1161,11 @@ export default {
             this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
             setTitle(this.orgName);
             this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
+        },
+
+        // The logo was sent or removed in the dialog: the header shows it now, whether or not Save follows
+        onLogoChanged(logoUrl) {
+            this.orgInfo = { ...this.orgInfo, logoUrl };
         },
 
         openMembersDialog() {
@@ -1219,13 +1231,7 @@ export default {
             gap: var(--ddb-spacing-sm);
         }
 
-        .org-icon-wrapper {
-            width: 3rem;
-            height: 3rem;
-            border-radius: var(--ddb-radius-md);
-            background: var(--p-primary-50);
-            color: var(--p-primary-color);
-            font-size: var(--ddb-font-size-lg);
+        .org-logo-skeleton {
             flex-shrink: 0;
         }
 

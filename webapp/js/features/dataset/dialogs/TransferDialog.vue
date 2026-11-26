@@ -17,8 +17,8 @@
                 <!-- Destination Organization -->
                 <div class="my-3">
                     <label id="transfer-dialog-destination-organization-label" for="transfer-dialog-destination-organization" class="d-block mb-1 fw-semibold">Destination Organization</label>
-                    <Select v-model="destOrg" input-id="transfer-dialog-destination-organization" aria-labelledby="transfer-dialog-destination-organization-label" :options="organizationOptions" option-label="label" option-value="value"
-                            placeholder="Select organization" class="w-100" data-autofocus @change="onOrgChange" />
+                    <OrgSelect v-model="destOrg" input-id="transfer-dialog-destination-organization" aria-labelledby="transfer-dialog-destination-organization-label" :organizations="organizations"
+                               placeholder="Select organization" class="w-100" data-autofocus @change="onOrgChange" />
                 </div>
 
                 <!-- Destination Dataset -->
@@ -69,6 +69,7 @@ import FolderPicker from '@/components/FolderPicker.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
+import OrgSelect from '@/components/OrgSelect.vue';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
@@ -79,7 +80,7 @@ import { transferModeOf } from '@/libs/dataset/transferMode';
 
 export default {
     components: {
-        Window, FolderPicker, Button, PrimeMessage, Select, InputText, Checkbox, ProgressBar
+        Window, FolderPicker, Button, PrimeMessage, Select, OrgSelect, InputText, Checkbox, ProgressBar
     },
 
     props: {
@@ -134,13 +135,6 @@ export default {
             } else {
                 return `${this.files.length} items from ${this.sourceOrg}/${this.sourceDs}`;
             }
-        },
-
-        organizationOptions: function () {
-            return this.organizations.map(org => ({
-                label: org.name || org.slug,
-                value: org.slug
-            }));
         },
 
         datasetOptions: function () {

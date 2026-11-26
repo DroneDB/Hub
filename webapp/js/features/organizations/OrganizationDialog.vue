@@ -33,6 +33,9 @@
                     <FieldError id="organization-dialog-description-error" :message="errorOf($form, 'description')" />
                     <small id="organization-dialog-description-count" class="char-count">{{ lengthOf($form, 'description') }}/{{ descriptionMax }}</small>
                 </div>
+                <!-- The logo is the organization's own file, sent at once; only an edit has the slug it belongs to, and only an
+                     administrator of the organization may change it -->
+                <OrganizationLogoField v-if="!isNew && canManageLogo" :org="model" @changed="$emit('logo-changed', $event)" />
                 <div class="d-flex align-items-center gap-2 mt-2">
                     <Checkbox v-model="isPublic" :binary="true" :disabled="busy" input-id="orgPublic" :pt="{ input: { 'aria-describedby': 'organization-dialog-public-hint' } }" />
                     <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
@@ -53,6 +56,7 @@ import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import PrimeMessage from 'primevue/message';
 import FieldError from '@/components/FieldError.vue';
+import OrganizationLogoField from './OrganizationLogoField.vue';
 import { createResolver } from '@/libs/forms/resolver';
 import { slugProblem, slugDescription, suggestSlug } from '@/libs/slug';
 import { latinNameProblem, displayNameLimits, displayNameLengthProblem, descriptionMaxLength, descriptionLengthProblem } from '@/libs/nameRules';
@@ -74,22 +78,26 @@ import { useHubForm } from '@/composables/useHubForm';
  *
  * Props:
  *   mode           - 'new' or 'edit'
- *   model          - the organization of an edit
+ *   model          - the organization of an edit (slug, name, description, isPublic, logoUrl)
  *   save           - async ({ name, slug, description, isPublic }) => ...; throws when the request fails
  *   forbiddenSlugs - the slugs of the organizations that exist (the loaded list)
+ *   canManageLogo  - the user may change the logo (an administrator of the organization): an edit then has the Logo
+ *                    field, which sends the file at once and says `logo-changed` with the new address (null when
+ *                    removed); the page that shows the organization takes it from there
  */
 export default {
     components: {
-        Window, Checkbox, InputText, Textarea, Form, FieldError, PrimeMessage
+        Window, Checkbox, InputText, Textarea, Form, FieldError, PrimeMessage, OrganizationLogoField
     },
 
     props: {
         mode: { type: String, required: true },
         model: { type: Object, default: null },
         save: { type: Function, required: true },
-        forbiddenSlugs: { type: Array, default: () => [] }
+        forbiddenSlugs: { type: Array, default: () => [] },
+        canManageLogo: { type: Boolean, default: false }
     },
-    emits: ['close'],
+    emits: ['close', 'logo-changed'],
 
     setup(props) {
         const isNew = props.mode !== 'edit';

@@ -38,6 +38,8 @@ export function organizationRow(org) {
         editing: false,
         deleting: false,
         description: org.description,
+        // The versioned address of the logo, null without one
+        logoUrl: org.logoUrl ?? null,
         creationDate: parseTimestamp(org.creationDate),
         lastModified: parseTimestamp(org.lastModified),
         datasetCount: Number.isFinite(org.datasetCount) ? org.datasetCount : null,

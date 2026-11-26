@@ -81,10 +81,20 @@ describe('UploadPage form', () => {
         await flushPromises();
 
         // The Public organization that the user can only read (Survey Team) is not a destination
-        expect(wrapper.vm.organizationOptions).toEqual([
-            { value: 'alice', label: 'alice' }, { value: 'drone-lab', label: 'Drone Lab' }
-        ]);
+        expect(wrapper.vm.organizations.map(org => org.slug)).toEqual(['alice', 'drone-lab']);
         expect(wrapper.vm.orgSlug).toBe('alice');
+    });
+
+    it('shows the logo of the chosen organization in the picker', async () => {
+        mocks.reg.orgs.getOrganizations.mockResolvedValue([
+            { org: { slug: 'alice', name: 'alice', permissions: { canWrite: true }, logoUrl: '/orgs/alice/logo?v=1' } },
+            org('drone-lab', 'Drone Lab', true)
+        ]);
+        mountPage();
+        await flushPromises();
+        const box = wrapper.find('#upload-org').element.closest('.p-select');
+        expect(box.querySelector('.p-select-label img').getAttribute('src')).toBe('/orgs/alice/logo?v=1');
+        expect(box.querySelector('.p-select-label').textContent).toContain('alice');
     });
 
     it('says so when the user may write no organization', async () => {

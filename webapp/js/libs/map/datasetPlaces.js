@@ -19,6 +19,7 @@
  * @typedef {object} LocationGroup  the datasets of one organization, as the server lists them
  * @property {string} org  slug of the organization
  * @property {string} [orgName]
+ * @property {string|null} [logoUrl]  the versioned address of the logo of the organization
  * @property {LocatedDataset[]} datasets
  *
  * @typedef {object} UnlocatedDataset

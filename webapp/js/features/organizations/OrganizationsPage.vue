@@ -51,7 +51,7 @@
         <!-- Placeholder rows while the list loads -->
         <div v-else-if="showSkeleton" ref="listArea" class="org-list org-list-skeleton" aria-busy="true">
             <div v-for="i in 4" :key="i" class="org-skeleton-row">
-                <Skeleton shape="circle" size="1.25rem" />
+                <Skeleton shape="circle" size="1.75rem" />
                 <Skeleton width="14rem" height="1.25rem" />
                 <Skeleton width="5rem" height="1.5rem" border-radius="1rem" class="ms-auto" />
             </div>
@@ -85,11 +85,17 @@
                         <i class="fa-solid fa-sitemap" aria-hidden="true" /> Organization
                     </template>
                     <template #body="{ data: org }">
-                        <!-- The whole cell opens the organization (stretched link), and so does a click on the row -->
-                        <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link" :title="org.name ? org.name : org.slug">
-                            {{ org.name ? org.name : org.slug }}
-                        </router-link>
-                        <div v-if="org.description" class="org-description-line" :title="org.description">{{ org.description }}</div>
+                        <div class="org-name-block">
+                            <!-- The name beside it says it: the logo is for the eye -->
+                            <OrgLogo :org="org" decorative />
+                            <div class="org-name-text">
+                                <!-- The whole cell opens the organization (stretched link), and so does a click on the row -->
+                                <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link" :title="org.name ? org.name : org.slug">
+                                    {{ org.name ? org.name : org.slug }}
+                                </router-link>
+                                <div v-if="org.description" class="org-description-line" :title="org.description">{{ org.description }}</div>
+                            </div>
+                        </div>
                     </template>
                 </Column>
                 <Column header="Owner" class="col-fit" v-bind="stackedColumn('Owner', 'md', { class: 'org-col-owner' })">
@@ -158,7 +164,8 @@
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
                             :forbidden-slugs="organizations.map(o => o.slug)" :save="saveOrganization"
-                            @close="handleOrganizationClose" />
+                            :can-manage-logo="canManageDialogLogo"
+                            @logo-changed="onLogoChanged" @close="handleOrganizationClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="selectedOrgForMembers.slug"
                                    :can-manage-members="selectedOrgForMembers.permissions?.canManageMembers || false"
@@ -166,7 +173,7 @@
                                    @close="closeMembersDialog" />
         <ReportSettingsDialog v-if="reportSettingsOrg"
                               :org-slug="reportSettingsOrg.slug"
-                              :can-edit="canEditReportSettings(reportSettingsOrg)"
+                              :can-edit="canAdministerOrg(reportSettingsOrg)"
                               @close="reportSettingsOrg = null" />
 
     </div>
@@ -176,6 +183,7 @@
 import EmptyState from '@/components/EmptyState.vue';
 import ResourceState from '@/components/ResourceState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
+import OrgLogo from '@/components/OrgLogo.vue';
 import SortSelect from '@/components/SortSelect.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import ListToolbar from '@/components/ListToolbar.vue';
@@ -249,6 +257,7 @@ export default {
         Column,
         Tag,
         VisibilityTag,
+        OrgLogo,
         Skeleton,
         ToggleSwitch,
         Paginator,
@@ -312,6 +321,12 @@ export default {
     },
 
     computed: {
+        // The Edit dialog shows the logo field to whoever administers the organization it edits
+        canManageDialogLogo() {
+            if (this.orgDialogMode !== 'edit') return false;
+            const row = this.organizations.find(o => o.slug === this.orgDialogModel?.slug);
+            return !!row && this.canAdministerOrg(row);
+        },
         // The page state of a list that did not load (loadErrorKind), or null
         loadKind: function () {
             return loadErrorKind(this.loadError);
@@ -575,7 +590,8 @@ export default {
                 slug: org.slug,
                 name: org.name,
                 description: org.description,
-                isPublic: org.isPublic
+                isPublic: org.isPublic,
+                logoUrl: org.logoUrl ?? null
             };
             this.orgDialogMode = "edit";
             this.orgDialogOpen = true;
@@ -678,9 +694,16 @@ export default {
                 || !!org.permissions?.canManageMembers || org.datasetCount != null;
         },
 
-        // The Registry refuses the writes of anyone but an administrator of the organization (or of the instance)
-        canEditReportSettings(org) {
+        // The Registry refuses the writes of anyone but an administrator of the organization (or of the instance): the
+        // report settings and the logo are theirs
+        canAdministerOrg(org) {
             return !this.readyOnly && (!!org.permissions?.canManageMembers || this.isAdmin);
+        },
+
+        // The logo was sent or removed in the dialog: the row shows it now, whether or not Save follows
+        onLogoChanged(logoUrl) {
+            const row = this.organizations.find(o => o.slug === this.orgDialogModel?.slug);
+            if (row) row.logoUrl = logoUrl;
         },
 
         openReportSettings(org) {
@@ -845,6 +868,17 @@ export default {
     }
 
     /* No underline, also on hover (the hover rule of app.scss is :where(), so this one wins) */
+    /* The logo, then the name over its description; the text may shrink and wrap beside the logo */
+    .org-name-block {
+        display: flex;
+        align-items: center;
+        gap: var(--ddb-spacing-sm);
+    }
+
+    .org-name-text {
+        min-width: 0;
+    }
+
     .org-name {
         font-weight: bold;
         color: inherit;

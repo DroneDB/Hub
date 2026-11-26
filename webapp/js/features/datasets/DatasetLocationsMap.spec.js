@@ -245,6 +245,19 @@ describe('DatasetLocationsMap states', () => {
         expect(wrapper.findAll('.dlm-legend li').map(li => li.text())).toEqual(['Org A', 'Org B']);
     });
 
+    it('shows the logo of an organization in the legend beside its colour, and nothing more for one without a logo', async () => {
+        render({ groups: [
+            { ...group('a', [ds('a1', [1, 1, 2, 2])], 'Org A'), logoUrl: '/orgs/a/logo?v=1' },
+            group('b', [ds('b1', [3, 3, 4, 4])], 'Org B')
+        ] });
+        await flushPromises();
+        const [first, second] = wrapper.findAll('.dlm-legend li');
+        expect(first.find('img').attributes('src')).toBe('/orgs/a/logo?v=1');
+        expect(first.find('.dlm-swatch').exists()).toBe(true);
+        expect(second.find('img').exists()).toBe(false);
+        expect(second.find('.org-logo').exists()).toBe(false);
+    });
+
     it('keeps the colours of the legend apart after the set was narrowed to one organization and widened again', async () => {
         const groups = [
             group('a', [ds('a1', [1, 1, 2, 2])], 'Org A'),
@@ -329,6 +342,17 @@ describe('DatasetLocationsMap buttons', () => {
 
 describe('DatasetLocationsMap interaction', () => {
     const groups = [group('acme', [ds('a', [10, 40, 12, 42], 'Dataset A'), ds('b', [30, 40, 32, 42], 'Dataset B')], 'Acme <b>Inc</b>')];
+
+    it('shows the logo of the organization in the popup of a pin', async () => {
+        render({ groups: [{ ...group('acme', [ds('a', [10, 40, 12, 42], 'Dataset A')], 'Acme'), logoUrl: '/orgs/acme/logo?v=1' }] });
+        await flushPromises();
+        pointAt('a');
+        map().dispatchEvent({ type: 'click', pixel: [5, 5] });
+        await flushPromises();
+        const org = wrapper.find('.dlm-popup .dlm-popup-org');
+        expect(org.find('img').attributes('src')).toBe('/orgs/acme/logo?v=1');
+        expect(org.text()).toBe('Acme');
+    });
 
     it('opens a popup with the dataset and its organization, as text, for a single pin', async () => {
         render({ groups: [group('acme', [ds('a', [10, 40, 12, 42], '<img src=x onerror=alert(1)>')], 'Acme <b>Inc</b>')] });

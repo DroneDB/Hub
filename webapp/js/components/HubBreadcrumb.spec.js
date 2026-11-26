@@ -38,6 +38,37 @@ beforeEach(() => {
 afterEach(() => wrapper?.unmount());
 
 describe('HubBreadcrumb crumbs', () => {
+    it('shows the logo of an organization that has one, small, before its name', async () => {
+        h.info = vi.fn(() => Promise.resolve({ name: 'Acme', logoUrl: '/orgs/acme/logo?v=1' }));
+        await render({ org: 'acme', ds: 'site', homeInNav: true });
+        const img = wrapper.find('li img');
+        expect(img.attributes('src')).toBe('/orgs/acme/logo?v=1');
+        expect(img.classes()).toContain('org-logo-sm');
+        expect(wrapper.findAll('li')[0].text()).toBe('Acme');
+        // Only the organization has one
+        expect(wrapper.findAll('img')).toHaveLength(1);
+    });
+
+    it('shows no logo, not even initials, for an organization without one or while it is not known', async () => {
+        await render({ org: 'acme', homeInNav: true });
+        expect(wrapper.find('.org-logo').exists()).toBe(false);
+        h.info = vi.fn(() => Promise.resolve({ name: 'Acme', logoUrl: null }));
+        wrapper.unmount();
+        await render({ org: 'acme', homeInNav: true });
+        expect(wrapper.find('.org-logo').exists()).toBe(false);
+    });
+
+    it('drops the logo of the previous organization when the route moves to another that has none', async () => {
+        h.info = vi.fn()
+            .mockResolvedValueOnce({ name: 'A', logoUrl: '/orgs/a/logo?v=1' })
+            .mockResolvedValueOnce({ name: 'B' });
+        await render({ org: 'a', homeInNav: true });
+        expect(wrapper.find('img').exists()).toBe(true);
+        await wrapper.setProps({ org: 'b' });
+        await flushPromises();
+        expect(wrapper.find('img').exists()).toBe(false);
+    });
+
     it('on the page of an organization (/r/x): the organization, the page, after the Organizations link of the main navigation', async () => {
         await render({ org: 't-orgs-bulk', homeInNav: true });
         expect(crumbs()).toEqual(['T Orgs Bulk']);

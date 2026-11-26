@@ -174,7 +174,7 @@ describe('DatasetsPage map view', () => {
         const datasets = [{ slug: 'a', name: 'A', bbox: [1, 1, 2, 2] }];
         calls[0].resolve(datasets);
         await flushPromises();
-        expect(mapProps()).toEqual({ groups: [{ org: 'org', orgName: 'Org', datasets }], loading: false });
+        expect(mapProps()).toEqual({ groups: [{ org: 'org', orgName: 'Org', logoUrl: null, datasets }], loading: false });
     });
 
     it('asks once for the visit, however often the view is switched', async () => {

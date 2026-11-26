@@ -2,6 +2,8 @@
     <nav v-if="crumbs.length > 0" class="hub-breadcrumb" aria-label="Breadcrumb">
         <ol>
             <li v-for="crumb in crumbs" :key="crumb.id" :class="{ 'is-current': crumb.current }">
+                <!-- The logo of the organization, before its name, which says it already -->
+                <OrgLogo v-if="crumb.image" class="crumb-logo" :org="crumb.image" size="sm" decorative />
                 <span v-if="crumb.current" class="crumb crumb-current" :title="crumb.title ?? crumb.label" aria-current="page">{{ crumb.label }}</span>
                 <RouterLink v-else-if="crumb.to" class="crumb crumb-link" :to="crumb.to" :title="crumb.label">{{ crumb.label }}</RouterLink>
                 <span v-else class="crumb" :title="crumb.label">{{ crumb.label }}</span>
@@ -29,6 +31,8 @@
  * slug; an organization the visitor has no access to is not a link, since the page would only refuse them. In a
  * one-organization install the organization is home, so there is no Organizations crumb either.
  *
+ * The crumb of an organization that has a logo shows it (crumb.image, from the same look-up), small, before the name.
+ *
  * The `after` slot follows the trail, outside the part that is cut with an ellipsis (the header puts the visibility of
  * the dataset there).
  *
@@ -42,6 +46,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { isForbidden, isUnauthorized } from '@/libs/ddb/apiError';
 import { homeLocation } from '@/libs/authRoutes';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
+import OrgLogo from '@/components/OrgLogo.vue';
 
 defineOptions({ name: 'HubBreadcrumb' });
 
@@ -56,19 +61,24 @@ const props = defineProps({
 
 const session = useDatasetSessionStore();
 
-// The organization asked for: its name, or why there is none
+// The organization asked for: its name and its logo, or why there is none
 const orgName = ref('');
+const orgLogoUrl = ref(null);
 const orgDenied = ref(false);
 let request = 0;
 
 watch(() => props.org, async org => {
     const mine = ++request;
     orgName.value = '';
+    orgLogoUrl.value = null;
     orgDenied.value = false;
     if (!org) return;
     try {
         const info = await reg.Organization(org).info({ skipUnauthorized: true });
-        if (mine === request) orgName.value = String(info?.name ?? '').trim();
+        if (mine === request) {
+            orgName.value = String(info?.name ?? '').trim();
+            orgLogoUrl.value = info?.logoUrl ?? null;
+        }
     } catch (e) {
         // No access (a visitor of a shared dataset of a private organization): the slug, and no link. Any other
         // failure: the slug too, the page may still open
@@ -85,12 +95,14 @@ const datasetTagline = computed(() => (session.rootEntry && !session.unavailable
 const crumbs = computed(() => {
     if (!props.org) return [];
     const home = homeLocation();
-    /** @type {Array<{ id: string, label: string, title?: string, to?: import('vue-router').RouteLocationRaw, current?: boolean }>} */
+    /** @type {Array<{ id: string, label: string, title?: string, image?: { slug: string, name: string, logoUrl: string }, to?: import('vue-router').RouteLocationRaw, current?: boolean }>} */
     const list = [];
     if (home.name === 'Organizations' && !props.homeInNav) list.push({ id: 'organizations', label: 'Organizations', to: { name: 'Organizations' } });
     list.push({
         id: 'org',
         label: orgName.value || props.org,
+        // Only an organization that has a logo shows one: the initials of every other would fill the trail
+        image: orgLogoUrl.value ? { slug: props.org, name: orgName.value || props.org, logoUrl: orgLogoUrl.value } : undefined,
         to: orgDenied.value ? undefined : { name: 'Datasets', params: { org: props.org } },
         current: !props.ds
     });
@@ -135,6 +147,10 @@ li {
     display: flex;
     align-items: center;
     min-width: 0;
+}
+
+.crumb-logo {
+    margin-inline-end: var(--ddb-spacing-xs);
 }
 
 /* The separator is drawn, not text: a screen reader reads the list */
