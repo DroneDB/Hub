@@ -29,11 +29,12 @@ export async function isListed(dataset, path) {
 /**
  * The address of the dataset thumbnail to show, or null when the dataset has none: the root entry of the dataset says it
  * (`hasThumbnail`), so no request goes out for a cover that is not there. A Registry that does not say (an older one) is asked.
- * @param {{ datasetThumbUrl: (size: number) => string }} dataset
+ * @param {{ datasetThumbUrl: (size: number, version?: string | number) => string }} dataset
  * @param {{ hasThumbnail?: boolean } | null | undefined} properties  the properties of the root entry
  * @param {number} size
+ * @param {string | number} [version]  see Dataset.datasetThumbUrl
  * @returns {string | null}
  */
-export function datasetThumbnailUrl(dataset, properties, size) {
-    return properties?.hasThumbnail === false ? null : dataset.datasetThumbUrl(size);
+export function datasetThumbnailUrl(dataset, properties, size, version) {
+    return properties?.hasThumbnail === false ? null : dataset.datasetThumbUrl(size, version);
 }

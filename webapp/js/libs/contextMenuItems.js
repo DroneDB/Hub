@@ -1,5 +1,4 @@
 import ddb from 'ddb';
-const { pathutils } = ddb;
 
 import { isCadDrawing } from '@/libs/cadCrs';
 import { isDroneDB, isGeoraster, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
@@ -8,7 +7,7 @@ import { canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { canBuildFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
-import { Features } from '@/libs/features';
+import { isCoverPath } from '@/libs/datasetCover';
 import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
 import { BUILD_DOWNLOADS, offersBuildDownload } from '@/libs/build/buildDownloads';
 import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
@@ -172,8 +171,8 @@ function setThumbnailItem(ctx) {
             const file = sel[0];
             const type = file.entry.type;
             if (!hasThumbnail(type)) return false;
-            const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
-            if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
+            // The cover itself
+            if (isCoverPath(file.entry.path)) return false;
             // A thumbnail of a built type comes from its build: not while it failed or runs
             if (isBuildableType(type)) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);

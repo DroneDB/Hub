@@ -1,18 +1,13 @@
 // @ts-check
 /**
  * What the photos of an annotation need from the dataset: the entries of the photos (their dimensions, for the
- * marker, and their hash, for the thumbnail address), a search for images to pick, and the upload of an image next to
- * the measurement file. The rules of the paths and names are libs/reports/annotationPhotos.
+ * marker, and their hash, for the thumbnail address) and the upload of an image next to the measurement file. The
+ * rules of the paths and names are libs/reports/annotationPhotos.
  */
 import pathutils from '@/libs/ddb/pathutils';
-import entryApi from '@/libs/ddb/entry';
 import { isNotFound, datasetBusyOf } from '@/libs/ddb/apiError';
 import { annotationsFolder, nextUploadPath, uploadExtension } from '@/libs/reports/annotationPhotos';
 
-/** The entry types that are pictures a person can pick as a photo. */
-const IMAGE_TYPES = Object.freeze([entryApi.type.GEOIMAGE, entryApi.type.IMAGE]);
-/** The most results of a search for images. */
-export const PICK_LIMIT = 50;
 /** The most conflicts one upload waits out: another session wrote a file with the name this one chose. */
 const MAX_CONFLICTS = 20;
 
@@ -36,19 +31,6 @@ export async function photoEntries(dataset, paths) {
         }
     }));
     return entries;
-}
-
-/**
- * The images of the dataset whose name has the text (any when it is empty), by path.
- * @param {any} dataset
- * @param {string} text
- * @param {{ signal?: AbortSignal }} [options]
- * @returns {Promise<any[]>} at most PICK_LIMIT entries
- */
-export async function findImages(dataset, text, { signal } = {}) {
-    const query = `*${String(text || '').trim()}*`;
-    const found = await Promise.all(IMAGE_TYPES.map(type => dataset.search(query, { recursive: true, type, signal })));
-    return found.flat().sort((a, b) => a.path.localeCompare(b.path)).slice(0, PICK_LIMIT);
 }
 
 /**

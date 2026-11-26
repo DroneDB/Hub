@@ -129,10 +129,12 @@ export default class Dataset {
         return url;
     }
 
-    datasetThumbUrl(size) {
-        let url = `${this.baseApi}/thumb`;
-        if (size) url += `?size=${size}`;
-        return url;
+    // version: any value that changes when the cover changes (a new address, so the browser does not show the old one)
+    datasetThumbUrl(size, version) {
+        const query = [];
+        if (size) query.push(`size=${size}`);
+        if (version !== undefined && version !== null) query.push(`v=${encodeURIComponent(version)}`);
+        return `${this.baseApi}/thumb${query.length ? `?${query.join('&')}` : ''}`;
     }
 
     // options: retina, hash (the entry hash, versions the URL), format ("png" | "webp" | "jpg", TILE_FORMAT by default)

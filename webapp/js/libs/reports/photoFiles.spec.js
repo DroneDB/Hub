@@ -1,9 +1,9 @@
 /**
- * What the photos of an annotation read and write in the dataset: the entries of the photos by folder, the search for
- * images, and the upload next to the measurement file, which takes the lowest free name and never replaces a file.
+ * What the photos of an annotation read and write in the dataset: the entries of the photos by folder and the upload
+ * next to the measurement file, which takes the lowest free name and never replaces a file.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { findImages, photoEntries, uploadPhoto, PICK_LIMIT } from './photoFiles';
+import { photoEntries, uploadPhoto } from './photoFiles';
 
 const file = (name = 'a.JPG') => new File(['x'], name, { type: 'image/jpeg' });
 const error = (status, extra = {}) => Object.assign(new Error(`HTTP ${status}`), { status, ...extra });
@@ -33,23 +33,6 @@ describe('photoEntries', () => {
         const entries = await photoEntries(ds, ['bad/1.jpg', 'ok/1.jpg']);
         expect([...entries.keys()]).toEqual(['ok/1.jpg']);
         warn.mockRestore();
-    });
-});
-
-describe('findImages', () => {
-    it('searches the whole dataset for pictures and merges the types, sorted by path', async () => {
-        const ds = dataset({
-            search: vi.fn(async (_q, { type }) => (type === 3 ? [{ path: 'b.jpg' }] : [{ path: 'a.jpg' }, { path: 'c.png' }]))
-        });
-        const found = await findImages(ds, ' roof ');
-        expect(found.map(e => e.path)).toEqual(['a.jpg', 'b.jpg', 'c.png']);
-        expect(ds.search).toHaveBeenCalledWith('*roof*', expect.objectContaining({ recursive: true, type: 3 }));
-        expect(ds.search).toHaveBeenCalledWith('*roof*', expect.objectContaining({ recursive: true, type: 6 }));
-    });
-
-    it('returns at most the limit', async () => {
-        const many = Array.from({ length: PICK_LIMIT + 20 }, (_, i) => ({ path: `p${String(i).padStart(3, '0')}.jpg` }));
-        expect(await findImages(dataset({ search: vi.fn(async () => many) }), '')).toHaveLength(PICK_LIMIT);
     });
 });
 

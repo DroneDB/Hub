@@ -370,3 +370,44 @@ describe('SettingsDialog README', () => {
         expect(button('Open')).toBeUndefined();
     });
 });
+
+describe('SettingsDialog thumbnail', () => {
+    it('writes the cover the user chose at once, with no Save, and tells the page which files changed', async () => {
+        await render();
+        dataset.list = vi.fn(async () => [{ path: 'cover.webp' }]);
+        dataset.uploadObj = vi.fn(async () => ({}));
+        dataset.deleteObjs = vi.fn(async () => ({}));
+        const file = new File(['x'], 'roof.jpg', { type: 'image/jpeg' });
+
+        wrapper.vm.coverChange = { file };
+        await flushPromises();
+
+        expect(dataset.uploadObj).toHaveBeenCalledWith('thumbnail.jpg', file, { overwrite: true });
+        expect(dataset.deleteObjs).toHaveBeenCalledWith(['cover.webp']);
+        expect(wrapper.emitted('fileSaved')).toEqual([['thumbnail.jpg']]);
+        expect(wrapper.emitted('filesRemoved')).toEqual([[['cover.webp']]]);
+        expect(notify.success).toHaveBeenCalledWith('Saved as thumbnail.jpg in the dataset root', { summary: 'Thumbnail Updated' });
+        // Done: nothing is pending, and the settings have no change to save
+        expect(wrapper.vm.coverChange).toBeNull();
+        expect(wrapper.vm.coverUrl).toBe('/thumb');
+        expect(button('Save').attributes('disabled')).toBeDefined();
+    });
+
+    it('removes every cover file, and says a failure in the window', async () => {
+        await render();
+        dataset.list = vi.fn(async () => [{ path: 'thumbnail.webp' }, { path: 'cover.png' }]);
+        dataset.deleteObjs = vi.fn(async () => ({}));
+
+        wrapper.vm.coverChange = { remove: true };
+        await flushPromises();
+        expect(dataset.deleteObjs).toHaveBeenCalledWith(['thumbnail.webp', 'cover.png']);
+        expect(wrapper.vm.coverUrl).toBeNull();
+        expect(notify.success).toHaveBeenCalledWith('Thumbnail removed', { summary: 'Thumbnail Removed' });
+
+        dataset.deleteObjs = vi.fn(async () => { throw new Error('busy'); });
+        wrapper.vm.coverChange = { remove: true };
+        await flushPromises();
+        expect(wrapper.vm.error).toBe('Could not change the thumbnail: busy');
+        expect(wrapper.vm.coverChange).toBeNull();
+    });
+});

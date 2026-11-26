@@ -217,7 +217,7 @@
         <DialogHost :dialogs="dialogs" />
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
-                       :org-slug="$route.params.org" :save="saveDataset" @close="handleDatasetClose" />
+                       :org-slug="$route.params.org" :edited-dataset="dsDialogDataset" :save="saveDataset" @close="handleDatasetClose" />
 
         <ImportDatasetDialog v-if="importDialogOpen" :org-slug="$route.params.org" :forbidden-slugs="forbiddenSlugs"
                              @close="handleImportClose" />
@@ -252,6 +252,7 @@ import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useEntityDelete } from '@/composables/useEntityDelete';
 import DatasetDialog from './DatasetDialog.vue';
+import { applyCoverChange } from '@/libs/datasetCover';
 import ImportDatasetDialog from './ImportDatasetDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import OrganizationDialog from '@/features/organizations/OrganizationDialog.vue';
@@ -390,6 +391,10 @@ export default {
         }
     },
     computed: {
+        // The dataset of an edit: the dialog shows its cover and finds its files
+        dsDialogDataset: function () {
+            return this.dsDialogMode === 'edit' && this.dsDialogModel ? this.org.Dataset(this.dsDialogModel.slug) : null;
+        },
         canDeleteGlobal: function () {
             return !HubOptions.disableDatasetCreation;
         },
@@ -679,7 +684,9 @@ export default {
                 slug: ds.slug,
                 name: ds.name || ds.slug, // Use slug as fallback if name is not available
                 visibility: ds.visibility !== undefined ? ds.visibility : Visibility.PRIVATE,
-                tagline: ds.tagline || ''
+                tagline: ds.tagline || '',
+                // The cover it has: the dialog shows it at the address the row uses
+                thumbnailUrl: ds.hasThumbnail ? this.org.Dataset(ds.slug).datasetThumbUrl(256, ds.thumbVersion) : null
             };
             this.dsDialogMode = "edit";
             this.dsDialogOpen = true;
@@ -842,12 +849,37 @@ export default {
                     dsitem['visibility'] = newds.visibility;
                     dsitem['tagline'] = newds.tagline || '';
                 }
+
+                // The cover last: the settings above are saved when it fails, and the dialog says that it did
+                if (newds.cover) await this.changeCover(dsobj, dsitem, newds.cover, model);
                 if (update) this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
             } finally {
                 // The pins know the dataset by its slug and name, which the edit changed
                 if (renamed) this.invalidateLocations();
                 if (dsitem) dsitem['editing'] = false;
             }
+        },
+
+        /**
+         * Writes the cover the dataset dialog chose and shows it in the row (a new address, so the browser does not show
+         * the one before). A failure is thrown with no status: it is the dialog's form-level message, not a field's.
+         */
+        async changeCover(dsobj, dsitem, change, model) {
+            let result;
+            try {
+                result = await applyCoverChange(dsobj, change);
+            } catch (e) {
+                throw new Error(`The other settings are saved, the thumbnail is not: ${e.message}`, { cause: e });
+            }
+            const version = Date.now();
+            // The dialog stays open when a later step fails: it then shows the cover as it is now
+            model.thumbnailUrl = result.written ? dsobj.datasetThumbUrl(256, version) : null;
+            if (!dsitem) return;
+            Object.assign(dsitem, {
+                hasThumbnail: !!result.written, thumbVersion: version, thumbLoaded: false, thumbLoading: false,
+                thumbUrl: '/images/dataset-placeholder.svg'
+            });
+            this.preloadDatasetThumbnail(dsitem);
         },
 
         viewDataset(ds) {
@@ -1089,7 +1121,7 @@ export default {
         },
         getDatasetThumbUrl(ds) {
             const dsobj = this.org.Dataset(ds.slug);
-            return dsobj.datasetThumbUrl(150);
+            return dsobj.datasetThumbUrl(150, ds.thumbVersion);
         },
 
         // Organization management

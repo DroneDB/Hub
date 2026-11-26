@@ -74,6 +74,15 @@ export function hasThumbnail(type) {
 }
 
 /**
+ * The entry types whose thumbnail libddb renders from the file itself (no build needed): the files that can give the
+ * dataset its cover.
+ * @returns {number[]}
+ */
+export function fileThumbnailTypes() {
+    return [...typeCapabilities().values()].filter(row => row.thumbnail === 'file').map(row => row.id);
+}
+
+/**
  * Whether a path names an archive the server can extract (its extension is one of the extractor's).
  * @param {string | null | undefined} path
  * @returns {boolean}

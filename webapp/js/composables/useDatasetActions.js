@@ -9,14 +9,13 @@
 import { ref } from 'vue';
 import ddb from 'ddb';
 import { countOf } from '@/libs/format';
-import reg from '@/libs/api/sharedRegistry';
-import { Features } from '@/libs/features';
 import { clone } from '@/libs/utils';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { renameDataset } from '@/libs/api/registryUtils';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor, { BUSY_TOOLS, RESCAN_TOOL_ID, RESCAN_ENTRIES_TOOL_ID } from '@/libs/tasks/taskMonitor';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
+import { applyCoverChange, coverFiles } from '@/libs/datasetCover';
 import { itemFor } from '@/libs/dataset/explorerItems';
 import { CONFIRM_RESCAN, CONFIRM_REBUILD, confirmRescanEntries, deleteFilesConfirmation } from '@/libs/dataset/confirmations';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
@@ -360,7 +359,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             confirmSlugChange,
             confirmVisibilityChange: (name, from, to) => confirm(visibilityChangeConfirmation({ name, from, to })),
             confirmDiscard: confirmDiscardSettings,
-            onFileSaved: path => listing.addEntry(path).catch(e => console.warn(`Could not show ${path} in the file list:`, e)),
+            onFileSaved: path => showCoverFiles(path, []),
+            onFilesRemoved: paths => showCoverFiles(null, paths),
             onSlugRenamed: slug => {
                 busy.value = true;
                 window.location.href = `/r/${route.org}/${slug}`;
@@ -448,36 +448,25 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     /** The file's thumbnail becomes the dataset cover (replacing any cover, after asking). */
     async function setAsCover(file) {
         try {
-            const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
-            if (!candidates || !candidates.length) {
-                showError('Dataset thumbnail candidates not configured');
-                return;
-            }
-            const names = new Set(candidates.map(c => c.toLowerCase()));
-            const covers = (await dataset.list()).filter(e => names.has(pathutils.basename(e.path).toLowerCase()));
-            if (covers.length && !await confirm({
+            if ((await coverFiles(dataset)).length && !await confirm({
                 title: 'Replace Dataset Cover', danger: true, confirmText: 'Replace',
                 message: 'A dataset cover already exists. Do you want to replace it? This action is irreversible.'
             })) return;
             await withBusy(async () => {
-                if (covers.length) {
-                    const paths = covers.map(e => e.path);
-                    await dataset.deleteObjs(paths);
-                    listing.removed(paths);
-                }
-                const res = await dataset.registry.fetchRaw(dataset.thumbUrl(file.entry.path, 1024));
-                if (!res.ok) throw new Error(`Failed to fetch thumbnail: ${res.statusText}`);
-                const blob = await res.blob();
-                // The replace was confirmed above
-                await dataset.uploadObj(candidates[0], new File([blob], candidates[0], { type: blob.type }), { overwrite: true });
-                // The cover is a file of the dataset (in its root): the toast names it, and the list and the tree show it (FR-EXP-30)
-                await listing.addEntry(candidates[0]).catch(e => console.warn('Could not show the cover in the file list:', e));
-                notify.success(`Saved as ${candidates[0]} in the dataset root`, { summary: 'Cover Set' });
+                const { written, removed } = await applyCoverChange(dataset, { entryPath: file.entry.path });
+                showCoverFiles(written, removed);
+                notify.success(`Saved as ${written} in the dataset root`, { summary: 'Cover Set' });
                 rootChanged?.();
             });
         } catch (e) {
             showError(e, 'Set as Dataset Cover');
         }
+    }
+
+    /** The cover is a file of the dataset (in its root): the list and the tree show it, and no longer the ones it replaced (FR-EXP-30). */
+    function showCoverFiles(written, removed) {
+        if (removed.length) listing.removed(removed);
+        if (written) listing.addEntry(written).catch(e => console.warn(`Could not show ${written} in the file list:`, e));
     }
 
     // ---- Processing ----------------------------------------------------------------------

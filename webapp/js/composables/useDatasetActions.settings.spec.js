@@ -195,14 +195,29 @@ describe('Set as Dataset Thumbnail (FR-EXP-30)', () => {
         expect(rootChanged).toHaveBeenCalled();
     });
 
-    it('a cover that is replaced leaves the list and the tree', async () => {
+    it('a cover that is replaced leaves the list and the tree: the new one is written over its own name, the others are deleted after it', async () => {
         const { actions } = setup();
-        dataset.list.mockResolvedValue([{ path: 'thumbnail.webp' }, { path: 'other.jpg' }]);
+        dataset.list.mockResolvedValue([{ path: 'thumbnail.webp' }, { path: 'cover.jpg' }, { path: 'other.jpg' }]);
 
         await actions.setAsCover({ entry: { path: 'odm_orthophoto.tif' } });
 
-        expect(dataset.deleteObjs).toHaveBeenCalledWith(['thumbnail.webp']);
-        expect(listing.removed).toHaveBeenCalledWith(['thumbnail.webp']);
+        expect(dataset.uploadObj).toHaveBeenCalledWith('thumbnail.webp', expect.any(File), { overwrite: true });
+        expect(dataset.deleteObjs).toHaveBeenCalledWith(['cover.jpg']);
+        expect(dataset.uploadObj.mock.invocationCallOrder[0]).toBeLessThan(dataset.deleteObjs.mock.invocationCallOrder[0]);
+        expect(listing.removed).toHaveBeenCalledWith(['cover.jpg']);
+        expect(listing.addEntry).toHaveBeenCalledWith('thumbnail.webp');
+    });
+});
+
+describe('The thumbnail buttons of the Settings window', () => {
+    it('a cover written joins the list, the cover files it replaced leave it', async () => {
+        const { props } = setup();
+
+        props.onFileSaved('thumbnail.jpg');
+        props.onFilesRemoved(['cover.webp']);
+
+        expect(listing.addEntry).toHaveBeenCalledWith('thumbnail.jpg');
+        expect(listing.removed).toHaveBeenCalledWith(['cover.webp']);
     });
 });
 

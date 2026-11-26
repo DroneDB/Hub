@@ -2,24 +2,24 @@
     <div class="dataset-image-picker">
         <form class="picker-search" role="search" @submit.prevent="search">
             <label :for="`${idPrefix}-query`" class="visually-hidden">Image name</label>
-            <InputText :id="`${idPrefix}-query`" v-model="query" type="search" placeholder="Part of the image name" autocomplete="off" class="picker-query" />
+            <InputText :id="`${idPrefix}-query`" v-model="query" type="search" placeholder="Part of the name" autocomplete="off" class="picker-query" />
             <Button type="submit" label="Search" severity="secondary" :loading="loading" />
         </form>
 
-        <p v-if="loading" class="picker-state" role="status">Looking for images...</p>
+        <p v-if="loading" class="picker-state" role="status">Looking for {{ noun }}...</p>
         <p v-else-if="error" class="picker-state" role="alert">
             {{ error }}
             <Button label="Retry" severity="secondary" size="small" class="ms-2" @click="search" />
         </p>
-        <p v-else-if="searched && !results.length" class="picker-state" role="status">No images found</p>
+        <p v-else-if="searched && !results.length" class="picker-state" role="status">No {{ noun }} found</p>
 
-        <ul v-if="results.length" class="picker-results" :aria-label="`Images of the dataset (${results.length})`">
+        <ul v-if="results.length" class="picker-results" :aria-label="`${capitalized} of the dataset (${results.length})`">
             <li v-for="entry in results" :key="entry.path" class="picker-row">
                 <img class="picker-thumb" :src="dataset.thumbUrl(entry.path, 96, entry.hash)" alt="" width="48" height="48" loading="lazy">
                 <span class="picker-name" :title="entry.path">{{ entry.path }}</span>
-                <ActionButton :label="`Add ${entry.path}`" severity="secondary" size="small" :disabled="!!blockedReasonOf(entry.path)"
+                <ActionButton :label="`${actionLabel} ${entry.path}`" severity="secondary" size="small" :disabled="!!blockedReasonOf(entry.path)"
                               :disabled-reason="blockedReasonOf(entry.path)" @click="$emit('pick', entry.path)">
-                    <i class="fa-solid fa-plus" aria-hidden="true" /> Add
+                    <i :class="actionIcon" aria-hidden="true" /> {{ actionLabel }}
                 </ActionButton>
             </li>
         </ul>
@@ -28,22 +28,34 @@
 
 <script setup>
 /**
- * Any image of the dataset, to pick as a photo: a search by part of the name over the whole dataset (the first 50 by
- * path), each result with its thumbnail and an Add action. An image the annotation has already, or any when it has the
- * most it can, is disabled with the reason. Emits `pick` with the path.
+ * A file of the dataset to pick (an image as a photo of an annotation, a file whose thumbnail becomes the dataset cover):
+ * a search by part of the name over the whole dataset (the first 50 by path) of the entry types asked for, each result
+ * with its thumbnail and an action. A path that is taken, or any when nothing can be picked now, is disabled with the
+ * reason. Emits `pick` with the path.
  */
-import { onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import ActionButton from '@/components/ActionButton.vue';
-import { findImages } from '@/libs/reports/photoFiles';
+import { findEntries, IMAGE_TYPES } from '@/libs/findEntries';
 
 const props = defineProps({
     dataset: { type: Object, required: true },
-    /** The paths the annotation has as photos */
+    /** The entry types to look for (the images by default) */
+    types: { type: Array, default: () => IMAGE_TYPES },
+    /** Whether a path found is offered (all are by default) */
+    accepts: { type: Function, default: () => true },
+    /** What the results are, plural and lowercase: the messages and the label of the list say it */
+    noun: { type: String, default: 'images' },
+    /** The action of a result, and its icon */
+    actionLabel: { type: String, default: 'Add' },
+    actionIcon: { type: String, default: 'fa-solid fa-plus' },
+    /** The paths that cannot be picked again (the photos the annotation has) */
     taken: { type: Array, default: () => [] },
-    /** Why nothing can be added now ('' when something can) */
+    /** Why nothing can be picked now ('' when something can) */
     blockedReason: { type: String, default: '' },
+    /** Why a taken path cannot be picked */
+    takenReason: { type: String, default: 'Already in this annotation' },
     idPrefix: { type: String, default: 'photo-pick' }
 });
 defineEmits(['pick']);
@@ -53,10 +65,11 @@ const results = ref(/** @type {any[]} */ ([]));
 const loading = ref(false);
 const error = ref('');
 const searched = ref(false);
+const capitalized = computed(() => props.noun.charAt(0).toUpperCase() + props.noun.slice(1));
 let controller = /** @type {AbortController | null} */ (null);
 
 function blockedReasonOf(path) {
-    if (props.taken.includes(path)) return 'Already in this annotation';
+    if (props.taken.includes(path)) return props.takenReason;
     return props.blockedReason;
 }
 
@@ -66,14 +79,14 @@ async function search() {
     loading.value = true;
     error.value = '';
     try {
-        const found = await findImages(props.dataset, query.value, { signal: mine.signal });
+        const found = await findEntries(props.dataset, query.value, { types: props.types, signal: mine.signal });
         if (mine !== controller) return;
-        results.value = found;
+        results.value = found.filter(entry => props.accepts(entry.path));
         searched.value = true;
     } catch (e) {
         if (mine !== controller || mine.signal.aborted) return;
         results.value = [];
-        error.value = `The images could not be listed: ${e?.message || e}`;
+        error.value = `The ${props.noun} could not be listed: ${e?.message || e}`;
     } finally {
         if (mine === controller) loading.value = false;
     }

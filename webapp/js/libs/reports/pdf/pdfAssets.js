@@ -9,6 +9,7 @@
 import { isDatasetPath } from '@/libs/reports/annotationPhotos';
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
 import { LOGO_MAX_SIDE, PHOTO_MAX_SIDE, SNAPSHOT_MAX_SIDE, prepareImage } from '@/libs/reports/pdf/pdfImages';
+import { fetchImageBlob } from '@/libs/imageBlob';
 
 /**
  * @typedef {import('./pdfImages').PreparedImage} PreparedImage
@@ -47,19 +48,8 @@ export function logoRequest(model) {
     return model.logo ? { url: model.logo.url, api: model.logo.source === 'template' } : null;
 }
 
-/**
- * The bytes of an image: the Registry's own endpoints (a thumbnail, a stored capture, the logo of a template) with the
- * session of the user, any other address as the browser fetches it.
- * @param {any} dataset
- * @param {string} url
- * @param {{ api: boolean, signal?: AbortSignal }} options
- * @returns {Promise<Blob>}
- */
-export async function fetchImageBlob(dataset, url, { api, signal }) {
-    const response = api ? await dataset.registry.fetchRaw(url, { signal }) : await fetch(url, { signal });
-    if (!response.ok) throw new Error(`The server answered ${response.status}`);
-    return response.blob();
-}
+// Shared with the cover of a dataset (libs/datasetCover)
+export { fetchImageBlob };
 
 /**
  * @typedef {object} AssetDeps

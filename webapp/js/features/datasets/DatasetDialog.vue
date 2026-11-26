@@ -69,6 +69,12 @@
                     </div>
                 </template>
             </Form>
+            <!-- Out of the form: the search of the files is a form of its own -->
+            <div v-if="!isNew && editedDataset" class="mb-3">
+                <span id="dataset-dialog-thumbnail-label" class="d-block mb-1 fw-semibold">Thumbnail</span>
+                <DatasetCoverField v-model="coverChange" :dataset="editedDataset" :current-url="model?.thumbnailUrl ?? null" :busy="busy"
+                                   labelledby="dataset-dialog-thumbnail-label" />
+            </div>
             <div v-if="isNew" class="mb-3">
                 <div class="d-flex align-items-center gap-2">
                     <Checkbox v-model="openAfterCreate" :binary="true" :disabled="busy" input-id="openAfterCreate" />
@@ -88,6 +94,7 @@ import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
 import Checkbox from 'primevue/checkbox';
 import FieldError from '@/components/FieldError.vue';
+import DatasetCoverField from '@/components/DatasetCoverField.vue';
 import { createResolver } from '@/libs/forms/resolver';
 import { useHubForm } from '@/composables/useHubForm';
 import { getOpenAfterCreatePreference, saveOpenAfterCreatePreference } from '@/libs/storageUtils';
@@ -111,16 +118,22 @@ const SLUG_TAKEN = 'A dataset with this slug already exists in this organization
  * must be unique), else in the form-level message; the dialog stays open with what was typed. It
  * closes only when the dataset is saved.
  *
+ * An edit also changes the cover of the dataset (its thumbnail in the list): an image of the user's or the thumbnail of
+ * a file of the dataset, or none. It is a change like the others, sent with Save (`cover`, a CoverChange of
+ * libs/datasetCover; null when the cover stays).
+ *
  * Props:
  *   mode           - 'new' or 'edit'
- *   model          - the dataset of an edit ({ slug, name, visibility, tagline })
- *   save           - async ({ name, slug, visibility, tagline, changeSlug, openAfterCreate }) => ...; throws when it fails
+ *   model          - the dataset of an edit ({ slug, name, visibility, tagline, thumbnailUrl }; thumbnailUrl: the
+ *                    address of its cover, null when it has none)
+ *   editedDataset  - the dataset of an edit (a ddb Dataset): its cover and its files
+ *   save           - async ({ name, slug, visibility, tagline, changeSlug, openAfterCreate, cover }) => ...; throws when it fails
  *   forbiddenSlugs - the slugs of the datasets of the organization (the loaded list)
  *   orgSlug        - the organization, for the URL the slug makes
  */
 export default {
     components: {
-        Window, Select, InputText, PrimeMessage, Checkbox, Form, FieldError
+        Window, Select, InputText, PrimeMessage, Checkbox, Form, FieldError, DatasetCoverField
     },
     props: {
         mode: {
@@ -128,6 +141,10 @@ export default {
             default: 'new'
         },
         model: {
+            type: Object,
+            default: null
+        },
+        editedDataset: {
             type: Object,
             default: null
         },
@@ -203,6 +220,8 @@ export default {
             // What the checkbox started from: the preference is stored only when the user changed it,
             // so a value that changed elsewhere since the dialog opened is not overwritten
             openAfterCreateAtOpen: openAfterCreate,
+            // The cover the user chose (null: it stays as it is)
+            coverChange: null,
             visibilityOptions: VISIBILITY_OPTIONS
         };
     },
@@ -249,7 +268,8 @@ export default {
                 // Edit: only then does the page rename the dataset
                 changeSlug: !this.isNew && this.changeSlug && slug !== this.model.slug,
                 openAfterCreate: this.openAfterCreate,
-                tagline: values.tagline || ''
+                tagline: values.tagline || '',
+                cover: this.isNew ? null : this.coverChange
             });
             if (this.isNew && this.openAfterCreate !== this.openAfterCreateAtOpen) {
                 saveOpenAfterCreatePreference(this.openAfterCreate);

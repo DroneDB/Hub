@@ -9,7 +9,7 @@ import PrimeVue from 'primevue/config';
 const reg = vi.hoisted(() => ({
     isAdmin: () => false,
     isLoggedIn: () => true,
-    features: { get: () => false },
+    features: { get: () => false, value: () => undefined },
     Organization: null
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
@@ -102,7 +102,11 @@ describe('DatasetsPage map view', () => {
         metaSet: vi.fn(() => Promise.resolve()),
         metaUnset: vi.fn(() => Promise.resolve()),
         rename: vi.fn(slug => Promise.resolve({ slug })),
-        update: vi.fn(() => Promise.resolve(true))
+        update: vi.fn(() => Promise.resolve(true)),
+        list: vi.fn(() => Promise.resolve([])),
+        uploadObj: vi.fn(() => Promise.resolve({})),
+        deleteObjs: vi.fn(() => Promise.resolve({})),
+        datasetThumbUrl: vi.fn((size, version) => `/thumb?size=${size}&v=${version}`)
     };
 
     async function render(view) {
@@ -300,6 +304,52 @@ describe('DatasetsPage map view', () => {
         expect(notify.error).not.toHaveBeenCalled();
         expect(wrapper.vm.dsDialogOpen).toBe(true);
         expect(wrapper.vm.datasets[0]).toMatchObject({ slug: 'ds', editing: false });
+    });
+
+    it('writes the cover chosen in the dialog after the other settings, and the row shows it at a new address', async () => {
+        pendingLocations();
+        await render();
+        for (const fn of Object.values(datasetApi)) fn.mockClear();
+        datasetApi.list.mockResolvedValueOnce([{ path: 'cover.webp' }]);
+        wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
+        expect(wrapper.vm.dsDialogDataset).toBe(datasetApi);
+        const file = new File(['x'], 'roof.jpg', { type: 'image/jpeg' });
+
+        await wrapper.vm.saveDataset({ name: 'Roof', visibility: 0, tagline: '', slug: 'ds', changeSlug: false, cover: { file } });
+        await flushPromises();
+
+        expect(datasetApi.uploadObj).toHaveBeenCalledWith('thumbnail.jpg', file, { overwrite: true });
+        expect(datasetApi.deleteObjs).toHaveBeenCalledWith(['cover.webp']);
+        expect(datasetApi.metaUnset.mock.invocationCallOrder[0]).toBeLessThan(datasetApi.uploadObj.mock.invocationCallOrder[0]);
+        const row = wrapper.vm.datasets[0];
+        expect(row.hasThumbnail).toBe(true);
+        expect(wrapper.vm.getDatasetThumbUrl(row)).toBe(`/thumb?size=150&v=${row.thumbVersion}`);
+    });
+
+    it('a cover that cannot be written is said in the dialog, with the other settings saved', async () => {
+        pendingLocations();
+        await render();
+        for (const fn of Object.values(datasetApi)) fn.mockClear();
+        datasetApi.uploadObj.mockRejectedValueOnce(Object.assign(new Error('Storage quota exceeded'), { status: 409 }));
+        wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
+
+        const saving = wrapper.vm.saveDataset({ name: 'Roof', visibility: 0, tagline: '', slug: 'ds', changeSlug: false,
+            cover: { file: new File(['x'], 'roof.png', { type: 'image/png' }) } });
+
+        // No status: the dialog shows it as its own message, not at the slug (where a 409 goes)
+        await expect(saving).rejects.toThrow(new Error('The other settings are saved, the thumbnail is not: Storage quota exceeded'));
+        expect(datasetApi.metaSet).toHaveBeenCalledWith('name', 'Roof');
+        expect(wrapper.vm.datasets[0]).toMatchObject({ name: 'Roof', editing: false });
+    });
+
+    it('sends nothing of the cover when the dialog did not change it', async () => {
+        pendingLocations();
+        await render();
+        for (const fn of Object.values(datasetApi)) fn.mockClear();
+        wrapper.vm.handleEdit(wrapper.vm.datasets[0]);
+        await wrapper.vm.saveDataset({ name: 'Roof', visibility: 0, tagline: '', slug: 'ds', changeSlug: false, cover: null });
+        expect(datasetApi.list).not.toHaveBeenCalled();
+        expect(datasetApi.uploadObj).not.toHaveBeenCalled();
     });
 
     it('creates a dataset in the dialog, and throws a refusal of the Registry with the temporary row gone', async () => {

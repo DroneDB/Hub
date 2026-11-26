@@ -92,7 +92,7 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import ActionButton from '@/components/ActionButton.vue';
 import PhotoThumb from '@/components/measurements/PhotoThumb.vue';
-import DatasetImagePicker from '@/components/measurements/DatasetImagePicker.vue';
+import DatasetImagePicker from '@/components/DatasetImagePicker.vue';
 import pathutils from '@/libs/ddb/pathutils';
 import {
     MAX_CAPTION, MAX_PHOTOS, PHOTO_SOURCE, UPLOAD_EXTENSIONS, addBlockReason, hasPhoto, isDatasetPath, photoAlt, withPhoto

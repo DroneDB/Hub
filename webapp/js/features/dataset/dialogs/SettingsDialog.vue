@@ -85,27 +85,9 @@
 
                 <div class="settings-field">
                     <span id="settings-thumbnail-label" class="settings-label"><i class="fa-solid fa-image" aria-hidden="true" />Thumbnail</span>
-                    <div class="settings-control thumbnail-upload" role="group" aria-labelledby="settings-thumbnail-label">
-                        <img v-if="thumbnailPreview && !thumbnailError"
-                             :src="thumbnailPreview" alt="Dataset thumbnail"
-                             class="thumbnail-preview"
-                             @error="thumbnailError = true">
-                        <img v-else
-                             :src="placeholderUrl" alt="No thumbnail"
-                             class="thumbnail-preview thumbnail-placeholder">
-                        <div class="thumbnail-actions">
-                            <input ref="thumbnailInput" type="file" aria-label="Thumbnail image"
-                                   accept="image/webp,image/jpeg,image/png"
-                                   style="display: none"
-                                   @change="handleThumbnailSelect">
-                            <Button severity="secondary" :loading="thumbnailUploading"
-                                    icon="fa-solid fa-upload" label="Upload" @click="$refs.thumbnailInput.click()" />
-                            <Button v-if="thumbnailPreview && !thumbnailError"
-                                    severity="danger" text
-                                    :loading="thumbnailRemoving"
-                                    icon="fa-solid fa-trash" label="Remove" @click="removeThumbnail" />
-                            <small class="field-hint">WebP, JPEG or PNG. Shown in the dataset list.</small>
-                        </div>
+                    <div class="settings-control">
+                        <DatasetCoverField v-model="coverChange" :dataset="dataset" :current-url="coverUrl" :busy="coverSaving"
+                                           labelledby="settings-thumbnail-label" />
                     </div>
                 </div>
 
@@ -166,10 +148,12 @@ import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
 import FieldError from '@/components/FieldError.vue';
+import DatasetCoverField from '@/components/DatasetCoverField.vue';
 import ddb from 'ddb';
 import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
 import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY, visibilityDescription } from '@/libs/visibility';
 import { datasetThumbnailUrl } from '@/libs/optionalFile';
+import { applyCoverChange } from '@/libs/datasetCover';
 import { slugProblem, slugDescription } from '@/libs/slug';
 import { displayNameLimits, displayNameLengthProblem } from '@/libs/nameRules';
 import { RESCAN_ICON } from '@/libs/glyphs';
@@ -189,7 +173,7 @@ const SETTINGS = [
 export default {
     components: {
         LoadingSpinner,
-        Message, Window, Button, Select, InputText, PrimeMessage, FieldError
+        Message, Window, Button, Select, InputText, PrimeMessage, FieldError, DatasetCoverField
     },
     props: {
         dataset: {
@@ -221,12 +205,10 @@ export default {
     },
     // close: the window closes ('saved' after a Save); changed: a setting was saved (the page reads the dataset again);
     // slugRenamed: the URL changed, the page goes to it; openReadme / editReadme: the README opens in its viewer / in the
-    // editor; fileSaved: a file of the dataset was written (the thumbnail), the file list shows it
-    emits: ['close', 'rescanRequested', 'addMarkdown', 'openReadme', 'editReadme', 'changed', 'slugRenamed', 'fileSaved'],
+    // editor; fileSaved / filesRemoved: files of the dataset were written / deleted (the thumbnail), the file list shows it
+    emits: ['close', 'rescanRequested', 'addMarkdown', 'openReadme', 'editReadme', 'changed', 'slugRenamed', 'fileSaved', 'filesRemoved'],
     data: function () {
         return {
-            // The image of a dataset without a cover, from the site's images (as the dataset list uses it)
-            placeholderUrl: '/images/dataset-placeholder.svg',
             taglineMaxLength: TAGLINE_MAX_LENGTH,
             error: "",
             loading: true,
@@ -243,10 +225,10 @@ export default {
             nameError: "",
             nameMaxLength: displayNameLimits().max,
             slugError: "",
-            thumbnailPreview: null,
-            thumbnailError: false,
-            thumbnailUploading: false,
-            thumbnailRemoving: false,
+            // The cover the dataset has (null: none), and the change the user chose, applied at once (a file button)
+            coverUrl: null,
+            coverChange: null,
+            coverSaving: false,
             Licenses,
             RESCAN_ICON,
             visibilityOptions: VISIBILITY_OPTIONS
@@ -297,6 +279,11 @@ export default {
             }));
         }
     },
+    watch: {
+        coverChange: function (change) {
+            this.applyCover(change);
+        }
+    },
     mounted: async function () {
         try {
             const info = await this.dataset.info();
@@ -312,9 +299,7 @@ export default {
 
             // The existing dataset thumbnail, asked for only when the dataset has one (its entry says so): a request for
             // a cover that is not there logs a 404 in the console (FR-XC-10, FR-EXP-28)
-            const thumbnail = datasetThumbnailUrl(this.dataset, properties, 256);
-            this.thumbnailPreview = thumbnail && thumbnail + '&t=' + Date.now();
-            this.thumbnailError = false;
+            this.coverUrl = datasetThumbnailUrl(this.dataset, properties, 256, Date.now());
 
         } catch (e) {
             this.error = e.message;
@@ -398,63 +383,27 @@ export default {
         leaveFor: async function (event, ...args) {
             if (await this.canLeave()) this.$emit(event, ...args);
         },
-        handleThumbnailSelect: async function (event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            this.thumbnailUploading = true;
+        /** The cover the user chose, written at once (the Files buttons do not wait for Save). */
+        applyCover: async function (change) {
+            if (!change || this.coverSaving) return;
+            this.coverSaving = true;
             this.error = '';
-
             try {
-                // Determine the target filename based on file type
-                const ext = file.type === 'image/webp' ? 'webp'
-                          : file.type === 'image/png' ? 'png'
-                          : 'jpg';
-                const path = `thumbnail.${ext}`;
-
-                // The dataset's thumbnail: a new one replaces it
-                await this.dataset.uploadObj(path, file, { overwrite: true });
-
-                // Refresh preview with cache-busting timestamp
-                this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
-                this.thumbnailError = false;
-                // The thumbnail is a file of the dataset: the toast names it (FR-EXP-30)
-                this.$notify.success(`Saved as ${path} in the dataset root`, { summary: 'Thumbnail Updated' });
-                this.$emit('fileSaved', path);
-            } catch (e) {
-                this.$notify.error('Failed to upload thumbnail: ' + e.message);
-                this.error = 'Failed to upload thumbnail: ' + e.message;
-            }
-
-            this.thumbnailUploading = false;
-            // Reset file input so the same file can be re-selected
-            this.$refs.thumbnailInput.value = '';
-        },
-        removeThumbnail: async function () {
-            this.thumbnailRemoving = true;
-            this.error = '';
-
-            try {
-                // Try to delete all possible thumbnail candidates
-                const candidates = ['thumbnail.webp', 'thumbnail.jpg', 'thumbnail.png',
-                                    'cover.webp', 'cover.jpg', 'cover.png'];
-                for (const candidate of candidates) {
-                    try {
-                        await this.dataset.deleteObj(candidate);
-                    } catch {
-                        // Ignore 404 errors - file doesn't exist
-                    }
+                const { written, removed } = await applyCoverChange(this.dataset, change);
+                this.coverUrl = written ? this.dataset.datasetThumbUrl(256, Date.now()) : null;
+                if (removed.length) this.$emit('filesRemoved', removed);
+                if (written) {
+                    // The thumbnail is a file of the dataset: the toast names it (FR-EXP-30)
+                    this.$notify.success(`Saved as ${written} in the dataset root`, { summary: 'Thumbnail Updated' });
+                    this.$emit('fileSaved', written);
+                } else {
+                    this.$notify.success('Thumbnail removed', { summary: 'Thumbnail Removed' });
                 }
-
-                this.thumbnailPreview = null;
-                this.thumbnailError = true;
-                this.$notify.success('Thumbnail removed successfully', { summary: 'Thumbnail Removed' });
             } catch (e) {
-                this.$notify.error('Failed to remove thumbnail: ' + e.message);
-                this.error = 'Failed to remove thumbnail: ' + e.message;
+                this.error = `Could not change the thumbnail: ${e.message}`;
             }
-
-            this.thumbnailRemoving = false;
+            this.coverSaving = false;
+            this.coverChange = null;
         },
         addDocument: async function (document) {
             // The new README opens in the editor and this window closes: its changes are asked about first
@@ -560,39 +509,6 @@ export default {
     color: var(--ddb-text-muted);
     font-size: var(--ddb-font-size-sm);
     line-height: 1.4;
-}
-
-.thumbnail-upload {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--ddb-spacing-md);
-}
-
-.thumbnail-preview {
-    flex-shrink: 0;
-    width: 7.5rem;
-    height: 5rem;
-    object-fit: cover;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-}
-
-.thumbnail-placeholder {
-    object-fit: contain;
-    opacity: 0.6;
-}
-
-.thumbnail-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--ddb-spacing-sm);
-    min-width: 0;
-}
-
-.thumbnail-actions .field-hint {
-    flex-basis: 100%;
-    margin-top: 0;
 }
 
 .unsaved-note {
