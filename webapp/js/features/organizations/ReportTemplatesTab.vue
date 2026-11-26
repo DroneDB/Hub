@@ -74,25 +74,35 @@
                     <FieldError id="report-template-sections-error" :message="errorAt('defaultSections')" />
                 </fieldset>
 
-                <div class="mb-3 logo-field" role="group" aria-labelledby="report-template-logo-label">
-                    <span id="report-template-logo-label" class="d-block mb-1 fw-semibold">Logo</span>
-                    <div class="d-flex flex-wrap align-items-center gap-2">
-                        <img v-if="logoSrc" :src="logoSrc" alt="Logo of the template" class="logo-image">
-                        <span v-else class="text-muted">No logo: reports show the logo of the site, if it has one.</span>
-                        <template v-if="!readOnly">
-                            <ActionButton severity="secondary" outlined size="small" icon="fa-solid fa-upload" show-label
-                                          :label="template.logo ? 'Replace logo' : 'Upload logo'" :disabled="!isSaved || logoBusy"
-                                          :disabled-reason="isSaved ? 'A logo is being sent' : 'Save the template to add a logo'" @click="chooseLogo" />
-                            <ActionButton v-if="template.logo" severity="danger" text size="small" icon="fa-solid fa-trash" show-label label="Remove logo"
-                                          :disabled="logoBusy" disabled-reason="A logo is being sent" @click="emit('remove-logo', template.id)" />
-                        </template>
+                <fieldset class="mb-3 logo-field">
+                    <legend class="fw-semibold mb-1">Logo</legend>
+                    <div :key="logoModeKey" class="d-flex flex-wrap gap-3 mb-2">
+                        <div v-for="mode in logoModes" :key="mode.value" class="d-flex align-items-center gap-1">
+                            <RadioButton :model-value="logoMode" :value="mode.value" name="report-template-logo-mode" :input-id="`report-template-logo-${mode.value}`"
+                                         :disabled="readOnly || logoWorking" @update:model-value="chooseLogoMode" />
+                            <label :for="`report-template-logo-${mode.value}`">{{ mode.label }}</label>
+                        </div>
                     </div>
-                    <input ref="logoInput" type="file" hidden :accept="logoTypes.join(',')" aria-label="Logo file" @change="onLogoChosen">
-                    <small class="d-block mt-1 text-muted">PNG, JPEG, WebP or SVG, up to {{ limits.logoBytes / 1024 }} KB.</small>
+                    <div v-if="logoMode === 'organization'" class="d-flex flex-wrap align-items-center gap-2" data-test="organization-logo">
+                        <img v-if="organizationLogoUrl" :src="organizationLogoUrl" alt="Logo of the organization" class="logo-image">
+                        <span v-else class="text-muted">The organization has no logo: reports show the logo of the site, if it has one. Add one with Edit organization.</span>
+                    </div>
+                    <template v-else>
+                        <div class="d-flex flex-wrap align-items-center gap-2" data-test="custom-logo">
+                            <img v-if="logoSrc" :src="logoSrc" alt="Logo of the template" class="logo-image">
+                            <span v-else-if="readOnly || isSaved" class="text-muted">Upload the logo of this template. Until then reports show the organization logo.</span>
+                            <ActionButton v-if="!readOnly" severity="secondary" outlined size="small" icon="fa-solid fa-upload" show-label
+                                          :label="template.logo ? 'Replace logo' : 'Upload logo'" :disabled="!isSaved || logoWorking"
+                                          :disabled-reason="isSaved ? 'A logo is being prepared and sent' : 'Save the template to add a logo'" @click="chooseLogo" />
+                        </div>
+                        <small v-if="preparing" class="d-block mt-1 text-muted" role="status">Preparing the logo…</small>
+                        <small v-if="!readOnly" class="d-block mt-1 text-muted">{{ logoHint }}</small>
+                    </template>
+                    <input ref="logoInput" type="file" hidden accept="image/*" aria-label="Logo file" @change="onLogoChosen">
                     <FieldError id="report-template-logo-error" :message="logoError" />
-                </div>
+                </fieldset>
             </div>
-            <ReportTemplatePreview class="template-preview-column" :template="template" :logo-src="logoSrc" />
+            <ReportTemplatePreview class="template-preview-column" :template="template" :logo-src="previewLogoSrc" />
         </div>
     </div>
 </template>
@@ -102,13 +112,17 @@
  * The templates of the organization: the one being edited (picked in the list; added and deleted here, the last
  * one stays) with its name, colours, paper, texts, disclaimer, the sections of a new report and its logo, and a
  * preview page that follows the values. The id of a new template is made from its name and follows it until it is
- * saved. The logo is the Registry's, sent at once (`upload-logo`, `remove-logo`: the dialog asks the Registry and keeps
- * the version it answers with), and only for a template that is saved: the Registry has no template to give the logo to
- * before that.
+ * saved. The logo is the organization's (the one Edit organization sets) or a custom one of the template: a template
+ * with a custom logo is Custom, and choosing Organization asks to remove it (`remove-logo`). The custom logo is the
+ * Registry's, prepared in the browser (libs/logoImage: shrunk and saved as WebP, an SVG kept) and sent at once
+ * (`upload-logo`, with what was prepared: the dialog asks the Registry and keeps the version it answers with), and only
+ * for a template that is saved: the Registry has no template to give the logo to before that. The preview shows the logo
+ * a report would show (resolveLogo).
  */
 import { computed, ref, watch } from 'vue';
 import Checkbox from 'primevue/checkbox';
 import InputText from 'primevue/inputtext';
+import RadioButton from 'primevue/radiobutton';
 import Select from 'primevue/select';
 import Textarea from 'primevue/textarea';
 import ActionButton from '@/components/ActionButton.vue';
@@ -116,8 +130,12 @@ import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import FieldError from '@/components/FieldError.vue';
 import ReportSettingsField from './ReportSettingsField.vue';
 import ReportTemplatePreview from './ReportTemplatePreview.vue';
+import { instanceLogoUrl } from '@/libs/hubBranding';
+import { LOGO_INPUT_HINT, prepareLogoFor } from '@/libs/logoImage';
+import { LOGO_MAX_SIDE } from '@/libs/reports/pdf/pdfImages';
+import { resolveLogo } from '@/libs/reports/reportModel';
 import {
-    LIMITS, LOGO_TYPES, ORIENTATIONS, PAPERS, REPORT_SWATCHES, SECTION_KINDS, SECTION_LABELS,
+    LIMITS, ORIENTATIONS, PAPERS, REPORT_SWATCHES, SECTION_KINDS, SECTION_LABELS,
     canAddEntry, canRemoveEntry, idFromName, logoProblem, newTemplate, problemAt, takenIds
 } from '@/libs/reports/reportSettings';
 
@@ -132,6 +150,8 @@ const props = defineProps({
     savedIds: { type: Object, default: () => new Set() },
     /** The address of the logo of a template, or '' (it has none, or is not stored) */
     logoUrl: { type: Function, default: () => '' },
+    /** The address of the logo of the organization, or '' (it has none) */
+    organizationLogoUrl: { type: String, default: '' },
     /** A logo is being sent or removed */
     logoBusy: { type: Boolean, default: false }
 });
@@ -145,10 +165,17 @@ const papers = PAPERS;
 const orientations = ORIENTATIONS.map(value => ({ value, label: value === 'portrait' ? 'Portrait' : 'Landscape' }));
 const sectionKinds = SECTION_KINDS;
 const sectionLabels = SECTION_LABELS;
-const logoTypes = LOGO_TYPES;
+const logoHint = LOGO_INPUT_HINT;
+const logoModes = [{ value: 'organization', label: 'Organization logo' }, { value: 'custom', label: 'Custom logo' }];
 
 const logoInput = ref(null);
 const logoError = ref('');
+const preparing = ref(false);
+// The id of the template whose Custom was chosen before it has a logo of its own (an id, so the choice outlives the
+// save that reads the templates again, and follows a new template's id as it is renamed); a new key puts the radios back to what the
+// template has when a choice is only asked for (Organization over a custom logo waits for the removal)
+const customChosen = ref(null);
+const logoModeKey = ref(0);
 
 const template = computed(() => templates.value[selected.value] ?? null);
 const options = computed(() => templates.value.map((t, index) => ({ value: index, label: t.name?.trim() || `Template ${index + 1}` })));
@@ -157,13 +184,21 @@ const canAdd = computed(() => canAddEntry('templates', templates.value));
 const canRemove = computed(() => canRemoveEntry('templates', templates.value));
 const listError = computed(() => problemAt(props.errors, 'templates'));
 const logoSrc = computed(() => (template.value?.logo ? props.logoUrl(template.value) : ''));
+const logoWorking = computed(() => props.logoBusy || preparing.value);
+const logoMode = computed(() => (template.value?.logo || (customChosen.value !== null && customChosen.value === template.value?.id) ? 'custom' : 'organization'));
+const previewLogoSrc = computed(() => resolveLogo(template.value ?? {},
+    { organizationLogoUrl: props.organizationLogoUrl, brandingLogoUrl: instanceLogoUrl() },
+    { templateLogoUrl: props.logoUrl })?.url ?? '');
 
 // A template that goes (or a list that is read again) can leave the index beyond the end
 watch(() => templates.value.length, length => {
     if (selected.value >= length) selected.value = Math.max(0, length - 1);
 });
-// The error of a logo is about the template it was chosen for
-watch(selected, () => { logoError.value = ''; });
+// The error of a logo, and a Custom without a logo yet, are about the template they were chosen for
+watch(selected, () => {
+    logoError.value = '';
+    customChosen.value = null;
+});
 
 const errorAt = field => problemAt(props.errors, `templates.${selected.value}.${field}`);
 
@@ -181,7 +216,10 @@ function remove() {
 function rename(name) {
     const current = template.value;
     current.name = name;
-    if (!isSaved.value) current.id = idFromName(name, takenIds(templates.value, props.savedIds, current));
+    if (isSaved.value) return;
+    const chosen = customChosen.value === current.id;
+    current.id = idFromName(name, takenIds(templates.value, props.savedIds, current));
+    if (chosen) customChosen.value = current.id;
 }
 
 function chooseLogo() {
@@ -189,15 +227,37 @@ function chooseLogo() {
     logoInput.value?.click();
 }
 
-function onLogoChosen(event) {
+function chooseLogoMode(mode) {
+    logoError.value = '';
+    if (mode === 'custom') {
+        customChosen.value = template.value.id;
+        return;
+    }
+    customChosen.value = null;
+    if (template.value?.logo) {
+        logoModeKey.value++;
+        emit('remove-logo', template.value.id);
+    }
+}
+
+async function onLogoChosen(event) {
     const input = event.target;
     const [file] = input.files ?? [];
     // Choosing the same file again must still fire a change
     input.value = '';
     if (!file) return;
-    const problem = logoProblem(file);
-    logoError.value = problem ?? '';
-    if (!problem) emit('upload-logo', template.value.id, file);
+    const templateId = template.value.id;
+    logoError.value = '';
+    preparing.value = true;
+    try {
+        // What is sent is the logo made from the file: at most the limit, and as wide as the PDF ever draws it
+        const logo = await prepareLogoFor(file, { maxBytes: limits.logoBytes, maxEdge: LOGO_MAX_SIDE, problemOf: logoProblem });
+        emit('upload-logo', templateId, logo.file, logo);
+    } catch (e) {
+        logoError.value = e instanceof Error ? e.message : 'The logo could not be prepared';
+    } finally {
+        preparing.value = false;
+    }
 }
 </script>
 
@@ -221,13 +281,15 @@ function onLogoChosen(event) {
     margin: -0.5rem 0 var(--ddb-spacing-xs);
 }
 
-.sections {
+.sections,
+.logo-field {
     border: 0;
     padding: 0;
     min-width: 0;
 }
 
-.sections legend {
+.sections legend,
+.logo-field legend {
     float: none;
     width: auto;
     font-size: 1rem;

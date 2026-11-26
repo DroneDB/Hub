@@ -7,13 +7,14 @@
 
 <script setup>
 /**
- * The logo block of the cover: the logo of the template (its endpoint, read with the session as the thumbnails are), else
- * the logo of the instance. The PDF draws the same block. A logo that cannot be read leaves its place empty.
+ * The logo block of the cover: the custom logo of the template, else the logo of the organization (endpoints of the
+ * Registry, read with the session as the thumbnails are), else the logo of the instance. The PDF draws the same block.
+ * A logo that cannot be read leaves its place empty.
  */
 import { ref, watch } from 'vue';
 
 const props = defineProps({
-    /** { source: 'template' | 'instance', url, alt } */
+    /** { source: 'template' | 'organization' | 'instance', url, alt } */
     block: { type: Object, required: true }
 });
 

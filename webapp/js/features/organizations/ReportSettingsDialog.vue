@@ -31,7 +31,7 @@
                     <TabPanels>
                         <TabPanel value="templates">
                             <ReportTemplatesTab v-model="draft.templates" v-model:selected="selectedTemplate" :read-only="!canEdit" :errors="errors"
-                                                :saved-ids="saved.templates" :logo-url="logoUrl" :logo-busy="logoBusy"
+                                                :saved-ids="saved.templates" :logo-url="logoUrl" :organization-logo-url="organizationLogoUrl" :logo-busy="logoBusy"
                                                 @upload-logo="uploadLogo" @remove-logo="askRemoveLogo" />
                         </TabPanel>
                         <TabPanel value="schema">
@@ -53,9 +53,9 @@
                        message="The report settings have changes that are not saved."
                        confirm-text="Discard changes" cancel-text="Keep editing" confirm-button-class="danger" @close="onDiscardClose" />
         <ConfirmDialog v-if="logoRemoval"
-                       title="Remove the logo"
-                       :message="`Remove the logo of <strong>${escapeHtml(logoRemoval.name)}</strong>? Reports made from it show the logo of the site, if it has one.`"
-                       confirm-text="Remove" cancel-text="Cancel" confirm-button-class="danger" @close="onLogoRemovalClose" />
+                       title="Use the organization logo"
+                       :message="`Remove the custom logo of <strong>${escapeHtml(logoRemoval.name)}</strong>? Reports made from it show the logo of the organization (or of the site, when the organization has none).`"
+                       confirm-text="Remove custom logo" cancel-text="Cancel" confirm-button-class="danger" @close="onLogoRemovalClose" />
     </Window>
 </template>
 
@@ -88,6 +88,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import ReportTemplatesTab from './ReportTemplatesTab.vue';
 import ReportSchemaList from './ReportSchemaList.vue';
 import reg from '@/libs/api/sharedRegistry';
+import { describeLogo } from '@/libs/logoImage';
 import { notify } from '@/libs/notify';
 import { escapeHtml } from '@/libs/sanitize';
 import { isNotFound } from '@/libs/ddb/apiError';
@@ -130,6 +131,8 @@ const showProblems = ref(false);
 const conflictOpen = ref(false);
 const discardOpen = ref(false);
 const logoRemoval = ref(null);
+// Where the logo of the organization is (the Registry says it with the settings), '' without one
+const organizationLogoUrl = ref('');
 
 // The logo does not count: it is saved by its own requests
 const snapshot = () => JSON.stringify({
@@ -157,6 +160,7 @@ function apply(settings) {
         statuses: cloneSettings(settings.schema?.statuses ?? [])
     };
     version.value = settings.version;
+    organizationLogoUrl.value = settings.organizationLogoUrl ?? '';
     saved.templates = new Set(draft.templates.map(t => t.id));
     for (const { key } of schemaLists) saved[key] = new Set(draft.schema[key].map(e => e.id));
     baseline.value = snapshot();
@@ -235,7 +239,12 @@ function onConflictClose(action) {
     if (action === 'confirm') load();
 }
 
-async function uploadLogo(templateId, file) {
+/**
+ * Sends the custom logo of a template.
+ * @param {string} templateId @param {File} file
+ * @param {import('@/libs/logoImage').PreparedLogo} [prepared]  what the tab made of the chosen file, for the message
+ */
+async function uploadLogo(templateId, file, prepared) {
     logoBusy.value = true;
     formError.value = '';
     try {
@@ -243,7 +252,7 @@ async function uploadLogo(templateId, file) {
         version.value = result.version;
         const template = draft.templates.find(t => t.id === templateId);
         if (template) template.logo = result.logo;
-        notify.success('Logo saved', { summary: 'Saved' });
+        notify.success(prepared ? `Saved as ${describeLogo(prepared)}` : 'Logo saved', { summary: 'Logo saved' });
     } catch (e) {
         // A 404 says the Registry has no such template (it was removed by someone else, or not saved)
         formError.value = isNotFound(e) ? 'The template is not saved yet: save it, then add its logo.' : formMessageOf(e, 'The logo was not saved');

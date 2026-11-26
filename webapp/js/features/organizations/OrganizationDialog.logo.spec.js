@@ -11,12 +11,12 @@ import { ApiError } from '@/libs/ddb/apiError';
 
 const hoisted = vi.hoisted(() => ({
     reg: { orgs: { uploadLogo: null, deleteLogo: null } },
-    prepareLogo: vi.fn(),
+    prepareLogoFor: vi.fn(),
     notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() }
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: hoisted.reg }));
 vi.mock('@/libs/notify', () => ({ notify: hoisted.notify }));
-vi.mock('@/libs/logoImage', async importOriginal => ({ ...(await importOriginal()), prepareLogo: hoisted.prepareLogo }));
+vi.mock('@/libs/logoImage', async importOriginal => ({ ...(await importOriginal()), prepareLogoFor: hoisted.prepareLogoFor }));
 
 const { default: OrganizationDialog } = await import('./OrganizationDialog.vue');
 const { LogoProblem } = await import('@/libs/logoImage');
@@ -53,7 +53,7 @@ async function click(element) {
 }
 
 beforeEach(() => {
-    hoisted.prepareLogo.mockReset().mockImplementation(async () => prepared());
+    hoisted.prepareLogoFor.mockReset().mockImplementation(async () => prepared());
     hoisted.reg.orgs.uploadLogo = vi.fn(async () => ({ logoUrl: '/orgs/acme/logo?v=2' }));
     hoisted.reg.orgs.deleteLogo = vi.fn(async () => undefined);
     Object.values(hoisted.notify).forEach(fn => fn.mockClear());
@@ -91,7 +91,7 @@ describe('OrganizationDialog: upload', () => {
         await render();
         const chosen = logoFile('image/jpeg');
         await choose(chosen);
-        expect(hoisted.prepareLogo).toHaveBeenCalledWith(chosen, { maxBytes: 256 * 1024 });
+        expect(hoisted.prepareLogoFor).toHaveBeenCalledWith(chosen, { maxBytes: 256 * 1024, problemOf: expect.any(Function) });
         expect(hoisted.reg.orgs.uploadLogo).toHaveBeenCalledTimes(1);
         const [slug, file] = hoisted.reg.orgs.uploadLogo.mock.calls[0];
         expect(slug).toBe('acme');
@@ -107,7 +107,7 @@ describe('OrganizationDialog: upload', () => {
     });
 
     it('says what was stored for an SVG that stayed one', async () => {
-        hoisted.prepareLogo.mockImplementation(async () => prepared({
+        hoisted.prepareLogoFor.mockImplementation(async () => prepared({
             file: new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }), type: 'image/svg+xml', width: null, height: null, bytes: 3072, kept: true
         }));
         await render();
@@ -131,12 +131,12 @@ describe('OrganizationDialog: upload', () => {
     });
 
     it('does not send a file that cannot be a logo, and says why at the field', async () => {
-        hoisted.prepareLogo.mockRejectedValueOnce(new LogoProblem('The file is not an image Hub can read'));
+        hoisted.prepareLogoFor.mockRejectedValueOnce(new LogoProblem('The file is not an image Hub can read'));
         await render();
         await choose(logoFile('application/pdf'));
         expect(hoisted.reg.orgs.uploadLogo).not.toHaveBeenCalled();
         expect(logoError().textContent).toBe('The file is not an image Hub can read');
-        hoisted.prepareLogo.mockRejectedValueOnce(new LogoProblem('The image does not fit in 256 KB, even much smaller: choose a simpler image'));
+        hoisted.prepareLogoFor.mockRejectedValueOnce(new LogoProblem('The image does not fit in 256 KB, even much smaller: choose a simpler image'));
         await choose(logoFile());
         expect(logoError().textContent).toContain('does not fit in 256 KB');
         expect(wrapper.emitted('logo-changed')).toBeUndefined();
@@ -145,7 +145,7 @@ describe('OrganizationDialog: upload', () => {
 
     it('is busy while the file is prepared, and says so', async () => {
         let finish;
-        hoisted.prepareLogo.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+        hoisted.prepareLogoFor.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
         await render();
         await choose(logoFile());
         expect(buttonNamed('Upload logo').getAttribute('aria-disabled')).toBe('true');
@@ -158,7 +158,7 @@ describe('OrganizationDialog: upload', () => {
     });
 
     it('clears an earlier problem when the next file is chosen', async () => {
-        hoisted.prepareLogo.mockRejectedValueOnce(new LogoProblem('The file is not an image Hub can read'));
+        hoisted.prepareLogoFor.mockRejectedValueOnce(new LogoProblem('The file is not an image Hub can read'));
         await render();
         await choose(logoFile('application/pdf'));
         expect(logoError()).not.toBeNull();

@@ -39,13 +39,14 @@ export function planAssetWork(model) {
 }
 
 /**
- * The logo of the report, as the model resolved it: the one of its template (its own endpoint, with the session), else
- * the instance's own, which is a file of the site; none when the model has none.
+ * The logo of the report, as the model resolved it: the custom one of its template or the one of its organization (the
+ * Registry's endpoints, with the session), else the instance's own, which is a file of the site; none when the model
+ * has none.
  * @param {any} model
  * @returns {{ url: string, api: boolean } | null}
  */
 export function logoRequest(model) {
-    return model.logo ? { url: model.logo.url, api: model.logo.source === 'template' } : null;
+    return model.logo ? { url: model.logo.url, api: model.logo.source !== 'instance' } : null;
 }
 
 // Shared with the cover of a dataset (libs/datasetCover)

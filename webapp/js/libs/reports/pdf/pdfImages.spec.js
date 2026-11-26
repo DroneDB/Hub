@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fitWithin, prepareImage, blobToDataUrl, JPEG_QUALITY, SNAPSHOT_MAX_SIDE, PHOTO_MAX_SIDE } from '@/libs/reports/pdf/pdfImages';
+import { prepareImage, blobToDataUrl, JPEG_QUALITY, SNAPSHOT_MAX_SIDE, PHOTO_MAX_SIDE } from '@/libs/reports/pdf/pdfImages';
 
 describe('the limits', () => {
     it('are JPEG at 85, 2000 px for a snapshot and 1600 px for a photo', () => {
@@ -9,27 +9,6 @@ describe('the limits', () => {
     });
 });
 
-describe('fitWithin', () => {
-    it('keeps an image that fits, and never enlarges it', () => {
-        expect(fitWithin(800, 600, 1600)).toEqual({ width: 800, height: 600 });
-        expect(fitWithin(1600, 1200, 1600)).toEqual({ width: 1600, height: 1200 });
-    });
-
-    it('scales the long side down to the limit with the proportions kept', () => {
-        expect(fitWithin(4000, 3000, 1600)).toEqual({ width: 1600, height: 1200 });
-        expect(fitWithin(3000, 4000, 1600)).toEqual({ width: 1200, height: 1600 });
-        expect(fitWithin(6000, 6000, 2000)).toEqual({ width: 2000, height: 2000 });
-    });
-
-    it('never makes a side of zero pixels', () => {
-        expect(fitWithin(20000, 3, 2000)).toEqual({ width: 2000, height: 1 });
-    });
-
-    it('refuses an image with no size', () => {
-        expect(() => fitWithin(0, 0, 1600)).toThrow();
-        expect(() => fitWithin(NaN, 10, 1600)).toThrow();
-    });
-});
 
 /** A browser's decoding and canvas, as far as prepareImage uses them. */
 function fakeBrowser({ width = 4000, height = 3000, jpeg = new Blob(['jpeg'], { type: 'image/jpeg' }) } = {}) {

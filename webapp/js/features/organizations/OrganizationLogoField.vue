@@ -11,7 +11,7 @@
         </div>
         <input ref="fileInput" type="file" hidden accept="image/*" aria-label="Logo file" @change="onFileChosen">
         <small v-if="busy" class="d-block mt-1 text-muted" role="status">Preparing and sending the logo…</small>
-        <small class="d-block mt-1 text-muted">Any image or SVG, up to {{ LOGO_MAX_INPUT_BYTES / (1024 * 1024) }} MB.</small>
+        <small class="d-block mt-1 text-muted">{{ LOGO_INPUT_HINT }}</small>
         <FieldError id="organization-logo-error" :message="error" />
 
         <ConfirmDialog v-if="removalOpen"
@@ -38,7 +38,7 @@ import OrgLogo from '@/components/OrgLogo.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { ORG_LOGO_BYTES, orgLogoProblem } from '@/libs/ddb/organizationsApi';
 import { formMessageOf } from '@/libs/forms/serverErrors';
-import { LOGO_MAX_INPUT_BYTES, describeLogo, prepareLogo } from '@/libs/logoImage';
+import { LOGO_INPUT_HINT, describeLogo, prepareLogoFor } from '@/libs/logoImage';
 import { notify } from '@/libs/notify';
 import { escapeHtml } from '@/libs/sanitize';
 
@@ -90,9 +90,7 @@ async function onFileChosen(event) {
     if (!file) return;
     const sent = await write(async () => {
         // The file the user chose may be any image or too big: what is sent is the logo made from it, at most the limit
-        const logo = await prepareLogo(file, { maxBytes: ORG_LOGO_BYTES });
-        const problem = orgLogoProblem(logo.file);
-        if (problem) throw new Error(problem);
+        const logo = await prepareLogoFor(file, { maxBytes: ORG_LOGO_BYTES, problemOf: orgLogoProblem });
         return { logo, answer: await reg.orgs.uploadLogo(props.org.slug, logo.file) };
     }, 'The logo was not saved');
     if (!sent) return;

@@ -18,6 +18,8 @@
  * result, so a small optimised logo does not grow.
  */
 
+import { fitWithin } from '@/libs/imageFit';
+
 /** The longest side, in pixels, a prepared logo has unless the caller says otherwise. */
 export const LOGO_MAX_EDGE = 512;
 /** The shortest the longest side becomes while a result is too big: below it the logo is no longer readable. */
@@ -28,6 +30,8 @@ export const LOGO_EDGE_STEP = 0.75;
 export const LOGO_QUALITIES = Object.freeze([0.9, 0.8, 0.7, 0.6]);
 /** The largest file read at all, refused before it is decoded (a decoder holds the whole image in memory). */
 export const LOGO_MAX_INPUT_BYTES = 20 * 1024 * 1024;
+/** What a logo field says it takes. */
+export const LOGO_INPUT_HINT = `Any image or SVG, up to ${LOGO_MAX_INPUT_BYTES / (1024 * 1024)} MB.`;
 
 const WEBP = 'image/webp';
 const PNG = 'image/png';
@@ -68,18 +72,6 @@ export class LogoProblem extends Error {
  * @property {number} bytes
  * @property {boolean} kept  the file the user chose, as it was (or minified, for an SVG)
  */
-
-/**
- * The size of an image of `width` x `height` with its longest side at most `maxEdge`: never larger than the image,
- * the proportions kept, each side at least one pixel.
- * @param {number} width @param {number} height @param {number} maxEdge
- * @returns {{ width: number, height: number }}
- */
-export function fitWithin(width, height, maxEdge) {
-    const longest = Math.max(width, height);
-    const scale = longest > maxEdge ? maxEdge / longest : 1;
-    return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
-}
 
 /**
  * The longest sides to try, from `start` down by `LOGO_EDGE_STEP` while they stay at least `LOGO_MIN_EDGE`. A start
@@ -251,6 +243,22 @@ const isSvg = file => file.type === SVG || (!file.type && /\.svg$/i.test(file.na
 export async function prepareLogo(file, { maxBytes, maxEdge = LOGO_MAX_EDGE, ports = browserPorts }) {
     if (file.size > LOGO_MAX_INPUT_BYTES) throw new LogoProblem(`The file is over ${LOGO_MAX_INPUT_BYTES / (1024 * 1024)} MB: choose a smaller image`);
     return isSvg(file) ? prepareSvg(file, maxBytes, maxEdge, ports) : prepareRaster(file, maxBytes, maxEdge, ports);
+}
+
+/**
+ * Prepares a logo for an endpoint (`prepareLogo`) and checks the result against that endpoint's own rule, so a field
+ * never sends what the Registry would refuse.
+ * @param {File} file  what the user chose
+ * @param {{ maxBytes: number, maxEdge?: number, problemOf: (file: Blob) => string | null }} options
+ *   `problemOf`: what the endpoint finds wrong with a file (its types and its limit), or null
+ * @returns {Promise<PreparedLogo>}
+ * @throws {LogoProblem} the file cannot be a logo: its message is for the user
+ */
+export async function prepareLogoFor(file, { maxBytes, maxEdge, problemOf }) {
+    const logo = await prepareLogo(file, { maxBytes, ...(maxEdge ? { maxEdge } : {}) });
+    const problem = problemOf(logo.file);
+    if (problem) throw new LogoProblem(problem);
+    return logo;
 }
 
 /** @param {HTMLImageElement} img @param {string} url @returns {Promise<void>} */

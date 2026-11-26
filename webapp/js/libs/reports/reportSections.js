@@ -52,7 +52,7 @@ export const figureCaption = (alt, ...notes) => [...new Set([alt, ...notes].filt
  * @typedef {object} SectionContext
  * @property {any} definition
  * @property {import('./reportSettings').ReportTemplate} template
- * @property {{ source: 'template' | 'instance', url: string } | null} logo  the logo of the report (resolveLogo)
+ * @property {ReportLogo | null} logo  the logo of the report (resolveLogo)
  * @property {TextContext} text
  * @property {ReportItem[]} items
  * @property {{ totals: import('./reportTotals').Total[], unconverted: number }} totals
@@ -153,12 +153,21 @@ function problemNotes(ctx) {
 }
 
 /**
- * The logo block of the cover: the logo of the template, named by the template, or the logo of the instance.
- * @param {{ source: 'template' | 'instance', url: string }} logo @param {import('./reportSettings').ReportTemplate} template
+ * The logo of a report and where it comes from: the custom logo of its template (an endpoint of the Registry), the logo
+ * of its organization (also the Registry's) or the logo of the instance (a file of the site).
+ * @typedef {{ source: 'template' | 'organization' | 'instance', url: string }} ReportLogo
+ */
+
+/** The text of the logo block, by where the logo comes from */
+const LOGO_ALT = { organization: 'Logo of the organization', instance: 'Logo' };
+
+/**
+ * The logo block of the cover: the custom logo of the template is named by the template.
+ * @param {ReportLogo} logo @param {import('./reportSettings').ReportTemplate} template
  */
 const logoBlock = (logo, template) => ({
     type: /** @type {const} */ ('logo'), source: logo.source, url: logo.url,
-    alt: logo.source === 'template' && template.name ? `${template.name} logo` : 'Logo'
+    alt: logo.source === 'template' ? (template.name ? `${template.name} logo` : 'Logo') : LOGO_ALT[logo.source]
 });
 
 /** @param {SectionContext} ctx */

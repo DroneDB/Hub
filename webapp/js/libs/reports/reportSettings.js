@@ -30,8 +30,12 @@ export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneS
 /** @typedef {import('./reportDefaults').AnnotationSchema} AnnotationSchema */
 /** @typedef {import('./reportDefaults').SectionKind} SectionKind */
 /** @typedef {import('./reportDefaults').ReportTemplate} ReportTemplate */
-/** @typedef {{ templates: ReportTemplate[], schema: AnnotationSchema }} ReportSettings */
-/** @typedef {{ templates: ReportTemplate[], schema: AnnotationSchema, version: number }} OrgReportSettings */
+/**
+ * `organizationLogoUrl`: where the logo of the organization is for whoever read the settings (null without one); a
+ * template without a custom logo shows it.
+ * @typedef {{ templates: ReportTemplate[], schema: AnnotationSchema, organizationLogoUrl?: string | null }} ReportSettings
+ */
+/** @typedef {ReportSettings & { version: number }} OrgReportSettings */
 /** @typedef {{ registry: any, org: string }} OrganizationRef  what `reg.Organization(slug)` is */
 /** @typedef {{ registry: any, baseApi: string }} DatasetRef  what `reg.Organization(org).Dataset(ds)` is */
 

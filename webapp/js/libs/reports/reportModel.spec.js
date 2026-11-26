@@ -58,13 +58,24 @@ describe('the cover section', () => {
 });
 
 describe('the logo', () => {
-    it('is the logo of the template, else the one of the instance, else none', () => {
+    it('is the custom logo of the template, else the one of the organization, else the one of the instance, else none', () => {
         const withLogo = template({ logo: 'report-logo-standard.png' });
         const links = { templateLogoUrl: t => `/logo/${t.id}` };
-        expect(resolveLogo(withLogo, '/branding/logo.png', links)).toEqual({ source: 'template', url: '/logo/standard' });
-        expect(resolveLogo(template(), '/branding/logo.png', links)).toEqual({ source: 'instance', url: '/branding/logo.png' });
-        expect(resolveLogo(template(), null, links)).toBeNull();
-        expect(resolveLogo(template(), '', {})).toBeNull();
+        const both = { organizationLogoUrl: '/orgs/acme/ds/pit/organization-logo?v=1', brandingLogoUrl: '/branding/logo.png' };
+        expect(resolveLogo(withLogo, both, links)).toEqual({ source: 'template', url: '/logo/standard' });
+        expect(resolveLogo(template(), both, links)).toEqual({ source: 'organization', url: '/orgs/acme/ds/pit/organization-logo?v=1' });
+        expect(resolveLogo(template(), { organizationLogoUrl: null, brandingLogoUrl: '/branding/logo.png' }, links)).toEqual({ source: 'instance', url: '/branding/logo.png' });
+        expect(resolveLogo(template(), { brandingLogoUrl: null }, links)).toBeNull();
+        expect(resolveLogo(template(), { organizationLogoUrl: '', brandingLogoUrl: '' }, {})).toBeNull();
+    });
+
+    it('is the logo of the organization the settings name, on the cover, for a template without a custom one', () => {
+        const model = buildReportModel(inputOf([], {
+            settings: settings({ organizationLogoUrl: '/orgs/acme/ds/pit/organization-logo?v=1' }), brandingLogoUrl: '/branding/logo.png'
+        }));
+        expect(blocksOf(model, 'cover', 'logo')).toEqual([
+            { type: 'logo', source: 'organization', url: '/orgs/acme/ds/pit/organization-logo?v=1', alt: 'Logo of the organization' }
+        ]);
     });
 
     it('is in the model', () => {

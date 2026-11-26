@@ -21,10 +21,10 @@ import { buildSections, COVER_DELETED } from '@/libs/reports/reportSections';
  * @property {import('./reportDefinition').ReportDefinition} definition
  * @property {import('./reportItems').SourceInput[]} sources  the measurement files as read (a source of the definition
  *   is matched by its file; one that is not here, or has an `error`, is listed as unreadable)
- * @property {{ templates?: import('./reportSettings').ReportTemplate[], schema?: import('./reportSettings').AnnotationSchema }} [settings]
+ * @property {Partial<import('./reportSettings').ReportSettings>} [settings]
  * @property {{ state?: import('@/libs/views/viewState').ViewState | null, deleted?: boolean } | null} [coverView]  the cover
  *   view as it is now: its state, or `deleted` when the saved view the definition names is gone
- * @property {string | null} [brandingLogoUrl]  the logo of the instance, for a template with none
+ * @property {string | null} [brandingLogoUrl]  the logo of the instance, for a template with none in an organization with none
  * @property {'metric' | 'imperial'} [units]  the reader's (PREF.MEASURE_UNIT); the definition's own wins
  * @property {string} [currency]  the reader's (PREF.CURRENCY): the currency of a stockpile that names none
  * @property {Date} [now]  the generation time
@@ -55,14 +55,16 @@ export function resolveTemplate(templates, id) {
 }
 
 /**
- * The logo of a report: the one of its template, else the one of the instance, else none.
+ * The logo of a report: the custom one of its template, else the one of the organization, else the one of the
+ * instance, else none.
  * @param {import('./reportSettings').ReportTemplate} template
- * @param {string | null | undefined} brandingLogoUrl
+ * @param {{ organizationLogoUrl?: string | null, brandingLogoUrl?: string | null }} fallbacks
  * @param {ReportInput['links']} links
- * @returns {{ source: 'template' | 'instance', url: string } | null}
+ * @returns {import('./reportSections').ReportLogo | null}
  */
-export function resolveLogo(template, brandingLogoUrl, links) {
+export function resolveLogo(template, { organizationLogoUrl, brandingLogoUrl }, links) {
     if (template.logo && links?.templateLogoUrl) return { source: 'template', url: links.templateLogoUrl(template) };
+    if (organizationLogoUrl) return { source: 'organization', url: organizationLogoUrl };
     return brandingLogoUrl ? { source: 'instance', url: brandingLogoUrl } : null;
 }
 
@@ -106,7 +108,7 @@ export function buildReportModel(input) {
     const totals = computeTotals(items, units, currency);
     const cover = resolveCover(input.coverView, layerInfo);
     const text = { units, schema, currency, projection: input.projection ?? null };
-    const logo = resolveLogo(template, input.brandingLogoUrl, links);
+    const logo = resolveLogo(template, { organizationLogoUrl: input.settings?.organizationLogoUrl, brandingLogoUrl: input.brandingLogoUrl }, links);
 
     const sections = buildSections({
         definition, template, logo, text, items, totals, cover, failed, duplicates, links, layerInfo,

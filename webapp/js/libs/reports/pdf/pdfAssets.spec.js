@@ -53,6 +53,9 @@ describe('logoRequest', () => {
     it('is the logo of the template, fetched with the session', () => {
         expect(logoRequest({ logo: { source: 'template', url: '/orgs/a/ds/b/report-settings/logo/x' } })).toEqual({ url: '/orgs/a/ds/b/report-settings/logo/x', api: true });
     });
+    it('is the logo of the organization, fetched with the session', () => {
+        expect(logoRequest({ logo: { source: 'organization', url: '/orgs/a/ds/b/organization-logo?v=1' } })).toEqual({ url: '/orgs/a/ds/b/organization-logo?v=1', api: true });
+    });
     it('is the logo of the instance the model resolved, fetched as a file of the site', () => {
         expect(logoRequest({ logo: { source: 'instance', url: '/images/acme.svg' } })).toEqual({ url: '/images/acme.svg', api: false });
     });

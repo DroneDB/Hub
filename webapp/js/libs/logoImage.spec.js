@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-    LOGO_MAX_INPUT_BYTES, LOGO_QUALITIES, LogoProblem, describeLogo, edgeLadder, fitWithin, minifySvg, prepareLogo, svgSize
+    LOGO_MAX_INPUT_BYTES, LOGO_QUALITIES, LogoProblem, describeLogo, edgeLadder, minifySvg, prepareLogo, svgSize
 } from './logoImage';
 
 const MAX = 256 * 1024;
@@ -36,21 +36,6 @@ function fakePorts({ width = 2000, height = 1000, bytes = () => 1000, canWebp = 
 }
 const renderedAt = ports => ports.render.mock.calls.map(([, w, h, , quality]) => [w, h, quality]);
 
-describe('fitWithin', () => {
-    it('shrinks the longest side to the limit and keeps the proportions', () => {
-        expect(fitWithin(2000, 1000, 512)).toEqual({ width: 512, height: 256 });
-        expect(fitWithin(1000, 4000, 512)).toEqual({ width: 128, height: 512 });
-    });
-
-    it('never makes an image larger', () => {
-        expect(fitWithin(300, 100, 512)).toEqual({ width: 300, height: 100 });
-        expect(fitWithin(512, 512, 512)).toEqual({ width: 512, height: 512 });
-    });
-
-    it('keeps each side at one pixel at least', () => {
-        expect(fitWithin(10000, 3, 512)).toEqual({ width: 512, height: 1 });
-    });
-});
 
 describe('edgeLadder', () => {
     it('steps down by a quarter while the side stays at 128 pixels or more', () => {

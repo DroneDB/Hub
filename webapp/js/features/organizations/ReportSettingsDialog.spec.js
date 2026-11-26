@@ -1,7 +1,8 @@
 /**
  * The report settings dialog of an organization: read-only for a member and editable for an administrator, the
  * version of the Registry's settings (a logo answers with a new one, which the next save sends; a stale one is a 409
- * that asks to reload), a logo only for a template that is saved, the schema keeping its last category and status,
+ * that asks to reload), the logo of the organization or a custom one (prepared in the browser, only for a template
+ * that is saved), the schema keeping its last category and status,
  * and the Registry's refusals shown at the fields.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -11,9 +12,17 @@ import Select from 'primevue/select';
 import { ApiError } from '@/libs/ddb/apiError';
 import { DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings } from '@/libs/reports/reportSettings';
 
-const hoisted = vi.hoisted(() => ({ reg: { Organization: null }, notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
+const hoisted = vi.hoisted(() => ({
+    reg: { Organization: null }, notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() }, prepareLogoFor: vi.fn()
+}));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: hoisted.reg }));
 vi.mock('@/libs/notify', () => ({ notify: hoisted.notify }));
+// The browser's part of preparing a logo is libs/logoImage's own spec: here the logo made from a file is a WebP
+vi.mock('@/libs/logoImage', async importOriginal => ({ ...(await importOriginal()), prepareLogoFor: hoisted.prepareLogoFor }));
+const { LogoProblem } = await import('@/libs/logoImage');
+const preparedLogo = () => ({
+    file: new File(['webp'], 'logo.webp', { type: 'image/webp' }), type: 'image/webp', width: 512, height: 288, bytes: 61 * 1024, kept: false
+});
 
 const { default: ReportSettingsDialog } = await import('./ReportSettingsDialog.vue');
 
@@ -80,6 +89,7 @@ beforeEach(() => {
     registry = makeRegistry();
     hoisted.reg.Organization = slug => ({ registry, org: slug });
     Object.values(hoisted.notify).forEach(fn => fn.mockClear());
+    hoisted.prepareLogoFor.mockReset().mockImplementation(async () => preparedLogo());
 });
 afterEach(() => {
     wrapper?.unmount();
@@ -244,11 +254,7 @@ describe('ReportSettingsDialog: templates', () => {
 });
 
 describe('ReportSettingsDialog: the logo', () => {
-    const logoFile = (type = 'image/png', size = 100) => {
-        const file = new File(['x'], 'logo.png', { type });
-        Object.defineProperty(file, 'size', { value: size });
-        return file;
-    };
+    const chosenFile = () => new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
     async function choose(file) {
         const input = body().querySelector('input[type="file"]');
         Object.defineProperty(input, 'files', { value: [file], configurable: true });
@@ -256,11 +262,35 @@ describe('ReportSettingsDialog: the logo', () => {
         await flushPromises();
     }
     const upload = () => buttonNamed('Upload logo') ?? buttonNamed('Replace logo');
+    const radio = mode => field(`report-template-logo-${mode}`);
+    const pick = mode => click(radio(mode));
+    const previewLogo = () => body().querySelector('[data-test="preview-page"] img');
+
+    it('is the logo of the organization by default: shown in the field and the preview, nothing to upload', async () => {
+        server.organizationLogoUrl = '/orgs/acme/logo?v=7';
+        await render();
+        expect(radio('organization').checked).toBe(true);
+        expect(body().querySelector('img[alt="Logo of the organization"]').getAttribute('src')).toBe('/orgs/acme/logo?v=7');
+        expect(previewLogo().getAttribute('src')).toBe('/orgs/acme/logo?v=7');
+        expect(upload()).toBeUndefined();
+    });
+
+    it('says when the organization has none, and the preview falls back to the logo of the site', async () => {
+        globalThis.HubOptions = { appLogo: '/images/site.svg' };
+        try {
+            await render();
+            expect(body().querySelector('[data-test="organization-logo"]').textContent).toContain('The organization has no logo');
+            expect(previewLogo().getAttribute('src')).toBe('/images/site.svg');
+        } finally {
+            delete globalThis.HubOptions;
+        }
+    });
 
     it('is not offered for a template that is only in the dialog, until it is saved', async () => {
         await render();
         await click(buttonNamed('Add template'));
         await type('report-template-name', 'Fresh');
+        await pick('custom');
         expect(upload().getAttribute('aria-disabled')).toBe('true');
         expect(body().textContent).toContain('Save the template to add a logo');
         await click(upload());
@@ -270,15 +300,22 @@ describe('ReportSettingsDialog: the logo', () => {
         expect(upload().getAttribute('aria-disabled')).toBeNull();
     });
 
-    it('sends the file, keeps the version of the answer, and the next save sends that version (no conflict)', async () => {
+    it('sends the logo prepared from the file, says what was saved, and the next save sends the new version (no conflict)', async () => {
         await render();
-        await choose(logoFile());
+        await pick('custom');
+        expect(radio('custom').checked).toBe(true);
+        expect(body().textContent).toContain('Any image or SVG, up to 20 MB.');
+        const chosen = chosenFile();
+        await choose(chosen);
+
+        expect(hoisted.prepareLogoFor).toHaveBeenCalledWith(chosen, { maxBytes: 512 * 1024, maxEdge: 600, problemOf: expect.any(Function) });
         expect(registry.putFormData).toHaveBeenCalledTimes(1);
         expect(registry.putFormData.mock.calls[0][0]).toBe('/orgs/acme/report-settings/templates/standard/logo');
-        expect(registry.putFormData.mock.calls[0][1].get('file')).toBeInstanceOf(File);
+        expect(registry.putFormData.mock.calls[0][1].get('file').name).toBe('logo.webp');
+        expect(hoisted.notify.success).toHaveBeenCalledWith('Saved as WebP, 512 × 288, 61 KB', { summary: 'Logo saved' });
         // The template now shows its logo, in the form and in the preview
-        expect(body().querySelectorAll('img[alt="Logo"], img[alt="Logo of the template"]').length).toBe(2);
         expect(body().querySelector('img[alt="Logo of the template"]').getAttribute('src')).toBe('/orgs/acme/report-settings/templates/standard/logo?v=4');
+        expect(previewLogo().getAttribute('src')).toBe('/orgs/acme/report-settings/templates/standard/logo?v=4');
 
         await type('report-template-header', 'Header');
         await save();
@@ -287,38 +324,55 @@ describe('ReportSettingsDialog: the logo', () => {
         expect(confirmDialog()).toBeNull();
     });
 
-    it('does not send a file that is too big or not an image, and says why', async () => {
+    it('does not send a file that cannot be a logo, and says why at the field', async () => {
+        hoisted.prepareLogoFor.mockRejectedValueOnce(new LogoProblem('The file is not an image Hub can read'));
         await render();
-        await choose(logoFile('image/png', 600 * 1024));
+        await pick('custom');
+        await choose(chosenFile());
         expect(registry.putFormData).not.toHaveBeenCalled();
-        expect(body().querySelector('#report-template-logo-error').textContent).toContain('512 KB');
-        await choose(logoFile('application/pdf'));
-        expect(body().querySelector('#report-template-logo-error').textContent).toContain('PNG, JPEG, WebP or SVG');
+        expect(body().querySelector('#report-template-logo-error').textContent).toContain('The file is not an image Hub can read');
     });
 
-    it('is removed after a question, and the version moves on', async () => {
+    it('a template with a custom logo is Custom; choosing Organization asks, and Cancel keeps the logo', async () => {
         server.templates[0].logo = 'report-logo.png';
         await render();
-        await click(buttonNamed('Remove logo'));
-        expect(confirmDialog()).not.toBeNull();
+        expect(radio('custom').checked).toBe(true);
+        expect(buttonNamed('Replace logo')).toBeDefined();
+
+        await pick('organization');
+        expect(confirmDialog().textContent).toContain('Remove the custom logo of');
+        await click(confirmDialog().querySelector('[data-cancel]') ?? buttonNamed('Cancel'));
         expect(registry.deleteRequest).not.toHaveBeenCalled();
+        expect(radio('custom').checked).toBe(true);
+        expect(body().querySelector('img[alt="Logo of the template"]')).not.toBeNull();
+    });
+
+    it('choosing Organization over a custom logo removes it after the question, and the version moves on', async () => {
+        server.templates[0].logo = 'report-logo.png';
+        server.organizationLogoUrl = '/orgs/acme/logo?v=7';
+        await render();
+        await pick('organization');
         await click(confirmDialog().querySelector('[data-confirm]'));
         expect(registry.deleteRequest).toHaveBeenCalledWith('/orgs/acme/report-settings/templates/standard/logo');
+        expect(radio('organization').checked).toBe(true);
         expect(body().querySelector('img[alt="Logo of the template"]')).toBeNull();
+        expect(previewLogo().getAttribute('src')).toBe('/orgs/acme/logo?v=7');
         await save();
         expect(registry.putRequest.mock.calls[0][1].version).toBe(4);
     });
 
     it('says to save the template when the Registry has none to give the logo to (404)', async () => {
         await render();
+        await pick('custom');
         registry.putFormData.mockRejectedValueOnce(new ApiError('Not found', 404));
-        await choose(logoFile());
+        await choose(chosenFile());
         expect(body().querySelector('[data-test="form-error"]').textContent).toContain('save it, then add its logo');
     });
 
     it('a logo does not count as a change to discard', async () => {
         await render();
-        await choose(logoFile());
+        await pick('custom');
+        await choose(chosenFile());
         await click(buttonNamed('Close'));
         expect(wrapper.emitted('close')).toHaveLength(1);
     });

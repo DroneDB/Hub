@@ -4,6 +4,8 @@
  * for a photo. A PDF of 100 photos stays a few tens of megabytes and the tab does not hold full-size bitmaps.
  */
 
+import { fitWithin } from '@/libs/imageFit';
+
 export const JPEG_QUALITY = 0.85;
 /** The longest side of a map snapshot, a chart or a 3D capture, in pixels */
 export const SNAPSHOT_MAX_SIDE = 2000;
@@ -12,19 +14,6 @@ export const PHOTO_MAX_SIDE = 1600;
 /** The longest side of a logo, in pixels (it is drawn a few centimetres wide) */
 export const LOGO_MAX_SIDE = 600;
 
-/**
- * The size of an image of `width` x `height` that is at most `maxSide` on its long side: the same size when it fits
- * (an image is never enlarged), else scaled with its proportions kept.
- * @param {number} width @param {number} height @param {number} maxSide
- * @returns {{ width: number, height: number }}
- */
-export function fitWithin(width, height, maxSide) {
-    const longSide = Math.max(width, height);
-    if (!(longSide > 0)) throw new Error('The image has no size');
-    if (longSide <= maxSide) return { width, height };
-    const scale = maxSide / longSide;
-    return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
-}
 
 /**
  * @typedef {object} DecodedImage
