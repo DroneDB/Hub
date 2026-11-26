@@ -4,13 +4,14 @@
         <div class="d-flex flex-wrap align-items-center gap-2">
             <OrgLogo :org="shown" size="lg" />
             <ActionButton severity="secondary" outlined size="small" icon="fa-solid fa-upload" show-label
-                          :label="logoUrl ? 'Replace logo' : 'Upload logo'" :disabled="busy" disabled-reason="A logo is being sent"
+                          :label="logoUrl ? 'Replace logo' : 'Upload logo'" :disabled="busy" :disabled-reason="BUSY_REASON"
                           @click="chooseFile" />
             <ActionButton v-if="logoUrl" severity="secondary" text size="small" icon="fa-solid fa-trash" show-label label="Remove logo"
-                          :disabled="busy" disabled-reason="A logo is being sent" @click="removalOpen = true" />
+                          :disabled="busy" :disabled-reason="BUSY_REASON" @click="removalOpen = true" />
         </div>
-        <input ref="fileInput" type="file" hidden :accept="LOGO_TYPES.join(',')" aria-label="Logo file" @change="onFileChosen">
-        <small class="d-block mt-1 text-muted">PNG, JPEG, WebP or SVG, up to {{ ORG_LOGO_BYTES / 1024 }} KB. It shows beside the name of the organization.</small>
+        <input ref="fileInput" type="file" hidden accept="image/*" aria-label="Logo file" @change="onFileChosen">
+        <small v-if="busy" class="d-block mt-1 text-muted" role="status">Preparing and sending the logo…</small>
+        <small class="d-block mt-1 text-muted">PNG, JPEG, WebP, GIF, BMP, AVIF or SVG, up to {{ LOGO_MAX_INPUT_BYTES / (1024 * 1024) }} MB. Hub shrinks a large image to {{ LOGO_MAX_EDGE }} pixels and saves it as WebP (an SVG stays an SVG, an animation keeps its first picture), at most {{ ORG_LOGO_BYTES / 1024 }} KB. It shows beside the name of the organization.</small>
         <FieldError id="organization-logo-error" :message="error" />
 
         <ConfirmDialog v-if="removalOpen"
@@ -25,8 +26,9 @@
  * OrganizationLogoField - the logo of an organization in its Edit dialog: the preview, Upload (Replace once it has
  * one) and Remove, which asks first. The logo is the Registry's own file of the organization, not a field of the
  * form: it is sent at once, not with Save, and `changed` carries the new address (null when removed) for the page
- * to show it. A problem of the file (its type, its size) shows at the field before any request, and a refusal of the
- * Registry (403, 413, 400) with its own message. The dialog shows the field only to whoever may change the logo.
+ * to show it. The file the user chooses is prepared in the browser first (libs/logoImage: shrunk and saved as WebP, an
+ * SVG kept), and the toast says what was stored. A file that cannot be a logo (not an image, too big even shrunk) is
+ * refused at the field before any request, and so is a refusal of the Registry (403, 413, 400) with its own message. The dialog shows the field only to whoever may change the logo.
  */
 import { computed, ref } from 'vue';
 import ActionButton from '@/components/ActionButton.vue';
@@ -36,11 +38,13 @@ import OrgLogo from '@/components/OrgLogo.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { ORG_LOGO_BYTES, orgLogoProblem } from '@/libs/ddb/organizationsApi';
 import { formMessageOf } from '@/libs/forms/serverErrors';
-import { LOGO_TYPES } from '@/libs/logoCheck';
+import { LOGO_MAX_EDGE, LOGO_MAX_INPUT_BYTES, describeLogo, prepareLogo } from '@/libs/logoImage';
 import { notify } from '@/libs/notify';
 import { escapeHtml } from '@/libs/sanitize';
 
 defineOptions({ name: 'OrganizationLogoField' });
+
+const BUSY_REASON = 'A logo is being prepared and sent';
 
 const props = defineProps({
     /** The organization: its slug, its name and the address of its logo (null without one) */
@@ -84,16 +88,17 @@ async function onFileChosen(event) {
     // Choosing the same file again must still fire a change
     input.value = '';
     if (!file) return;
-    const problem = orgLogoProblem(file);
-    if (problem) {
-        error.value = problem;
-        return;
-    }
-    const result = await write(() => reg.orgs.uploadLogo(props.org.slug, file), 'The logo was not saved');
-    if (!result) return;
-    logoUrl.value = result.logoUrl ?? null;
+    const sent = await write(async () => {
+        // The file the user chose may be any image or too big: what is sent is the logo made from it, at most the limit
+        const logo = await prepareLogo(file, { maxBytes: ORG_LOGO_BYTES });
+        const problem = orgLogoProblem(logo.file);
+        if (problem) throw new Error(problem);
+        return { logo, answer: await reg.orgs.uploadLogo(props.org.slug, logo.file) };
+    }, 'The logo was not saved');
+    if (!sent) return;
+    logoUrl.value = sent.answer?.logoUrl ?? null;
     emit('changed', logoUrl.value);
-    notify.success('Logo saved', { summary: 'Saved' });
+    notify.success(`Saved as ${describeLogo(sent.logo)}`, { summary: 'Logo saved' });
 }
 
 async function onRemovalClose(action) {
