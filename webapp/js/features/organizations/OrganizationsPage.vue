@@ -892,10 +892,11 @@ export default {
 
     /* No underline, also on hover (the hover rule of app.scss is :where(), so this one wins) */
     /* The logo, then the name over its description; the text may shrink and wrap beside the logo */
+    /* The logo and the name are apart enough to read as two things */
     .org-name-block {
         display: flex;
         align-items: center;
-        gap: var(--ddb-spacing-sm);
+        gap: var(--ddb-spacing-md);
     }
 
     .org-name-text {
