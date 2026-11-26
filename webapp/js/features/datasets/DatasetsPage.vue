@@ -176,16 +176,21 @@
                 </Column>
                 <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center; white-space: nowrap' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7rem;">
                     <template #body="slotProps">
-                        <ActionButton v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
-                                      severity="secondary" outlined size="small" :loading="slotProps.data.editing"
-                                      :disabled="slotProps.data.editing || slotProps.data.deleting || !!slotProps.data.busy"
-                                      :disabled-reason="busyBlockReason(slotProps.data.busy) || ''" icon="fa-solid fa-pencil"
-                                      label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
-                        <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
-                        <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
-                                severity="danger" text size="small" :loading="slotProps.data.deleting"
-                                :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
-                                class="ms-1" aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
+                        <!-- Each action keeps its place on every row, empty where it does not apply, so the buttons line up -->
+                        <div class="ds-row-buttons">
+                            <RowActionSlot v-if="actionColumns.edit" :shown="rowActions.edit(slotProps.data)">
+                                <ActionButton severity="secondary" outlined size="small" :loading="slotProps.data.editing"
+                                              :disabled="slotProps.data.editing || slotProps.data.deleting || !!slotProps.data.busy"
+                                              :disabled-reason="busyBlockReason(slotProps.data.busy) || ''" icon="fa-solid fa-pencil"
+                                              label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
+                            </RowActionSlot>
+                            <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
+                            <RowActionSlot v-if="actionColumns.delete" :shown="rowActions.delete(slotProps.data)">
+                                <Button severity="danger" text size="small" :loading="slotProps.data.deleting"
+                                        :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
+                                        aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
+                            </RowActionSlot>
+                        </div>
                     </template>
                 </Column>
             </DataTable>
@@ -236,6 +241,8 @@
 <script>
 import EmptyState from '@/components/EmptyState.vue';
 import ActionButton from '@/components/ActionButton.vue';
+import RowActionSlot from '@/components/RowActionSlot.vue';
+import { actionsOfAnyRow } from '@/libs/rowActions';
 import ResourceState from '@/components/ResourceState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
 import OrgLogo from '@/components/OrgLogo.vue';
@@ -296,6 +303,7 @@ export default {
     components: {
         EmptyState,
         ActionButton,
+        RowActionSlot,
         ResourceState,
         Message,
         ViewSelect,
@@ -440,11 +448,19 @@ export default {
             return this.datasets.some(ds => ds.permissions && ds.permissions.canWrite);
         },
         // Show Actions column only if at least one dataset has actions available
+        // Whether each action of a row, in the order of its buttons (and of the row menu), applies to a dataset
+        rowActions: function () {
+            return {
+                edit: ds => !!ds.permissions?.canWrite,
+                delete: ds => !!ds.permissions?.canDelete && this.canDeleteGlobal
+            };
+        },
+        // The actions that some dataset of the page has: every row keeps a place for each of them, so the buttons line up
+        actionColumns: function () {
+            return actionsOfAnyRow(this.datasets, this.rowActions);
+        },
         showActionsColumn: function () {
-            return this.datasets.some(ds =>
-                (ds.permissions && ds.permissions.canWrite) ||
-                (ds.permissions && ds.permissions.canDelete && this.canDeleteGlobal)
-            );
+            return Object.values(this.actionColumns).some(Boolean);
         },
         datasetContextMenuItems: function () {
             const ds = this.contextMenuDataset;
@@ -459,7 +475,7 @@ export default {
                 command: () => { this.viewDataset(ds); }
             }];
 
-            if (ds.permissions && ds.permissions.canWrite) {
+            if (this.rowActions.edit(ds)) {
                 items.push({
                     ...offWhileBusy('Edit'),
                     icon: 'fa-solid fa-pencil',
@@ -467,7 +483,7 @@ export default {
                 });
             }
 
-            if (ds.permissions && ds.permissions.canDelete && this.canDeleteGlobal) {
+            if (this.rowActions.delete(ds)) {
                 items.push({
                     separator: true
                 });
@@ -1320,6 +1336,11 @@ export default {
     /* A header never wraps; the columns that do not fit leave the table instead */
     .ds-table :deep(th) {
         white-space: nowrap;
+    }
+
+    .ds-row-buttons {
+        display: inline-flex;
+        gap: var(--ddb-spacing-xs);
     }
 
     .ds-pagination {

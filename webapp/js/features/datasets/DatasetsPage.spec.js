@@ -34,11 +34,11 @@ describe('DatasetsPage rows', () => {
 });
 
 describe('DatasetsPage table', () => {
-    async function render(sortColumn) {
+    async function render(sortColumn, items = [serverDataset({ lastModified: '2026-03-04T05:06:07Z' })]) {
         globalThis.HubOptions = {};
         localStorage.clear();
         if (sortColumn) localStorage.setItem('dataset_table_prefs', JSON.stringify({ sortColumn, sortDirection: 'desc' }));
-        const datasetsPage = vi.fn(() => Promise.resolve({ items: [serverDataset({ lastModified: '2026-03-04T05:06:07Z' })], total: 1 }));
+        const datasetsPage = vi.fn(() => Promise.resolve({ items, total: items.length }));
         reg.Organization = vi.fn(() => ({
             info: () => Promise.resolve({ name: 'Org', slug: 'org', permissions: {} }),
             datasetsPage
@@ -62,6 +62,20 @@ describe('DatasetsPage table', () => {
         expect(header.classes()).toContain('d-xl-table-cell');
         expect(header.attributes('aria-sort')).toBeDefined();
         expect(wrapper.find('tbody .relative-time').exists()).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('keeps the place of each action on every row, so the buttons line up (an empty place where one does not apply)', async () => {
+        const { wrapper } = await render(undefined, [
+            serverDataset({ slug: 'both', permissions: { canRead: true, canWrite: true, canDelete: true } }),
+            serverDataset({ slug: 'edit', permissions: { canRead: true, canWrite: true } }),
+            serverDataset({ slug: 'none' })
+        ]);
+        // The edit button's hidden reason (a span) is not a place
+        const places = wrapper.findAll('.ds-row-buttons').map(row => [...row.element.children]
+            .filter(el => el.tagName === 'BUTTON' || el.classList.contains('row-action-placeholder'))
+            .map(el => el.tagName === 'BUTTON' ? el.getAttribute('aria-label') : null));
+        expect(places).toEqual([['Edit dataset', 'Delete dataset'], ['Edit dataset', null], [null, null]]);
         wrapper.unmount();
     });
 

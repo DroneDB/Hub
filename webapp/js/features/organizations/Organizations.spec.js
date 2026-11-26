@@ -165,6 +165,25 @@ describe('Public organizations (D-003)', () => {
         expect(card('Open').text()).toContain('Public');
     });
 
+    it('keeps the place of each action on every row, so the buttons line up (an empty place where one does not apply)', async () => {
+        const owner = { canRead: true, canWrite: true, canDelete: true, canManageMembers: true };
+        const member = { canRead: true, canWrite: false, canDelete: false, canManageMembers: false };
+        await renderPage([
+            { slug: 'mine', name: 'Mine', owner: 'ann', isPublic: false, permissions: owner },
+            { slug: 'team', name: 'Team', owner: 'bob', isPublic: false, permissions: member, datasetCount: 2 }
+        ]);
+        const places = slug => card(slug).findAll('.org-row-buttons > *')
+            .map(el => el.classes('row-action-placeholder') ? null : el.attributes('aria-label'));
+        expect(places('Mine')).toEqual(['Manage members', 'Report settings', 'Edit organization', 'Delete organization']);
+        expect(places('Team')).toEqual([null, 'Report settings', null, null]);
+    });
+
+    it('keeps no place for an action that no row of the list has', async () => {
+        const member = { canRead: true, canWrite: false, canDelete: false, canManageMembers: false };
+        await renderPage([{ slug: 'team', name: 'Team', owner: 'bob', isPublic: false, permissions: member, datasetCount: 2 }]);
+        expect(card('Team').findAll('.org-row-buttons > *').map(el => el.attributes('aria-label'))).toEqual(['Report settings']);
+    });
+
     it('draws the delete of a card as a text button, not a solid one, and keeps the edit outlined (FR-ORG-15)', async () => {
         const owner = { canRead: true, canWrite: true, canDelete: true, canManageMembers: true };
         await renderPage([{ slug: 'mine', name: 'Mine', owner: 'ann', isPublic: false, permissions: owner }]);

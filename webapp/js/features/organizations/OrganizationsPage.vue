@@ -124,23 +124,28 @@
                 <Column header="Actions" class="col-fit"
                         v-bind="stackedColumn(undefined, undefined, { class: 'org-row-actions' }, { columnHeaderContent: { style: 'display: flex; justify-content: center' } })">
                     <template #body="{ data: org }">
+                        <!-- Each action keeps its place on every row, empty where it does not apply, so the buttons line up -->
                         <div class="org-row-buttons">
-                            <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
-                                    severity="secondary" outlined size="small" icon="fa-solid fa-users"
-                                    title="Manage Members" aria-label="Manage members" @click.stop="openMembersDialog(org)" />
+                            <RowActionSlot v-if="actionColumns.members" :shown="rowActions.members(org)">
+                                <Button severity="secondary" outlined size="small" icon="fa-solid fa-users"
+                                        title="Manage Members" aria-label="Manage members" @click.stop="openMembersDialog(org)" />
+                            </RowActionSlot>
                             <!-- Every member can look at the report settings; only an administrator edits them (the dialog says which) -->
-                            <Button v-if="isMemberOf(org)"
-                                    severity="secondary" outlined size="small" icon="fa-solid fa-file-lines"
-                                    title="Report settings" aria-label="Report settings" @click.stop="openReportSettings(org)" />
-                            <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
-                                    severity="secondary" outlined size="small" :loading="org.editing"
-                                    :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
-                                    title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
+                            <RowActionSlot v-if="actionColumns.report" :shown="rowActions.report(org)">
+                                <Button severity="secondary" outlined size="small" icon="fa-solid fa-file-lines"
+                                        title="Report settings" aria-label="Report settings" @click.stop="openReportSettings(org)" />
+                            </RowActionSlot>
+                            <RowActionSlot v-if="actionColumns.edit" :shown="rowActions.edit(org)">
+                                <Button severity="secondary" outlined size="small" :loading="org.editing"
+                                        :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
+                                        title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
+                            </RowActionSlot>
                             <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
-                            <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
-                                    severity="danger" text size="small" :loading="org.deleting"
-                                    :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
-                                    title="Delete" aria-label="Delete organization" @click.stop="handleDelete(org)" />
+                            <RowActionSlot v-if="actionColumns.delete" :shown="rowActions.delete(org)">
+                                <Button severity="danger" text size="small" :loading="org.deleting"
+                                        :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
+                                        title="Delete" aria-label="Delete organization" @click.stop="handleDelete(org)" />
+                            </RowActionSlot>
                         </div>
                     </template>
                 </Column>
@@ -187,6 +192,7 @@ import OrgLogo from '@/components/OrgLogo.vue';
 import SortSelect from '@/components/SortSelect.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import ListToolbar from '@/components/ListToolbar.vue';
+import RowActionSlot from '@/components/RowActionSlot.vue';
 import { DatasetLocationsMap } from '@/features/datasets/locationsMap';
 import UnlocatedDatasetsButton from '@/features/datasets/UnlocatedDatasetsButton.vue';
 import { createLocationFanOut } from '@/libs/locationFanOut';
@@ -200,6 +206,7 @@ import ReportSettingsDialog from './ReportSettingsDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
 import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
+import { actionsOfAnyRow } from '@/libs/rowActions';
 import { ORG_SORT_OPTIONS, organizationRow, sortOrganizations } from '@/libs/organizationList';
 import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
 import { useStackedLayout } from '@/composables/useStackedLayout';
@@ -245,6 +252,7 @@ export default {
         SortSelect,
         ViewSelect,
         ListToolbar,
+        RowActionSlot,
         DatasetLocationsMap,
         UnlocatedDatasetsButton,
         DialogHost,
@@ -336,6 +344,21 @@ export default {
         },
         memberManagementEnabled() {
             return reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+        },
+        // Whether each action of a row, in the order of its buttons, applies to an organization
+        rowActions() {
+            const editable = org => !this.readyOnly && org.slug !== 'public';
+            return {
+                members: org => this.memberManagementEnabled && !this.readyOnly && !!org.permissions?.canManageMembers,
+                report: org => this.isMemberOf(org),
+                edit: org => editable(org) && !!org.permissions?.canWrite,
+                delete: org => editable(org) && !!org.permissions?.canDelete
+            };
+        },
+        // The actions that some organization of the list has: every row keeps a place for each of them, so the buttons
+        // stay where they are when a row lacks one, and from page to page
+        actionColumns() {
+            return actionsOfAnyRow(this.filteredOrganizations, this.rowActions);
         },
         filteredOrganizations() {
             const query = this.searchQuery.toLowerCase();
