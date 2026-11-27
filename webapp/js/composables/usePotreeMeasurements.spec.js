@@ -19,7 +19,8 @@ vi.mock('@/libs/potree/measureLabels', () => ({
     measureAt: vi.fn((...args) => (labels.measureAt ? labels.measureAt(...args) : null)),
     annotationElement: () => null,
     updateItemLabel: vi.fn(),
-    updateAnnotationTooltip: vi.fn()
+    updateAnnotationTooltip: vi.fn(),
+    hideTooltips: vi.fn()
 }));
 // The viewer's measures are plain objects here: the converter writes and reads them as features
 vi.mock('@/libs/map/potreeMeasurementConverter', async importOriginal => ({
@@ -50,7 +51,7 @@ vi.mock('@/libs/reports/reportSettings', async importOriginal => {
 });
 
 const { usePotreeMeasurements } = await import('./usePotreeMeasurements');
-const { updateItemLabel } = await import('@/libs/potree/measureLabels');
+const { updateItemLabel, hideTooltips } = await import('@/libs/potree/measureLabels');
 
 // Minimal stand-ins for the THREE / Potree globals the viewer loads: a restored measure is a new
 // Potree.Measure, with Potree's defaults (maxMarkers has no limit)
@@ -116,6 +117,18 @@ function start(error = ref('')) {
     viewer = fakeViewer();
     m.attach(viewer, session, {});
     return m;
+}
+/**
+ * A double click as the document's capture hears it, on the view's canvas unless `target` says where; `handled`: an
+ * earlier listener (the drawing gestures) already took it
+ */
+function doubleClick({ target = viewer.renderer.domElement, handled = false } = {}) {
+    const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'target', { value: target });
+    if (handled) event.preventDefault();
+    vi.spyOn(event, 'stopPropagation');
+    listeners.get('other:dblclick')(event);
+    return event;
 }
 const inFile = () => (PATH in stored ? JSON.parse(stored[PATH]).features.map(f => f.properties.name) : null);
 
@@ -487,7 +500,7 @@ describe('usePotreeMeasurements', () => {
         // The properties dialog opens on a double click on the measure (measureAt finds it)
         const editWith = (measure, properties) => {
             labels.measureAt = () => measure;
-            listeners.get('other:dblclick')(new MouseEvent('dblclick'));
+            doubleClick();
             dialogs.open.mock.calls.at(-1)[1].onSave(properties);
         };
         const style = { name: 'Fence', description: 'North side', stroke: '#00ff00', 'stroke-width': 4, 'stroke-opacity': 0.5, fill: '#0000ff', 'fill-opacity': 0.6 };
@@ -553,12 +566,51 @@ describe('usePotreeMeasurements', () => {
             const drawing = startDrawing('drawing');
             viewer.inputHandler = { drag: { object: drawing.spheres[0] } };
             labels.measureAt = () => drawing;
-            listeners.get('other:dblclick')(new MouseEvent('dblclick'));
+            doubleClick();
             expect(dialogs.open).not.toHaveBeenCalled();
 
             finishDrawing(drawing, 3);
-            listeners.get('other:dblclick')(new MouseEvent('dblclick'));
+            doubleClick();
             expect(dialogs.open).toHaveBeenCalledTimes(1);
+        });
+
+        it('a double click on a measure opens its properties and goes no further: Potree does not fly the camera there', () => {
+            const track = vi.spyOn(session, 'track');
+            start();
+            // Heard in the document's capture, before Potree's input handler on the canvas
+            expect(track).toHaveBeenCalledWith(document, 'dblclick', expect.any(Function), true);
+            track.mockRestore();
+            const measure = startDrawing('d1');
+            finishDrawing(measure, 5);
+            labels.measureAt = () => measure;
+
+            hideTooltips.mockClear();
+            const event = doubleClick();
+            expect(dialogs.open).toHaveBeenCalledTimes(1);
+            // The card's tooltip under the pointer does not stay over the dialog
+            expect(hideTooltips).toHaveBeenCalledWith(viewer);
+            expect(event.defaultPrevented).toBe(true);
+            expect(event.stopPropagation).toHaveBeenCalled();
+        });
+
+        it('a double click on no measure, outside the view or already handled is left alone', () => {
+            start();
+            const measure = startDrawing('d1');
+            finishDrawing(measure, 5);
+
+            // Nothing under the pointer: Potree's own double click (the flight to the point) happens
+            const empty = doubleClick();
+            expect(empty.defaultPrevented).toBe(false);
+            expect(empty.stopPropagation).not.toHaveBeenCalled();
+
+            labels.measureAt = () => measure;
+            // An annotation's title or a panel over the view: their own double click
+            const elsewhere = doubleClick({ target: document.createElement('div') });
+            expect(elsewhere.defaultPrevented).toBe(false);
+            // The drawing gestures ended a measure with it
+            const handled = doubleClick({ handled: true });
+            expect(handled.stopPropagation).not.toHaveBeenCalled();
+            expect(dialogs.open).not.toHaveBeenCalled();
         });
     });
 });
@@ -635,7 +687,7 @@ describe('the id and the ref of the measures of the viewer', () => {
         const two = startDrawing('d2');
         finishDrawing(two, 6);
         labels.measureAt = () => one;
-        listeners.get('other:dblclick')(new MouseEvent('dblclick'));
+        doubleClick();
         const props = dialogs.open.mock.calls.at(-1)[1];
         expect(props.schema.categories.length).toBeGreaterThan(0);
         expect(props.isRefTaken('2')).toBe(true);

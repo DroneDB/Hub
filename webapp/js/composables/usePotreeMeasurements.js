@@ -22,7 +22,7 @@ import { unstatedMeasurementCrs } from '@/libs/build/pointCloudCrs';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
 import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/measureSnapshot';
-import { measureAt, annotationElement, updateItemLabel, updateAnnotationTooltip } from '@/libs/potree/measureLabels';
+import { measureAt, annotationElement, updateItemLabel, updateAnnotationTooltip, hideTooltips } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { focusItem as focusViewerItem } from '@/libs/potree/itemFocus';
 import { captureForReport } from '@/libs/potree/captureForReport';
@@ -149,6 +149,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
     function openDialog(component, props) {
         if (dialog) dialog.close();
+        hideTooltips(viewer);
         dialog = dialogs.open(component, { ...props, onClose: () => { dialog = null; } });
     }
 
@@ -341,12 +342,18 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         scene.annotations.traverse(listenToAnnotation);
         countMeasurements();
 
-        // Double click on a finished measure edits it (while drawing, it ends the measure)
-        session.track(viewer.renderer.domElement, 'dblclick', event => {
-            if (drawingAny()) return;
+        // Double click on a finished measure (a marker or its label) edits it, and the camera stays where it is: the
+        // document's capture hears it before Potree's input handler, which would fly to the point under the pointer.
+        // While a measure is drawn the double click ends it (the drawing gestures handle it and mark it handled)
+        const canvas = viewer.renderer.domElement;
+        session.track(canvas.ownerDocument ?? document, 'dblclick', event => {
+            if (event.target !== canvas || event.defaultPrevented || drawingAny()) return;
             const measure = measureAt(viewer, event);
-            if (measure) editMeasure(measure);
-        });
+            if (!measure) return;
+            event.stopPropagation();
+            event.preventDefault();
+            editMeasure(measure);
+        }, true);
 
         session.track(document, 'keydown', event => {
             if (!(event.ctrlKey || event.metaKey) || isTyping(event.target)) return;

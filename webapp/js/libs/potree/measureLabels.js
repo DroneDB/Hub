@@ -22,12 +22,25 @@ function pointerRaycaster(viewer, event) {
     return raycaster;
 }
 
-/** The measure whose marker spheres are under the pointer, or null. */
+/**
+ * The measure under the pointer, or null: one of its marker spheres or its label (the card of its name, category and
+ * description, the part a user points at) is there. The nearest one when several are; a hidden measure is not picked.
+ */
 export function measureAt(viewer, event) {
     const raycaster = pointerRaycaster(viewer, event);
-    raycaster.params.Points = { threshold: 5 };
-    return (viewer.scene.measurements || []).find(m => m.spheres && m.spheres.length &&
-        raycaster.intersectObjects(m.spheres, true).length > 0) || null;
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for (const measure of viewer.scene.measurements || []) {
+        if (measure.visible === false) continue;
+        const targets = [...(measure.spheres || []), ...(measure._itemLabel ? [measure._itemLabel] : [])];
+        if (!targets.length) continue;
+        const [hit] = raycaster.intersectObjects(targets, true);
+        if (hit && hit.distance < nearestDistance) {
+            nearest = measure;
+            nearestDistance = hit.distance;
+        }
+    }
+    return nearest;
 }
 
 /** The HTMLElement of an annotation (Potree keeps a jQuery object). */
@@ -200,6 +213,17 @@ export function updateItemLabel(measure, ctx) {
         }
     };
     session.track(dom, 'mousemove', measure._tooltipHoverHandler);
+}
+
+/**
+ * Hides the description tooltips of the measures and the annotations. A dialog over the view takes the pointer: the
+ * view hears no move that would hide the tooltip under it, which would stay over the dialog.
+ * @param {any} viewer
+ */
+export function hideTooltips(viewer) {
+    const hide = tooltip => { if (tooltip) tooltip.style.display = 'none'; };
+    (viewer.scene.measurements || []).forEach(measure => hide(measure._itemLabelTooltip));
+    viewer.scene.annotations?.traverse?.(annotation => hide(annotation._descriptionTooltip));
 }
 
 /**

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { loadPotree } from './potreeLibs.fixtures';
-import { updateItemLabel } from './measureLabels';
+import { updateItemLabel, measureAt, hideTooltips } from './measureLabels';
 import { ensureProperties } from '@/libs/map/potreeMeasurementConverter';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportDefaults';
 
@@ -103,5 +103,86 @@ describe('updateItemLabel', () => {
         expect(measure._itemLabel.lines).toEqual([{ text: 'Urgent', kind: 'fields', colour: '#ff0000' }]);
         expect(measure.children).not.toContain(first);
         expect(session.untrack).toHaveBeenCalledWith(viewer, 'update', expect.any(Function));
+    });
+});
+
+describe('measureAt', () => {
+    /** The setup's viewer with these measures, its canvas at the top left of the page, and a pointer at (x, y) CSS px */
+    function scene(...measures) {
+        const ctx = setup();
+        ctx.viewer.scene.measurements = measures;
+        ctx.viewer.renderer.domElement.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 800 });
+        const at = (clientX, clientY) => measureAt(ctx.viewer, { clientX, clientY });
+        const place = () => { ctx.frame(); measures.forEach(m => m.updateMatrixWorld(true)); };
+        return { ...ctx, at, place };
+    }
+    /** Where a world position is on the screen, in CSS px */
+    const onScreen = (camera, position) => {
+        const p = position.clone().project(camera);
+        return { x: ((p.x + 1) / 2) * 1000, y: ((1 - p.y) / 2) * 800 };
+    };
+
+    it('finds a measure by its label, the card a user points at, and not by an empty place', () => {
+        const measure = point({ name: 'Pickup truck: height', description: 'Accuracy check' });
+        const { viewer, session, camera, at, place } = scene(measure);
+        updateItemLabel(measure, { viewer, session, schema: () => DEFAULT_SCHEMA });
+        place();
+        // The card stands above the point: its bottom edge 12 px over it, so 8 px further up is inside it
+        const label = onScreen(camera, measure._itemLabel.position);
+        expect(at(label.x, label.y - 8)).toBe(measure);
+        expect(at(label.x + 5, label.y - 8)).toBe(measure);
+        expect(at(100, 100)).toBeNull();
+    });
+
+    it('finds a measure by one of its marker spheres', () => {
+        const measure = point({ name: '' });
+        const { at, place } = scene(measure);
+        place();
+        expect(measure._itemLabel).toBeUndefined();
+        expect(at(500, 400)).toBe(measure);
+    });
+
+    it('does not find a hidden measure, by its label or its spheres', () => {
+        const measure = point({ name: 'Hidden' });
+        const { viewer, session, camera, at, place } = scene(measure);
+        updateItemLabel(measure, { viewer, session, schema: () => DEFAULT_SCHEMA });
+        place();
+        measure.visible = false;
+        const label = onScreen(camera, measure._itemLabel.position);
+        expect(at(label.x, label.y - 8)).toBeNull();
+        expect(at(500, 400)).toBeNull();
+    });
+
+    it('finds the nearer of two measures under the pointer, whichever comes first in the scene', () => {
+        const far = point({ name: '' });
+        const near = point({ name: '' });
+        near.points[0].position.set(0, 0, 10);
+        near.spheres[0].position.set(0, 0, 10);
+        const { at, place } = scene(far, near);
+        place();
+        expect(at(500, 400)).toBe(near);
+        expect(scene(near, far).at(500, 400)).toBe(near);
+    });
+});
+
+describe('hideTooltips', () => {
+    it('hides the shown description tooltips of the measures and the annotations, and leaves those without one alone', () => {
+        const { viewer, session } = setup();
+        const described = point({ name: 'Crepa', description: 'Crack in the roof' });
+        const bare = point({ name: 'No description' });
+        updateItemLabel(described, { viewer, session, schema: () => DEFAULT_SCHEMA });
+        updateItemLabel(bare, { viewer, session, schema: () => DEFAULT_SCHEMA });
+        expect(bare._itemLabelTooltip).toBeFalsy();
+        described._itemLabelTooltip.style.display = 'block';
+        const annotationTooltip = document.createElement('div');
+        annotationTooltip.style.display = 'block';
+        const annotations = [{}, { _descriptionTooltip: annotationTooltip }];
+        viewer.scene.measurements = [described, bare];
+        viewer.scene.annotations = { traverse: fn => annotations.forEach(fn) };
+
+        hideTooltips(viewer);
+
+        expect(described._itemLabelTooltip.style.display).toBe('none');
+        expect(annotationTooltip.style.display).toBe('none');
     });
 });
