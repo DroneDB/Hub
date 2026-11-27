@@ -65,28 +65,6 @@ const placeAt = (tooltip, x, y) => {
     tooltip.style.top = (y - 10) + 'px';
 };
 
-/** Where a measure's label goes: area centroid, beside a point, beside a line's middle. */
-function labelPosition(measure) {
-    const points = measure.points;
-    const position = new THREE.Vector3();
-    const offset = new THREE.Vector3();
-    if (measure.showArea && measure.closed && points.length >= 3) {
-        points.forEach(p => position.add(p.position));
-        position.divideScalar(points.length);
-    } else if (points.length === 1) {
-        position.copy(points[0].position);
-        offset.set(0.5, 0.5, 0);
-    } else if (points.length === 2) {
-        position.copy(points[0].position).add(points[1].position).divideScalar(2);
-        const dir = new THREE.Vector3().subVectors(points[1].position, points[0].position).normalize();
-        offset.crossVectors(dir, new THREE.Vector3(0, 0, 1)).normalize().multiplyScalar(0.3);
-    } else {
-        position.copy(points[Math.floor(points.length / 2)].position);
-        offset.set(0.3, 0, 0);
-    }
-    return position.add(offset);
-}
-
 /** Removes a measure's label, its tooltip and their listeners. */
 function clearItemLabel(measure, { viewer, session }) {
     if (measure._itemLabel) {
@@ -99,8 +77,10 @@ function clearItemLabel(measure, { viewer, session }) {
     measure._itemLabel = measure._itemLabelTooltip = measure._labelUpdateHandler = measure._tooltipHoverHandler = null;
 }
 
-/** How far above its point the label of a point stands, in CSS px. */
+/** How far above its point the label of a point stands, in CSS px (clear of the marker sphere). */
 const POINT_LABEL_GAP_PX = 12;
+/** How far above the label of its value (a length, a height, an area) the label of a measure stands, in CSS px. */
+const VALUE_LABEL_GAP_PX = 4;
 /** Potree's rule for the screen size of its labels: 70 over the projected radius of one unit (see its MeasuringTool). */
 const POTREE_LABEL_SIZE = 70;
 
@@ -144,6 +124,62 @@ function labelScale(camera, distance, size) {
     return (POTREE_LABEL_SIZE / pixelsPerUnit(camera, distance, size)) * measureLabelFactor(size.height);
 }
 
+/** The middle one of a list (the first of the two middle ones of an even list). */
+const middleOf = list => list[Math.floor((list.length - 1) / 2)];
+
+/** Whether Potree shows this label of a measure. */
+const isShown = label => !!label && label.visible === true;
+
+/**
+ * The label of the value a measure shows, which its own label stands above: its area, its height or its radius, else the
+ * middle one of the lengths of its sides or of its angles. Null when Potree shows none of them (a point, or values
+ * turned off).
+ * @param {any} measure
+ */
+function valueLabelOf(measure) {
+    const single = [measure.areaLabel, measure.heightLabel, measure.circleRadiusLabel].find(isShown);
+    if (single) return single;
+    for (const labels of [measure.edgeLabels, measure.angleLabels]) {
+        const shown = (labels || []).filter(isShown);
+        if (shown.length) return middleOf(shown);
+    }
+    return null;
+}
+
+/**
+ * The height on the screen of one of Potree's labels, in CSS px: its sprite's size in the scene times its scale.
+ * @param {any} label  a Potree.TextSprite
+ * @param {any} camera
+ * @param {{ width: number, height: number }} size
+ */
+function screenHeightOf(label, camera, size) {
+    const sceneHeight = (label.sprite?.scale.y ?? 0) * label.scale.y;
+    return sceneHeight * pixelsPerUnit(camera, camera.position.distanceTo(label.position), size);
+}
+
+/**
+ * Where the bottom edge of the label of a measure goes this frame: a few px above the label of its value, so the two
+ * read as one stack (name over value) and never cover each other, whatever the zoom; else above its middle point.
+ * @param {any} measure
+ * @param {any} camera
+ * @param {{ width: number, height: number }} size
+ */
+function labelAnchor(measure, camera, size) {
+    const value = valueLabelOf(measure);
+    if (value) {
+        const gap = screenHeightOf(value, camera, size) / 2 + VALUE_LABEL_GAP_PX;
+        return aboveOnScreen(camera, value.position, gap, size.height);
+    }
+    return aboveOnScreen(camera, middlePositionOf(measure.points), POINT_LABEL_GAP_PX, size.height);
+}
+
+/** The middle of the points of a measure: its middle point, or the middle of its two middle points (a line's middle). */
+function middlePositionOf(points) {
+    const first = middleOf(points).position;
+    if (points.length % 2) return first.clone();
+    return first.clone().add(points[points.length / 2].position).multiplyScalar(0.5);
+}
+
 /**
  * The text of an item of the viewer, as its label shows it: its name and description as text, and its category and
  * severity.
@@ -156,8 +192,9 @@ const labelItemOf = measure => {
 
 /**
  * (Re)draws the label of a measure (itemLabel: its name, its category and severity, its description) as a sprite of
- * constant screen size, with the whole description in a tooltip while the pointer is over it. A point shows the label
- * above it instead of its coordinates. An item with nothing to show has no label (and a point its coordinates).
+ * constant screen size, with the whole description in a tooltip while the pointer is over it. The label stands above the
+ * label of the measure's value (its length, height or area); a point shows it above the point instead of its
+ * coordinates. An item with nothing to show has no label (and a point its coordinates).
  * @param {any} measure
  * @param {{ viewer: any, session: import('@/libs/potree/potreeSession').PotreeSession, schema?: () => any }} ctx
  *   schema: the organization's categories and severities, for their names and the colour of a severity
@@ -174,20 +211,18 @@ export function updateItemLabel(measure, ctx) {
     label.material.depthTest = false;
     label.material.opacity = 1;
     label.setLines(lines);
-    const isPoint = measure.points.length === 1;
-    // A point's label stands above it: its bottom edge is the anchor
-    if (isPoint && label.sprite?.center) label.sprite.center.set(0.5, 0);
-    label.position.copy(labelPosition(measure));
+    // The label stands above its anchor (labelAnchor): its bottom edge is there
+    if (label.sprite?.center) label.sprite.center.set(0.5, 0);
 
-    // Each frame, after Potree's measuring tool placed and sized its own labels: the place and the screen size, and a
-    // point's coordinates hidden (Potree shows them again at each update of the measure)
+    // Each frame, after Potree's measuring tool placed and sized its own labels: the place (it follows a moved point and
+    // the size of the value's label), the screen size, and a point's coordinates hidden (Potree shows them again at each
+    // update of the measure)
     const place = () => {
+        if (!measure.points.length) return;
         const camera = viewer.scene.getActiveCamera();
         const size = viewSize(viewer);
-        if (isPoint && measure.points[0]) {
-            label.position.copy(aboveOnScreen(camera, measure.points[0].position, POINT_LABEL_GAP_PX, size.height));
-            (measure.coordinateLabels || []).forEach(coordinates => { coordinates.visible = false; });
-        }
+        label.position.copy(labelAnchor(measure, camera, size));
+        if (measure.points.length === 1) (measure.coordinateLabels || []).forEach(coordinates => { coordinates.visible = false; });
         const scale = labelScale(camera, camera.position.distanceTo(label.position), size);
         label.scale.set(scale, scale, scale);
     };

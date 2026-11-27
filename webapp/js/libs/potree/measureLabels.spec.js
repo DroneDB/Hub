@@ -186,3 +186,96 @@ describe('hideTooltips', () => {
         expect(annotationTooltip.style.display).toBe('none');
     });
 });
+
+describe('updateItemLabel places the label above the value of its measure', () => {
+    /** A measure of the real Potree through these points, with these options, and its values updated */
+    function measureOf(points, options) {
+        const measure = new Potree.Measure();
+        Object.assign(measure, { name: 'Dry beach width', description: 'Vegetation edge to the wet/dry line.' }, options);
+        points.forEach(([x, y, z]) => measure.addMarker(new globalThis.THREE.Vector3(x, y, z)));
+        measure.update();
+        return measure;
+    }
+    /** Potree's measuring tool sizes its labels at each frame (70 over the px of one unit at their distance) */
+    function sizeLikePotree(measure, camera) {
+        const labels = [...measure.edgeLabels, ...measure.angleLabels, measure.heightLabel, measure.areaLabel, measure.circleRadiusLabel];
+        for (const label of labels) {
+            const pxPerUnit = 800 / (2 * Math.tan(Math.PI / 6) * camera.position.distanceTo(label.position));
+            const scale = 70 / pxPerUnit;
+            label.scale.set(scale, scale, scale);
+        }
+    }
+    /** The screen box of a label, in CSS px from the top left of the 1000 x 800 view (its sprite's center is its anchor) */
+    function boxOf(label, camera) {
+        const p = label.position.clone().project(camera);
+        const x = ((p.x + 1) / 2) * 1000;
+        const y = ((1 - p.y) / 2) * 800;
+        const pxPerUnit = 800 / (2 * Math.tan(Math.PI / 6) * camera.position.distanceTo(label.position));
+        const width = label.sprite.scale.x * label.scale.x * pxPerUnit;
+        const height = label.sprite.scale.y * label.scale.y * pxPerUnit;
+        const { x: cx, y: cy } = label.sprite.center;
+        return { left: x - cx * width, right: x + (1 - cx) * width, top: y - (1 - cy) * height, bottom: y + cy * height };
+    }
+    /** Places the labels as a frame does, with the camera at this distance above the origin */
+    function render(measure, distance) {
+        const ctx = setup();
+        ctx.camera.position.set(0, 0, distance);
+        ctx.camera.lookAt(0, 0, 0);
+        ctx.camera.updateMatrixWorld();
+        updateItemLabel(measure, { viewer: ctx.viewer, session: ctx.session, schema: () => DEFAULT_SCHEMA });
+        sizeLikePotree(measure, ctx.camera);
+        ctx.frame();
+        return ctx;
+    }
+    const expectStackedOver = (card, value) => {
+        // The card's bottom edge is 4 px over the value's top edge, centred over it
+        expect(value.top - card.bottom).toBeCloseTo(4, 3);
+        expect((card.left + card.right) / 2).toBeCloseTo((value.left + value.right) / 2, 3);
+    };
+
+    it('stands over the length of a distance, at any zoom: zoomed out it no longer covers it', () => {
+        for (const distance of [30, 300, 3000]) {
+            const measure = measureOf([[-10, 0, 0], [10, 0, 0]], { showDistances: true, showArea: false, closed: false });
+            const { camera } = render(measure, distance);
+            expect(measure.edgeLabels[0].visible).toBe(true);
+            expectStackedOver(boxOf(measure._itemLabel, camera), boxOf(measure.edgeLabels[0], camera));
+        }
+    });
+
+    it('stands over the area of an area, and over the height of a height', () => {
+        const area = measureOf([[-10, -10, 0], [10, -10, 0], [0, 10, 0]], { showDistances: true, showArea: true, closed: true });
+        const one = render(area, 100);
+        expect(area.areaLabel.visible).toBe(true);
+        expectStackedOver(boxOf(area._itemLabel, one.camera), boxOf(area.areaLabel, one.camera));
+
+        const height = measureOf([[0, 0, 0], [5, 0, 3]], { showDistances: false, showHeight: true, showArea: false, closed: false });
+        const two = render(height, 100);
+        expect(height.heightLabel.visible).toBe(true);
+        expectStackedOver(boxOf(height._itemLabel, two.camera), boxOf(height.heightLabel, two.camera));
+    });
+
+    it('stands over the middle length of a line of several sides', () => {
+        const measure = measureOf([[-30, 0, 0], [-10, 0, 0], [10, 0, 0], [30, 0, 0]], { showDistances: true, showArea: false, closed: false });
+        const { camera } = render(measure, 100);
+        expectStackedOver(boxOf(measure._itemLabel, camera), boxOf(measure.edgeLabels[1], camera));
+    });
+
+    it('stands 12 px over the middle of the line when its values are not shown', () => {
+        const measure = measureOf([[-10, 0, 0], [10, 0, 0]], { showDistances: false, showArea: false, closed: false });
+        const { camera } = render(measure, 100);
+        expect(measure.edgeLabels[0].visible).toBe(false);
+        const card = boxOf(measure._itemLabel, camera);
+        expect(card.bottom).toBeCloseTo(400 - 12, 3);
+        expect((card.left + card.right) / 2).toBeCloseTo(500, 3);
+    });
+
+    it('follows its value when a point of the measure moves', () => {
+        const measure = measureOf([[-10, 0, 0], [10, 0, 0]], { showDistances: true, showArea: false, closed: false });
+        const { camera, frame } = render(measure, 100);
+        measure.setPosition(1, new globalThis.THREE.Vector3(30, 0, 0));
+        sizeLikePotree(measure, camera);
+        frame();
+        expectStackedOver(boxOf(measure._itemLabel, camera), boxOf(measure.edgeLabels[0], camera));
+        expect(boxOf(measure.edgeLabels[0], camera).left).toBeGreaterThan(500);
+    });
+});
