@@ -80,12 +80,24 @@ describe('focusItem', () => {
         expect(box.max.x - box.min.x).toBe(10);
     });
 
-    it('moves the camera to an annotation the way Potree does', () => {
-        const annotation = note('n1');
+    it('moves the camera to an annotation that has a camera of its own the way Potree does', () => {
+        const annotation = { ...note('n1'), cameraPosition: new Vector3(0, 0, 50), cameraTarget: new Vector3(1, 2, 3) };
         viewer = viewerOf([], [annotation]);
         expect(focusItem(viewer, 'n1')).toBe(true);
         expect(annotation.moveHere).toHaveBeenCalledWith('camera');
         expect(viewer.zoomTo).not.toHaveBeenCalled();
+    });
+
+    it('frames an annotation with no camera of its own as a lone point, without Potree\'s move (which throws on one)', () => {
+        const annotation = note('n1');
+        annotation.moveHere.mockImplementation(() => { throw new TypeError("Cannot read properties of undefined (reading 'x')"); });
+        viewer = viewerOf([], [annotation]);
+        expect(focusItem(viewer, 'n1')).toBe(true);
+        expect(annotation.moveHere).not.toHaveBeenCalled();
+        const [node, factor] = viewer.zoomTo.mock.calls[0];
+        expect(node.boundingBox.min.x).toBe(-4);
+        expect(node.boundingBox.max.x).toBe(6);
+        expect(factor).toBe(2);
     });
 
     it('is false when the viewer has no item with the id', () => {

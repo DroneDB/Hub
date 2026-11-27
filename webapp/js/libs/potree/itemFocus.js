@@ -61,6 +61,9 @@ export function frameItemNow(viewer, item) {
     return zoomToBoxOf(viewer, positions, 0, CAPTURE_FRAMING);
 }
 
+/** @param {any} annotation  whether a Potree annotation has a camera position and target of its own to move to */
+const hasSavedView = annotation => !!(annotation.cameraPosition && annotation.cameraTarget);
+
 /**
  * Frames the annotation with this id.
  * @param {any} viewer
@@ -73,8 +76,12 @@ export function focusItem(viewer, id) {
     if (Array.isArray(item.points)) {
         // A measure: the box of its points (one that has none is left where it is)
         zoomToBoxOf(viewer, item.points.map((/** @type {any} */ p) => p.position), ANIMATION_MS, FOCUS);
-    } else if (typeof item.moveHere === 'function') {
+    } else if (hasSavedView(item) && typeof item.moveHere === 'function') {
         item.moveHere(viewer.scene.getActiveCamera());
+    } else if (item.position) {
+        // An annotation made in the Hub keeps no camera of its own, and Potree's move (its hasView) throws on one that has
+        // none: it is framed as a lone point
+        zoomToBoxOf(viewer, [item.position], ANIMATION_MS, FOCUS);
     }
     return true;
 }
