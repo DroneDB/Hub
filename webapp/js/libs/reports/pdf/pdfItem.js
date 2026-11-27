@@ -10,6 +10,7 @@ import { INK, MUTED, SUBTLE, WHITE, textOn } from '@/libs/reports/pdf/pdfTheme';
 import { badgeLine, callout, figureOf, keyValue, photoGrid } from '@/libs/reports/pdf/pdfBlocks';
 import { markdownToPdf } from '@/libs/reports/pdf/pdfMarkdown';
 import { itemFacts } from '@/libs/reports/reportParts';
+import { NO_REF } from '@/libs/reports/reportItems';
 import { qrSvg } from '@/libs/qr';
 import { isOriginUrl } from '@/libs/originUrl';
 
@@ -35,7 +36,7 @@ function headerCard(part, ctx) {
         margin: [12, 9, 8, 9]
     };
     const linked = part.qr && isOriginUrl(part.qr.url, ctx.origin);
-    const ref = heading.ref || '—';
+    const ref = heading.ref || NO_REF;
     return {
         table: {
             widths: [52, '*', ...(linked ? [QR_SIDE + 14] : [])],

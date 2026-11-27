@@ -92,7 +92,7 @@ export function prefillReport({ initial, lastReport, views, measurementFiles, ba
 
     return {
         fields: {
-            name: freeName(`${viewName || datasetName} – ${dateText}`, reportNames),
+            name: freeName(`${viewName || datasetName}, ${dateText}`, reportNames),
             title: datasetName,
             subtitle: viewName,
             preparedBy: lastReport?.preparedBy || user,

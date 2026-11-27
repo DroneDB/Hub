@@ -9,7 +9,7 @@
  * @property {string} id
  * @property {string} ref  '' while the file is not numbered
  * @property {boolean} numbered  it has a ref: only a numbered item has an anchor, a viewer action and a QR code
- * @property {string} displayRef  the reference every callout, row, page and entry shows ('—' unnumbered)
+ * @property {string} displayRef  the reference every callout, row, page and entry shows (NO_REF unnumbered)
  * @property {string} sourceLabel
  * @property {number} sourceIndex
  * @property {string} file  the measurements file
@@ -40,9 +40,10 @@ import { passesFilter } from '@/libs/reports/reportDefinition';
 import { idOf, refOf, inCreationOrder, duplicateRefs } from '@/libs/map/annotationIds';
 import { VIEW, sectionOf, LEGACY_GEOMETRY } from '@/libs/map/measurementFormat';
 import { kindOfFeature, measuredOf } from '@/libs/reports/reportKinds';
+import { EMPTY_CELL } from '@/libs/format';
 
-/** What an unnumbered item shows in place of a reference. */
-export const NO_REF = '—';
+/** What an unnumbered item shows in place of a reference: the mark of a value that is not there. */
+export const NO_REF = EMPTY_CELL;
 
 const refCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 

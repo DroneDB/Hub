@@ -66,9 +66,9 @@ describe('the view', () => {
 
 describe('the texts', () => {
     it('name the report after its saved view and the date, the cover after the dataset and the view, prepared by the user', () => {
-        const { fields } = prefillReport(input({ initial: { view: { uid: SITE.uid } }, reportNames: ['Site – 23 Nov 2026'] }));
-        expect(fields).toMatchObject({ name: 'Site – 23 Nov 2026 (2)', title: 'Quarry', subtitle: 'Site', preparedBy: 'jdoe', preparedFor: '', units: null });
-        expect(prefillReport(input({ views: [] })).fields).toMatchObject({ name: 'Quarry – 23 Nov 2026', subtitle: '' });
+        const { fields } = prefillReport(input({ initial: { view: { uid: SITE.uid } }, reportNames: ['Site, 23 Nov 2026'] }));
+        expect(fields).toMatchObject({ name: 'Site, 23 Nov 2026 (2)', title: 'Quarry', subtitle: 'Site', preparedBy: 'jdoe', preparedFor: '', units: null });
+        expect(prefillReport(input({ views: [] })).fields).toMatchObject({ name: 'Quarry, 23 Nov 2026', subtitle: '' });
     });
 
     it('take the prepared by and for, the units, the template and its sections of the last report, never its notes or filter', () => {

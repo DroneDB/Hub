@@ -133,7 +133,7 @@ describe('the fields', () => {
 
     it('start filled in from the dataset page: a name, the only saved view, and Create report', async () => {
         await render();
-        expect(field('report-name').value).toMatch(/^Cover view – /);
+        expect(field('report-name').value).toMatch(/^Cover view, /);
         expect(field('report-title').value).toBe('North pit survey');
         expect(field('report-preparedBy').value).toBe('jdoe');
         expect(selectOf('report-view').props('modelValue')).toBe('saved:v_cover123');

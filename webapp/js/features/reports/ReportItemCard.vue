@@ -1,7 +1,7 @@
 <template>
     <article class="report-item" :style="itemColours" data-section-part="item">
         <header class="report-item-head">
-            <span class="report-item-ref" aria-hidden="true">{{ heading.ref || '—' }}</span>
+            <span class="report-item-ref" aria-hidden="true">{{ heading.ref || NO_REF }}</span>
             <div class="report-item-titles">
                 <h3 :id="heading.anchor || undefined" :tabindex="heading.anchor ? -1 : undefined" class="report-item-name">
                     <span class="visually-hidden">{{ heading.ref }}</span> {{ heading.name || heading.text }}
@@ -55,6 +55,7 @@
  */
 import { computed } from 'vue';
 import { itemFacts } from '@/libs/reports/reportParts';
+import { NO_REF } from '@/libs/reports/reportItems';
 import { textOn } from '@/libs/reports/reportStyling';
 import QrBlock from './blocks/QrBlock.vue';
 import ReportBlock from './ReportBlock.vue';

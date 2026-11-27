@@ -60,7 +60,7 @@ describe('the PDF pdfmake writes', () => {
         for (const paper of ['A4', 'Letter']) {
             for (const orientation of ['portrait', 'landscape']) {
                 const definition = definitionOf(['a.geojson'], {
-                    preparedBy: 'A. Kaczmarek — Northbank Geomatics, field services',
+                    preparedBy: 'A. Kaczmarek, Northbank Geomatics, field services',
                     preparedFor: 'Reserve management of the municipality (sample client)',
                     sections: [{ kind: 'cover', enabled: true }, { kind: 'summary', enabled: true }]
                 });

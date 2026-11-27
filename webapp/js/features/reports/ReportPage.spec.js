@@ -8,6 +8,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { computed, defineComponent, h, reactive, ref, shallowRef } from 'vue';
 import PrimeVue from 'primevue/config';
 import { buildReportModel } from '@/libs/reports/reportModel';
+import { NO_REF } from '@/libs/reports/reportItems';
 import { cloudFeature, definitionOf, documentOf, inputOf, mapFeature, settings, template } from '@/libs/reports/reportModel.fixtures';
 
 const m = vi.hoisted(() => ({ report: null, route: null, push: vi.fn(), actions: null, photoEntries: vi.fn() }));
@@ -138,7 +139,7 @@ describe('the items', () => {
         expect(wrapper.find('#item-u1').exists()).toBe(false);
         expect(wrapper.find('.report-item-viewer').exists()).toBe(false);
         const heading = wrapper.find('[data-section="items"] h3');
-        expect(heading.text()).toContain('—');
+        expect(heading.text()).toContain(NO_REF);
         expect(wrapper.find('[data-section="tables"] tbody th a').exists()).toBe(false);
     });
 

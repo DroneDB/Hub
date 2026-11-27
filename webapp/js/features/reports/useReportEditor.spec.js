@@ -102,7 +102,7 @@ describe('what the editor offers', () => {
         expect(editor.draft.sources).toEqual([{ file: 'a/measurements.geojson', label: 'A' }]);
         expect(editor.viewChoice.value).toEqual({ kind: 'saved', uid: 'v_cover123' });
         expect(editor.draft.cover).toEqual({ viewId: 'v_cover123' });
-        expect(editor.draft.name).toMatch(/^Cover – /);
+        expect(editor.draft.name).toMatch(/^Cover, /);
         expect(editor.draft.title).toBe('North pit survey');
         expect(editor.draft.subtitle).toBe('Cover');
         expect(editor.draft.preparedBy).toBe('jdoe');
@@ -130,7 +130,7 @@ describe('what the editor offers', () => {
         const editor = make();
         await editor.load();
         expect(editor.viewChoice.value).toEqual({ kind: 'fromFile', path: 'odm_orthophoto.tif', name: 'odm_orthophoto.tif' });
-        expect(editor.draft.name).toMatch(/^North pit survey – /);
+        expect(editor.draft.name).toMatch(/^North pit survey, /);
     });
 
     it('fills in the texts, template, units, sections and files of the newest report of the dataset', async () => {

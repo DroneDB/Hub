@@ -5,6 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { loadReportSource, loadReportSources } from './reportSources';
 import { buildReportModel } from './reportModel';
+import { NO_REF } from './reportItems';
 import { ApiError } from '@/libs/ddb/apiError';
 import { mixedFile } from '@/libs/map/measurementFormat.fixtures';
 import { definitionOf, inputOf, blocksOf, documentOf, mapFeature } from './reportModel.fixtures';
@@ -54,7 +55,7 @@ describe('a report of a file written before the references', () => {
         const model = buildReportModel({ ...inputOf([]), definition, sources });
         expect(model.failedSources).toEqual([]);
         expect(model.items.length).toBeGreaterThan(3);
-        expect(model.items.every(i => !i.numbered && i.displayRef === '—' && /^[0-9a-f]{64}(-\d+)?$/.test(i.id))).toBe(true);
+        expect(model.items.every(i => !i.numbered && i.displayRef === NO_REF && /^[0-9a-f]{64}(-\d+)?$/.test(i.id))).toBe(true);
         expect(model.items.some(i => i.owner === 'pointCloud' && i.georeferenced)).toBe(true);
         expect(model.items.find(i => i.name === 'Fence line').groupName).toBe('Fence');
         expect(blocksOf(model, 'items', 'qr')).toEqual([]);

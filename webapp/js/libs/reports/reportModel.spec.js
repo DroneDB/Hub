@@ -10,6 +10,7 @@ import { CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
 import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_TEMPLATE, DEFAULT_SCHEMA, cloneSettings } from './reportSettings';
 import { formatArea, formatLength, formatDate, EMPTY_CELL } from '@/libs/format';
+import { NO_REF } from '@/libs/reports/reportItems';
 import { geodesicArea } from '@/libs/map/geodesic';
 import {
     square, mapFeature, cloudFeature, documentOf, template, settings, definitionOf, coverState, inputOf, blocksOf, NOW, DSM_INFO, ORTHO_INFO
@@ -598,7 +599,7 @@ describe('an item of a file that is not numbered yet', () => {
     const model = () => buildReportModel(inputOf(features));
 
     it('comes after the numbered ones, by creation time, and shows a dash', () => {
-        expect(model().items.map(i => [i.id, i.displayRef])).toEqual([['n1', '1'], ['n2', '2'], ['early', '—'], ['late', '—']]);
+        expect(model().items.map(i => [i.id, i.displayRef])).toEqual([['n1', '1'], ['n2', '2'], ['early', NO_REF], ['late', NO_REF]]);
     });
 
     it('has no anchor, no viewer action and no QR code, and no link in its table row', () => {
@@ -613,7 +614,7 @@ describe('an item of a file that is not numbered yet', () => {
 
     it('is shown with the dash and the source label when the report has several sources', () => {
         const input = { ...inputOf([]), definition: definitionOf(['a.geojson', 'b.geojson']), sources: [{ file: 'a.geojson', document: documentOf(features) }, { file: 'b.geojson', document: documentOf([]) }] };
-        expect(buildReportModel(input).items.map(i => i.displayRef)).toEqual(['A-1', 'A-2', '—', '—']);
+        expect(buildReportModel(input).items.map(i => i.displayRef)).toEqual(['A-1', 'A-2', NO_REF, NO_REF]);
     });
 });
 
