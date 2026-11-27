@@ -1,31 +1,28 @@
 // @ts-check
 /**
  * The blocks of the report model as PDF content. Every text is the model's string, written as it is (the model has
- * already formatted the numbers, the dates and the units): this file chooses where it goes on the page, and nothing
- * else, so the page and the PDF cannot differ in what they say.
+ * already formatted the numbers, the dates and the units): this file chooses where it goes on the page and how it looks,
+ * and nothing else, so the page and the PDF cannot differ in what they say.
  *
  * Content is pdfmake document-definition nodes: plain data, with no DOM and no PDF library loaded.
  */
 import { markdownToPdf } from '@/libs/reports/pdf/pdfMarkdown';
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
+import { INK, MUTED, RULE, SUBTLE, TRACK, WHITE, INFO_FILL, WARNING_FILL, tint, textOn, toneColour } from '@/libs/reports/pdf/pdfTheme';
+import { shade } from '@/libs/reports/reportStyling';
 import { qrSvg } from '@/libs/qr';
 import { isOriginUrl } from '@/libs/originUrl';
 import { MISSING_PHOTO, figureCaption } from '@/libs/reports/reportSections';
 
-export const INK = '#1f2937';
-export const MUTED = '#64748b';
-const RULE = '#cbd5e1';
-const HEADER_FILL = '#f1f5f9';
-const INFO_FILL = '#e0f2fe';
-// The yellow of a warning, with dark text
-const WARNING_FILL = '#fef08a';
-/** The box of the logo on the cover, in points */
-const COVER_LOGO = Object.freeze({ width: 180, height: 60 });
+export { INK, MUTED };
+
 /** The side of a QR code on the page, in points */
 const QR_POINTS = 76;
 const PHOTO_GAP = 10;
 /** The most photos in a row, by the orientation of the page */
-const PHOTOS_PER_ROW = Object.freeze({ portrait: 2, landscape: 3 });
+export const PHOTOS_PER_ROW = Object.freeze({ portrait: 3, landscape: 6 });
+/** The gap between two tiles of a row, in points */
+const TILE_GAP = 8;
 
 /**
  * @typedef {object} BlockContext
@@ -41,7 +38,33 @@ const PHOTOS_PER_ROW = Object.freeze({ portrait: 2, landscape: 3 });
  */
 
 /** A text that is the model's, in the style named. @param {string} text @param {string} style */
-const line = (text, style) => ({ text, style });
+export const line = (text, style) => ({ text, style });
+
+/** No lines and no padding: a table used to place things, not to draw a grid */
+const PLAIN = Object.freeze({
+    hLineWidth: () => 0, vLineWidth: () => 0,
+    paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0
+});
+
+/**
+ * A badge: its text on a light fill of its colour, in its colour (white on its colour for a strong one).
+ * @param {{ label: string, colour: string, tone?: string }} badge @param {number} [fontSize]
+ */
+export function badgeText(badge, fontSize = 8) {
+    const strong = badge.tone === 'alert';
+    return {
+        text: `\u00a0${badge.label}\u00a0`,
+        background: strong ? badge.colour : tint(badge.colour, 0.82),
+        color: strong ? WHITE : shade(badge.colour, 0.4),
+        bold: true,
+        fontSize
+    };
+}
+
+/** The badges of an item on one line, a space between two. @param {any[]} badges @param {number} [fontSize] */
+export function badgeLine(badges, fontSize = 8) {
+    return { text: badges.flatMap((/** @type {any} */ b, /** @type {number} */ i) => [...(i ? [{ text: '  ', fontSize }] : []), badgeText(b, fontSize)]), lineHeight: 1.4 };
+}
 
 /**
  * The figure of an image that was prepared: the image in its box, then its caption (what it shows, the note of the
@@ -51,11 +74,14 @@ const line = (text, style) => ({ text, style });
  * @param {{ widthPt: number, heightPt: number }} box
  * @param {string} alt  what it shows
  */
-function figure(block, made, box, alt) {
+export function figure(block, made, box, alt) {
     const image = made?.image ?? null;
     return {
         stack: [
-            ...(image ? [{ image: image.dataUrl, fit: [box.widthPt, box.heightPt], alignment: 'left' }] : []),
+            ...(image ? [{
+                table: { widths: ['auto'], body: [[{ image: image.dataUrl, fit: [box.widthPt, box.heightPt] }]] },
+                layout: { hLineWidth: () => 0.6, vLineWidth: () => 0.6, hLineColor: () => RULE, vLineColor: () => RULE, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 }
+            }] : [{ text: '', margin: [0, 2, 0, 0] }]),
             line(figureCaption(alt, block.note, made?.note), 'caption')
         ],
         unbreakable: true,
@@ -63,96 +89,216 @@ function figure(block, made, box, alt) {
     };
 }
 
+/**
+ * The figure of a block that is an image (a map, a 3D capture, a chart), in its box.
+ * @param {any} block @param {BlockContext} ctx
+ * @param {{ maxHeight?: number, maxWidth?: number }} [options]  the room the image has on its page (its column), in points
+ */
+export function figureOf(block, ctx, { maxHeight = Infinity, maxWidth = Infinity } = {}) {
+    const alt = block.type === 'capture3d' ? block.text : block.alt;
+    const box = figureBox(ctx.layout, block);
+    const scale = Math.min(1, Math.max(0.2, Math.min(maxHeight / box.heightPt, maxWidth / box.widthPt)));
+    const node = figure(block, ctx.assets.figures.get(block), { widthPt: box.widthPt * scale, heightPt: box.heightPt * scale }, alt);
+    // The legend of a map stays with it
+    if (block.type === 'mapSnapshot') node.stack.push(...legendNodes(block.legend));
+    return [node];
+}
+
 /** @param {{ id: string | null, name: string, colour: string }[]} legend @returns {any[]} */
 function legendNodes(legend) {
     if (!legend?.length) return [];
     return [{
-        columns: legend.flatMap(entry => [
-            { canvas: [{ type: 'rect', x: 0, y: 2, w: 8, h: 8, color: entry.colour }], width: 12 },
-            { text: entry.name, width: 'auto', fontSize: 8, margin: [0, 0, 10, 0] }
+        text: legend.flatMap((entry, i) => [
+            ...(i ? [{ text: '    ' }] : []),
+            { text: '■ ', color: entry.colour, fontSize: 11 },
+            { text: entry.name, color: INK }
         ]),
-        columnGap: 0,
-        margin: [0, 0, 0, 8]
+        fontSize: 8,
+        margin: [0, 0, 0, 10]
     }];
+}
+
+/**
+ * The title of a section: its name in the primary colour over a short bar of the accent colour.
+ * @param {any} block @param {BlockContext} ctx
+ */
+function sectionTitle(block, ctx) {
+    return {
+        stack: [
+            { text: block.text, style: 'h1', tocItem: true, tocStyle: { bold: true, fontSize: 10.5 }, tocMargin: [0, 6, 0, 0] },
+            { canvas: [{ type: 'rect', x: 0, y: 0, w: 46, h: 3, color: ctx.colours.accent }], margin: [0, 0, 0, 14] }
+        ]
+    };
 }
 
 /** @param {any} block @param {BlockContext} ctx */
 function heading(block, ctx) {
     if (ctx.section.kind === 'cover') return line(block.text, block.level === 1 ? 'coverTitle' : 'coverSubtitle');
-    if (block.level === 1) return { ...line(block.text, 'h1'), tocItem: true, tocStyle: { bold: true, fontSize: 10.5 }, tocMargin: [0, 6, 0, 0] };
+    if (block.level === 1) return sectionTitle(block, ctx);
     const node = /** @type {Record<string, any>} */ (line(block.text, block.level === 2 ? 'h2' : 'h3'));
     if (block.anchor && !ctx.used.has(block.anchor)) {
         ctx.used.add(block.anchor);
         node.id = block.anchor;
     }
-    if (block.itemId) {
-        // Each item has a page of its own, unless it follows the heading of its section on the page it is on
-        const first = ctx.previous?.type === 'heading' && ctx.previous.level === 1;
-        Object.assign(node, { tocItem: true, tocStyle: { fontSize: 9 }, tocMargin: [14, 0, 0, 0], ...(first ? {} : { pageBreak: 'before' }) });
-    }
     return node;
 }
 
-/** @param {{ label: string, value: string }[]} rows */
-function keyValue(rows) {
+/** @param {{ label: string, value: string }[]} rows @param {number} [labelWidth] */
+export function keyValue(rows, labelWidth = 110) {
     return {
-        table: { widths: [110, '*'], body: rows.map(row => [{ text: row.label, color: MUTED, fontSize: 9 }, { text: row.value, fontSize: 9.5 }]) },
-        layout: 'noBorders',
-        margin: [0, 0, 0, 8]
+        table: { widths: [labelWidth, '*'], body: rows.map(row => [{ text: row.label, color: MUTED, fontSize: 8.5 }, { text: row.value, fontSize: 9.5, bold: true }]) },
+        layout: {
+            hLineWidth: (/** @type {number} */ i, /** @type {any} */ node) => (i === 0 || i === node.table.body.length ? 0 : 0.5),
+            vLineWidth: () => 0, hLineColor: () => TRACK,
+            paddingLeft: () => 0, paddingRight: () => 6, paddingTop: () => 3.5, paddingBottom: () => 3.5
+        },
+        margin: [0, 0, 0, 10]
     };
+}
+
+/**
+ * Tiles in a row: each a light fill with a bar of its colour on top. A row has `perRow` tiles at most; the last row
+ * keeps the width of a tile.
+ * @param {{ colour: string, stack: any[] }[]} tiles @param {number} perRow @param {number} contentWidth
+ */
+export function tileRows(tiles, perRow, contentWidth) {
+    const width = (contentWidth - TILE_GAP * (perRow - 1)) / perRow;
+    /** @type {any[]} */
+    const rows = [];
+    for (let i = 0; i < tiles.length; i += perRow) {
+        rows.push({
+            columns: tiles.slice(i, i + perRow).map(tile => ({
+                width,
+                table: {
+                    widths: ['*'],
+                    body: [
+                        [{ text: '', fillColor: tile.colour, margin: [0, 1.5, 0, 0] }],
+                        [{ stack: tile.stack, fillColor: tint(tile.colour, 0.92), margin: [9, 7, 9, 8] }]
+                    ]
+                },
+                layout: PLAIN
+            })),
+            columnGap: TILE_GAP,
+            margin: [0, 0, 0, TILE_GAP],
+            unbreakable: true
+        });
+    }
+    return rows;
+}
+
+/**
+ * The headline figures as tiles: the number large in the colour of its tone, its name and what it means under it.
+ * @param {any} block @param {BlockContext} ctx @param {{ perRow?: number, width?: number }} [options]
+ */
+export function kpiTiles(block, ctx, { perRow, width } = {}) {
+    const tiles = block.tiles.map((/** @type {any} */ kpi) => {
+        const colour = toneColour(kpi.tone, ctx.colours);
+        return {
+            colour,
+            stack: [
+                { text: kpi.value, fontSize: 22, bold: true, color: colour, lineHeight: 1 },
+                { text: kpi.label, fontSize: 8, bold: true, color: INK, characterSpacing: 0.3, margin: [0, 3, 0, 0] },
+                { text: kpi.detail, fontSize: 7.5, color: MUTED }
+            ]
+        };
+    });
+    return tileRows(tiles, perRow ?? tiles.length, width ?? ctx.layout.contentWidth);
 }
 
 /** @param {any} block @param {BlockContext} ctx */
 function table(block, ctx) {
     const align = (/** @type {string} */ a) => (a === 'right' ? 'right' : 'left');
-    const header = block.columns.map((/** @type {any} */ c) => ({ text: c.label, style: 'tableHeader', alignment: align(c.align) }));
+    const header = block.columns.map((/** @type {any} */ c) => ({ text: c.label, style: 'tableHeader', color: textOn(ctx.colours.primary), alignment: align(c.align) }));
     const body = block.rows.map((/** @type {any} */ row) => block.columns.map((/** @type {any} */ column, /** @type {number} */ index) => {
         const text = row.cells[column.key] ?? '';
         const note = row.note && column.key === 'name' ? ` (${row.note})` : '';
         const cell = /** @type {Record<string, any>} */ ({ text: `${text}${note}`, style: 'tableCell', alignment: align(column.align) });
+        // Only the name, a path and an assignee wrap: a value, a reference or a status stays on one line
+        if (!['name', 'path', 'assignee'].includes(column.key)) cell.noWrap = true;
+        const marks = row.marks;
+        // A category or severity has a square of its colour; a status is written in its colour, red when overdue
+        if (marks && (column.key === 'category' || column.key === 'severity') && marks[column.key]) {
+            cell.text = [{ text: '■ ', color: marks[column.key] }, { text }];
+        } else if (marks && column.key === 'status' && marks.status) {
+            Object.assign(cell, { color: marks.overdue ? '#dc2626' : marks.status, bold: true });
+        }
         // The first column names the row: it jumps to the page of the item when the report has one
         const destination = row.anchor ? String(row.anchor).replace(/^#/, '') : '';
+        if (index === 0) Object.assign(cell, { bold: true });
         if (index === 0 && destination && ctx.destinations.has(destination)) Object.assign(cell, { linkToDestination: destination, color: ctx.colours.primary });
         return cell;
     }));
     return [
-        { ...line(block.title, 'tableTitle') },
+        { text: block.title, style: 'tableTitle', color: ctx.colours.primary },
         {
-            table: { headerRows: 1, dontBreakRows: true, widths: block.columns.map(() => 'auto'), body: [header, ...body] },
+            table: { headerRows: 1, dontBreakRows: true, widths: block.columns.map((/** @type {any} */ c) => (c.key === 'name' ? '*' : 'auto')), body: [header, ...body] },
             layout: {
-                hLineWidth: (/** @type {number} */ i, /** @type {any} */ node) => (i === 0 || i === node.table.body.length ? 0 : 0.5),
+                hLineWidth: (/** @type {number} */ i, /** @type {any} */ node) => (i === 0 || i === 1 || i === node.table.body.length ? 0 : 0.5),
                 vLineWidth: () => 0,
-                hLineColor: () => RULE,
-                fillColor: (/** @type {number} */ row) => (row === 0 ? HEADER_FILL : null),
-                paddingLeft: () => 4, paddingRight: () => 4, paddingTop: () => 3, paddingBottom: () => 3
+                hLineColor: () => TRACK,
+                fillColor: (/** @type {number} */ row) => (row === 0 ? ctx.colours.primary : row % 2 === 0 ? SUBTLE : null),
+                paddingLeft: () => 5, paddingRight: () => 5, paddingTop: () => 4, paddingBottom: () => 4
             },
-            margin: [0, 0, 0, 10]
+            margin: [0, 0, 0, 14]
         }
     ];
 }
 
-/** The summary: the counts and totals, with the texts of the model. @param {any} block */
-function summaryStats(block) {
+/**
+ * A count as a bar: its name, a bar of its colour on a grey track as long as the count is of the largest, the count.
+ * @param {{ label: string, count: number, colour?: string }} count @param {number} max @param {number} track  the length of the track
+ */
+function barRow(count, max, track) {
+    const length = max ? Math.max(2, (count.count / max) * track) : 0;
     return [
-        { text: block.headline, bold: true, margin: [0, 0, 0, 6] },
-        ...(block.totals.length ? [keyValue(block.totals.map((/** @type {any} */ total) => ({
-            label: total.label,
-            value: total.partsText ? `${total.text} (${total.partsText})` : total.text
-        })))] : []),
-        ...(block.groups.length ? [{
-            columns: block.groups.map((/** @type {any} */ group) => ({
-                stack: [{ text: group.title, bold: true, fontSize: 9.5, margin: [0, 0, 0, 3] }, { ul: group.counts.map((/** @type {any} */ count) => ({ text: `${count.label}: ${count.count}`, fontSize: 9 })) }]
-            })),
-            columnGap: 12,
-            margin: [0, 0, 0, 8]
-        }] : [])
+        { text: count.label, fontSize: 8.5, color: INK, margin: [0, 1, 4, 0] },
+        { canvas: [{ type: 'rect', x: 0, y: 3, w: track, h: 7, r: 3.5, color: TRACK }, { type: 'rect', x: 0, y: 3, w: length, h: 7, r: 3.5, color: count.colour || MUTED }] },
+        { text: String(count.count), fontSize: 8.5, bold: true, alignment: 'right', margin: [0, 1, 0, 0] }
     ];
 }
 
-/** @param {any} block @param {BlockContext} ctx */
-function photoGrid(block, ctx) {
-    const perRow = PHOTOS_PER_ROW[ctx.layout.pageOrientation];
-    const width = (ctx.layout.contentWidth - PHOTO_GAP * (perRow - 1)) / perRow;
+/** The summary: the totals as tiles, then the counts as bars. @param {any} block @param {BlockContext} ctx */
+function summaryStats(block, ctx) {
+    const landscape = ctx.layout.pageOrientation === 'landscape';
+    const totals = block.totals.map((/** @type {any} */ total) => ({
+        colour: ctx.colours.accent,
+        stack: [
+            { text: total.label, fontSize: 8, bold: true, color: MUTED, characterSpacing: 0.3 },
+            { text: total.text, fontSize: 14, bold: true, color: INK, margin: [0, 2, 0, 0] },
+            ...(total.partsText ? [{ text: total.partsText, fontSize: 7.5, color: MUTED }] : [])
+        ]
+    }));
+    const perRow = landscape ? 4 : 2;
+    const columnWidth = (ctx.layout.contentWidth - 18 * (perRow - 1)) / perRow;
+    const labelWidth = Math.min(110, columnWidth * 0.42);
+    const track = Math.max(20, columnWidth - labelWidth - 26 - 8);
+    const groups = block.groups.map((/** @type {any} */ group) => {
+        const max = Math.max(...group.counts.map((/** @type {any} */ c) => c.count), 0);
+        return {
+            width: columnWidth,
+            stack: [
+                { text: group.title, bold: true, fontSize: 10, color: ctx.colours.primary, margin: [0, 0, 0, 5] },
+                { table: { widths: [labelWidth, track, 22], body: group.counts.map((/** @type {any} */ c) => barRow(c, max, track)) }, layout: PLAIN }
+            ],
+            unbreakable: true
+        };
+    });
+    /** @type {any[]} */
+    const rows = [];
+    for (let i = 0; i < groups.length; i += perRow) rows.push({ columns: groups.slice(i, i + perRow), columnGap: 18, margin: [0, 0, 0, 16] });
+    return [
+        { text: block.headline, bold: true, fontSize: 10.5, margin: [0, 0, 0, 8] },
+        ...(totals.length ? [{ text: 'Totals', style: 'tableTitle', color: ctx.colours.primary }, ...tileRows(totals, landscape ? Math.min(5, totals.length) : Math.min(3, totals.length), ctx.layout.contentWidth)] : []),
+        ...(rows.length ? [{ text: 'Breakdown', style: 'tableTitle', color: ctx.colours.primary, margin: [0, 8, 0, 8] }, ...rows] : [])
+    ];
+}
+
+/**
+ * The photos of an item in rows, each with its caption.
+ * @param {any} block @param {BlockContext} ctx @param {{ perRow?: number, width?: number }} [options]
+ */
+export function photoGrid(block, ctx, { perRow = PHOTOS_PER_ROW[ctx.layout.pageOrientation], width: available = ctx.layout.contentWidth } = {}) {
+    const width = (available - PHOTO_GAP * (perRow - 1)) / perRow;
     const cells = block.photos.map((/** @type {any} */ photo) => {
         const image = ctx.assets.photos.get(photo.path) ?? null;
         return {
@@ -177,15 +323,18 @@ function photoGrid(block, ctx) {
     return rows;
 }
 
-/** @param {any} block @param {BlockContext} ctx */
-function qr(block, ctx) {
+/**
+ * The QR code of an address of the Hub, with its label and the address; a code is made only for this Hub.
+ * @param {any} block @param {BlockContext} ctx @param {number} [side]  of the code, in points
+ */
+export function qr(block, ctx, side = QR_POINTS) {
     const label = { text: block.label, bold: true, fontSize: 9 };
     // Only the address of this Hub gets a code: a report cannot print a code for another site
     if (!isOriginUrl(block.url, ctx.origin)) return [{ stack: [label, { text: block.url, fontSize: 8, color: MUTED }], margin: [0, 0, 0, 8] }];
     return [{
         columns: [
-            { svg: qrSvg(ctx.qr(block.url), QR_POINTS), width: QR_POINTS },
-            { stack: [label, { text: block.url, fontSize: 8, color: MUTED, link: block.url, margin: [0, 2, 0, 0] }], margin: [10, 4, 0, 0] }
+            { svg: qrSvg(ctx.qr(block.url), side), width: side },
+            { stack: [label, { text: block.url, fontSize: 7.5, color: MUTED, link: block.url, margin: [0, 2, 0, 0] }], margin: [10, 4, 0, 0] }
         ],
         unbreakable: true,
         margin: [0, 4, 0, 8]
@@ -195,25 +344,41 @@ function qr(block, ctx) {
 /** @param {any} block */
 function note(block) {
     return {
-        table: { widths: ['*'], body: [[{ text: block.text, fontSize: 9.5, color: INK, fillColor: block.tone === 'warning' ? WARNING_FILL : INFO_FILL, margin: [4, 3, 4, 3] }]] },
+        table: { widths: ['*'], body: [[{ text: block.text, fontSize: 9.5, color: INK, fillColor: block.tone === 'warning' ? WARNING_FILL : INFO_FILL, margin: [6, 4, 6, 4] }]] },
         layout: 'noBorders',
         margin: [0, 0, 0, 8],
         unbreakable: true
     };
 }
 
-/** @param {any} block */
-function signOff(block) {
+/**
+ * A text in a box with a bar of a colour on its left: a description, the disclaimer.
+ * @param {any[]} content @param {string} colour
+ */
+export function callout(content, colour) {
+    return {
+        table: { widths: ['*'], body: [[{ stack: content, fillColor: SUBTLE, margin: [10, 7, 10, 3] }]] },
+        layout: {
+            hLineWidth: () => 0, vLineWidth: (/** @type {number} */ i) => (i === 0 ? 3 : 0), vLineColor: () => colour,
+            paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0
+        },
+        margin: [0, 2, 0, 10]
+    };
+}
+
+/** @param {any} block @param {BlockContext} ctx */
+function signOff(block, ctx) {
     return [
-        ...(block.byline ? [{ text: block.byline, margin: [0, 0, 0, 14] }] : []),
+        ...(block.byline ? [{ text: block.byline, bold: true, margin: [0, 6, 0, 10] }] : []),
         {
             columns: block.lines.map((/** @type {{ label: string }} */ entry) => ({
-                stack: [
-                    { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 150, y2: 0, lineWidth: 0.5, lineColor: MUTED }], margin: [0, 28, 0, 3] },
-                    { text: entry.label, fontSize: 8, color: MUTED }
-                ]
+                table: { widths: ['*'], body: [[{ text: '', margin: [0, 26, 0, 0] }], [{ text: entry.label, fontSize: 8, bold: true, color: MUTED, characterSpacing: 0.3 }]] },
+                layout: {
+                    hLineWidth: (/** @type {number} */ i) => (i === 1 ? 0.8 : 0), vLineWidth: () => 0, hLineColor: () => ctx.colours.primary,
+                    paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 3, paddingBottom: () => 0
+                }
             })),
-            columnGap: 14,
+            columnGap: 24,
             unbreakable: true
         }
     ];
@@ -228,20 +393,21 @@ function signOff(block) {
 export function blockNodes(block, ctx) {
     switch (block.type) {
         // The logo the assets prepared from the model's (the one of the header); none when it could not be read
-        case 'logo': return ctx.assets.logo ? [{ image: ctx.assets.logo.dataUrl, fit: [COVER_LOGO.width, COVER_LOGO.height], margin: [0, 20, 0, 0] }] : [];
+        case 'logo': return ctx.assets.logo ? [{ image: ctx.assets.logo.dataUrl, fit: [180, 60], margin: [0, 20, 0, 0] }] : [];
         case 'heading': return [heading(block, ctx)];
         case 'keyValue': return [keyValue(block.rows)];
+        case 'kpis': return kpiTiles(block, ctx);
         case 'table': return table(block, ctx);
         case 'markdown': return markdownToPdf(block.text, { link: ctx.colours.accent });
         case 'note': return [note(block)];
-        case 'signOff': return signOff(block);
-        case 'summaryStats': return summaryStats(block);
+        case 'signOff': return signOff(block, ctx);
+        case 'summaryStats': return summaryStats(block, ctx);
         case 'photoGrid': return photoGrid(block, ctx);
         case 'qr': return qr(block, ctx);
-        case 'mapSnapshot': return [figure(block, ctx.assets.figures.get(block), figureBox(ctx.layout, block), block.alt), ...legendNodes(block.legend)];
-        case 'chart': return [figure(block, ctx.assets.figures.get(block), figureBox(ctx.layout, block), block.alt)];
-        // With no capture the model says so ("No 3D snapshot"); with one that could not be read, the note says why
-        case 'capture3d': return [figure(block, ctx.assets.figures.get(block), figureBox(ctx.layout, block), block.text)];
+        // A 3D capture with none says so ("No 3D snapshot"); one that could not be read, the note says why
+        case 'mapSnapshot':
+        case 'chart':
+        case 'capture3d': return figureOf(block, ctx);
         default: return [];
     }
 }

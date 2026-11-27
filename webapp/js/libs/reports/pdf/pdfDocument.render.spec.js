@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { buildPdfDocument } from '@/libs/reports/pdf/pdfDocument';
-import { fullAssets, options, pdfModel } from '@/libs/reports/pdf/pdfDocument.fixtures';
+import { fullAssets, options, pdfModel, threeItems, JPEG_URL } from '@/libs/reports/pdf/pdfDocument.fixtures';
+import { definitionOf } from '@/libs/reports/reportModel.fixtures';
 
 let pdfMake;
 beforeAll(async () => {
@@ -51,5 +52,29 @@ describe('the PDF pdfmake writes', () => {
         const model = pdfModel();
         const { blob } = await render(model, { logo: null, figures: new Map(), photos: new Map() });
         expect(blob.size).toBeGreaterThan(5000);
+    }, 60000);
+
+    it('fits the cover on its page, with a tall map and facts on two lines, on every paper and orientation: the contents are on page 2', async () => {
+        for (const paper of ['A4', 'Letter']) {
+            for (const orientation of ['portrait', 'landscape']) {
+                const definition = definitionOf(['a.geojson'], {
+                    preparedBy: 'A. Kaczmarek — Northbank Geomatics, field services',
+                    preparedFor: 'Reserve management of the municipality (sample client)',
+                    sections: [{ kind: 'cover', enabled: true }, { kind: 'summary', enabled: true }]
+                });
+                // Twenty items of four categories: a legend of four entries and a caption on two lines under the map
+                const features = Array.from({ length: 20 }, (_, i) => {
+                    const f = threeItems()[i % 3];
+                    return { ...f, id: `i${i}`, properties: { ...f.properties, id: `i${i}`, ref: String(i + 1), category: ['defect', 'safety', 'observation', 'general'][i % 4], status: i % 2 ? 'open' : 'resolved' } };
+                });
+                const model = pdfModel({ features, templateExtra: { paper, orientation, headerText: '' }, input: { definition } });
+                const assets = fullAssets(model);
+                // A map taller than it is wide: the one that fills the most of a page
+                for (const [block, figure] of assets.figures) assets.figures.set(block, { ...figure, image: { dataUrl: JPEG_URL, width: 1000, height: 2000 } });
+                const { text } = await render(model, assets);
+                // cover, contents, summary: a cover that overflows by a margin would add an empty page after it
+                expect(pageCount(text), `${paper} ${orientation}`).toBe(3);
+            }
+        }
     }, 60000);
 });

@@ -66,9 +66,12 @@ describe('the texts of the summary and the sign-off', () => {
     it('are the model\'s: the headline, the parts of a total and the titles of the groups of counts', () => {
         const text = mount(SummaryStatsBlock, { props: { block: summary } }).text();
         expect(text).toContain('Two items, one late');
-        expect(text).toContain('(100 m² 2D, 50 m² 3D)');
+        expect(text).toContain('100 m² 2D, 50 m² 3D');
         expect(text).toContain('Per kind');
-        expect(text).toContain('Points: 2');
+        // A count is its name, its bar and its number
+        const bar = mount(SummaryStatsBlock, { props: { block: summary } }).find('.report-summary-bar');
+        expect(bar.find('.report-summary-bar-label').text()).toBe('Points');
+        expect(bar.find('.report-summary-bar-count').text()).toBe('2');
         expect(text).not.toContain('By kind');
     });
 

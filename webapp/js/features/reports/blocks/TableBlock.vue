@@ -15,7 +15,8 @@
                             <a v-if="row.anchor" :href="row.anchor">{{ row.cells[column.key] }}</a>
                             <template v-else>{{ row.cells[column.key] }}</template>
                         </th>
-                        <td v-else :class="`align-${column.align}`">
+                        <td v-else :class="[`align-${column.align}`, markClass(row, column.key)]" :style="markStyle(row, column.key)">
+                            <span v-if="hasSwatch(row, column.key)" class="report-swatch" :style="{ background: row.marks[column.key] }" aria-hidden="true" />
                             {{ row.cells[column.key] }}
                             <span v-if="row.note && column.key === 'name'" class="report-row-note">({{ row.note }})</span>
                         </td>
@@ -32,9 +33,18 @@
  * values. The text of every cell is the model's.
  */
 defineProps({
-    /** { title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note }] } */
+    /** { title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note, marks }] } */
     block: { type: Object, required: true }
 });
+
+// A category or severity has a square of its colour before its name; a status is written in its colour, red and bold
+// when the item is overdue (its text says "overdue" too)
+/** @param {any} row @param {string} key */
+const hasSwatch = (row, key) => (key === 'category' || key === 'severity') && !!row.marks?.[key];
+/** @param {any} row @param {string} key */
+const markClass = (row, key) => (key === 'status' && row.marks?.status ? (row.marks.overdue ? 'report-status overdue' : 'report-status') : '');
+/** @param {any} row @param {string} key */
+const markStyle = (row, key) => (key === 'status' && row.marks?.status && !row.marks.overdue ? { color: row.marks.status } : undefined);
 </script>
 
 <style scoped>
@@ -51,7 +61,8 @@ defineProps({
 
 caption {
     padding: var(--ddb-spacing-xs) 0;
-    font-weight: 600;
+    color: var(--report-primary, var(--ddb-primary));
+    font-weight: 700;
     text-align: left;
 }
 
@@ -65,7 +76,34 @@ td {
 }
 
 thead th {
+    background: var(--report-primary, var(--ddb-primary));
+    color: var(--report-on-primary, var(--ddb-text-on-color));
+    font-size: var(--ddb-font-size-sm);
+}
+
+tbody tr:nth-child(even) {
     background: var(--ddb-bg-subtle);
+}
+
+tbody th a {
+    font-weight: 700;
+}
+
+.report-swatch {
+    display: inline-block;
+    width: 0.6rem;
+    height: 0.6rem;
+    margin-right: 0.3rem;
+    border-radius: 2px;
+}
+
+.report-status {
+    font-weight: 600;
+}
+
+.report-status.overdue {
+    color: var(--ddb-danger);
+    font-weight: 700;
 }
 
 tbody th {

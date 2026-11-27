@@ -4,10 +4,12 @@
  * compute) that the live page and the PDF both draw:
  *
  *   logo          { type, source: 'template' | 'instance', url, alt }   the logo of the report, first on the cover
- *   heading       { type, level 1-3, text, anchor: 'item-<id>' | null, itemId, viewerUrl }
+ *   heading       { type, level 1-3, text, anchor: 'item-<id>' | null, itemId, viewerUrl }; an item's heading also has
+ *                   ref, name, kind ("Volume · 2D"), colour (of its category) and badges [{ key, label, colour, tone }]
+ *   kpis          { type, tiles: [{ key, label, value, detail, tone }] }   the headline figures (cover and summary)
  *   keyValue      { type, rows: [{ label, value }] }
  *   table         { type, id, title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note }] }
- *   mapSnapshot   { type, kind: 'overview' | 'item', itemId, ref, items, extent, frame, layers, basemap, view,
+ *   mapSnapshot   { type, kind: 'overview' | 'item', placement: 'cover' | 'overview' | 'item', itemId, ref, items, extent, frame, layers, basemap, view,
  *                   coverDeleted, legend, alt, note }   a request: the renderer draws it; the cover and the overview have
  *                   none when no item is drawn and the cover view has no layer (it would be the whole world)
  *   chart         { type, chart: 'profile', itemId, ref, line, elevationLayer, units, note, alt }   a request too; units:
@@ -15,7 +17,8 @@
  *   capture3d     { type, itemId, ref, path, camera, capturedAt, text }   the capture of a 3D item, or "No 3D snapshot"
  *   photoGrid     { type, itemId, photos: [{ path, caption, source, pixel }] }
  *   markdown      { type, text }   markdown the renderer sanitises
- *   summaryStats  { type, total, overdue, headline, totals, groups: [{ key, title, counts }] }   the groups that have counts
+ *   summaryStats  { type, total, overdue, headline, totals, groups: [{ key, title, counts: [{ key, label, count, colour }] }] }
+ *                   the groups that have counts
  *   qr            { type, url, label }
  *   note          { type, tone: 'info' | 'warning', text }
  *   signOff       { type, byline, lines: [{ label }] }   byline: "Prepared by <name>", or empty
@@ -25,6 +28,7 @@ import { SECTION_LABELS } from '@/libs/reports/reportDefaults';
 import { buildTables, itemRows } from '@/libs/reports/reportTables';
 import { countByKind, countByChoice, itemCountText } from '@/libs/reports/reportTotals';
 import { extentOf, frameOf } from '@/libs/reports/reportFrames';
+import { itemBadges, kindLabel, reportKpis, choiceColour, UNSET_COLOUR } from '@/libs/reports/reportStyling';
 
 export const NO_ELEVATION_LAYER = 'No elevation layer in the cover view';
 export const NO_3D_SNAPSHOT = 'No 3D snapshot';
@@ -103,7 +107,7 @@ function legendOf(ctx, drawn) {
  * @param {any[]} drawn  drawnItems
  * @param {ReportItem | null} item
  */
-function mapSnapshot(ctx, drawn, item) {
+function mapSnapshot(ctx, drawn, item, placement = item ? 'item' : 'overview') {
     const geometries = item ? [item.geometry] : drawn.map(i => i.geometry);
     const extent = extentOf(geometries);
     const alt = item
@@ -112,6 +116,8 @@ function mapSnapshot(ctx, drawn, item) {
     return {
         type: /** @type {const} */ ('mapSnapshot'),
         kind: item ? 'item' : 'overview',
+        // Where the map is drawn: the renderers give the cover, the overview page and an item page maps of their own size
+        placement,
         itemId: item ? item.id : null,
         ref: item ? item.displayRef : null,
         items: drawn,
@@ -134,11 +140,17 @@ function mapSnapshot(ctx, drawn, item) {
  */
 const hasMap = (ctx, drawn) => drawn.length > 0 || ctx.cover.layers.length > 0;
 
-/** The overview map of the items, or none when it would show nothing on the earth (hasMap). @param {SectionContext} ctx */
-function overviewMap(ctx) {
+/**
+ * The overview map of the items, or none when it would show nothing on the earth (hasMap).
+ * @param {SectionContext} ctx @param {'cover' | 'overview'} placement
+ */
+function overviewMap(ctx, placement) {
     const drawn = drawnItems(ctx);
-    return hasMap(ctx, drawn) ? [mapSnapshot(ctx, drawn, null)] : [];
+    return hasMap(ctx, drawn) ? [mapSnapshot(ctx, drawn, null, placement)] : [];
 }
+
+/** The headline figures of the items. @param {SectionContext} ctx */
+const kpisBlock = ctx => ({ type: /** @type {const} */ ('kpis'), tiles: reportKpis(ctx.items, ctx.text.schema) });
 
 /** @param {number} level @param {string} text */
 const heading = (level, text) => ({ type: /** @type {const} */ ('heading'), level: /** @type {1 | 2 | 3} */ (level), text, anchor: null, itemId: null, viewerUrl: null });
@@ -184,8 +196,9 @@ function coverSection(ctx) {
         heading(1, definition.title || definition.name),
         ...(definition.subtitle ? [heading(2, definition.subtitle)] : []),
         { type: /** @type {const} */ ('keyValue'), rows },
+        kpisBlock(ctx),
         ...(ctx.cover.deleted ? [warning(COVER_DELETED)] : []),
-        ...overviewMap(ctx),
+        ...overviewMap(ctx, 'cover'),
         ...(ctx.links.reportUrl ? [{ type: /** @type {const} */ ('qr'), url: ctx.links.reportUrl, label: 'Open the live report' }] : [])
     ];
 }
@@ -195,15 +208,19 @@ function summarySection(ctx) {
     const { items, text } = ctx;
     const overdue = items.filter(i => i.overdue).length;
     const total = itemCountText(items.length);
+    // Each count has the colour of what it counts (a kind the accent of the template, a value not set grey)
+    const coloured = (/** @type {'category' | 'severity' | 'status'} */ field, /** @type {any[]} */ counts) =>
+        counts.map(c => ({ ...c, colour: c.key ? choiceColour(text.schema, field, c.key) : UNSET_COLOUR }));
     const groups = [
-        { key: 'kind', title: 'By kind', counts: countByKind(items) },
-        { key: 'category', title: 'By category', counts: countByChoice(items, 'category', text.schema.categories) },
-        { key: 'severity', title: 'By severity', counts: countByChoice(items, 'severity', text.schema.severities) },
-        { key: 'status', title: 'By status', counts: countByChoice(items, 'status', text.schema.statuses) }
+        { key: 'kind', title: 'By kind', counts: countByKind(items).map(c => ({ ...c, colour: ctx.template.accent })) },
+        { key: 'category', title: 'By category', counts: coloured('category', countByChoice(items, 'category', text.schema.categories)) },
+        { key: 'severity', title: 'By severity', counts: coloured('severity', countByChoice(items, 'severity', text.schema.severities)) },
+        { key: 'status', title: 'By status', counts: coloured('status', countByChoice(items, 'status', text.schema.statuses)) }
     ];
     return [
         heading(1, SECTION_LABELS.summary),
         ...problemNotes(ctx),
+        kpisBlock(ctx),
         {
             type: /** @type {const} */ ('summaryStats'),
             total: { count: items.length, text: total },
@@ -217,7 +234,7 @@ function summarySection(ctx) {
 
 /** @param {SectionContext} ctx */
 function overviewSection(ctx) {
-    const map = overviewMap(ctx);
+    const map = overviewMap(ctx, 'overview');
     return [
         heading(1, SECTION_LABELS.overview),
         ...(ctx.cover.deleted ? [warning(COVER_DELETED)] : []),
@@ -257,7 +274,10 @@ function visualBlocks(ctx, item, drawn) {
 function itemPage(ctx, item, drawn) {
     const viewerUrl = item.numbered && ctx.links.viewerUrl ? ctx.links.viewerUrl(item) : null;
     return [
-        { type: /** @type {const} */ ('heading'), level: /** @type {const} */ (2), text: `${item.displayRef} ${item.name}`.trim(), anchor: anchorOf(item), itemId: item.id, viewerUrl },
+        {
+            type: /** @type {const} */ ('heading'), level: /** @type {const} */ (2), text: `${item.displayRef} ${item.name}`.trim(), anchor: anchorOf(item), itemId: item.id, viewerUrl,
+            ref: item.displayRef, name: item.name, kind: kindLabel(item), colour: colourOf(ctx, item), badges: itemBadges(item, ctx.text.schema)
+        },
         { type: /** @type {const} */ ('keyValue'), rows: itemRows(item, ctx.text) },
         ...visualBlocks(ctx, item, drawn),
         ...(item.description ? [{ type: /** @type {const} */ ('markdown'), text: item.description }] : []),

@@ -1,12 +1,15 @@
 <template>
-    <div class="report-qr" data-block="qr">
+    <div class="report-qr" :class="{ compact }" data-block="qr">
         <!-- The code is a picture of the address, which is also written out: the code is no way to read it for a screen reader -->
         <svg v-if="code" class="report-qr-code" role="img" :aria-label="`QR code: ${block.label}`" :viewBox="`0 0 ${code.size} ${code.size}`"
              shape-rendering="crispEdges" data-testid="qr-code">
             <rect :width="code.size" :height="code.size" fill="#fff" />
             <path :d="code.path" fill="#000" />
         </svg>
-        <p class="report-qr-text">
+        <p v-if="compact" class="report-qr-label">
+            <a :href="block.url">{{ block.label }}</a>
+        </p>
+        <p v-else class="report-qr-text">
             {{ block.label }}: <a :href="block.url">{{ block.url }}</a>
         </p>
     </div>
@@ -23,7 +26,9 @@ import { isOriginUrl } from '@/libs/originUrl';
 
 const props = defineProps({
     /** { url, label } */
-    block: { type: Object, required: true }
+    block: { type: Object, required: true },
+    /** A small code with its label under it (the cover and the card of an item), the address being the link of the label */
+    compact: { type: Boolean, default: false }
 });
 
 /** @type {import('vue').Ref<{ size: number, path: string } | null>} */
@@ -55,6 +60,23 @@ watch(() => props.block.url, async url => {
     flex: none;
     width: 7rem;
     height: 7rem;
+}
+
+.report-qr.compact {
+    flex-direction: column;
+    gap: var(--ddb-spacing-xs);
+    margin: 0;
+}
+
+.report-qr.compact .report-qr-code {
+    width: 4.5rem;
+    height: 4.5rem;
+}
+
+.report-qr-label {
+    margin: 0;
+    font-size: var(--ddb-font-size-xs, 0.75rem);
+    text-align: center;
 }
 
 .report-qr-text {

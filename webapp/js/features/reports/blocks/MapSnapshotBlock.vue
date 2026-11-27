@@ -1,5 +1,5 @@
 <template>
-    <div ref="root" class="report-snapshot">
+    <div ref="root" class="report-snapshot" :class="`placement-${block.placement || block.kind}`">
         <FigureFrame data-block="mapSnapshot" :label="block.alt" :caption="caption" icon="fa-regular fa-map" :image="url"
                      :error="error" retryable :busy="state === 'rendering'" @retry="retry" />
     </div>
@@ -30,3 +30,10 @@ watch(() => props.block, retry);
 
 const caption = computed(() => figureCaption(props.block.alt, props.block.note, note.value));
 </script>
+
+<style scoped>
+/* The overview map takes the width of the page */
+.placement-overview :deep(.report-figure-frame) {
+    max-width: none;
+}
+</style>

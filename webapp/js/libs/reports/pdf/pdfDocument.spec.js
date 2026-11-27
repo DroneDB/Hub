@@ -6,7 +6,7 @@ import { ORIGIN, REPORT_URL, JPEG_URL, fullAssets, nodesOf, noAssets, options, p
 import { mapFeature } from '@/libs/reports/reportModel.fixtures';
 
 const build = (model, assets) => buildPdfDocument(model, options(model, assets));
-const headings = content => nodesOf(content).filter(n => ['h1', 'h2', 'h3', 'coverTitle', 'coverSubtitle'].includes(n.style));
+const headings = content => nodesOf(content).filter(n => ['h1', 'h2', 'h3', 'coverTitle', 'coverSubtitle', 'itemEntry'].includes(n.style));
 const qrNodes = content => nodesOf(content).filter(n => typeof n.svg === 'string');
 
 describe('the page', () => {
@@ -60,22 +60,30 @@ describe('the header and the footer', () => {
         expect(nodesOf(build(model, noAssets()).content).some(n => n.image)).toBe(false);
     });
 
+    it('has no header on the cover, which has a top of its own', () => {
+        const model = pdfModel();
+        expect(build(model, fullAssets(model)).header(1, 9)).toBeNull();
+        // A report with no cover has the header on its first page
+        const noCover = { ...model, sections: model.sections.filter(s => s.kind !== 'cover') };
+        expect(build(noCover, fullAssets(model)).header(1, 9)).not.toBeNull();
+    });
+
     it('has no logo when the report has none, and no header text when the template has none', () => {
         const model = pdfModel({ templateExtra: { headerText: '' } });
-        const header = build(model).header(1, 1);
+        const header = build(model).header(2, 2);
         expect(nodesOf(header).some(n => n.image)).toBe(false);
         expect(textsOf(header)).toEqual(['Inspection']);
     });
 
     it('has the footer text and "n / total" in the footer, for the page and the page count the library gives', () => {
         const footer = build(pdfModel()).footer(2, 7);
-        expect(textsOf(footer)).toEqual(['Confidential', '2 / 7']);
-        expect(textsOf(build(pdfModel()).footer(7, 7))).toContain('7 / 7');
+        expect(textsOf(footer).map(t => t.trim())).toEqual(['Confidential', '2 / 7']);
+        expect(textsOf(build(pdfModel()).footer(7, 7)).map(t => t.trim())).toContain('7 / 7');
     });
 
     it('has the page number alone when the template has no footer text', () => {
         const footer = build(pdfModel({ templateExtra: { footerText: '' } })).footer(1, 3);
-        expect(textsOf(footer)).toEqual(['1 / 3']);
+        expect(textsOf(footer).map(t => t.trim())).toEqual(['1 / 3']);
     });
 });
 
@@ -85,7 +93,8 @@ describe('the contents', () => {
         const nodes = nodesOf(content);
         const tocIndex = content.findIndex(n => n.toc);
         expect(tocIndex).toBeGreaterThan(0);
-        expect(textOf(content[tocIndex].toc.title)).toBe(CONTENTS_TITLE);
+        // its title, then the bar of the accent colour, then the list
+        expect(textOf(content[tocIndex - 2])).toBe(CONTENTS_TITLE);
         // the cover is before it and is not listed; each other section and each item is
         const listed = nodes.filter(n => n.tocItem).map(textOf);
         expect(listed).toEqual(expect.arrayContaining(['Summary', 'Overview map', 'Tables', 'Items', 'Notes', '1 Point 1', '2 Line 2', '3 Gate']));
@@ -95,7 +104,9 @@ describe('the contents', () => {
     it('starts with the contents when the cover is switched off', () => {
         const model = pdfModel({ input: {} });
         const noCover = { ...model, sections: model.sections.filter(s => s.kind !== 'cover') };
-        expect(build(noCover).content[0].toc).toBeDefined();
+        const { content } = build(noCover);
+        expect(textOf(content[0])).toBe(CONTENTS_TITLE);
+        expect(content[2].toc).toBeDefined();
     });
 
     it('has no contents when there is nothing to list', () => {
@@ -126,7 +137,7 @@ describe('the sections and their values: the page and the PDF are the same repor
     it('has the items in the order of the model, the unnumbered last', () => {
         const model = pdfModel({ features: threeItems({ unnumbered: true }) });
         const expected = model.items.map(i => `${i.displayRef} ${i.name}`.trim());
-        const got = nodesOf(build(model).content).filter(n => n.tocItem && n.style === 'h2').map(textOf);
+        const got = nodesOf(build(model).content).filter(n => n.tocItem && n.style === 'itemEntry').map(textOf);
         expect(got).toEqual(expected);
         expect(got.at(-1)).toMatch(/Draft$/);
     });
@@ -146,15 +157,33 @@ describe('the sections and their values: the page and the PDF are the same repor
         });
     });
 
-    it('writes the key values of every item as the model wrote them', () => {
-        const model = pdfModel();
-        const all = textsOf(build(model).content);
+    it('writes the key values of every block as the model wrote them; the reference, name, category, severity and status of an item are in its header', () => {
+        const model = pdfModel({ features: threeItems().map((f, i) => ({ ...f, properties: { ...f.properties, category: 'defect', severity: 'high', status: i ? 'open' : 'resolved' } })) });
+        const all = textsOf(build(model).content).map(t => t.replace(/\u00a0/g, ' ').trim());
+        const inHeader = new Set(['reference', 'name', 'category', 'severity', 'status']);
         for (const block of model.sections.flatMap(s => s.blocks).filter(b => b.type === 'keyValue')) {
             for (const row of block.rows) {
+                if (row.key && inHeader.has(row.key)) {
+                    // A status is its badge: "Open (overdue)" is "Open" and the Overdue badge
+                    expect(all).toContain(row.value.replace(/ \(overdue\)$/, ''));
+                    continue;
+                }
                 expect(all).toContain(row.label);
                 expect(all).toContain(row.value);
             }
         }
+    });
+
+    it('draws the header card of an item: its reference on its colour, its name and kind, and its badges', () => {
+        const model = pdfModel({ features: threeItems().map(f => ({ ...f, properties: { ...f.properties, category: 'defect', status: 'open', dueDate: '2020-01-01' } })) });
+        const heading = model.sections.flatMap(s => s.blocks).find(b => b.type === 'heading' && b.itemId);
+        const nodes = nodesOf(build(model).content);
+        const square = nodes.find(n => n.text === heading.ref && n.fillColor === heading.colour);
+        expect(square).toBeDefined();
+        expect(nodes.some(n => n.text === heading.name)).toBe(true);
+        expect(nodes.some(n => n.text === heading.kind)).toBe(true);
+        const badges = nodes.flatMap(n => (Array.isArray(n.text) ? n.text : [])).filter(run => run.background && run.bold).map(run => run.text.replace(/\u00a0/g, '').trim());
+        expect(badges).toEqual(expect.arrayContaining(['Defect', 'Open', 'Overdue']));
     });
 
     it('writes the summary counts and totals as the page does', () => {
@@ -164,7 +193,11 @@ describe('the sections and their values: the page and the PDF are the same repor
         expect(all).toContain(summary.headline);
         for (const group of summary.groups) {
             expect(all).toContain(group.title);
-            for (const count of group.counts) expect(all).toContain(`${count.label}: ${count.count}`);
+            // A count is a bar between its name and its number
+            for (const count of group.counts) {
+                expect(all).toContain(count.label);
+                expect(all).toContain(String(count.count));
+            }
         }
     });
 
@@ -321,11 +354,11 @@ describe('the images', () => {
         expect(texts).toContain('The crack');
     });
 
-    it('put the photos in rows of two on a portrait page and three on a landscape one', () => {
+    it('put the photos in rows of three on a portrait page, and in rows of three under the map on a landscape one', () => {
         const photos = Array.from({ length: 5 }, (_, i) => ({ path: `p/${i}.jpg`, source: 'dataset' }));
         const features = [threeItems()[2]].map(f => ({ ...f, properties: { ...f.properties, photos } }));
-        const rowsOf = model => nodesOf(build(model, fullAssets(model)).content).filter(n => n.columns && n.columns.every(c => c.stack && c.width !== undefined && typeof c.width === 'number'));
-        expect(rowsOf(pdfModel({ features })).map(r => r.columns.length)).toEqual([2, 2, 1]);
+        const rowsOf = model => nodesOf(build(model, fullAssets(model)).content).filter(n => n.columns && n.columns.every(c => typeof c.width === 'number' && c.stack?.[0]?.image && c.stack[0].fit));
+        expect(rowsOf(pdfModel({ features })).map(r => r.columns.length)).toEqual([3, 2]);
         expect(rowsOf(pdfModel({ features, templateExtra: { orientation: 'landscape' } })).map(r => r.columns.length)).toEqual([3, 2]);
     });
 });

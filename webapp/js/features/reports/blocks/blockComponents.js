@@ -17,6 +17,7 @@ import ChartBlock from './ChartBlock.vue';
 import Capture3dBlock from './Capture3dBlock.vue';
 import QrBlock from './QrBlock.vue';
 import LogoBlock from './LogoBlock.vue';
+import KpisBlock from './KpisBlock.vue';
 
 export const BLOCK_COMPONENTS = Object.freeze({
     heading: HeadingBlock,
@@ -31,5 +32,6 @@ export const BLOCK_COMPONENTS = Object.freeze({
     chart: ChartBlock,
     capture3d: Capture3dBlock,
     qr: QrBlock,
-    logo: LogoBlock
+    logo: LogoBlock,
+    kpis: KpisBlock
 });

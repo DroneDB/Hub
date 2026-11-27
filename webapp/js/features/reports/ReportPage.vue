@@ -14,7 +14,7 @@
                        :back-to="datasetLocation" back-label="Back to the dataset" />
 
         <div v-else-if="model" class="report-page">
-            <article class="report-document" :aria-label="`Report ${model.name}`">
+            <article class="report-document" :aria-label="`Report ${model.name}`" :style="templateColours">
                 <PrimeMessage v-if="anchorMissing" severity="warn" :closable="false" role="alert" class="report-notice" data-testid="item-missing">
                     This item is no longer in this report
                 </PrimeMessage>
@@ -50,6 +50,7 @@ import { setTitle } from '@/libs/utils';
 import { loadErrorKind } from '@/libs/ddb/apiError';
 import { itemOfAnchor } from '@/libs/views/viewLinks';
 import { photoEntries } from '@/libs/reports/photoFiles';
+import { textOn } from '@/libs/reports/reportStyling';
 import ReportBar from './ReportBar.vue';
 import ReportExport from './ReportExport.vue';
 import ReportSection from './ReportSection.vue';
@@ -104,6 +105,13 @@ watch([model, () => route.hash], async () => {
 }, { flush: 'post', immediate: true });
 
 watch(model, current => { if (current) setTitle(`${current.name} - Report`); }, { immediate: true });
+
+// The colours of the template, which the cover, the titles, the tables and the tiles take
+const templateColours = computed(() => {
+    const template = model.value?.template;
+    if (!template) return {};
+    return { '--report-primary': template.primary, '--report-accent': template.accent, '--report-on-primary': textOn(template.primary) };
+});
 </script>
 
 <style scoped>
@@ -115,10 +123,25 @@ watch(model, current => { if (current) setTitle(`${current.name} - Report`); }, 
     overflow-x: hidden;
 }
 
+.report-page {
+    background: var(--ddb-bg-subtle);
+}
+
 .report-document {
-    max-width: 60rem;
-    margin: 0 auto;
-    padding: var(--ddb-spacing-md);
+    max-width: 64rem;
+    margin: var(--ddb-spacing-lg) auto;
+    padding: var(--ddb-spacing-xl) clamp(var(--ddb-spacing-md), 4vw, 3rem);
+    border-top: 6px solid var(--report-primary, var(--ddb-primary));
+    border-radius: var(--ddb-radius-md, 0.5rem);
+    background: var(--ddb-bg);
+    box-shadow: var(--ddb-shadow-md);
+}
+
+@media (width <= 48rem) {
+    .report-document {
+        margin: 0;
+        border-radius: 0;
+    }
 }
 
 .report-notice {

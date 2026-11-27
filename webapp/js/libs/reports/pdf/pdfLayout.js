@@ -65,16 +65,21 @@ export function frameAspect(frame) {
 }
 
 /**
- * How a block of the model that becomes an image is drawn: `share` of the width of the content, at most
- * `maxHeight` of the height of the content.
+ * How a block of the model that becomes an image is drawn: `share` of the width of the content, at most `maxHeight` of
+ * the height of the content. The layout differs by orientation: on a landscape page the cover map sits beside the facts
+ * of the cover, and the map of an item beside its facts; on a portrait page they are under them, across the page.
  * @param {any} block
+ * @param {'portrait' | 'landscape'} orientation
  * @returns {{ share: number, maxHeight: number, aspect: number }}
  */
-function figureSpec(block) {
-    if (block.type === 'chart') return { share: 1, maxHeight: 0.3, aspect: 0.4 };
-    if (block.type === 'capture3d') return { share: 0.8, maxHeight: 0.4, aspect: 0.6 };
-    if (block.kind === 'item') return { share: 0.8, maxHeight: 0.4, aspect: frameAspect(block.frame) };
-    return { share: 1, maxHeight: 0.55, aspect: frameAspect(block.frame) };
+function figureSpec(block, orientation) {
+    const landscape = orientation === 'landscape';
+    if (block.type === 'chart') return { share: 1, maxHeight: landscape ? 0.34 : 0.28, aspect: 0.4 };
+    if (block.type === 'capture3d') return landscape ? { share: 0.49, maxHeight: 0.5, aspect: 0.6 } : { share: 1, maxHeight: 0.36, aspect: 0.6 };
+    const aspect = frameAspect(block.frame);
+    if (block.placement === 'cover') return landscape ? { share: 0.6, maxHeight: 0.54, aspect } : { share: 1, maxHeight: 0.34, aspect };
+    if (block.kind === 'item') return landscape ? { share: 0.55, maxHeight: 0.4, aspect } : { share: 1, maxHeight: 0.36, aspect };
+    return { share: 1, maxHeight: landscape ? 0.78 : 0.74, aspect };
 }
 
 /**
@@ -85,7 +90,7 @@ function figureSpec(block) {
  * @returns {{ widthPt: number, heightPt: number, widthPx: number, heightPx: number }}
  */
 export function figureBox(layout, block) {
-    const { share, maxHeight, aspect } = figureSpec(block);
+    const { share, maxHeight, aspect } = figureSpec(block, layout.pageOrientation);
     let widthPt = layout.contentWidth * share;
     let heightPt = widthPt * aspect;
     if (heightPt > layout.contentHeight * maxHeight) {

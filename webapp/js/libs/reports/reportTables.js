@@ -11,7 +11,7 @@
  *   report layer when it is projected: a points table gives the coordinates in it too
  *
  * @typedef {{ key: string, label: string, align: 'left' | 'right' }} TableColumn
- * @typedef {{ itemId: string, anchor: string | null, cells: Record<string, string>, note: string | null }} TableRow
+ * @typedef {{ itemId: string, anchor: string | null, cells: Record<string, string>, note: string | null, marks?: ReturnType<typeof rowMarks> }} TableRow
  * @typedef {{ type: 'table', id: string, title: string, columns: TableColumn[], rows: TableRow[] }} TableBlock
  */
 import {
@@ -21,6 +21,7 @@ import {
 import { choiceLabel } from '@/libs/map/annotationIds';
 import { baseMethodName } from '@/libs/stockpileBase';
 import { KIND_ORDER, KIND_LABELS, KIND_SINGULAR, OWNER_TAGS } from '@/libs/reports/reportKinds';
+import { rowMarks } from '@/libs/reports/reportStyling';
 
 /** What the row of a 3D item says when it has no place on a map. */
 export const NOT_GEOREFERENCED = 'Not georeferenced';
@@ -171,9 +172,11 @@ const KIND_TABLES = {
  * @param {Record<string, string>} cells
  * @returns {TableRow}
  */
-function rowOf(item, cells) {
+function rowOf(item, cells, ctx) {
     return {
         itemId: item.id,
+        // The colours of the category, severity and status cells, and whether the item is overdue
+        marks: rowMarks(item, ctx.schema),
         anchor: item.numbered ? `#item-${item.id}` : null,
         cells: { ref: item.displayRef, name: item.name || EMPTY_CELL, type: OWNER_TAGS[item.owner], ...cells },
         note: item.owner === 'pointCloud' && !item.georeferenced ? NOT_GEOREFERENCED : null
@@ -202,7 +205,7 @@ export function buildTables(items, ctx) {
             id: spec.id,
             title: KIND_LABELS[kind],
             columns: [...identityColumns(), ...spec.columns(ctx), column('category', 'Category'), column('status', 'Status')],
-            rows: own.map(item => rowOf(item, { ...spec.cells(item, ctx), category: fieldText(item, 'category', ctx), status: statusText(item, ctx) }))
+            rows: own.map(item => rowOf(item, { ...spec.cells(item, ctx), category: fieldText(item, 'category', ctx), status: statusText(item, ctx) }, ctx))
         });
     }
     const punch = items.filter(i => i.status);
@@ -220,7 +223,7 @@ export function buildTables(items, ctx) {
                 status: statusText(item, ctx),
                 assignee: item.assignee ?? EMPTY_CELL,
                 dueDate: dueDateText(item.dueDate)
-            }))
+            }, ctx))
         });
     }
     return tables;
@@ -230,27 +233,27 @@ export function buildTables(items, ctx) {
  * What an item pages says an item measures and is: label and value pairs, the same text as its table row.
  * @param {import('./reportItems').ReportItem} item
  * @param {TextContext} ctx
- * @returns {{ label: string, value: string }[]}
+ * @returns {{ key: string, label: string, value: string }[]}
  */
 export function itemRows(item, ctx) {
-    /** @type {{ label: string, value: string }[]} */
+    /** @type {{ key: string, label: string, value: string }[]} */
     const rows = [
-        { label: 'Reference', value: item.displayRef },
-        { label: 'Name', value: item.name || EMPTY_CELL },
-        { label: 'Kind', value: `${KIND_SINGULAR[item.kind]} (${OWNER_TAGS[item.owner]})` }
+        { key: 'reference', label: 'Reference', value: item.displayRef },
+        { key: 'name', label: 'Name', value: item.name || EMPTY_CELL },
+        { key: 'kind', label: 'Kind', value: `${KIND_SINGULAR[item.kind]} (${OWNER_TAGS[item.owner]})` }
     ];
     const spec = KIND_TABLES[item.kind];
     const labels = new Map(spec.columns(ctx).map(c => [c.key, c.label]));
     for (const [key, value] of Object.entries(spec.cells(item, ctx))) {
-        if (value !== '') rows.push({ label: labels.get(key) ?? key, value });
+        if (value !== '') rows.push({ key, label: labels.get(key) ?? key, value });
     }
-    if (item.groupName || item.group) rows.push({ label: 'Group', value: item.groupName || item.group || EMPTY_CELL });
+    if (item.groupName || item.group) rows.push({ key: 'group', label: 'Group', value: item.groupName || item.group || EMPTY_CELL });
     rows.push(
-        { label: 'Category', value: fieldText(item, 'category', ctx) },
-        { label: 'Severity', value: fieldText(item, 'severity', ctx) },
-        { label: 'Status', value: statusText(item, ctx) },
-        { label: 'Assignee', value: item.assignee ?? EMPTY_CELL },
-        { label: 'Due date', value: dueDateText(item.dueDate) }
+        { key: 'category', label: 'Category', value: fieldText(item, 'category', ctx) },
+        { key: 'severity', label: 'Severity', value: fieldText(item, 'severity', ctx) },
+        { key: 'status', label: 'Status', value: statusText(item, ctx) },
+        { key: 'assignee', label: 'Assignee', value: item.assignee ?? EMPTY_CELL },
+        { key: 'dueDate', label: 'Due date', value: dueDateText(item.dueDate) }
     );
     return rows;
 }

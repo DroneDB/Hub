@@ -126,7 +126,8 @@ describe('the items', () => {
         const heading = wrapper.find('#item-p1');
         expect(heading.exists()).toBe(true);
         expect(heading.attributes('tabindex')).toBe('-1');
-        const viewer = heading.find('.report-heading-viewer');
+        // The viewer link is in the header of the item's card, beside its heading
+        const viewer = wrapper.find('[data-section-part="item"] .report-item-viewer');
         expect(viewer.attributes('href')).toBe('/r/acme/site/views/v_cover?item=p1');
         expect(viewer.attributes('target')).toBe('_blank');
         expect(viewer.attributes('rel')).toBe('noopener');
@@ -135,7 +136,7 @@ describe('the items', () => {
     it('show an item of a file that is not numbered with a dash and no anchor, viewer action or link in the table', async () => {
         await render(modelOf([point('u1', null)]));
         expect(wrapper.find('#item-u1').exists()).toBe(false);
-        expect(wrapper.find('.report-heading-viewer').exists()).toBe(false);
+        expect(wrapper.find('.report-item-viewer').exists()).toBe(false);
         const heading = wrapper.find('[data-section="items"] h3');
         expect(heading.text()).toContain('—');
         expect(wrapper.find('[data-section="tables"] tbody th a').exists()).toBe(false);

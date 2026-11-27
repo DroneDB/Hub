@@ -1,6 +1,6 @@
 <template>
     <!-- The page's own h1 is the report name: the model's level 1 is the h2 of a section -->
-    <component :is="tag" :id="block.anchor || undefined" :tabindex="block.anchor ? -1 : undefined" class="report-heading">
+    <component :is="tag" :id="block.anchor || undefined" :tabindex="block.anchor ? -1 : undefined" class="report-heading" :class="{ 'report-section-title': block.level === 1 }">
         {{ block.text }}
         <a v-if="block.anchor" class="report-heading-anchor" :href="`#${block.anchor}`" :aria-label="`Link to ${block.text}`">
             <i class="fa-solid fa-link" aria-hidden="true" />
@@ -31,6 +31,22 @@ const tag = computed(() => `h${Math.min(props.block.level + 1, 6)}`);
 .report-heading {
     margin: var(--ddb-spacing-lg) 0 var(--ddb-spacing-sm);
     scroll-margin-top: var(--ddb-spacing-lg);
+}
+
+.report-section-title {
+    margin-top: var(--ddb-spacing-xl);
+    color: var(--report-primary, var(--ddb-primary));
+    font-size: 1.6rem;
+}
+
+.report-section-title::after {
+    content: '';
+    display: block;
+    width: 3rem;
+    height: 4px;
+    margin-top: var(--ddb-spacing-xs);
+    border-radius: 2px;
+    background: var(--report-accent, var(--ddb-primary));
 }
 
 .report-heading:focus-visible {

@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { buildReportModel, resolveTemplate, resolveLogo, resolveCover, templateMissingText } from './reportModel';
 import { newDefinition } from './reportDefinition';
 import { NO_MAP, NOT_GEOREFERENCED } from './reportSections';
+import { CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
 import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_TEMPLATE, DEFAULT_SCHEMA, cloneSettings } from './reportSettings';
 import { formatArea, formatLength, formatDate, EMPTY_CELL } from '@/libs/format';
@@ -38,14 +39,15 @@ describe('the cover section', () => {
     it('has the title, the people, the date, the dataset, an overview snapshot and the QR of the live page', () => {
         const definition = definitionOf(['a.geojson'], { title: 'Stockpile report', subtitle: 'North pit', preparedBy: 'J. Doe', preparedFor: 'Acme' });
         const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT)], { definition }));
-        const [title, subtitle, facts, snapshot, qr] = blocksOf(model, 'cover');
+        const [title, subtitle, facts, kpis, snapshot, qr] = blocksOf(model, 'cover');
         expect(title).toMatchObject({ type: 'heading', level: 1, text: 'Stockpile report' });
         expect(subtitle).toMatchObject({ level: 2, text: 'North pit' });
         expect(facts.rows).toEqual([
             { label: 'Prepared by', value: 'J. Doe' }, { label: 'Prepared for', value: 'Acme' },
             { label: 'Date', value: formatDate(NOW) }, { label: 'Dataset', value: 'North pit dataset' }
         ]);
-        expect(snapshot).toMatchObject({ type: 'mapSnapshot', kind: 'overview' });
+        expect(kpis).toMatchObject({ type: 'kpis', tiles: [{ key: 'items', value: '1' }, { key: 'open' }, { key: 'overdue' }, { key: 'closed' }] });
+        expect(snapshot).toMatchObject({ type: 'mapSnapshot', kind: 'overview', placement: 'cover' });
         expect(qr).toEqual({ type: 'qr', url: 'https://hub.example/r/acme/north/reports/r_k3x9q2m7', label: 'Open the live report' });
     });
 
@@ -53,7 +55,7 @@ describe('the cover section', () => {
         const definition = definitionOf(['a.geojson'], { title: '' });
         const model = buildReportModel(inputOf([], { definition, links: {} }));
         expect(model.title).toBe('North pit');
-        expect(blocksOf(model, 'cover').map(b => b.type)).toEqual(['heading', 'keyValue', 'mapSnapshot']);
+        expect(blocksOf(model, 'cover').map(b => b.type)).toEqual(['heading', 'keyValue', 'kpis', 'mapSnapshot']);
     });
 });
 
@@ -252,7 +254,7 @@ describe('a point cloud without a usable CRS', () => {
             sources: [{ file: 'a.geojson', document: documentOf(cloudOnly, { crs: false }) }]
         });
         expect(blocksOf(model, 'cover', 'mapSnapshot')).toEqual([]);
-        expect(blocksOf(model, 'cover').map(b => b.type)).toEqual(['heading', 'keyValue', 'qr']);
+        expect(blocksOf(model, 'cover').map(b => b.type)).toEqual(['heading', 'keyValue', 'kpis', 'qr']);
         expect(blocksOf(model, 'overview').map(b => b.type)).toEqual(['heading', 'note']);
         expect(blocksOf(model, 'overview', 'note')[0]).toMatchObject({ tone: 'info', text: NO_MAP });
         expect(blocksOf(model, 'items', 'mapSnapshot')).toEqual([]);
@@ -546,11 +548,36 @@ describe('the item pages', () => {
         expect(east - west).toBeGreaterThan(40 / (111320 * Math.cos((45.1 * Math.PI) / 180)) - 1e-9);
     });
 
+    it('have a heading with the reference, the name, the kind, the colour of the category and the badges of the item', () => {
+        const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT, { name: 'Crack', category: 'defect', severity: 'high', status: 'open', dueDate: '2026-01-01' })]));
+        const heading = blocksOf(model, 'items', 'heading').find(h => h.itemId);
+        expect(heading).toMatchObject({ ref: '1', name: 'Crack', kind: 'Point · 2D', colour: '#dc2626' });
+        expect(heading.badges).toEqual([
+            { key: 'category', label: 'Defect', colour: '#dc2626' },
+            { key: 'severity', label: 'High', colour: '#dc2626' },
+            { key: 'status', label: 'Open', colour: '#0070e0', tone: 'open' },
+            { key: 'overdue', label: 'Overdue', colour: OVERDUE_COLOUR, tone: 'alert' }
+        ]);
+        // The rows of its facts say what they are, so a renderer can leave out what the heading shows
+        expect(blocksOf(model, 'items', 'keyValue')[0].rows.map(r => r.key)).toEqual(['reference', 'name', 'kind', 'coordinates', 'category', 'severity', 'status', 'assignee', 'dueDate']);
+    });
+
+    it('have no badge for a field with no value, and the closed tone for a closed status', () => {
+        const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT, { status: 'resolved' })]));
+        expect(blocksOf(model, 'items', 'heading').find(h => h.itemId).badges).toEqual([{ key: 'status', label: 'Resolved', colour: CLOSED_COLOUR, tone: 'closed' }]);
+    });
+
+    it('mark each row of a table with the colours of its category, severity and status, and whether it is overdue', () => {
+        const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT, { category: 'safety', status: 'resolved' })]));
+        const row = blocksOf(model, 'tables', 'table').find(t => t.id === 'points').rows[0];
+        expect(row.marks).toEqual({ category: '#eab308', severity: null, status: CLOSED_COLOUR, closed: true, overdue: false });
+    });
+
     it('show the value of an id the schema does not have as Unknown (<id>)', () => {
         const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT, { category: 'old', status: 'gone' })]));
         const rows = Object.fromEntries(blocksOf(model, 'items', 'keyValue')[0].rows.map(r => [r.label, r.value]));
         expect(rows).toMatchObject({ Category: 'Unknown (old)', Status: 'Unknown (gone)' });
-        expect(blocksOf(model, 'summary', 'summaryStats')[0].groups.find(g => g.key === 'category').counts).toEqual([{ key: 'old', label: 'Unknown (old)', count: 1 }]);
+        expect(blocksOf(model, 'summary', 'summaryStats')[0].groups.find(g => g.key === 'category').counts).toEqual([{ key: 'old', label: 'Unknown (old)', count: 1, colour: UNSET_COLOUR }]);
     });
 
     it('use the anchor and the viewer address the caller makes', () => {
@@ -602,12 +629,23 @@ describe('the summary', () => {
 
     it('counts the items by kind, category, severity and status, "Not set" for those with no value', () => {
         const s = stats();
-        const counts = Object.fromEntries(s.groups.map(g => [g.key, g.counts]));
+        // Without their colours (see the colours of the counts)
+        const counts = Object.fromEntries(s.groups.map(g => [g.key, g.counts.map(c => ({ key: c.key, label: c.label, count: c.count }))]));
         expect(s.total).toEqual({ count: 5, text: '5 items' });
         expect(counts.kind).toEqual([{ key: 'point', label: 'Points', count: 2 }, { key: 'length', label: 'Lengths', count: 3 }]);
         expect(counts.category).toEqual([{ key: 'defect', label: 'Defect', count: 2 }, { key: '', label: 'Not set', count: 3 }]);
         expect(counts.status).toEqual([{ key: 'open', label: 'Open', count: 2 }, { key: 'in-progress', label: 'In progress', count: 1 }, { key: 'resolved', label: 'Resolved', count: 1 }, { key: '', label: 'Not set', count: 1 }]);
         expect(counts.severity).toEqual([{ key: 'high', label: 'High', count: 1 }, { key: '', label: 'Not set', count: 4 }]);
+    });
+
+    it('gives each count the colour of what it counts: a kind the accent, a category or severity its schema colour, a status its status colour, Not set grey', () => {
+        const s = stats();
+        const colours = Object.fromEntries(s.groups.map(g => [g.key, Object.fromEntries(g.counts.map(c => [c.key, c.colour]))]));
+        const template = buildReportModel(inputOf(features)).template;
+        expect(colours.kind).toEqual({ point: template.accent, length: template.accent });
+        expect(colours.category).toEqual({ defect: '#dc2626', '': UNSET_COLOUR });
+        expect(colours.severity).toEqual({ high: '#dc2626', '': UNSET_COLOUR });
+        expect(colours.status).toEqual({ open: '#0070e0', 'in-progress': '#0891b2', resolved: CLOSED_COLOUR, '': UNSET_COLOUR });
     });
 
     it('titles the groups of counts, in their order, and leaves out a group that has none', () => {
