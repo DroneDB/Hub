@@ -40,10 +40,12 @@ import { passesFilter } from '@/libs/reports/reportDefinition';
 import { idOf, refOf, inCreationOrder, duplicateRefs } from '@/libs/map/annotationIds';
 import { VIEW, sectionOf, LEGACY_GEOMETRY } from '@/libs/map/measurementFormat';
 import { kindOfFeature, measuredOf } from '@/libs/reports/reportKinds';
-import { EMPTY_CELL } from '@/libs/format';
 
-/** What an unnumbered item shows in place of a reference: the mark of a value that is not there. */
-export const NO_REF = EMPTY_CELL;
+/** What a report writes for a value that is not there: a hyphen (a report writes no long dash). */
+export const NO_VALUE = '-';
+
+/** What an unnumbered item shows in place of a reference. */
+export const NO_REF = NO_VALUE;
 
 const refCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 

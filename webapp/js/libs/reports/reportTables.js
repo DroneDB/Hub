@@ -15,13 +15,14 @@
  * @typedef {{ type: 'table', id: string, title: string, columns: TableColumn[], rows: TableRow[] }} TableBlock
  */
 import {
-    EMPTY_CELL, formatLength, formatArea, formatVolume, formatWeight, formatMoney, formatNumber, formatDate,
+    formatLength, formatArea, formatVolume, formatWeight, formatMoney, formatNumber, formatDate,
     latLonText, normalizeCurrency
 } from '@/libs/format';
 import { choiceLabel } from '@/libs/map/annotationIds';
 import { baseMethodName } from '@/libs/stockpileBase';
 import { KIND_ORDER, KIND_LABELS, KIND_SINGULAR, OWNER_TAGS } from '@/libs/reports/reportKinds';
 import { rowMarks } from '@/libs/reports/reportStyling';
+import { NO_VALUE } from '@/libs/reports/reportItems';
 
 /** What the row of a 3D item says when it has no place on a map. */
 export const NOT_GEOREFERENCED = 'Not georeferenced';
@@ -35,19 +36,19 @@ const column = (key, label, align = LEFT) => ({ key, label, align });
 /** A due date as the locale writes it. It is a calendar date: it is read as one, not as midnight UTC. @param {string | null} dueDate */
 export function dueDateText(dueDate) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate ?? '');
-    return match ? formatDate(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) : EMPTY_CELL;
+    return match ? formatDate(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))) : NO_VALUE;
 }
 
 /**
  * The value of an annotation field by name: its name in the schema, `Unknown (<id>)` for an id the schema does not
- * have, an en dash for none.
+ * have, NO_VALUE for none.
  * @param {import('./reportItems').ReportItem} item
  * @param {'category' | 'severity' | 'status'} field
  * @param {TextContext} ctx
  */
 export function fieldText(item, field, ctx) {
     const lists = /** @type {Record<string, { id: string, name: string }[]>} */ ({ category: ctx.schema.categories, severity: ctx.schema.severities, status: ctx.schema.statuses });
-    return choiceLabel(lists[field], item[field]) || EMPTY_CELL;
+    return choiceLabel(lists[field], item[field]) || NO_VALUE;
 }
 
 /** The status, with "(overdue)" after it for an item that is. @param {import('./reportItems').ReportItem} item @param {TextContext} ctx */
@@ -60,7 +61,7 @@ export function statusText(item, ctx) {
 const orRaw = (/** @type {import('./reportItems').ReportItem} */ item, /** @type {'distance' | 'area' | 'perimeter' | 'radius' | 'circumference'} */ stored, /** @type {number | null} */ value, /** @type {(v: number) => string} */ format) => {
     if (value !== null) return format(value);
     const raw = item.properties[stored];
-    return item.measured.unconvertible && typeof raw === 'number' ? `${formatNumber(raw, 2, { trim: true })} ${item.properties.unit ?? ''}`.trim() : EMPTY_CELL;
+    return item.measured.unconvertible && typeof raw === 'number' ? `${formatNumber(raw, 2, { trim: true })} ${item.properties.unit ?? ''}`.trim() : NO_VALUE;
 };
 
 /** @param {import('./reportItems').ReportItem} item @param {TextContext} ctx */
@@ -86,7 +87,7 @@ export function locationText(item, ctx) {
     const projected = ctx.projection?.project([position[0], position[1]]);
     return {
         coordinates: latLonText(position[1], position[0]),
-        projected: projected ? projected.slice(0, 2).map(v => formatNumber(v, 2, { grouping: false })).join(', ') : EMPTY_CELL
+        projected: projected ? projected.slice(0, 2).map(v => formatNumber(v, 2, { grouping: false })).join(', ') : NO_VALUE
     };
 }
 
@@ -95,14 +96,14 @@ function pileTexts(item, ctx) {
     const p = item.properties;
     const money = p.costEstimate && isNumber(p.costEstimate.amount)
         ? formatMoney(p.costEstimate.amount, normalizeCurrency(p.currency ?? p.costEstimate.currency ?? ctx.currency))
-        : EMPTY_CELL;
+        : NO_VALUE;
     return {
-        net: formatVolume(p.netVolume, ctx.units),
-        cut: formatVolume(p.cutVolume, ctx.units),
-        fill: formatVolume(p.fillVolume, ctx.units),
-        base: typeof p.basePlaneMethod === 'string' ? baseMethodName(/** @type {any} */ (p.basePlaneMethod)) : EMPTY_CELL,
-        material: typeof p.materialName === 'string' && p.materialName ? p.materialName : EMPTY_CELL,
-        weight: isNumber(p.weightEstimate?.tons) ? formatWeight(p.weightEstimate.tons, ctx.units) : EMPTY_CELL,
+        net: formatVolume(p.netVolume, ctx.units, { placeholder: NO_VALUE }),
+        cut: formatVolume(p.cutVolume, ctx.units, { placeholder: NO_VALUE }),
+        fill: formatVolume(p.fillVolume, ctx.units, { placeholder: NO_VALUE }),
+        base: typeof p.basePlaneMethod === 'string' ? baseMethodName(/** @type {any} */ (p.basePlaneMethod)) : NO_VALUE,
+        material: typeof p.materialName === 'string' && p.materialName ? p.materialName : NO_VALUE,
+        weight: isNumber(p.weightEstimate?.tons) ? formatWeight(p.weightEstimate.tons, ctx.units) : NO_VALUE,
         cost: money
     };
 }
@@ -111,7 +112,7 @@ function pileTexts(item, ctx) {
 function measure3dTexts(item, ctx) {
     const m = item.measured;
     if (item.measurementType === 'angle') {
-        return { measure: 'Angle', value: isNumber(m.angle) ? `${formatNumber(m.angle, 2, { trim: true })}°` : EMPTY_CELL, detail: '' };
+        return { measure: 'Angle', value: isNumber(m.angle) ? `${formatNumber(m.angle, 2, { trim: true })}°` : NO_VALUE, detail: '' };
     }
     const radius = orRaw(item, 'radius', m.radius, v => formatLength(v, ctx.units));
     const parts = [`Circumference ${orRaw(item, 'circumference', m.circumference, v => formatLength(v, ctx.units))}`, `Area ${areaText(item, ctx)}`];
@@ -178,7 +179,7 @@ function rowOf(item, cells, ctx) {
         // The colours of the category, severity and status cells, and whether the item is overdue
         marks: rowMarks(item, ctx.schema),
         anchor: item.numbered ? `#item-${item.id}` : null,
-        cells: { ref: item.displayRef, name: item.name || EMPTY_CELL, type: OWNER_TAGS[item.owner], ...cells },
+        cells: { ref: item.displayRef, name: item.name || NO_VALUE, type: OWNER_TAGS[item.owner], ...cells },
         note: item.owner === 'pointCloud' && !item.georeferenced ? NOT_GEOREFERENCED : null
     };
 }
@@ -221,7 +222,7 @@ export function buildTables(items, ctx) {
                 category: fieldText(item, 'category', ctx),
                 severity: fieldText(item, 'severity', ctx),
                 status: statusText(item, ctx),
-                assignee: item.assignee ?? EMPTY_CELL,
+                assignee: item.assignee ?? NO_VALUE,
                 dueDate: dueDateText(item.dueDate)
             }, ctx))
         });
@@ -239,7 +240,7 @@ export function itemRows(item, ctx) {
     /** @type {{ key: string, label: string, value: string }[]} */
     const rows = [
         { key: 'reference', label: 'Reference', value: item.displayRef },
-        { key: 'name', label: 'Name', value: item.name || EMPTY_CELL },
+        { key: 'name', label: 'Name', value: item.name || NO_VALUE },
         { key: 'kind', label: 'Kind', value: `${KIND_SINGULAR[item.kind]} (${OWNER_TAGS[item.owner]})` }
     ];
     const spec = KIND_TABLES[item.kind];
@@ -247,12 +248,12 @@ export function itemRows(item, ctx) {
     for (const [key, value] of Object.entries(spec.cells(item, ctx))) {
         if (value !== '') rows.push({ key, label: labels.get(key) ?? key, value });
     }
-    if (item.groupName || item.group) rows.push({ key: 'group', label: 'Group', value: item.groupName || item.group || EMPTY_CELL });
+    if (item.groupName || item.group) rows.push({ key: 'group', label: 'Group', value: item.groupName || item.group || NO_VALUE });
     rows.push(
         { key: 'category', label: 'Category', value: fieldText(item, 'category', ctx) },
         { key: 'severity', label: 'Severity', value: fieldText(item, 'severity', ctx) },
         { key: 'status', label: 'Status', value: statusText(item, ctx) },
-        { key: 'assignee', label: 'Assignee', value: item.assignee ?? EMPTY_CELL },
+        { key: 'assignee', label: 'Assignee', value: item.assignee ?? NO_VALUE },
         { key: 'dueDate', label: 'Due date', value: dueDateText(item.dueDate) }
     );
     return rows;

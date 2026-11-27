@@ -23,12 +23,13 @@
  *   note          { type, tone: 'info' | 'warning', text }
  *   signOff       { type, byline, lines: [{ label }] }   byline: "Prepared by <name>", or empty
  */
-import { EMPTY_CELL, formatDate } from '@/libs/format';
+import { formatDate } from '@/libs/format';
 import { SECTION_LABELS } from '@/libs/reports/reportDefaults';
 import { buildTables, itemRows } from '@/libs/reports/reportTables';
 import { countByKind, countByChoice, itemCountText } from '@/libs/reports/reportTotals';
 import { extentOf, frameOf } from '@/libs/reports/reportFrames';
 import { itemBadges, kindLabel, reportKpis, choiceColour, UNSET_COLOUR } from '@/libs/reports/reportStyling';
+import { NO_VALUE } from '@/libs/reports/reportItems';
 
 export const NO_ELEVATION_LAYER = 'No elevation layer in the cover view';
 export const NO_3D_SNAPSHOT = 'No 3D snapshot';
@@ -189,7 +190,7 @@ function coverSection(ctx) {
         ...(definition.preparedBy ? [{ label: 'Prepared by', value: definition.preparedBy }] : []),
         ...(definition.preparedFor ? [{ label: 'Prepared for', value: definition.preparedFor }] : []),
         { label: 'Date', value: formatDate(ctx.now) },
-        { label: 'Dataset', value: ctx.datasetName || EMPTY_CELL }
+        { label: 'Dataset', value: ctx.datasetName || NO_VALUE }
     ];
     return [
         ...(ctx.logo ? [logoBlock(ctx.logo, ctx.template)] : []),
@@ -302,7 +303,7 @@ function layersTable(paths, ctx, id, title) {
         columns: [{ key: 'name', label: 'Name', align: /** @type {const} */ ('left') }, { key: 'path', label: 'File', align: /** @type {const} */ ('left') }, { key: 'built', label: 'Built', align: /** @type {const} */ ('left') }],
         rows: paths.map(({ path }) => {
             const info = ctx.layerInfo[path] ?? {};
-            return { itemId: '', anchor: null, note: null, cells: { name: info.name || path.split('/').pop() || path, path, built: info.builtAt ? formatDate(info.builtAt, { placeholder: EMPTY_CELL }) : EMPTY_CELL } };
+            return { itemId: '', anchor: null, note: null, cells: { name: info.name || path.split('/').pop() || path, path, built: info.builtAt ? formatDate(info.builtAt, { placeholder: NO_VALUE }) : NO_VALUE } };
         })
     };
 }

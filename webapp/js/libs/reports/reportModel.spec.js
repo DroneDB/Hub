@@ -9,8 +9,8 @@ import { NO_MAP, NOT_GEOREFERENCED } from './reportSections';
 import { CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
 import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_TEMPLATE, DEFAULT_SCHEMA, cloneSettings } from './reportSettings';
-import { formatArea, formatLength, formatDate, EMPTY_CELL } from '@/libs/format';
-import { NO_REF } from '@/libs/reports/reportItems';
+import { formatArea, formatLength, formatDate } from '@/libs/format';
+import { NO_REF, NO_VALUE } from '@/libs/reports/reportItems';
 import { geodesicArea } from '@/libs/map/geodesic';
 import {
     square, mapFeature, cloudFeature, documentOf, template, settings, definitionOf, coverState, inputOf, blocksOf, NOW, DSM_INFO, ORTHO_INFO
@@ -453,7 +453,7 @@ describe('the stockpiles', () => {
     it('show a dash for what a pile has no figure of', () => {
         const bare = mapFeature('s1', '1', 'stockpile', square(9.2, 45.1, 20), {});
         const row = tableOf(buildReportModel(inputOf([bare])), 'volumes').rows[0];
-        expect(row.cells).toMatchObject({ net: EMPTY_CELL, weight: EMPTY_CELL, cost: EMPTY_CELL, material: EMPTY_CELL, base: EMPTY_CELL });
+        expect(row.cells).toMatchObject({ net: NO_VALUE, weight: NO_VALUE, cost: NO_VALUE, material: NO_VALUE, base: NO_VALUE });
     });
 });
 
@@ -735,7 +735,7 @@ describe('the notes section', () => {
         expect(blocks[1].text).toBe('Weather was *clear*');
         expect(blocks[2].rows).toEqual([{ label: 'Units', value: 'Imperial' }, { label: 'Coordinate system', value: 'WGS84' }]);
         expect(blocks[3]).toMatchObject({ id: 'layers', rows: [{ cells: { name: 'Orthophoto', path: 'ortho.tif', built: formatDate(built) } }] });
-        expect(blocks[4]).toMatchObject({ id: 'sourceRasters', rows: [{ cells: { name: 'dsm.tif', path: 'dsm.tif', built: EMPTY_CELL } }] });
+        expect(blocks[4]).toMatchObject({ id: 'sourceRasters', rows: [{ cells: { name: 'dsm.tif', path: 'dsm.tif', built: NO_VALUE } }] });
         expect(blocks[5].text).toBe('Not for **legal** use');
         expect(blocks[6]).toEqual({ type: 'signOff', byline: 'Prepared by J. Doe', lines: [{ label: 'Name' }, { label: 'Signature' }, { label: 'Date' }] });
     });
