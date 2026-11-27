@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { statusColour, choiceColour, itemBadges, rowMarks, reportKpis, kindLabel, tint, shade, textOn, CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
 import { DEFAULT_SCHEMA } from './reportDefaults';
+import { DARK_TEXT } from '@/libs/readableText';
 
 const schema = DEFAULT_SCHEMA;
 
@@ -86,8 +87,9 @@ describe('the colours of a fill and of the text on it', () => {
 
     it('write white on a dark fill and the ink on a light one', () => {
         expect(textOn('#0f2a4a')).toBe('#ffffff');
-        expect(textOn('#eab308')).toBe('#1f2937');
-        expect(textOn('#ffffff')).toBe('#1f2937');
+        expect(textOn('#eab308')).toBe(DARK_TEXT);
+        expect(textOn('#ffffff')).toBe(DARK_TEXT);
+        expect(textOn('not a colour')).toBe(DARK_TEXT);
     });
 
     it('name the kind and the view of an item on one line', () => {

@@ -11,6 +11,7 @@
 import { choiceLabel } from '@/libs/map/annotationIds';
 import { formatNumber } from '@/libs/format';
 import { KIND_SINGULAR, OWNER_TAGS } from '@/libs/reports/reportKinds';
+import { DARK_TEXT, readableTextOnChannels } from '@/libs/readableText';
 
 /** The colour of an item or a count that has no value for a field */
 export const UNSET_COLOUR = '#94a3b8';
@@ -118,17 +119,13 @@ export function shade(hex, amount) {
 }
 
 /**
- * The colour of a text written on a fill: white on a dark one, a dark ink on a light one (relative luminance).
+ * The colour of a text written on a fill: white or the dark text, whichever reads better (libs/readableText, the rule of
+ * the template colours and of the organization colours).
  * @param {string} hex
  */
 export function textOn(hex) {
     const rgb = rgbOf(hex);
-    if (!rgb) return '#1f2937';
-    const [r, g, b] = rgb.map(c => {
-        const v = c / 255;
-        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#1f2937' : '#ffffff';
+    return rgb ? readableTextOnChannels(rgb) : DARK_TEXT;
 }
 
 /** The kind of an item as a line: "Volume · 2D". @param {{ kind: import('./reportKinds').MeasurementKind, owner: string }} item */
