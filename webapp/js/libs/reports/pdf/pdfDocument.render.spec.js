@@ -6,6 +6,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { buildPdfDocument } from '@/libs/reports/pdf/pdfDocument';
 import { fullAssets, options, pdfModel, threeItems, JPEG_URL } from '@/libs/reports/pdf/pdfDocument.fixtures';
 import { definitionOf } from '@/libs/reports/reportModel.fixtures';
+import { addSymbolsFont } from '@/libs/reports/pdf/pdfSymbols';
 
 let pdfMake;
 beforeAll(async () => {
@@ -13,6 +14,7 @@ beforeAll(async () => {
     const fonts = await import('pdfmake/build/vfs_fonts');
     pdfMake = library.default ?? library;
     pdfMake.addVirtualFileSystem(fonts.default ?? fonts);
+    addSymbolsFont(pdfMake);
 }, 60000);
 
 /** The PDF as text, with no compression, so that its objects can be read. */
@@ -76,5 +78,12 @@ describe('the PDF pdfmake writes', () => {
                 expect(pageCount(text), `${paper} ${orientation}`).toBe(3);
             }
         }
+    }, 60000);
+
+    it('draws an arrow of a text with the glyph of the symbols font, embedded beside Roboto', async () => {
+        const model = pdfModel({ features: threeItems().map(f => ({ ...f, properties: { ...f.properties, description: 'Back beach → berm crest → swash zone' } })) });
+        const { text } = await render(model, fullAssets(model));
+        expect(text).toMatch(/\/BaseFont \/[A-Z]{6}\+ReportSymbols-Regular/);
+        expect(text).toMatch(/\/BaseFont \/[A-Z]{6}\+Roboto/);
     }, 60000);
 });

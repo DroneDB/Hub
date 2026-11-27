@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1000" width="9" height="10">
+  <!-- The arrow of the report PDFs (U+2192). The points are font units (1000 to the em, y up from the baseline):
+       scripts/build_report_symbols.mjs turns this polygon into the glyphs of ReportSymbols, the left, up and down
+       arrows being the same shape turned. The transform only draws it upright here. -->
+  <polygon transform="translate(0 750) scale(1 -1)" points="70,235 70,325 600,325 455,470 520,535 775,280 520,25 455,90 600,235" />
+</svg>

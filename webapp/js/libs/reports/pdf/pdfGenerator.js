@@ -5,6 +5,7 @@
  * document definition from the report model, and has the library write it. The progress is the items rendered out of
  * all of them; aborting the signal stops it and nothing is returned.
  */
+import { addSymbolsFont } from '@/libs/reports/pdf/pdfSymbols';
 import { buildPdfDocument } from '@/libs/reports/pdf/pdfDocument';
 import { loadAssets } from '@/libs/reports/pdf/pdfAssets';
 import { pageLayout } from '@/libs/reports/pdf/pdfLayout';
@@ -30,6 +31,7 @@ export async function loadPdfDependencies() {
     ]);
     const pdfMake = /** @type {any} */ (pdfmake).default ?? pdfmake;
     pdfMake.addVirtualFileSystem(/** @type {any} */ (fonts).default ?? fonts);
+    addSymbolsFont(pdfMake);
     return { pdfMake, qr: qr.qrCode, renderers };
 }
 

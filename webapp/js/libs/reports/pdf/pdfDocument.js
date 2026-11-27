@@ -15,6 +15,7 @@ import { itemNodes } from '@/libs/reports/pdf/pdfItem';
 import { INK, MUTED, tint } from '@/libs/reports/pdf/pdfTheme';
 import { pageLayout } from '@/libs/reports/pdf/pdfLayout';
 import { sectionParts } from '@/libs/reports/reportParts';
+import { withSymbols } from '@/libs/reports/pdf/pdfSymbols';
 
 export const CONTENTS_TITLE = 'Contents';
 /** The height of the logo in the header, in points */
@@ -109,6 +110,12 @@ function itemAnchors(model) {
 }
 
 /**
+ * A header or footer function whose texts have their symbols in their font.
+ * @param {(...args: any[]) => any} make
+ */
+const symbolsOf = make => (/** @type {any[]} */ ...args) => withSymbols(make(...args));
+
+/**
  * The PDF document definition of a report model.
  * @param {any} model  the report model (libs/reports/reportModel)
  * @param {PdfOptions} options
@@ -165,9 +172,10 @@ export function buildPdfDocument(model, { assets, qr, origin }) {
         pageMargins: layout.margins,
         defaultStyle: { font: 'Roboto', fontSize: 10, color: INK, lineHeight: 1.15 },
         styles: styles(colours),
-        header: header(model, layout, assets, !!coverPart),
-        footer: footer(model, layout),
+        // The symbols Roboto has no glyph for (the arrows) are written in a font of their own, wherever they are
+        header: symbolsOf(header(model, layout, assets, !!coverPart)),
+        footer: symbolsOf(footer(model, layout)),
         background: background(layout, colours, coverPart ? coverBackground(layout, colours, !!assets.logo, coverHasQr(coverPart, origin)) : null),
-        content
+        content: withSymbols(content)
     };
 }
