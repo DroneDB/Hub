@@ -2,7 +2,7 @@
  * Lengths, areas, radii and angles of measured points, each axis scaled to the unit of the result first.
  */
 import { describe, it, expect } from 'vitest';
-import { pathLength, groundArea, surfaceArea, circumradius, angleAt } from './scaledGeometry';
+import { pathLength, groundArea, surfaceArea, circumradius, angleAt, heightDifference } from './scaledGeometry';
 
 const FT_US = 1200 / 3937;
 
@@ -32,5 +32,17 @@ describe('scaledGeometry', () => {
         expect(angleAt([0, 0, 0], [0, 0, 0], [0, 1, 0])).toBe(0);
         // 1 m across and 3.28 ft up is 45 degrees once the heights are in metres
         expect(angleAt([1, 0, 0], [0, 0, 0], [1, 0, 1 / FT_US], [1, 1, FT_US])).toBeCloseTo(45, 9);
+    });
+});
+
+describe('heightDifference', () => {
+    it('is the highest z less the lowest, whatever the distance on the ground', () => {
+        expect(heightDifference([[0, 0, 10], [6, 8, 12.5]])).toBe(2.5);
+        expect(heightDifference([[6, 8, 12.5], [0, 0, 10], [100, 0, 11]])).toBe(2.5);
+    });
+
+    it('scales the heights to the unit of the frame, and is 0 with no points', () => {
+        expect(heightDifference([[0, 0, 0], [0, 0, 100]], [1, 1, 0.3048])).toBeCloseTo(30.48, 9);
+        expect(heightDifference([])).toBe(0);
     });
 });

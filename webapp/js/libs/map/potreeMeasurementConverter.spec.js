@@ -318,6 +318,15 @@ describe('the lengths of a cloud whose heights are in another unit than its x an
             .toMatchObject({ unit: 'm²', area: parseFloat((100 * FT_US * 100 * FT_US / 2).toFixed(2)) });
     });
 
+    it('a height is the difference between the highest and the lowest point, as Potree shows it, not the slant length', () => {
+        // 6 m east and 8 m north of the foot, 2.5 m up: the line is 10.3 m long, the height 2.5 m
+        expect(props(UTM_33N_WKT, { showHeight: true }, [[0, 0, 10], [6, 8, 12.5]])).toMatchObject({ unit: 'm', distance: 2.5 });
+        // The order of the points does not matter
+        expect(props(UTM_33N_WKT, { showHeight: true }, [[6, 8, 12.5], [0, 0, 10]]).distance).toBe(2.5);
+        // In US survey feet up and metres across, the height is in metres
+        expect(props(METRE_US_FOOT_HEIGHT_WKT2, { showHeight: true }, [[0, 0, 0], [30, 40, 100]]).distance).toBe(30.48);
+    });
+
     it('feet across and up stay in feet', () => {
         expect(props(US_FOOT_COMPOUND_WKT, { showHeight: true }, [[0, 0, 0], [0, 0, 100]])).toMatchObject({ unit: 'ftUS', distance: 100 });
     });

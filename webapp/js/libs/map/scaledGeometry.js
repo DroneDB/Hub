@@ -46,6 +46,18 @@ export function pathLength(points, scale = SAME_UNITS) {
 }
 
 /**
+ * The vertical extent of the points: the highest z less the lowest, as Potree's height measure shows it (the points may be
+ * far apart on the ground: only their heights count).
+ * @param {Point[]} points
+ * @param {ArrayLike<number>} [scale]
+ */
+export function heightDifference(points, scale = SAME_UNITS) {
+    if (!points.length) return 0;
+    const heights = points.map(p => scaledPoint(p, scale)[2]);
+    return Math.max(...heights) - Math.min(...heights);
+}
+
+/**
  * The area of the ring the points make on the ground (x and y; the shoelace formula, as Potree's area label).
  * @param {Point[]} points
  * @param {ArrayLike<number>} [scale]

@@ -21,7 +21,7 @@
 import { write, VIEW, savedPositions } from '@/libs/map/measurementFormat';
 import { projectorFor, geometryOf, srsDefinitionOf } from '@/libs/map/pointCloudGeometry';
 import { cloudUnitsOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
-import { pathLength, groundArea, circumradius, angleAt, SAME_UNITS } from '@/libs/map/scaledGeometry';
+import { pathLength, heightDifference, groundArea, circumradius, angleAt, SAME_UNITS } from '@/libs/map/scaledGeometry';
 import { textToHtml, htmlToText } from '@/libs/sanitize';
 import { newId } from '@/libs/ids';
 import { ANNOTATION_KEYS, annotationProperties, unknownProperties } from '@/libs/map/annotationIds';
@@ -169,8 +169,15 @@ function measureToGeoJSON(measure, projector, { scale, unit }) {
         properties.unit = `${unit.code}²`;
     }
 
-    if (measurementType === 'distance' || measurementType === 'height') {
+    if (measurementType === 'distance') {
         properties.distance = rounded(pathLength(positions, scale));
+        properties.unit = unit.code;
+    }
+
+    // A height is what Potree's label shows: the difference between the highest and the lowest point, not the length
+    // of the line between them
+    if (measurementType === 'height') {
+        properties.distance = rounded(heightDifference(positions, scale));
         properties.unit = unit.code;
     }
 
