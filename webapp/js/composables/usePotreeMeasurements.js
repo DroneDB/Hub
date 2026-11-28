@@ -6,7 +6,7 @@
  * viewer (also with nothing left to save), and Delete saved removes them from the file and the viewer. The map's
  * measurements in the same file are not shown and stay as they are; the file goes when nothing is left in it.
  *
- *   const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs });
+ *   const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs, endDrawing });
  *   m.attach(viewer, session, coordinateSystem);   // once the viewer exists
  *   await m.load();
  */
@@ -41,8 +41,12 @@ import { useTimerGroup } from '@/composables/useTimers';
  * @param {import('vue').Ref<boolean>} ctx.canWrite
  * @param {import('vue').Ref<string>} ctx.error
  * @param {{ open: Function }} ctx.dialogs
+ * @param {() => void} [ctx.endDrawing]  ends the measure being drawn as a right click does: it keeps the points placed
+ *   and drops a measure with too few. Potree puts a measure in the scene when it starts, with a marker that follows the
+ *   pointer (at the origin of the coordinates until the pointer is on the cloud): Save ends it first, so that marker is
+ *   never written
  */
-export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs }) {
+export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs, endDrawing = () => {} }) {
     const measurementCount = ref(0);
     const hasSavedMeasurements = ref(false);
     const savingMeasurements = ref(false);
@@ -436,6 +440,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         // The viewer does not show what the file holds (the read failed or is still going)
         const current = storageFor();
         if (notifySaveRefused(current, () => alive && storage === current, load)) return;
+        endDrawing();
         const geojson = exportMeasurements(viewer, entry.value.path, coordinateSystem);
         if (!(geojson.features || []).length && !hasSavedMeasurements.value) {
             error.value = 'No measurements to save';

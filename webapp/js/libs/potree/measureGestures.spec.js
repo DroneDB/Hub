@@ -6,6 +6,8 @@
  * works as the vendored one (potree.js InputHandler): a press with nothing in hand takes the camera's drag, a move
  * drags what it holds (a marker follows the pointer; with nothing held the controls rotate with the left button and
  * pan with the right one), a release lets go, and a double click goes to the controls (which fly the camera to it).
+ * The measure tells what Potree's Measure tells: a marker added (then moved where it begins), a marker moved onto the cloud
+ * by the pick under the pointer, and a marker the release of the input handler dropped.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PotreeMeasureGestures, MEASURE_TOOLS } from './measureGestures';
@@ -52,12 +54,16 @@ function makeViewer() {
         if (!drag) return;
         drag.mouse = e.buttons;
         if (drag.object) {
-            if (!pointerMisses) Object.assign(drag.object.point.position, { x: e.clientX, y: e.clientY, z: pointerZ });
+            if (!pointerMisses) drag.object.measure.setPosition(drag.object, { x: e.clientX, y: e.clientY, z: pointerZ });
         }
         else if (e.buttons === 1) controls.rotations.push(dx);
         else if (e.buttons === 2) controls.pans.push(dx);
     });
-    canvas.addEventListener('mouseup', () => { inputHandler.drag = null; });
+    canvas.addEventListener('mouseup', () => {
+        const object = inputHandler.drag?.object;
+        if (object) object.measure.dispatchEvent({ type: 'marker_dropped', index: object.measure.spheres.indexOf(object) });
+        inputHandler.drag = null;
+    });
     // A touch gives Potree's input handler no mouse events: it lets go of what it drags at touchstart, and again at touchend
     canvas.addEventListener('touchstart', () => inputHandler.startDragging(null));
     canvas.addEventListener('touchend', () => { inputHandler.drag = null; });
@@ -68,11 +74,18 @@ function makeViewer() {
     v.pointer = { x: 0, y: 0 };
     const tool = new Dispatcher();
     tool.startInsertion = (args = {}) => {
-        const measure = { points: [], spheres: [], name: args.name || 'Measurement', maxMarkers: args.maxMarkers ?? Infinity };
+        const measure = Object.assign(new Dispatcher(), { points: [], spheres: [], name: args.name || 'Measurement', maxMarkers: args.maxMarkers ?? Infinity });
+        measure.setPosition = (sphere, position) => {
+            Object.assign(sphere.point.position, position);
+            measure.dispatchEvent({ type: 'marker_moved', index: measure.spheres.indexOf(sphere) });
+        };
         measure.addMarker = position => {
             const point = { position: { ...position } };
             measure.points.push(point);
-            measure.spheres.push({ id: measure.spheres.length, point });
+            const sphere = { id: measure.spheres.length, point, measure };
+            measure.spheres.push(sphere);
+            measure.dispatchEvent({ type: 'marker_added', sphere });
+            measure.setPosition(sphere, position);
         };
         measure.removeMarker = i => { measure.points.splice(i, 1); measure.spheres.splice(i, 1); };
         tool.dispatchEvent({ type: 'start_inserting_measurement', measure });
@@ -528,16 +541,16 @@ describe('a measure drawn with a finger', () => {
         expect(coords(measures[0])).toEqual([[1, 1, 0], [1, 1, 8]]);
     });
 
-    it('Done on a Point nobody placed keeps nothing: the marker at the origin is not a placement', () => {
+    it('Done on a Point nobody placed ends the tool and keeps nothing: the marker at the origin is not a placement', () => {
         gestures.start('point');
         flushTimers();
         // The finger only moved the view: Potree let go of the marker, which stays where it began
         pan();
         expect(gestures.placed(measures[0])).toBe(0);
-        expect(gestures.finish({ dropShort: false })).toBe(false);
-        expect(gestures.activeKind).toBe('point');
-        expect(discarded).toEqual([]);
-        expect(coords(measures[0])).toEqual([[0, 0, 0]]);
+        expect(gestures.finish({ dropShort: false })).toBe(true);
+        expect(gestures.activeKind).toBeNull();
+        expect(discarded).toEqual([measures[0]]);
+        expect(viewer.scene.measurements).toEqual([]);
     });
 
     it('Done on a Distance with one tap placed ends nothing (two points are needed), and with two keeps them', () => {

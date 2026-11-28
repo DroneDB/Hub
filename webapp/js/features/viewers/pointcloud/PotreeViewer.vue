@@ -89,7 +89,8 @@ const { entry, dataset, canWrite, canDelete, loading, error, loadError, entryLoa
     types: [ddb.entry.type.POINTCLOUD], typeLabel: 'a point cloud', title: 'Point Cloud'
 });
 const dialogs = useDialogs();
-const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs });
+// Save ends the measure being drawn first, as a right click does (endMeasure, below)
+const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs, endDrawing: () => endMeasure() });
 const {
     hasMeasurements, hasSavedMeasurements, savingMeasurements, deleteDialogOpen, deleteToolActive, canUndo, canRedo,
     undo, redo, toggleDeleteTool, save: saveMeasurements, requestDelete, onDeleteDialogClose, discardMeasure

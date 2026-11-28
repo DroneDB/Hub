@@ -13,10 +13,16 @@
  *     double click of a measure is the measure's alone: the controls do not fly the camera to it, and nothing
  *     else on the canvas hears it (the edit of a finished measure);
  *   - a measure that ends leaves the input handler with nothing in hand, so the next drag moves the camera;
- *   - the point that follows the pointer, and a last point on the spot of the one before, are taken out; a measure
- *     that has too few points left is dropped. A double click clicks twice: the point its second click placed is
- *     taken out when that click is the second of a double click (`detail`) or lands within 4 CSS px of the first
- *     (`RIGHT_CLICK_MAX_MOVE_PX`), so a hand that moves a pixel or two adds no segment;
+ *   - a point is placed when a release drops the marker that follows the pointer after that marker went onto the cloud
+ *     (Potree's `marker_moved` from its pick, then `marker_dropped`). Potree's first marker starts at the origin of the
+ *     coordinates, and a release where no point of the cloud is would drop it there: such a release places nothing,
+ *     Potree's insertion does not hear it, and the marker follows the pointer again. Whether the input handler holds
+ *     the marker is not the test: a touch lets go of it with nothing placed;
+ *   - the markers no release placed (the one that follows the pointer), and a last point on the spot of the one before,
+ *     are taken out; a measure that has too few points left is dropped. Done, Enter or a double click with some points
+ *     but too few goes on; with none placed it ends the measure and keeps nothing. A double click clicks twice: the
+ *     point its second click placed is taken out when that click is the second of a double click (`detail`) or lands
+ *     within 4 CSS px of the first (`RIGHT_CLICK_MAX_MOVE_PX`), so a hand that moves a pixel or two adds no segment;
  *   - Enter on a focused button or link is the button's or the link's (Escape still drops the measure); a field keeps both.
  *
  * A finger places points too. Potree takes the points of a measure from mouse events (the marker that follows the
@@ -82,8 +88,17 @@ export class PotreeMeasureGestures {
         this.rightDown = /** @type {{ button: number, clientX: number, clientY: number } | null} */ (null);
         /** The marker that followed the pointer when the right button was pressed: it follows it again after the pan */
         this.carriedAtPress = /** @type {any} */ (null);
-        /** The last two left releases of the measure being drawn (each one places a point of an open measure) */
-        this.leftUps = /** @type {{ clientX: number, clientY: number, detail: number }[]} */ ([]);
+        /** The last two left releases of the measure being drawn, and whether each one placed a point */
+        this.leftUps = /** @type {{ clientX: number, clientY: number, detail: number, placed: boolean }[]} */ ([]);
+        /** The markers that went onto the cloud since they were added, and those a release placed there */
+        this.movedMarkers = /** @type {WeakSet<object>} */ (new WeakSet());
+        this.placedMarkers = /** @type {WeakSet<object>} */ (new WeakSet());
+        /** The marker Potree is adding: the move of its addition (`setMarker`) puts it nowhere on the cloud */
+        this.adding = /** @type {any} */ (null);
+        /** The marker the release being handled dropped where no point of the cloud is */
+        this.unplacedDrop = /** @type {any} */ (null);
+        /** Stops following the markers of the measure being drawn */
+        this.unfollow = () => {};
         /** The fingers on the canvas, by pointer id, and whether the gesture is more than one tap (a second finger, a drag) */
         this.touches = /** @type {Map<number, { clientX: number, clientY: number }>} */ (new Map());
         this.touchGesture = /** @type {{ start: { clientX: number, clientY: number }, carried: any, tap: boolean, touched: boolean } | null} */ (null);
@@ -145,11 +160,15 @@ export class PotreeMeasureGestures {
     finish({ dropShort = true } = {}) {
         const measure = this.measure;
         if (!measure) return false;
-        if (!dropShort && this.placed(measure) < this.minPoints(measure)) return false;
-        // Potree's own end of an insertion: it takes the marker that followed the pointer out
+        const placed = this.placed(measure);
+        // Some points but too few: Enter, a double click or Done go on; with none there is nothing to go on with
+        if (!dropShort && placed > 0 && placed < this.minPoints(measure)) return false;
+        // Potree's own end of an insertion: it takes the marker that followed the pointer out of an open measure
         this.viewer.dispatchEvent({ type: 'cancel_insertions' });
         // The input handler lets go of that marker, so the next drag moves the camera
         this.release();
+        // A measure of a fixed number of markers keeps its marker that followed the pointer: it goes, as any marker no release placed
+        this.removeUnplaced(measure);
         this.trim(measure);
         if (this.pointsOf(measure).length < this.minPoints(measure)) this.drop(measure);
         else this.close();
@@ -177,9 +196,43 @@ export class PotreeMeasureGestures {
         return !!dragged && (measure.spheres || []).includes(dragged);
     }
 
-    /** The points the user placed: the marker that follows the pointer is not one. @param {any} measure */
+    /** The points a release placed on the cloud: the marker that follows the pointer is not one. @param {any} measure */
     placed(measure) {
-        return this.pointsOf(measure).length - (this.carrying(measure) ? 1 : 0);
+        return (measure.spheres || []).filter((/** @type {any} */ sphere) => this.placedMarkers.has(sphere)).length;
+    }
+
+    /** Takes out the markers no release placed. @param {any} measure */
+    removeUnplaced(measure) {
+        for (let i = (measure.spheres || []).length - 1; i >= 0; i--) {
+            if (!this.placedMarkers.has(measure.spheres[i])) measure.removeMarker(i);
+        }
+    }
+
+    /**
+     * Follows the markers of a measure being drawn (Potree tells each addition, move and drop): which of them went onto the
+     * cloud, and which a release placed. @param {any} measure
+     * @returns {() => void} stops following them
+     */
+    followMarkers(measure) {
+        if (typeof measure?.addEventListener !== 'function') return () => {};
+        const sphereAt = (/** @type {any} */ e) => (measure.spheres || [])[e.index];
+        const listeners = /** @type {Record<string, (e: any) => void>} */ ({
+            marker_added: e => { this.adding = e.sphere ?? (measure.spheres || []).at(-1); },
+            marker_moved: e => {
+                const sphere = sphereAt(e);
+                if (!sphere) return;
+                if (sphere === this.adding) this.adding = null;
+                else this.movedMarkers.add(sphere);
+            },
+            marker_dropped: e => {
+                const sphere = sphereAt(e);
+                if (!sphere) return;
+                if (this.movedMarkers.has(sphere)) this.placedMarkers.add(sphere);
+                else this.unplacedDrop = sphere;
+            }
+        });
+        Object.entries(listeners).forEach(([type, fn]) => measure.addEventListener(type, fn));
+        return () => Object.entries(listeners).forEach(([type, fn]) => measure.removeEventListener(type, fn));
     }
 
     /** What a measure needs to be kept: its own number of markers, or the least of its kind. @param {any} measure */
@@ -213,9 +266,12 @@ export class PotreeMeasureGestures {
     /** The measure is no longer being drawn. */
     close() {
         if (!this.measure) return;
+        this.unfollow();
+        this.unfollow = () => {};
         this.measure = null;
         this.kind = null;
         this.leftUps = [];
+        this.adding = this.unplacedDrop = null;
         this.onActive(null);
     }
 
@@ -226,6 +282,8 @@ export class PotreeMeasureGestures {
         this.measure = measure;
         this.kind = known;
         this.leftUps = [];
+        // Potree adds the first marker after it tells the start
+        this.unfollow = this.followMarkers(measure);
         if (known) this.onActive(known);
         // Potree names the measure and sets its markers after it tells: the kind is read then
         this.later(() => {
@@ -267,7 +325,7 @@ export class PotreeMeasureGestures {
     dropSecondClick(measure) {
         const [first, second] = this.leftUps;
         this.leftUps = [];
-        if (!first || !second || Number.isFinite(measure.maxMarkers) || !this.carrying(measure)) return;
+        if (!first || !second || !second.placed || Number.isFinite(measure.maxMarkers) || !this.carrying(measure)) return;
         const repeats = second.detail >= 2 || Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY) <= RIGHT_CLICK_MAX_MOVE_PX;
         // The two clicks each placed a point, before the marker that follows the pointer
         if (!repeats || this.placed(measure) < 2) return;
@@ -277,6 +335,9 @@ export class PotreeMeasureGestures {
     /** @param {MouseEvent} e */
     onMouseUp(e) {
         if (!this.measure) return;
+        // Potree's input handler, before this listener, dropped the marker that followed the pointer
+        const unplaced = this.unplacedDrop;
+        this.unplacedDrop = null;
         if (e.button === RIGHT_BUTTON) {
             const down = this.rightDown;
             const carried = this.carriedAtPress;
@@ -288,9 +349,16 @@ export class PotreeMeasureGestures {
             else if (carried) this.carry(this.measure);
             return;
         }
-        if (e.button === LEFT_BUTTON) this.leftUps = [...this.leftUps, { clientX: e.clientX, clientY: e.clientY, detail: e.detail }].slice(-2);
-        // A measure of a fixed number of points ends by itself with its last click, once Potree has handled it
         const measure = this.measure;
+        // Where no point of the cloud is: nothing is placed (Potree's insertion does not hear it) and the marker follows the pointer again
+        const placesNothing = !!unplaced && unplaced === (measure.spheres || []).at(-1);
+        if (e.button === LEFT_BUTTON) this.leftUps = [...this.leftUps, { clientX: e.clientX, clientY: e.clientY, detail: e.detail, placed: !placesNothing }].slice(-2);
+        if (placesNothing) {
+            e.stopImmediatePropagation();
+            this.carry(measure);
+            return;
+        }
+        // A measure of a fixed number of points ends by itself with its last click, once Potree has handled it
         this.later(() => {
             if (this.measure === measure && Number.isFinite(measure.maxMarkers) && !this.carrying(measure)) this.close();
         }, 0);
