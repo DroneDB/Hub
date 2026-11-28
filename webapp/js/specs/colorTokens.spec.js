@@ -386,6 +386,10 @@ describe('the status of a task (HeavyTaskStatus)', () => {
 
 describe('the stylesheets of the components', () => {
     const JS = path.resolve(__dirname, '..');
+    // The global stylesheets (webapp/css) are checked too: a custom property they define is a palette
+    // (the dark panel of the analysis tools), so its value may be a colour; _variables.scss is the tokens' own file
+    const CSS = path.resolve(__dirname, '../../css');
+    const DEFINITION = /^\s*--[\w-]+:/;
     const LITERAL = /#[0-9a-f]{3,8}\b|rgba?\(\s*\d|(?<![-\w])(white|black)\s*(;|!|\))/i;
     // Data, not styling: the rainbow of the custom colour swatch; the vendor-prefixed fallbacks of
     // the point cloud background (documented in _variables.scss, exception 3)
@@ -398,10 +402,11 @@ describe('the stylesheets of the components', () => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
             const full = path.join(dir, entry.name);
             if (entry.isDirectory()) walk(full);
-            else if (/\.(vue|scss|css)$/.test(entry.name)) styles.push(full);
+            else if (/\.(vue|scss|css)$/.test(entry.name) && !(dir === CSS && entry.name === '_variables.scss')) styles.push(full);
         }
     };
     walk(JS);
+    walk(CSS);
 
     it('name no colour: a token, or a triplet token with an alpha', () => {
         expect(styles.length).toBeGreaterThan(150);
@@ -416,6 +421,7 @@ describe('the stylesheets of the components', () => {
             css.split('\n').forEach(line => {
                 const code = line.replace(/\/\*.*?\*\/|\/\/.*$/g, '');
                 if (!LITERAL.test(code)) return;
+                if (file.startsWith(CSS) && DEFINITION.test(code)) return;
                 if (DATA.some(([f, allowed]) => f === rel && allowed.test(code))) return;
                 found.push(`${rel}: ${code.trim()}`);
             });

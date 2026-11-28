@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
-import { measuredFiles, measurementFileOf, measurementOwnerEntry, shownPath, standaloneMeasurementEntry, viewMeasurementOwner } from './measurementOwner';
+import { drawnByMap, measuredFiles, measurementFileOf, measurementOwnerEntry, shownPath, standaloneMeasurementEntry, viewMeasurementOwner } from './measurementOwner';
 
 const entry = (path, type = ddb.entry.type.GEORASTER) => ({ entry: { path, type } });
 const placeholder = path => ({ placeholder: { path } });
@@ -25,7 +25,57 @@ describe('measuredFiles', () => {
     });
 });
 
+describe('drawnByMap', () => {
+    it('is true for the types the map draws and for a layer that cannot be drawn yet', () => {
+        const T = ddb.entry.type;
+        for (const type of [T.GEORASTER, T.GEOIMAGE, T.GEOVIDEO, T.GEOPANORAMA, T.POINTCLOUD, T.VECTOR, T.GAUSSIAN_SPLAT]) {
+            expect(drawnByMap(entry('a/file', type))).toBe(true);
+        }
+        expect(drawnByMap(placeholder('a/building.tif'))).toBe(true);
+    });
+
+    it('is false for a folder, a notes file, a PDF, a model and a measurements file', () => {
+        const T = ddb.entry.type;
+        for (const [path, type] of [['a/sub', T.DIRECTORY], ['a/notes.txt', T.GENERIC], ['a/report.pdf', T.GENERIC], ['a/model.obj', T.MODEL],
+            ['a/ortho_measurements.geojson', T.VECTOR], ['a/measurements.geojson', T.VECTOR]]) {
+            expect(drawnByMap(entry(path, type)), path).toBe(false);
+        }
+    });
+});
+
 describe('measurementOwnerEntry', () => {
+    it('is the sidecar of the raster when the other files of the folder are not drawn: an upload of a notes file does not move the file', () => {
+        const T = ddb.entry.type;
+        const files = [entry('flights/ortho.tif'), entry('flights/notes.txt', T.GENERIC), entry('flights/report.pdf', T.GENERIC), entry('flights/sub', T.DIRECTORY)];
+        expect(measurementFileOf(files)).toBe('flights/ortho_measurements.geojson');
+        expect(measurementFileOf([files[0]])).toBe('flights/ortho_measurements.geojson');
+    });
+
+    it('is the sidecar of the first raster that has one when the folder has no measurements file of its own', () => {
+        const files = [entry('flights/ortho.tif'), entry('flights/dsm.tif'), entry('flights/dsm_measurements.geojson', ddb.entry.type.VECTOR)];
+        expect(measurementOwnerEntry(files).path).toBe('flights/dsm.tif');
+        expect(measurementFileOf(files)).toBe('flights/dsm_measurements.geojson');
+        // The first of two that have one
+        expect(measurementFileOf([...files, entry('flights/ortho_measurements.geojson', ddb.entry.type.VECTOR)])).toBe('flights/ortho_measurements.geojson');
+    });
+
+    it('is the file of the folder as soon as the listing holds it, whatever sidecars are there', () => {
+        const files = [entry('flights/ortho.tif'), entry('flights/dsm.tif'), entry('flights/ortho_measurements.geojson', ddb.entry.type.VECTOR),
+            entry('flights/measurements.geojson', ddb.entry.type.VECTOR)];
+        expect(measurementFileOf(files)).toBe('flights/measurements.geojson');
+    });
+
+    it('is the file of the folder when no raster has a sidecar, and for layers that are only placeholders', () => {
+        expect(measurementFileOf([entry('flights/ortho.tif'), entry('flights/dsm.tif')])).toBe('flights/measurements.geojson');
+        expect(measurementFileOf([placeholder('flights/ortho.tif'), placeholder('flights/dsm.tif')])).toBe('flights/measurements.geojson');
+    });
+
+    it('does not take the sidecar of a file that is not a raster', () => {
+        const T = ddb.entry.type;
+        const files = [entry('flights/a.laz', T.POINTCLOUD), entry('flights/b.laz', T.POINTCLOUD), entry('flights/a_measurements.geojson', T.VECTOR)];
+        expect(measurementFileOf(files)).toBe('flights/measurements.geojson');
+    });
+
     it('is the one file on show: its sidecar holds the measurements', () => {
         const file = entry('flights/ortho.tif');
         expect(measurementOwnerEntry([file])).toBe(file.entry);

@@ -10,6 +10,7 @@ import { copyText } from '@/composables/useCopyText';
 import { latLonText, latLonDmsText } from '@/libs/format';
 import { escapeHtml } from '@/libs/sanitize';
 import { PRIMARY } from '@/libs/palette';
+import { safeColour } from '@/libs/map/measurementColour';
 import { placeOverlay, mapRailReserve } from '@/libs/map/overlayPlacement';
 import { unByKey } from 'ol/Observable';
 
@@ -36,7 +37,8 @@ export const POPUP_SHOWN_CLASS = 'ol-point-popup-shown';
  * @returns {string}
  */
 export function pointPopupHtml({ lat, lon, name, accent, description, actions = false }) {
-    const color = escapeHtml(accent || DEFAULT_ACCENT);
+    // A colour from a file goes into a style attribute: only a hexadecimal one is used
+    const color = escapeHtml(safeColour(accent, DEFAULT_ACCENT));
     const headerHtml = name
         ? `<div class="ol-point-popup-header" style="border-left-color:${color}">
                 <i class="fa-solid fa-location-dot" style="color:${color}" aria-hidden="true"></i>

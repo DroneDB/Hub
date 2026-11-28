@@ -143,7 +143,7 @@ describe('MeasurementStorage.save', () => {
         const result = await storage.save(collection([]));
         expect(dataset.writeObj).not.toHaveBeenCalled();
         expect(dataset.deleteObj).toHaveBeenCalledWith('cloud_measurements.geojson');
-        expect(result).toEqual({ path: 'cloud_measurements.geojson', fileName: 'cloud_measurements.geojson', count: 0, deleted: true, owner: MAP, refs: {}, renumbered: [] });
+        expect(result).toEqual({ path: 'cloud_measurements.geojson', fileName: 'cloud_measurements.geojson', count: 0, deleted: true, owner: MAP, refs: {}, renumbered: [], keptFromOthers: 0 });
     });
 
     it('an empty save without a file neither writes nor fails when the delete finds nothing', async () => {
@@ -744,5 +744,80 @@ describe('copyMeasurements', () => {
         const dataset = datasetOf({ 'odm/measurements.geojson': collection([cloud('point', 'p')], { version: '3.0' }) });
         expect(await copyMeasurements(dataset, FOLDER, ORTHO)).toBe(0);
         expect(dataset.writeObj).not.toHaveBeenCalled();
+    });
+});
+
+describe('a save keeps what another session saved after this view read the file', () => {
+    // A feature with a place, as both views write them; the 3D viewer's carry their local coordinates
+    const line = (id, extra) => feature('length', id, extra);
+
+    it('the map keeps the measurement another session added since its read, and says how many it kept', async () => {
+        const { dataset, state, file } = memoryDataset(JSON.stringify(collection([line('l1'), line('l2')])));
+        const storage = storageFor(dataset, MAP);
+        const loaded = await storage.load();
+        expect(ids(loaded)).toEqual(['l1', 'l2']);
+        // Another session saves l3 before this one saves
+        state.content = JSON.stringify(collection([line('l1'), line('l2'), line('l3')]));
+
+        const result = await storage.save(collection([line('l1'), line('l2'), line('l4')]));
+
+        expect(ids(file()).sort()).toEqual(['l1', 'l2', 'l3', 'l4']);
+        expect(result.keptFromOthers).toBe(1);
+        expect(result.count).toBe(4);
+    });
+
+    it('still deletes what this view loaded and deleted, and keeps the other session\'s on the saves after', async () => {
+        const { dataset, state, file } = memoryDataset(JSON.stringify(collection([line('l1'), line('l2')])));
+        const storage = storageFor(dataset, MAP);
+        await storage.load();
+        state.content = JSON.stringify(collection([line('l1'), line('l2'), line('l3')]));
+
+        await storage.save(collection([line('l1')]));
+        expect(ids(file()).sort()).toEqual(['l1', 'l3']);
+
+        // The measurement kept was never on this view's map: the next save keeps it again
+        await storage.save(collection([line('l1'), line('l5')]));
+        expect(ids(file()).sort()).toEqual(['l1', 'l3', 'l5']);
+    });
+
+    it('the 3D viewer keeps the measure another session saved, and its own measures follow what it shows', async () => {
+        const { dataset, state, file } = memoryDataset(JSON.stringify(collection([cloud('distance', 'd1'), cloud('height', 'h1')])));
+        const storage = storageFor(dataset, POINT_CLOUD);
+        await storage.load();
+        state.content = JSON.stringify(collection([cloud('distance', 'd1'), cloud('height', 'h1'), cloud('distance', 'd2'), line('m1')]));
+
+        await storage.save(collection([cloud('distance', 'd1')]));
+
+        // h1 was deleted here; d2 is another session's and kept; the map's m1 is untouched
+        expect(ids(file()).sort()).toEqual(['d1', 'd2', 'm1']);
+    });
+
+    it('a file that was not there at the read is not this view\'s: what a session made meanwhile is kept', async () => {
+        const { dataset, state, file } = memoryDataset();
+        const storage = storageFor(dataset, MAP);
+        expect(await storage.load()).toBeNull();
+        state.content = JSON.stringify(collection([line('x1')]));
+
+        await storage.save(collection([line('l1')]));
+
+        expect(ids(file()).sort()).toEqual(['l1', 'x1']);
+    });
+
+    it('Delete saved removes all the view\'s measurements, the ones it never read too', async () => {
+        const { dataset, state } = memoryDataset(JSON.stringify(collection([line('l1')])));
+        const storage = storageFor(dataset, MAP);
+        await storage.load();
+        state.content = JSON.stringify(collection([line('l1'), line('l3')]));
+
+        const result = await storage.deleteSaved();
+
+        expect(result.deleted).toBe(true);
+        expect(state.content).toBeNull();
+    });
+
+    it('a view that has not read the file writes what it shows, as before', async () => {
+        const { dataset, file } = memoryDataset(JSON.stringify(collection([line('l1'), line('l2')])));
+        await storageFor(dataset, MAP).save(collection([line('l9')]));
+        expect(ids(file())).toEqual(['l9']);
     });
 });

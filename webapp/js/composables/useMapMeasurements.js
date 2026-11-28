@@ -151,9 +151,11 @@ const definition = {
             this.measureControls.setSavedState(saved);
         },
 
-        // The map's measurements are the file's now (after a load or a save); what reads isDirty follows
-        _markSaved() {
-            this.measureControls.markSaved();
+        // The map's measurements are the file's now (after a load or a save); what reads isDirty follows. `saved`: what
+        // the file holds when the map is not what was written (a measurement changed while the file was being read or
+        // written): that change is not in the file, and stays unsaved
+        _markSaved(saved) {
+            this.measureControls.markSaved(saved);
             this._changeTick++;
         },
 
@@ -188,6 +190,10 @@ const definition = {
                 if (storage.measurementPath === previous && !reload) return;
             }
             this._loadedMeasurementPath = storage.measurementPath;
+            // The measurements on show come from another file now (the files on the map changed): the user is told which
+            if (previous && previous !== storage.measurementPath) {
+                this.showFlash(`Now showing the measurements of "${ddb.pathutils.basename(storage.measurementPath)}": the files on the map changed`, 'info');
+            }
 
             this.measureControls.clearAllMeasurements();
             this.measurementGroups = [];
@@ -211,12 +217,16 @@ const definition = {
             }
             // Another read (another owner, a Reload) or the end of the map took over while the file was read
             if (!this._isCurrentStorage(storage)) return;
+            let fromFile = new Set();
             if (geojson) {
                 const result = this.measureControls.importFromGeoJSON(geojson);
                 if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
+                if (result && result.features) fromFile = new Set(result.features);
             }
             this._setSaved(!!geojson);
-            this._markSaved();
+            // A measurement drawn while the file was being read is on the map but not in the file. The control is read raw:
+            // its features are matched by identity with the ones the import gave
+            this._markSaved(toRaw(this.measureControls).snapshot(fromFile));
             this.onMeasurementsLoaded();
         },
 
@@ -339,6 +349,8 @@ const definition = {
             if (notifySaveRefused(storage, () => this._isCurrentStorage(storage), () => this.loadSavedMeasurements({ reload: true }))) return;
 
             const geojson = this.measureControls.exportToGeoJSON(this.activeMeasurementEntry.path, this.measurementGroups);
+            // What this save writes: a measurement changed while it goes is not in the file
+            const exported = this.measureControls.snapshot();
             const count = geojson.features ? geojson.features.length : 0;
             if (!count && !this.hasSavedMeasurements) {
                 this.showAlert('Warning', 'No measurements to save');
@@ -346,7 +358,7 @@ const definition = {
             }
 
             try {
-                this._afterFileChange(await this.measurementStorage.save(geojson));
+                this._afterFileChange(await this.measurementStorage.save(geojson), exported);
             } catch (e) {
                 console.error('Error saving measurements:', e);
                 this.showAlert('Error', `Failed to save measurements: ${e.message}`);
@@ -356,16 +368,24 @@ const definition = {
             if (!this._switching) await this.loadSavedMeasurements();
         },
 
-        // The file holds what the map shows now: the saved state, the file list and a message follow
-        _afterFileChange(result) {
+        // The file holds what the map showed when it was written (`exported`, a snapshot of the control; omitted when the
+        // map was emptied with it): the saved state, the file list and a message follow
+        _afterFileChange(result, exported) {
+            // Whether the map is still what was written: asked before the references are applied
+            const unchanged = exported === undefined || this.measureControls.snapshot() === exported;
             // The file numbered the measurements that had no reference (and renumbered the new ones whose reference
             // another session had taken): the map shows what the file holds, and is not changed by it
             this.measureControls.applyRefs(result.refs);
             notifyRenumbered(result);
             this._setSaved(result.count > 0);
-            this._markSaved();
-            // The file mirrors the map, so the "logically deleted" IDs are no longer relevant
-            this.deletedMeasurementIds.clear();
+            this._markSaved(unchanged ? undefined : exported);
+            // The file mirrors the map, so the "logically deleted" IDs are no longer relevant; the ones of a
+            // measurement deleted while the save went are still to be kept out of a reload
+            if (unchanged) this.deletedMeasurementIds.clear();
+            if (result.keptFromOthers) {
+                this.showFlash(`${result.keptFromOthers} measurement${result.keptFromOthers > 1 ? 's' : ''} saved by another session `
+                    + `${result.keptFromOthers > 1 ? 'were' : 'was'} kept in the file. Reload the map to see ${result.keptFromOthers > 1 ? 'them' : 'it'}.`, 'warning');
+            }
             if (result.deleted) this.onFileRemoved(result.path);
             else this.onFileWritten(result.path);
             this.showFlash(saveResultMessage(result), 'positive');

@@ -6,6 +6,8 @@ import Observable from 'ol/Observable';
 import Collection from 'ol/Collection';
 import { showPointPopup, pointPopupHtml, POPUP_BELOW_CLASS } from './pointPopup';
 import { copyText } from '@/composables/useCopyText';
+import { readSource, ruleOf } from '@/specs/cssSource';
+import { PRIMARY } from '@/libs/palette';
 
 vi.mock('@/composables/useCopyText', () => ({ copyText: vi.fn(() => Promise.resolve()) }));
 
@@ -348,5 +350,38 @@ describe('the move handle of a point popup', () => {
         pointer('pointerdown', 10, 10);
         pointer('pointermove', 500, 500, { pointerId: 8 });
         expect(at(feature)).toEqual([1000, 2000]);
+    });
+});
+
+describe('the colour of a popup comes from a file', () => {
+    const INJECTED = 'red;position:fixed;inset:0;z-index:99999;background:url(https://evil/x)';
+
+    it('is the accent of the point when it is a hexadecimal colour', () => {
+        const html = pointPopupHtml({ lat: 1, lon: 2, name: 'Gate', accent: '#12ab34' });
+        expect(html).toContain('border-left-color:#12ab34');
+    });
+
+    it('is the default accent for style text: nothing of it reaches the markup', () => {
+        const html = pointPopupHtml({ lat: 1, lon: 2, name: 'Gate', accent: INJECTED });
+        expect(html).not.toContain('position:fixed');
+        expect(html).not.toContain('evil');
+        expect(html).toContain(`border-left-color:${PRIMARY[500]}`);
+    });
+
+    it('is the default accent for a popup made from a feature whose stroke is style text', () => {
+        const feature = pointAt([0, 0], { name: 'Gate', stroke: INJECTED });
+        const { popupEl } = showPointPopup(fakeMap(), feature, noActions());
+        expect(popupEl.innerHTML).not.toContain('position:fixed');
+        expect(popupEl.querySelector('.ol-point-popup-header').getAttribute('style')).toBe(`border-left-color:${PRIMARY[500]}`);
+    });
+});
+
+describe('the callout of a point in the dark theme', () => {
+    const css = readSource(__dirname, '../../../css/ol-controls.css');
+
+    it('takes the surface colour of the theme for its box and both arrows, not white', () => {
+        expect(ruleOf(css, '.ol-point-popup')).toMatch(/background:\s*var\(--ddb-bg-surface\)/);
+        expect(ruleOf(css, '.ol-point-popup::after')).toMatch(/border-top:\s*0\.5rem solid var\(--ddb-bg-surface\)/);
+        expect(ruleOf(css, '.ol-point-popup-below::after')).toMatch(/border-bottom:\s*0\.5rem solid var\(--ddb-bg-surface\)/);
     });
 });

@@ -277,3 +277,88 @@ describe('the identity, the fields and the properties of a measurement that the 
         expect(saved.id).toBeUndefined();
     });
 });
+
+describe('what a save of the map writes back of the file', () => {
+    const MULTI = [[[[9, 0], [9.0001, 0], [9.0001, 0.0001], [9, 0]]], [[[9.1, 0], [9.1001, 0], [9.1001, 0.0001], [9.1, 0]]]];
+    function save(features, unitPref = 'metric') {
+        const source = new VectorSource();
+        const { carried } = importMeasurements({ type: 'FeatureCollection', features }, source, unitPref, null);
+        return { saved: exportMeasurements(source, 'ortho.tif', unitPref, [], null, carried), source, carried };
+    }
+
+    it('keeps the features it cannot draw as they were: an untyped point, a multi-polygon, no geometry, no properties', () => {
+        const foreign = [
+            featureOf('Point', [9, 0], { name: 'survey mark', id: 'k1' }),
+            featureOf('MultiPolygon', MULTI, { name: 'parcels', id: 'k2', measurementType: 'parcel' }),
+            { type: 'Feature', geometry: null, properties: { name: 'note', id: 'k3' } },
+            { type: 'Feature', geometry: { type: 'LineString', coordinates: LINE }, properties: null, id: 'k4' }
+        ];
+        const mine = [
+            featureOf('Polygon', ROOF, { measurementType: 'area', id: 'a1' }),
+            featureOf('LineString', LINE, { measurementType: 'length', id: 'l1' }),
+            featureOf('Point', [9, 0], { measurementType: 'point', id: 'p1' })
+        ];
+        const { saved, source, carried } = save([...mine, ...foreign]);
+        // Nothing of the foreign features is drawn, and all of them are written back unchanged
+        expect(source.getFeatures()).toHaveLength(3);
+        expect(carried).toEqual(foreign);
+        expect(saved.features).toHaveLength(7);
+        foreign.forEach(f => expect(saved.features).toContainEqual(f));
+    });
+
+    it('leaves the carried features out of a part of the measurements exported on its own', () => {
+        const source = new VectorSource();
+        const { features, carried } = importMeasurements({ type: 'FeatureCollection', features: [
+            featureOf('LineString', LINE, { measurementType: 'length', id: 'l1' }),
+            featureOf('Point', [9, 0], { id: 'k1' })
+        ] }, source, 'metric', null);
+        const part = exportMeasurements(source, 'ortho.tif', 'metric', [], new Set(features), carried);
+        expect(part.features.map(f => f.properties.id)).toEqual(['l1']);
+    });
+
+    it('keeps the type of a polygon or a line of another tool: a zone stays a zone', () => {
+        const { saved } = save([
+            featureOf('Polygon', ROOF, { measurementType: 'zone', id: 'z1', name: 'No fly' }),
+            featureOf('LineString', LINE, { measurementType: 'route', id: 'r1' }),
+            featureOf('Polygon', ROOF, { id: 'u1' })
+        ]);
+        expect(saved.features.map(f => f.properties.measurementType)).toEqual(['zone', 'route', 'area']);
+        expect(saved.features[0].properties.name).toBe('No fly');
+    });
+});
+
+describe('the style properties of a saved measurement', () => {
+    const roundTripped = props => {
+        const source = new VectorSource();
+        importMeasurements({ type: 'FeatureCollection', features: [featureOf('Polygon', ROOF, { measurementType: 'area', ...props })] }, source, 'metric', null);
+        return { feature: source.getFeatures()[0], saved: exportMeasurements(source, 'ortho.tif', 'metric').features[0].properties };
+    };
+
+    it('keeps an opacity of 0: a fill that is not drawn stays so after a save', () => {
+        const { feature, saved } = roundTripped({ 'fill-opacity': 0, 'stroke-opacity': 0 });
+        expect(feature.get('fill-opacity')).toBe(0);
+        expect(saved['fill-opacity']).toBe(0);
+        expect(saved['stroke-opacity']).toBe(0);
+    });
+
+    it('leaves out an opacity the file does not have', () => {
+        const { saved } = roundTripped({});
+        expect(saved).not.toHaveProperty('fill-opacity');
+        expect(saved).not.toHaveProperty('stroke-opacity');
+    });
+
+    it('uses a hexadecimal colour and the rgba the Hub writes for an analysis overlay', () => {
+        const { feature } = roundTripped({ stroke: '#ff0000', fill: 'rgba(10, 20, 30, 0.2)' });
+        expect(feature.get('stroke')).toBe('#ff0000');
+        expect(feature.get('fill')).toBe('rgba(10, 20, 30, 0.2)');
+    });
+
+    it('drops a colour that is style text, so that a file cannot put markup or a style in a popup', () => {
+        const injected = 'red;position:fixed;inset:0;z-index:99999;background:url(https://evil/x)';
+        const { feature, saved } = roundTripped({ stroke: injected, fill: 'url(https://evil/x)' });
+        expect(feature.get('stroke')).toBeUndefined();
+        expect(feature.get('fill')).toBeUndefined();
+        expect(saved).not.toHaveProperty('stroke');
+        expect(saved).not.toHaveProperty('fill');
+    });
+});

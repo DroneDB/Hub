@@ -255,11 +255,13 @@ export default {
         deleteGroupConfirmDialog() {
             const group = this.pendingDeleteGroup;
             if (!group) return { message: '' };
-            const count = Array.isArray(group.items) ? group.items.length : null;
+            // Every measurement of the group goes, the ones the filters hide too: they are counted from the whole list
+            // (group.items is only what the filters show)
+            const count = this.measurements.filter(m => m.groupId === group.id).length;
             return confirmDialogProps({
                 kind: 'measurement group',
                 items: [group.name],
-                lost: [count === null ? 'all its measurements' : `its ${countOf(count, 'measurement')}`]
+                lost: [`its ${countOf(count, 'measurement')}`]
             });
         },
         // The distinct types, categories and statuses the measurements have, for the filters

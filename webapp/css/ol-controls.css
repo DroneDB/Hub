@@ -3,7 +3,7 @@
  */
 
 .ol-control {
-    background-color: rgba(255, 255, 255, .4) !important;
+    background-color: rgba(var(--ddb-glass-rgb), 0.4) !important;
     border-radius: 0.25rem !important;
     padding: 0.25rem !important;
 }
@@ -12,7 +12,7 @@
     background-color: rgba(var(--ddb-primary-rgb), 0.5) !important;
     margin: 0.25rem !important;
     padding: 0 !important;
-    color: #fff !important;
+    color: var(--ddb-text-on-dark) !important;
     font-weight: bold !important;
     text-decoration: none !important;
     font-size: inherit !important;
@@ -36,7 +36,7 @@
 
 .ol-control button.active {
     background-color: var(--ddb-success) !important;
-    box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 0 0 0.25rem rgba(var(--ddb-glass-rgb), 0.5);
 }
 
 /* The keyboard focus ring: the --ddb-focus-ring-* set (FR-XC-21), with its halo, as the button sits
@@ -54,7 +54,7 @@
 }
 
 .ol-control button.active:focus-visible {
-    box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5), 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
+    box-shadow: inset 0 0 0 0.25rem rgba(var(--ddb-glass-rgb), 0.5), 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
 }
 
 /* ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@
 
 .ol-tooltip-measure:before,
 .ol-tooltip-static:before {
-    border-top: 0.5rem solid rgb(255 255 255 / 90%);
+    border-top: 0.5rem solid rgba(var(--ddb-glass-rgb), 0.9);
     border-right: 0.5rem solid transparent;
     border-left: 0.5rem solid transparent;
     content: "";
@@ -248,8 +248,8 @@
 
 .ol-tooltip-static {
     background-color: var(--ddb-measure-color);
-    color: black;
-    border: var(--ddb-border-width) solid white;
+    color: rgba(var(--ddb-shade-rgb), 1);
+    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 1);
 }
 
 /* Persistent measurement labels are hidden by default and revealed only
@@ -261,9 +261,9 @@
 
 .ol-tooltip {
     position: relative;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(var(--ddb-shade-rgb), 0.5);
     border-radius: 0.25rem;
-    color: white;
+    color: var(--ddb-text-on-dark);
     padding: 0.25rem 0.5rem;
     opacity: 0.9;
     white-space: nowrap;
@@ -276,7 +276,7 @@
     font-weight: bold;
     font-size: 0.75rem;
     margin-bottom: 0.25rem;
-    border-bottom: var(--ddb-border-width) solid rgba(255, 255, 255, 0.3);
+    border-bottom: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.3);
     padding-bottom: 0.25rem;
 }
 
@@ -321,8 +321,8 @@
     width: max-content;
     max-width: calc(100% - 2 * var(--map-rail-reserve));
     box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
+    background: rgba(var(--ddb-shade-rgb), 0.6);
+    color: var(--ddb-text-on-dark);
     font-size: 0.75rem;
     user-select: none;
     /* Dark in both themes: the ring of the dark surfaces */
@@ -338,7 +338,7 @@
 .map-bottom-panel .ph-btn {
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(var(--ddb-glass-rgb), 0.75);
     cursor: pointer;
     padding: 0 0.15rem;
     font-size: var(--ddb-font-size-base);
@@ -384,9 +384,9 @@
 
 /* Point location popup */
 .ol-point-popup {
-    background: white;
+    background: var(--ddb-bg-surface);
     border-radius: 0.5rem;
-    box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0.25rem 1rem rgba(var(--ddb-shade-rgb), 0.25);
     font-size: 0.75rem;
     color: var(--ddb-text);
     white-space: nowrap;
@@ -405,7 +405,7 @@
     margin-left: -0.5rem;
     border-left: 0.5rem solid transparent;
     border-right: 0.5rem solid transparent;
-    border-top: 0.5rem solid white;
+    border-top: 0.5rem solid var(--ddb-bg-surface);
 }
 
 .ol-point-popup-header {
@@ -413,8 +413,8 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0.75rem;
-    background: var(--ddb-bg-subtle, #f6f8fa);
-    border-bottom: 1px solid var(--ddb-border-separator, #e5e7eb);
+    background: var(--ddb-bg-subtle);
+    border-bottom: 1px solid var(--ddb-border-separator);
     border-left: 0.25rem solid var(--ddb-primary);
     font-weight: 600;
     font-size: 0.8rem;
@@ -431,7 +431,7 @@
     bottom: auto;
     top: -0.5rem;
     border-top: 0;
-    border-bottom: 0.5rem solid white;
+    border-bottom: 0.5rem solid var(--ddb-bg-surface);
 }
 
 .ol-point-popup-title {

@@ -150,15 +150,22 @@ describe('useMapMeasurements', () => {
         expect(onMap()).toEqual([]);
     });
 
-    it('a new owner replaces the measurements on the map, quietly when nothing was unsaved', async () => {
+    it('a new owner replaces the measurements on the map, with a notice of the file that is shown now and no question when nothing was unsaved', async () => {
         stored['b/notes_measurements.geojson'] = fileOf('b1');
         const m = start();
         await m.loadSavedMeasurements();
-        files.value = [{ entry: { path: 'b/notes.txt', type: T.GENERIC } }];
+        files.value = [{ entry: { path: 'b/notes.tif', type: T.GEORASTER } }];
         await m.loadSavedMeasurements();
         expect(onMap()).toEqual(['b1']);
-        expect(flashes).toEqual([]);
+        expect(flashes).toEqual([{ message: 'Now showing the measurements of "notes_measurements.geojson": the files on the map changed', color: 'info' }]);
         expect(choose).not.toHaveBeenCalled();
+    });
+
+    it('says nothing of the file on the first read, nor when the same file is read again', async () => {
+        const m = start();
+        await m.loadSavedMeasurements();
+        await m.loadSavedMeasurements({ reload: true });
+        expect(flashes).toEqual([]);
     });
 
     describe('after a read of the file that failed', () => {
@@ -254,7 +261,7 @@ describe('useMapMeasurements', () => {
             const m = start();
             await m.loadSavedMeasurements();
             await m.saveMeasurements();
-            files.value = [{ entry: { path: 'b/notes.txt', type: T.GENERIC } }];
+            files.value = [{ entry: { path: 'b/notes.tif', type: T.GEORASTER } }];
             await m.loadSavedMeasurements();
             expect(onMap()).toEqual(['b1']);
             const reads = dataset.getFileContents.mock.calls.length;
@@ -466,7 +473,7 @@ describe('useMapMeasurements', () => {
             expect(onMap()).toEqual(['f1']);
             expect(m.measurementsFilePath.value).toBe('a/measurements.geojson');
             expect(controls.isDirty()).toBe(false);
-            expect(flashes.map(f => f.color)).toEqual(['positive']);
+            expect(flashes.map(f => f.color)).toEqual(['positive', 'info']);
         });
 
         it('Discard shows the new file and writes nothing', async () => {
@@ -501,7 +508,7 @@ describe('useMapMeasurements', () => {
             toFolder();
             await m.loadSavedMeasurements();
             expect(choose).not.toHaveBeenCalled();
-            expect(flashes).toEqual([]);
+            expect(flashes).toEqual([{ message: 'Now showing the measurements of "measurements.geojson": the files on the map changed', color: 'info' }]);
             expect(onMap()).toEqual(['f1']);
         });
 
@@ -543,7 +550,8 @@ describe('useMapMeasurements', () => {
             toFolder();
             await m.loadSavedMeasurements();
             expect(choose).not.toHaveBeenCalled();
-            expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
+            expect(flashes.map(f => f.color)).toEqual(['warning', 'info']);
+            expect(flashes[0].message).toBe('Unsaved measurement changes for "ortho_measurements.geojson" discarded');
             expect(onMap()).toEqual(['f1']);
         });
 
@@ -556,8 +564,148 @@ describe('useMapMeasurements', () => {
             await m.loadSavedMeasurements();
             vi.restoreAllMocks();
             expect(choose).not.toHaveBeenCalled();
-            expect(flashes).toHaveLength(1);
+            expect(flashes.map(f => f.color)).toEqual(['warning', 'info']);
             expect(onMap()).toEqual(['f1']);
+        });
+    });
+
+    describe('a measurement changed while the file is being written or read', () => {
+        /** A write that ends when `release()` is called */
+        function slowWrite() {
+            let release;
+            const gate = new Promise(resolve => { release = resolve; });
+            const write = dataset.writeObj;
+            dataset.writeObj = vi.fn(async (...args) => { await gate; return write(...args); });
+            return release;
+        }
+
+        it('stays unsaved when it was edited while a save was going, and the next save writes it', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            const release = slowWrite();
+            const saving = m.saveMeasurements();
+            // The user edits a measurement while the file is being written
+            controls.source.getFeatures()[0].set('name', 'edited meanwhile');
+            release();
+            await saving;
+
+            expect(controls.isDirty()).toBe(true);
+            expect(m.hasUnsavedMeasurements.value).toBe(true);
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features.map(f => f.properties.name)).toEqual(['m1', 'm2']);
+
+            dataset.writeObj = vi.fn(async (path, blob) => { stored[path] = await blob.text(); });
+            await m.saveMeasurements();
+            expect(controls.isDirty()).toBe(false);
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features.map(f => f.properties.name)).toContain('edited meanwhile');
+        });
+
+        it('stays unsaved when it was drawn or deleted while a save was going', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            const release = slowWrite();
+            const saving = m.saveMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            controls.deleteMeasurement(controls.source.getFeatures()[0]);
+            release();
+            await saving;
+            expect(controls.isDirty()).toBe(true);
+        });
+
+        it('is saved when nothing changed while the save was going', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            const release = slowWrite();
+            const saving = m.saveMeasurements();
+            release();
+            await saving;
+            expect(controls.isDirty()).toBe(false);
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+        });
+
+        it('keeps the id of a measurement deleted while a save was going out of a reload', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            const release = slowWrite();
+            const saving = m.saveMeasurements();
+            const gone = controls.source.getFeatures()[0];
+            controls.deleteMeasurement(gone);
+            m.deletedMeasurementIds.value.add(gone.get('id'));
+            release();
+            await saving;
+            expect(m.deletedMeasurementIds.value.has(gone.get('id'))).toBe(true);
+        });
+
+        it('keeps a measurement drawn while the file was being read unsaved, and saves it with the file\'s', async () => {
+            let release;
+            const gate = new Promise(resolve => { release = resolve; });
+            const read = dataset.getFileContents;
+            dataset.getFileContents = vi.fn(async (...args) => { await gate; return read(...args); });
+            const m = start();
+            const loading = m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            release();
+            await loading;
+
+            expect(onMap()).toEqual(['m1', 'm2', 'n1']);
+            expect(controls.isDirty()).toBe(true);
+            expect(m.hasUnsavedMeasurements.value).toBe(true);
+            await m.saveMeasurements();
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features.map(f => f.properties.name).sort()).toEqual(['m1', 'm2', 'n1']);
+            expect(controls.isDirty()).toBe(false);
+        });
+    });
+
+    describe('a file with features the map cannot draw (made by another tool)', () => {
+        const foreign = [
+            { type: 'Feature', geometry: { type: 'Point', coordinates: [10, 45] }, properties: { name: 'mark', id: 'k1' } },
+            { type: 'Feature', geometry: { type: 'MultiPolygon', coordinates: [[[[10, 45], [10.1, 45], [10.1, 45.1], [10, 45]]]] }, properties: { id: 'k2', measurementType: 'zone' } },
+            { type: 'Feature', geometry: null, properties: { id: 'k3', name: 'note' } }
+        ];
+
+        it('writes them back unchanged with the measurements it draws, and Clear all does not delete them', async () => {
+            const own = JSON.parse(fileOf('m1', 'm2')).features;
+            stored['a/ortho_measurements.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [...own, ...foreign] });
+            const m = start();
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['m1', 'm2']);
+            expect(m.hasUnsavedMeasurements.value).toBe(false);
+
+            controls.confirmClearAll();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            await m.saveMeasurements();
+
+            const written = JSON.parse(stored['a/ortho_measurements.geojson']).features;
+            expect(written).toHaveLength(4);
+            foreign.forEach(f => expect(written).toContainEqual(expect.objectContaining({ geometry: f.geometry, properties: expect.objectContaining(f.properties) })));
+        });
+    });
+
+    describe('the owner when the folder holds measurements an earlier map saved in a sidecar', () => {
+        it('shows and saves in the sidecar of the first raster while the folder has no measurements file', async () => {
+            const raster = path => ({ entry: { path, type: T.GEORASTER } });
+            stored['a/dtm_measurements.geojson'] = fileOf('s1');
+            files.value = [raster('a/ortho.tif'), raster('a/dtm.tif'), { entry: { path: 'a/dtm_measurements.geojson', type: T.VECTOR } }];
+            const m = start();
+            await m.loadSavedMeasurements();
+            expect(m.measurementsFilePath.value).toBe('a/dtm_measurements.geojson');
+            expect(onMap()).toEqual(['s1']);
+        });
+    });
+
+    describe('a save over what another session saved since the read', () => {
+        it('keeps their measurement and tells the user to reload to see it', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            const file = JSON.parse(stored['a/ortho_measurements.geojson']);
+            file.features.push({ ...lengthFeature('theirs'), properties: { ...lengthFeature('theirs').properties, id: 'their-id' } });
+            stored['a/ortho_measurements.geojson'] = JSON.stringify(file);
+
+            await m.saveMeasurements();
+
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features.map(f => f.properties.name).sort()).toEqual(['m1', 'm2', 'theirs']);
+            const notice = flashes.find(f => f.color === 'warning');
+            expect(notice.message).toBe('1 measurement saved by another session was kept in the file. Reload the map to see it.');
         });
     });
 

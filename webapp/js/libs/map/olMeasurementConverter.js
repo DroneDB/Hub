@@ -2,7 +2,7 @@
  * Utility to convert OpenLayers measurements to GeoJSON and vice versa
  */
 
-import { LineString, Polygon, Point } from 'ol/geom';
+import { LineString, Polygon } from 'ol/geom';
 import Feature from 'ol/Feature';
 import Overlay from 'ol/Overlay';
 import GeoJSON from 'ol/format/GeoJSON';
@@ -17,6 +17,7 @@ import { contourLevelText, CONTOUR_PROPERTIES, UNSAVED_FLAG } from './contourSto
 import { write, sectionOf, VIEW } from './measurementFormat';
 import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
 import { ANNOTATION_KEYS, annotationProperties, unknownProperties } from './annotationIds';
+import { safeColour } from './measurementColour';
 
 /**
  * The property of a feature that holds what its file says that the map does not know: it is written back as it
@@ -103,11 +104,12 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
             calculatedValues = calculateLengthValues(length, unitPref);
         }
     } else if (geometryType === 'Polygon') {
-        measurementType = 'area';
+        // A polygon of another tool keeps its own type (a zone stays a zone): only one with none is an area
+        measurementType = measurementType || 'area';
         const area = geodesicArea(geometry);
         calculatedValues = calculateAreaValues(area, unitPref);
     } else if (geometryType === 'LineString') {
-        measurementType = 'length';
+        measurementType = measurementType || 'length';
         const length = geodesicLength(geometry);
         calculatedValues = calculateLengthValues(length, unitPref);
     } else if (geometryType === 'Point') {
@@ -136,10 +138,11 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
         createdAt: feature.get('createdAt') || new Date().toISOString(),
         // GeoJSON styling properties
         stroke: feature.get('stroke') || null,
-        'stroke-width': feature.get('stroke-width') || null,
-        'stroke-opacity': feature.get('stroke-opacity') || null,
+        // An opacity of 0 is a value (a fill that is not drawn): only a missing one is left out
+        'stroke-width': feature.get('stroke-width') ?? null,
+        'stroke-opacity': feature.get('stroke-opacity') ?? null,
         fill: feature.get('fill') || null,
-        'fill-opacity': feature.get('fill-opacity') || null,
+        'fill-opacity': feature.get('fill-opacity') ?? null,
         // Group assignment
         groupId: feature.get('groupId') || null
     };
@@ -187,6 +190,9 @@ export function measurementSizeText(geometry, measurementType, unitPref) {
     if (measurementType === 'length' && geometry instanceof LineString) return lengthParts(geodesicLength(geometry), unitPref).text;
     return null;
 }
+
+/** @param {unknown} value @returns {boolean} whether a style property of a file has a value (0 is one) */
+const hasValue = value => !!value || value === 0;
 
 /** The size kind of an untyped geometry: 'area' for a polygon, 'length' for a line, else null */
 function sizeKind(geometry) {
@@ -242,11 +248,17 @@ function geoJSONToFeature(geoJsonFeature, unitPref) {
     // Restore GeoJSON styling properties; a stockpile or a profile saved in the orange of the
     // earlier analysis overlays takes today's yellow
     const colour = ANALYSIS_MEASUREMENT_TYPES.includes(props.measurementType) ? currentAnalysisColour : c => c;
-    if (props.stroke) feature.set('stroke', colour(props.stroke));
+    // A colour of the file is used only when it is a hexadecimal one (it reaches style attributes); any other is the default
+    // (the reader of the file copies every property onto the feature as it is: an unusable colour is taken off it)
+    const stroke = safeColour(props.stroke);
+    const fill = safeColour(props.fill);
+    if (!stroke) feature.unset('stroke');
+    if (!fill) feature.unset('fill');
+    if (stroke) feature.set('stroke', colour(stroke));
     if (props['stroke-width']) feature.set('stroke-width', props['stroke-width']);
-    if (props['stroke-opacity']) feature.set('stroke-opacity', props['stroke-opacity']);
-    if (props.fill) feature.set('fill', colour(props.fill));
-    if (props['fill-opacity']) feature.set('fill-opacity', props['fill-opacity']);
+    if (hasValue(props['stroke-opacity'])) feature.set('stroke-opacity', props['stroke-opacity']);
+    if (fill) feature.set('fill', colour(fill));
+    if (hasValue(props['fill-opacity'])) feature.set('fill-opacity', props['fill-opacity']);
     // Restore group assignment
     if (props.groupId) feature.set('groupId', props.groupId);
 
@@ -292,6 +304,19 @@ export function measurementTooltipHtml(name, text) {
 }
 
 /**
+ * Whether the map can draw and write back a measurement of this geometry type: a point only when it is a point
+ * measurement (a Point with no type is a plain feature of another tool), a line or a polygon of any type. What it
+ * cannot is carried through a save as it is (see importMeasurements).
+ * @param {string | undefined} geometryType  a GeoJSON geometry type
+ * @param {unknown} measurementType
+ * @returns {boolean}
+ */
+function isMapMeasurement(geometryType, measurementType) {
+    if (geometryType === 'Point') return measurementType === 'point';
+    return geometryType === 'LineString' || geometryType === 'Polygon';
+}
+
+/**
  * Export all measurements in GeoJSON format: the document of the map's measurements (its features and
  * its section of the file, with the groups), which the storage merges into the file next to the 3D
  * viewer's.
@@ -301,9 +326,11 @@ export function measurementTooltipHtml(name, text) {
  * @param {Array} [groups] - Measurement groups (optional, for serialization)
  * @param {Set<ol.Feature>|null} [only] - Only these features (a part of the measurements downloaded on its own): the
  *   groups are then the ones they belong to
+ * @param {Object[]} [carried] - The features of the file that the map cannot draw (importMeasurements gives them),
+ *   written as they were read; left out when `only` is given
  * @returns {Object} GeoJSON FeatureCollection
  */
-export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', groups = [], only = null) {
+export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', groups = [], only = null, carried = []) {
     const kept = only ? source.getFeatures().filter(f => only.has(f)) : source.getFeatures();
     if (only) {
         const used = new Set(kept.map(f => f.get('groupId')).filter(Boolean));
@@ -313,16 +340,11 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
         .filter(f => {
             // Only export actual measurement features (not temporary draw features)
             const geom = f.getGeometry();
-            const hasType = f.get('measurementType');
-            return geom && (
-                geom instanceof Polygon
-                || geom instanceof LineString
-                || (geom instanceof Point && hasType === 'point')
-            );
+            return !!geom && isMapMeasurement(geom.getType(), f.get('measurementType'));
         })
         .map(f => featureToGeoJSON(f, unitPref));
 
-    return write(null, VIEW.MAP, features, { orthophotoFile: orthophotoPath, unitPreference: unitPref, groups });
+    return write(null, VIEW.MAP, only ? features : [...features, ...carried], { orthophotoFile: orthophotoPath, unitPreference: unitPref, groups });
 }
 
 /**
@@ -333,7 +355,10 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
  * @param {ol.Map} map - OpenLayers map instance
  * @param {import('./pointPopup').PointPopupActions} [pointActions] - The handlers of the edit and delete
  *   buttons of the popups of the points
- * @returns {Array} Imported features
+ * @returns {{ features: ol.Feature[], groups: Array, carried: Object[] }} The imported features, the groups of the map's section,
+ *   and `carried`: the features of the file that the map cannot draw or write back (a point with no type, a geometry
+ *   other than a point, a line or a polygon, no geometry, a feature that cannot be read). They are not put on the
+ *   map; exportMeasurements writes them as they are, so a save does not lose what another tool put in the file.
  */
 export function importMeasurements(geojson, source, unitPref, map, pointActions) {
     if (!geojson || !geojson.features) {
@@ -342,11 +367,24 @@ export function importMeasurements(geojson, source, unitPref, map, pointActions)
     }
 
     const imported = [];
+    /** @type {Object[]} */
+    const carried = [];
 
     geojson.features.forEach(geoJsonFeature => {
+        const readable = geoJsonFeature && geoJsonFeature.geometry && geoJsonFeature.properties;
+        if (!readable || !isMapMeasurement(geoJsonFeature.geometry.type, geoJsonFeature.properties.measurementType)) {
+            carried.push(geoJsonFeature);
+            return;
+        }
+        let feature;
         try {
-            const feature = geoJSONToFeature(geoJsonFeature, unitPref);
-
+            feature = geoJSONToFeature(geoJsonFeature, unitPref);
+        } catch (e) {
+            console.error('Error importing measurement:', e, geoJsonFeature);
+            carried.push(geoJsonFeature);
+            return;
+        }
+        try {
             // Add the feature to the source
             source.addFeature(feature);
 
@@ -370,7 +408,7 @@ export function importMeasurements(geojson, source, unitPref, map, pointActions)
 
     // Return imported features AND the map's groups from metadata.views.map (for group state restoration)
     const { groups } = sectionOf(geojson, VIEW.MAP);
-    return { features: imported, groups: Array.isArray(groups) ? groups : [] };
+    return { features: imported, groups: Array.isArray(groups) ? groups : [], carried };
 }
 
 /**

@@ -141,6 +141,13 @@ export class MeasurementStorage {
          * there are any, so the file keeps them.
          */
         this.unplaced = 0;
+        /**
+         * The ids of this view's measurements in the file as the last read gave them (null before a read): a save keeps
+         * the measurements of this view that the file holds and this id list does not, which another session saved
+         * after the read, and drops the ones the view had and no longer has (it deleted them).
+         * @type {Set<string> | null}
+         */
+        this._loadedIds = null;
         /** The refs of the file, which the refs this view issues come after (annotationIds.RefSequence) */
         this.refs = new RefSequence();
         /** @type {Promise<any> | null} */
@@ -246,22 +253,50 @@ export class MeasurementStorage {
         return this._write(geojsonData);
     }
 
-    /** Reads the file, merges the measurements of this view into it and writes it (or removes it). */
-    async _write(geojsonData) {
+    /**
+     * The measurements of this view that the file holds now and the view never read: another session saved them
+     * after this view's read, and a save of this view's measurements must not delete them. Empty when the view has not
+     * read the file (it then writes what it shows, as a save always did) or `replaceAll` (the view removes its own).
+     * @param {Record<string, any> | null} previous  the file as it is now
+     * @param {any[]} own  the measurements the view writes
+     * @param {boolean} replaceAll
+     * @returns {any[]}
+     */
+    _unseenOwn(previous, own, replaceAll) {
+        if (replaceAll || !previous || !this._loadedIds) return [];
+        const written = new Set(own.map(idOf).filter(Boolean));
+        return previous.features.filter(f => this._owns(f) && !this._loadedIds.has(idOf(f)) && !written.has(idOf(f)));
+    }
+
+    /**
+     * Reads the file, merges the measurements of this view into it and writes it (or removes it).
+     * @param {Object} geojsonData
+     * @param {{ replaceAll?: boolean }} [options]  `replaceAll`: the view's measurements in the file are all replaced,
+     *   also those it has not read (the user removes the saved measurements)
+     */
+    async _write(geojsonData, { replaceAll = false } = {}) {
         try {
             const previous = await this._read();
-            const own = geojsonData.features || [];
+            const shown = geojsonData.features || [];
+            const unseen = this._unseenOwn(previous, shown, replaceAll);
+            const own = [...shown, ...unseen];
             // The first save of either view gives every feature of the file its ref (the other view's too)
             const { document, refs, renumbered } = writeNumbered(previous, this.owner, own, sectionOf(geojsonData, this.owner));
-            const result = { path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner, refs, renumbered };
+            const result = {
+                path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner, refs, renumbered,
+                keptFromOthers: unseen.length
+            };
             if (!document.features.length) {
                 await this._deleteIfPresent();
+                this._loadedIds = new Set();
                 this.loadState = 'loaded';
                 this.unplaced = 0;
                 return { ...result, deleted: true };
             }
 
             await this._writeDocument(document);
+            // The view has what it wrote; the measurements it kept and never read stay unseen, so the next save keeps them too
+            this._loadedIds = new Set(shown.map(idOf).filter(Boolean));
             this.loadState = 'loaded';
             // What the view did not show is gone from the file (a delete; a save is refused while there is any)
             this.unplaced = 0;
@@ -306,7 +341,7 @@ export class MeasurementStorage {
      * @returns {Promise<{path: string, fileName: string, count: number, deleted: boolean, owner: string}>}
      */
     deleteSaved() {
-        return this._write({ type: 'FeatureCollection', features: [] });
+        return this._write({ type: 'FeatureCollection', features: [] }, { replaceAll: true });
     }
 
     /** Deletes the file; a file that is already gone is not an error. */
@@ -343,10 +378,16 @@ export class MeasurementStorage {
             throw e;
         }
         if (turn === this._loadTurn) this.loadState = 'loaded';
-        if (!document) return null;
+        if (!document) {
+            // A file that is not there: what a session saves before this view's next save is not this view's to delete
+            if (turn === this._loadTurn) this._loadedIds = new Set();
+            return null;
+        }
         // The refs of the file: this view issues the ones after them, and tells a user which ones the other view has
         this.refs.observe(document, f => !this._owns(f));
         const features = document.features.filter(f => this._owns(f));
+        // What this view has read: a later save keeps the measurements of this view that are not among them
+        if (turn === this._loadTurn) this._loadedIds = new Set(features.map(idOf).filter(Boolean));
         if (!features.length) return null;
         const views = { [this.owner]: sectionOf(document, this.owner) };
         return { ...document, metadata: { ...document.metadata, views }, features };

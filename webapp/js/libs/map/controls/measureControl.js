@@ -3,6 +3,7 @@ import { newId } from '@/libs/ids';
 import { RefSequence, choiceLabel, isAnnotationType } from '@/libs/map/annotationIds';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { controlButton, controlGroup } from './controlButton';
+import { isTypingTarget } from './typingTarget';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Collection from 'ol/Collection';
@@ -38,6 +39,21 @@ import {
 // load them and others re-normalize the value on read-back, breaking any
 // equality check used to detect ownership of the cursor.
 const ERASE_HOVER_CURSOR = `url('${'/images/measure-erase.svg'}') 12 12, crosshair`;
+
+// The smallest line and area that are kept: a click that draws less is a mistake, and goes
+const MIN_LENGTH_METERS = 0.01; // 1 cm
+const MIN_AREA_SQUARE_METERS = 0.0001; // 1 cm2
+
+/**
+ * Whether a drawn geometry is too small to be a measurement (a line of less than 1 cm, an area of less than 1 cm2).
+ * @param {import('ol/geom').Geometry} geometry
+ * @returns {boolean}
+ */
+export function isDegenerateMeasurement(geometry) {
+    if (geometry instanceof LineString) return geodesicLength(geometry) < MIN_LENGTH_METERS;
+    if (geometry instanceof Polygon) return geodesicArea(geometry) < MIN_AREA_SQUARE_METERS;
+    return false;
+}
 
 /**
  * The label of a stockpile in the units of the map, from its stored metric properties; null for one
@@ -266,6 +282,9 @@ class MeasureControls extends Control {
         this.hasSaved = false;
         // The measurements as last loaded or saved, to tell unsaved changes (isDirty): none yet
         this._savedSnapshot = '[]';
+        // The features of the file that the map cannot draw or write back (a point with no type, a multi-polygon):
+        // a Save writes them as they were read (importMeasurements)
+        this.carried = [];
     }
 
     /**
@@ -514,7 +533,8 @@ class MeasureControls extends Control {
      * Confirm and execute clear all measurements (called after user confirmation)
      */
     confirmClearAll() {
-        this.clearAllMeasurements();
+        // What the map cannot draw is not on it to be cleared: it stays in the file as it is
+        this._clearMeasurements();
         this.onClearAll();
     }
 
@@ -549,9 +569,12 @@ class MeasureControls extends Control {
         this.btnDelete.style.display = show(this.hasSaved && this.canDelete);
     }
 
-    /** The measurements as they would be saved, without the times that an export may fill in. */
-    _snapshot() {
-        const { features } = this.exportToGeoJSON('');
+    /**
+     * The measurements as they would be saved, without the times that an export may fill in.
+     * @param {Set<ol.Feature>|null} [only]  only these features (the ones a read gave: what the file holds)
+     */
+    snapshot(only = null) {
+        const { features } = exportMeasurements(this.source, '', this.unitPref, [], only);
         return JSON.stringify(features.map(f => {
             const properties = { ...f.properties };
             delete properties.createdAt;
@@ -559,14 +582,19 @@ class MeasureControls extends Control {
         }));
     }
 
-    /** Takes the measurements on the map as the saved ones (after a load or a save). */
-    markSaved() {
-        this._savedSnapshot = this._snapshot();
+    /**
+     * Takes the measurements on the map as the saved ones (after a load or a save), or the given snapshot when the map
+     * changed since the file was made from it (a measurement edited while a save was going: it is not in the file and
+     * stays unsaved).
+     * @param {string} [saved]  what the file holds, as `snapshot` gave it; the measurements on the map now when omitted
+     */
+    markSaved(saved = this.snapshot()) {
+        this._savedSnapshot = saved;
     }
 
     /** Whether the map has changes that are not in the file. */
     isDirty() {
-        return this._snapshot() !== this._savedSnapshot;
+        return this.snapshot() !== this._savedSnapshot;
     }
 
     /**
@@ -648,6 +676,16 @@ class MeasureControls extends Control {
     }
 
     /**
+     * Whether a measurement is shown (its group is not hidden)
+     * @param {ol.Feature} feature
+     * @returns {boolean}
+     */
+    isFeatureVisible(feature) {
+        const style = feature.getStyle();
+        return !(Array.isArray(style) && style.length === 0);
+    }
+
+    /**
      * Shows or hides one measurement (its shape and its label), as the visibility of its group says
      * @param {ol.Feature} feature
      * @param {boolean} visible
@@ -657,6 +695,21 @@ class MeasureControls extends Control {
         feature.setStyle(visible ? undefined : []);
         const tooltip = feature.get('measureTooltip');
         if (tooltip) tooltip.getElement().style.display = visible ? '' : 'none';
+    }
+
+    /**
+     * Deletes the measurement drawn at a map coordinate: the one `_measurementAt` finds there, which is what the
+     * eraser's hover shows. A measurement that is not drawn (its group is hidden) is not found, and one under another
+     * is left alone: a click deletes one measurement.
+     * @param {ol.Map} map
+     * @param {number[]} coordinate  in the projection of the map
+     * @returns {ol.Feature | null} the measurement that was deleted
+     */
+    eraseAt(map, coordinate) {
+        const feature = this._measurementAt(map, map.getPixelFromCoordinate(coordinate));
+        if (!feature || !this.isFeatureVisible(feature)) return null;
+        this.deleteMeasurement(feature);
+        return feature;
     }
 
     /**
@@ -781,6 +834,12 @@ class MeasureControls extends Control {
      * Clear all measurements from the map
      */
     clearAllMeasurements() {
+        this._clearMeasurements();
+        this.carried = [];
+    }
+
+    /** Takes the measurements off the map (see clearAllMeasurements, which also lets go of what the map cannot draw). */
+    _clearMeasurements() {
         const map = this.getMap();
         const features = this.source.getFeatures();
 
@@ -798,7 +857,7 @@ class MeasureControls extends Control {
      * Export measurements to GeoJSON: all of them, or only the features of `only` (a Set)
      */
     exportToGeoJSON(orthophotoPath, groups = [], only = null) {
-        return exportMeasurements(this.source, orthophotoPath, this.unitPref, groups, only);
+        return exportMeasurements(this.source, orthophotoPath, this.unitPref, groups, only, this.carried);
     }
 
     /**
@@ -808,6 +867,7 @@ class MeasureControls extends Control {
         const map = this.getMap();
 
         const result = importMeasurements(geojson, this.source, this.unitPref, map, this.pointPopupActions());
+        if (result.carried) this.carried.push(...result.carried);
 
         // Update button visibility after import
         this.refreshButtons();
@@ -971,6 +1031,8 @@ class MeasureControls extends Control {
 
         // Add keyboard listener for ESC to exit and Ctrl+Z for undo
         this.keyboardListener = (e) => {
+            // A field of a dialog (the name of a measurement) keeps its own Ctrl+Z and Escape
+            if (isTypingTarget(e.target)) return;
             if (e.key === 'Escape' || e.keyCode === 27) {
                 e.stopPropagation();
                 e.preventDefault();
@@ -1667,50 +1729,8 @@ class MeasureControls extends Control {
                 } else if (tool === 'erase') {
                     // lifetime: defer (after OpenLayers adds the feature)
                     setTimeout(() => {
-                        // Delete every measurement that contains the click
-                        // coordinate. We use direct geometry intersection
-                        // instead of pixel-based hit detection because:
-                        //   - it is independent of map render order (the
-                        //     temporary Point sketch sitting on top of a
-                        //     line/polygon would otherwise mask it),
-                        //   - line geometries don't have area, so we widen
-                        //     the hit-test by buffering the coordinate to a
-                        //     small bounding box (~6 pixels worth) and
-                        //     checking extent intersection for them,
-                        //   - it deterministically targets only the shared
-                        //     measurement source, regardless of what other
-                        //     overlay layers happen to be at the same pixel.
-                        const coords = feat.getGeometry().getCoordinates();
-                        const view = map.getView();
-                        const resolution = view.getResolution() || 1;
-                        const tolerance = resolution * 6; // ~6 CSS pixels at current zoom
-                        const hitBox = [
-                            coords[0] - tolerance, coords[1] - tolerance,
-                            coords[0] + tolerance, coords[1] + tolerance
-                        ];
-                        const toDelete = [];
-                        self.source.forEachFeature((f) => {
-                            if (f === feat) return;
-                            if (!f.get('measurementType')) return;
-                            const g = f.getGeometry();
-                            if (!g) return;
-                            // Polygons/Points: precise containment test.
-                            // Lines: extent test against the buffered click.
-                            if (g instanceof Polygon || g instanceof Point) {
-                                if (g.intersectsCoordinate(coords)
-                                    || g.intersectsExtent(hitBox)) {
-                                    toDelete.push(f);
-                                }
-                            } else if (g instanceof LineString) {
-                                if (g.intersectsExtent(hitBox)) {
-                                    toDelete.push(f);
-                                }
-                            } else if (typeof g.intersectsExtent === 'function'
-                                && g.intersectsExtent(hitBox)) {
-                                toDelete.push(f);
-                            }
-                        });
-                        toDelete.forEach((f) => self.deleteMeasurement(f));
+                        // Delete the measurement under the click, the one the eraser's hover showed
+                        self.eraseAt(map, feat.getGeometry().getCoordinates());
 
                         // Remove the transient erase-click point itself.
                         try { self.source.removeFeature(feat); } catch { /* noop */ }
@@ -1720,15 +1740,7 @@ class MeasureControls extends Control {
                     }, 100);
                 } else {
                     // Validate measurement: discard degenerate geometries (0m lines, 0m² areas)
-                    const geom = feat.getGeometry();
-                    let isDegenerate = false;
-                    if (geom instanceof LineString) {
-                        isDegenerate = geodesicLength(geom) < 0.01; // less than 1cm
-                    } else if (geom instanceof Polygon) {
-                        isDegenerate = geodesicArea(geom) < 0.01; // less than 1cm²
-                    }
-
-                    if (isDegenerate) {
+                    if (isDegenerateMeasurement(feat.getGeometry())) {
                         // Remove degenerate measurement: OpenLayers adds the feature to the source after
                         // this event, so it goes just after (it has no measurementType to be kept for)
                         queueMicrotask(() => { try { self.source.removeFeature(feat); } catch { /* already gone */ } });

@@ -29,9 +29,18 @@ describe('MeasurementListDialog delete questions', () => {
     });
 
     it('names a group and counts its measurements', () => {
-        const props = deleteGroupConfirmDialog.call({ pendingDeleteGroup: { name: 'Piles', items: [{}, {}] } });
+        const measurements = [{ groupId: 'g1' }, { groupId: 'g1' }, { groupId: 'other' }, { groupId: '' }];
+        const props = deleteGroupConfirmDialog.call({ measurements, pendingDeleteGroup: { id: 'g1', name: 'Piles', items: [{}, {}] } });
         expect(props).toMatchObject({ title: 'Delete measurement group “Piles”', confirmText: 'Delete', cancelText: 'Cancel' });
         expect(props.message).toContain('its 2 measurements');
+    });
+
+    it('counts every measurement of the group when a filter shows only some of them', () => {
+        const measurements = Array.from({ length: 12 }, (_, i) => ({ groupId: 'g1', type: i === 0 ? 'area' : 'length' }));
+        // The group row holds the one measurement the filter shows; all 12 are deleted with the group
+        const props = deleteGroupConfirmDialog.call({ measurements, pendingDeleteGroup: { id: 'g1', name: 'Piles', items: [measurements[0]] } });
+        expect(props.message).toContain('its 12 measurements');
+        expect(props.message).not.toContain('its 1 measurement');
     });
 });
 
