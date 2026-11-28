@@ -1,8 +1,8 @@
 /**
- * The one export control of Raster Analysis and Plant Health (FR-RAS-16, FR-PRC-15, FR-RAS-26, D-023): an Export button with a
+ * The one export control of Raster Analysis and Plant Health: an Export button with a
  * menu of the two exports, which run the styled raster as the raster-export task with 'Queued…', 'Exporting n %' and Cancel, a toast and the download when it is ready, the visible
  * extent as a window, and a refusal for the size that is a focusable button with its reason as visible text. The sizes are
- * the examples of the SPEC (about 9.3 GB over a 1 GB limit), as literals.
+ * an example (about 9.3 GB over a 1 GB limit), as literals.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ref, nextTick } from 'vue';
@@ -111,7 +111,7 @@ function controlledRun() {
 }
 
 describe('RasterExportButton the export of the whole raster', () => {
-    it('says what the file is: the scaled bands without a formula, a styled image with one or with a colormap on one band, in the CRS of the file, not the values (FR-RAS-26)', async () => {
+    it('says what the file is: the scaled bands without a formula, a styled image with one or with a colormap on one band, in the CRS of the file, not the values', async () => {
         // The default style of the tests has a colormap and no formula, on a raster not known to have one band: ddb scales the bands to 8 bits and applies no colormap
         await mountOpen();
         const bands = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
@@ -156,7 +156,7 @@ describe('RasterExportButton the export of the whole raster', () => {
         expect(options.params).not.toHaveProperty('bbox');
     });
 
-    it('shows Queued…, then Exporting n %, then downloads the file and says it is ready (FR-PRC-15)', async () => {
+    it('shows Queued…, then Exporting n %, then downloads the file and says it is ready', async () => {
         const run = controlledRun();
         const { dataset } = await mountOpen();
         await whole().trigger('click');
@@ -185,7 +185,7 @@ describe('RasterExportButton the export of the whole raster', () => {
         expect(notify.success).toHaveBeenCalledWith('Export ready: mosaic_export.tif');
     });
 
-    it('offers Cancel while it runs, asks, cancels the task and unlocks when it ends (FR-PRC-10)', async () => {
+    it('offers Cancel while it runs, asks, cancels the task and unlocks when it ends', async () => {
         confirmCancel.mockResolvedValue(true);
         const run = controlledRun();
         const { dataset } = await mountOpen();
@@ -352,7 +352,7 @@ describe('RasterExportButton the visible extent while its estimate is read', () 
     });
 });
 
-describe('RasterExportButton an export refused for its size (FR-XC-22)', () => {
+describe('RasterExportButton an export refused for its size', () => {
     it('is a button that can be focused, with the reason as visible text and as its description', async () => {
         await mountOpen({ info: HUGE });
         const button = whole();

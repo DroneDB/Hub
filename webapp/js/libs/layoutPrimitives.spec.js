@@ -1,7 +1,7 @@
 /**
- * The CSS of the layout primitives (FR-XC-20, D-026) read from css/app.scss: one stacked-card renderer
+ * The CSS of the layout primitives read from css/app.scss: one stacked-card renderer
  * below `sm` and one Select-overlay width rule. A browser measures the result (the Playwright pass of
- * AC-031); here the rules are pinned to the breakpoints of responsiveColumns.js and to what no page may do.
+ * e2e/phone-tablet-layout.test.mjs); here the rules are pinned to the breakpoints of responsiveColumns.js and to what no page may do.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';

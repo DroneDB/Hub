@@ -1,6 +1,6 @@
 /**
  * The build toasts of the dataset page: one when a build starts (BuildManager 'buildStarted'), one when it ends. A build
- * that runs adds none (the spinner shows it). The builds that end together are one toast (FR-PRC-26).
+ * that runs adds none (the spinner shows it). The builds that end together are one toast.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope } from 'vue';
@@ -64,7 +64,7 @@ describe('useBuildEvents', () => {
         expect(notify.error).toHaveBeenCalledWith('Build failed for a.tif', { summary: 'Build Failed' });
     });
 
-    it('9 builds that end in the window are one toast, with the names (FR-PRC-26)', () => {
+    it('9 builds that end in the window are one toast, with the names', () => {
         listen();
 
         for (let i = 1; i <= 9; i++) ended(`out/file${i}.tif`);

@@ -146,7 +146,7 @@ describe('showPointPopup', () => {
     });
 });
 
-describe('showPointPopup near the edges of the map (FR-MAP-26)', () => {
+describe('showPointPopup near the edges of the map', () => {
     const show = (map, coords = [1, 2]) => showPointPopup(map, pointAt(coords, { name: 'Gate' }));
 
     it('puts the popup above its point when there is room, with the arrow down', () => {
@@ -199,7 +199,7 @@ describe('showPointPopup near the edges of the map (FR-MAP-26)', () => {
     });
 });
 
-describe('the popups of a map share one listener of the view (FR-MAP-26)', () => {
+describe('the popups of a map share one listener of the view', () => {
     const show = (map, coords) => showPointPopup(map, pointAt(coords, { name: 'Gate' }));
     const listenerCount = (map, type) => (map.getListeners(type) || []).length;
 

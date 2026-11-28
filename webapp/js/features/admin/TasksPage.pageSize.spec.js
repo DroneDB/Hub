@@ -1,5 +1,5 @@
 /**
- * Admin > Tasks, the page size follows the height (FR-XC-34, FR-ADM-29): the page holds the rows that fit, a size
+ * Admin > Tasks, the page size follows the height: the page holds the rows that fit, a size
  * the user chose is kept (preferences and address), and the offset of the first task shown stays inside the page
  * (the address and the last page) when the size changes.
  *

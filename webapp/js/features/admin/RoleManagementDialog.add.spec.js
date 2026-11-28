@@ -1,5 +1,5 @@
 /**
- * Add Role and Delete Role of the Role Management window (FR-ADM-01, FR-ADM-22, FR-XC-11): a role name
+ * Add Role and Delete Role of the Role Management window: a role name
  * follows the user name rule of the Registry (lowercase letters and digits), stated before input and
  * shown at the field; an invalid name sends no request; a failed delete closes the question and shows
  * its error once, in the window, with no toast.

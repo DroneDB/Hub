@@ -1,5 +1,5 @@
 /**
- * The drawing session of the 2D map tools (FR-XC-17, D-027): Esc abandons the shape, Enter, a double click and
+ * The drawing session of the 2D map tools: Esc abandons the shape, Enter, a double click and
  * a right click finish it, a right-drag does not, Space adds the point of the crosshair, and the tool lock
  * is taken once and given back once. It runs on a real OpenLayers map.
  */

@@ -91,7 +91,7 @@ describe('ShareEmbed', () => {
         expect(document.body.textContent).not.toContain('This dataset is Private');
     });
 
-    it('names the item in the title (FR-SHR-06): the file, or the folder', async () => {
+    it('names the item in the title: the file, or the folder', async () => {
         await open(photo);
         expect(wrapper.find('[data-title]').text()).toBe('Share a.jpg');
         wrapper.unmount();
@@ -102,7 +102,7 @@ describe('ShareEmbed', () => {
         expect(wrapper.find('[data-title]').text()).toBe('Share Folder images');
     });
 
-    it('gives the window the size class dialog-xl, so its width does not change with the share type (FR-SHR-06)', async () => {
+    it('gives the window the size class dialog-xl, so its width does not change with the share type', async () => {
         await open(ortho);
         const size = () => wrapper.find('[data-size-class]').attributes('data-size-class');
         expect(size()).toBe('dialog-xl');

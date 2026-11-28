@@ -1,5 +1,5 @@
 /**
- * The tile of a file that builds (FR-EXP-07, FR-EXP-21, FR-XC-16): the spinner stays from the first to the last active state
+ * The tile of a file that builds: the spinner stays from the first to the last active state
  * of the build (Enqueued, Processing), with no image in between; the type icon is shown dimmed under it and the tile says
  * 'Building…'; the thumbnail loads when the build succeeds. The tooltip is the file's name, type, size and build state in
  * plain words, never the internal address of the file.
@@ -181,7 +181,7 @@ describe('EntryThumbnail while its file builds', () => {
     });
 });
 
-describe('EntryThumbnail tooltip (FR-EXP-21)', () => {
+describe('EntryThumbnail tooltip', () => {
     beforeEach(() => {
         BuildManager.cleanup();
         taskMonitor.getTasks.mockReturnValue([]);

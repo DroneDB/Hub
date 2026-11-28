@@ -103,7 +103,7 @@ describe('applyFilters — filtering', () => {
         expect(vm.filteredTasks[0].taskId).toBe('t2');
     });
 
-    it('lists a task queued on a processing node under Enqueued, not Processing (FR-PRC-37)', () => {
+    it('lists a task queued on a processing node under Enqueued, not Processing', () => {
         const tasks = [
             fixedTask(1, { state: 'Processing', waitingForNode: true }),
             fixedTask(2, { state: 'Processing' }),
@@ -138,7 +138,7 @@ describe('onFilterChange', () => {
     });
 });
 
-// FR-ACC-01: GET /sys/processingNodes needs a signed-in user; its 401 would send an anonymous
+// GET /sys/processingNodes needs a signed-in user; its 401 would send an anonymous
 // visitor of a shared dataset to Login, and only a user who can write is offered the nodes
 describe('processing nodes', () => {
     const { loadProcessingNodes } = TaskHistory.methods;
@@ -189,7 +189,7 @@ describe('processing nodes', () => {
     });
 });
 
-// FR-PRC-21: a reader who cannot write to the dataset is not offered Clear Concluded, which the server refuses
+// A reader who cannot write to the dataset is not offered Clear Concluded, which the server refuses
 describe('Clear Concluded', () => {
     let wrapper;
     afterEach(() => wrapper?.unmount());
@@ -258,7 +258,7 @@ describe('showClearDialog', () => {
 });
 
 describe('photogrammetry new dataset name', () => {
-    // The slug rule of the Registry (SlugRules, FR-XC-12, libs/slug.js): FR-PRC-03 replaced the local kebab-case check
+    // The slug rule of the Registry (SlugRules, libs/slug.js), not a local kebab-case check
     const build = newDatasetName => {
         const vm = {
             optionsError: '',
@@ -272,7 +272,7 @@ describe('photogrammetry new dataset name', () => {
     };
     const RULE = "Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'";
 
-    // FR-PRC-34: the error of the name is under the name input, which takes the focus; the options error is not used for it
+    // The error of the name is under the name input, which takes the focus; the options error is not used for it
     it('refuses what the Registry refuses, with its rule, under the name field', () => {
         for (const name of ['a', 'a--b', 'Survey 2026', '-survey']) {
             const { params, error, options, vm } = build(name);
@@ -295,7 +295,7 @@ describe('photogrammetry new dataset name', () => {
     });
 });
 
-// FR-PRC-34: a path error is shown once, inline, with the focus on its field: no window with Close and OK
+// A path error is shown once, inline, with the focus on its field: no window with Close and OK
 describe('photogrammetry path errors', () => {
     const submit = async form => {
         const vm = {
@@ -326,7 +326,7 @@ describe('photogrammetry path errors', () => {
     });
 });
 
-// FR-PRC-22: the profile names the run in the task lists (the label the server gives the task)
+// The profile names the run in the task lists (the label the server gives the task)
 describe('photogrammetry profile', () => {
     const build = (preset, customOptions = []) => TaskHistory.methods._buildSubmitParams.call({
         optionsError: '', destPathError: '', customOptions,
@@ -343,7 +343,7 @@ describe('photogrammetry profile', () => {
     });
 });
 
-// FR-PRC-35: Check Node says what the node runs and what waits; the submit's own check adds no toast
+// Check Node says what the node runs and what waits; the submit's own check adds no toast
 describe('Check Node', () => {
     const status = { reachable: true, taskQueueCount: 1, maxParallelTasks: 1, engine: 'odx', engineVersion: '3.8.4' };
     function vmWith(info) {
@@ -391,7 +391,7 @@ describe('Check Node', () => {
     });
 });
 
-// FR-PRC-26: the builds of a photogrammetry run are folded under it
+// The builds of a photogrammetry run are folded under it
 describe('applyFilters - the builds of a task', () => {
     const pg = { taskId: 'pg', toolId: 'photogrammetry', state: 'Succeeded' };
     const builds = Array.from({ length: 9 }, (_, i) => ({ taskId: `b${i}`, toolId: 'build', state: 'Succeeded', parentJobId: 'pg' }));

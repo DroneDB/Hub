@@ -11,7 +11,7 @@ import { notify } from './notify';
 export const PREFERENCES_QUERY = 'preferences';
 
 /**
- * The query of the one-shot notices (FR-XC-13): why the app brought the user to this page.
+ * The query of the one-shot notices: why the app brought the user to this page.
  * One handler (handleNotice, run after every navigation) shows it once and removes it from the
  * address, so a reload, a step back or a copied link does not show it again.
  */
@@ -33,7 +33,7 @@ export const SIGNED_OUT_TEXT = 'You signed out in another tab.';
 /**
  * Where "home" is, for everyone, signed in or not: the Organizations page, or the datasets of
  * the one organization of a one-organization install (HubOptions.singleOrganization). The logo,
- * the page states, the landing after sign-in and the admin refusals go there (FR-NAV-06).
+ * the page states, the landing after sign-in and the admin refusals go there.
  * @returns {{ name: string, params?: Record<string, string> }}
  */
 export function homeLocation() {
@@ -44,7 +44,7 @@ export function homeLocation() {
 }
 
 /**
- * Home, with the notice that `routeName` needs administrator rights (FR-ACC-15): the guard
+ * Home, with the notice that `routeName` needs administrator rights: the guard
  * and the pages whose admin request is refused (403) send the user there.
  * @param {string} [routeName]
  */
@@ -172,7 +172,7 @@ export function markStaleSession({ hadSession, isLoggedIn, embed }) {
  * What the app does when the server rejects a request with 401 (registered with
  * `reg.onUnauthorized`): end a session the server no longer accepts, then sign in
  * and come back, told why (`expired`). A visitor without a session stays on the page, which
- * shows the "sign in" state of its primary resource (ResourceState, D-048); a private route
+ * shows the "sign in" state of its primary resource (ResourceState); a private route
  * sends them to Login through the route guard. Nothing happens on the Login page itself.
  * @param {import('vue-router').Router} router
  * @param {{ isLoggedIn: boolean, logout: () => void }} auth

@@ -35,7 +35,7 @@
 
 <script setup>
 /**
- * The measurement toolbar of the 3D, splat and point-cloud viewers (FR-XC-17, D-027): the tools it is
+ * The measurement toolbar of the 3D, splat and point-cloud viewers: the tools it is
  * given (point, distance, height, area), Clear, and (for a user who can save it, on a scene with no scale)
  * setting the scale. A georeferenced scene also has a button for the coordinates of a point: in its CRS or in
  * WGS84. While a shape is drawn it says how to end it (the one hint text of libs/measureHints), with Done and

@@ -123,7 +123,7 @@ describe('wheel zoom', () => {
     });
 });
 
-describe('the shared constrained orbit with the splat viewer\'s options (FR-XC-18)', () => {
+describe('the shared constrained orbit with the splat viewer\'s options', () => {
     const UP = new THREE.Vector3(0, 0, 1);
     const POLE = 0.996;
 

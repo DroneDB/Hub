@@ -201,7 +201,7 @@ describe('AnalysisPanel', () => {
         });
     });
 
-    describe('the actions slot (FR-RAS-23)', () => {
+    describe('the actions slot', () => {
         const withActions = () => mount(AnalysisPanel, {
             props: { icon: 'fas fa-leaf', title: 'Plant Health', variant: 'plant-health' },
             slots: { default: '<div class="panel-body">body</div>', actions: '<div class="actions-grid"><button class="act">Export</button></div>' }

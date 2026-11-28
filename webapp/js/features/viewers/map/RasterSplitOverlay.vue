@@ -29,7 +29,7 @@
             </span>
         </div>
 
-        <!-- Vertical dividers (N-1): dragged with a pointer, moved with the arrow keys, Home and End (FR-MAP-17) -->
+        <!-- Vertical dividers (N-1): dragged with a pointer, moved with the arrow keys, Home and End -->
         <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- a focusable separator is a widget: it has its role, its value and its arrow keys -->
         <div
             v-for="(pos, i) in positions"
@@ -96,7 +96,7 @@ export default {
         };
     },
     computed: {
-        // The part of each name that tells the layers apart (the date of two mosaics), cut in the middle if still long (FR-RAS-12)
+        // The part of each name that tells the layers apart (the date of two mosaics), cut in the middle if still long
         labels() {
             return distinctLabels(this.bands.map(b => b.name || ''), LABEL_MAX);
         }

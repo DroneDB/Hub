@@ -1,5 +1,5 @@
 /**
- * UploadPage (FR-UPL-02, FR-UPL-01, D-009, D-047): a form for the organization, the name and the visibility (Private by
+ * UploadPage: a form for the organization, the name and the visibility (Private by
  * default) before the upload starts; Cancel, and leaving the page, roll the share batch back so that no half-filled
  * dataset stays; after the commit the router opens the dataset.
  */
@@ -234,7 +234,7 @@ describe('UploadPage init', () => {
     });
 });
 
-// The question of Cancel (FR-UPL-16) is a dialog of the page: its buttons are in the document
+// The question of Cancel is a dialog of the page: its buttons are in the document
 const question = () => document.querySelector('#confirmDialog');
 async function answer(button) {
     question().querySelector(button).click();
@@ -245,7 +245,7 @@ async function clickCancel() {
     await flushPromises();
 }
 
-describe('UploadPage cancel (FR-UPL-01, FR-UPL-16)', () => {
+describe('UploadPage cancel', () => {
     it('rolls the batch back with its token, then says "Upload cancelled" and shows the form again', async () => {
         await started();
         expect(wrapper.find('form').exists()).toBe(false);
@@ -383,7 +383,7 @@ describe('UploadPage cancel (FR-UPL-01, FR-UPL-16)', () => {
     });
 });
 
-describe('UploadPage progress (FR-UPL-16)', () => {
+describe('UploadPage progress', () => {
     const view = () => wrapper.findComponent({ name: 'UploadQueueView' });
 
     it('lists every file of the batch with its status, in the "All" filter', async () => {

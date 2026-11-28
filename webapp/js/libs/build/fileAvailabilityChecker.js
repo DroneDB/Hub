@@ -95,8 +95,8 @@ class FileAvailabilityChecker {
                 }
                 // The artifact is not there: why is the build state's to say (running, on hold, failed, never built),
                 // as for any viewer, from the entry just listed. The viewer shows that state with its Build / Rebuild
-                // action and loads the file when the build ends (useViewerBuild, FR-XC-16), not a fixed message that
-                // never changes (FR-VWR-08)
+                // action and loads the file when the build ends (useViewerBuild), not a fixed message that
+                // never changes
                 return this.checkBuildableFile(dataset, listed, viewType, { ...options, current: true });
             }
         }
@@ -156,7 +156,7 @@ class FileAvailabilityChecker {
             }
 
             // The server cannot read this kind of file, as libddb tags it (a DWG on a server without its converter): the
-            // user is told so, and no build is offered, because processing the file again cannot help (FR-EXP-18)
+            // user is told so, and no build is offered, because processing the file again cannot help
             const unsupported = buildWarningOf(listed);
             if (unsupported?.kind === 'unsupported') {
                 return {
@@ -215,7 +215,7 @@ class FileAvailabilityChecker {
                     };
                 }
                 // A model built before 3D Tiles has only its Nexus output: only a forced build makes it, libddb skips a
-                // build that is complete (FR-VWR-08)
+                // build that is complete
                 return {
                     available: false,
                     status: 'rebuild',

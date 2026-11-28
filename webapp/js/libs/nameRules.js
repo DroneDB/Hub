@@ -1,10 +1,10 @@
 // @ts-check
 /**
- * The input rules the Registry owns (FR-XC-12, D-014), as `GET /sys/features` publishes them in
- * `inputRules`: user and role names (D-007, D-015), e-mail, entry names, the "already exists" message and its case rule (D-040), the
- * cron words that switch a job off and the Latin letter rule of organization and dataset names
- * (D-035). Slugs are in libs/slug.js, which reads the same rules. Every Hub form checks its input
- * here, and shows the published description or message at the field (AC-036).
+ * The input rules the Registry owns, as `GET /sys/features` publishes them in
+ * `inputRules`: user and role names, e-mail, entry names, the "already exists" message and its case rule, the
+ * cron words that switch a job off and the Latin letter rule of organization and dataset names.
+ * Slugs are in libs/slug.js, which reads the same rules. Every Hub form checks its input
+ * here, and shows the published description or message at the field.
  *
  * FALLBACK_INPUT_RULES is not a second source of truth: it is what the Registry publishes (its
  * golden sys-features.json), used field by field only when the server did not send a value (an
@@ -143,7 +143,7 @@ export function matchesRule(pattern, value) {
     return re ? re.test(value) : true;
 }
 
-// ---- User and role names (D-007, D-015) -----------------------------------------------------
+// ---- User and role names -----------------------------------------------------
 
 /** The user and role name rule as a form shows it (helper text). */
 export function nameDescription() {
@@ -161,7 +161,7 @@ export function isName(value) {
 
 /**
  * The refusal of a name, in the words of the Registry's own 400 (`NameRules.InvalidMessage`), so the
- * form shows the same rule text before submit as the server after it (AC-036).
+ * form shows the same rule text before submit as the server after it.
  * @param {string} kind  "User name", "Role name"
  */
 export function invalidNameMessage(kind) {
@@ -171,7 +171,7 @@ export function invalidNameMessage(kind) {
 /**
  * What is wrong with the user name of a new user, or null. Required; the rule of the Registry
  * (lowercase letters and digits). A user an external provider signs in has the wider Identity set,
- * and is never created here (D-015).
+ * and is never created here.
  * @param {string|null|undefined} value
  * @returns {string|null}
  */
@@ -181,7 +181,7 @@ export function userNameProblem(value) {
 }
 
 /**
- * What is wrong with the name of a new role, or null: the user name rule (D-007).
+ * What is wrong with the name of a new role, or null: the user name rule.
  * @param {string|null|undefined} value
  * @returns {string|null}
  */
@@ -248,7 +248,7 @@ export function isEntryName(name, { atRoot = false } = {}) {
     return true;
 }
 
-// ---- "Already exists" (D-040) ---------------------------------------------------------------
+// ---- "Already exists" ---------------------------------------------------------------
 
 /**
  * The one "already exists" message, for `name`.
@@ -268,10 +268,10 @@ export function namesClash(a, b) {
 }
 
 /**
- * A name for a new entry that no sibling has (FR-XC-07): `name` itself when it is free, else
+ * A name for a new entry that no sibling has: `name` itself when it is free, else
  * `<stem> (<n>).<ext>` with the lowest free n of 2 or more, put before the last extension
  * ("a.b.tif" -> "a.b (2).tif"), or `<name> (<n>)` for a name without one (a leading dot, as in
- * ".env", is not an extension). Names are compared by the rule of D-040 (namesClash).
+ * ".env", is not an extension). Names are compared by the Registry's letter case rule (namesClash).
  * @param {string} name  one entry name, without its folder
  * @param {Iterable<string|null|undefined>} siblings  the names of the entries of the folder
  * @returns {string}
@@ -310,10 +310,9 @@ export function namesInFolder(entries, folder) {
 }
 
 /**
- * What is wrong with the name of an entry that a dialog creates or renames to, or null (FR-EXP-04,
- * FR-EXP-05, FR-EXP-15): blank, a '/' or '\\' (the Hub dialogs take one name, not a path, D-034), a name
+ * What is wrong with the name of an entry that a dialog creates or renames to, or null: blank, a '/' or '\\' (the Hub dialogs take one name, not a path), a name
  * that the published entry name rule refuses, and a sibling that holds the name (the Registry's
- * case rule, D-040), in the Registry's words ("A file or folder named '<name>' already exists in
+ * case rule), in the Registry's words ("A file or folder named '<name>' already exists in
  * this folder"). The name is checked as typed after the spaces around it are dropped.
  * @param {string|null|undefined} name
  * @param {Iterable<string | { path?: string } | null | undefined>} [siblings]  the entries of the
@@ -381,7 +380,7 @@ export function isCronDisableWord(value) {
     return inputRule('cron').disableWords.some(w => w.toLowerCase() === word);
 }
 
-// ---- Latin letter or digit in a name (D-035) ------------------------------------------------
+// ---- Latin letter or digit in a name ------------------------------------------------
 
 /** The Latin letter rule as a form shows it. */
 export function latinNameDescription() {
@@ -407,7 +406,7 @@ export function hasLatinLetterOrDigit(name) {
 }
 
 /**
- * What is wrong with an organization or dataset name by the rule of D-035, or null: the name, or
+ * What is wrong with an organization or dataset name by the Registry's rule, or null: the name, or
  * the slug the user enters, needs a Latin letter or a digit.
  * @param {string|null|undefined} name
  * @param {{ slug?: string|null, withSlugField?: boolean }} [options]
@@ -420,7 +419,7 @@ export function latinNameProblem(name, { slug = null, withSlugField = true } = {
     return withSlugField ? rule.message : rule.messageWithoutSlug;
 }
 
-// ---- Length of names and descriptions (FR-ORG-14) -------------------------------------------
+// ---- Length of names and descriptions -------------------------------------------
 
 /** The limits of the name of an organization or a dataset: `{ min, max }`. */
 export function displayNameLimits() {

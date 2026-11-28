@@ -1,5 +1,5 @@
 /**
- * Add role and Add to organization for the users selected in the Users list (FR-ADM-23): one request per user, one after
+ * Add role and Add to organization for the users selected in the Users list: one request per user, one after
  * the other, and one summary of the users it worked for and the ones it did not.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

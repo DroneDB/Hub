@@ -44,7 +44,7 @@ import { useHubForm } from '@/composables/useHubForm';
 export default {
     // Used by admins to change other users' passwords: the current password is optional (admin
     // override), the new one follows the policy of the server like any other. The passwords are
-    // another user's: autocomplete off, so the browser does not fill in the admin's own (FR-ACC-07)
+    // another user's: autocomplete off, so the browser does not fill in the admin's own
     components: {
         LoadingSpinner,
         Window, PrimeMessage, Form, PasswordInput, NewPasswordFields

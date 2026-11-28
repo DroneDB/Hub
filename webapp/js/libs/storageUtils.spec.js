@@ -176,7 +176,7 @@ describe('open dataset after create', () => {
     });
 });
 
-describe('the page size the user chose (FR-XC-34)', () => {
+describe('the page size the user chose', () => {
     it('is none until the user chooses one: the sort changes store no size', () => {
         saveDatasetTablePreferences({ sortColumn: 'size' });
         expect(JSON.parse(localStorage.getItem(PREF.DATASET_TABLE)).itemsPerPage).toBeNull();

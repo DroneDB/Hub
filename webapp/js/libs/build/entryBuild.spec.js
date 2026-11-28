@@ -92,7 +92,7 @@ describe('currentEntry', () => {
     });
 });
 
-describe('the words of the build states (FR-EXP-21, FR-EXP-07)', () => {
+describe('the words of the build states', () => {
     it('is one table: the badge, the caption and the tooltip read it', () => {
         expect(BUILD_WORDS).toEqual({ built: 'Built', building: 'Building\u2026', queued: 'Queued', pending: 'On hold', failed: 'Failed' });
     });

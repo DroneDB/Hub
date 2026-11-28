@@ -1,6 +1,6 @@
 /**
- * The previews of the expanded table are requested at the size they are shown, pixel ratio included
- * (FR-EXP-41): the 48 px box that `object-fit: cover` fills along the long side of a 16:9 photo is 86 CSS px,
+ * The previews of the expanded table are requested at the size they are shown, pixel ratio included:
+ * the 48 px box that `object-fit: cover` fills along the long side of a 16:9 photo is 86 CSS px,
  * so 128 px at ratio 1 and 256 px at ratio 2 - not the 48 px bitmap that was blurry at 200%.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 afterEach(() => { w?.unmount(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe('TableView previews (FR-EXP-41)', () => {
+describe('TableView previews', () => {
     it('requests 128 px at ratio 1', async () => {
         await mountTable(1);
         expect(thumbs.fetch.mock.calls.map(c => c[1])).toEqual([128, 128]);

@@ -13,7 +13,7 @@
                                    :readonly="busy" :invalid="!!errorOf($form, 'username')"
                                    :aria-invalid="errorOf($form, 'username') ? 'true' : undefined"
                                    :aria-describedby="errorOf($form, 'username') ? 'add-user-dialog-username-error add-user-dialog-username-help' : 'add-user-dialog-username-help'" />
-                        <!-- The rule of the Registry, before any input (FR-ADM-02) -->
+                        <!-- The rule of the Registry, before any input -->
                         <small id="add-user-dialog-username-help" class="field-help">Use {{ nameRule }}</small>
                         <FieldError id="add-user-dialog-username-error" :message="errorOf($form, 'username')" />
                     </div>
@@ -81,7 +81,7 @@ export default {
         });
         const form = useHubForm({
             fields: ['username', 'email', 'newPassword', 'confirmPassword'],
-            // The Registry names the field of a refusal by the member of the request (D-047)
+            // The Registry names the field of a refusal by the member of the request
             aliases: { userName: 'username', password: 'newPassword' },
             dependents: { newPassword: ['confirmPassword'] }
         });

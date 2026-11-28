@@ -1,5 +1,5 @@
 /**
- * The one pattern of a disabled action (FR-XC-22): it stays focusable, says why through
+ * The one pattern of a disabled action: it stays focusable, says why through
  * aria-describedby and its tooltip, and a click does nothing.
  */
 import { describe, it, expect } from 'vitest';

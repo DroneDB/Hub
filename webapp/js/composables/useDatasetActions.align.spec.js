@@ -1,5 +1,5 @@
 /**
- * Align from the dataset page (FR-PRC-11): the Align window stays open with its result, so the page learns of the
+ * Align from the dataset page: the Align window stays open with its result, so the page learns of the
  * output when the tasks are done (`aligned`: toast with the numbers, list refresh) and opens it on the map only when
  * the user asks (`close` with 'map').
  */

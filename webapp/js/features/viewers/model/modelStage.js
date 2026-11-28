@@ -122,7 +122,7 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     if (colourManaged) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.setClearColor(scene.fog.color);
-    // min(devicePixelRatio, 2): the canvas follows it on the next frame (fitCanvas); a screen with another ratio moves it again (FR-XC-32)
+    // min(devicePixelRatio, 2): the canvas follows it on the next frame (fitCanvas); a screen with another ratio moves it again
     renderer.setPixelRatio(appliedPixelRatio());
     const stopPixelRatio = watchPixelRatio(() => renderer.setPixelRatio(appliedPixelRatio()));
 

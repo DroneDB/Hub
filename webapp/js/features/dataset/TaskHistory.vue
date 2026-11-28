@@ -39,7 +39,7 @@
 
         <!-- Photogrammetry launcher -->
         <!-- The form dialog size below the wide breakpoint; from it the wide size, the fields and the options side by side
-             (FR-PRC-45, FR-XC-33). The window is 90vh high from sm up (css below): the options list takes the free height -->
+. The window is 90vh high from sm up (css below): the options list takes the free height -->
         <Window id="photogrammetry" v-model:visible="photogrammetryDialogOpen" modal title="Run Photogrammetry (NodeODX)"
                 fixed-position :size-class="wideScreen && optionsListShown ? 'dialog-wide' : 'dialog-xl'">
             <!-- The window is high (and, on a wide screen, two columns) only for the list of the node's options -->
@@ -161,7 +161,7 @@
                                        :aria-invalid="newDatasetNameError ? 'true' : undefined"
                                        :aria-describedby="newDatasetNameError ? 'task-history-new-dataset-name-error' : 'task-history-new-dataset-name-help'"
                                        @input="newDatasetNameError = ''" />
-                            <!-- The error of the name is under the name, not with the options (FR-PRC-34) -->
+                            <!-- The error of the name is under the name, not with the options -->
                             <small v-if="newDatasetNameError" id="task-history-new-dataset-name-error" class="error-text d-block">{{ newDatasetNameError }}</small>
                             <small v-else id="task-history-new-dataset-name-help" class="muted">A slug: {{ slugRuleText }}</small>
                         </div>
@@ -306,7 +306,7 @@ export default {
         const dialogs = useDialogs();
         const confirm = useConfirm(dialogs);
         const formatting = useTaskFormatting();
-        // The row actions read the tab when they run: its tool catalog and its reload (FR-XC-15)
+        // The row actions read the tab when they run: its tool catalog and its reload
         const vm = /** @type {any} */ (getCurrentInstance()?.proxy);
         const taskActions = useTaskActions({
             datasetOf: () => props.dataset,
@@ -351,7 +351,7 @@ export default {
             optionsError: '',
             // The node did not answer the list of its options: the window says so in place of the list
             optionsLoadFailed: false,
-            // The refusal of the name of the new dataset, under its field (FR-PRC-34)
+            // The refusal of the name of the new dataset, under its field
             newDatasetNameError: '',
             folderPathError: '',
             destPathError: '',
@@ -481,7 +481,7 @@ export default {
         async loadProcessingNodes() {
             // The nodes are only offered to a user who can write. GET /sys/processingNodes needs a
             // signed-in user: for an anonymous visitor of a shared dataset its 401 would send them to
-            // Login (FR-ACC-01), so a reader never asks. Asked once per tab.
+            // Login, so a reader never asks. Asked once per tab.
             if (!this.canWrite || this._nodesRequested) return;
             this._nodesRequested = true;
             try {
@@ -553,10 +553,10 @@ export default {
         // background store update (resetPage = false, keeps the current page).
         applyFilters(resetPage = true) {
             let filtered = [...this.tasks];
-            // A task queued on a processing node is Enqueued, as the Registry filters it (FR-PRC-37)
+            // A task queued on a processing node is Enqueued, as the Registry filters it
             if (this.selectedState) filtered = filtered.filter(t => matchesStateFilter(t, this.selectedState));
             if (this.selectedTool) filtered = filtered.filter(t => t.toolId === this.selectedTool);
-            // The builds a task started are listed under it with a count, unless the list is the one of the builds (FR-PRC-26)
+            // The builds a task started are listed under it with a count, unless the list is the one of the builds
             if (this.selectedTool !== 'build') filtered = foldBuildChildren(filtered, state => this.isActive(state));
             this.filteredTasks = filtered;
 
@@ -723,7 +723,7 @@ export default {
                     this._focusField('task-history-new-dataset-name');
                     return null;
                 }
-                // The slug rule of the Registry (FR-XC-12, libs/slug.js), the text the Registry answers with
+                // The slug rule of the Registry (libs/slug.js), the text the Registry answers with
                 const slugError = slugProblem(this.photogrammetryForm.newDatasetName, 'Dataset');
                 if (slugError) {
                     this.newDatasetNameError = slugError;
@@ -737,7 +737,7 @@ export default {
             if (this.photogrammetryForm.nodeId) params.nodeId = this.photogrammetryForm.nodeId;
             if (this.photogrammetryForm.name) params.name = this.photogrammetryForm.name;
             if (options) params.options = options;
-            // The profile names the run in the task lists (its label, FR-PRC-22)
+            // The profile names the run in the task lists (its label)
             const customized = this.photogrammetryForm.preset !== 'custom' && this.customOptions.length > 0;
             params.profile = customized ? `${this.selectedPreset.label}, customized` : this.selectedPreset.label;
 
@@ -752,7 +752,7 @@ export default {
             return params;
         },
 
-        // The focus goes to the field that shows the error (FR-PRC-34): the window is rendered outside the page, so by id
+        // The focus goes to the field that shows the error: the window is rendered outside the page, so by id
         _focusField(id) {
             this.$nextTick(() => document.getElementById(id)?.focus());
         },
@@ -763,7 +763,7 @@ export default {
             this.destPathError = '';
             this.newDatasetNameError = '';
 
-            // #5: clean dataset-relative path validation: one error, inline at the field, which takes the focus (FR-PRC-34)
+            // #5: clean dataset-relative path validation: one error, inline at the field, which takes the focus
             const folderErr = this.validateDatasetPath(this.photogrammetryForm.folder, 'Image folder');
             if (folderErr) {
                 this.folderPathError = folderErr;
@@ -993,7 +993,7 @@ export default {
     background-color: var(--ddb-primary-hover);
 }
 
-/* The photogrammetry window (FR-PRC-45). With the list of the node's options, from sm the window is 90vh high and its
+/* The photogrammetry window. With the list of the node's options, from sm the window is 90vh high and its
    content a column: the form fields do not grow, the options list takes the free height (at least 12rem), so the
    only scroll area is the list. When the screen is too small for the fields and 12rem of list, the window scrolls as
    a whole, and nothing overlaps. Below sm (a phone) the window is as high as its content, and the list keeps its own
@@ -1047,7 +1047,7 @@ export default {
     }
 }
 
-/* From the wide breakpoint (FR-XC-33) the fields are on the left and the options on the right, twice as wide */
+/* From the wide breakpoint the fields are on the left and the options on the right, twice as wide */
 @include wide-up {
     .pg-layout.with-options {
         display: grid;

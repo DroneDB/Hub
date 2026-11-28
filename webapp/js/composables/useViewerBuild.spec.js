@@ -1,5 +1,5 @@
 /**
- * useViewerBuild (FR-VWR-08, FR-XC-16): a viewer that cannot open its file yet shows the build state with Build / Rebuild
+ * useViewerBuild: a viewer that cannot open its file yet shows the build state with Build / Rebuild
  * (for somebody who can write), 'Building… 40 %' while it runs, and loads the file again when the build ends.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -93,7 +93,7 @@ describe('useViewerBuild', () => {
         scope.stop();
     });
 
-    // FR-VWR-08: a model built before 3D Tiles has its Nexus output only; libddb skips a build that is complete, so only a
+    // A model built before 3D Tiles has its Nexus output only; libddb skips a build that is complete, so only a
     // forced build makes the 3D Tiles
     it('offers Rebuild, forced, for a file built without the output the viewer needs', async () => {
         const start = vi.spyOn(BuildManager, 'startBuild').mockResolvedValue(true);

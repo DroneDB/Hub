@@ -44,7 +44,7 @@ describe('useViewerEntry from the route', () => {
         expect(v.loading.value).toBe(false);
     });
 
-    it('puts the root entry of the dataset in the session, for the name in the breadcrumb, and takes it out when the viewer goes (FR-NAV-03)', async () => {
+    it('puts the root entry of the dataset in the session, for the name in the breadcrumb, and takes it out when the viewer goes', async () => {
         const root = { path: '', properties: { meta: { name: { data: 'Bulk dataset 26' } }, permissions: { canRead: true } } };
         dataset.info.mockResolvedValue([root]);
         let v;
@@ -55,7 +55,7 @@ describe('useViewerEntry from the route', () => {
         expect(session.rootEntry).toBeNull();
     });
 
-    it('does not put a root entry in the session when the dataset answers after the viewer went (FR-NAV-03)', async () => {
+    it('does not put a root entry in the session when the dataset answers after the viewer went', async () => {
         let answer;
         dataset.info.mockImplementation(() => new Promise(resolve => { answer = resolve; }));
         let v;
@@ -103,7 +103,7 @@ describe('useViewerEntry from the route', () => {
         expect(loadErrorKind(v.loadError.value)).toBe(LoadErrorKind.INVALID_LINK);
     });
 
-    it('reports a file path that cannot be decoded as a link that is not valid, without a request (FR-VWR-23)', async () => {
+    it('reports a file path that cannot be decoded as a link that is not valid, without a request', async () => {
         route.params = { org: 'o', ds: 'd', encodedPath: '%%%garbage' };
         const v = useViewerEntry({ title: 'Map' });
         expect(await v.entryLoaded).toBe(false);

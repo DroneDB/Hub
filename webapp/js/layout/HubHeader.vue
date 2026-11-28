@@ -1,6 +1,6 @@
 <template>
     <header id="header">
-        <!-- Home without a reload: the same place as after sign-in (FR-NAV-06) -->
+        <!-- Home without a reload: the same place as after sign-in -->
         <RouterLink :to="homeTarget" class="logo">
             <img v-if="appLogo" :src="appLogo" :alt="appName || 'Home'">
             <template v-else>
@@ -10,7 +10,7 @@
             </template>
         </RouterLink>
 
-        <!-- The main destinations, always in view; the current one says so (aria-current) (FR-NAV-01) -->
+        <!-- The main destinations, always in view; the current one says so (aria-current) -->
         <nav v-if="primaryNav.length > 0" class="primary-nav" aria-label="Main">
             <RouterLink v-for="link in primaryNav" :key="link.id" :to="link.to" class="primary-nav-link" :data-nav="link.id"
                         :title="link.label">
@@ -19,7 +19,7 @@
         </nav>
 
         <!-- Where the user is: organization / dataset, after the Organizations link of the main navigation, which is its
-             root; an anonymous visitor has no such link, so the trail has an Organizations crumb (FR-NAV-03, FR-NAV-04).
+             root; an anonymous visitor has no such link, so the trail has an Organizations crumb.
              The visibility of the dataset follows its name: the dataset page has no title block of its own -->
         <HubBreadcrumb v-if="params.org" class="header-crumbs" :org="String(params.org)" :ds="params.ds ? String(params.ds) : ''"
                        :home-in-nav="primaryNav.length > 0">
@@ -30,7 +30,7 @@
 
         <nav class="right" aria-label="Page actions and account">
 
-            <!-- The uploads of the dataset page go on while the user is on another page (FR-UPL-04) -->
+            <!-- The uploads of the dataset page go on while the user is on another page -->
             <UploadIndicator />
 
             <Button v-if="updateAvailable" class="update-available-btn" size="small" text
@@ -38,7 +38,7 @@
                 <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
             </Button>
             <!-- The dataset actions: label, icon, permission, enabled state and what they run come
-                 from the explorer's action registry (FR-XC-14); the header places them -->
+                 from the explorer's action registry; the header places them -->
             <ActionButton v-if="showDownload && onFilesTab && datasetActions.download.visible" severity="secondary" size="small" text
                           :label="datasetActions.download.label" :disabled="!datasetActions.download.enabled"
                           :disabled-reason="datasetActions.download.disabledReason" @click="datasetActions.download.run()">
@@ -69,7 +69,7 @@
 
             <PreferencesDialog v-if="preferencesOpen && loggedIn" :initial-tab="preferencesTab" @close="preferencesOpen = false" />
 
-            <!-- What the storage is, whatever its shape: a quota with its bar (the real percentage), or no quota (FR-ACC-11, FR-ACC-17) -->
+            <!-- What the storage is, whatever its shape: a quota with its bar (the real percentage), or no quota -->
             <Alert v-if="storageInfoDialogOpen && storageNow" title="Storage Info" @close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
                     <p v-if="storageNow.unlimited" class="storage-unlimited">{{ storageNow.label }}</p>
@@ -155,7 +155,7 @@ import { userMenuItems, primaryNavItems } from '@/libs/userMenuItems';
 
 // The dataset actions of the header, in the registry (libs/dataset/explorerActions.js)
 const HEADER_ACTIONS = Object.freeze(['download', 'share-embed', 'settings']);
-// What each shows beside its icon from md up (FR-NAV-04); the accessible name stays the registry's label
+// What each shows beside its icon from md up; the accessible name stays the registry's label
 // ('Download entire dataset' contains 'Download')
 const SHORT_LABELS = Object.freeze({ download: 'Download', 'share-embed': 'Share', settings: 'Settings' });
 
@@ -232,7 +232,7 @@ export default {
                 itemLabel: ({ context }) => {
                     const cls = context.item?.class ?? '';
                     if (cls === 'user-menu-header') return { style: { fontWeight: 'bold' } };
-                    // A storage row from 90 % of the quota is amber, from 100 % red (D-030)
+                    // A storage row from 90 % of the quota is amber, from 100 % red
                     if (cls.includes('user-menu-storage-over')) return { style: { color: 'var(--ddb-danger)', fontWeight: 'bold' } };
                     if (cls.includes('user-menu-storage-warn')) return { style: { color: 'var(--ddb-warning)', fontWeight: 'bold' } };
                     return {};
@@ -252,7 +252,7 @@ export default {
                 unavailable: this.unavailable,
                 downloadInProgress: () => this.isDownloading || this.activeBulkDownload,
                 emit: (event, ...args) => {
-                    // A single file downloads at once; an archive asks first (FR-EXP-27)
+                    // A single file downloads at once; an archive asks first
                     if (event === 'downloadItems') {
                         if (needsConfirm(this.selectedFiles)) this.askDownload();
                         else this.startDownload();
@@ -449,7 +449,7 @@ export default {
         },
         // The session may have gone since the menu was drawn (cleared storage, a sign-out
         // elsewhere): then the header catches up and the user signs in again, coming back here.
-        // No notice: nothing says the session expired (FR-ACC-08)
+        // No notice: nothing says the session expired
         myDatasets: function () {
             if (!this.username || !reg.isLoggedIn()) {
                 useAuthStore().sync();
@@ -611,7 +611,7 @@ export default {
         },
 
         // The menu closed. When it closed while its list had the focus (Tab, or Escape) the list is gone with
-        // the menu, and the focus would be lost: it goes back to the button, from where Tab moves on (FR-ACC-20)
+        // the menu, and the focus would be lost: it goes back to the button, from where Tab moves on
         onMenuHide: function () {
             this.menuOpen = false;
             const container = this.$refs.userMenu?.container;

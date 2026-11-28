@@ -158,7 +158,7 @@ const definition = {
         handleRasterVizParamsChanged(params) {
             const path = this.rasterFilePath;
             if (path) {
-                // The unit changed: the values that are shown were read in the other one (D-022)
+                // The unit changed: the values that are shown were read in the other one
                 const before = this.vizParamsByPath && this.vizParamsByPath[path];
                 const unitChanged = thermalUnitOfFormula(before && before.formula) !== thermalUnitOfFormula(params && params.formula);
                 if (params && Object.keys(params).length) {
@@ -175,7 +175,7 @@ const definition = {
 
         /**
          * Reads again what the panel shows (the spot value, the area statistics, the profile) in the unit of the layer: ddb
-         * converts the values, the Hub does not (D-022). A reading that is no longer there is not asked.
+         * converts the values, the Hub does not. A reading that is no longer there is not asked.
          */
         _rereadRasterValues() {
             const spot = this.rasterSpotInfo;
@@ -195,7 +195,7 @@ const definition = {
         },
 
         /**
-         * The NoData value the layer is styled with (FR-RAS-31): the value calls read the file with it, so the
+         * The NoData value the layer is styled with: the value calls read the file with it, so the
          * numbers and the tiles agree on which pixels have no value.
          * @returns {number|string|undefined}
          */
@@ -206,7 +206,7 @@ const definition = {
 
         /**
          * The options the value calls read the file with: the NoData value of the layer and, when the layer is styled with a
-         * thermal formula, that formula, so that ddb answers in the unit the panel shows (D-022). A formula that is not a
+         * thermal formula, that formula, so that ddb answers in the unit the panel shows. A formula that is not a
          * thermal one (a vegetation index of Plant Health on the same file) is no option of a value.
          * @returns {{ nodata?: number|string, formula?: string }}
          */
@@ -215,7 +215,7 @@ const definition = {
         },
 
         /**
-         * The value of the raster at a map coordinate of the view (D-021): the server finds the pixel of the file under
+         * The value of the raster at a map coordinate of the view: the server finds the pixel of the file under
          * it; the panel shows the answer as the spot value. Errors reach the caller.
          * @param {number[]} mapCoord  [x, y] in the projection of the map view
          * @returns {Promise<any>} the server's answer
@@ -263,7 +263,7 @@ const definition = {
 
         /**
          * The statistics of the raster values under a rectangle of the map: its WGS 84 window
-         * [minLon, minLat, maxLon, maxLat], the pixels of the file under it (D-021).
+         * [minLon, minLat, maxLon, maxLat], the pixels of the file under it.
          * An answer that comes after the panel moved to another raster, or after a newer question
          * or Clear, is dropped.
          */
@@ -890,7 +890,7 @@ const definition = {
             const v = (info.value != null) ? info.value
                 : (Array.isArray(info.values) ? info.values.join(', ') : null);
             if (v == null) return '';
-            // The one format of a raster value (FR-RAS-28): a number with its unit, "29.1 °C"
+            // The one format of a raster value: a number with its unit, "29.1 °C"
             return rasterValueParts(v, info.unit || info.units || '').text;
         },
 

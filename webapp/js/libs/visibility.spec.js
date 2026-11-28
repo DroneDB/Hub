@@ -1,5 +1,5 @@
 /**
- * The visibility options and the default of every form that picks one (FR-UPL-02, D-009): Private first and the
+ * The visibility options and the default of every form that picks one: Private first and the
  * default; the task parameters carry the name.
  */
 import { describe, it, expect } from 'vitest';
@@ -21,7 +21,7 @@ describe('VISIBILITY_OPTIONS', () => {
 });
 
 describe('DEFAULT_VISIBILITY', () => {
-    it('is Private (D-009)', () => {
+    it('is Private', () => {
         expect(DEFAULT_VISIBILITY).toBe(0);
         expect(visibilityLabel(DEFAULT_VISIBILITY)).toBe('Private');
     });

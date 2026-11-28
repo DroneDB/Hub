@@ -42,7 +42,7 @@ describe('the tile layout', () => {
         expect(tileCssVars()).toEqual({ '--tile-spacing': '0.25rem', '--tile-label-lines': 2, '--tile-label-line-height': 1.5 });
     });
 
-    it('lets the thumbnail fill its square box and show whole on a neutral background (FR-EXP-33)', () => {
+    it('lets the thumbnail fill its square box and show whole on a neutral background', () => {
         const rule = css.slice(css.indexOf('.thumbnail .container img {'));
         const block = rule.slice(0, rule.indexOf('}'));
         expect(block).toMatch(/width:\s*100%/);
@@ -96,7 +96,7 @@ describe('the virtual grid', () => {
     });
 });
 
-// ---- The size of the thumbnails: S, M, L (FR-EXP-43) ---------------------------------------------------
+// ---- The size of the thumbnails: S, M, L ---------------------------------------------------
 
 describe('the tile sizes', () => {
     it('are S 128, M 192 and L 256 px', () => {

@@ -9,8 +9,8 @@
 
 /**
  * @typedef {'sm'|'md'|'lg'|'xl'|'xxl'|'wide'|'xwide'} Breakpoint  The breakpoint a column appears from:
- *   Bootstrap's sm 576px, md 768px, lg 992px, xl 1200px, xxl 1400px, and the two of the wide screens
- *   (FR-XC-33): wide 1600px and xwide 2560px
+ *   Bootstrap's sm 576px, md 768px, lg 992px, xl 1200px, xxl 1400px, and the two of the wide screens:
+ * wide 1600px and xwide 2560px
  */
 
 const BREAKPOINTS = Object.freeze(['sm', 'md', 'lg', 'xl', 'xxl', 'wide', 'xwide']);
@@ -19,7 +19,7 @@ const BREAKPOINTS = Object.freeze(['sm', 'md', 'lg', 'xl', 'xxl', 'wide', 'xwide
  * The width in px each breakpoint starts at. A phone layout is below `sm`, a tablet layout below
  * `lg`: the toolbars that move tools into an overflow menu (HubToolbar) read these too. Above `xxl`: on a screen
  * wider than `wide` a page keeps the maximum width of its content (the width tokens and the .page-column classes of
- * css/app.scss), and a layout change above it uses `xwide` (FR-XC-33). css/_breakpoints.scss has the same two widths.
+ * css/app.scss), and a layout change above it uses `xwide`. css/_breakpoints.scss has the same two widths.
  * @type {Readonly<Record<Breakpoint, number>>}
  */
 export const BREAKPOINT_PX = Object.freeze({ sm: 576, md: 768, lg: 992, xl: 1200, xxl: 1400, wide: 1600, xwide: 2560 });
@@ -46,7 +46,7 @@ export function columnFrom(breakpoint) {
     return { headerClass: cls, bodyClass: cls };
 }
 
-// ---- Stacked cards (D-026, FR-XC-20) ---------------------------------------------------------
+// ---- Stacked cards ---------------------------------------------------------
 
 /**
  * Below this breakpoint a table is one stacked card per row (the one renderer is `.stacked-table`
@@ -62,7 +62,7 @@ export const STACKED_TABLE_CLASS = 'stacked-table';
 /** The media query of the stacked cards: below `sm`, as the renderer of css/app.scss (575.98 px) */
 export const STACKED_MEDIA_QUERY = `(max-width: ${BREAKPOINT_PX[STACK_BELOW] - 0.02}px)`;
 
-/** The media query of a wide screen: from `wide` (1600 px) up, where a page keeps its maximum width (FR-XC-33) */
+/** The media query of a wide screen: from `wide` (1600 px) up, where a page keeps its maximum width */
 export const WIDE_MEDIA_QUERY = `(min-width: ${BREAKPOINT_PX.wide}px)`;
 
 /** The media query of a very wide screen (a 4K screen): from `xwide` (2560 px) up */
@@ -126,7 +126,7 @@ export function stackedColumn(label, breakpoint, bodyCell = {}, pt = {}) {
 
 /**
  * A slug as the pieces it may wrap between: after each hyphen, never inside a word. The cell renders
- * them with a <wbr> between the pieces (FR-ADM-11).
+ * them with a <wbr> between the pieces.
  * @param {string} slug
  * @returns {string[]} 'my-org-x' gives ['my-', 'org-', 'x']
  */

@@ -19,7 +19,7 @@ export function crsRequest(mode, input) {
 const WKT_START = /^(PROJCS|GEOGCS|PROJCRS|GEOGCRS|COMPD_CS|COMPOUNDCRS|COMPD)\b/i;
 
 /**
- * What is wrong with the form of the coordinate system the dialog would send (FR-PRC-31), or null:
+ * What is wrong with the form of the coordinate system the dialog would send, or null:
  * it checks `crsRequest(mode, input)`, so a bare number is valid (an EPSG code), "EPSG:<digits>"
  * is valid, and so is a text that starts with PROJCS, GEOGCS, PROJCRS, GEOGCRS or COMPD. Whether
  * the code exists, or the WKT is sound, is the server's to say (a 400, shown under the same field).

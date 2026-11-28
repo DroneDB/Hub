@@ -94,7 +94,7 @@ const away = { path: '/r/o/d', fullPath: '/r/o/d' };
 const here = { path: '/r/o/d/view/x/markdown', fullPath: '/r/o/d/view/x/markdown' };
 
 describe('MarkdownViewer', () => {
-    // FR-EXP-39: the text, the editor and their toolbars take the whole width of the viewer, Edit is in a toolbar row
+    // The text, the editor and their toolbars take the whole width of the viewer, Edit is in a toolbar row
     // above the text
     const NARROW = ['prose-column', 'editor-column', 'page-column', 'form-column'];
     const isFullWidth = el => NARROW.forEach(c => expect(el.classes()).not.toContain(c));
@@ -216,7 +216,7 @@ describe('MarkdownViewer', () => {
         expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
     });
 
-    it('shows the error of a file of another type in the shell, with the way back and no spinner (FR-VWR-05)', async () => {
+    it('shows the error of a file of another type in the shell, with the way back and no spinner', async () => {
         source.refused = 'cog.tif cannot be opened as markdown';
         globalThis.HubOptions = {};
         const { createRouter, createMemoryHistory } = await import('vue-router');

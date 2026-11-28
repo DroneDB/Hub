@@ -645,7 +645,7 @@ const definition = {
 
         /**
          * Engage "single click on map" capture: the next map click (or Space / Enter at the crosshair) triggers
-         * `autoDetectAndCalculate` at that coordinate. A drawing session of one point (FR-XC-17, D-027).
+         * `autoDetectAndCalculate` at that coordinate. A drawing session of one point.
          * Acts as a toggle: a second invocation while already in click-mode cancels.
          */
         startStockpileClickMode() {
@@ -673,7 +673,7 @@ const definition = {
         },
 
         /**
-         * Activate a Polygon drawing session (FR-XC-17, D-027): click (or Space at the crosshair) adds a corner, a
+         * Activate a Polygon drawing session: click (or Space at the crosshair) adds a corner, a
          * double click, Enter or a right click finishes, Esc cancels. When the polygon is finished it is converted to
          * WGS84 GeoJSON and passed to `calculateStockpileVolume`.
          */

@@ -2,7 +2,7 @@
 /**
  * The drawing session of every 2D map tool that draws or picks on the map: Measure Length and Area, the
  * point annotation and the eraser (measureControl), Inspect, the statistics rectangle and the profile
- * (useRasterAnalysis), the stockpile Click map and Draw (useStockpileVolume). FR-XC-17, D-027.
+ * (useRasterAnalysis), the stockpile Click map and Draw (useStockpileVolume).
  *
  * One session owns what the tool needs while it is armed, and removes it all in `end()`:
  *   - the OpenLayers Draw interaction (a point, a line, a polygon or a box);
@@ -45,7 +45,7 @@ const HINT_KIND = { Point: 'point', LineString: 'line', Polygon: 'area', Box: 'b
  * @param {import('ol/MapBrowserEvent').default<any>} e
  */
 const addsPoint = e => noModifierKeys(e) && primaryAction(e);
-/** What pans while a tool draws (D-027): a drag of the right mouse button. @param {import('ol/MapBrowserEvent').default<any>} e */
+/** What pans while a tool draws: a drag of the right mouse button. @param {import('ol/MapBrowserEvent').default<any>} e */
 const rightButtonPan = e => e.originalEvent?.button === RIGHT_BUTTON;
 
 /** The session that runs on each map: one at a time. @type {WeakMap<object, DrawingSession>} */

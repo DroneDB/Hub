@@ -2,7 +2,7 @@
 /**
  * The colours of the CodeMirror text editor (TextEditorDialog) as the Hub's colour tokens
  * (--ddb-code-*, --ddb-text and the others of css/_variables.scss), so it reads in the light and
- * the dark theme and follows a change of scheme while it is open (FR-XC-21).
+ * the dark theme and follows a change of scheme while it is open.
  *
  * The syntax colours are CodeMirror's default highlight style with each of its colours replaced
  * by a token: the same tags, the same weights and decorations.

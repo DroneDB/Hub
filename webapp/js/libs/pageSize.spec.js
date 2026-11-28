@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { rowsThatFit, pageStart, pageAfterResize, pageSizeOptions, pageSizeChoices, isPageSize, PAGE_SIZE_MIN, PAGE_SIZE_MAX } from './pageSize';
 
-describe('rowsThatFit (FR-XC-34, FR-ORG-25)', () => {
+describe('rowsThatFit', () => {
     it('holds the rows that the height holds, with a row of 48 px', () => {
         // 1850 / 48 = 38.5: 38 whole rows
         expect(rowsThatFit({ height: 1850, rowHeight: 48 })).toBe(38);
@@ -71,7 +71,7 @@ describe('isPageSize', () => {
     });
 });
 
-describe('pageSizeChoices (FR-XC-34)', () => {
+describe('pageSizeChoices', () => {
     it('labels the size that fits "N (fit)" and the others by their number', () => {
         expect(pageSizeChoices([10, 25, 50], 38)).toEqual([
             { value: 10, label: '10' }, { value: 25, label: '25' }, { value: 38, label: '38 (fit)' }, { value: 50, label: '50' }

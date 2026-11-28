@@ -16,7 +16,7 @@ export function copyText(text) {
 }
 
 /**
- * Copy a link and say so: "Link copied to the clipboard", or "The link could not be copied" (FR-RAS-05). The wording
+ * Copy a link and say so: "Link copied to the clipboard", or "The link could not be copied". The wording
  * of every Copy Link of the Hub.
  * @param {string} text  the link
  * @param {{ success: Function, error: Function }} notify  the app notifier (libs/notify; this.$notify in a component)

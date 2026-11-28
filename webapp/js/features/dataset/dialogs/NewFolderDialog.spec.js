@@ -1,5 +1,5 @@
 /**
- * The New folder dialog (FR-EXP-15, FR-EXP-05, D-034, D-040, D-046): the field is neutral when the dialog opens,
+ * The New folder dialog: the field is neutral when the dialog opens,
  * a blank name, a '/' and a name that an entry of the folder has are refused at the field before any request, a
  * server refusal (409) shows at the field and the dialog stays open with the typed text.
  */
@@ -94,7 +94,7 @@ describe('NewFolderDialog', () => {
         expect(wrapper.emitted('close')).toEqual([['createFolder', 'new', entry]]);
     });
 
-    // FR-EXP-15: the server's refusal replaced the dialog with an alert; now it is at the field and the dialog stays
+    // The server's refusal replaced the dialog with an alert; now it is at the field and the dialog stays
     it('shows a 409 of the Registry at the field and stays open with the typed text', async () => {
         createFolder.mockRejectedValue(new ApiError("A file or folder named 'Fresh' already exists in this folder", 409, { conflictPath: 'Fresh' }));
         await render();

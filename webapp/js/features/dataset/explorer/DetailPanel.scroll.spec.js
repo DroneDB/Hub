@@ -1,5 +1,5 @@
 /**
- * The detail panel starts at the top for each file it shows (FR-EXP-34): the content keeps the scroll position of the
+ * The detail panel starts at the top for each file it shows: the content keeps the scroll position of the
  * file before otherwise, and the preview of a raster selected after a long list of properties shows with its upper
  * part out of view.
  */

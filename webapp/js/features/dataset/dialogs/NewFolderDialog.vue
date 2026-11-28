@@ -9,7 +9,7 @@
                            :invalid="!!errorOf($form, 'name')"
                            :aria-invalid="errorOf($form, 'name') ? 'true' : undefined"
                            :aria-describedby="errorOf($form, 'name') ? 'new-folder-name-error' : undefined" />
-                <!-- The refusal of the name, at the field: before the request for what the Hub knows, after it for what the Registry answers (409, FR-EXP-15) -->
+                <!-- The refusal of the name, at the field: before the request for what the Hub knows, after it for what the Registry answers (409) -->
                 <FieldError id="new-folder-name-error" :message="errorOf($form, 'name')" />
             </template>
         </Form>
@@ -27,11 +27,11 @@ import { entryNameProblem } from '@/libs/nameRules';
 import { useHubForm } from '@/composables/useHubForm';
 
 /**
- * NewFolderDialog - the name of a new folder (FR-EXP-15, FR-EXP-05, D-034, D-046).
+ * NewFolderDialog - the name of a new folder.
  *
  * The field is neutral when the dialog opens. A name that is blank, has a '/' (the dialog takes one
  * folder name, as Rename does; the API accepts nested paths) or that an entry of the folder already
- * has (letter case ignored, as the Registry compares, D-040) is refused at the field with
+ * has (letter case ignored, as the Registry compares) is refused at the field with
  * `entryNameProblem`, and no request is sent. The request runs in the dialog (`createFolder`): a refusal of
  * the Registry (a 409 for a name that exists) shows at the field and the dialog stays open with the
  * typed text; the dialog closes only when the folder exists.

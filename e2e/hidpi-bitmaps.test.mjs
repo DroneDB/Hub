@@ -1,5 +1,5 @@
 /**
- * Bitmaps at the displayed size, end to end (FR-XC-32, FR-EXP-41, FR-EXP-43, FR-VWR-35, FR-MAP-31): drives the real Hub in
+ * Bitmaps at the displayed size, end to end: drives the real Hub in
  * Chromium against a running Registry. Not part of `npm test` (needs a server and a dataset with photos); same
  * environment and conventions as smoke.test.mjs:
  *
@@ -57,7 +57,7 @@ async function newPage(viewport, deviceScaleFactor = 1) {
 before(async () => { browser = await chromium.launch({ executablePath: chromeExecutable() }); });
 after(async () => { for (const c of contexts) await c.close(); await browser?.close(); });
 
-test('3840x2160: the grid starts at M and L makes the tiles 256 px or more, without overlapping rows (FR-EXP-43)', async () => {
+test('3840x2160: the grid starts at M and L makes the tiles 256 px or more, without overlapping rows', async () => {
     const page = await newPage({ width: 3840, height: 2160 });
     await page.goto(`${URL_}/r/${DATASET}`);
     await page.waitForSelector('#explorer .thumbnail .container', { timeout: 30000 });
@@ -73,7 +73,7 @@ test('3840x2160: the grid starts at M and L makes the tiles 256 px or more, with
     assert.equal(overlap, false);
 });
 
-test('1920x1080 at device scale factor 2: the expanded table and the grid ask for twice the pixels (FR-EXP-41, FR-XC-32)', async () => {
+test('1920x1080 at device scale factor 2: the expanded table and the grid ask for twice the pixels', async () => {
     const page = await newPage({ width: 1920, height: 1080 }, 2);
     await page.goto(`${URL_}/r/${DATASET}`);
     await page.waitForSelector('#explorer .thumbnail .container', { timeout: 30000 });
@@ -86,7 +86,7 @@ test('1920x1080 at device scale factor 2: the expanded table and the grid ask fo
     assert.ok(natural >= 96, `an image of the table is ${natural} px high`);
 });
 
-test('3840x2160: the video of the lightbox fills the free area (FR-VWR-35)', { skip: !VIDEO }, async () => {
+test('3840x2160: the video of the lightbox fills the free area', { skip: !VIDEO }, async () => {
     const page = await newPage({ width: 3840, height: 2160 });
     const [org, ds, ...rest] = VIDEO.split('/');
     await page.goto(`${URL_}/r/${org}/${ds}`);

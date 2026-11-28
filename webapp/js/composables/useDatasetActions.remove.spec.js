@@ -1,5 +1,5 @@
 /**
- * Deleting files from the dataset page (FR-EXP-08, D-011): the question is titled "Delete 2 items",
+ * Deleting files from the dataset page: the question is titled "Delete 2 items",
  * lists the items, warns that a folder goes with everything inside it and gives the total size,
  * with "Calculating size…" while the size of a folder is read. Delete stays available meanwhile.
  */

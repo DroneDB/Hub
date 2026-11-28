@@ -142,12 +142,12 @@ export function createVisibilityTracker(opts) {
     };
 }
 
-/** The sizes thumbnails are requested at: few steps keep the cache effective (FR-XC-32). */
+/** The sizes thumbnails are requested at: few steps keep the cache effective. */
 const REQUEST_STEPS = [128, 256, 512, 1024, 2048, 4096];
 
 /**
- * Thumbnail size to request: the displayed CSS size times the pixel ratio, in cache-friendly steps
- * (FR-XC-32). The one helper every bitmap the Hub requests for display goes through.
+ * Thumbnail size to request: the displayed CSS size times the pixel ratio, in cache-friendly steps.
+ * The one helper every bitmap the Hub requests for display goes through.
  * @param {number} cssPx                 the displayed CSS size (the long side)
  * @param {number} [devicePixelRatio]
  * @param {number} [maxPx]               the natural long side of the source: never ask for more than it has

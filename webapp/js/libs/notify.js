@@ -9,9 +9,9 @@
  *   notify.error(err);                                   // an Error shows its message
  *   notify.warn('Quota almost full', { summary: 'Storage', life: 'long' });
  *   notify.success({ summary: 'Camera views saved' });   // summary only
- *   notify.success('File moved', { action: { label: 'Undo', run: undoMove } });   // one action (FR-XC-23)
+ *   notify.success('File moved', { action: { label: 'Undo', run: undoMove } });   // one action
  *
- * Where a toast shows (FR-XC-09): the one <Toast> host of the root app is top right, below the header. A viewer
+ * Where a toast shows: the one <Toast> host of the root app is top right, below the header. A viewer
  * has controls in the corners, so the toasts of a viewer route go to the `viewer` group, which has its own
  * host: `group: 'viewer'`, or, for every toast that is raised while a viewer route is open, the group the
  * app gives with setToastGroupResolver.
@@ -25,11 +25,11 @@ import { TOAST_LIFE } from './constants';
  * @property {string} [summary]  the title
  * @property {keyof typeof TOAST_LIFE | number} [life]  how long it stays
  * @property {string} [group]  the toast host that shows it (VIEWER_GROUP for a viewer); the app's default otherwise
- * @property {ToastAction} [action]  one button of the toast (FR-XC-23): `run` is called on a click and the toast closes
+ * @property {ToastAction} [action]  one button of the toast: `run` is called on a click and the toast closes
  */
 /** @typedef {{ add: (message: object) => void, remove?: (message: object) => void }} ToastService */
 
-/** The toast group of the viewer routes: its host is in a corner that the viewers do not use (FR-XC-09) */
+/** The toast group of the viewer routes: its host is in a corner that the viewers do not use */
 export const VIEWER_GROUP = 'viewer';
 
 /** @type {Record<Severity, [string, number]>} default summary and duration */

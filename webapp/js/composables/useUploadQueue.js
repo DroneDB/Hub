@@ -60,7 +60,7 @@ export function useUploadQueue(opts) {
          *   `lod-meta.json` (a SOG level-of-detail splat folder, not supported) gets a warning, and is queued all the same
          */
         add(files) {
-            // The one step before the queue that the dataset upload and /upload share (FR-UPL-09): a splat folder that
+            // The one step before the queue that the dataset upload and /upload share: a splat folder that
             // DroneDB does not read gets its warning here, whichever page the files come from. The files are still queued
             const lodWarning = splatLodWarning(files);
             if (lodWarning) notify.warn(lodWarning, { summary: 'Splat folder not supported', life: 'long' });
@@ -75,7 +75,7 @@ export function useUploadQueue(opts) {
                 size: file.size
             })));
         },
-        /** Stops sending (FR-UPL-04): the file being sent is aborted and waits, a chunked one goes on where it was. */
+        /** Stops sending: the file being sent is aborted and waits, a chunked one goes on where it was. */
         pause: () => scheduler.pause(),
         resume: () => scheduler.resume(),
         retry: id => scheduler.retry(id),
@@ -83,10 +83,10 @@ export function useUploadQueue(opts) {
         /** @param {string} id @param {{ path?: string, overwrite?: boolean }} changes */
         requeue: (id, changes) => scheduler.requeue(id, changes),
         /**
-         * The one way the Hub cancels an upload (FR-XC-27). `confirm()` asks the user first: when it answers
+         * The one way the Hub cancels an upload. `confirm()` asks the user first: when it answers
          * false nothing happens. The queue then stops (requests in flight are aborted, queued and retrying files
          * are dropped), and `cleanup()` undoes what the upload left on the server: /upload rolls its share batch
-         * back (ShareApi.rollback), the dataset page passes none, because the files already sent stay (D-045).
+         * back (ShareApi.rollback), the dataset page passes none, because the files already sent stay.
          * The stop is synchronous when there is no `confirm`. A failing cleanup does not throw: the queue is
          * stopped either way, and the caller gets the error to tell the user.
          * @param {object} [steps]

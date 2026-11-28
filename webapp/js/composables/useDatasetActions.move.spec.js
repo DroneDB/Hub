@@ -1,6 +1,6 @@
 /**
- * A drag move offers Undo (FR-EXP-16, FR-XC-23): the toast of the move carries an Undo action that moves the item back to the
- * path it came from. A rename carries none. A move onto a name that exists is refused by the Registry (409, D-040): it says
+ * A drag move offers Undo: the toast of the move carries an Undo action that moves the item back to the
+ * path it came from. A rename carries none. A move onto a name that exists is refused by the Registry (409): it says
  * that the name is taken and offers no Undo. An Undo whose old path holds an entry again is refused and moves nothing.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -86,7 +86,7 @@ describe('Undo of a drag move', () => {
         expect(listing.added).toHaveBeenCalledTimes(1);
     });
 
-    // D-040: the Registry refuses a move onto a name that exists (no replace, so no extra listing is asked first)
+    // The Registry refuses a move onto a name that exists (no replace, so no extra listing is asked first)
     it('says that the name is taken when the server refuses the move with 409, offers no Undo and moves nothing', async () => {
         dataset.moveObj.mockRejectedValueOnce(new ApiError("A file or folder named 'Notes.TXT' already exists in this folder", 409, { conflictPath: 'x/Notes.TXT' }));
 

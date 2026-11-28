@@ -1,5 +1,5 @@
 /**
- * The sign-in form (FR-ACC-04, FR-ACC-05, FR-ACC-06, FR-ACC-07, FR-XC-11), end to end: drives the real
+ * The sign-in form, end to end: drives the real
  * Hub in Chromium against a running Registry. Not part of `npm test` (needs a server); same
  * environment and conventions as smoke.test.mjs:
  *

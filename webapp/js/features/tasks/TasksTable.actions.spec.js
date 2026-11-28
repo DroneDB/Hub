@@ -1,7 +1,7 @@
 /**
- * TasksTable draws a row as the server describes it (FR-XC-15, D-024): only the actions the summary lists
- * (FR-PRC-21), the tool's label of the target instead of "Whole dataset" (FR-PRC-22, FR-PRC-43), a cancelled task
- * as "Cancelled at n %" (FR-PRC-20) and a task queued on a processing node as waiting (FR-PRC-37).
+ * TasksTable draws a row as the server describes it: only the actions the summary lists,
+ * the tool's label of the target instead of "Whole dataset", a cancelled task
+ * as "Cancelled at n %" and a task queued on a processing node as waiting.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';

@@ -1,5 +1,5 @@
 /**
- * The legend on the map (FR-RAS-27): the colour bar and the labels of a styled layer, from the vizParams of the layers.
+ * The legend on the map: the colour bar and the labels of a styled layer, from the vizParams of the layers.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';

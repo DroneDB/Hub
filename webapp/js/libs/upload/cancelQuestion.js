@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * The question that asks before an upload is stopped (FR-UPL-16, FR-XC-27): what is lost depends on the page. /upload rolls
- * its batch back (the dataset it made and the files sent are deleted); the dataset page keeps the files already sent
- * (D-045). The answer goes to `useConfirm`, then `useUploadQueue.cancel({ confirm })`.
+ * The question that asks before an upload is stopped: what is lost depends on the page. /upload rolls
+ * its batch back (the dataset it made and the files sent are deleted); the dataset page keeps the files already sent.
+ * The answer goes to `useConfirm`, then `useUploadQueue.cancel({ confirm })`.
  */
 import { countOf, pluralize } from '@/libs/format';
 

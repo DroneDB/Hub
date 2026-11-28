@@ -1,5 +1,5 @@
 /**
- * Admin > Organizations, delete (FR-ORG-03, AC-004): the shared wording, the organization by
+ * Admin > Organizations, delete: the shared wording, the organization by
  * name and slug with its datasets, Enter on open deletes nothing, and Delete waits for the slug; no second delete while the
  * first runs. Create: the slug is the one the shared generator makes, and what it cannot accept is said before a request.
  */

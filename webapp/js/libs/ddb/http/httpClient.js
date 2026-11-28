@@ -217,7 +217,7 @@ function encodeBody(headers, body, contentType) {
  * @property {(headers: Headers) => void} [onHeaders]
  * @property {boolean} [skipUnauthorized]  a request the user did not start (a header look-up,
  *   an optional side file): its 401/403 rejects as usual but never reaches the unauthorized
- *   handler, so it cannot send the visitor to Login (FR-XC-05)
+ *   handler, so it cannot send the visitor to Login
  */
 
 /**

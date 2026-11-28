@@ -37,7 +37,7 @@
 
         <!-- Search -->
         <!-- Escape belongs to the search while it is open (data-owns-escape): the SearchField clears its text,
-             an empty one closes the search; the dialog around the editor stays open with every field it holds (FR-PRC-25) -->
+             an empty one closes the search; the dialog around the editor stays open with every field it holds -->
         <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- it only keeps Escape for the search; the field inside is the control -->
         <div v-if="showSearch" class="odm-search-bar" data-owns-escape @keydown.esc="onSearchEscape">
             <SearchField ref="searchField" v-model="searchQuery" label="Search options" placeholder="Search options by name..." />
@@ -45,7 +45,7 @@
 
         <!-- Options content -->
         <div class="odm-options-content" :class="{ 'odm-scroll': true }">
-            <!-- A search that matches no option says so (FR-PRC-38) -->
+            <!-- A search that matches no option says so -->
             <EmptyState v-if="searchQuery && filteredOptions.length === 0" title="No options" items="options" :query="searchQuery"
                         class="odm-no-match" @clear="clearSearch" />
             <!-- Grouped view -->
@@ -390,7 +390,7 @@ export default {
     },
 
     watch: {
-        // The options that match are shown, not the headers of collapsed groups (FR-PRC-38)
+        // The options that match are shown, not the headers of collapsed groups
         searchQuery(query, previous) {
             if (query && !previous) {
                 this.collapsedBeforeSearch = { ...this.collapsedGroups };
@@ -502,12 +502,12 @@ export default {
             const option = this.availableOptions.find(o => o.name === name);
             return option && option.value !== undefined ? option.value : '';
         },
-        // A customization is a value the user set by hand that differs from the effective one (FR-PRC-07)
+        // A customization is a value the user set by hand that differs from the effective one
         isCustomization(name, value) {
             if (value === '' || value === undefined || value === null) return false;
             return String(value) !== String(this.effectiveValue(name));
         },
-        // Reset: the option leaves the customizations, and the profile's (else the node's) value is the one it has (FR-PRC-33)
+        // Reset: the option leaves the customizations, and the profile's (else the node's) value is the one it has
         onOptionReset(name) {
             if (this.modelValue.some(o => o.name === name))
                 this.$emit('update:modelValue', this.modelValue.filter(o => o.name !== name));
@@ -534,7 +534,7 @@ export default {
 
 <style scoped>
 .odm-options-editor {
-    /* A column: the options list takes the height the editor is given (FR-PRC-45) */
+    /* A column: the options list takes the height the editor is given */
     display: flex;
     flex-direction: column;
     border: 1px solid var(--ddb-border);
@@ -574,7 +574,7 @@ export default {
     border-bottom: 1px solid var(--ddb-border);
 }
 
-/* The list takes the free height of the window and scrolls on its own: no maximum height (FR-PRC-45) */
+/* The list takes the free height of the window and scrolls on its own: no maximum height */
 .odm-options-content {
     flex: 1 1 0px;
     min-height: 12rem;

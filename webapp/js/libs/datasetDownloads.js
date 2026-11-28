@@ -21,7 +21,7 @@ import { CALCULATING } from '@/libs/dataset/selection';
 /**
  * Whether a download is an archive (a ZIP): several items, a folder or the whole dataset (nothing
  * selected). One file is not, and an item without its entry counts as an archive. The header and the
- * menus share this rule (FR-EXP-27).
+ * menus share this rule.
  * @param {Array<{ entry?: any }>} files
  */
 export function isArchiveDownload(files) {

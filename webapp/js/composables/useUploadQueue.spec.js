@@ -1,6 +1,6 @@
 /**
- * useUploadQueue.cancel({ confirm, cleanup }) (FR-XC-27): the one way the Hub cancels an upload. /upload passes the
- * rollback of its share batch as the cleanup; the dataset page passes none, because the files already sent stay (D-045).
+ * useUploadQueue.cancel({ confirm, cleanup }): the one way the Hub cancels an upload. /upload passes the
+ * rollback of its share batch as the cleanup; the dataset page passes none, because the files already sent stay.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { useUploadQueue } from './useUploadQueue';
@@ -93,7 +93,7 @@ describe('useUploadQueue.cancel', () => {
     });
 });
 
-describe('useUploadQueue pause and resume (FR-UPL-04)', () => {
+describe('useUploadQueue pause and resume', () => {
     it('pause aborts the file being sent and keeps it pending; resume sends it again', async () => {
         const { queue, send } = heldQueue();
         await flush();
@@ -154,7 +154,7 @@ describe('useUploadQueue activity signal', () => {
     });
 });
 
-describe('useUploadQueue.add, a splat level-of-detail folder (FR-UPL-09)', () => {
+describe('useUploadQueue.add, a splat level-of-detail folder', () => {
     afterEach(() => vi.restoreAllMocks());
 
     const queueOf = () => useUploadQueue({ send: vi.fn(() => new Promise(() => {})) });

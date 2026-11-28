@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The unbundled SOG level-of-detail layout of a Gaussian splat (FR-UPL-09): a folder with a `lod-meta.json` and, in it
+ * The unbundled SOG level-of-detail layout of a Gaussian splat: a folder with a `lod-meta.json` and, in it
  * and below it, the `.webp` textures of every level. DroneDB does not read it as a splat (its textures would show as
  * photos), so the Hub says so when such a folder is in an upload, and says what to do: bundle it into one `.sog` file.
  */

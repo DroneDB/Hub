@@ -1,5 +1,5 @@
 /**
- * An empty folder (FR-EXP-37, FR-XC-20): somebody who may write is told where files come from ('Drop files here or
+ * An empty folder: somebody who may write is told where files come from ('Drop files here or
  * click Upload') and has the Upload and Import from URL buttons, in the grid and in the table; a reader has the plain
  * text only.
  */

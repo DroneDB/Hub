@@ -15,7 +15,7 @@
             </template>
             <template #second>
                 <!-- The heading of the page, for screen readers: the header of the Hub shows the name, the visibility and
-                     the tagline of the dataset (FR-EXP-14), so the tabs start at the top -->
+                     the tagline of the dataset, so the tabs start at the top -->
                 <DatasetHeader :entry="rootEntry" />
                 <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="initialTab ?? mainTabs[0].key" position="top"
                              :hide-single="false" bottom-nav-phone @tab-change="onTabChange">
@@ -44,7 +44,7 @@
                                 <Button v-if="detailReopenable" ref="detailReopen" class="detail-reopen" icon="fa-solid fa-circle-info" label="Details"
                                         severity="secondary" aria-controls="dataset-detail-side" aria-expanded="false" @click="openDrawer" />
                             </div>
-                            <!-- The README of the dataset under the files of its root (FR-EXP-14) -->
+                            <!-- The README of the dataset under the files of its root -->
                             <DatasetReadme v-if="readmePath && readmeEntry" :dataset="dataset" :path="readmePath" :entry="readmeEntry" :version="readmeVersion" @open="openReadme" />
                         </div>
                     </template>
@@ -166,9 +166,9 @@ const BACK_TO_DATASETS = Object.freeze({ backTo: DATASETS_LIST, backLabel: 'Back
 // A dataset opened after one that did not load starts with the toolbar's actions
 session.setUnavailable(false);
 // Nor does it start with the root entry of the page before it (a viewer of another dataset, whose answer came late): the
-// breadcrumb would name that dataset until this one's own root entry arrives (FR-NAV-03)
+// breadcrumb would name that dataset until this one's own root entry arrives
 session.setRootEntry(null);
-// The phone layout (FR-EXP-29): a window below `sm`, the breakpoint of libs/responsiveColumns.js (as the bottom
+// The phone layout: a window below `sm`, the breakpoint of libs/responsiveColumns.js (as the bottom
 // navigation), not the screen of libs/responsive's isMobile. It follows the window (a phone that rotates, a window
 // resized): there the tree is the Browser tab and the detail of a file the Properties tab, and the splitter hides its
 // first pane (HubPanel mobile-collapsed). The tabs change around the ones they keep, which are not rendered again.
@@ -180,7 +180,7 @@ const mainTabs = computed(() => [
     { label: 'Map', icon: 'fa-solid fa-map', key: 'map' },
     { label: 'Tasks', icon: 'fa-solid fa-list-check', key: 'tasks' }
 ]);
-// The link of the task e-mail (FR-PRC-40) opens the Tasks tab: `?tab=tasks`; any other query leaves the first tab.
+// The link of the task e-mail opens the Tasks tab: `?tab=tasks`; any other query leaves the first tab.
 // It is read for the first tab; the route is followed afterwards (watch below), and the query goes once the user
 // switches to another tab (onTabChange), so a reload or a shared address does not bring the old tab back.
 const TASKS_TAB_QUERY = 'tasks';
@@ -192,13 +192,13 @@ const openedTabs = reactive({ map: false, tasks: false });
 const viewMode = usePreference(PREF.FILE_VIEW_MODE, 'grid');
 // Table view: thumbnails and relative times, or icons and dates
 const expandedGrid = usePreference(PREF.TABLE_EXPANDED_GRID, true);
-// The size of the grid's thumbnails (FR-EXP-43): S, M or L as the user chose, else M on a 4K screen and S below it
+// The size of the grid's thumbnails: S, M or L as the user chose, else M on a 4K screen and S below it
 const tileSizePref = usePreference(PREF.TILE_SIZE, '');
 const xwide = useMediaMatch(XWIDE_MEDIA_QUERY);
 const tileSize = computed(() => tileSizeChoice(tileSizePref.value, xwide.value));
 // The file the user asked the detail panel to show (a click on it, the tree opening it); shownFile, below, is what it shows
 const detailFile = ref(null);
-// Below lg (and from sm) the detail panel is a drawer over the list (FR-EXP-17). Once the user closes it, a selection
+// Below lg (and from sm) the detail panel is a drawer over the list. Once the user closes it, a selection
 // does not open it again: its Details button does. From lg it is a column that follows the selection, as before.
 const belowLg = useMediaMatch(TABLET_MEDIA_QUERY);
 const drawerMode = computed(() => belowLg.value && !phoneLayout.value);
@@ -229,7 +229,7 @@ const detailReopen = ref(null);
 const listing = useDatasetListing(dataset);
 // What the panel shows: that file as the list holds it now. A file that left the list (deleted, moved, the archive
 // that an extraction deleted) is not shown any more: the panel shows the first item that is still selected, else it
-// closes (FR-EXP-06, FR-EXP-19); a file the list replaces by a newer item keeps its panel.
+// closes; a file the list replaces by a newer item keeps its panel.
 const shownFile = computed(() => {
     const asked = detailFile.value;
     if (!asked) return null;
@@ -239,7 +239,7 @@ const shownFile = computed(() => {
 // A panel that closed because its file is gone does not open again for a file that comes back at that path
 watch(shownFile, file => { if (!file) detailFile.value = null; });
 // An upload that ends while this dataset is open shows in its listing, also one that the user started on another page
-// and that went on in the background (FR-UPL-04)
+// and that went on in the background
 const stopHearingUploads = useUploadsStore().subscribe(params.org, params.ds, { added: entries => listing.uploaded(entries) });
 onBeforeUnmount(stopHearingUploads);
 const dialogs = useDialogs();
@@ -257,7 +257,7 @@ const refresh = () => {
     const tree = activeTree();
     if (tree) tree.refreshAndNavigate(listing.currentPath.value);
 };
-// The Map tab's "Photos are in images - Show" (FR-MAP-10): the tree opens that subfolder, and the map shows what it holds
+// The Map tab's "Photos are in images - Show": the tree opens that subfolder, and the map shows what it holds
 const showFolder = path => { activeTree()?.refreshAndNavigate(path); };
 const actions = useDatasetActions({
     dataset, listing, dialogs, busy, canWrite, route: params, refresh, showFolder, rootChanged: reloadRoot, openItem: node => openItem(node)
@@ -349,7 +349,7 @@ async function downloadItems(picked) {
         notify.warn('A download archive is already being prepared. Please wait for it to complete.', { summary: 'Download in progress' });
         return;
     }
-    // A single file downloads at once, like the header's Download; several items or a folder ask (FR-EXP-27)
+    // A single file downloads at once, like the header's Download; several items or a folder ask
     if (needsConfirm(files) && !await askDownload(files)) return;
     const paths = files.length ? files.map(f => (f.entry && f.entry.path !== undefined ? f.entry.path : ddb.utils.parseUri(f.path).path)) : undefined;
     try {
@@ -473,7 +473,7 @@ function applyRootEntry(entry) {
     rootEntry.value = entry;
     session.setRootEntry(entry);
     syncReadme(entry);
-    // A new name shows on the root of the tree at once, the tree stays as it is (FR-EXP-24)
+    // A new name shows on the root of the tree at once, the tree stays as it is
     const label = entry ? ddb.utils.entryLabel(entry) : '';
     for (const tree of [fileBrowser.value, mobileFileBrowser.value]) tree?.setRootLabel?.(label);
     const name = entry?.properties?.meta?.name;
@@ -730,7 +730,7 @@ watch(canWrite, value => session.setCanWrite(value), { immediate: true });
 watch(() => session.settingsRequests, () => actions.settings());
 
 // The dataset was deleted while the page is open (an import that was cancelled or failed rolled
-// back and deleted the dataset it created, FR-UPL-05, D-004): the same page state as a dataset that
+// back and deleted the dataset it created): the same page state as a dataset that
 // is not there when it is opened. The Hub deletes nothing itself.
 function onDatasetGone({ dataset: gone, error: e }) {
     if (datasetKey(gone) !== datasetKey(dataset) || loadError.value) return;
@@ -773,7 +773,7 @@ onMounted(() => {
     watchBuildEvents(() => dataset, (message, title) => actions.showError(message, title));
 });
 
-/** When the dataset was created: the Registry's dataset list has it, the root entry does not (FR-EXP-25). Read once. */
+/** When the dataset was created: the Registry's dataset list has it, the root entry does not. Read once. */
 async function loadCreationDate() {
     try {
         const list = await reg.Organization(params.org).datasets({ slugs: [params.ds] });
@@ -821,8 +821,8 @@ onBeforeUnmount(() => {
     overflow: auto;
 }
 
-/* The width of the panel is the token of FR-XC-33: it grows with the window up to 45rem, and the file list takes the
-   rest (FR-EXP-40); in a narrow row it shrinks, to 15rem at the least */
+/* The width of the panel is a width token: it grows with the window up to 45rem, and the file list takes the
+   rest; in a narrow row it shrinks, to 15rem at the least */
 .detail-side {
     flex: 0 1 var(--ddb-panel-detail-width);
     min-width: 15rem;
@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
 }
 
 /* Below lg (992px, libs/responsiveColumns.js) the panel does not share a narrow row with the file list (the values
-   of the file clipped there, FR-EXP-17): it opens over the list as a drawer */
+   of the file clipped there): it opens over the list as a drawer */
 @media (max-width: 991.98px) {
     .detail-layout {
         position: relative;

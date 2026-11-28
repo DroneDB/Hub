@@ -216,7 +216,7 @@ export class MeasurementStorage {
      * (a 200 with no body) is a new file too. Any other failure (a network error, 401, 403, 5xx) is
      * not a missing file: the read throws, so a save does not replace what it could not read.
      * With `onlyIfListed` (the first read of a view, which has no file in most datasets) the file is asked for only
-     * when the listing of its folder holds it, so the browser logs no 404 (FR-XC-10). A save reads without it: what it
+     * when the listing of its folder holds it, so the browser logs no 404. A save reads without it: what it
      * merges into must be the file as the server holds it now.
      * @param {{ onlyIfListed?: boolean }} [options]
      * @returns {Promise<Object|null>} null when there is no file (or it is empty)

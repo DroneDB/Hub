@@ -1,8 +1,7 @@
 // @ts-check
 /**
  * The builds a task starts (the files a photogrammetry run adds, an archive it extracts) are tasks of their own, and
- * the Tasks tab lists them next to it: one run makes dozens of rows. They are shown under their task, with a count
- * (FR-PRC-26).
+ * the Tasks tab lists them next to it: one run makes dozens of rows. They are shown under their task, with a count.
  */
 
 /**

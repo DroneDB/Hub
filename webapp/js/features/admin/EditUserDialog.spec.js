@@ -1,5 +1,5 @@
 /**
- * The Edit User window (FR-ADM-07, FR-ADM-22, FR-XC-11): the e-mail is optional and checked by the
+ * The Edit User window: the e-mail is optional and checked by the
  * shared `emailProblem` at the field, an empty e-mail is sent as it is, a submit that stays enabled
  * shows the errors at the fields, and a refused request shows once, at its field or in the window
  * (never in a toast as well).
@@ -68,7 +68,7 @@ describe('EditUserDialog', () => {
         expect(wrapper.emitted('close')[0]).toEqual(['updated']);
     });
 
-    it('leaves the e-mail out of the request when it was not changed: the Registry keeps it (FR-ADM-07)', async () => {
+    it('leaves the e-mail out of the request when it was not changed: the Registry keeps it', async () => {
         updateUser.mockResolvedValue(true);
         await render();
         await type('email', ' bob@example.com ');
@@ -102,7 +102,7 @@ describe('EditUserDialog', () => {
         expect(document.activeElement).toBe(wrapper.find('input[name="email"]').element);
     });
 
-    // FR-ADM-22: one error, at its field or in the window, never in a toast as well
+    // One error, at its field or in the window, never in a toast as well
     it('shows an error of the Registry that names the e-mail at the e-mail field, once, with no toast', async () => {
         updateUser.mockRejectedValue(new ApiError('x', 400, { errors: { email: ['The e-mail address is not valid: enter one address, such as name@example.com'] } }));
         await render();
@@ -136,7 +136,7 @@ describe('EditUserDialog', () => {
     });
 });
 
-// FR-ADM-16: the storage quota of a user, in MB, sent alone and only when it changed
+// The storage quota of a user, in MB, sent alone and only when it changed
 describe('EditUserDialog storage quota', () => {
     const MB = 1024 * 1024;
     const bob = (extra = {}) => ({ userName: 'bob', email: 'bob@example.com', roles: ['editor'], storageQuota: 40 * MB, storageUsed: 3 * MB, ...extra });

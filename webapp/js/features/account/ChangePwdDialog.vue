@@ -50,7 +50,7 @@ export default {
         });
         const form = useHubForm({
             fields: ['oldPassword', 'newPassword', 'confirmPassword'],
-            // The Registry names the field of a refusal (D-047): a wrong current password under
+            // The Registry names the field of a refusal: a wrong current password under
             // `currentPassword`, the policy under `newPassword`
             aliases: { currentPassword: 'oldPassword' },
             dependents: { oldPassword: ['newPassword'], newPassword: ['confirmPassword'] }
@@ -64,7 +64,7 @@ export default {
     },
     methods: {
         // Once the password is changed the form is done: the fields stay read-only until the
-        // window closes, and a submit (Enter in a field) sends nothing (FR-XC-11)
+        // window closes, and a submit (Enter in a field) sends nothing
         onSubmit: function (e) {
             if (this.success) return;
             return this.submit(this.change, e);

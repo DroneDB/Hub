@@ -16,7 +16,7 @@
 
 <script setup>
 /**
- * PasswordInput - the one password field of the Hub (FR-ACC-06, FR-ADM-20): PrimeVue Password
+ * PasswordInput - the one password field of the Hub: PrimeVue Password
  * with a show/hide toggle that is a real button, named "Show password" in both states (the
  * name does not change: it is a toggle button, `aria-pressed` says the state) and the same
  * element in both, so the keyboard focus stays on it when it is pressed; full width,

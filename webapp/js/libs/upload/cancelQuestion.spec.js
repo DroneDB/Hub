@@ -10,7 +10,7 @@ describe('cancelUploadQuestion', () => {
         expect(cancelUploadQuestion({ sent: 0, discardsBatch: true }).message).toBe('Stop the upload? The dataset is deleted.');
     });
 
-    it('the dataset page says that the files sent stay (D-045)', () => {
+    it('the dataset page says that the files sent stay', () => {
         expect(cancelUploadQuestion({ sent: 3, discardsBatch: false }).message)
             .toBe('Stop the upload? The 3 files already sent stay in the dataset.');
         expect(cancelUploadQuestion({ sent: 1, discardsBatch: false }).message)

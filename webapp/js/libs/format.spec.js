@@ -1,6 +1,6 @@
 /**
- * The one formatter (FR-XC-08): numbers in the browser's locale with one precision table, typed
- * numbers read by the rule of D-025, sizes, dates (UNKNOWN when not known), and the units of a pile
+ * The one formatter: numbers in the browser's locale with one precision table, typed
+ * numbers read by the decimal sign rule, sizes, dates (UNKNOWN when not known), and the units of a pile
  * of material and the amounts of money: metric values shown in the user's units, and back without drift.
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -21,7 +21,7 @@ afterEach(() => {
     delete navigator.language;
 });
 
-describe('formatNumber (FR-MAP-05, D-006)', () => {
+describe('formatNumber', () => {
     it('writes the decimal sign and the group separator of the browser locale', () => {
         inLocale('it-IT');
         expect(displayLocale()).toBe('it-IT');
@@ -64,7 +64,7 @@ describe('formatNumber (FR-MAP-05, D-006)', () => {
     });
 });
 
-describe('parseNumber (D-025)', () => {
+describe('parseNumber', () => {
     it('reads a lone "." or "," as the decimal sign in every locale', () => {
         for (const locale of ['en-US', 'it-IT']) {
             inLocale(locale);
@@ -216,7 +216,7 @@ describe('formatBytes', () => {
     });
 });
 
-describe('formatDateTime (FR-EXP-26, FR-ADM-19)', () => {
+describe('formatDateTime', () => {
     const when = new Date(2016, 5, 23, 23, 32, 13);
 
     it('writes local date and time with 2-digit fields in the browser locale', () => {
@@ -254,7 +254,7 @@ describe('utcClockToLocal', () => {
     });
 });
 
-describe('lengthParts (FR-MAP-18)', () => {
+describe('lengthParts', () => {
     it('stays in metres below 1 km with 2 decimals, then km with 3', () => {
         inLocale('en-US');
         expect(lengthParts(110.4).text).toBe('110.4 m');
@@ -279,7 +279,7 @@ describe('lengthParts (FR-MAP-18)', () => {
     });
 });
 
-describe('bulk quantities (FR-MAP-05)', () => {
+describe('bulk quantities', () => {
     it('writes volumes, weights and densities in the user units with the decimals of the table', () => {
         inLocale('en-US');
         expect(formatVolume(1234.567)).toBe('1,234.57 m³');
@@ -318,12 +318,12 @@ describe('bulkUnits', () => {
     });
 });
 
-describe('stockpileLabel (FR-MAP-13)', () => {
+describe('stockpileLabel', () => {
     const pile = { title: 'North pile', netVolume: 8097.19, materialName: 'Gravel', materialDensity: 1.68, unitSystem: 'metric' };
     // Worked out by hand, not with the formatter:
     //   8097.19 m³ x 1.307950619 yd³/m³ = 10,590.7247 yd³ -> "10,590.72 yd³" (2 decimals)
     //   1.68 t/m³ x (0.764554858 m³/yd³ / 0.90718474 t/ST = 0.8427774) = 1.415866 ST/yd³ -> "1.416 ST/yd³" (3 decimals)
-    // The title is the name heading above the label on the map and in the list, so the label does not repeat it (FR-MAP-26)
+    // The title is the name heading above the label on the map and in the list, so the label does not repeat it
     const METRIC = '8,097.19 m³ - Gravel - 1.68 t/m³';
     const IMPERIAL = '10,590.72 yd³ - Gravel - 1.416 ST/yd³';
 
@@ -350,7 +350,7 @@ describe('stockpileLabel (FR-MAP-13)', () => {
         expect(stockpileLabel({ title: 'North pile', materialName: 'Gravel' }, 'imperial')).toBe('Gravel');
     });
 
-    it('never has the title in it, whatever the title is (FR-MAP-26)', () => {
+    it('never has the title in it, whatever the title is', () => {
         inLocale('en-US');
         expect(stockpileLabel({ ...pile, title: 'North pile' }, 'metric')).not.toContain('North pile');
         expect(stockpileLabel({ title: 'North pile' }, 'metric')).toBe('Stockpile');
@@ -362,7 +362,7 @@ describe('stockpileLabel (FR-MAP-13)', () => {
     });
 });
 
-describe('distinctLabels (FR-RAS-12)', () => {
+describe('distinctLabels', () => {
     // The two mosaics of r3thermal/hat-creek and the masked variant of the first one
     const A = 'Hat_Creek_Fire_Thermal_08242018_16bit.tif';
     const B = 'Hat_Creek_Fire_Thermal_08252018_16bit.tif';

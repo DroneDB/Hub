@@ -1,7 +1,7 @@
 /**
  * A stockpile on the measure control: its label (map and Measurement List) is built from its
- * stored metric properties in the units of the map (FR-MAP-13), and the control tells whether one
- * measurement is in the saved file (FR-MAP-02).
+ * stored metric properties in the units of the map, and the control tells whether one
+ * measurement is in the saved file.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import OlMap from 'ol/Map';
@@ -46,9 +46,9 @@ afterEach(() => {
     _resetPrefListenersForTests();
 });
 
-describe('stockpile label after a units change (FR-MAP-13)', () => {
+describe('stockpile label after a units change', () => {
     // Worked out by hand: 8097.19 m³ x 1.307950619 yd³/m³ = 10,590.72 yd³; 1.68 t/m³ x 0.8427774 = 1.416 ST/yd³
-    // The title is the name heading above the label, not part of it (FR-MAP-26)
+    // The title is the name heading above the label, not part of it
     const METRIC = '8,097.19 m³ - Gravel - 1.68 t/m³';
     const IMPERIAL = '10,590.72 yd³ - Gravel - 1.416 ST/yd³';
     beforeEach(() => Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true }));
@@ -151,7 +151,7 @@ describe('a name or a material from a saved file is text on the map and in the l
     });
 });
 
-describe('isSaved (FR-MAP-02)', () => {
+describe('isSaved', () => {
     it('is true for a measurement in the saved snapshot, whatever else changed since', () => {
         control.source.addFeature(pile('p1'));
         expect(control.isSaved('p1')).toBe(false);

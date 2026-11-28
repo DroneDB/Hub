@@ -25,7 +25,7 @@ describe('the brand blue', () => {
     });
 });
 
-// FR-XC-21: every colour block of the preset has its dark block, which applies under the class
+// Every colour block of the preset has its dark block, which applies under the class
 // libs/colorScheme.js puts on <html>
 describe('two schemes', () => {
     it('applies the dark scheme under the dark class, not the media query', () => {
@@ -50,7 +50,7 @@ describe('two schemes', () => {
     });
 });
 
-// FR-NAV-05: one ring for every component, from the token set of libs/palette.js (the stylesheets
+// One ring for every component, from the token set of libs/palette.js (the stylesheets
 // keep a copy that libs/palette.spec.js holds equal); Lara's light halo of each component is gone
 describe('the focus ring', () => {
     it('is FOCUS_RING: 2px solid, 2px out, primary.700 (primary.300 in the dark scheme), no shadow', () => {
@@ -168,7 +168,7 @@ describe('no orange', () => {
         expect(orange).toEqual([]);
     });
 
-    // FR-VWR-06: Lara's yellow.600 text on its tint is 2.8:1; the warning text token passes in both themes
+    // Lara's yellow.600 text on its tint is 2.8:1; the warning text token passes in both themes
     it.each(['light', 'dark'])('a warning message, inline message and toast is the warning text token in the %s theme', scheme => {
         const of = name => preset.components[name].colorScheme[scheme].warn;
         expect(of('message')).toMatchObject({

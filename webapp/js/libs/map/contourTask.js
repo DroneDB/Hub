@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * The contour lines of a raster run as the heavy task `raster-contours` (FR-RAS-11, NFR-001): the task gives the progress and
- * the Cancel (HeavyTaskStatus, FR-XC-15), its artifact is the GeoJSON of the lines. What the Hub decides about a request
+ * The contour lines of a raster run as the heavy task `raster-contours`: the task gives the progress and
+ * the Cancel (HeavyTaskStatus), its artifact is the GeoJSON of the lines. What the Hub decides about a request
  * lives here: the task's parameters, the estimate of its levels (a long run is confirmed first) and what to say about a
  * result that was cut at the cap of the server.
  */
@@ -11,7 +11,7 @@ import { nodataNumber } from '@/libs/ddb/dataset';
 /** The id of the Registry's tool */
 export const CONTOUR_TOOL_ID = 'raster-contours';
 
-/** More levels than this ask for a confirmation before the run (FR-RAS-11) */
+/** More levels than this ask for a confirmation before the run */
 export const CONTOUR_LEVEL_WARNING = 50;
 
 /**
@@ -78,7 +78,7 @@ function finite(value) {
  * the interval; a target count is the number of levels asked for.
  * @param {number|null} levels  estimateContourLevels
  * @param {'interval'|'count'} [mode]  how the dialog spaces the levels
- * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model (FR-RAS-25)
+ * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model
  * @returns {string}
  */
 export function contourLevelsWarning(levels, mode = 'interval', noun = 'elevation') {
@@ -94,7 +94,7 @@ export function contourLevelsWarning(levels, mode = 'interval', noun = 'elevatio
  * What a result says about being cut at the cap of the server: `truncated` and `featureCap` of ddb. Empty when the result
  * is complete.
  * @param {{ truncated?: boolean, featureCap?: number }|null|undefined} result
- * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model (FR-RAS-25)
+ * @param {string} [noun]  what the values of the raster are called: 'value' on a raster that is not an elevation model
  * @returns {{ truncated: boolean, title: string, message: string }}
  */
 export function contourTruncation(result, noun = 'elevation') {

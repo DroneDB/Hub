@@ -124,7 +124,7 @@ let stopScale = () => {};
 // The key F toggles fullscreen (ViewerShell), but not in fly mode, where it flies down (FirstPersonControls of Potree)
 const fullscreenKeyFree = () => !viewer?.fpControls || viewer.getControls() !== viewer.fpControls;
 
-// The measures follow the gesture rule of every measuring tool (D-027): click adds a point; double click, Enter or
+// The measures follow the gesture rule of every measuring tool: click adds a point; double click, Enter or
 // right click ends it; Escape cancels it (libs/potree/measureGestures). The toolbar shows the kind being drawn; a
 // measure it has no button for (the angle, circle or azimuth of the Potree menu) is 'other': the general hint, Done
 // and Cancel, with no button pressed.
@@ -208,7 +208,7 @@ async function addPointCloud(ddbEntry) {
             }
             viewer.scene.addPointCloud(e.pointcloud);
             // Sizes in CSS px (the vendored renderer draws them in buffer pixels): an adaptive size of 1 closes the surface at
-            // any screen resolution, and no point is smaller than 2 px (FR-VWR-36). The Appearance menu changes them in CSS px
+            // any screen resolution, and no point is smaller than 2 px. The Appearance menu changes them in CSS px
             const material = e.pointcloud.material;
             material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
             material.size = 1;
@@ -235,7 +235,7 @@ async function loadViewer() {
     cloudUnits = cloudUnitsOf(null);
     mixedUnits.value = false;
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
-    // The canvas, the points and the labels are drawn at the applied ratio of the screen (FR-XC-32)
+    // The canvas, the points and the labels are drawn at the applied ratio of the screen
     stopScale = attachPotreeScale(viewer, session);
     // At once: a measure that the Potree menu starts while the cloud still loads is followed too. A measure that is
     // dropped leaves without a step of the history; before the measurements are attached there is no history yet

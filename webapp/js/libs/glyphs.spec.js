@@ -1,5 +1,5 @@
 /**
- * FR-MAP-24: one icon per meaning, and one meaning per icon. The buttons of the map take their glyph from libs/glyphs:
+ * One icon per meaning, and one meaning per icon. The buttons of the map take their glyph from libs/glyphs:
  * a Font Awesome Solid glyph, or one drawn for the Hub where Font Awesome has none that says what the button does.
  */
 import { describe, it, expect } from 'vitest';

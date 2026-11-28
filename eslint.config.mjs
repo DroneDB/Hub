@@ -2,6 +2,7 @@ import pluginVue from 'eslint-plugin-vue';
 import js from '@eslint/js';
 import globals from 'globals';
 import pairedListeners from './eslint-rules/paired-listeners.mjs';
+import noPlanningIds from './eslint-rules/no-planning-ids.mjs';
 import { guardConfigs } from './eslint-rules/guards.mjs';
 import { a11yConfigs } from './eslint-rules/a11y.mjs';
 
@@ -45,6 +46,12 @@ export default [
     ...guardConfigs(),
     // Accessibility rules on every component (no exceptions list)
     ...a11yConfigs(),
+    {
+        // Comments and test titles say why in words: no ids of planning documents
+        files: ['webapp/**/*.{js,vue}', 'e2e/**/*.mjs', 'scripts/**/*.{js,mjs,cjs}'],
+        plugins: { planning: { rules: { 'no-planning-ids': noPlanningIds } } },
+        rules: { 'planning/no-planning-ids': 'error' }
+    },
     {
         files: ['webapp/**/*.spec.js', 'webapp/**/*.test.js', 'test-setup.js'],
         languageOptions: { globals: { ...globals.browser, ...globals.node, ...globals.vitest } },

@@ -1,5 +1,5 @@
 /**
- * useBuildCompletion (FR-XC-16): the one wait for a build. onEnd runs when a build of one of the paths ends (a terminal
+ * useBuildCompletion: the one wait for a build. onEnd runs when a build of one of the paths ends (a terminal
  * state), never for another file, another dataset or a state that is still active; the dataset's builds are followed
  * while the view lives, and the dataset page that follows the same dataset is not disturbed by a view that goes away.
  */

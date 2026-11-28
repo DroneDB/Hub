@@ -3,7 +3,7 @@
  * The range of an index histogram that is worth showing. A few outliers (an NDVI of -191 where
  * the ground has no signal) put almost every value in one or two bars and the range handles on
  * top of each other. The server bins the range worth showing itself (the values the index can have,
- * near the bulk of the data, D-041) and counts the values outside its edges (`below`, `above`); the
+ * near the bulk of the data) and counts the values outside its edges (`below`, `above`); the
  * Hub computes no range of its own from the percentiles. A server that bins from min to max is
  * trimmed here to the values the index can have (its formula's range).
  */

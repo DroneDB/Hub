@@ -169,7 +169,7 @@ export default {
             type: Array,
             default: () => []
         },
-        // What a disabled row says (FR-XC-22): why a path of `exclude` cannot be selected, and why `accept` rejects a file
+        // What a disabled row says: why a path of `exclude` cannot be selected, and why `accept` rejects a file
         excludeReason: {
             type: String,
             default: 'Already chosen'
@@ -399,7 +399,7 @@ export default {
             return false;
         },
 
-        // Why a row cannot be selected, in words (FR-MAP-22, FR-XC-22); '' when it can
+        // Why a row cannot be selected, in words; '' when it can
         disabledReason: function (file) {
             if (!file || this.canSelect(file)) return '';
             if (this.excludedPaths.has(this.normalizePath(file.entry.path))) return this.excludeReason;

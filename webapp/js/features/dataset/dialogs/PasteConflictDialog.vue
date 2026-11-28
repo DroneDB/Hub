@@ -57,13 +57,13 @@ const { pathutils } = ddb;
 const PARTICIPLES = { paste: 'pasted', upload: 'uploaded', move: 'moved' };
 
 /**
- * The prompt for names that exist in the destination folder (FR-UPL-03, FR-XC-07).
+ * The prompt for names that exist in the destination folder.
  *
  * Paste (the default): one choice for every file, `resolve` with 'overwrite', 'skip' or 'cancel'.
  * With `keepBoth` (uploads): the files one at a time, each with Replace, Keep both or Skip, and
  * "Apply to all" for the rest; `resolve` with one choice per item ('replace' | 'keep' | 'skip', in
  * the order of `items`) or 'cancel'. Without `replace` (a move inside one dataset: the Registry
- * cannot move onto a name that exists, D-040) Replace is not offered: Keep both or Skip.
+ * cannot move onto a name that exists) Replace is not offered: Keep both or Skip.
  */
 export default {
     components: { Window, Button, Checkbox },

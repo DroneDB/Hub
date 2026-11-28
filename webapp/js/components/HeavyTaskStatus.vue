@@ -24,8 +24,8 @@
 
 <script setup>
 /**
- * HeavyTaskStatus - the state of the task a tool dialog started (FR-XC-15): queued, running with the
- * phase and the percent, done, or failed with the message of the task (FR-XC-06), cancelled. One component for
+ * HeavyTaskStatus - the state of the task a tool dialog started: queued, running with the
+ * phase and the percent, done, or failed with the message of the task, cancelled. One component for
  * every tool dialog (Merge, Align, Extract, the training export), fed by the live entry of useHeavyTask:
  *
  *   const { heavyTasks, runHeavyTask } = useHeavyTask();
@@ -39,7 +39,7 @@
  *
  * `cancellable` offers Cancel on a queued or running task (a dialog whose task waits for a processing node needs
  * an exit): the component only emits `cancel` with the task; the dialog asks and cancels through
- * useHeavyTaskCancel, the question every task cancel shares (FR-PRC-10). `cancelling` disables the button meanwhile.
+ * useHeavyTaskCancel, the question every task cancel shares. `cancelling` disables the button meanwhile.
  *
  * Accessibility: the wrapper is a stable status region; the state (label and words) is read whole when it
  * changes, the percent is hidden from it (it changes at each poll; the bar carries the value); the reason of
@@ -70,7 +70,7 @@ const emit = defineEmits(['cancel']);
 
 const view = computed(() => describeHeavyTask(props.task, { error: props.error || null, phases: props.phases }));
 // Only a task that exists and has not ended: a failure, a result or a refusal has nothing to cancel
-// The server's actions decide when the task carries them (FR-XC-15): no Cancel for a caller who may not cancel
+// The server's actions decide when the task carries them: no Cancel for a caller who may not cancel
 const serverAllowsCancel = computed(() => !Array.isArray(props.task?.actions) || props.task.actions.includes('cancel'));
 const canCancel = computed(() => props.cancellable && !!props.task && serverAllowsCancel.value
     && (view.value?.kind === 'queued' || view.value?.kind === 'running'));

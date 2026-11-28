@@ -1,5 +1,5 @@
 /**
- * The sticky footer of a window (FR-UPL-08, FR-XC-20) takes the space under the content with a negative margin of
+ * The sticky footer of a window takes the space under the content with a negative margin of
  * --window-pad: the content's padding must be that same --window-pad, on a desktop as on a phone, else a window that
  * fits overflows by the difference. css/app.scss is compiled (sass, as webpack does) and read by jsdom.
  */

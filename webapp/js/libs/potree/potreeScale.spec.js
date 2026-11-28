@@ -1,5 +1,5 @@
 /**
- * FR-VWR-33, FR-VWR-37: the point cloud viewer draws at the applied ratio and its measure labels follow the size of the view;
+ * The point cloud viewer draws at the applied ratio and its measure labels follow the size of the view;
  * the vendored potree.js (webapp/public/potree/build/potree/potree.js) sizes its targets from the drawing buffer and
  * draws point sizes in buffer pixels.
  */
@@ -16,7 +16,7 @@ const measure = (extra = {}) => ({
 });
 const scales = m => [...m.edgeLabels, ...m.angleLabels, ...m.coordinateLabels, m.heightLabel, m.areaLabel, m.circleRadiusLabel].map(l => l.scale.value);
 
-describe('scaleMeasureLabels (FR-VWR-37)', () => {
+describe('scaleMeasureLabels', () => {
     it('makes the labels the tool sized larger by the factor: edge, angle, coordinate, area and radius, and the height label of a height measure', () => {
         const plain = measure();
         const tall = measure({ showHeight: true });
@@ -91,7 +91,7 @@ describe('attachPotreeScale', () => {
     });
 });
 
-describe('the vendored potree.js draws at the drawing buffer size (FR-VWR-33)', () => {
+describe('the vendored potree.js draws at the drawing buffer size', () => {
     const source = readSource(__dirname, '../../../public/potree/build/potree/potree.js');
     const bodyOf = (start, end) => {
         const from = source.indexOf(start);
@@ -146,7 +146,7 @@ describe('the vendored potree.js draws at the drawing buffer size (FR-VWR-33)', 
     });
 });
 
-describe('Renderer.renderOctree of the vendored potree.js uploads the point sizes in the pixels of the target (FR-XC-32, FR-VWR-33)', () => {
+describe('Renderer.renderOctree of the vendored potree.js uploads the point sizes in the pixels of the target', () => {
     // The whole bundle, run with stand-ins for the globals it reads (its own Potree global, proj4, jQuery and its plugins)
     const chain = new Proxy(function () {}, {
         get: (t, key) => (key === Symbol.toPrimitive ? () => '' : chain), apply: () => chain, construct: () => chain

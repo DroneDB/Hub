@@ -70,7 +70,7 @@ describe('SplatTrainingExportDialog', () => {
         expect(options.force).toBeUndefined();
     });
 
-    it('starts one task on a double click, and is busy while it runs (FR-PRC-02)', async () => {
+    it('starts one task on a double click, and is busy while it runs', async () => {
         runHeavyTask.mockImplementation(() => new Promise(() => {}));
         const w = open();
         await flushPromises();
@@ -149,7 +149,7 @@ describe('SplatTrainingExportDialog', () => {
     });
 });
 
-// ---- Cancel of a task that waits for a node or runs (FR-PRC-10, FR-XC-15) --------------------------------
+// ---- Cancel of a task that waits for a node or runs --------------------------------
 
 describe('SplatTrainingExportDialog cancel', () => {
     beforeEach(() => {

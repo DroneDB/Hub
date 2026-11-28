@@ -1,8 +1,8 @@
 /**
- * The map viewer and the dataset Map tab, end to end (U-405: FR-MAP-10, FR-MAP-23, FR-MAP-24): drives the real Hub in
+ * The map viewer and the dataset Map tab, end to end: drives the real Hub in
  * Chromium against a running Registry. Not part of `npm test` (needs a server); same environment as smoke.test.mjs:
  *
- *   HUB_URL=http://localhost:5100 node --test e2e/map-viewer-u405.test.mjs
+ *   HUB_URL=http://localhost:5100 node --test e2e/map-viewer-map-tab.test.mjs
  *
  * It creates (then deletes) a throw-away dataset in HUB_USER's organisation: photos only in images/, and a raster.
  */
@@ -16,7 +16,7 @@ const URL_ = process.env.HUB_URL || 'http://localhost:5100';
 const USER = process.env.HUB_USER || 'admin';
 const PASS = process.env.HUB_PASS || 'password123';
 const DATA = process.env.HUB_TEST_DATA || '/mnt/data/repos/test_data';
-const DS = `map-u405-${Date.now().toString(36)}`;
+const DS = `map-viewer-${Date.now().toString(36)}`;
 const PHOTOS = ['DJI_0018.JPG', 'DJI_0019.JPG'].map(n => path.join(DATA, 'images', n));
 const RASTER = path.join(DATA, 'ortho', 'brighton-beach-cog.tif');
 const b64 = s => Buffer.from(s, 'utf8').toString('base64');
@@ -93,7 +93,7 @@ after(async () => {
     try { await api('DELETE', `/orgs/${USER}/ds/${DS}`); } catch { /* best effort */ }
 });
 
-test('FR-MAP-10: the Map tab at a root with no photos names the subfolder that has them, and Show opens it', async () => {
+test('the Map tab at a root with no photos names the subfolder that has them, and Show opens it', async () => {
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}`);
     await appReady(page);
@@ -115,7 +115,7 @@ test('FR-MAP-10: the Map tab at a root with no photos names the subfolder that h
     assert.deepEqual(errors, []);
 });
 
-test('FR-MAP-23: the first Save of a file map offers the stem of the file, selected', async () => {
+test('the first Save of a file map offers the stem of the file, selected', async () => {
     await api('POST', `/orgs/${USER}/ds/${DS}/obj`, form({ path: path.basename(RASTER), file: new Blob([fs.readFileSync(RASTER)]) }));
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(RASTER))}/map`);
@@ -131,7 +131,7 @@ test('FR-MAP-23: the first Save of a file map offers the stem of the file, selec
     assert.deepEqual(errors, []);
 });
 
-test('FR-MAP-24: the Stockpile button is a heap, not the stack of layers', async () => {
+test('the Stockpile button is a heap, not the stack of layers', async () => {
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(RASTER))}/map`);
     await appReady(page);

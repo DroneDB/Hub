@@ -47,7 +47,7 @@ export function stateIcon(state) {
 export const isWaitingForFiles = task => task?.state === 'Succeeded' && task.waitingForFiles === true;
 
 /**
- * Whether a processing node holds the task in its queue: the server says so (waitingForNode, D-024) while the
+ * Whether a processing node holds the task in its queue: the server says so (waitingForNode) while the
  * node has not started it. The Hub reads the flag, never the phase message.
  * @param {{ state?: string, waitingForNode?: boolean } | null | undefined} task
  */
@@ -55,13 +55,13 @@ export const isWaitingForNode = task => task?.waitingForNode === true && isActiv
 
 /**
  * Whether a user cancelled the task: the stored state of a cancelled task stays Deleted, and the server names
- * who cancelled it (cancelledBy, D-038). Other Deleted tasks (ended by the server) were not cancelled.
+ * who cancelled it (cancelledBy). Other Deleted tasks (ended by the server) were not cancelled.
  * @param {{ state?: string, cancelledBy?: string | null } | null | undefined} task
  */
 export const isCancelled = task => task?.state === 'Deleted' && !!task.cancelledBy;
 
 /**
- * The state of a task in words, for every list, tag and tooltip (FR-PRC-20, FR-PRC-37): "Cancelled" for a task
+ * The state of a task in words, for every list, tag and tooltip: "Cancelled" for a task
  * a user cancelled, "Queued on node" while a processing node keeps it queued, else the state.
  * @param {{ state: string, waitingForNode?: boolean, cancelledBy?: string | null }} task
  */
@@ -75,7 +75,7 @@ export function stateLabel(task) {
 export const stateFilterLabel = state => (state === 'Deleted' ? 'Cancelled or deleted' : state);
 
 /**
- * Whether a task is one the state filter `state` selects, by the rule of the Registry's filter (FR-PRC-37, D-024):
+ * Whether a task is one the state filter `state` selects, by the rule of the Registry's filter:
  * a task a processing node keeps queued is Enqueued, not Processing.
  * @param {{ state?: string, waitingForNode?: boolean }} task
  * @param {string} state
@@ -116,7 +116,7 @@ export function stateTag(task) {
 }
 
 /**
- * The files a task works on, in words: the label the tool gives them (targetLabel, FR-XC-25), else the task's
+ * The files a task works on, in words: the label the tool gives them (targetLabel), else the task's
  * path, else nothing (a task of the whole dataset).
  * @param {{ targetLabel?: string | null, path?: string | null }} task
  */
@@ -158,7 +158,7 @@ export function taskDuration(task) {
 }
 
 /**
- * How long a task waited in the queue before it started (startedAt - createdAt), shown next to its duration (FR-PRC-15);
+ * How long a task waited in the queue before it started (startedAt - createdAt), shown next to its duration;
  * '' for a task that has not started, one that started at once (under a second) and a task a processing node still holds.
  * @param {{ startedAt?: string | null, createdAt?: string | null, state?: string, waitingForNode?: boolean }} task
  */
@@ -207,7 +207,7 @@ export function toolTitle(toolId, tools) {
 }
 
 /**
- * What a NodeODX node is doing, from its status (FR-PRC-35): its queue count includes the tasks it runs, and it runs at
+ * What a NodeODX node is doing, from its status: its queue count includes the tasks it runs, and it runs at
  * most maxParallelTasks of them at once, so the rest waits. A node that does not say its limit runs all of them.
  * @param {{ taskQueueCount?: number, maxParallelTasks?: number }} status
  * @returns {{ running: number, waiting: number }}

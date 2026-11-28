@@ -1,5 +1,5 @@
 /**
- * HeavyTaskStatus (FR-XC-15): the one status of a tool dialog's task: queued, running with phase and percent, done,
+ * HeavyTaskStatus: the one status of a tool dialog's task: queued, running with phase and percent, done,
  * failed with the task's message.
  */
 import { describe, it, expect } from 'vitest';

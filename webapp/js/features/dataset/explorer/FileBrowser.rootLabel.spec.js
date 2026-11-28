@@ -1,5 +1,5 @@
 /**
- * The root of the tree shows the name of the dataset (FR-EXP-24): a rename changes the label in place, the tree is not read
+ * The root of the tree shows the name of the dataset: a rename changes the label in place, the tree is not read
  * again, so the folders that are open stay open.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';

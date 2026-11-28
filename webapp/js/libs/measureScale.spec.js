@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { measureLabelPx, measureLabelFactor, MEASURE_LINE_PX } from './measureScale';
 
-describe('measurement label and line sizes (FR-VWR-37)', () => {
+describe('measurement label and line sizes', () => {
     it('the label is the canvas height / 90 px, from 12 to 18', () => {
         expect(measureLabelPx(1080)).toBe(12);
         expect(measureLabelPx(400)).toBe(12);

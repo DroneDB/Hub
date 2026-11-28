@@ -430,7 +430,7 @@ describe('preferences store: sending changes', () => {
         expect(bodies()[0].datasets.table).toEqual({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
     });
 
-    it('sends a page size the user chose with its mark, in both list sections (FR-XC-34)', async () => {
+    it('sends a page size the user chose with its mark, in both list sections', async () => {
         await start();
         saveDatasetTablePreferences({ itemsPerPage: 10 });
         saveOrgPageSettings({ itemsPerPage: 25 });

@@ -1,5 +1,5 @@
 /**
- * The datasets of an organization: the page size follows the height (FR-XC-34, FR-ORG-25). A page holds the rows
+ * The datasets of an organization: the page size follows the height. A page holds the rows
  * that fit until the user chooses a size; a size that the user chose is kept; when the size changes the list shows
  * the page that holds the first dataset shown.
  *

@@ -10,7 +10,7 @@ import { formatBytes } from '@/libs/format';
 import { escapeHtml } from '@/libs/sanitize';
 
 /**
- * The question of deleting explorer items (FR-EXP-08, D-011): it names the items, says that a
+ * The question of deleting explorer items: it names the items, says that a
  * folder goes with everything inside it, and gives the total size. A selection with a folder has
  * its size read from the server (selectionSize): until then `size` is null and the question says
  * "Calculating size…"; it stays answerable meanwhile.

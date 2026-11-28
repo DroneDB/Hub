@@ -58,7 +58,7 @@ describe('RoleManagementDialog delete question', () => {
     });
 });
 
-describe('RoleManagementDialog focus (ADM-03)', () => {
+describe('RoleManagementDialog focus', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => {
         vi.runOnlyPendingTimers();

@@ -6,11 +6,11 @@ import { displayNameLimits } from '@/libs/nameRules';
 export async function renameDataset(orgSlug, dsSlug, name) {
     const ds = reg.Organization(orgSlug).Dataset(dsSlug);
 
-    // The Registry's limit of a name (published, FR-ORG-14)
+    // The Registry's limit of a name (published)
     const max = displayNameLimits().max;
     if (name.length > max) name = name.slice(0, max);
 
-    // A name with no Latin letter or digit makes no slug: the dataset keeps its own and only the name changes (D-035)
+    // A name with no Latin letter or digit makes no slug: the dataset keeps its own and only the name changes
     const slug = suggestSlug(name) || dsSlug;
 
     // The slug first: a slug that is taken or refused changes nothing (the name stays as it was)

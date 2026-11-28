@@ -1,8 +1,8 @@
 /**
- * Every contour request of the Hub runs as the task raster-contours (FR-RAS-11, NFR-001): the progress and the Cancel come
+ * Every contour request of the Hub runs as the task raster-contours: the progress and the Cancel come
  * from the task, the lines are its artifact, the layer's NoData value goes with the request, and a result the server cut at
  * its cap says so. A refusal or a failure shows in the dialog, not in a modal alert. A thermal layer gets its levels, its
- * limits and its labels in the unit it shows: its formula goes with the request (D-022), never a Plant Health index formula.
+ * limits and its labels in the unit it shows: its formula goes with the request, never a Plant Health index formula.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { effectScope, ref, shallowRef } from 'vue';
@@ -104,7 +104,7 @@ describe('useContourLines as a task', () => {
         expect(showAlert.mock.calls[0][1]).toContain('truncated at 100,000 lines');
     });
 
-    it('names the value range in the truncation of a raster that is not an elevation model (FR-RAS-25)', async () => {
+    it('names the value range in the truncation of a raster that is not an elevation model', async () => {
         const { contours, showAlert } = setup({ result: resultOf({ truncated: true, featureCount: 100000 }) });
         contours.openContourDialog({ valueMin: 145, valueMax: 402, bandCount: 2, dataType: 'UInt16', isThermal: false, unit: '' });
 
@@ -210,7 +210,7 @@ describe('useContourLines as a task', () => {
         expect(contours.contourTask.value).toBeNull();
     });
 
-    it('reads the contours of a thermal layer with its formula and its NoData value (D-022)', async () => {
+    it('reads the contours of a thermal layer with its formula and its NoData value', async () => {
         // What the Registry answers for the contours of a Kelvin raster with the CELSIUS formula
         const celsius = resultOf({ unit: '°C', interval: 5, min: 15, max: 30, rasterMin: 10.85, rasterMax: 30.65 });
         const { contours } = setup({

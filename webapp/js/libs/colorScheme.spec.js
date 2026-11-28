@@ -1,5 +1,5 @@
 /**
- * The colour scheme (FR-XC-21, FR-NAV-07, D-044): the Appearance preference of the device and, for
+ * The colour scheme: the Appearance preference of the device and, for
  * System, the system's scheme; an embedded view follows the system. The inline script of index.html
  * applies the same rule before the app mounts.
  */

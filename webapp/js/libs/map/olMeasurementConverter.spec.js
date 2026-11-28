@@ -53,7 +53,7 @@ describe('importMeasurements tooltip text', () => {
         expect(profile.get('tooltipText')).toBe('Profile: 11.1 m');
     });
 
-    it('builds the label of a stockpile from its metric properties in the current units (FR-MAP-13)', () => {
+    it('builds the label of a stockpile from its metric properties in the current units', () => {
         Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true });
         const props = { measurementType: 'stockpile', id: 'p1', title: 'North', netVolume: 8097.19, materialName: 'Gravel',
             materialDensity: 1.68, unitSystem: 'metric', tooltipText: 'North - 8,097.19 m³ - Gravel - 1.68 t/m³' };
@@ -169,10 +169,10 @@ describe('importMeasurements colours of the analysis overlays', () => {
     });
 });
 
-// FR-MAP-15: a length and an area on the WGS84 ellipsoid, at 56°N where a sphere is 0.34% / 0.5% short.
+// A length and an area on the WGS84 ellipsoid, at 56°N where a sphere is 0.34% / 0.5% short.
 // The shapes are built from a transverse Mercator grid, k=1, on the UTM 32N central meridian (9°E): not
 // UTM, which has k0 = 0.9996, but a grid of scale 1 like SWEREF99, so 100 grid metres are 100 ground metres.
-describe('measurements at 56°N on the ellipsoid (FR-MAP-15)', () => {
+describe('measurements at 56°N on the ellipsoid', () => {
     /** Transverse Mercator, k=1, on the UTM 32N central meridian */
     const GRID = '+proj=tmerc +lat_0=0 +lon_0=9 +k=1 +x_0=500000 +y_0=0 +ellps=WGS84 +units=m +no_defs';
     const LONLAT = '+proj=longlat +datum=WGS84 +no_defs';

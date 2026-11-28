@@ -162,7 +162,7 @@ describe('MapViewer on a file', () => {
         expect(mapProps().standalone).toBe(true);
         expect(mapProps().linkTarget).toEqual({ path: 'f/a.tif' });
         expect(mapProps().shareNote).toBe(false);
-        // A new view records no style: the map gives its rasters their default (FR-RAS-01)
+        // A new view records no style: the map gives its rasters their default
         expect(mapProps().savedLayers).toEqual([]);
         expect(viewBar().text()).toContain('a.tif');
         expect(barButton('Save view')).toBeDefined();
@@ -259,7 +259,7 @@ describe('MapViewer on a saved view', () => {
         expect(mapProps().changedPaths).toEqual(['f/a.tif']);
     });
 
-    // FR-RAS-01: the map keeps the style the saved view records for its layers, none included
+    // The map keeps the style the saved view records for its layers, none included
     it('names the layers of the saved view to the map, whose styles are the user\'s', async () => {
         await open('/r/acme/site/views/v_k3j9x2ab', { dataset: saved() });
         expect(mapProps().savedLayers).toEqual(['f/a.tif', 'f/b.tif']);

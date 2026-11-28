@@ -102,11 +102,11 @@ export default {
             if (this.isEnum) return null;
             return typeof this.option.domain === 'string' ? this.option.domain : null;
         },
-        // The Registry writes the choices and the default into the help (FR-DEV-10): it is shown as it is
+        // The Registry writes the choices and the default into the help: it is shown as it is
         helpText() {
             return this.option.help || '';
         },
-        // The value the row has without a customization: the one of the profile, else the node's default (FR-PRC-33)
+        // The value the row has without a customization: the one of the profile, else the node's default
         baseValue() {
             return this.option.baseValue !== undefined ? this.option.baseValue : (this.option.defaultValue ?? '');
         },
@@ -122,7 +122,7 @@ export default {
     },
 
     watch: {
-        // The profile or the editor changed the value: the control follows, and nothing is emitted (FR-PRC-07): only
+        // The profile or the editor changed the value: the control follows, and nothing is emitted: only
         // what the user does is a customization, a value that a profile sets is not
         'option.value'(val) {
             this.localValue = val !== undefined ? val : '';

@@ -9,11 +9,11 @@
                                class="w-100" :maxlength="nameMax" :readonly="busy" :invalid="!!errorOf($form, 'name')"
                                :aria-invalid="errorOf($form, 'name') ? 'true' : undefined"
                                :aria-describedby="describedBy('organization-dialog-name', errorOf($form, 'name'), 'count')" />
-                    <!-- The Registry's rule text, at the field (D-035, FR-ORG-05) -->
+                    <!-- The Registry's rule text, at the field -->
                     <FieldError id="organization-dialog-name-error" :message="errorOf($form, 'name')" />
                     <small id="organization-dialog-name-count" class="char-count">{{ lengthOf($form, 'name') }}/{{ nameMax }}</small>
                 </div>
-                <!-- A new organization has its slug, the URL, made from the name and editable (FR-ORG-05); an edit keeps it -->
+                <!-- A new organization has its slug, the URL, made from the name and editable; an edit keeps it -->
                 <div v-if="isNew" class="mb-3">
                     <label for="organization-dialog-slug" class="d-block mb-1 fw-semibold">URL (slug)</label>
                     <InputText id="organization-dialog-slug" name="slug" placeholder="organization-slug" autocomplete="off" spellcheck="false"
@@ -40,7 +40,7 @@
                     <Checkbox v-model="isPublic" :binary="true" :disabled="busy" input-id="orgPublic" :pt="{ input: { 'aria-describedby': 'organization-dialog-public-hint' } }" />
                     <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
                 </div>
-                <!-- What Public means (D-003): readable and listed for everyone -->
+                <!-- What Public means: readable and listed for everyone -->
                 <small id="organization-dialog-public-hint" class="d-block text-muted mt-1">Anyone, signed in or not, can see this organization and its public datasets.</small>
             </template>
         </Form>
@@ -63,17 +63,17 @@ import { latinNameProblem, displayNameLimits, displayNameLengthProblem, descript
 import { useHubForm } from '@/composables/useHubForm';
 
 /**
- * OrganizationDialog - create or edit an organization (FR-ORG-04, FR-ORG-05, FR-ORG-14).
+ * OrganizationDialog - create or edit an organization.
  *
  * A new organization has a name and a slug (its URL). The slug is made from the name (accents
  * dropped, `libs/slug.js`, the Registry's own generator) until the user edits it, and is what must
  * be unique: a slug of the loaded organizations is refused at the slug field, with no request (the
  * slug is not made unique by itself: 'Survey Team' says that survey-team exists). A
- * name that has no Latin letter or digit needs a slug the user enters (D-035). The name and the
+ * name that has no Latin letter or digit needs a slug the user enters. The name and the
  * description have the Registry's length limits, with a counter.
  *
  * The request runs in the dialog (`save`): a refusal of the Registry shows at the field its
- * `errors` member names (`name`, `slug`, `description`, D-047), and the dialog stays open with
+ * `errors` member names (`name`, `slug`, `description`), and the dialog stays open with
  * what was typed. It closes only when the organization is saved.
  *
  * Props:
@@ -105,7 +105,7 @@ export default {
             name: (value, values) => {
                 if (typeof value !== 'string' || value.trim() === '') return 'Enter a name';
                 return displayNameLengthProblem(value)
-                    // A new name needs a Latin letter or digit, or a slug the user enters (D-035); an edit is never refused
+                    // A new name needs a Latin letter or digit, or a slug the user enters; an edit is never refused
                     // for it (the organization keeps its slug)
                     || (isNew ? latinNameProblem(value, { slug: values.slug, withSlugField: true }) : null);
             },
@@ -124,7 +124,7 @@ export default {
             fields: isNew ? ['name', 'slug', 'description'] : ['name', 'description'],
             // The slug is what must be unique: a duplicate the Registry finds answers 409 at the slug
             statusFields: isNew ? { 409: 'slug' } : {},
-            // A slug that now holds a Latin letter makes the name valid (D-035)
+            // A slug that now holds a Latin letter makes the name valid
             dependents: { slug: ['name'] }
         });
 

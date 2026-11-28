@@ -1,5 +1,5 @@
 /**
- * Cut items are dimmed until they are pasted (FR-EXP-16): the tiles of the grid get a `cut` class and the rows of the
+ * Cut items are dimmed until they are pasted: the tiles of the grid get a `cut` class and the rows of the
  * table a `row-cut` class, for the paths that the clipboard of this dataset holds as a cut; a copy dims nothing, and
  * neither does a cut of another dataset. The opacity (.5) is in the sources of the tile and of the table.
  */

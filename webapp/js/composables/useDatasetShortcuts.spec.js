@@ -74,7 +74,7 @@ describe('useDatasetShortcuts', () => {
         reader.scope.stop();
     });
 
-    // FR-EXP-09: Ctrl/Cmd+A and F2 are accelerators of the registry, bound here
+    // Ctrl/Cmd+A and F2 are accelerators of the registry, bound here
     describe('Select all and Rename', () => {
         const dispatch = (target, key, mods = {}) => {
             const e = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mods });

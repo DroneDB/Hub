@@ -1,5 +1,5 @@
 /**
- * The organization select of Manage User Organizations (FR-ADM-10, FR-XC-20): it filters, with a placeholder
+ * The organization select of Manage User Organizations: it filters, with a placeholder
  * and a name for the filter field, and sets no width of its own list (the one global rule does).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

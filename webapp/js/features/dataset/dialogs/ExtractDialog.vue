@@ -41,7 +41,7 @@
                     </div>
                 </div>
 
-                <!-- The task: queued, extracting, failed with its reason (FR-XC-15) -->
+                <!-- The task: queued, extracting, failed with its reason -->
                 <HeavyTaskStatus :task="extractTask" :error="errorMessage" label="Extract" :phases="PHASES" cancellable :cancelling="cancelling"
                                  @cancel="cancelHeavyTask($event, 'Extract archive')" />
 
@@ -236,7 +236,7 @@ export default {
             try {
                 // Offloaded to the archive-extract heavy task. Awaits completion so the
                 // file listing can be refreshed when the dialog closes. The task lists
-                // name it by the label the tool gives it (archive → folder, FR-PRC-22):
+                // name it by the label the tool gives it (archive → folder):
                 // no `path` is sent only for that.
                 const task = await this.runHeavyTask(this.dataset, 'archive-extract', {
                     params: {
@@ -245,7 +245,7 @@ export default {
                         deleteArchive: this.deleteArchive,
                         overwrite: this.overwrite
                     },
-                    // No force: a second submit of the same extraction gets the running task (FR-PRC-02)
+                    // No force: a second submit of the same extraction gets the running task
                     notify: false,
                     onSubmitted: entry => { this.extractTaskId = entry.taskId; }
                 });
@@ -254,7 +254,7 @@ export default {
                     destPath: this.destPath || '',
                     deletedArchive: this.deleteArchive,
                     archivePath: sourcePath,
-                    // What the extraction did not extract, named with the reason (FR-PRC-30)
+                    // What the extraction did not extract, named with the reason
                     summary: extractSummary(task && task.logTail)
                 });
             } catch (e) {

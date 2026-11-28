@@ -1,6 +1,5 @@
 /**
- * Notices and disabled states, end to end (U-310: FR-XC-09, FR-XC-10, FR-XC-22, FR-XC-23, FR-EXP-16, FR-ACC-19,
- * FR-UPL-11): drives the real Hub in Chromium against a running Registry. Not part of `npm test` (needs a server);
+ * Notices and disabled states, end to end: drives the real Hub in Chromium against a running Registry. Not part of `npm test` (needs a server);
  * same environment and conventions as smoke.test.mjs:
  *
  *   HUB_URL=http://localhost:5100 node --test e2e/notices-disabled.test.mjs
@@ -133,7 +132,7 @@ after(async () => {
     }
 });
 
-test('FR-XC-10: opening a dataset without optional files, and its map viewer, logs no console error', async () => {
+test('opening a dataset without optional files, and its map viewer, logs no console error', async () => {
     const { page, errors, consoleErrors } = await newPage();
     await openFiles(page);
     await tile(page, RASTER).waitFor({ timeout: 20000 });
@@ -149,7 +148,7 @@ test('FR-XC-10: opening a dataset without optional files, and its map viewer, lo
     assert.deepEqual(consoleErrors, [], 'the console has error entries');
 });
 
-test('FR-XC-22: the keyboard reaches a disabled action, which says why it is disabled', async () => {
+test('the keyboard reaches a disabled action, which says why it is disabled', async () => {
     const { page, errors } = await newPage();
     await openFiles(page);
     // Nothing selected: Delete is disabled, and stays a tab stop
@@ -175,7 +174,7 @@ test('FR-XC-22: the keyboard reaches a disabled action, which says why it is dis
     assert.deepEqual(errors, []);
 });
 
-test('FR-EXP-16: Ctrl+X dims the tile', async () => {
+test('Ctrl+X dims the tile', async () => {
     const { page, errors } = await newPage();
     await openFiles(page);
     await tile(page, PHOTO).click();
@@ -188,7 +187,7 @@ test('FR-EXP-16: Ctrl+X dims the tile', async () => {
     assert.deepEqual(errors, []);
 });
 
-test('FR-EXP-16, FR-XC-23: a drag move offers Undo, and Undo brings the file back', async () => {
+test('a drag move offers Undo, and Undo brings the file back', async () => {
     const { page, errors } = await newPage();
     await openFiles(page);
     await tile(page, MARKDOWN).dragTo(tile(page, FOLDER));
@@ -205,7 +204,7 @@ test('FR-EXP-16, FR-XC-23: a drag move offers Undo, and Undo brings the file bac
     assert.deepEqual(errors, []);
 });
 
-test('FR-XC-09: a toast raised in the 3D viewer does not cover Home or the toolbar', { skip: !fs.existsSync(FILES.model) }, async () => {
+test('a toast raised in the 3D viewer does not cover Home or the toolbar', { skip: !fs.existsSync(FILES.model) }, async () => {
     // A new context: the one-time hint of the 3D controls is a toast raised as the viewer opens
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(MODEL)}/unified`);
@@ -225,7 +224,7 @@ test('FR-XC-09: a toast raised in the 3D viewer does not cover Home or the toolb
     assert.deepEqual(errors, []);
 });
 
-test('FR-ACC-19: signing out in one page signs the other page of the browser out', async () => {
+test('signing out in one page signs the other page of the browser out', async () => {
     const { page: a, context } = await newPage();
     const b = await context.newPage();
     await b.goto(`${URL_}/r/${USER}`);
@@ -245,7 +244,7 @@ test('FR-ACC-19: signing out in one page signs the other page of the browser out
     assert.equal(await notice.locator('button.toast-action').textContent(), 'Sign in');
 });
 
-test('FR-UPL-11: an archive import that runs in the background ends with a toast', { skip: !ARCHIVE_URL }, async () => {
+test('an archive import that runs in the background ends with a toast', { skip: !ARCHIVE_URL }, async () => {
     const { page, errors } = await newPage();
     await page.goto(`${URL_}/r/${USER}`);
     await appReady(page);

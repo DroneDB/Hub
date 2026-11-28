@@ -190,7 +190,7 @@
                         <span class="result-value" data-testid="stockpile-cost">{{ formatCost(result.costEstimate) }}</span>
                     </div>
 
-                    <!-- A custom material with a density the catalog refuses: the rows stay, with the reason (FR-MAP-27) -->
+                    <!-- A custom material with a density the catalog refuses: the rows stay, with the reason -->
                     <div v-if="densityProblem && !result.weightEstimate" class="result-pair">
                         <span class="result-label">Weight</span>
                         <span class="result-value density-error" data-testid="stockpile-weight-error">{{ densityProblem }}</span>
@@ -224,7 +224,7 @@
             </div>
 
             <!-- A map narrower than `sm` with a mode active or a result: the settings fold behind this button, so the
-                 prompt of the mode and the result are in view (FR-MAP-16) -->
+                 prompt of the mode and the result are in view -->
             <button v-if="foldable" type="button" class="settings-toggle" data-testid="stockpile-settings-toggle"
                     :aria-expanded="String(settingsOpen)" aria-controls="stockpile-volume-panel-settings" @click="settingsOpen = !settingsOpen">
                 <i class="fas" :class="settingsOpen ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true" />
@@ -288,7 +288,7 @@
                                class="panel-input" data-testid="stockpile-custom-density"
                                :aria-invalid="densityProblem ? 'true' : undefined"
                                :aria-describedby="densityProblem ? 'stockpile-volume-panel-density-error' : undefined">
-                        <!-- The rule of the material catalog (isValidDensity), in the user's unit (FR-MAP-27) -->
+                        <!-- The rule of the material catalog (isValidDensity), in the user's unit -->
                         <small v-if="densityProblem" id="stockpile-volume-panel-density-error" class="density-error" role="alert"
                                data-testid="stockpile-density-error">{{ densityProblem }}</small>
                     </label>
@@ -481,7 +481,7 @@ export default {
         units() { return bulkUnits(this.unitPref); },
         /**
          * What is wrong with the density of the custom material, or '': the rule of the material catalog (more than 0, at most
-         * MAX_DENSITY_TON_PER_M3, checked on the stored t/m³ value), the limit said in the user's unit (FR-MAP-27).
+         * MAX_DENSITY_TON_PER_M3, checked on the stored t/m³ value), the limit said in the user's unit.
          */
         densityProblem() {
             if (this.material !== this.customSlug || isValidDensity(this.customDensity)) return '';
@@ -587,7 +587,7 @@ export default {
         }
     },
     methods: {
-        /** Brings a part of the panel (the prompt of the mode, the result) into the visible part of the sheet (FR-MAP-16) */
+        /** Brings a part of the panel (the prompt of the mode, the result) into the visible part of the sheet */
         async scrollTo(ref) {
             await this.$nextTick();
             this.$refs[ref]?.scrollIntoView?.({ block: 'nearest' });
@@ -1045,7 +1045,7 @@ export default {
     font-size: 0.8rem;
 }
 
-/* The density the catalog refuses, at its field and in the Weight and Est. cost rows (FR-MAP-27) */
+/* The density the catalog refuses, at its field and in the Weight and Est. cost rows */
 .density-error {
     color: var(--ddb-danger);
 }

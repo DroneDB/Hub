@@ -1,5 +1,5 @@
 /**
- * The 3D viewer draws at the applied ratio of FR-XC-32 (FR-VWR-34, D-042): min(devicePixelRatio, 2). Giro3D is a fake
+ * The 3D viewer draws at the applied ratio: min(devicePixelRatio, 2). Giro3D is a fake
  * Instance that records what it is asked; three.js is the real one.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -44,7 +44,7 @@ function makeScene({ failing = false } = {}) {
     return { scene, calls, buffer };
 }
 
-describe('the Giro3D instance draws at the applied ratio (FR-VWR-34)', () => {
+describe('the Giro3D instance draws at the applied ratio', () => {
     it.each([[2, 2], [3, 2], [1.5, 1.5], [1, 1]])('at devicePixelRatio %s the flat scene sets %s, then asks for a frame', (dpr, applied) => {
         ratioOf(dpr);
         const { scene, calls } = makeScene();
@@ -80,7 +80,7 @@ describe('the Giro3D instance draws at the applied ratio (FR-VWR-34)', () => {
     });
 });
 
-describe('the eye-dome lighting pass of a point cloud (FR-VWR-34)', () => {
+describe('the eye-dome lighting pass of a point cloud', () => {
     it('renders through targets of the drawing buffer size, and gives the engine its CSS size back', () => {
         ratioOf(2);
         const { scene, calls } = makeScene();

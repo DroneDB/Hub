@@ -1,5 +1,5 @@
 /**
- * constrainedOrbit - the navigation of geo scenes (D-001, D-019), driven like a user drives it:
+ * constrainedOrbit - the navigation of geo scenes, driven like a user drives it:
  * pointer drags, two fingers and the wheel on a stub canvas, with the real class and three.js.
  * The ground stays below, the horizon level, the tilt within 5° to 89° and the heading turns
  * around the scene's up axis, on a flat scene and on the globe.
@@ -94,7 +94,7 @@ function expectTiltInRange(controls) {
     expect(controls.tilt).toBeLessThanOrEqual(GEO_TILT.max * DEG + EPS);
 }
 
-describe('ConstrainedOrbit: drags on a flat geo scene (FR-VWR-03, AC-021)', () => {
+describe('ConstrainedOrbit: drags on a flat geo scene', () => {
     it('turns the heading around the scene up on a half-screen horizontal left-drag, the ground below and the horizon level', () => {
         const { el, camera, controls } = fixture();
         const target = controls.target.clone();
@@ -193,7 +193,7 @@ describe('ConstrainedOrbit: drags on a flat geo scene (FR-VWR-03, AC-021)', () =
         expect(d).toBeLessThanOrEqual(controls.maxDistance + EPS);
     }
 
-    it('keeps the distance at least minDistance through left-drags about pivots off the middle of the view (FR-VWR-02)', () => {
+    it('keeps the distance at least minDistance through left-drags about pivots off the middle of the view', () => {
         const { el, camera, controls } = fixture();
         const check = () => {
             expectDistanceInRange(camera, controls);
@@ -210,7 +210,7 @@ describe('ConstrainedOrbit: drags on a flat geo scene (FR-VWR-03, AC-021)', () =
         controls.dispose();
     });
 
-    it('keeps the distance at most maxDistance through left-drags about pivots off the middle of the view (FR-VWR-02)', () => {
+    it('keeps the distance at most maxDistance through left-drags about pivots off the middle of the view', () => {
         const { el, camera, controls } = fixture();
         const check = () => {
             expectDistanceInRange(camera, controls);

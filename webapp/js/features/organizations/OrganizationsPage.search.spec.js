@@ -1,5 +1,5 @@
 /**
- * The search of the organizations page (FR-ORG-18, FR-ORG-13): the shared field empties with Escape and its x,
+ * The search of the organizations page: the shared field empties with Escape and its x,
  * the empty result names the query with Clear search, and the paginator is hidden when nothing is left to page.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

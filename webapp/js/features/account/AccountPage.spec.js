@@ -166,7 +166,6 @@ describe('AccountPage', () => {
         expect(wrapper.find('.storage-details').text()).toContain('Unlimited');
     });
 
-    // FR-ACC-12, FR-ACC-17 (D-030)
     describe('storage quota', () => {
         const MB = 1024 * 1024;
         const showStorage = async (used, total) => {

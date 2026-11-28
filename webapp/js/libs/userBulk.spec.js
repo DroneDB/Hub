@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { selectableUser, successorChoices, bulkSummary, sumDeleteResults } from './userBulk';
 
-describe('selectableUser (FR-ADM-23)', () => {
+describe('selectableUser', () => {
     it('is every user but the built-in admin', () => {
         expect(selectableUser({ userName: 'alice' })).toBe(true);
         expect(selectableUser({ userName: 'admin' })).toBe(false);

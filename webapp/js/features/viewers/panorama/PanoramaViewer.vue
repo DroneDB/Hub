@@ -41,7 +41,7 @@ onMounted(async () => {
         if (left) return;
         const p = entry.value.properties || {};
         // The size of the whole sphere of a cropped panorama (GPano FullPanoWidthPixels/HeightPixels). The size of
-        // the image is the cropped part, not the sphere: it is never given as the full size (FR-VWR-19). Without
+        // the image is the cropped part, not the sphere: it is never given as the full size. Without
         // it in the entry the viewer reads the GPano XMP of the file (it is the original), and failing that it has
         // the image size, which is right for a complete panorama.
         const hasFullSize = [p.fullWidth, p.fullHeight].every(v => typeof v === 'number' && v > 0);

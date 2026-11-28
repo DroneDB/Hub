@@ -106,13 +106,13 @@ export default {
         dataset: { type: Object, required: true },
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false },
-        // The size of the thumbnails: 's' (128 px), 'm' (192) or 'l' (256), FR-EXP-43
+        // The size of the thumbnails: 's' (128 px), 'm' (192) or 'l' (256)
         tileSize: { type: String, default: 's' }
     },
     emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
-        // One tab stop: the list holds the focus and names its active tile (aria-activedescendant), FR-EXP-09
+        // One tab stop: the list holds the focus and names its active tile (aria-activedescendant)
         const nav = useListNavigation({
             count: () => props.files.length,
             columns: () => instance.proxy.columnCount(),
@@ -125,7 +125,7 @@ export default {
             ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
             selection: useFileSelection(() => props.files, f => f.path),
             nav,
-            // Cut items are dimmed until they are pasted (FR-EXP-16)
+            // Cut items are dimmed until they are pasted
             ...useCutMarks(() => props.dataset)
         };
     },
@@ -157,7 +157,7 @@ export default {
         };
     },
     computed: {
-        // A list of files is the one tab stop of the files (FR-EXP-09); an empty folder is no listbox
+        // A list of files is the one tab stop of the files; an empty folder is no listbox
         hasFiles: function () {
             return this.files.length > 0;
         },
@@ -411,7 +411,7 @@ export default {
 
 }
 
-/* The list holds the focus; its active tile shows the focus ring, only while the list has it (FR-EXP-09) */
+/* The list holds the focus; its active tile shows the focus ring, only while the list has it */
 #explorer:focus-visible {
     outline: none;
 }

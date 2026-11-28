@@ -1,5 +1,5 @@
 /**
- * EmptyState (FR-XC-20, FR-ORG-13): the one empty list. A search says what it found nothing for and
+ * EmptyState: the one empty list. A search says what it found nothing for and
  * has Clear search; a filter has its own button; an empty list has its hint and the `#actions` buttons.
  */
 import { describe, it, expect } from 'vitest';

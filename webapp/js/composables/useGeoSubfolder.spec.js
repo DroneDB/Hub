@@ -1,5 +1,5 @@
 /**
- * useGeoSubfolder (FR-MAP-10): a folder with nothing for the map and a subfolder that has it. The subfolders are asked
+ * useGeoSubfolder: a folder with nothing for the map and a subfolder that has it. The subfolders are asked
  * one at a time (never a recursive search), the hint names the first that holds geo entries; nothing is asked when it
  * cannot help.
  */
@@ -171,7 +171,7 @@ describe('useGeoSubfolder', () => {
         warn.mockRestore();
     });
 
-    // FR-MAP-10: the page keeps the map mounted behind its other tabs; a folder visit there asks nothing
+    // The page keeps the map mounted behind its other tabs; a folder visit there asks nothing
     it('asks nothing while the map is hidden, and asks when it shows', async () => {
         active.value = false;
         start();

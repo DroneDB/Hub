@@ -172,7 +172,7 @@ describe('DatasetsPage map view', () => {
         expect(actions.find('input').exists()).toBe(false);
     });
 
-    it('keeps the search in the map view, where it filters the pins (FR-ORG-10), and keeps the view where it was', async () => {
+    it('keeps the search in the map view, where it filters the pins, and keeps the view where it was', async () => {
         pendingLocations();
         await render('map');
         expect(wrapper.find('.list-toolbar input[aria-label="Search datasets"]').exists()).toBe(true);
@@ -299,7 +299,7 @@ describe('DatasetsPage map view', () => {
         expect(wrapper.vm.datasets[0].slug).toBe('roof');
     });
 
-    // D-046: the dialog runs the request, so a refusal is thrown for it to show at its field; no toast, the dialog stays open
+    // The dialog runs the request, so a refusal is thrown for it to show at its field; no toast, the dialog stays open
     it('sends nothing else when the rename is refused, and throws the refusal for the dialog', async () => {
         pendingLocations();
         await render();
@@ -395,7 +395,7 @@ describe('DatasetsPage map view', () => {
         await render();
         wrapper.vm.view = 'map';
         await flushPromises();
-        // No page size was chosen: none is stored (FR-XC-34)
+        // No page size was chosen: none is stored
         expect(stored()).toEqual({ sortColumn: 'name', sortDirection: 'asc', itemsPerPage: null, pageSizeChosen: false, view: 'map' });
     });
 
@@ -456,7 +456,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(dialog.text()).toContain('Links to /r/org/survey-2026 will stop working');
         await type('#dataset-dialog-slug', 'Roof 2026');
         expect(dialog.find('#dataset-dialog-slug-error').text()).toBe("Dataset slug is invalid: it has 2 to 128 characters (lowercase letters, digits, '_' and '-'), starts with a letter or digit and has no '--'");
-        // D-046: Save stays enabled; a submit sends nothing while a field is invalid
+        // Save stays enabled; a submit sends nothing while a field is invalid
         expect(dialog.find('[data-confirm]').attributes('disabled')).toBeUndefined();
         await confirm();
         expect(save).not.toHaveBeenCalled();
@@ -469,7 +469,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(sent()).toEqual(expect.objectContaining({ slug: 'roof-2026', changeSlug: true }));
     });
 
-    // D-035: a new dataset has its slug field (FR-ORG-05): a name with no Latin letter or digit needs a slug the user enters
+    // A new dataset has its slug field: a name with no Latin letter or digit needs a slug the user enters
     it('shows the Latin letter rule at the name field of a new dataset; a slug the user enters answers it', async () => {
         await open({ mode: 'new' });
         await type('#dataset-dialog-dataset-name', 'Москва');
@@ -485,7 +485,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(dialog.emitted('close')).toEqual([['create']]);
     });
 
-    // D-035: the dataset keeps its slug, so an edit is never refused for a name with no Latin letter or digit
+    // The dataset keeps its slug, so an edit is never refused for a name with no Latin letter or digit
     it('does not refuse a name with no Latin letter or digit on an edit, with or without Change URL', async () => {
         await edit();
         await type('#dataset-dialog-dataset-name', 'Москва');
@@ -505,7 +505,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(sent()).toEqual(expect.objectContaining({ name: 'Москва', slug: 'moskva', changeSlug: true }));
     });
 
-    // FR-ORG-05: the slug is made from the name with the accents transliterated, and the user edits it
+    // The slug is made from the name with the accents transliterated, and the user edits it
     it('shows the slug a new dataset gets from its name, transliterated, and lets the user edit it', async () => {
         await open({ mode: 'new' });
         const slug = () => dialog.find('#dataset-dialog-new-slug').element.value;
@@ -549,7 +549,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(save).toHaveBeenCalledTimes(1);
     });
 
-    // D-046, FR-ORG-04: Create stays enabled; an empty form shows its errors at the fields and sends nothing
+    // Create stays enabled; an empty form shows its errors at the fields and sends nothing
     it('keeps Create enabled and shows the errors of an empty form at the fields on submit', async () => {
         await open({ mode: 'new' });
         expect(dialog.find('[data-confirm]').attributes('disabled')).toBeUndefined();
@@ -561,7 +561,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(document.activeElement).toBe(dialog.find('#dataset-dialog-dataset-name').element);
     });
 
-    // FR-ORG-04, D-047: a duplicate the Registry finds shows at the slug field, the dialog stays open with the typed values
+    // A duplicate the Registry finds shows at the slug field, the dialog stays open with the typed values
     it('shows a refusal of the Registry at the field it names, or a 409 at the slug field, and stays open', async () => {
         await open({ mode: 'new', forbiddenSlugs: [] });
         await type('#dataset-dialog-dataset-name', 'Survey');
@@ -587,7 +587,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
         expect(dialog.emitted('close')).toBeUndefined();
     });
 
-    // FR-ORG-14: the Registry's limit of a name, with a counter like the tagline's
+    // The Registry's limit of a name, with a counter like the tagline's
     it('limits the name to the 256 characters of the Registry, with a counter', async () => {
         await open({ mode: 'new' });
         const name = dialog.find('#dataset-dialog-dataset-name');
@@ -599,7 +599,7 @@ describe('DatasetsPage edit dialog (DatasetDialog)', () => {
     });
 });
 
-// A Public organization of another user is readable (D-003): its permissions, not an empty list, decide the create actions
+// A Public organization of another user is readable: its permissions, not an empty list, decide the create actions
 describe('DatasetsPage create actions', () => {
     let wrapper;
     beforeEach(() => {
@@ -649,7 +649,7 @@ describe('DatasetsPage create actions', () => {
     it('shows them in an empty organization the user may write', async () => {
         await renderEmpty({ canRead: true, canWrite: true, canDelete: false, canManageMembers: false });
         expect(createActions()).toEqual(['Import Dataset', 'Create Dataset']);
-        // FR-ORG-13: the empty state has the buttons that fill the organization, and the table is not drawn
+        // The empty state has the buttons that fill the organization, and the table is not drawn
         expect(emptyActions()).toEqual(['Create dataset', 'Import', 'Upload']);
         expect(wrapper.find('.p-datatable').exists()).toBe(false);
         expect(wrapper.find('.empty-state h3').text()).toBe('No datasets found');
@@ -661,7 +661,7 @@ describe('DatasetsPage create actions', () => {
         expect(wrapper.vm.$router.push).toHaveBeenCalledWith({ name: 'Upload' });
     });
 
-    it('names the query of a search without a match, with a Clear search button that empties the search (FR-ORG-13)', async () => {
+    it('names the query of a search without a match, with a Clear search button that empties the search', async () => {
         await renderEmpty({ canRead: true, canWrite: true, canDelete: false, canManageMembers: false });
         await wrapper.find('input[aria-label="Search datasets"]').setValue('nomatchxyz');
         expect(wrapper.find('.empty-state h3').text()).toBe('No datasets match "nomatchxyz"');
@@ -684,7 +684,7 @@ describe('DatasetsPage create actions', () => {
         expect(wrapper.find('.empty-state h3').text()).toBe('No datasets found');
     });
 
-    it('offers none in an empty organization of an older Registry that sends no permissions (FR-ACC-02)', async () => {
+    it('offers none in an empty organization of an older Registry that sends no permissions', async () => {
         await renderEmpty(null);
         expect(wrapper.vm.canCreateDataset).toBe(false);
         expect(createActions()).toEqual([]);
@@ -696,8 +696,8 @@ describe('DatasetsPage create actions', () => {
     });
 });
 
-// FR-ACC-02, FR-ACC-16, D-048: an organization that did not load shows its page state, not a broken page
-describe('DatasetsPage page states (FR-XC-13)', () => {
+// An organization that did not load shows its page state, not a broken page
+describe('DatasetsPage page states', () => {
     let wrapper;
     let push;
     beforeEach(() => {
@@ -747,7 +747,7 @@ describe('DatasetsPage page states (FR-XC-13)', () => {
         expect(wrapper.text()).toContain('Sign in as another user');
     });
 
-    it('a 404 shows "Organization not found" naming the slug, and does not redirect (FR-ACC-16)', async () => {
+    it('a 404 shows "Organization not found" naming the slug, and does not redirect', async () => {
         await renderRefused(404);
         expect(wrapper.find('h1').text()).toBe('Organization not found');
         expect(wrapper.text()).toContain('"admin" does not exist.');
@@ -756,7 +756,7 @@ describe('DatasetsPage page states (FR-XC-13)', () => {
         expect(shownActions()).toEqual([]);
     });
 
-    it('a 401 to a visitor without a session shows the sign-in state (D-048)', async () => {
+    it('a 401 to a visitor without a session shows the sign-in state', async () => {
         reg.isLoggedIn = () => false;
         await renderRefused(401);
         expect(wrapper.find('h1').text()).toBe('Sign in to open this organization');
@@ -772,7 +772,7 @@ describe('DatasetsPage page states (FR-XC-13)', () => {
     });
 });
 
-describe('DatasetsPage keyboard (ORG-01)', () => {
+describe('DatasetsPage keyboard', () => {
     let wrapper;
     beforeEach(() => {
         globalThis.HubOptions = {};
@@ -860,7 +860,7 @@ describe('DatasetsPage keyboard (ORG-01)', () => {
     });
 });
 
-describe('DatasetsPage, an import that failed (FR-UPL-12, FR-UPL-11)', () => {
+describe('DatasetsPage, an import that failed', () => {
     const { handleImportClose } = DatasetsPage.methods;
 
     it('drops the placeholder row of the dataset the rollback deletes; the toast with the reason is the app\'s (importNotices)', () => {

@@ -1,7 +1,7 @@
 /**
- * A sign-out in another tab reaches this one (FR-ACC-19): the browser's storage event, sent after the token keys are
+ * A sign-out in another tab reaches this one: the browser's storage event, sent after the token keys are
  * cleared in the other tab, makes the store read the session again; a session that ended that way is told once, as an info
- * toast ("You signed out in another tab.") with a Sign in action (FR-XC-13, FR-XC-23).
+ * toast ("You signed out in another tab.") with a Sign in action.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';

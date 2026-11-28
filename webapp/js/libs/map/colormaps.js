@@ -75,7 +75,7 @@ export function colorAt(id, t) {
 /**
  * The CSS background of a colour bar for the colours of a colormap, left to right: a smooth gradient, or for a discrete
  * colormap (`discrete`) one block per colour with hard stops, as the server paints it. The one gradient of the colormap
- * picker and of the map legend (FR-RAS-27); '' without colours.
+ * picker and of the map legend; '' without colours.
  * @param {string[]|null|undefined} colors
  * @param {boolean} [discrete]
  * @returns {string}

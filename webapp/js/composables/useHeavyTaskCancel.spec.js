@@ -1,5 +1,5 @@
 /**
- * The Cancel of a tool dialog's task (FR-PRC-10): the question of every task cancel, the cancel of the task, the
+ * The Cancel of a tool dialog's task: the question of every task cancel, the cancel of the task, the
  * poller read again so that the run of the dialog ends.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

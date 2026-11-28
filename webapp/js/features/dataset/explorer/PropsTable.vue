@@ -459,7 +459,7 @@ export default {
     display: none;
 }
 
-/* The table is as wide as its panel, never wider: a long value wraps in its cell (FR-EXP-17) */
+/* The table is as wide as its panel, never wider: a long value wraps in its cell */
 .props-datatable :deep(table) {
     table-layout: fixed;
     width: 100%;

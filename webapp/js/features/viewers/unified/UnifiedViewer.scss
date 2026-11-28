@@ -1,7 +1,7 @@
 // The 3D viewer's overlays: toolbars, layer panel, badges.
 
 // The row of the measure toolbar at the top left: a 2.25rem button, the padding of the bar (0.25rem each side) and its border.
-// The badge of local coordinates goes below it on a phone (FR-VWR-27)
+// The badge of local coordinates goes below it on a phone
 #unified-viewer {
     --unified-toolbar-height: calc(2.25rem + 2 * 0.25rem + 2 * var(--ddb-border-width));
 }

@@ -24,7 +24,7 @@
 <script setup>
 /**
  * NewPasswordFields - the new password and its confirmation, once for every form that sets a
- * password (FR-ADM-08, FR-ACC-21): the add user, change password and admin change password
+ * password: the add user, change password and admin change password
  * windows. Put it inside a Form of `@primevue/forms`: the two fields are registered by their
  * names, and the validators in libs/accountProblems.js (newPasswordProblem,
  * confirmPasswordProblem) give the texts in `errors`, which the component only draws.
@@ -50,7 +50,7 @@ const props = defineProps({
     /**
      * The autocomplete value of both fields: `new-password`, or `off` where the password is
      * someone else's (an admin sets another user's password: the browser must not offer or save
-     * the admin's own, FR-ACC-07)
+     * the admin's own)
      */
     autocomplete: { type: String, default: 'new-password' },
     /** Prefix of the DOM ids of the fields */

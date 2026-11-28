@@ -1,5 +1,5 @@
 <template>
-    <!-- The choices of every delete of users: who takes the data over, what happens on a conflict, and what is lost (FR-ADM-17, FR-ADM-23) -->
+    <!-- The choices of every delete of users: who takes the data over, what happens on a conflict, and what is lost -->
     <div class="delete-options">
         <div class="field">
             <label id="users-transfer-data-to-successor-label" for="users-transfer-data-to-successor" class="d-block mb-1 fw-semibold">Transfer data to successor (optional)</label>

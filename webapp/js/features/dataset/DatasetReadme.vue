@@ -27,7 +27,7 @@
 
 <script setup>
 /**
- * DatasetReadme - the README of the dataset under the files at its root, as a code host shows it (FR-EXP-14): the
+ * DatasetReadme - the README of the dataset under the files at its root, as a code host shows it: the
  * Markdown of README.md rendered by libs/markdown.js (its relative images and links are files of the dataset), in a
  * panel that collapses. A long file shows its first part; Open shows all of it in the Markdown viewer. A file above
  * MAX_BYTES (its size is on the entry the page lists) is not downloaded: the panel says so, and Open reads it.

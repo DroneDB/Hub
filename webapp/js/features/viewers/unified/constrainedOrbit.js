@@ -1,5 +1,5 @@
 /**
- * ConstrainedOrbit - the navigation of geo scenes (D-001, D-019): the splat viewer's earth
+ * ConstrainedOrbit - the navigation of geo scenes: the splat viewer's earth
  * controls, generalised. The heading turns around the scene's up axis, the tilt stays within a
  * range, the ground is grabbed by a pan, the wheel and a pinch zoom toward the point under the
  * pointer, and a marker shows the pivot of a gesture.
@@ -8,7 +8,7 @@
  * first framing, after the controls exist, and the splat viewer's moves with its tilt calibration.
  * camera.up is that up axis (no roll): setPose and update() reassert it.
  *
- * Two options shape it (FR-XC-18):
+ * Two options shape it:
  *  - `tilt`: `{ min, max }` in degrees, the camera's elevation above the ground through the pivot
  *    it turns around (the unified viewer's geo scenes: 5° to 89°, GEO_TILT); or `{ pole }`, the
  *    splat viewer's limit of |view direction · up| (its view may also look up from below);
@@ -39,7 +39,7 @@ const CHANGE_EVENT = { type: 'change' };
 const START_EVENT = { type: 'start' };
 const END_EVENT = { type: 'end' };
 
-/** The tilt range of the unified viewer's geo scenes (D-001): degrees above the ground. */
+/** The tilt range of the unified viewer's geo scenes: degrees above the ground. */
 export const GEO_TILT = Object.freeze({ min: 5, max: 89 });
 
 /**
@@ -197,7 +197,7 @@ export class ConstrainedOrbit {
         return Math.atan2(ahead.dot(east), ahead.dot(north));
     }
 
-    // ---- The navigation interface (FR-XC-18) -----------------------------------------
+    // ---- The navigation interface -----------------------------------------
 
     /**
      * Places the camera: at `position` (kept when absent), looking at `target` (kept when
@@ -620,7 +620,7 @@ export class ConstrainedOrbit {
 
     // The camera within minDistance and maxDistance of the target, along the line from the target
     // (the tilt and the heading kept): a turn about the point under the pointer and the target
-    // sliding back onto the ground change the distance, whatever the input (FR-VWR-02)
+    // sliding back onto the ground change the distance, whatever the input
     _clampDistance() {
         const { camera, target } = this;
         const offset = this._v[5].subVectors(camera.position, target);

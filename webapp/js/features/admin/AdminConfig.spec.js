@@ -136,12 +136,12 @@ describe('AdminConfig', () => {
         expect(document.getElementById(header.getAttribute('aria-describedby')).textContent).toBe('Default');
     });
 
-    it('says that it does not change the server, and how to use what it copies (D-005)', async () => {
+    it('says that it does not change the server, and how to use what it copies', async () => {
         await show();
         expect(wrapper.text()).toContain('This page does not change the server. Merge the copied keys into appsettings.json, then restart the Registry. Do not replace the file with them.');
     });
 
-    // FR-ACC-15: the server refuses the admin rights the client believed in
+    // The server refuses the admin rights the client believed in
     it('goes home with the notice of the guard when the server refuses it (403), and stays refused', async () => {
         const push = vi.fn(() => Promise.resolve());
         h.sys.config = vi.fn(() => Promise.reject(new ApiError('Forbidden', 403)));
@@ -252,7 +252,7 @@ describe('AdminConfig', () => {
             expect(unload()).toBe(true);
         });
     });
-    // FR-ADM-06, FR-ADM-13: each cron, timespan and JSON value is checked while the admin types
+    // Each cron, timespan and JSON value is checked while the admin types
     describe('validation of cron, timespan and JSON values', () => {
         const VALIDATED = {
             sections: [{
@@ -398,7 +398,7 @@ describe('AdminConfig', () => {
         });
     });
 
-    // FR-ADM-12 and D-005: Copy changes is the default, Copy full file the second action
+    // Copy changes is the default, Copy full file the second action
     describe('the two Copy actions', () => {
         const SECTIONS = {
             sections: [{
@@ -446,7 +446,7 @@ describe('AdminConfig', () => {
         });
     });
 
-    // FR-ADM-25: no PrimeVue deprecation warning, and the list field still edits
+    // No PrimeVue deprecation warning, and the list field still edits
     describe('PrimeVue components', () => {
         it('writes no console warning when the page mounts', async () => {
             const warn = vi.spyOn(console, 'warn').mockImplementation(() => { });

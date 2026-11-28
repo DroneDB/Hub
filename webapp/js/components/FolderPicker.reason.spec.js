@@ -1,5 +1,5 @@
 /**
- * The disabled rows of the picker say why (FR-MAP-22, FR-XC-22): a row that cannot be selected stays focusable and its
+ * The disabled rows of the picker say why: a row that cannot be selected stays focusable and its
  * name carries the reason as its description and tooltip.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

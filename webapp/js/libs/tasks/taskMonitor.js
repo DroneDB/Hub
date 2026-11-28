@@ -20,8 +20,7 @@
  *                    progress (buildManager derives the build state of each file from it). The
  *                    first fetch of a dataset always fires it, even for an empty list.
  *   'datasetGone'  - the server answered 404 to the task list: the dataset is not there any more (an
- *                    import that was cancelled or failed has rolled back and deleted it, FR-UPL-05,
- *                    D-004). Fires once, with { dataset, error }, and the dataset is not polled again.
+ *                    import that was cancelled or failed has rolled back and deleted it). Fires once, with { dataset, error }, and the dataset is not polled again.
  *                    The Hub never deletes the dataset: the page shows the not-found state.
  *   'busyEnded'    - a tracked task that keeps its dataset busy (see "Busy datasets" below) ended:
  *                    { dataset, task, gone, kind }, with the task as last listed (Succeeded or Failed), or `gone: true`

@@ -1,5 +1,5 @@
 <template>
-    <!-- Below `sm` with mobileCollapsed the first pane and the handle are hidden (FR-EXP-29), not removed: the second
+    <!-- Below `sm` with mobileCollapsed the first pane and the handle are hidden, not removed: the second
          pane stays the same element whatever the width, so a phone that rotates keeps what it shows (its tabs, the map) -->
     <Splitter ref="splitter" :layout="layout" class="panel-splitter" :class="{ 'panel-collapsed': collapsed }" :pt="splitterPt"
               @resizeend="onResizeEnd">
@@ -32,7 +32,7 @@ const OTHER_PANE_MIN = '20rem';
  * the next visit. Phones always start from mobileAmount.
  *
  * With firstSize, the first pane of a desktop screen has a width, not a share: the extra width of a large screen
- * goes to the content (FR-EXP-40). The width is resolved to px, converted to the percent the Splitter needs when
+ * goes to the content. The width is resolved to px, converted to the percent the Splitter needs when
  * the panel mounts and every time its container changes size (ResizeObserver), and the width the user drags the pane
  * to is kept in px (`<storageKey>.desktop.px`), so it is the same width on another window size.
  *

@@ -1,11 +1,11 @@
 // @ts-check
 /**
- * The slug rule of the Registry (`SlugRules`, FR-XC-12, D-014), as `GET /sys/features` publishes it
+ * The slug rule of the Registry (`SlugRules`), as `GET /sys/features` publishes it
  * in `inputRules.slug`: the pattern, the limits and the description. Every Hub form that takes or
- * makes a slug checks it here and shows the same text the Registry answers with (AC-036).
+ * makes a slug checks it here and shows the same text the Registry answers with.
  * A Registry that does not publish the rule gets the built-in copy of libs/nameRules.js.
  *
- * It is also the one slug generator (FR-ORG-05, FR-ORG-14): `slugFromName` gives what the Registry's
+ * It is also the one slug generator: `slugFromName` gives what the Registry's
  * `ToSlug` gives (the shared test cases `toSlug` in __vectors__/input-rules.json run against both),
  * `suggestSlug` is what a form proposes for a name, and `uniqueSlug` adds the `-<n>` suffix of a
  * taken slug within the limits (`SlugSuffix.Candidate`).
@@ -56,7 +56,7 @@ export function slugProblem(slug, options = 'The') {
     return null;
 }
 
-/** The letters NFD leaves whole, as the Registry's ToSlug transliterates them (FR-ORG-05). */
+/** The letters NFD leaves whole, as the Registry's ToSlug transliterates them. */
 const TRANSLITERATIONS = { 'ø': 'o', 'æ': 'ae', 'ß': 'ss', 'ẞ': 'ss', 'ł': 'l' };
 
 /**
@@ -64,7 +64,7 @@ const TRANSLITERATIONS = { 'ø': 'o', 'æ': 'ae', 'ß': 'ss', 'ẞ': 'ss', 'ł':
  * name are dropped, accents are dropped by NFD, ø, æ, ß and ł are transliterated, ASCII capitals
  * are lowercased, anything but [a-z0-9_-] is a dash, a run of dashes is one, a slug that starts
  * with '-' or '_' gets a '0' first, it is cut to the maximum length, a trailing '-' or '_' is
- * dropped (FR-ORG-14) and it is padded with '0' to the minimum length. A name that has no Latin
+ * dropped and it is padded with '0' to the minimum length. A name that has no Latin
  * letter or digit gives the internal fallback ("00"), which a form never proposes
  * (`suggestSlug`).
  * @param {string|null|undefined} name
@@ -100,7 +100,7 @@ export function slugFromName(name) {
 
 /**
  * The slug a form proposes for a name: `slugFromName`, or '' when the name has no Latin letter or
- * digit (D-035), so the user has to enter one.
+ * digit, so the user has to enter one.
  * @param {string|null|undefined} name
  * @returns {string}
  */
@@ -131,7 +131,7 @@ export function uniqueSlug(base, taken) {
 }
 
 /**
- * The first free slug and the name that goes with it (FR-UPL-14): when `uniqueSlug` adds the suffix `-<n>`, the name
+ * The first free slug and the name that goes with it: when `uniqueSlug` adds the suffix `-<n>`, the name
  * gets ' (<n>)' at its end, with the same n, so that a second import of a dataset has a different name too ('Aukerman'
  * and 'aukerman' become 'Aukerman (2)' and 'aukerman-2'). The name is cut to make room for the suffix within the
  * name limit.

@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * The validators of the Configuration page, one per field type (FR-ADM-06, FR-XC-11): pure
+ * The validators of the Configuration page, one per field type: pure
  * `xxxProblem(value)` functions that give the rule to show next to an invalid field, or null. A blank
  * value is never a problem: it means the default (`null` for a JSON value). The module also holds the
- * hint and the placeholder of each type (FR-ADM-13), so a field says the rule its validator checks.
+ * hint and the placeholder of each type, so a field says the rule its validator checks.
  *
  * - cron: the rule of the Registry (`inputRules.cron`, libs/nameRules.js): blank, a word that switches
  *   the job off (`disabled`, `off`, `none`, any case), a macro (`@daily`, any case) or 5 or 6 fields. These are the forms
@@ -155,8 +155,8 @@ export function fieldProblem(field, value) {
 }
 
 /**
- * The placeholder of an empty field: the default it takes, in words nobody mistakes for a value
- * (FR-ADM-13). Only cron and timespan fields have one.
+ * The placeholder of an empty field: the default it takes, in words nobody mistakes for a value.
+ * Only cron and timespan fields have one.
  * @param {ConfigField} field
  * @returns {string|undefined}
  */

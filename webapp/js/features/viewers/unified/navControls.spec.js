@@ -5,8 +5,8 @@
  * scene (the real ArcballControls of the bm3d viewer: rotation, pan, the upright aim, the orbit
  * Home flight, the focus of a double-click), the double-click pick (surface pick and the
  * up-vector-aware ground-plane fallback) and the camera tweener (easing endpoint, retarget,
- * stop), the flights of the scene with both strategies (D-019) and the strategy each loader picks
- * (D-001; the constrained orbit itself: constrainedOrbit.spec). three.js is the real thing; Giro3D
+ * stop), the flights of the scene with both strategies and the strategy each loader picks
+ * (the constrained orbit itself: constrainedOrbit.spec). three.js is the real thing; Giro3D
  * is stubbed.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -69,7 +69,7 @@ describe('wheelNotches', () => {
 
 // ---- scene distance limits ----
 
-describe('applySceneMetrics (FR-XC-18)', () => {
+describe('applySceneMetrics', () => {
     it('derives min/max distance from the framed scene size', () => {
         const c = {};
         applySceneMetrics(c, 200);
@@ -96,7 +96,7 @@ describe('applySceneMetrics (FR-XC-18)', () => {
         expect(c.maxDistance).toBeGreaterThan(300 * NAV.maxDistanceFactor * 10);
     });
 
-    it('sets the near plane to a hundredth of the framing distance and a far plane bounded by the cap (FR-VWR-09)', () => {
+    it('sets the near plane to a hundredth of the framing distance and a far plane bounded by the cap', () => {
         const c = {};
         const view = {};
         // A framing 8 units from a 20-unit scene: a hundredth of it (0.08) is under a quarter of minDistance (0.1)
@@ -149,7 +149,7 @@ describe('applySceneMetrics (FR-XC-18)', () => {
         expect(view.maxFarPlane).toBe(5.0e7);
     });
 
-    it('caps the zoom-out at the distance where the basemap stops filling the view, when that is nearer (FR-VWR-15)', () => {
+    it('caps the zoom-out at the distance where the basemap stops filling the view, when that is nearer', () => {
         const c = {};
         const view = {};
         applySceneMetrics(c, 14000, { view, distance: 20000, fillDistance: 212504 });
@@ -646,7 +646,7 @@ describe('navigation (real ArcballControls)', () => {
         applySceneMetrics(controls, 50);
         expect(controls.arcball.minDistance).toBeCloseTo(50 * NAV.minDistanceFactor);
         expect(controls.arcball.maxDistance).toBeCloseTo(50 * NAV.maxDistanceFactor);
-        // An option picks the strategy (D-019): the free trackball by default
+        // An option picks the strategy: the free trackball by default
         const make = strategy => createNavControls({ THREE, ArcballControls }, new THREE.PerspectiveCamera(), makeCanvas(), new THREE.Scene(),
             { strategy, getUp: () => Z_UP });
         const strategies = [make('free'), make('constrained'), make(undefined)];
@@ -740,7 +740,7 @@ describe('navigation (real ArcballControls)', () => {
         const change = vi.fn();
         // lifetime: paired (removed below)
         controls.addEventListener('change', change);
-        // Off the middle (FR-VWR-28): the pivot moves toward the point under the cursor, the camera with it
+        // Off the middle: the pivot moves toward the point under the cursor, the camera with it
         const under = controls.pointUnder(W / 4, H / 4);
         const notch = wheel(el, -100);
         expect(notch.defaultPrevented).toBe(true);
@@ -885,7 +885,7 @@ describe('navigation (real ArcballControls)', () => {
 
 // ---- the flights of the scene (Home, the double-click focus) ----
 
-// Both strategies (D-019): the free trackball (real ArcballControls) and the constrained orbit
+// Both strategies: the free trackball (real ArcballControls) and the constrained orbit
 describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3D stubbed)', strategy => {
     const W = 600;
     const H = 800;
@@ -1030,10 +1030,10 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
         scene.dispose();
     });
 
-    // FR-XC-18: the wheel calls zoomAt in both strategies, never the three.js controls' own wheel
+    // The wheel calls zoomAt in both strategies, never the three.js controls' own wheel
     // listener. A Chrome notch is 100 px (ArcballControls count 125 px a notch, so they zoom
     // 1.1^0.8 = x1.079 for it).
-    it('zooms x1.1 for a 100 px Chrome wheel notch, through zoomAt (FR-XC-18)', () => {
+    it('zooms x1.1 for a 100 px Chrome wheel notch, through zoomAt', () => {
         const { scene, el, camera } = sceneFixture();
         const zoomAt = vi.spyOn(scene.controls, 'zoomAt');
         const pivot = navPivot(scene.controls).clone();
@@ -1044,7 +1044,7 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
         scene.dispose();
     });
 
-    it('changes the field of view on Shift+wheel through setFov (FR-XC-18)', () => {
+    it('changes the field of view on Shift+wheel through setFov', () => {
         const { scene, el, camera } = sceneFixture();
         const setFov = vi.spyOn(scene.controls, 'setFov');
         const position = camera.position.clone();
@@ -1055,8 +1055,8 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
         scene.dispose();
     });
 
-    // FR-VWR-28: the point under the cursor stays under the cursor, the pivot moves toward it
-    it('zooms a wheel notch toward the point under the cursor, which stays where it is on the screen (FR-VWR-28)', () => {
+    // The point under the cursor stays under the cursor, the pivot moves toward it
+    it('zooms a wheel notch toward the point under the cursor, which stays where it is on the screen', () => {
         const { scene, el, camera } = sceneFixture();
         const { controls } = scene;
         const cursor = [150, 200];
@@ -1087,8 +1087,8 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
         scene.dispose();
     });
 
-    // FR-VWR-29: Home gives back the field of view too
-    it('flies Home with the field of view it was framed with, after Shift+wheel changed it (FR-VWR-29)', () => {
+    // Home gives back the field of view too
+    it('flies Home with the field of view it was framed with, after Shift+wheel changed it', () => {
         const { scene, el, camera, frames } = sceneFixture();
         expect(scene.homePose.fov).toBe(50);
         wheel(el, 100, { shiftKey: true });
@@ -1112,8 +1112,8 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
         scene.dispose();
     });
 
-    // FR-VWR-16: the keys of the focused canvas, through the interface of the strategy
-    it('has a name, a role and the keyboard focus on its canvas (FR-VWR-16)', () => {
+    // The keys of the focused canvas, through the interface of the strategy
+    it('has a name, a role and the keyboard focus on its canvas', () => {
         const { scene, el } = sceneFixture();
         expect(el.getAttribute('role')).toBe('application');
         expect(el.getAttribute('aria-label')).toMatch(/^3D view\. Arrow keys rotate/);
@@ -1128,7 +1128,7 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
         ['ArrowDown', {}, 'orbit', [0, -Math.PI / 36]],
         ['ArrowRight', { shiftKey: true }, 'pan', [0.05, 0]],
         ['ArrowDown', { shiftKey: true }, 'pan', [0, -0.05]]
-    ])('%s %j calls %s on the interface with %j, moves the camera and renders (FR-VWR-16)', (name, fields, method, args) => {
+    ])('%s %j calls %s on the interface with %j, moves the camera and renders', (name, fields, method, args) => {
         const { scene, el, camera } = sceneFixture();
         const spy = vi.spyOn(scene.controls, method);
         const before = camera.position.clone();
@@ -1211,7 +1211,7 @@ describe.each(['free', 'constrained'])('UnifiedScene flights (%s strategy, Giro3
     });
 });
 
-// ---- the strategy of each scene (FR-XC-18, D-001) ----
+// ---- the strategy of each scene ----
 
 describe('the navigation strategy each loader picks for the scene it builds', () => {
     const T = ddb.entry.type;

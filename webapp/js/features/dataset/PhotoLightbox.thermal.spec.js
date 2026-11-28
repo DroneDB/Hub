@@ -1,5 +1,5 @@
 /**
- * The thermal mode of the photo viewer (U-603: FR-RAS-15, FR-XC-24, FR-XC-32, D-022): for the picture of a thermal camera
+ * The thermal mode of the photo viewer: for the picture of a thermal camera
  * with raw thermal data, the temperature under the pointer (a pixel of the raw thermal grid, from the box the picture is drawn
  * in, whatever the bitmap), its range, the Unit, a palette drawn by thumb-ex with its legend, and the thermal fields in the
  * Information panel. A picture that is not radiometric stays a plain picture. The expected texts are literals.

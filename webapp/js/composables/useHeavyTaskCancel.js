@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * useHeavyTaskCancel - the Cancel of the task a tool dialog started (Merge, Align, Extract, the training export):
- * the same question and the same answer as the Cancel of a task row (useTaskActions.cancel, FR-PRC-10, D-002):
+ * the same question and the same answer as the Cancel of a task row (useTaskActions.cancel):
  * the confirmation of libs/tasks/cancelConfirmation, a toast of what came of it, the shared task poller read again.
  * The poll of the dialog's run then sees the cancelled state and ends the run, so the dialog unlocks.
  *

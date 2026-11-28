@@ -23,7 +23,7 @@ describe('viewer shell', () => {
         expect(shell).toBeTruthy();
     });
 
-    // FR-VWR-06: a viewer that cannot open is an error, not a warning (whose yellow text was 2.8:1)
+    // A viewer that cannot open is an error, not a warning (whose yellow text was 2.8:1)
     it('shows the error of a viewer as an error message', async () => {
         const { mount } = await import('@vue/test-utils');
         const PrimeVue = (await import('primevue/config')).default;

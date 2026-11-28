@@ -99,7 +99,7 @@ const pointAt = (...ofSlugs) => {
     map().hit = { get: () => members };
 };
 
-describe('DatasetLocationsMap canvas ratio (FR-XC-32)', () => {
+describe('DatasetLocationsMap canvas ratio', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s', async (dpr, applied) => {
@@ -135,7 +135,7 @@ describe('DatasetLocationsMap pins', () => {
         expect(map().options.target).toBe(wrapper.find('.dlm-map').element);
     });
 
-    it('pins a dataset at its point when it has one, not at the centre of its box (FR-ORG-09)', async () => {
+    it('pins a dataset at its point when it has one, not at the centre of its box', async () => {
         // New York and Rome: the centre of the box is in the Atlantic
         render({ groups: [group('acme', [{ slug: 'two', bbox: [-74, 40.5, 12.6, 42], point: [12.5, 41.9] }, ds('one', [10, 40, 12, 42])])] });
         await flushPromises();
@@ -178,7 +178,7 @@ describe('DatasetLocationsMap pins', () => {
         expect(map().view.fit.mock.lastCall[1]).toEqual({ ...FIT_OPTIONS, padding: [50, 164, 114, 100] });
     });
 
-    it('pads the fit by 10% of the map and the reserves read from the map, not by fixed pixels (FR-ORG-09)', async () => {
+    it('pads the fit by 10% of the map and the reserves read from the map, not by fixed pixels', async () => {
         render({ groups: [group('a', [ds('a1', [10, 40, 12, 42]), ds('a2', [20, 30, 21, 31])])] });
         await flushPromises();
         // The element that carries the tokens must be in the document for its computed style

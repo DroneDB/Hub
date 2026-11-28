@@ -1,5 +1,5 @@
 /**
- * The organization page on a phone (FR-ORG-20): the private lock is on the line of the name, before it (one
+ * The organization page on a phone: the private lock is on the line of the name, before it (one
  * `.ds-name-line`), so it never wraps alone; the header tags are a group on their own line under the title below `sm`.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

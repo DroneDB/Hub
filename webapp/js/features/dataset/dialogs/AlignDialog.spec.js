@@ -1,5 +1,5 @@
 /**
- * Align (FR-PRC-02, FR-PRC-04): one click starts one align task, not forced, and the dialog is busy
+ * Align: one click starts one align task, not forced, and the dialog is busy
  * while it runs; the proposed output is a free name, an existing name is announced and replaced only
  * after the user confirmed it (also after a 409 with conflictPath, once), and the source or the
  * reference is not accepted as output.
@@ -185,7 +185,7 @@ describe('AlignDialog submit', () => {
     });
 });
 
-// ---- The result stays until the user closes the window (FR-PRC-11, FR-XC-15) ---------------------------
+// ---- The result stays until the user closes the window ---------------------------
 
 const RESULT_LINE = '[14:22:01] ' + JSON.stringify({ success: true, tx: -3, ty: 2, thetaDeg: 0, scale: 1, confidence: 1 });
 const status = w => w.findAll('[data-testid="heavy-task-status"]');
@@ -361,7 +361,7 @@ describe('AlignDialog result', () => {
     });
 });
 
-// ---- Cancel of a task that waits for a node or runs (FR-PRC-10, FR-XC-15) --------------------------------
+// ---- Cancel of a task that waits for a node or runs --------------------------------
 
 describe('AlignDialog cancel', () => {
     beforeEach(() => {

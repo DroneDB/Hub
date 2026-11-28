@@ -93,7 +93,7 @@ const container = { width: 1800 };
 const resizeObservers = [];
 let widthDescriptor;
 
-describe('HubPanel firstSize (FR-EXP-40): the first pane has a width in px', () => {
+describe('HubPanel firstSize: the first pane has a width in px', () => {
     beforeEach(() => {
         screenClass.mobile = false;
         screenClass.tablet = false;

@@ -1,7 +1,7 @@
 /**
- * The OGC share URLs of the Share dialog: FR-SHR-01 (the WMTS template names the tile matrix set that
- * GetCapabilities lists), FR-SHR-02 (the sample GetCoverage asks for a size within the server's limit),
- * FR-SHR-04 (WMS for rasters only). The contract test (FR-XC-31) checks the template and the service table against
+ * The OGC share URLs of the Share dialog: the WMTS template names the tile matrix set that
+ * GetCapabilities lists, the sample GetCoverage asks for a size within the server's limit,
+ * and WMS is for rasters only. The contract test checks the template and the service table against
  * what the Registry serves (__vectors__/ogc-contract.json).
  */
 import { describe, it, expect } from 'vitest';
@@ -25,14 +25,14 @@ const vector = () => ({ type: T.VECTOR, path: 'roads.fgb', properties: {} });
 const urls = (entry, extra = {}) =>
     buildOgcShareUrls({ baseUrl: BASE, org: 'org', ds: 'ds', scope: 'entry', entry, ...extra });
 
-describe('WMTS RESTful tile template (FR-SHR-01)', () => {
+describe('WMTS RESTful tile template', () => {
     it('names GoogleMapsCompatible, the tile matrix set GetCapabilities lists', () => {
         expect(urls(raster()).wmts.restTileTemplate)
             .toBe('https://registry.test/orgs/org/ds/ds/wmts/1.0.0/ortho.tif/default/GoogleMapsCompatible/{z}/{y}/{x}.png');
         expect(WMTS_TILE_MATRIX_SET).toBe('GoogleMapsCompatible');
     });
 
-    it('names a nested raster by its escaped path (AC-015)', () => {
+    it('names a nested raster by its escaped path', () => {
         expect(urls(raster({ path: 'odm_orthophoto/odm_orthophoto.tif' })).wmts.restTileTemplate).toBe(
             'https://registry.test/orgs/org/ds/ds/wmts/1.0.0/odm_orthophoto%2Fodm_orthophoto.tif/default/GoogleMapsCompatible/{z}/{y}/{x}.png');
     });
@@ -47,7 +47,7 @@ describe('WMTS RESTful tile template (FR-SHR-01)', () => {
     });
 });
 
-describe('WMS for georasters only (FR-SHR-04)', () => {
+describe('WMS for georasters only', () => {
     it('offers WMS for a raster entry with a GetMap sample', () => {
         const { wms } = urls(raster());
         expect(wms.supported).toBe(true);
@@ -78,7 +78,7 @@ describe('WMS for georasters only (FR-SHR-04)', () => {
     });
 });
 
-describe('the sample GetCoverage size (FR-SHR-02)', () => {
+describe('the sample GetCoverage size', () => {
     const size = descriptor => descriptor.wcs.getCoverage.match(/&SCALESIZE=Long\((\d+)\),Lat\((\d+)\)/)?.slice(1).map(Number);
 
     it('asks for at most the published limit on the long side, keeping the aspect ratio (12544x10240, 8192)', () => {
@@ -114,12 +114,12 @@ describe('the sample GetCoverage size (FR-SHR-02)', () => {
     });
 });
 
-// FR-XC-31: the Hub's templates and its service table are those of the Registry (a copy of what it serves)
-describe('contract with the Registry (FR-XC-31)', () => {
+// The Hub's templates and its service table are those of the Registry (a copy of what it serves)
+describe('contract with the Registry', () => {
     const doc = new DOMParser().parseFromString(contract.wmtsCapabilities, 'application/xml');
     const resourceUrls = [...doc.getElementsByTagName('ResourceURL')];
 
-    /** The Hub template, as GetCapabilities writes it: the placeholders of WMTS 1.0.0 §10.2. */
+    /** The Hub template, as GetCapabilities writes it: the placeholders of WMTS 1.0.0 (section 10.2). */
     const asCapabilities = template => template
         .replace('/default/', '/{Style}/')
         .replace('/GoogleMapsCompatible/', '/{TileMatrixSet}/')
@@ -148,7 +148,7 @@ describe('contract with the Registry (FR-XC-31)', () => {
         expect(asCapabilities(urls(raster()).wmts.restTileTemplate)).toBe(ortho.png);
     });
 
-    it('is the template of every Layer of GetCapabilities, nested and non-NCName paths included (AC-015)', () => {
+    it('is the template of every Layer of GetCapabilities, nested and non-NCName paths included', () => {
         expect(layers.map(l => l.path)).toEqual(['ortho.tif', 'odm_orthophoto/odm_orthophoto.tif', 'my map (1).tif']);
         for (const layer of layers)
             expect(asCapabilities(urls(raster({ path: layer.path })).wmts.restTileTemplate), layer.path).toBe(layer.png);

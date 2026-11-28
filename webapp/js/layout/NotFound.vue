@@ -6,7 +6,7 @@
 <script setup>
 /**
  * NotFound - the page of an address that matches no route: the "not found" state of
- * ResourceState, with the ways out of every missing thing (FR-XC-13).
+ * ResourceState, with the ways out of every missing thing.
  */
 import ResourceState from '@/components/ResourceState.vue';
 

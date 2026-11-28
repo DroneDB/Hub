@@ -33,7 +33,7 @@
                             </span>
                         </li>
                     </ol>
-                    <!-- The new position of the band a button moved, said to a screen reader (FR-PRC-18) -->
+                    <!-- The new position of the band a button moved, said to a screen reader -->
                     <span class="visually-hidden" role="status" aria-live="polite" data-testid="band-move-announcement">{{ moveAnnouncement }}</span>
                 </div>
 
@@ -118,7 +118,7 @@
                 </div>
             </div>
 
-            <!-- The task: queued, merging, failed with its reason (FR-PRC-13) -->
+            <!-- The task: queued, merging, failed with its reason -->
             <HeavyTaskStatus class="merge-task" :task="mergeTask" :error="mergeError" label="Merge" cancellable :cancelling="cancelling"
                              @cancel="cancelHeavyTask($event, 'Merge multispectral')" />
         </div>
@@ -150,7 +150,7 @@ import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import ddb, { pathutils } from 'ddb';
 
 // The preview is drawn at 28rem at most (.preview-thumb): its bitmap has that CSS width times the pixel ratio,
-// in the steps of FR-XC-32 (440 px at 2x is 512, 28rem at 2x is 1024), and never more than 1024 px (FR-PRC-46)
+// in the shared bitmap steps (440 px at 2x is 512, 28rem at 2x is 1024), and never more than 1024 px
 const PREVIEW_CSS_PX = 448;
 const PREVIEW_MAX_PX = 1024;
 
@@ -161,8 +161,8 @@ const PREVIEW_MAX_PX = 1024;
  * Validates band availability, exposes merge options, and tracks task
  * progress via the useHeavyTask composable.
  *
- * One click starts one task (FR-PRC-02): the form is busy from the click until the task ends.
- * The proposed output is a free name of its folder (FR-PRC-04); a name that exists is replaced
+ * One click starts one task: the form is busy from the click until the task ends.
+ * The proposed output is a free name of its folder; a name that exists is replaced
  * only after the user confirmed it (overwrite: true), also when the Registry finds it at the
  * submit (409 with conflictPath). With "Delete source files" the Registry deletes the bands
  * itself (deleteSources), once the output is written and opens.
@@ -215,7 +215,7 @@ export default {
         outputPath() {
             return this.outputName.trim();
         },
-        // The listed entry the output would replace (letter case ignored, D-040)
+        // The listed entry the output would replace (letter case ignored)
         existingOutput() {
             return existingItem(this.outputPath, this.allEntries);
         },
@@ -452,7 +452,7 @@ export default {
                 const outputPath = this.outputPath;
                 const deleteSources = this.deleteSource;
 
-                // A replaced file keeps its own path (the Registry writes the existing entry, D-040)
+                // A replaced file keeps its own path (the Registry writes the existing entry)
                 let written = outputPath;
                 let overwrite = false;
                 if (this.existingOutput) {
@@ -522,7 +522,7 @@ export default {
 }
 
 .col-preview {
-    /* The preview shares the free width with the details and grows with the dialog, up to 28rem (FR-PRC-46) */
+    /* The preview shares the free width with the details and grows with the dialog, up to 28rem */
     flex: 1 1 14rem;
     max-width: 28rem;
     min-width: 0;

@@ -1,5 +1,5 @@
 /**
- * Dialog focus, end to end (FR-XC-02, FR-XC-03, FR-XC-19; ADM-03, ACC-10, ORG-01, ORG-06, MAP-03), and the report surfaces
+ * Dialog focus, end to end, and the report surfaces
  * (the live page, the editor, the PDF progress, the organization Report settings; tests 7 to 11):
  * drives the real Hub in Chromium against a running Registry. Not part of `npm test` (needs a
  * server); same environment and conventions as smoke.test.mjs:
@@ -85,7 +85,7 @@ after(async () => {
     try { await api('DELETE', `/orgs/${USER}/ds/${DS}`); } catch { /* best effort */ }
 });
 
-test('1. Preferences opened with the keyboard from the user menu takes the focus and keeps it (ACC-10)', async () => {
+test('1. Preferences opened with the keyboard from the user menu takes the focus and keeps it', async () => {
     const { page } = await newPage();
     await login(page);
     await page.focus('button[aria-controls="user_menu"]');
@@ -105,7 +105,7 @@ test('1. Preferences opened with the keyboard from the user menu takes the focus
     assert.ok(await page.evaluate(() => document.activeElement?.matches('button[aria-controls="user_menu"]')), 'focus is back on the user menu button');
 });
 
-test('2. Preferences opened with the mouse takes the focus and keeps it (ACC-10)', async () => {
+test('2. Preferences opened with the mouse takes the focus and keeps it', async () => {
     const { page } = await newPage();
     await login(page);
     await page.click('button[aria-controls="user_menu"]');
@@ -115,7 +115,7 @@ test('2. Preferences opened with the mouse takes the focus and keeps it (ACC-10)
     await assertTrapped(page, '#preferencesDialog');
 });
 
-test('3. Manage Roles opened with Enter takes the focus and keeps it (ADM-03)', async () => {
+test('3. Manage Roles opened with Enter takes the focus and keeps it', async () => {
     const { page } = await newPage();
     await login(page);
     await page.goto(`${URL_}/admin/users`);
@@ -127,7 +127,7 @@ test('3. Manage Roles opened with Enter takes the focus and keeps it (ADM-03)', 
     await assertTrapped(page, '#roleManagementDialog');
 });
 
-test('4. Create Organization gives the focus back to its button when it closes (ORG-06)', async () => {
+test('4. Create Organization gives the focus back to its button when it closes', async () => {
     const { page } = await newPage();
     await login(page);
     await page.goto(`${URL_}/r`);
@@ -143,7 +143,7 @@ test('4. Create Organization gives the focus back to its button when it closes (
     assert.ok(await page.evaluate(() => /Create Organization/.test(document.activeElement?.textContent || '')), 'focus is back on Create Organization');
 });
 
-test('5. a dataset opens with Tab and Enter, and Shift+F10 opens its menu (ORG-01)', async () => {
+test('5. a dataset opens with Tab and Enter, and Shift+F10 opens its menu', async () => {
     const { page, errors } = await newPage();
     await login(page);
     await page.goto(`${URL_}/r/${USER}`);
@@ -159,7 +159,7 @@ test('5. a dataset opens with Tab and Enter, and Shift+F10 opens its menu (ORG-0
     assert.deepEqual(errors, []);
 });
 
-test('6. Map Settings: Escape with the basemap list open closes only the list, a second Escape the dialog (FR-XC-19, MAP-03)', async () => {
+test('6. Map Settings: Escape with the basemap list open closes only the list, a second Escape the dialog', async () => {
     const { page, errors } = await newPage();
     await login(page);
     await page.goto(`${URL_}/r/${USER}/${DS}`);

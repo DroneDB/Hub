@@ -332,7 +332,7 @@ export default {
         },
 
         /**
-         * Shows another name on the root of the tree, in place (the dataset was renamed, FR-EXP-24): the tree is not
+         * Shows another name on the root of the tree, in place (the dataset was renamed): the tree is not
          * read again, so what is expanded stays expanded.
          */
         setRootLabel: function (label) {

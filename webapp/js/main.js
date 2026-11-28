@@ -118,7 +118,7 @@ window.addEventListener('load', function () {
             ddbVersion: features?.ddbVersion ?? null
         };
         const app = createApp(App, { notice: updateNotice, versions });
-        // The running versions, for the administrator's menu in the header (FR-NAV-08): read once, not loaded again
+        // The running versions, for the administrator's menu in the header: read once, not loaded again
         app.provide('versions', versions);
 
         // Pinia before the router: the route guards read the auth store
@@ -130,9 +130,9 @@ window.addEventListener('load', function () {
         // The server rejected the session or a private page needs one: one place
         // decides - end the session and sign in, then come back here
         reg.onUnauthorized(() => handleUnauthorized(router, useAuthStore(pinia)));
-        // A sign-out in another tab: this one says so and offers Sign in (FR-ACC-19)
+        // A sign-out in another tab: this one says so and offers Sign in
         useAuthStore(pinia).bindRouter(router);
-        // An import that runs in the background says when it ends, on any page (FR-UPL-11)
+        // An import that runs in the background says when it ends, on any page
         startImportNotices(dataset => router.push({ name: 'ViewDataset', params: { org: dataset.org, ds: dataset.ds } }));
         app.use(ToastService);
 

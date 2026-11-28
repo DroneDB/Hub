@@ -14,7 +14,7 @@
 
 <script setup>
 /**
- * EmptyState - what a list says when it has nothing to show (FR-XC-20). One shape for every list:
+ * EmptyState - what a list says when it has nothing to show. One shape for every list:
  *
  *   - A search (`query`): 'No datasets match "pile"', the hint to change it and a 'Clear search'
  *     button that emits `clear`; the page empties its query.

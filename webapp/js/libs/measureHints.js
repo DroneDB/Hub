@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * The one hint text of every measuring and drawing tool (FR-XC-17): how to add a point, how to
- * finish and how to cancel (D-027). The 2D map tools, the 3D, splat and point-cloud toolbars read it
+ * The one hint text of every measuring and drawing tool: how to add a point, how to
+ * finish and how to cancel. The 2D map tools, the 3D, splat and point-cloud toolbars read it
  * here, so a tool says the same thing in every viewer.
  */
 

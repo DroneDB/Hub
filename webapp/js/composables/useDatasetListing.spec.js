@@ -147,7 +147,7 @@ describe('addEntry', () => {
     });
 });
 
-describe('the tree hears of entries outside the folder on show (FR-EXP-36)', () => {
+describe('the tree hears of entries outside the folder on show', () => {
     const readme = { path: 'README.md', type: 8, size: 1 };
 
     it('addEntry of a root path while a subfolder is on show emits addItems and leaves the list alone', async () => {

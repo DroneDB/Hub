@@ -278,7 +278,7 @@ describe('RasterLayerOpacityPanel fold', () => {
     });
 });
 
-describe('RasterLayerOpacityPanel on a map narrower than sm (FR-MAP-12)', () => {
+describe('RasterLayerOpacityPanel on a map narrower than sm', () => {
     const renderOn = (mapSize, props) => {
         wrapper = mount(RasterLayerOpacityPanel, { props: { layers: [row('b.tif'), row('a.tif')], ...props }, global: { provide: { mapSize } } });
         return wrapper;
@@ -330,7 +330,7 @@ describe('RasterLayerOpacityPanel on a map narrower than sm (FR-MAP-12)', () => 
     });
 });
 
-describe('RasterLayerOpacityPanel layer names (FR-RAS-12)', () => {
+describe('RasterLayerOpacityPanel layer names', () => {
     // The two mosaics of r3thermal/hat-creek, and the masked one
     const A = 'Hat_Creek_Fire_Thermal_08242018_16bit.tif';
     const B = 'Hat_Creek_Fire_Thermal_08252018_16bit.tif';
@@ -361,7 +361,7 @@ describe('RasterLayerOpacityPanel layer names (FR-RAS-12)', () => {
     });
 });
 
-describe('RasterLayerOpacityPanel zoom to layer (FR-MAP-08)', () => {
+describe('RasterLayerOpacityPanel zoom to layer', () => {
     const zooms = () => wrapper.findAll('button[title="Zoom to layer"]');
 
     it('has a Zoom to layer button for each drawn row, named by the layer, and emits the path of its row', async () => {
@@ -378,7 +378,7 @@ describe('RasterLayerOpacityPanel zoom to layer (FR-MAP-08)', () => {
     });
 });
 
-// FR-RAS-09: a raster that is building is a row that says so, with how far the build is, and it can be zoomed to
+// A raster that is building is a row that says so, with how far the build is, and it can be zoomed to
 describe('RasterLayerOpacityPanel a raster that is building', () => {
     let percent;
     const building = path => row(path, {

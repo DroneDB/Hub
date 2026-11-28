@@ -1,5 +1,5 @@
 /**
- * The Properties window (FR-EXP-25): the dataset root shows readable rows and keeps its raw metadata behind a toggle; a
+ * The Properties window: the dataset root shows readable rows and keeps its raw metadata behind a toggle; a
  * selection of several items has a window of the size of its content and lists the names with the selection summary.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

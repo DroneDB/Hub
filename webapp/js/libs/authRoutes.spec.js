@@ -1,7 +1,7 @@
 /**
- * The session routes of FR-XC-13: one home (homeLocation), one notice query handled in one
- * place (handleNotice), Login told why (`expired`, FR-ACC-09) and admin pages that say why they
- * are refused (`denied`, FR-ACC-15).
+ * The session routes: one home (homeLocation), one notice query handled in one
+ * place (handleNotice), Login told why (`expired`) and admin pages that say why they
+ * are refused (`denied`).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createRouter, createWebHistory } from 'vue-router';
@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-describe('homeLocation (FR-NAV-06)', () => {
+describe('homeLocation', () => {
     it('is Organizations, signed in or not', () => {
         expect(homeLocation()).toEqual({ name: 'Organizations' });
     });
@@ -80,7 +80,7 @@ describe('parseNotice', () => {
 });
 
 describe('guard', () => {
-    it('sends a non-admin home with the notice of the admin page (FR-ACC-15)', () => {
+    it('sends a non-admin home with the notice of the admin page', () => {
         const router = appRouter({ isLoggedIn: true, isAdmin: false });
         expect(guard(router.resolve('/admin/users'), { isLoggedIn: true, isAdmin: false }))
             .toEqual({ name: 'Organizations', query: { [NOTICE_QUERY]: 'denied:Users' } });
@@ -101,7 +101,7 @@ describe('deniedLocation', () => {
     });
 });
 
-describe('handleUnauthorized (FR-ACC-09)', () => {
+describe('handleUnauthorized', () => {
     it('with a session: ends it and goes to Login with the notice expired', () => {
         window.history.replaceState({}, '', '/account');
         const router = { currentRoute: { value: { name: 'Account' } }, push: vi.fn(() => Promise.resolve()) };
@@ -112,7 +112,7 @@ describe('handleUnauthorized (FR-ACC-09)', () => {
     });
 });
 
-describe('markStaleSession (boot, FR-ACC-09)', () => {
+describe('markStaleSession (boot)', () => {
     beforeEach(() => window.history.replaceState({}, '', '/account?tab=1#top'));
 
     it('marks the address when a stored session is gone, keeping the rest of it', () => {

@@ -1,5 +1,5 @@
 /**
- * The action registry of the file explorer (FR-XC-14, AC-034): one definition per action, so for
+ * The action registry of the file explorer: one definition per action, so for
  * one selection an action that two surfaces show has the same label and the same enabled state,
  * the menu leaves out what does not apply, and every accelerator a menu shows works.
  */

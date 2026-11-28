@@ -67,7 +67,7 @@ export default {
         humanSize() {
             return bytesToSize(this.file.size);
         },
-        // A whole number, by the one number formatter (FR-UPL-16, FR-XC-08)
+        // A whole number, by the one number formatter
         percentText() {
             return `${formatNumber(this.file.progress, PRECISION.count)}%`;
         },

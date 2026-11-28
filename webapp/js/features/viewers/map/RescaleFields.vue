@@ -19,7 +19,7 @@
             <!-- Only a range the fields accept can be fitted: a constant raster (min = max) has none -->
             <button v-if="canFit" type="button" class="rescale-fit" :disabled="disabled" data-testid="rescale-fit" @click="fitToData">Fit to data</button>
         </div>
-        <!-- The refusal at its field; the map keeps the last valid range meanwhile (FR-RAS-10, FR-RAS-20) -->
+        <!-- The refusal at its field; the map keeps the last valid range meanwhile -->
         <small v-if="shown.min" :id="`${idPrefix}-min-error`" class="rescale-error" role="alert" data-testid="rescale-min-error">{{ shown.min }}</small>
         <small v-if="shown.max" :id="`${idPrefix}-max-error`" class="rescale-error" role="alert" data-testid="rescale-max-error">{{ shown.max }}</small>
     </div>
@@ -30,8 +30,7 @@ import { rescaleErrors, rescaleValue, localiseRescale } from '@/libs/rescale';
 import { formatNumber, localiseNumberText } from '@/libs/format';
 
 /**
- * RescaleFields - the Rescale range of a raster panel as two number fields, Min and Max (FR-RAS-10,
- * FR-RAS-20, D-025). It is the one Rescale input of RasterAnalysisControls and PlantHealthPanel.
+ * RescaleFields - the Rescale range of a raster panel as two number fields, Min and Max. the one Rescale input of RasterAnalysisControls and PlantHealthPanel.
  *
  * The user types numbers the way their locale writes them ("12,5" is 12.5). A range that is not two
  * numbers with Min below Max shows its error at the field and emits nothing, so the map keeps the

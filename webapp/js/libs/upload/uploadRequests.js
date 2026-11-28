@@ -5,10 +5,10 @@
  * - bundle: POST {dataset}/obj with `path`, `file` pairs, one result per file;
  * - chunked: POST {dataset}/obj/chunk per missing chunk, then POST .../commit.
  *
- * A chunked upload's id (`fileId`) is made from the file, not drawn at random (FR-UPL-04, §7.1): the SHA-256 (hex)
+ * A chunked upload's id (`fileId`) is made from the file, not drawn at random: the SHA-256 (hex)
  * of the dataset, the destination path, the size and the last-modified time. The same file picked again after a
  * reload therefore has the same id, and `GET .../obj/chunk/{fileId}` tells which chunks the server still has. That
- * status is asked only for an upload the server holds (FR-XC-10: a new file's id is unknown, and a 404 per file would
+ * status is asked only for an upload the server holds (a new file's id is unknown, and a 404 per file would
  * log a console error): the caller's open uploads (`GET .../obj/chunk`) are listed once per batch, shared by the files
  * of the batch (`newBatch`, which takes the list that the resume offer already read), and an id that the list holds,
  * or that these requests have sent chunks for, has its status read; any other file sends every chunk. A list that
@@ -17,7 +17,7 @@
  * that upload has: Keep both renamed it, so the path alone would not give it back. The chunks carry the file's
  * own name and last-modified time, which the server keeps to match a file selected again.
  *
- * A file whose name exists is refused (409 with `conflictPath`, D-040) unless its item has
+ * A file whose name exists is refused (409 with `conflictPath`) unless its item has
  * `overwrite: true`: then `overwrite=true` goes before its `file` part (and in every chunk and the
  * commit), as the Registry reads the flag sent before the file. A refused file's result carries
  * `conflictPath`. An upload id belongs to one destination: Keep both (another path) starts a new
@@ -354,7 +354,7 @@ function normalizedPath(path) {
     return typeof path === 'string' ? path.replace(/\\/g, '/').replace(/^(\.?\/)+/, '') : '';
 }
 
-// The path of the entry that refused the name (D-040), or null
+// The path of the entry that refused the name, or null
 function conflict(conflictPath) {
     return typeof conflictPath === 'string' && conflictPath ? conflictPath : null;
 }

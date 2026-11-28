@@ -18,7 +18,7 @@ const { pathutils } = ddb;
 
 /**
  * @typedef {{ status: 'ok' | 'missing' | 'unavailable', entry: any, reason: string, building?: boolean }} ResolvedLayer
- *   `building`: an unavailable layer whose file is being built (FR-RAS-09): it is drawn when the build ends
+ *   `building`: an unavailable layer whose file is being built: it is drawn when the build ends
  * @typedef {Map<string, ResolvedLayer>} ResolvedLayers  path -> what the file is now
  */
 
@@ -119,7 +119,7 @@ export function pickGeoraster(dialogs, dataset, { title, near = '', exclude = []
         initialPath: pathutils.getParentFolder(near) || '',
         accept: isGeoraster,
         exclude,
-        // What the disabled rows say (FR-MAP-22)
+        // What the disabled rows say
         excludeReason: 'Already on the map',
         rejectReason: 'Not a map layer'
     });

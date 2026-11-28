@@ -60,7 +60,7 @@ const {
         save: () => mapCore.value.saveMeasurements()
     }
 });
-// A layer added where the map is not looking is told, with the way there (FR-MAP-08)
+// A layer added where the map is not looking is told, with the way there
 const layers = useViewLayers({
     dataset, state, setState, baseEntry, savedData: () => saved.value?.data ?? null, dialogs, embed,
     onAdded: path => mapCore.value?.announceAddedLayer?.(path)
@@ -90,7 +90,7 @@ const onMapUpdate = next => setState(JSON.parse(JSON.stringify(next)));
 // The view on show, for a report made from the map: its saved view as it is, or its state saved as a new view
 const viewInfo = computed(() => ({ uid: saved.value?.uid ?? '', name: name.value, dirty: !!dirty.value }));
 
-// The layers of the saved view: the map keeps the style it records for them, none included (FR-RAS-01)
+// The layers of the saved view: the map keeps the style it records for them, none included
 const savedLayers = computed(() => (saved.value ? saved.value.data.layers.map(l => l.path) : []));
 
 // "Compare to": the picker opens once, as soon as the map shows

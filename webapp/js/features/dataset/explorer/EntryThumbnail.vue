@@ -1,10 +1,10 @@
 <template>
-    <!-- Not a tab stop, and its keys are the list's: the list holds the focus and names its active tile (useListNavigation, FR-EXP-09) -->
+    <!-- Not a tab stop, and its keys are the list's: the list holds the focus and names its active tile (useListNavigation) -->
     <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/interactive-supports-focus -- the listbox is the focusable element (aria-activedescendant) -->
     <div ref="tile" class="thumbnail" :class="{ selected: file.selected, active, cut }" :title="titleText"
          role="option" :aria-selected="!!file.selected"
          :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
-        <!-- A second cue of the selection besides the tint and the outline (FR-EXP-10) -->
+        <!-- A second cue of the selection besides the tint and the outline -->
         <span v-if="file.selected" class="selected-badge" aria-hidden="true"><i class="fa-solid fa-check" /></span>
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
@@ -12,7 +12,7 @@
                  :src="thumbnail" alt="" @load="handleImageLoad"
                  @error="handleImageError">
 
-            <!-- The type icon: the fallback when there is no thumbnail, and under the spinner of a build, dimmed (FR-EXP-07) -->
+            <!-- The type icon: the fallback when there is no thumbnail, and under the spinner of a build, dimmed -->
             <i v-else-if="shownIcon && !loading" class="icon icon-file" :class="[shownIcon, { 'build-dimmed': buildLoading }]" :style="iconStyle" />
 
             <!-- Build loading spinner (highest priority) -->
@@ -79,7 +79,7 @@ export default {
             type: Boolean,
             default: false
         },
-        // The file was cut and waits for a paste: the tile is dimmed (FR-EXP-16)
+        // The file was cut and waits for a paste: the tile is dimmed
         cut: {
             type: Boolean,
             default: false
@@ -87,7 +87,7 @@ export default {
     },
     emits: ['clicked', 'open'],
     setup(props) {
-        // The wait for the build of the file is the shared one (FR-XC-16): the build the tile shows is the BuildManager's, and
+        // The wait for the build of the file is the shared one: the build the tile shows is the BuildManager's, and
         // the end of a build comes through onBuildEnd. A file that is not built by libddb waits for nothing
         const instance = getCurrentInstance();
         const buildable = () => isBuildableType(props.file.entry.type);
@@ -140,7 +140,7 @@ export default {
         buildingWord() {
             return BUILD_WORDS.building;
         },
-        // Name, type, size and build state in plain words (FR-EXP-21), or the error of the tile
+        // Name, type, size and build state in plain words, or the error of the tile
         titleText() {
             if (this.error) return this.error;
             const title = tileTitle(this.file.entry, this.buildState ? { currentState: this.buildState.currentState } : null);
@@ -190,7 +190,7 @@ export default {
             this.thumbnail = null;
             this.icon = this.file.icon;
         },
-        // Another tile size: a thumbnail shown comes again at the step of the new size (FR-EXP-43, FR-XC-32), now
+        // Another tile size: a thumbnail shown comes again at the step of the new size, now
         // when the tile is in view, else when it comes into view. A tile still waiting for its turn needs nothing:
         // its URL is built when the turn comes.
         size(size, before) {
@@ -231,7 +231,7 @@ export default {
             return this.retryNumber > 0 ? `${stripRetryParam(url)}&retry=${this.retryNumber}` : url;
         },
         // Shows the thumbnail once the loader grants a slot (at once without a loader). The URL is built then, not
-        // before: the size may change while the tile waits for its turn (FR-EXP-43).
+        // before: the size may change while the tile waits for its turn.
         showImage: function () {
             this.cancelImageRequest();
             if (!this.thumbnailLoader) {
@@ -415,7 +415,7 @@ export default {
             this.$emit("open", this);
         },
 
-        // A build of the file ended (the shared wait of FR-XC-16): a build that succeeded makes the thumbnail, so it loads
+        // A build of the file ended (the shared build wait): a build that succeeded makes the thumbnail, so it loads
         // again with a fresh retry budget; one that failed leaves the icon, which the badge of the build explains
         onBuildEnd(end) {
             this.cancelImageRequest();
@@ -475,10 +475,10 @@ export default {
     outline-offset: -2px;
 }
 
-/* Selected (FR-EXP-10): the primary tint, a 2px primary outline (3:1 or more against the page and
+/* Selected: the primary tint, a 2px primary outline (3:1 or more against the page and
    against the hover grey) and a check badge; it is declared after :hover, so a selected tile keeps its tint
    under the pointer and never reads as hovered */
-/* Cut (Ctrl+X) and not pasted yet: dimmed, as a file manager does (FR-EXP-16) */
+/* Cut (Ctrl+X) and not pasted yet: dimmed, as a file manager does */
 .thumbnail.cut {
     opacity: 0.5;
 }
@@ -522,7 +522,7 @@ export default {
 
 /* .thumbnail .container.bordered - drop shadow removed */
 
-/* The image fills the square box of the thumbnail and shows whole (FR-EXP-33): a landscape photo is as wide as the
+/* The image fills the square box of the thumbnail and shows whole: a landscape photo is as wide as the
    tile, with the neutral background above and below it, not a smaller picture at the foot of the box */
 .thumbnail .container img {
     width: 100%;
@@ -554,7 +554,7 @@ export default {
     margin-left: -0.5rem;
 }
 
-/* A file that builds: its type icon dimmed under the spinner, and the state in words at the foot of the tile (FR-EXP-07) */
+/* A file that builds: its type icon dimmed under the spinner, and the state in words at the foot of the tile */
 .thumbnail .container i.icon-file.build-dimmed {
     opacity: 0.35;
 }

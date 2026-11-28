@@ -107,7 +107,7 @@ useOverlay({
 const POPUP_FALLBACK_CSS_PX = 640;
 
 /**
- * The size to request for the photo (FR-MAP-31, FR-XC-32): the popup is as wide as its max-width allows
+ * The size to request for the photo: the popup is as wide as its max-width allows
  * (--ddb-popup-width, which grows with the screen) and the photo fills it, so the bitmap has that CSS width
  * times the pixel ratio, in the steps of the helper, not a fixed 512 px.
  */
@@ -281,7 +281,7 @@ defineExpose({ show, close, closeUnlessIn });
     border-radius: var(--ddb-radius-md);
     box-shadow: var(--ddb-shadow-md);
     min-width: min(16.25rem, calc(100vw - 2rem));
-    /* The width of a map popup is a token of the layout (FR-XC-33): 20rem on a phone, up to 40rem on a 4K screen */
+    /* The width of a map popup is a token of the layout: 20rem on a phone, up to 40rem on a 4K screen */
     max-width: min(var(--ddb-popup-width), calc(100vw - 2rem));
     overflow: hidden;
     z-index: 1001;

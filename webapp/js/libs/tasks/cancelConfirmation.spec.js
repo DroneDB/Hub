@@ -1,5 +1,5 @@
 /**
- * The cancel question of a task (FR-UPL-05, D-004): the cancel of a tool that adds files (imports,
+ * The cancel question of a task: the cancel of a tool that adds files (imports,
  * archive extraction, multispectral merge, raster alignment, photogrammetry) says what is deleted:
  * the files or output so far, and the dataset that an import of a dataset (or photogrammetry, when it
  * made one) created. Any other task keeps the plain question. It is a destructive confirmation.
@@ -46,7 +46,7 @@ describe('cancelConfirmation', () => {
         }
     });
 
-    it('names the task by the label its tool gives it, before its path (FR-PRC-22)', () => {
+    it('names the task by the label its tool gives it, before its path', () => {
         const q = cancelConfirmation({ toolId: 'photogrammetry', path: null, targetLabel: 'limit-1 · images/ → out (Fast Orthophoto)' }, 'Photogrammetry');
         expect(q.message).toBe('Are you sure you want to cancel this task?<br/><strong>Photogrammetry</strong> (limit-1 · images/ → out (Fast Orthophoto)) will be stopped.');
         expect(cancelConfirmation({ toolId: 'merge-multispectral', path: 'a.tif', targetLabel: '→ <b>.tif' }, 'Merge').message)

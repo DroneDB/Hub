@@ -39,7 +39,7 @@
                 <small v-if="validation.errors.fileName" class="field-error">{{ validation.errors.fileName }}</small>
             </div>
 
-            <!-- The task: queued, exporting, failed with its reason (FR-XC-15) -->
+            <!-- The task: queued, exporting, failed with its reason -->
             <HeavyTaskStatus :task="exportTask" :error="errorMessage" label="Export" cancellable :cancelling="cancelling"
                              @cancel="cancelHeavyTask($event, 'Splat training export')" />
 
@@ -126,7 +126,7 @@ async function start() {
         const result = await runHeavyTask(props.dataset, TRAINING_EXPORT_TOOL, {
             path: path ?? undefined,
             params,
-            // No force: a second submit of the same export gets the running task (FR-PRC-02)
+            // No force: a second submit of the same export gets the running task
             notify: false,
             onSubmitted: entry => { exportTaskId.value = entry.taskId; },
             onProgress: entry => { warnings.value = trainingWarnings(entry.logTail); }
@@ -135,7 +135,7 @@ async function start() {
         taskId.value = result.taskId;
         notify.success('The training data is ready to download.', { summary: 'Export completed' });
     } catch (e) {
-        // The dialog is open: a failed task shows its reason in the status (not in a toast, FR-XC-11); a refusal of
+        // The dialog is open: a failed task shows its reason in the status (not in a toast); a refusal of
         // the submit has no task
         if (!(/** @type {any} */ (e))?.task) errorMessage.value = e instanceof Error ? e.message : String(e);
     } finally {

@@ -174,7 +174,7 @@ describe('terminal state', () => {
     });
 });
 
-describe('a dataset deleted while its task runs (FR-UPL-05, D-004)', () => {
+describe('a dataset deleted while its task runs', () => {
     const notFound = () => new ApiError('Not found', 404);
 
     it('rejects once with "The dataset was deleted." when the list answers 404 after a Processing summary', async () => {
@@ -263,7 +263,7 @@ describe('a dataset deleted while its task runs (FR-UPL-05, D-004)', () => {
     });
 });
 
-describe('what a dialog reads of a task (FR-XC-15)', () => {
+describe('what a dialog reads of a task', () => {
     it('tells the caller the task as soon as the submit is answered, before the first poll', async () => {
         const dataset = makeDataset({
             submitTask: vi.fn(async () => ({ taskId: 't1', toolId: 'merge-multispectral' })),

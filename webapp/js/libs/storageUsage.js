@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * storageUsage - how full a storage quota is, written once for the header, the Account page and Admin > Users (D-030,
- * FR-ACC-17): the real percentage (not capped at 100), the severity, the colour of the bar, and the text that says it.
- * The bar is amber from 90 % and red from 100 %; with no quota nothing is full, and no bar is shown.
+ * storageUsage - how full a storage quota is, written once for the header, the Account page and Admin > Users: the
+ * real percentage (not capped at 100), the severity, the colour of the bar, and the text that says it. The bar is amber
+ * from 90 % and red from 100 %; with no quota nothing is full, and no bar is shown.
  */
 import { formatBytes, formatNumber } from '@/libs/format';
 

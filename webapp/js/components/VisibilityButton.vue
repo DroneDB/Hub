@@ -29,7 +29,7 @@
 
 <script setup>
 /**
- * VisibilityButton - the visibility of the open dataset, in the header after its name (FR-NAV-03). For a user who
+ * VisibilityButton - the visibility of the open dataset, in the header after its name. For a user who
  * can write the dataset it is a button: its menu lists Private, Unlisted and Public with what each means, and picking
  * another one asks first, then changes it (composables/useVisibilityChange.js). Anyone else sees the tag only.
  *

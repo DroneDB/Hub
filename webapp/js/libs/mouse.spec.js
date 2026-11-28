@@ -3,7 +3,7 @@ import { isRightClick, RIGHT_CLICK_MAX_MOVE_PX } from './mouse';
 
 const press = (x, y, button = 2) => ({ button, clientX: x, clientY: y });
 
-describe('isRightClick (D-027)', () => {
+describe('isRightClick', () => {
     it('is a right-button release where the right button went down', () => {
         expect(isRightClick(press(100, 100), press(100, 100))).toBe(true);
     });

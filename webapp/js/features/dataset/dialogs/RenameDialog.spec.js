@@ -1,5 +1,5 @@
 /**
- * The Rename dialog (FR-EXP-04, D-040, D-046): a name that a sibling has is refused at the field before any request
+ * The Rename dialog: a name that a sibling has is refused at the field before any request
  * (letter case ignored, as the Registry compares), the character rule is the published entry name rule, a 409 of the
  * Registry shows at the field and the dialog stays open, and a rename that does not change the name is the one
  * disabled submit.
@@ -124,7 +124,7 @@ describe('RenameDialog', () => {
         expect(error().text()).toBe('Folder names cannot contain /');
     });
 
-    // FR-EXP-04: a clash that came after the listing was read is the Registry's 409, shown at the field
+    // A clash that came after the listing was read is the Registry's 409, shown at the field
     it('shows a 409 of the Registry at the field and stays open with the typed name', async () => {
         renameEntry.mockRejectedValue(new ApiError("A file or folder named 'late.tif' already exists in this folder", 409, { conflictPath: 'late.tif' }));
         await render();
@@ -152,7 +152,7 @@ describe('RenameDialog', () => {
         expect(renameEntry).toHaveBeenCalledWith('Guide2.md', { sidecars: [] });
     });
 
-    // D-035: the dataset keeps its slug when the name makes none, so the rename is not refused for the Latin letter rule
+    // The dataset keeps its slug when the name makes none, so the rename is not refused for the Latin letter rule
     it('renames the dataset root through the page in the dialog, a name in another script included', async () => {
         const root = { label: 'My survey', entry: { path: '', type: T.DRONEDB } };
         const renameDataset = vi.fn().mockResolvedValue({ slug: 'my-survey' });

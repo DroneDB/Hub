@@ -25,7 +25,7 @@ export function nodataNumber(value) {
 }
 
 /**
- * The query part of the NoData option of every raster call (tiles, thumbnails, export and the value calls: FR-RAS-31).
+ * The query part of the NoData option of every raster call (tiles, thumbnails, export and the value calls).
  * @param {{ nodata?: number|string|null }} [options]
  */
 export function rasterOptionsQuery(options = {}) {
@@ -34,7 +34,7 @@ export function rasterOptionsQuery(options = {}) {
 }
 
 /**
- * The query part of the unit of the rescale (D-022): a rescale of a thermal formula written in another unit than the formula's
+ * The query part of the unit of the rescale: a rescale of a thermal formula written in another unit than the formula's
  * (the user changed the Unit after setting it) is sent with the unit it was written in, and ddb converts it.
  * @param {{ formula?: string, rescale?: string, rescaleUnit?: string }} [vizParams]
  */
@@ -46,7 +46,7 @@ export function rescaleUnitQuery(vizParams = {}) {
 
 /**
  * The query part of the options the raster value calls (info, point, area) share: the NoData value, and the formula of
- * the values (D-022).
+ * the values.
  * @param {{ nodata?: number|string|null, formula?: string }} [options]
  */
 function valueOptionsQuery(options = {}) {
@@ -114,8 +114,8 @@ export default class Dataset {
 
     /**
      * The thumbnail of a file drawn with visualisation parameters (thumb-ex): a formula with a colormap and a rescale in its unit.
-     * The one use is the thermal image viewer (FR-RAS-15): an R-JPEG drawn from the temperatures of its raw thermal data,
-     * `formula` a thermal one (CELSIUS, KELVIN, FAHRENHEIT, D-022), over the rescale or else the minimum to the maximum.
+     * The one use is the thermal image viewer: an R-JPEG drawn from the temperatures of its raw thermal data,
+     * `formula` a thermal one (CELSIUS, KELVIN, FAHRENHEIT), over the rescale or else the minimum to the maximum.
      * @param {string} path
      * @param {number} [size]  the long side, in pixels
      * @param {{ formula?: string, colormap?: string, rescale?: string, nodata?: number|string|null }} [vizParams]
@@ -206,8 +206,8 @@ export default class Dataset {
     }
 
     /**
-     * The value info of a raster file (U-201, D-021): its exact range in the units of the band, NoData, the default
-     * stretch (D-041) and the size of an export with its limit (D-023). `bbox` is a WGS 84 window
+     * The value info of a raster file: its exact range in the units of the band, NoData, the default
+     * stretch and the size of an export with its limit. `bbox` is a WGS 84 window
      * [minLon, minLat, maxLon, maxLat]: the estimate is that of the window.
      * @param {string} path
      * @param {{ nodata?: number|string|null, formula?: string, bbox?: number[] }} [options]
@@ -220,8 +220,8 @@ export default class Dataset {
     }
 
     /**
-     * The value at a pixel of the raw thermal grid of an R-JPEG, which has no geotransform (§7.1), with the options of the
-     * values (FR-RAS-31, D-022). A georeferenced raster takes map coordinates: getRasterPointValueAt.
+     * The value at a pixel of the raw thermal grid of an R-JPEG, which has no geotransform, with the options of the
+     * values. A georeferenced raster takes map coordinates: getRasterPointValueAt.
      * @param {string} path
      * @param {number} x
      * @param {number} y
@@ -232,7 +232,7 @@ export default class Dataset {
     }
 
     /**
-     * The value at a map coordinate (WGS 84): libddb finds the pixel of the file under it (U-201, D-021).
+     * The value at a map coordinate (WGS 84): libddb finds the pixel of the file under it.
      * @param {string} path
      * @param {number} lon
      * @param {number} lat
@@ -257,7 +257,7 @@ export default class Dataset {
     }
 
     /**
-     * The statistics of the pixels of the file under a WGS 84 window [minLon, minLat, maxLon, maxLat] (U-201, D-021).
+     * The statistics of the pixels of the file under a WGS 84 window [minLon, minLat, maxLon, maxLat].
      * @param {string} path
      * @param {number[]} bbox
      * @param {{ nodata?: number|string|null, formula?: string }} [options]
@@ -348,7 +348,7 @@ export default class Dataset {
      * @param {number} [options.bandIndex=1] 1-based raster band index
      * @param {{ nodata?: number|string|null, formula?: string }} [valueOptions] the options of the values of the layer
      *        (layerValueOptions): its NoData value, and its thermal formula, which gives the levels, the limits and the labels
-     *        in the unit of the layer (D-022)
+     *        in the unit of the layer
      */
     async generateContours(path, {
         interval = null,
@@ -495,7 +495,7 @@ export default class Dataset {
     }
 
     /**
-     * The open chunked uploads of the caller in this dataset (FR-UPL-04, §7.1): `{ fileId, path, totalFileSize,
+     * The open chunked uploads of the caller in this dataset: `{ fileId, path, totalFileSize,
      * totalChunks, chunkSize, sourceFileName, lastModified, received, missing, complete }` each. After a reload the
      * upload dialog offers to resume them.
      * @returns {Promise<Array<{ fileId: string, path: string, totalFileSize: number, totalChunks: number, chunkSize: number, sourceFileName: string|null, lastModified: number|null, received: number[], missing: number[], complete: boolean }>>}
@@ -505,7 +505,7 @@ export default class Dataset {
     }
 
     /**
-     * Removes the chunks that the server stores for a chunked upload (the Cancel of an upload, FR-UPL-04); the files
+     * Removes the chunks that the server stores for a chunked upload (the Cancel of an upload); the files
      * that the batch already sent stay. An upload the server does not know (404) is already gone.
      * @param {string} fileId
      */

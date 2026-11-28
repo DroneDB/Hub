@@ -4,7 +4,7 @@ import { foldBuildChildren, childBuildsText } from './taskGroups';
 const isActive = state => ['Enqueued', 'Processing'].includes(state);
 const task = (taskId, over = {}) => ({ taskId, toolId: 'build', state: 'Succeeded', parentJobId: null, ...over });
 
-describe('foldBuildChildren (FR-PRC-26)', () => {
+describe('foldBuildChildren', () => {
     it('folds the builds of a listed task into it, with their count', () => {
         const rows = [
             task('pg', { toolId: 'photogrammetry' }),

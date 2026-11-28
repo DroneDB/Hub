@@ -1,5 +1,5 @@
 /**
- * Where the toasts of the app show (FR-XC-09, FR-VWR-24, FR-NAV-09): a page's toast is top right, below the header; a toast
+ * Where the toasts of the app show: a page's toast is top right, below the header; a toast
  * raised while a viewer route is open goes to the viewer group, whatever raises it.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

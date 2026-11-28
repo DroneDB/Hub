@@ -1,5 +1,5 @@
 /**
- * The Settings window of a dataset (FR-EXP-24): General has the name (saved as the `name` metadata: the URL does not change
+ * The Settings window of a dataset: General has the name (saved as the `name` metadata: the URL does not change
  * with it), the URL slug (a new one warns that links stop working, checks the slug rules, and renames the dataset) and the
  * tagline; Sharing has the visibility and the license. These are a draft that Save writes (the slug last, after the page
  * agrees), and Save closes the window. The Files buttons (thumbnail, README) act at once. Closing with changes that are not

@@ -4,7 +4,7 @@ import { tileTitle } from './tileTitle';
 
 const T = ddbEntry.type;
 
-describe('tileTitle (FR-EXP-21)', () => {
+describe('tileTitle', () => {
     it('is the relative path, the type and the size', () => {
         expect(tileTitle({ path: 'images/a.jpg', type: T.IMAGE, size: 3355443 })).toBe('images/a.jpg — Image — 3.2 MB');
     });

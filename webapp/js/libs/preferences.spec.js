@@ -178,7 +178,7 @@ describe('catalog', () => {
         expect(ACCOUNT_OWNED).toContain(PREF.BUILD_NOTIFICATIONS);
     });
 
-    it('task notifications are notifications.tasks next to the builds field, off by default, and owned by the account (FR-PRC-40)', () => {
+    it('task notifications are notifications.tasks next to the builds field, off by default, and owned by the account', () => {
         // The server reads this field of the same section, and treats a missing value as 'none'
         expect(ACCOUNT_SECTIONS[PREF.TASK_NOTIFICATIONS]).toEqual(['notifications', 'tasks']);
         expect(PREF_DEFAULTS[PREF.TASK_NOTIFICATIONS]).toBe('none');
@@ -200,7 +200,7 @@ describe('catalog', () => {
         for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key] ?? DEVICE_PREF_DEFAULTS[key]);
     });
 
-    // FR-EXP-43: a thumbnail size follows the screen: it stays on the device, and nothing is stored until the user chooses
+    // A thumbnail size follows the screen: it stays on the device, and nothing is stored until the user chooses
     it('the tile size is a device preference with no stored default (M on a 4K screen, S below, until chosen)', () => {
         expect(PREF.TILE_SIZE).toBe('explorerTileSize');
         expect(ACCOUNT_SECTIONS).not.toHaveProperty(PREF.TILE_SIZE);
@@ -208,7 +208,7 @@ describe('catalog', () => {
         expect(getPref(PREF.TILE_SIZE, '')).toBe('');
     });
 
-    // D-044: the choice is stored per device, not with the account; System until the user picks one
+    // The choice is stored per device, not with the account; System until the user picks one
     it('the appearance is a device preference, System, Light or Dark, System by default', () => {
         expect(ACCOUNT_SECTIONS).not.toHaveProperty(PREF.APPEARANCE);
         expect(PREF_CHOICES[PREF.APPEARANCE]).toEqual(['system', 'light', 'dark']);
@@ -218,12 +218,12 @@ describe('catalog', () => {
         expect(prefChoice(PREF.APPEARANCE, null)).toBe('system');
     });
 
-    it('the organisation list defaults to name ascending, as a list, with no page size chosen (FR-XC-34)', () => {
+    it('the organisation list defaults to name ascending, as a list, with no page size chosen', () => {
         expect(PREF_DEFAULTS[PREF.ORG_PAGE]).toEqual({ itemsPerPage: null, pageSizeChosen: false, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' });
         expect(ACCOUNT_SECTIONS[PREF.ORG_PAGE]).toEqual(['orgs', 'list']);
     });
 
-    it('no page size is stored by default for the four paged lists, and the admin lists follow the account (FR-XC-34)', () => {
+    it('no page size is stored by default for the four paged lists, and the admin lists follow the account', () => {
         expect(PREF_DEFAULTS[PREF.DATASET_TABLE]).toMatchObject({ itemsPerPage: null, pageSizeChosen: false });
         expect(PREF_DEFAULTS[PREF.ADMIN_USERS]).toEqual({ itemsPerPage: null, pageSizeChosen: false });
         expect(PREF_DEFAULTS[PREF.ADMIN_TASKS]).toEqual({ itemsPerPage: null, pageSizeChosen: false });

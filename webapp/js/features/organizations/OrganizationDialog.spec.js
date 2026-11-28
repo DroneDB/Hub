@@ -1,5 +1,5 @@
 /**
- * The organization dialog (FR-ORG-04, FR-ORG-05, FR-ORG-14, FR-XC-11, D-046, D-047): the slug (the URL) is made from the
+ * The organization dialog: the slug (the URL) is made from the
  * name, with the accents transliterated, and edited by the user; a name the Registry refuses is explained at the field;
  * a slug of the loaded list sends no request; a refusal of the Registry shows at the field its `errors` names, and the
  * dialog stays open with what was typed; the name and the description have the Registry's limits, with a counter.
@@ -47,7 +47,7 @@ describe('OrganizationDialog (new)', () => {
         expect(wrapper.find('#organization-dialog-description-count').text()).toBe('0/2000');
     });
 
-    // FR-ORG-05: accents are transliterated and the slug it will use is shown, editable
+    // Accents are transliterated and the slug it will use is shown, editable
     it('shows the slug that the name gives, with the accents transliterated, and the URL it makes', async () => {
         await render();
         await type('name', 't-orgs Équipe Été');
@@ -80,7 +80,7 @@ describe('OrganizationDialog (new)', () => {
         expect(save).toHaveBeenCalledExactlyOnceWith({ name: 'Roof Team 2', slug: 'roof-team-2', description: '', isPublic: false });
     });
 
-    // FR-ORG-05: '!!!@@@###' was silent
+    // '!!!@@@###' was silent
     it('explains at the name field why a name with no Latin letter or digit is refused, and sends nothing', async () => {
         await render();
         await type('name', '!!!@@@###');
@@ -95,7 +95,7 @@ describe('OrganizationDialog (new)', () => {
         expect(slugError().exists()).toBe(false);
     });
 
-    it('accepts a name in another script with a slug the user enters (D-035)', async () => {
+    it('accepts a name in another script with a slug the user enters', async () => {
         save.mockResolvedValue(undefined);
         await render();
         await type('name', 'Москва');
@@ -107,7 +107,7 @@ describe('OrganizationDialog (new)', () => {
         expect(wrapper.emitted('close')).toEqual([['saved']]);
     });
 
-    // FR-ORG-04: the dialog closed and the input was lost
+    // The dialog closed and the input was lost
     it('shows a duplicate organization at the slug field, with the typed name, and sends no request', async () => {
         await render();
         await type('name', 'Survey Team');
@@ -159,7 +159,6 @@ describe('OrganizationDialog (new)', () => {
         expect(wrapper.emitted('close')).toBeUndefined();
     });
 
-    // FR-ORG-14
     it("limits the name to 256 characters and the description to 2000, with a counter and the Registry's text", async () => {
         await render();
         expect(field('name').attributes('maxlength')).toBe('256');
@@ -198,7 +197,7 @@ describe('OrganizationDialog (edit)', () => {
         expect(save).toHaveBeenCalledExactlyOnceWith({ name: 'Acme Corp', slug: 'acme', description: 'Anvils', isPublic: true });
     });
 
-    // D-035: the organization keeps its slug, so an edit is never refused for a name with no Latin letter or digit
+    // The organization keeps its slug, so an edit is never refused for a name with no Latin letter or digit
     it('does not refuse a name with no Latin letter or digit on an edit', async () => {
         await render({ mode: 'edit', model });
         save.mockResolvedValue(undefined);

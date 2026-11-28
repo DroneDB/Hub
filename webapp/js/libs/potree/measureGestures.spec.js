@@ -1,5 +1,5 @@
 /**
- * The gesture rule (D-027, FR-XC-17) on the point-cloud viewer's measures, against a stand-in of Potree 1.8's measuring
+ * The gesture rule on the point-cloud viewer's measures, against a stand-in of Potree 1.8's measuring
  * tool that ends a measure the way the vendored one does: a left release adds a marker, a right release of
  * any move ends it (taking the marker that follows the pointer out of an open measure), and a measure of a
  * fixed number of markers ends by itself. The input handler comes first on the canvas, then the tools, and it

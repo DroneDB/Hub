@@ -1,5 +1,5 @@
 /**
- * The app's router (router.js) handles the one-shot notices after every navigation (FR-XC-13).
+ * The app's router (router.js) handles the one-shot notices after every navigation.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';

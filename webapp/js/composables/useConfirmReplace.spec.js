@@ -1,5 +1,5 @@
 /**
- * The one question before the Hub replaces an existing file (FR-XC-07): a danger confirmation that
+ * The one question before the Hub replaces an existing file: a danger confirmation that
  * names the file and its folder, true only for Replace; and the 409 that asks it after a race.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -60,7 +60,7 @@ describe('useConfirmReplace', () => {
 });
 
 describe('existingItem', () => {
-    it('finds the listed item at a path without regard to case (D-040)', () => {
+    it('finds the listed item at a path without regard to case', () => {
         const items = [{ entry: { path: 'images/A.tif' } }, { entry: { path: 'images/b.tif' } }];
         expect(existingItem('images/a.TIF', items)).toBe(items[0]);
         expect(existingItem('images/c.tif', items)).toBeNull();

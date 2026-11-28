@@ -1,5 +1,5 @@
 /**
- * ViewerShell, the frame of every viewer (FR-VWR-07, FR-ACC-18, FR-VWR-23, FR-VWR-11): the view bar
+ * ViewerShell, the frame of every viewer: the view bar
  * with the way back to the dataset and the file name (none when embedded), the page state of a
  * file that did not load, from its `load-error`, the navigation toolbar (Home, fullscreen, help)
  * and the docked settings panel.
@@ -102,7 +102,7 @@ describe('ViewerShell page states', () => {
         expect(wrapper.text()).toContain('"odm/report/README.md" does not exist.');
     });
 
-    it('a link whose path cannot be read says the link is not valid (FR-VWR-23)', async () => {
+    it('a link whose path cannot be read says the link is not valid', async () => {
         await render({ loadError: new InvalidLinkError('x') }, { path: '/r/acme/site/view/%25%25%25garbage/markdown' });
         expect(wrapper.find('h1').text()).toBe('This link is not valid');
         expect(wrapper.text()).toContain('The file path in the address cannot be read.');
@@ -110,7 +110,7 @@ describe('ViewerShell page states', () => {
         expect(bar().find('.viewer-name').text()).toBe('');
     });
 
-    it('any other failure to load shows its message and the way back (FR-VWR-05)', async () => {
+    it('any other failure to load shows its message and the way back', async () => {
         await render({ loadError: new Error('cog.tif cannot be opened as markdown'), error: 'cog.tif cannot be opened as markdown' });
         expect(wrapper.find('.resource-state').exists()).toBe(false);
         expect(wrapper.text()).toContain('cog.tif cannot be opened as markdown');
@@ -140,7 +140,7 @@ function press(key, { target = document.body, ...init } = {}) {
 const nav = () => wrapper.find('.viewer-nav');
 const navButton = label => nav().find(`button[aria-label="${label}"]`);
 
-describe('ViewerShell navigation toolbar (FR-VWR-11)', () => {
+describe('ViewerShell navigation toolbar', () => {
     it('has no toolbar unless the viewer asks for it, and none before the viewer is ready', async () => {
         await render({ ready: true });
         expect(nav().exists()).toBe(false);
@@ -265,7 +265,7 @@ describe('ViewerShell navigation toolbar (FR-VWR-11)', () => {
     });
 });
 
-describe('ViewerShell settings panel (FR-VWR-11)', () => {
+describe('ViewerShell settings panel', () => {
     const settingsSlot = { settings: '<input class="field" type="range"><button class="inside">Reset</button>' };
     const panel = () => wrapper.find('.viewer-settings-panel');
 
@@ -322,7 +322,7 @@ describe('ViewerShell settings panel (FR-VWR-11)', () => {
     });
 });
 
-describe('ViewerShell fullscreen (FR-VWR-38)', () => {
+describe('ViewerShell fullscreen', () => {
     const request = vi.fn();
     const exit = vi.fn();
     const supportFullscreen = () => {
@@ -435,7 +435,7 @@ describe('ViewerShell fullscreen (FR-VWR-38)', () => {
     });
 });
 
-describe('ViewerShell fullscreen when embedded (FR-VWR-38)', () => {
+describe('ViewerShell fullscreen when embedded', () => {
     const request = vi.fn();
     const exit = vi.fn();
     const supportFullscreen = () => {
@@ -503,7 +503,7 @@ describe('ViewerShell fullscreen when embedded (FR-VWR-38)', () => {
     });
 });
 
-describe('ViewerShell key F and the keys of others (FR-VWR-38)', () => {
+describe('ViewerShell key F and the keys of others', () => {
     const request = vi.fn();
     const supportFullscreen = () => {
         request.mockClear();

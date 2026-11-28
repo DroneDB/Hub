@@ -101,7 +101,7 @@ describe('HubHeader update indicator', () => {
         expect(buttons[0].classList.contains('update-available-btn')).toBe(true);
     });
 
-    it('has the upload indicator of the dataset page uploads (FR-UPL-04)', async () => {
+    it('has the upload indicator of the dataset page uploads', async () => {
         await render();
         expect(wrapper.find('.right upload-indicator-stub').exists()).toBe(true);
     });
@@ -368,11 +368,11 @@ describe('HubHeader accessible names', () => {
         useDatasetSessionStore(wrapper.vm.$pinia).activeTab = 'explorer';
         await flushPromises();
         expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(true);
-        // Nothing selected: the whole dataset (FR-EXP-27)
+        // Nothing selected: the whole dataset
         expect(wrapper.find('[aria-label="Download entire dataset"]').attributes('title')).toBe('Download entire dataset');
     });
 
-    it('offers no Download, Share or Settings on a dataset that did not load (FR-ACC-18)', async () => {
+    it('offers no Download, Share or Settings on a dataset that did not load', async () => {
         await render();
         const { useDatasetSessionStore } = await import('@/stores/datasetSession');
         const session = useDatasetSessionStore(wrapper.vm.$pinia);
@@ -389,13 +389,13 @@ describe('HubHeader accessible names', () => {
         expect(wrapper.find('[aria-label="Download"]').exists()).toBe(true);
     });
 
-    it('is the banner landmark, with its actions in the Main navigation (FR-NAV-02)', async () => {
+    it('is the banner landmark, with its actions in the Main navigation', async () => {
         await render();
         expect(wrapper.element.tagName).toBe('HEADER');
         expect(wrapper.find('nav[aria-label="Main"]').exists()).toBe(true);
     });
 
-    // FR-ACC-11: every shape of the storage has a row with a text and the one command, to open the Storage Info
+    // Every shape of the storage has a row with a text and the one command, to open the Storage Info
     it('gives the storage row a text that says what it is, and the command that opens the Storage Info, for each shape', async () => {
         await render();
         const MB = 1024 * 1024;
@@ -419,7 +419,7 @@ describe('HubHeader accessible names', () => {
         expect(wrapper.vm.userMenuPt.item({ context: { item: { label: 'Logout' } } })).toEqual({});
     });
 
-    it('colours the storage row amber from 90 % and red from 100 % (D-030)', async () => {
+    it('colours the storage row amber from 90 % and red from 100 %', async () => {
         await render();
         const labelPt = used => {
             wrapper.vm.storageInfo = { total: 100, used };
@@ -448,7 +448,7 @@ describe('HubHeader accessible names', () => {
         expect(document.body.textContent).toContain('Storage quota reached');
     });
 
-    // FR-ACC-20: the avatar button says what it opens and whether it is open
+    // The avatar button says what it opens and whether it is open
     it('names the user menu button "Account menu for <user>", and aria-expanded follows the menu', async () => {
         await render();
         const button = () => wrapper.find('.user-menu-button');
@@ -490,7 +490,6 @@ describe('HubHeader accessible names', () => {
         other.remove();
     });
 
-    // FR-NAV-08
     it('shows an administrator System health and the running versions in the menu, from the provided versions', async () => {
         await render(AVAILABLE, { versions: { registryVersion: '2.7.1', hubVersion: '2.7.0', ddbVersion: '2.2.0' } });
         const admin = wrapper.vm.userMenuItems.find(i => i.label === 'Administration').items;
@@ -506,7 +505,7 @@ describe('HubHeader accessible names', () => {
     });
 });
 
-// FR-XC-14: Download, Share/Embed and Settings are actions of the explorer's registry
+// Download, Share/Embed and Settings are actions of the explorer's registry
 describe('HubHeader dataset actions', () => {
     const tif = { path: 'ddb://acme/site/a.tif', entry: { path: 'a.tif', type: ddb.entry.type.GEORASTER } };
     const jpg = { path: 'ddb://acme/site/b.jpg', entry: { path: 'b.jpg', type: ddb.entry.type.IMAGE } };
@@ -572,7 +571,7 @@ describe('HubHeader dataset actions', () => {
         expect(session.settingsRequests).toBe(1);
     });
 
-    // FR-EXP-27: one file downloads at once; several items, a folder or the dataset ask, with their size
+    // One file downloads at once; several items, a folder or the dataset ask, with their size
     describe('Download', () => {
         const sized = (name, size) => ({ path: `ddb://acme/site/${name}`, entry: { path: name, type: ddb.entry.type.IMAGE, size } });
         const folder = { path: 'ddb://acme/site/newdir', entry: { path: 'newdir', type: ddb.entry.type.DIRECTORY, size: 0 } };
@@ -677,7 +676,7 @@ describe('HubHeader dataset actions', () => {
     });
 });
 
-// FR-ACC-01 / FR-XC-05: an anonymous visitor of a shared dataset of a private organization
+// An anonymous visitor of a shared dataset of a private organization
 describe('HubHeader organization look-up (breadcrumb)', () => {
     const crumbs = () => wrapper.findAll('.hub-breadcrumb li').map(li => li.text());
     let original;
@@ -908,7 +907,7 @@ describe('HubHeader: Settings follow the page the user is on', () => {
     });
 });
 
-// FR-NAV-06, FR-ACC-03, FR-ACC-08: home, Sign In and My Datasets
+// Home, Sign In and My Datasets
 describe('HubHeader: home and the session', () => {
     let push;
 
@@ -978,7 +977,7 @@ describe('HubHeader: home and the session', () => {
         h.auth.username = '';
         expect(() => wrapper.vm.myDatasets()).not.toThrow();
         expect(h.auth.sync).toHaveBeenCalledOnce();
-        // It may have ended by a sign-out in another tab: nothing says it expired (FR-ACC-08)
+        // It may have ended by a sign-out in another tab: nothing says it expired
         expect(push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/account' } });
     });
 

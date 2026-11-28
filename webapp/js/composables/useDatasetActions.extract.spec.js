@@ -1,5 +1,5 @@
 /**
- * Extract Archive from the dataset page (FR-PRC-30): the toast names the entries the extraction skipped, with the reason of
+ * Extract Archive from the dataset page: the toast names the entries the extraction skipped, with the reason of
  * each, instead of saying the archive was extracted as a whole.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -59,7 +59,7 @@ describe('Extract of the dataset page', () => {
         expect(notify.success).toHaveBeenCalledWith('Archive extracted to out', { summary: 'Extract Completed', life: 'normal' });
     });
 
-    // FR-EXP-19: the docs say the Hub opens the destination folder, and the tree gets the new folders
+    // The docs say the Hub opens the destination folder, and the tree gets the new folders
     it('opens the destination folder in the tree and the list (and the archive that was deleted leaves the list)', async () => {
         await extractAndClose({ destPath: 'extracted/gltf', archivePath: 'models/zips/model-gltf.zip', deletedArchive: true, summary: { extracted: 2, skipped: 0, entries: [], more: 0 } });
 

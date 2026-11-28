@@ -3,7 +3,7 @@
         <MapCore ref="core" :files="files" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" :defer-load="lazyload"
                  @scroll-to="file => emit('scrollTo', file)" @open-item="(file, view) => emit('openItem', file, view)"
                  @file-written="path => emit('fileWritten', path)" @file-removed="path => emit('fileRemoved', path)" @view-saved="emit('viewSaved')">
-            <!-- The folder has nothing for the map and a subfolder has (FR-MAP-10); over the map, clear of its controls -->
+            <!-- The folder has nothing for the map and a subfolder has; over the map, clear of its controls -->
             <template #overlay>
                 <GeoSubfolderChip v-if="hint" :text="hint.text" :folder="hint.folder" @show="emit('showFolder', hint.path)" />
             </template>

@@ -28,7 +28,7 @@
                                            :invalid="!!userNameError" :aria-invalid="userNameError ? 'true' : undefined"
                                            :aria-describedby="userNameError ? 'organization-members-dialog-user-error organization-members-dialog-user-hint' : 'organization-members-dialog-user-hint'"
                                            @input="userNameError = ''" @keyup.enter="addMember" />
-                                <!-- The Registry names the field of its refusal (errors.userName, D-047): 'No user named x' shows here, not in the banner -->
+                                <!-- The Registry names the field of its refusal (errors.userName): 'No user named x' shows here, not in the banner -->
                                 <FieldError id="organization-members-dialog-user-error" :message="userNameError" />
                                 <small id="organization-members-dialog-user-hint" class="d-block mt-1 text-muted">Type the exact user name; it is checked when you add the member.</small>
                             </div>
@@ -46,7 +46,7 @@
                     <!-- Current members table -->
                     <h3>Current Members</h3>
                     <!-- The table scrolls in a box of its own with a sticky header: the Add Member form above and the
-                         Close button in the footer stay in view however many members there are (FR-ORG-26) -->
+                         Close button in the footer stay in view however many members there are -->
                     <div v-if="members.length > 0" class="members-scroll">
                         <table class="ui celled table stacked-table">
                             <thead>

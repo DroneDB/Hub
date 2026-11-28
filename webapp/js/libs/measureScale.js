@@ -1,5 +1,5 @@
 /**
- * The size of measurement labels and lines in the 3D and point cloud viewers (FR-VWR-37): the 12 px label and the 1 to 2 px
+ * The size of measurement labels and lines in the 3D and point cloud viewers: the 12 px label and the 1 to 2 px
  * line that suit a 1080 px high view are too small on a 4K screen, so they follow the height of the canvas (CSS px).
  */
 

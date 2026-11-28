@@ -1,7 +1,7 @@
 /**
- * The file grid has one tab stop and a keyboard model (FR-EXP-09): arrows move the active tile and
+ * The file grid has one tab stop and a keyboard model: arrows move the active tile and
  * the selection, Shift extends it, Home/End jump, Enter opens, Space toggles; tiles are not tab
- * stops. A selected tile has a second cue besides its tint (FR-EXP-10).
+ * stops. A selected tile has a second cue besides its tint.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';

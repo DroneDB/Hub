@@ -40,12 +40,12 @@
 
 <script setup>
 /**
- * UploadIndicator - the header's view of the uploads of the dataset page (FR-UPL-04). While an upload runs it shows the
+ * UploadIndicator - the header's view of the uploads of the dataset page. While an upload runs it shows the
  * number of files left and the total progress; it opens the upload list, a row for each dataset that is uploading, with
  * Pause/Resume and Cancel. An upload goes on when the user opens another page of the Hub, so the indicator is where
- * it stays visible; Cancel keeps the files already sent (D-045).
+ * it stays visible; Cancel keeps the files already sent.
  *
- * The page-unload warning is here too (FR-XC-04): an upload that is not settled is unsaved work for a reload or a
+ * The page-unload warning is here too: an upload that is not settled is unsaved work for a reload or a
  * closed tab, and never for a route change (`ignore` is always true: the guard asks nothing on a route change).
  *
  * Signed out it shows nothing: the uploads are the signed-in user's (the store drops them when the session ends).
@@ -90,7 +90,7 @@ function togglePause(u) {
     else uploads.pause(u.org, u.ds);
 }
 
-// FR-UPL-16: the question says what stays
+// The question says what stays
 async function cancel(u) {
     const ok = await confirm(cancelUploadQuestion({ sent: u.done, discardsBatch: false }));
     if (ok) await uploads.cancel(u.org, u.ds);

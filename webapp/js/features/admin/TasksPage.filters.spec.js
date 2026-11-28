@@ -1,5 +1,5 @@
 /**
- * Admin > Tasks, filters and order (FR-PRC-28): the three filters clear the same way (their x, or Clear
+ * Admin > Tasks, filters and order: the three filters clear the same way (their x, or Clear
  * filters), the empty state offers Clear filters, the filters, the page and the order stay in the address, and
  * a click on Created, State or Tool asks the server for that order.
  */

@@ -10,7 +10,7 @@
  * and the values are worked out from them every time they are drawn, so they follow a change of the
  * scale or of the up. Navigation is suspended while a shape is drawn (a drag would also move the
  * camera): a click adds a point, a double click, Enter or a right click ends the shape, Escape
- * cancels it (the gesture rule of every measuring tool, D-027). A right click is a right-button release
+ * cancels it (the gesture rule of every measuring tool). A right click is a right-button release
  * after a move of 4 CSS px or less (`isRightClick`), not the browser's `contextmenu`, which a
  * right-drag also sends. A shape with a fixed number of points (a point, a height) ends by itself.
  *

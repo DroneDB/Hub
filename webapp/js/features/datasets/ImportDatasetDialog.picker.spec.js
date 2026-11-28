@@ -1,5 +1,5 @@
 /**
- * The organization and dataset pickers of the Import dialog (FR-UPL-15, FR-XC-20): both Selects filter (a
+ * The organization and dataset pickers of the Import dialog: both Selects filter (a
  * list of 173 organizations is searched, not scrolled), name the filter field, and set no width of their own
  * (the global Select-overlay rule keeps the list inside a phone).
  */

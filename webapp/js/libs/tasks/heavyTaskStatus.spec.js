@@ -1,5 +1,5 @@
 /**
- * What a tool dialog says about its task (FR-XC-15, FR-XC-06): queued, running with the phase and the percent, done,
+ * What a tool dialog says about its task: queued, running with the phase and the percent, done,
  * failed with the task's message and no progress, cancelled.
  */
 import { describe, it, expect } from 'vitest';

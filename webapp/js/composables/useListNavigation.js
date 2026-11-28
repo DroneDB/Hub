@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useListNavigation - the keyboard model of the file grid and the file table (FR-EXP-09): the list
+ * useListNavigation - the keyboard model of the file grid and the file table: the list
  * is one tab stop that holds the focus, and the active item is named by `aria-activedescendant`
  * (as the tree and the colormap dropdown do), not by a tab stop on every item.
  *

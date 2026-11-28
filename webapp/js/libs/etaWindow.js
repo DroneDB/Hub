@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The time left of a transfer from how fast it went lately (FR-UPL-21): the rate of the last `windowMs` of progress,
+ * The time left of a transfer from how fast it went lately: the rate of the last `windowMs` of progress,
  * not the average since the start. The average of a transfer that begins with its biggest files, or that waits for a slow
  * start, gives a time that is several times too long; the rate of the window follows the speed the transfer has now.
  *

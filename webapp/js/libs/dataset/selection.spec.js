@@ -1,5 +1,5 @@
 /**
- * The summary of a selection (FR-EXP-32) and the size of a selection with folders (FR-EXP-08).
+ * The summary of a selection and the size of a selection with folders.
  * The expected texts are written out, not computed by the code under test.
  */
 import { describe, it, expect, vi } from 'vitest';

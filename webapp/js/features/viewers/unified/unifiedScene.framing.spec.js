@@ -1,5 +1,5 @@
 /**
- * The framing of the 3D viewer's scene (FR-XC-18, FR-VWR-09, FR-VWR-15, FR-VWR-20, FR-VWR-21):
+ * The framing of the 3D viewer's scene:
  * every framing method sizes the near plane, the far plane and the zoom cap through
  * applySceneMetrics; a georeferenced tileset is framed from the south-east above the ground at the
  * distance that fits the view, at any size and in any window; the first frame of a 3D Tiles set is
@@ -37,7 +37,7 @@ function makeScene({ strategy = 'constrained', fov = 30, aspect = 1, up = [0, 0,
     return { scene, camera, view, el };
 }
 
-describe('frameGlobe (FR-VWR-09)', () => {
+describe('frameGlobe', () => {
     // A 0.2 m box on the equator at the prime meridian: the local vertical is +X, north +Z, east +Y
     const GROUND = 6378137;
     const box = (half = 0.1) => new THREE.Box3(new THREE.Vector3(GROUND - half, -half, -half), new THREE.Vector3(GROUND + half, half, half));
@@ -84,7 +84,7 @@ describe('frameGlobe (FR-VWR-09)', () => {
         expect(distance).toBeGreaterThan(view.minNearPlane * 100);
     });
 
-    it('stands farther back for a tall window (390 x 844) than for a wide one (FR-VWR-21)', () => {
+    it('stands farther back for a tall window (390 x 844) than for a wide one', () => {
         const wide = makeScene({ aspect: 1400 / 900 });
         wide.scene.frameGlobe({}, box());
         const portrait = makeScene({ aspect: 390 / 844 });
@@ -120,7 +120,7 @@ describe.each(['constrained', 'free'])('frameBox (%s strategy)', strategy => {
     });
 });
 
-describe('a camera zoomed in to the limit sees its pivot (FR-XC-18, FR-VWR-09)', () => {
+describe('a camera zoomed in to the limit sees its pivot', () => {
     // fov 30, a tall window (aspect 0.5): the horizontal half-angle is 7.63 degrees, the framing
     // twice as far as in a square one, and a hundredth of it would pass the minimum distance
     const GROUND = 6378137;
@@ -144,7 +144,7 @@ describe('a camera zoomed in to the limit sees its pivot (FR-XC-18, FR-VWR-09)',
     });
 });
 
-describe('a flat scene with a basemap (FR-VWR-15)', () => {
+describe('a flat scene with a basemap', () => {
     // A basemap whose extent (with its margin) is 154 km x 110 km: the data is 14 km x 10 km
     function withBasemap(strategy = 'constrained') {
         const libs = {
@@ -187,7 +187,7 @@ describe('a flat scene with a basemap (FR-VWR-15)', () => {
     });
 });
 
-describe('waitForFirstRender (FR-VWR-20)', () => {
+describe('waitForFirstRender', () => {
     it('gives the progress row the tile progress while it waits, and stops at the timeout', async () => {
         vi.useFakeTimers();
         const { scene } = makeScene();
@@ -243,7 +243,7 @@ function withUpdateEvents(scene) {
     return { frame: () => [...listeners].forEach(fn => fn()), count: () => listeners.size };
 }
 
-describe('afterFirstRender (FR-VWR-20)', () => {
+describe('afterFirstRender', () => {
     it('runs once, on the first frame with the data, and then stops listening', () => {
         const { scene } = makeScene();
         const updates = withUpdateEvents(scene);
@@ -286,7 +286,7 @@ describe('afterFirstRender (FR-VWR-20)', () => {
     });
 });
 
-describe('a georeferenced tileset slower than the wait of the loading indicator (FR-VWR-20)', () => {
+describe('a georeferenced tileset slower than the wait of the loading indicator', () => {
     const GROUND = 6378137;
 
     it('is grounded and re-framed once, on its first frame with geometry after the 5 s', async () => {
@@ -363,7 +363,7 @@ describe('a georeferenced tileset slower than the wait of the loading indicator 
     });
 });
 
-describe('the 3D Tiles loader (FR-VWR-20)', () => {
+describe('the 3D Tiles loader', () => {
     const T = ddb.entry.type;
 
     function stubTilesScene(entry) {
@@ -488,7 +488,7 @@ describe('a model tileset in the flat scene of a model', () => {
     });
 });
 
-describe('configureTilesetStreaming (FR-XC-18)', () => {
+describe('configureTilesetStreaming', () => {
     const cacheOf = deviceMemory => {
         vi.stubGlobal('navigator', deviceMemory === undefined ? {} : { deviceMemory });
         const { scene } = makeScene();

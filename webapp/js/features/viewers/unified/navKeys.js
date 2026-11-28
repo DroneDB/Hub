@@ -1,6 +1,5 @@
 /**
- * navKeys - the keyboard of the 3D viewer's canvas and the help of its controls (FR-VWR-16, D-001,
- * D-019). The keys move the view only through the navigation interface that both strategies share
+ * navKeys - the keyboard of the 3D viewer's canvas and the help of its controls). The keys move the view only through the navigation interface that both strategies share
  * (navControls: orbit, pan, zoomAt), so they work the same with the constrained orbit and the free
  * trackball:
  *

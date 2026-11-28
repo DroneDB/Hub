@@ -1,5 +1,5 @@
 /**
- * The clip volume of a point cloud in the viewer's measuring toolbar (FR-VWR-26): buttons that do what the icons of
+ * The clip volume of a point cloud in the viewer's measuring toolbar: buttons that do what the icons of
  * the Potree menu do, and the hint while a clip box is placed.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

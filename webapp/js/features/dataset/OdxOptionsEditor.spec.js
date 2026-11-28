@@ -1,5 +1,5 @@
 /**
- * The NodeODX options editor and its option rows (FR-PRC-07): selecting a processing profile replaces the options of
+ * The NodeODX options editor and its option rows: selecting a processing profile replaces the options of
  * the profile, and only what the user changed by hand stays. The old rows emitted every value they were given, so
  * the options of the profiles selected before were stored as customizations and 'Default' could run as 'Fast
  * Orthophoto'.
@@ -149,7 +149,7 @@ describe('OdxOptionRow', () => {
     });
 });
 
-describe('OdxOptionsEditor - Reset (FR-PRC-33)', () => {
+describe('OdxOptionsEditor - Reset', () => {
     it('Reset of a changed option leaves the customizations, and the submit sends nothing of it', async () => {
         const { custom } = mountEditor();
         await flushPromises();

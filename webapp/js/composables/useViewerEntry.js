@@ -60,7 +60,7 @@ export function useViewerEntry({ types, accepts, typeLabel = 'this view', title,
     // The dataset's root entry this viewer put in the session, taken out when the viewer goes
     let sessionRoot = null;
     // A dataset.info() that resolves after the viewer went must not put its root entry in the session: nothing would
-    // take it out, and the breadcrumb of the next page would name this dataset (FR-NAV-03)
+    // take it out, and the breadcrumb of the next page would name this dataset
     let unmounted = false;
     onBeforeUnmount(() => {
         unmounted = true;
@@ -111,7 +111,7 @@ export function useViewerEntry({ types, accepts, typeLabel = 'this view', title,
         try {
             const root = (await ds.info())[0];
             permissions = permissionsOf(root);
-            // The header's breadcrumb names the dataset from it, as on the dataset page (FR-NAV-03)
+            // The header's breadcrumb names the dataset from it, as on the dataset page
             if (!unmounted) {
                 session.setRootEntry(root);
                 sessionRoot = root;

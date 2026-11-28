@@ -19,7 +19,7 @@
             This page does not change the server. Merge the copied keys into appsettings.json, then restart the Registry. Do not replace the file with them.
         </PrimeMessage>
 
-        <!-- A Copy with an invalid value copies nothing: the page says how many fields it refuses and which (FR-ADM-06) -->
+        <!-- A Copy with an invalid value copies nothing: the page says how many fields it refuses and which -->
         <PrimeMessage v-if="copyBlocked && invalidFields.length" severity="error" role="alert" :closable="false" class="config-notice invalid-summary">
             Nothing was copied: {{ invalidFields.length === 1 ? '1 field has an invalid value' : `${invalidFields.length} fields have an invalid value` }}
             ({{ invalidFields.map(f => f.name).join(', ') }}). Fix {{ invalidFields.length === 1 ? 'it' : 'them' }} and copy again.
@@ -28,7 +28,7 @@
         <LoadingSpinner v-if="loading" size="lg" label="Loading configuration..." />
 
         <div v-else class="config-scroll-container page-scroll-column">
-            <!-- The two cards share one row from 2 x 30rem up (FR-ADM-28) -->
+            <!-- The two cards share one row from 2 x 30rem up -->
             <div class="config-cards">
                 <UsageAndContactCard ref="usageCard" />
                 <EmailTemplatesCard ref="emailTemplatesCard" />
@@ -47,7 +47,7 @@
                     </AccordionHeader>
                     <AccordionContent>
                         <!-- A section in its default state is as legible and editable as a custom one: the tag says
-                         which it is, and a custom one has a bar along its edge (FR-ADM-15) -->
+                         which it is, and a custom one has a bar along its edge -->
                         <div :class="['config-section-content', { 'config-section-custom': isSectionActive(sIdx) }]">
                             <p class="section-description">{{ section.description }}</p>
 
@@ -241,7 +241,7 @@ const FULL_FILE_TITLE = 'Copies every setting, to start an appsettings.json from
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
  * section, with typed inputs and JSON generation for appsettings.json. The page changes
- * nothing on the server (D-005): it says so, and asks before it is left with edits, its own or
+ * nothing on the server: it says so, and asks before it is left with edits, its own or
  * the unsaved ones of the usage and e-mail template cards (one leave guard for the page).
  */
 export default {
@@ -291,7 +291,7 @@ export default {
         // The edited fields whose value the page refuses, by the validator of their type, while the admin types.
         // An unedited field keeps the value the server runs with, which the server's own parser accepted (or the
         // Registry would not run), so the page does not judge it: it never blocks a Copy. A Copy writes nothing
-        // while there is one (FR-ADM-06)
+        // while there is one
         invalidFields() {
             const list = [];
             this.sections.forEach((section, sIdx) => section.fields.forEach((field, fIdx) => {
@@ -445,7 +445,7 @@ export default {
 
         // ---- copy ----
 
-        // Only the keys that were edited, to merge into the appsettings.json of the server (the default action, D-005)
+        // Only the keys that were edited, to merge into the appsettings.json of the server (the default action)
         copyChanges() {
             this.copy('changes');
         },
@@ -456,7 +456,7 @@ export default {
         },
 
         copy(mode) {
-            // Both Copy buttons stay enabled; with an invalid value nothing is copied, and the page says how many (D-046)
+            // Both Copy buttons stay enabled; with an invalid value nothing is copied, and the page says how many
             if (this.invalidFields.length) {
                 this.copyBlocked = true;
                 // The field may be in a section that is closed: open it first
@@ -503,7 +503,7 @@ export default {
     margin: 0.5rem 0;
 }
 
-/* One column of --ddb-page-max-width, centred (the side padding is .page-scroll-column's; the page has its own) (FR-ADM-28) */
+/* One column of --ddb-page-max-width, centred (the side padding is .page-scroll-column's; the page has its own) */
 .config-scroll-container {
     --page-column-pad: 0px;
     flex: 1;

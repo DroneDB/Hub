@@ -1,11 +1,11 @@
 <template>
-    <!-- The toasts of the pages: top right, below the header (FR-NAV-09) -->
+    <!-- The toasts of the pages: top right, below the header -->
     <Toast position="top-right">
         <template #message="{ message }">
             <NotifyToastContent :message="message" />
         </template>
     </Toast>
-    <!-- The toasts raised in a viewer: a corner of its own, off the viewer's controls (FR-XC-09, FR-VWR-24) -->
+    <!-- The toasts raised in a viewer: a corner of its own, off the viewer's controls -->
     <Toast :group="VIEWER_GROUP" :position="VIEWER_TOAST_POSITION">
         <template #message="{ message }">
             <NotifyToastContent :message="message" />

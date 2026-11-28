@@ -2,7 +2,7 @@
  * Point / distance / area measurement in the 3D viewer, with Giro3D's DrawTool. The labels are in the
  * user's units (measureFormatters).
  *
- * The gesture rule of every measuring tool (D-027, FR-XC-17): a click adds a point; a double click, Enter
+ * The gesture rule of every measuring tool: a click adds a point; a double click, Enter
  * or a right click ends the shape; Escape (and Cancel) drops it; Clear takes it with the others. A right
  * click is a right-button release after a move of 4 CSS px or less (`isRightClick`), not Giro3D's own
  * `conditions.rightClick`, so a right-drag still pans: navigation stays on while a shape is drawn (the
@@ -69,7 +69,7 @@ export class MeasureTool {
 
     /**
      * How a shape looks: the label size and the line width in CSS px follow the height of the canvas, so the values are
-     * readable on a 4K screen as on a 1080 one (FR-VWR-37).
+     * readable on a 4K screen as on a 1080 one.
      */
     look() {
         return { fontSize: measureLabelPx(this.scene.instance?.domElement?.clientHeight), lineWidth: MEASURE_LINE_PX };

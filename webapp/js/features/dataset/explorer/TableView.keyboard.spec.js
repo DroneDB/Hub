@@ -1,7 +1,7 @@
 /**
- * The file table is an ARIA grid with one tab stop and the same keyboard model as the grid
- * (FR-EXP-09): Up/Down move the active row and the selection, Shift extends it, Home/End jump,
- * Enter opens, Space toggles. Its rows say whether they are selected (FR-EXP-10).
+ * The file table is an ARIA grid with one tab stop and the same keyboard model as the grid:
+ * Up/Down move the active row and the selection, Shift extends it, Home/End jump,
+ * Enter opens, Space toggles. Its rows say whether they are selected.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';

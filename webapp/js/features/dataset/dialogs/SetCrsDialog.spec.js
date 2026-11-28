@@ -1,5 +1,5 @@
 /**
- * The Set Coordinate System dialog (FR-PRC-31, FR-XC-11, D-046): the form of the value (an EPSG code or WKT) is checked at the
+ * The Set Coordinate System dialog: the form of the value (an EPSG code or WKT) is checked at the
  * field before Apply, and Apply stays enabled; a value of the right form that the server refuses gets the server's error under
  * the same field; a bare number is an EPSG code; the dialog does not point to itself.
  */

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The tooltip of a file tile (FR-EXP-21): its dataset path, its type, its size and, for a file that is built, the state of
+ * The tooltip of a file tile: its dataset path, its type, its size and, for a file that is built, the state of
  * its build in plain words, never the internal address of the file. For example 'images/a.jpg — Image — 3.2 MB', and
  * 'cloud.laz — Point Cloud — 22 MB — Building…'. The path is the dataset-relative one of the entry; the size is the one
  * formatter of the Hub (libs/format); the build words are the table of libs/build/entryBuild (BUILD_WORDS), the one the

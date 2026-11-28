@@ -228,7 +228,7 @@ describe('PreferencesDialog', () => {
             expect(direction().closest('.p-select').textContent).toContain('Ascending');
         });
 
-        it('names the default list for what it holds: owned, member and public organizations (D-003)', async () => {
+        it('names the default list for what it holds: owned, member and public organizations', async () => {
             await open();
             const label = document.getElementById('pref-orgs-owned-only-label');
             expect(label.textContent.trim()).toBe('Show only organizations I own, belong to, or that are public');
@@ -245,7 +245,7 @@ describe('PreferencesDialog', () => {
         });
     });
 
-    describe('Page sizes of the lists (FR-XC-34)', () => {
+    describe('Page sizes of the lists', () => {
         const datasets = () => document.getElementById('pref-datasets-per-page');
         const orgs = () => document.getElementById('pref-orgs-per-page');
         const open = async () => {
@@ -395,7 +395,7 @@ describe('PreferencesDialog', () => {
         });
     });
 
-    it('takes the focus to the first field of the shown tab, not of a hidden one, and gives it back on close (ACC-10)', async () => {
+    it('takes the focus to the first field of the shown tab, not of a hidden one, and gives it back on close', async () => {
         const Dialog = (await import('primevue/dialog')).default;
         const opener = document.createElement('button');
         document.body.appendChild(opener);
@@ -477,7 +477,7 @@ describe('PreferencesDialog', () => {
             expect(getPref(PREF.TASK_NOTIFICATIONS, '')).toBe(''); // never chosen: nothing stored
         });
 
-        // FR-PRC-40, D-012: a second setting for the tasks that end (photogrammetry, imports, exports)
+        // A second setting for the tasks that end (photogrammetry, imports, exports)
         it('has a task notifications setting beside the build one, None first and None by default', async () => {
             await render({ initialTab: 'notifications' });
             expect(document.body.textContent).toContain('Send task notifications');
@@ -544,7 +544,7 @@ describe('PreferencesDialog', () => {
         });
     });
 
-    // FR-NAV-07, D-044: the theme, System by default, kept on this device; libs/colorScheme.js applies it
+    // The theme, System by default, kept on this device; libs/colorScheme.js applies it
     describe('Appearance', () => {
         const appearanceSelect = () => wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-appearance');
         const choose = async value => {

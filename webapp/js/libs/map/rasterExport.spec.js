@@ -1,6 +1,6 @@
 /**
- * The words, the window and the refusal of the export of a styled raster (FR-RAS-16, FR-RAS-26, D-023). The expected
- * numbers are written as literals: the sizes are those of the examples of the SPEC, the window the longitude and latitude
+ * The words, the window and the refusal of the export of a styled raster. The expected
+ * numbers are written as literals: the sizes are an example (about 9.3 GB), the window the longitude and latitude
  * of the corners of a Web Mercator extent (x / 6378137 rad; 2 atan(e^(y / 6378137)) - 90 degrees), by hand.
  */
 import { describe, it, expect } from 'vitest';
@@ -94,7 +94,7 @@ describe('the words of the control', () => {
     });
 });
 
-describe('the label follows the style (FR-RAS-26, the rule of ddb: a formula, or a colormap on exactly one band, makes the RGBA image)', () => {
+describe('the label follows the style (the rule of ddb: a formula, or a colormap on exactly one band, makes the RGBA image)', () => {
     it('is the styled image for a formula, with or without a colormap', () => {
         expect(exportsStyledImage({ formula: 'NDVI', colormap: 'rdylgn' })).toBe(true);
         expect(exportsStyledImage({ formula: 'CELSIUS' })).toBe(true);

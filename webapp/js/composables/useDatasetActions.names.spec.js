@@ -1,5 +1,5 @@
 /**
- * New folder and Rename run their request inside their dialog (FR-EXP-04, FR-EXP-15, FR-XC-11): the page hands the dialog the
+ * New folder and Rename run their request inside their dialog: the page hands the dialog the
  * names of the entries of the folder (for the clash check) and a callback that throws when the request fails, so that a
  * refusal of the Registry (409) shows at the name field and the dialog stays open, with no Alert and no toast.
  */

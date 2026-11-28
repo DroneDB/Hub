@@ -43,7 +43,7 @@ describe('progress rendering rules', () => {
         });
     });
 
-    it('queued states render no bar: the label of their state (FR-PRC-42)', () => {
+    it('queued states render no bar: the label of their state', () => {
         for (const state of ['Created', 'Enqueued', 'Scheduled', 'Reused', 'Awaiting']) {
             expect(progressKind({ state, progressPercent: null })).toBe('queued');
         }
@@ -98,7 +98,7 @@ describe('the Progress column of a row', () => {
         return wrapper.findAll('tbody tr')[0].find('.col-progress');
     };
 
-    it('shows 5 % as text of its own, next to a bar without a label (FR-PRC-39)', () => {
+    it('shows 5 % as text of its own, next to a bar without a label', () => {
         const progress = progressOf({ state: 'Processing', progressPercent: 5, phaseMessage: 'opensfm' });
 
         expect(progress.find('.task-percent').text()).toBe('5%');
@@ -127,7 +127,7 @@ describe('the Progress column of a row', () => {
         expect(progressOf({ state: 'Processing', progressPercent: null }).find('.task-percent').exists()).toBe(false);
     });
 
-    it('shows an Enqueued build with the label of its state and what it waits behind (FR-PRC-42)', () => {
+    it('shows an Enqueued build with the label of its state and what it waits behind', () => {
         const progress = progressOf({ state: 'Enqueued', path: 'small.tif', phaseMessage: 'Waiting behind orthos/big.tif' });
 
         expect(progress.find('.p-tag').text()).toBe('Enqueued');
@@ -135,7 +135,7 @@ describe('the Progress column of a row', () => {
         expect(progress.find('.p-progressbar').exists()).toBe(false);
     });
 
-    it('shows the count of the builds folded under a task (FR-PRC-26)', () => {
+    it('shows the count of the builds folded under a task', () => {
         wrapper = mount(TasksTable, {
             props: { tasks: [{ ...base, toolId: 'photogrammetry', taskId: 'pg', state: 'Succeeded', childBuilds: { total: 9, active: 0 } }], rows: 10 },
             global: { plugins: [PrimeVue] }

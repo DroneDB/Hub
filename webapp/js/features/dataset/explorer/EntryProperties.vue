@@ -3,7 +3,7 @@
     <Window id="properties" :height="multiple ? 'auto' : '80%'" :width="multiple ? 'auto' : '40%'" :size-class="multiple ? 'dialog-md' : null"
             :fixed-size="multiple" title="Properties" @close="$emit('close', $event, arguments[1])">
         <div v-if="files.length === 1" class="text-selectable">
-            <!-- The dataset's own properties are read as words; its metadata as stored (ids, epoch times) is one click away (FR-EXP-25) -->
+            <!-- The dataset's own properties are read as words; its metadata as stored (ids, epoch times) is one click away -->
             <Button v-if="isDataset" class="raw-toggle" severity="secondary" text size="small"
                     :icon="showRaw ? 'fa-solid fa-eye-slash' : 'fa-solid fa-code'" :label="showRaw ? 'Hide raw metadata' : 'Show raw metadata'"
                     :aria-pressed="showRaw ? 'true' : 'false'" @click="showRaw = !showRaw" />
@@ -56,7 +56,7 @@ export default {
         multiple() {
             return this.files.length >= 2;
         },
-        // The same summary the detail panel gives: the count, the size, the types, the first names (FR-EXP-32)
+        // The same summary the detail panel gives: the count, the size, the types, the first names
         summary() {
             return describeSelection(this.files);
         },

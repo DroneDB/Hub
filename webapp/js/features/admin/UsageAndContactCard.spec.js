@@ -45,7 +45,7 @@ async function show(info = {}) {
     return wrapper;
 }
 const saveButton = () => [...document.querySelectorAll('button')].find(b => b.textContent.includes('Save'));
-// A disabled Save is aria-disabled, not disabled: it stays focusable and says why (FR-XC-22)
+// A disabled Save is aria-disabled, not disabled: it stays focusable and says why
 const saveDisabled = () => saveButton().getAttribute('aria-disabled') === 'true';
 const saveReason = () => document.getElementById(saveButton().getAttribute('aria-describedby'))?.textContent ?? null;
 const emailError = () => document.getElementById('usage-contact-email-error')?.textContent ?? null;
@@ -108,7 +108,7 @@ describe('UsageAndContactCard', () => {
         expect(consentHelp()).toBeNull();
         await typeEmail('it@acme.test');
         expect(consentBox().disabled).toBe(false);
-        // Save stays available (D-046); the helper says what is missing
+        // Save stays available; the helper says what is missing
         expect(saveDisabled()).toBe(false);
         expect(consentHelp()).toBe('Tick the box to save an e-mail address');
         expect(consentBox().getAttribute('aria-invalid')).toBeNull();
@@ -228,7 +228,6 @@ describe('UsageAndContactCard', () => {
         expect(wrapper.vm.dirty).toBe(false);
     });
 
-    // FR-ADM-21
     it('disables Save with the reason "No changes to save" while the form equals the saved values, and keeps the button focusable', async () => {
         await show({ useDeclaration: 'nonprofit', contactEmail: 'it@acme.test' });
         expect(saveDisabled()).toBe(true);

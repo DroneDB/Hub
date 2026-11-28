@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The format of the measurements file (`<name>_measurements.geojson`): the one place that reads and
- * writes it, for the 2D map, the 3D point-cloud viewer and the stockpile panel (FR-XC-30, D-016).
+ * writes it, for the 2D map, the 3D point-cloud viewer and the stockpile panel.
  *
  * A file is a GeoJSON FeatureCollection whose `metadata` holds the format version (3.0; the writers
  * before it wrote 1.0, 1.1 and 2.0), the application ('DroneDB Registry'), `createdAt` (kept by every save),

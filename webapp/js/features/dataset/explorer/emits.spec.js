@@ -1,5 +1,5 @@
 /**
- * The events that the explorer views raise are declared (FR-EXP-28): the context menu emits `alignGeoRaster`, and an
+ * The events that the explorer views raise are declared: the context menu emits `alignGeoRaster`, and an
  * undeclared event is a Vue warning on every dataset page load.
  */
 import { describe, it, expect, vi } from 'vitest';

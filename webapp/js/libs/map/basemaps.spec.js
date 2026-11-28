@@ -154,7 +154,7 @@ describe('customBasemapTestUrl', () => {
         expect(customBasemapTestUrl({ ...XYZ })).toBe('https://tiles.example.com/0/0/0.png');
     });
 
-    it('is the 1x tile of an XYZ source with a 2x source: {r} is left out (FR-MAP-29)', () => {
+    it('is the 1x tile of an XYZ source with a 2x source: {r} is left out', () => {
         expect(customBasemapTestUrl({ ...XYZ, url: 'https://tiles.example.com/{z}/{x}/{y}{r}.png' })).toBe('https://tiles.example.com/0/0/0.png');
     });
 

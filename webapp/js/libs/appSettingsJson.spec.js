@@ -66,7 +66,7 @@ describe('setSettingAt', () => {
     });
 });
 
-describe('buildAppSettings (FR-ADM-12, D-005)', () => {
+describe('buildAppSettings', () => {
     const field = (key, fieldType, currentValue, extra = {}) =>
         ({ key, fieldType, currentValue, defaultValue: currentValue, sensitive: false, isSet: false, ...extra });
     const SECTIONS = [

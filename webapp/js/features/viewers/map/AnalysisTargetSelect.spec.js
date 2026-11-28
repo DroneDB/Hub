@@ -71,7 +71,7 @@ describe('AnalysisTargetSelect', () => {
     });
 });
 
-describe('AnalysisTargetSelect names (FR-RAS-12)', () => {
+describe('AnalysisTargetSelect names', () => {
     const A = { path: 'hat/Hat_Creek_Thermal_08242018_16bit.tif', label: 'Hat_Creek_Thermal_08242018_16bit.tif' };
     const B = { path: 'hat/Hat_Creek_Thermal_08252018_16bit.tif', label: 'Hat_Creek_Thermal_08252018_16bit.tif' };
 
@@ -83,7 +83,7 @@ describe('AnalysisTargetSelect names (FR-RAS-12)', () => {
         expect(wrapper.find('select').element.value).toBe(B.path);
     });
 
-    it('takes the label of the tool: "Raster" for Raster Analysis, which takes any raster (FR-RAS-25)', () => {
+    it('takes the label of the tool: "Raster" for Raster Analysis, which takes any raster', () => {
         render({ label: 'Raster' });
         expect(wrapper.find('label').text()).toBe('Raster');
     });

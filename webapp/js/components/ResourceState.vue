@@ -31,7 +31,7 @@
 
 <script setup>
 /**
- * ResourceState - the one page state of a primary resource that cannot be shown (FR-XC-13):
+ * ResourceState - the one page state of a primary resource that cannot be shown:
  * not found, no access, sign in, invalid link, and a dataset that is busy (an import or a rescan runs). It replaces the page's content (the dataset
  * table of an organization, the panels of a dataset, a viewer), names what was asked for, says
  * why in plain words, and gives the ways out (SPA links): the page's own back target, Sign in

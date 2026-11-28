@@ -109,7 +109,7 @@ describe('ViewBar', () => {
     });
 });
 
-describe('ViewBar on a phone (FR-MAP-12)', () => {
+describe('ViewBar on a phone', () => {
     const original = window.matchMedia;
     afterEach(() => { window.matchMedia = original; });
 

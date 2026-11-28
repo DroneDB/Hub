@@ -275,7 +275,7 @@ describe('acquire/release refcounting', () => {
     });
 });
 
-describe('datasetGone event (FR-UPL-05, D-004)', () => {
+describe('datasetGone event', () => {
     const listeners = [];
 
     afterEach(() => {

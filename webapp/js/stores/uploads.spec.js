@@ -1,7 +1,7 @@
 /**
- * The app-wide upload store (FR-UPL-04): the queue of a dataset outlives the dialog; the header reads its totals; the
+ * The app-wide upload store: the queue of a dataset outlives the dialog; the header reads its totals; the
  * listing hears the entries that the server added; Cancel removes the server's chunks of the files not committed and
- * keeps the files already sent (D-045); a queue that settles unseen tells the user and is dropped.
+ * keeps the files already sent; a queue that settles unseen tells the user and is dropped.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
@@ -254,7 +254,7 @@ describe('pause and resume', () => {
     });
 });
 
-describe('cancel (FR-XC-27, D-045)', () => {
+describe('cancel', () => {
     // A chunked item is one that has a file id: the request layer sets it, here the file asks for it (a resume)
     const chunked = (name, fileId) => ({ file: { size: 10, name }, path: name, fileId });
 
@@ -367,7 +367,7 @@ describe('open uploads (the resume offer)', () => {
         warn.mockRestore();
     });
 
-    // FR-XC-10: the batch asks the chunk status only of the uploads that this list holds, and does not list them again
+    // The batch asks the chunk status only of the uploads that this list holds, and does not list them again
     it('hands the list that the offer read to the next batch of the dataset, once; a later batch lists by itself', async () => {
         h.open = [open('a'), open('b')];
         await uploads.listOpen('o', 'd');

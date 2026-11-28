@@ -1,13 +1,12 @@
 /**
- * The phone and tablet layout and the dialog sizes, end to end (AC-031, AC-001; FR-XC-20; FR-EXP-17, FR-EXP-29,
- * FR-ORG-19, FR-ORG-20, FR-SHR-06, FR-UPL-08): drives the real Hub in Chromium against a running Registry. Not part
+ * The phone and tablet layout and the dialog sizes, end to end: drives the real Hub in Chromium against a running Registry. Not part
  * of `npm test` (needs a server); same environment and conventions as smoke.test.mjs:
  *
  *   HUB_URL=http://localhost:5100 node --test e2e/phone-tablet-layout.test.mjs
  *
- * AC-031: at 390x844 and 820x1180 no page scrolls horizontally and no toolbar control overlaps another control. It
+ * At 390x844 and 820x1180 no page scrolls horizontally and no toolbar control overlaps another control. It
  * creates (then deletes) a throw-away dataset in HUB_USER's organisation, with files from HUB_TEST_DATA, and a
- * private one named 'Bulk dataset 24' for the lock of FR-ORG-20.
+ * private one named 'Bulk dataset 24' for the lock on the line of the dataset name.
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -140,7 +139,7 @@ after(async () => {
 for (const viewport of VIEWPORTS) {
     const at = `${viewport.width}x${viewport.height}`;
 
-    test(`AC-031 at ${at}: the organization page and the dataset page do not scroll sideways, no toolbar control overlaps another`, async () => {
+    test(`at ${at}: the organization page and the dataset page do not scroll sideways, no toolbar control overlaps another`, async () => {
         const { page, errors } = await newPage(viewport, { touch: true });
         await page.goto(`${URL_}/r/${USER}`);
         await appReady(page);
@@ -159,7 +158,7 @@ for (const viewport of VIEWPORTS) {
         assert.deepEqual(errors, []);
     });
 
-    test(`FR-EXP-17 at ${at}: selecting the orthophoto shows every value fully, and Open is inside the window`, async () => {
+    test(`at ${at}: selecting the orthophoto shows every value fully, and Open is inside the window`, async () => {
         const { page } = await newPage(viewport, { touch: true });
         await openFiles(page);
         // A dataset with one file opens with it selected: on a tablet its details drawer covers the toolbar (Escape closes it)
@@ -185,7 +184,7 @@ for (const viewport of VIEWPORTS) {
     });
 }
 
-test('FR-EXP-29 at 390x844: five tabs with a label each, no splitter handle at the left edge', async () => {
+test('at 390x844: five tabs with a label each, no splitter handle at the left edge', async () => {
     const { page } = await newPage({ width: 390, height: 844 }, { touch: true });
     await openDataset(page);
     await page.getByRole('tab', { name: 'Browser' }).waitFor({ state: 'visible', timeout: 20000 }); // the page builds its tabs after the dataset loads
@@ -207,7 +206,7 @@ test('FR-EXP-29 at 390x844: five tabs with a label each, no splitter handle at t
     assert.equal(atLeftEdge, 0);
 });
 
-test('FR-ORG-20 at 390x844: the lock is on the line of the dataset name', async () => {
+test('at 390x844: the lock is on the line of the dataset name', async () => {
     const { page } = await newPage({ width: 390, height: 844 }, { touch: true });
     await page.goto(`${URL_}/r/${USER}`);
     await appReady(page);
@@ -222,7 +221,7 @@ test('FR-ORG-20 at 390x844: the lock is on the line of the dataset name', async 
     assert.ok(Math.abs(lockBox.y - nameBox.y) < nameBox.height, 'the lock is on another line than the name');
 });
 
-test('FR-ORG-19: the Create dataset dialog keeps its width while a name is typed', async () => {
+test('the Create dataset dialog keeps its width while a name is typed', async () => {
     const { page } = await newPage({ width: 1400, height: 900 });
     await page.goto(`${URL_}/r/${USER}`);
     await appReady(page);
@@ -240,7 +239,7 @@ test('FR-ORG-19: the Create dataset dialog keeps its width while a name is typed
 });
 
 for (const viewport of [{ width: 1400, height: 900 }, { width: 390, height: 844 }]) {
-    test(`FR-UPL-08 at ${viewport.width}x${viewport.height}: after Verify the Dataset Name and the Import button are in the window`, async () => {
+    test(`at ${viewport.width}x${viewport.height}: after Verify the Dataset Name and the Import button are in the window`, async () => {
         const { page } = await newPage(viewport, { touch: viewport.width < 576 });
         await page.goto(`${URL_}/r/${USER}`);
         await appReady(page);
@@ -261,7 +260,7 @@ for (const viewport of [{ width: 1400, height: 900 }, { width: 390, height: 844 
     });
 }
 
-test('FR-SHR-06: the Share dialog names the file and keeps its width between share types', async () => {
+test('the Share dialog names the file and keeps its width between share types', async () => {
     const { page } = await newPage({ width: 1400, height: 900 });
     await openFiles(page);
     await page.locator('.hub-toolbar button[aria-label="List"]').click();

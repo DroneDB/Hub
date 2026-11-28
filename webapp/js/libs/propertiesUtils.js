@@ -261,7 +261,7 @@ export function formatCadCrs(entry, { forDialog = false } = {}) {
 export const isDatasetEntry = entry => !!entry && entry.type === ddb.entry.type.DRONEDB;
 
 /**
- * The properties of the dataset's own entry as people read them (FR-EXP-25): its name, tagline, visibility as a label,
+ * The properties of the dataset's own entry as people read them: its name, tagline, visibility as a label,
  * license by name, how many entries it holds, its size and when it was changed. The ids of the metadata rows, their
  * epoch times and the visibility as a number are in the raw view (`raw`), not here.
  * @param {Object} entry - The dataset's root entry
@@ -334,7 +334,7 @@ export function buildAllProperties(file, units = 'metric', { raw = false, create
         formatMeasuredProperties(props, units);
         // A warning libddb tagged with a code is said in words for users, not as the server's setup message (the
         // lines a build wrote are such words: the reason a tool gave, the files it left out); the code itself is not a
-        // row (FR-EXP-18)
+        // row
         delete props.warningCode;
         const words = warningWordsOf(entry);
         if (words) props.warning = words;

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { fieldErrorsOf, formMessageOf } from './serverErrors';
 import { ApiError } from '@/libs/ddb/apiError';
 
-describe('fieldErrorsOf (D-047)', () => {
+describe('fieldErrorsOf', () => {
     it('maps the members of the errors of the answer to the fields, by key', () => {
         const e = new ApiError('One or more validation errors occurred.', 400, {
             errors: { currentPassword: ['The current password is incorrect.'] }

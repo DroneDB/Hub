@@ -1,6 +1,5 @@
 /**
- * Maximum widths on wide screens, end to end (AC-038, AC-001; FR-XC-33; FR-ORG-24, FR-EXP-39, FR-ADM-27, FR-ADM-28,
- * FR-NAV-10, FR-EXP-42, FR-ACC-23, FR-UPL-22, FR-ORG-26): drives the real Hub in Chromium against a running Registry.
+ * Maximum widths on wide screens, end to end: drives the real Hub in Chromium against a running Registry.
  * Not part of `npm test` (needs a server); same environment and conventions as smoke.test.mjs:
  *
  *   HUB_URL=http://localhost:5100 node --test e2e/wide-layout.test.mjs
@@ -72,7 +71,7 @@ after(async () => { for (const c of contexts) await c.close(); await browser?.cl
 for (const viewport of VIEWPORTS) {
     const at = `${viewport.width}x${viewport.height}`;
 
-    test(`${at}: the organization and dataset lists take the whole width and do not scroll horizontally (FR-ORG-24)`, async () => {
+    test(`${at}: the organization and dataset lists take the whole width and do not scroll horizontally`, async () => {
         const page = await newPage(viewport);
         for (const [route, selector] of [['/r', '#organizations'], [`/r/${USER}`, '#datasets']]) {
             await page.goto(`${URL_}${route}`);
@@ -108,13 +107,13 @@ for (const viewport of VIEWPORTS) {
         assert.ok(m.content <= ROW_MAX_PX, `/admin/config: the column is ${m.content} px wide`);
     });
 
-    test(`${at}: the login card is in the upper part of the screen (FR-NAV-10)`, async () => {
+    test(`${at}: the login card is in the upper part of the screen`, async () => {
         const page = await newPage(viewport, { signedIn: false });
         const m = await measure(page, '#login .p-card');
         assert.ok(m.box.top >= m.windowHeight * 0.15 && m.box.top <= m.windowHeight * 0.4, `the card starts at ${m.box.top} of ${m.windowHeight}`);
     });
 
-    test(`${at}: the upload drop zone has a border and is not at the header (FR-NAV-10)`, async () => {
+    test(`${at}: the upload drop zone has a border and is not at the header`, async () => {
         const page = await newPage(viewport);
         await page.goto(`${URL_}/upload`);
         await appReady(page);
@@ -128,7 +127,7 @@ for (const viewport of VIEWPORTS) {
         assert.ok(zone.height >= zone.windowHeight * 0.5 - 1, `the zone is ${zone.height} px high`);
     });
 
-    test(`${at}: the Preferences window shows all its tabs and is a form dialog (FR-ACC-23)`, async () => {
+    test(`${at}: the Preferences window shows all its tabs and is a form dialog`, async () => {
         const page = await newPage(viewport);
         await page.goto(`${URL_}/account`);
         await appReady(page);

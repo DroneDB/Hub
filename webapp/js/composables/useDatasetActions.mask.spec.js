@@ -1,5 +1,5 @@
 /**
- * Mask Borders from the dataset page (FR-PRC-12, FR-XC-07): a heavy task through runHeavyTask, never the endpoint of
+ * Mask Borders from the dataset page: a heavy task through runHeavyTask, never the endpoint of
  * before. The masked file joins the list when the task ends and the toast names it; the Registry replaces an existing
  * masked copy only when the request says so (409 otherwise), so the page sends overwrite only after the user confirmed
  * the replace.
@@ -76,14 +76,14 @@ describe('Mask Borders of the dataset page', () => {
         expect(maskTaskCalls()[0][2].params).toEqual({ path: 'ortho/ortho.tif', overwrite: true });
     });
 
-    it('asks the one replace question of the Hub (confirmReplace, FR-XC-07)', async () => {
+    it('asks the one replace question of the Hub (confirmReplace)', async () => {
         await maskWith({ listed: ['ortho/ortho_masked.tif'] });
         const { title, message, confirmText } = replaceConfirmation('ortho/ortho_masked.tif');
         expect(title).toBe('Replace “ortho_masked.tif”?');
         expect(dialogs.open.mock.calls[1][1]).toMatchObject({ title, message, confirmText, confirmButtonClass: 'danger' });
     });
 
-    it('finds the copy in another letter case, and writes that entry (D-040)', async () => {
+    it('finds the copy in another letter case, and writes that entry', async () => {
         await maskWith({ listed: ['ortho/Ortho_Masked.TIF'] });
         expect(maskTaskCalls()[0][2].params.overwrite).toBe(true);
         expect(listing.addEntry).toHaveBeenCalledWith('ortho/Ortho_Masked.TIF');

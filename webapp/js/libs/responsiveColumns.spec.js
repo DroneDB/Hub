@@ -20,7 +20,7 @@ describe('responsiveColumns', () => {
     });
 });
 
-describe('responsiveColumns: stacked cards (D-026)', () => {
+describe('responsiveColumns: stacked cards', () => {
     it('has the media query of the card renderer, below 576 px', () => {
         expect(STACKED_MEDIA_QUERY).toBe('(max-width: 575.98px)');
     });
@@ -56,7 +56,7 @@ describe('responsiveColumns: stacked cards (D-026)', () => {
         expect(stackedColumn(undefined, undefined, { style: 'text-align: center' }).pt.bodyCell).toEqual({ style: 'text-align: center' });
     });
 
-    it('breaks a slug after its hyphens, never inside a word (FR-ADM-11)', () => {
+    it('breaks a slug after its hyphens, never inside a word', () => {
         expect(breakAfterHyphens('my-org-x')).toEqual(['my-', 'org-', 'x']);
         expect(breakAfterHyphens('long-organization-name--2')).toEqual(['long-', 'organization-', 'name--', '2']);
         expect(breakAfterHyphens('acme')).toEqual(['acme']);
@@ -64,7 +64,7 @@ describe('responsiveColumns: stacked cards (D-026)', () => {
     });
 });
 
-describe('responsiveColumns: the wide screens (FR-XC-33)', () => {
+describe('responsiveColumns: the wide screens', () => {
     it('has the wide breakpoint at 1600 px and xwide at 2560 px, above Bootstrap\'s xxl of 1400 px', () => {
         expect(BREAKPOINT_PX.xxl).toBe(1400);
         expect(BREAKPOINT_PX.wide).toBe(1600);

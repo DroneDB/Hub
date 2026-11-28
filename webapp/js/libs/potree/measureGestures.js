@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The gesture rule of every measuring tool (D-027, FR-XC-17) for the point-cloud viewer's measures. Potree 1.8
+ * The gesture rule of every measuring tool for the point-cloud viewer's measures. Potree 1.8
  * starts a measure with `viewer.measuringTool.startInsertion(...)` and ends it by itself on a right-button
  * release whatever the pointer did since the press, so a right-drag that pans also ended it, and it has no
  * double click, Enter or Escape. The vendored Potree stays as it is; this module sits next to it:

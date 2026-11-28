@@ -113,7 +113,7 @@ describe('MapSettingsDialog', () => {
     });
 });
 
-describe('MapSettingsDialog keyboard (MAP-03)', () => {
+describe('MapSettingsDialog keyboard', () => {
     const escapeOn = target => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
 
     it('closes on Escape, also from the basemap Select after a basemap was chosen', async () => {

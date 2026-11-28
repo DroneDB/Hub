@@ -50,7 +50,7 @@ export function shownBuildStatus(job, entry) {
 
 /**
  * The words of the build states, in one table keyed by the state `shownBuildState` gives: the badge, the caption of a tile
- * that builds (FR-EXP-07) and the tile's tooltip (FR-EXP-21) read it, so a state has one name everywhere.
+ * that builds and the tile's tooltip read it, so a state has one name everywhere.
  */
 export const BUILD_WORDS = Object.freeze({
     built: 'Built',

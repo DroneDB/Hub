@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Mask Borders (FR-PRC-12): the heavy tool `mask-borders` writes the masked copy of a georaster next to it,
+ * Mask Borders: the heavy tool `mask-borders` writes the masked copy of a georaster next to it,
  * `<name>_masked.tif`. The Registry decides that name (MaskBordersTool.MaskedOutputPath); the Hub needs it to ask before it
  * replaces a copy that is in the listing, and to put the new file in the list when the task ends.
  */

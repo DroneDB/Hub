@@ -1,5 +1,5 @@
 /**
- * Change Password of the account page (FR-ACC-21, FR-ADM-08, FR-ACC-06, FR-ACC-07, FR-XC-11):
+ * Change Password of the account page:
  * the requirements are visible from the start, the mismatch shows live, the same password is
  * refused, a submit with invalid input stays enabled and shows the errors at the fields, and a
  * refusal of the Registry shows at its field from the `errors` member.
@@ -118,7 +118,7 @@ describe('ChangePwdDialog', () => {
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
 
-    it('keeps the fields read-only after the success, and Enter before the window closes sends nothing more (FR-XC-11)', async () => {
+    it('keeps the fields read-only after the success, and Enter before the window closes sends nothing more', async () => {
         vi.useFakeTimers();
         changePwd.mockResolvedValue(true);
         await render();

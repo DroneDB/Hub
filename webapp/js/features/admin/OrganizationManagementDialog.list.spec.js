@@ -1,5 +1,5 @@
 /**
- * The organization list of Organization Management (FR-ADM-11, FR-ORG-18, FR-ORG-13, D-026): stacked cards below
+ * The organization list of Organization Management: stacked cards below
  * `sm`, an Actions cell that keeps its buttons on one line, slugs that wrap only after a hyphen, a list that
  * scrolls in its own area, the shared search field and the empty state that names the query.
  */

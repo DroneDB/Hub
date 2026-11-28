@@ -52,7 +52,7 @@ export const useClipboardStore = defineStore('clipboard', () => {
     const isEmpty = computed(() => !mode.value || items.value.length === 0);
     const isCut = computed(() => mode.value === 'cut');
     const count = computed(() => items.value.length);
-    // The paths that a paste will move, while the clipboard holds a cut: the explorers dim them (FR-EXP-16)
+    // The paths that a paste will move, while the clipboard holds a cut: the explorers dim them
     const cutPaths = computed(() => new Set(isCut.value && !isEmpty.value ? items.value.map(it => it.path) : []));
 
     /**

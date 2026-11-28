@@ -1,6 +1,6 @@
 <template>
     <!-- The body of a toast, as PrimeVue draws it by default (the icon of the severity, the summary, the detail), and
-         the one action a toast may carry (FR-XC-23). PrimeVue's own classes: the theme styles them -->
+         the one action a toast may carry. PrimeVue's own classes: the theme styles them -->
     <component :is="icon" class="p-toast-message-icon" aria-hidden="true" />
     <div class="p-toast-message-text">
         <span class="p-toast-summary">{{ message.summary }}</span>

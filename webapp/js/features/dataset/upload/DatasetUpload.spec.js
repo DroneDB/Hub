@@ -3,12 +3,12 @@
  * watchers first read it, and the dialog must follow the queue from the file list to the
  * summary. The request layer is replaced by a fake that answers each job at once.
  *
- * Names that exist (FR-UPL-03, AC-023): the destination is listed before a byte is sent, and the
+ * Names that exist: the destination is listed before a byte is sent, and the
  * files whose names exist go to one prompt (Replace / Keep both / Skip, Apply to all); a 409 with
- * conflictPath brings the file back to it once. Errors (FR-UPL-07): Retry only for what can succeed,
+ * conflictPath brings the file back to it once. Errors: Retry only for what can succeed,
  * Transferred counts the files that are done.
  *
- * FR-UPL-04: the queue is the app-wide store's, so closing the dialog does not stop it ("Continue in background"),
+ * The queue is the app-wide store's, so closing the dialog does not stop it ("Continue in background"),
  * Pause and Resume act on it, Cancel stops it and removes the server's chunks, and after a reload the dialog offers the
  * open chunked uploads: a file selected again with the same name, size and last-modified time resumes one at its path,
  * before the question about names that exist.
@@ -30,7 +30,7 @@ vi.mock('@/libs/notify', () => ({
 }));
 vi.mock('@/libs/upload/uploadRequests', () => ({
     createUploadRequests: () => ({
-        // Each add is a new batch (the open uploads it starts with: FR-XC-10)
+        // Each add is a new batch (the open uploads it starts with)
         newBatch: () => {},
         send: async (job, hooks) => {
             sent.push(...job.items.map(i => ({ path: i.path, overwrite: i.overwrite, ...(i.fileId ? { fileId: i.fileId } : {}) })));
@@ -264,7 +264,7 @@ describe('DatasetUpload', () => {
         });
     });
 
-    describe('uploads that go on and resume (FR-UPL-04)', () => {
+    describe('uploads that go on and resume', () => {
         const LAMB = { fileId: 'stored-id-0001', path: 'orto/Lamb (2).tif', totalFileSize: 4, totalChunks: 4, chunkSize: 1,
             sourceFileName: 'Lamb.tif', lastModified: 1731000000123, received: [0, 1], missing: [2, 3], complete: false };
         const lambFile = () => new File(['abcd'], 'Lamb.tif', { lastModified: 1731000000123 });
@@ -371,7 +371,7 @@ describe('DatasetUpload', () => {
 
             await button('Cancel Upload').trigger('click');
             await flush();
-            // It asks first, and says that the files already sent stay (D-045)
+            // It asks first, and says that the files already sent stay
             expect(document.querySelector('#confirmDialog').textContent).toContain('Stop the upload? No file has been added to the dataset yet.');
             expect(server.deleted).toEqual([]);
             document.querySelector('#confirmDialog [data-confirm]').click();

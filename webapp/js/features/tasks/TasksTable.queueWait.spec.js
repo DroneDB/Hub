@@ -1,5 +1,5 @@
 /**
- * FR-PRC-15: the Tasks table shows how long a task waited in the queue (startedAt - createdAt) next to its duration, so a
+ * The Tasks table shows how long a task waited in the queue (startedAt - createdAt) next to its duration, so a
  * minute-long export that was queued for 50 s reads as a short run behind a long wait.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

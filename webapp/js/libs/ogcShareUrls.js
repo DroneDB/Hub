@@ -14,9 +14,9 @@
  * Layer eligibility (see Registry.Web/Services/Adapters/OgcLayerCatalog.cs):
  * only GeoRaster and Vector entries are catalogued. OGC_SERVICE_TABLE says which
  * services serve which entry type: WMS and WCS only rasters (WMS renders no vector
- * layer, FR-SHR-04), WFS / OGC API Features only vectors, WMTS (vector tiles through
+ * layer), WFS / OGC API Features only vectors, WMTS (vector tiles through
  * the RESTful template) and OGC API Tiles both. The contract test checks the table and
- * the WMTS template against what the Registry serves (FR-XC-31).
+ * the WMTS template against what the Registry serves.
  *
  * Client URL guidance:
  * - serviceUrl / landing is the connection URL to paste into most desktop GIS clients.
@@ -49,7 +49,7 @@ export function streamableArtifactRole(entryType) {
 
 /**
  * The tile matrix set of the WMTS RESTful template: the one GetCapabilities lists
- * (Registry `WmtsConformance.DefaultTileMatrixSet`, FR-SHR-01). The Registry also accepts
+ * (Registry `WmtsConformance.DefaultTileMatrixSet`). The Registry also accepts
  * `WebMercatorQuad` as an alias, so links shared with it keep working.
  */
 export const WMTS_TILE_MATRIX_SET = 'GoogleMapsCompatible';
@@ -59,12 +59,12 @@ export const WMTS_STYLE = 'default';
 
 /**
  * The WCS output limit assumed when the server does not publish `maxWcsCoverageSizePixels`
- * in /sys/features (an older Registry kept 4096 px, FR-SHR-02).
+ * in /sys/features (an older Registry kept 4096 px).
  */
 export const DEFAULT_MAX_WCS_COVERAGE_SIZE_PIXELS = 4096;
 
 /**
- * One table of the OGC services by entry type (FR-SHR-04, FR-XC-31): the entry types a
+ * One table of the OGC services by entry type: the entry types a
  * service serves, and the reason shown for the other entry types.
  */
 export const OGC_SERVICE_TABLE = Object.freeze({

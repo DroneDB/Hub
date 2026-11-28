@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useGeoSubfolder - the Map tab of a folder that has nothing to put on the map, while a subfolder has (FR-MAP-10): the
+ * useGeoSubfolder - the Map tab of a folder that has nothing to put on the map, while a subfolder has: the
  * photos of a dataset are in `images/`, its root has none. The subfolders are asked about one at a time, each for its
  * own entries; the first that holds some is the hint ("Photos are in images - Show"). No recursive search and no
  * toggle: the user opens the subfolder, the map then shows its entries.

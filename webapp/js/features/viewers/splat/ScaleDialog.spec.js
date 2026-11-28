@@ -1,6 +1,6 @@
 /**
- * ScaleDialog (FR-VWR-18): the real length is read with parseNumber (D-025), so "12.5" and "12,5"
- * are 12.5 in a comma-decimal locale too; Set scale stays enabled while the user types (D-046), and
+ * ScaleDialog: the real length is read with parseNumber, so "12.5" and "12,5"
+ * are 12.5 in a comma-decimal locale too; Set scale stays enabled while the user types, and
  * a Set with a value that is not a length shows the rule at the field and keeps the dialog open.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

@@ -4,7 +4,7 @@
 
 <script setup>
 /**
- * DatasetHeader - the heading of the dataset page (FR-EXP-14): the name of the dataset, from its root entry (the name as
+ * DatasetHeader - the heading of the dataset page: the name of the dataset, from its root entry (the name as
  * the tree shows it: the display name, else the slug), for screen readers only. The header of the Hub shows the name
  * in its breadcrumb, with the visibility (VisibilityButton) and the tagline (the tooltip of the name), so the page
  * keeps its height for the files and the map. It shows nothing until the root entry is read.

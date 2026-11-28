@@ -107,7 +107,7 @@
 
 <script setup>
 /**
- * PhotoLightbox - a photo of a folder over the whole page, with zoom (FR-VWR-12).
+ * PhotoLightbox - a photo of a folder over the whole page, with zoom.
  *
  * A dialog on an <img>, an overlay of the overlay stack (composables/useOverlay: the focus goes to
  * Close and stays inside, Escape closes it when it is the topmost overlay, the focus goes back to
@@ -117,15 +117,15 @@
  * Zoom: the wheel, a pinch, a double click or tap and the + and - buttons (composables/usePanZoom);
  * a zoomed photo is dragged, and the arrows pan it instead of changing the photo.
  *
- * The bitmap (FR-EXP-38): the size of the stage in device pixels, in the steps of FR-XC-32
+ * The bitmap: the size of the stage in device pixels, in the shared bitmap steps
  * (thumbnailRequestSize), never above the photo's long side. A photo that the step does not
  * shrink is the file itself (the inline download), and so is any photo once it is zoomed - when
  * the browser can decode the file (BROWSER_FORMATS). Other photos (a TIFF...) stay thumbnails:
  * the capped size, and the largest step once zoomed. A file or larger thumbnail that does not
  * load falls back to the preview.
  *
- * A radiometric picture (a thermal camera's R-JPEG, FR-RAS-15) has a thermal mode: the temperature under the pointer (a pixel
- * of its raw thermal grid, whatever the size of the bitmap on show), its range, the Unit (°C, K, °F, answered by ddb, D-022)
+ * A radiometric picture (a thermal camera's R-JPEG) has a thermal mode: the temperature under the pointer (a pixel
+ * of its raw thermal grid, whatever the size of the bitmap on show), its range, the Unit (°C, K, °F, answered by ddb)
  * and a palette (thumb-ex with a colormap, with its legend); the Information panel lists its thermal fields. A thermal picture
  * without temperatures (no calibration: a DJI R-JPEG, whose raw values need DJI's own conversion) is shown as shot, with a
  * notice that says so.
@@ -203,7 +203,7 @@ const photoWidth = computed(() => Number(entry.value?.properties?.width) || 0);
 const photoHeight = computed(() => Number(entry.value?.properties?.height) || 0);
 const longSide = computed(() => Math.max(photoWidth.value, photoHeight.value));
 
-// The thermal mode of a radiometric picture (FR-RAS-15)
+// The thermal mode of a radiometric picture
 const thermal = useThermalImage({ dataset: props.dataset, path: () => path.value, entry: () => entry.value });
 const {
     formula: thermalFormula, palette: thermalPalette, activePalette: thermalActivePalette, info: thermalInfo,
@@ -217,7 +217,7 @@ const thermalLegend = computed(() => (thermalLegendStyle.value
 
 const fullUrl = computed(() => (path.value ? props.dataset.downloadUrl(path.value, { inline: true }) : ''));
 const decodable = computed(() => BROWSER_FORMATS.has(ddb.pathutils.extname(path.value).slice(1).toLowerCase()));
-// The stage in device pixels, in the steps of FR-XC-32, capped at the photo's long side
+// The stage in device pixels, in the shared bitmap steps, capped at the photo's long side
 const previewSize = computed(() =>
     thumbnailRequestSize(Math.max(stageSize.value.w, stageSize.value.h), pixelRatio.value, longSide.value));
 const previewUrl = computed(() => (path.value ? props.dataset.thumbUrl(path.value, previewSize.value) : ''));
@@ -228,7 +228,7 @@ const fullSrc = computed(() => (decodable.value
     ? fullUrl.value
     : props.dataset.thumbUrl(path.value, thumbnailRequestSize(Number.POSITIVE_INFINITY, 1, longSide.value))));
 // The thermal rendering of the picture (thumb-ex): its temperatures in the unit and the palette chosen, in the steps of
-// FR-XC-32 like the preview; zoomed, the largest step (the file itself has no palette)
+// The shared bitmap steps like the preview; zoomed, the largest step (the file itself has no palette)
 const usesPalette = computed(() => !!thermalActivePalette.value && !paletteFailed.value);
 const paletteSize = computed(() => (fullWanted.value
     ? thumbnailRequestSize(Number.POSITIVE_INFINITY, 1, longSide.value)
@@ -297,7 +297,7 @@ function go(step) {
 }
 
 // The temperature under the pointer: the pixel of the raw thermal grid at the pointer, from the box the picture is drawn in
-// (zoom included), so it holds at any size of the bitmap on show (FR-XC-32)
+// (zoom included), so it holds at any size of the bitmap on show
 function onStagePointerMove(e) {
     zoom.onPointerMove(e);
     if (!thermalAvailable.value || dragging.value || !img.value) return;

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * usePageSize - the page size of a paged list (FR-XC-34). Until the user chooses a size, a page holds
+ * usePageSize - the page size of a paged list. Until the user chooses a size, a page holds
  * the rows that the visible height holds (libs/pageSize.js rowsThatFit): measured when the list is
  * mounted, when the list shows its first rows (`measure()`), and again on a resize, but only while the
  * user has not chosen a size. A size the user chose is kept by the caller (libs/preferences.js) and

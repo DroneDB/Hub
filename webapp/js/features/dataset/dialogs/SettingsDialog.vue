@@ -8,7 +8,7 @@
             <section v-if="canWrite" class="settings-group" aria-labelledby="settings-general">
                 <h3 id="settings-general" class="settings-group-title">General</h3>
 
-                <!-- The display name only: the URL does not change with it (FR-EXP-24) -->
+                <!-- The display name only: the URL does not change with it -->
                 <div class="settings-field">
                     <label for="settings-name" class="settings-label"><i class="fa-solid fa-signature" aria-hidden="true" />Name</label>
                     <div class="settings-control">
@@ -298,7 +298,7 @@ export default {
             this.saved = { ...this.draft };
 
             // The existing dataset thumbnail, asked for only when the dataset has one (its entry says so): a request for
-            // a cover that is not there logs a 404 in the console (FR-XC-10, FR-EXP-28)
+            // a cover that is not there logs a 404 in the console
             this.coverUrl = datasetThumbnailUrl(this.dataset, properties, 256, Date.now());
 
         } catch (e) {
@@ -346,7 +346,7 @@ export default {
                 }
             } catch (e) {
                 const failed = changes[written];
-                // The Registry's words, at the field when it has one (FR-XC-11)
+                // The Registry's words, at the field when it has one
                 if (failed.key === 'name') this.nameError = e.message;
                 else if (failed.key === 'slug') this.slugError = e.message;
                 else this.error = `Could not save the ${failed.what}: ${e.message}`;
@@ -393,7 +393,7 @@ export default {
                 this.coverUrl = written ? this.dataset.datasetThumbUrl(256, Date.now()) : null;
                 if (removed.length) this.$emit('filesRemoved', removed);
                 if (written) {
-                    // The thumbnail is a file of the dataset: the toast names it (FR-EXP-30)
+                    // The thumbnail is a file of the dataset: the toast names it
                     this.$notify.success(`Saved as ${written} in the dataset root`, { summary: 'Thumbnail Updated' });
                     this.$emit('fileSaved', written);
                 } else {

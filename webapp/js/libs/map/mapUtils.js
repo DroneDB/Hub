@@ -30,13 +30,13 @@ export function bboxExtent(bbox) {
     return transformExtent([minLon, Math.max(minLat, -MERCATOR_MAX_LAT), maxLon, Math.min(maxLat, MERCATOR_MAX_LAT)], EPSG.WGS84, EPSG.WEB_MERCATOR);
 }
 
-/** The share of the map size an overview map leaves free around the pins it fits (FR-ORG-09) */
+/** The share of the map size an overview map leaves free around the pins it fits */
 export const OVERVIEW_FIT_MARGIN = 0.1;
 
 /**
  * The padding ([top, right, bottom, left], px) of an overview map that fits its pins: 10% of the map size on
  * every side, plus what the toolbar rail takes on the right and what the bottom controls take at the bottom (the
- * `--map-rail-reserve` and `--map-bottom-reserve` tokens of the map, FR-XC-20), so no pin lands at the edge or
+ * `--map-rail-reserve` and `--map-bottom-reserve` tokens of the map), so no pin lands at the edge or
  * under a control.
  * @param {number[]} mapSize  width and height of the map in px
  * @param {{ rail: number, bottom: number }} reserves  in px
@@ -49,7 +49,7 @@ export function overviewFitPadding([width, height], { rail, bottom }) {
 }
 
 /**
- * How a map fits its view to the extent of its files (FR-MAP-28): the same room and animation, and no limit
+ * How a map fits its view to the extent of its files: the same room and animation, and no limit
  * but the zoom range. A drone survey is a few hundred metres wide and has to fill the map; FIT_OPTIONS stops
  * at 0.5 m per pixel, which is right for a cluster of pins and shows a survey as a postage stamp. The
  * view never zooms past the native zoom of the rasters (ViewZoomCap).

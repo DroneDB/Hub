@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * What the bulk actions of the Users list decide (FR-ADM-23), as pure functions: which users a row can select, who may
+ * What the bulk actions of the Users list decide, as pure functions: which users a row can select, who may
  * take over the data of deleted users, and the one summary text of a bulk action.
  */
 import { isDisabledUser } from '@/libs/roles';

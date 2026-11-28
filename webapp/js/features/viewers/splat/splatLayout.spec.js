@@ -20,7 +20,7 @@ describe('the overlays of the splat viewer', () => {
     });
 });
 
-describe('the movement pad and the bottom bar of the splat viewer on a phone (FR-VWR-14)', () => {
+describe('the movement pad and the bottom bar of the splat viewer on a phone', () => {
     const pad = read('SplatNavPad.vue');
 
     it('size the bar of buttons from one variable of the viewer', () => {

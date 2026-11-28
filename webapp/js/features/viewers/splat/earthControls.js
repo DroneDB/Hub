@@ -3,7 +3,7 @@
  * (or one finger) grabs and pans the ground, right-drag orbits the pivot under the
  * pointer, the wheel and a pinch zoom toward the pointer. A marker shows the pivot.
  *
- * The shared constrained orbit of the 3D viewers (D-019) with the splat viewer's own values: its
+ * The shared constrained orbit of the 3D viewers with the splat viewer's own values: its
  * pitch limit (POLE, which lets the view look up from below as well as down), its buttons and its
  * wheel step. It moves the camera position and the OrbitControls target (shared with it); the
  * orientation stays the rig's, which looks at that target every frame (syncYawPitch).
@@ -13,7 +13,7 @@ import { ConstrainedOrbit } from '@/features/viewers/unified/constrainedOrbit';
 // Pitch stops ~5° from straight up/down so the view cannot flip over
 const POLE = 0.996;
 
-/** The constrained orbit's options of the splat viewer's earth mode (FR-XC-18). */
+/** The constrained orbit's options of the splat viewer's earth mode. */
 export const SPLAT_EARTH = Object.freeze({
     tilt: Object.freeze({ pole: POLE }),
     // Left button, middle button and one finger pan; the right button orbits; two fingers orbit

@@ -1,5 +1,5 @@
 /**
- * deviceMemoryGb (FR-XC-18, NFR-003): the one memory budget of the 3D viewers, 4 GB when the
+ * deviceMemoryGb: the one memory budget of the 3D viewers, 4 GB when the
  * browser gives no value.
  */
 import { describe, it, expect } from 'vitest';

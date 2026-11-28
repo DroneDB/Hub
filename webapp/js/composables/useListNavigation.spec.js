@@ -1,5 +1,5 @@
 /**
- * The keyboard model of the file grid and table (FR-EXP-09): one active item, moved by the arrows
+ * The keyboard model of the file grid and table: one active item, moved by the arrows
  * (by 1, by a row), Home/End, Shift to extend; Enter opens, Space toggles.
  */
 import { describe, it, expect, vi } from 'vitest';

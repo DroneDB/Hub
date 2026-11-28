@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The colour scheme of the page, light or dark (FR-XC-21, FR-NAV-07, D-044): the Appearance
+ * The colour scheme of the page, light or dark: the Appearance
  * preference of this device (System, Light or Dark) and, for System, the scheme of the operating
  * system. An embedded view always follows the system.
  *

@@ -1,5 +1,5 @@
 /**
- * The measure tools run in the shared drawing session (FR-MAP-14, D-027): Esc and Stop Measuring cancel the
+ * The measure tools run in the shared drawing session: Esc and Stop Measuring cancel the
  * measurement in progress (nothing is added), a right click, Enter and a double click finish it, a right-drag does
  * not, and the sketch leaves no feature without a measurementType.
  */

@@ -107,7 +107,7 @@ import { useCutMarks } from '@/composables/useCutMarks';
 import { columnFrom } from '@/libs/responsiveColumns';
 
 // The preview of a row is a 48 px box that `object-fit: cover` fills along the long side of a 16:9 photo:
-// 48 x 16 / 9 = 85.3, so 86 CSS px of bitmap (FR-EXP-41); the request adds the pixel ratio (128 at 1x, 256 at 2x)
+// 48 x 16 / 9 = 85.3, so 86 CSS px of bitmap; the request adds the pixel ratio (128 at 1x, 256 at 2x)
 const ROW_PREVIEW_CSS_PX = 86;
 
 /**
@@ -136,7 +136,7 @@ export default {
     emits: ['upload', 'importFromUrl', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'alignGeoRaster', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
-        // One tab stop: the table holds the focus and names its active row (aria-activedescendant), FR-EXP-09
+        // One tab stop: the table holds the focus and names its active row (aria-activedescendant)
         const nav = useListNavigation({
             count: () => instance.proxy.sortedFiles.length,
             horizontal: false,
@@ -280,7 +280,7 @@ export default {
             const classes = [];
             if (data.selected) classes.push('row-selected');
             if (this.activePath === data.path) classes.push('row-active');
-            // Cut (Ctrl+X) and not pasted yet: dimmed (FR-EXP-16)
+            // Cut (Ctrl+X) and not pasted yet: dimmed
             if (this.isCut(data)) classes.push('row-cut');
             if (data.entry && this.dropTargetPath === data.entry.path) classes.push('drop-target');
             return classes.join(' ');
@@ -530,7 +530,7 @@ export default {
         cursor: pointer;
     }
 
-    /* The table holds the focus; its active row shows the focus ring, only while the table has it (FR-EXP-09) */
+    /* The table holds the focus; its active row shows the focus ring, only while the table has it */
     table:focus-visible {
         outline: none;
     }
@@ -540,7 +540,7 @@ export default {
         outline-offset: calc(-1 * var(--ddb-focus-ring-width));
     }
 
-    /* A second cue of the selection besides the tint (FR-EXP-10): a bar on its left edge */
+    /* A second cue of the selection besides the tint: a bar on its left edge */
     tr.row-selected > td:first-child {
         box-shadow: inset 0.25rem 0 0 var(--ddb-primary);
     }

@@ -75,7 +75,7 @@ export default {
         const resolver = createResolver(() => ({
             crs: value => (mode.value === 'local' ? null : crsProblem(crsRequest('system', value)))
         }));
-        // A 400 of the server concerns the value, which is the one field (D-047, FR-XC-11)
+        // A 400 of the server concerns the value, which is the one field
         const form = useHubForm({ fields: ['crs'], statusFields: { 400: 'crs' } });
         return {
             ...form, resolver, mode,

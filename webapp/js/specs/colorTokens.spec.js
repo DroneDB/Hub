@@ -1,5 +1,5 @@
 /**
- * The colour tokens in both themes (FR-XC-21, AC-030, WCAG 2.2 AA): every colour of
+ * The colour tokens in both themes (WCAG 2.2 AA): every colour of
  * css/_variables.scss has a dark value, and the pairs the Hub draws pass their contrast ratio:
  * 4.5:1 for text, 3:1 for the focus ring and other parts of a control (WCAG 1.4.3, 1.4.11).
  * The ratios are computed here from the tokens, as axe computes them.
@@ -144,7 +144,7 @@ const PAIRS = [
     ...['--ddb-bg', '--ddb-bg-surface'].flatMap(bg => [
         ['--ddb-text-secondary', bg, TEXT], ['--ddb-text-muted', bg, TEXT], ['--ddb-link', bg, TEXT], ['--ddb-danger', bg, TEXT]
     ]),
-    // FR-UPL-06: text in a warning colour, on the page and on its tint
+    // Text in a warning colour, on the page and on its tint
     ['--ddb-warning-text', '--ddb-bg', TEXT],
     ['--ddb-warning-text', '--ddb-bg-surface', TEXT],
     ['--ddb-warning-text', '--ddb-warning-bg', TEXT],
@@ -153,11 +153,11 @@ const PAIRS = [
     ['--ddb-text-on-color', '--ddb-danger', TEXT],
     ['--ddb-text-on-warning', '--ddb-warning', TEXT],
     ['--ddb-link-on-tint', '--ddb-info-bg', TEXT],
-    // FR-NAV-05, FR-MAP-11: the focus ring on the page and on cards, and its halo
+    // The focus ring on the page and on cards, and its halo
     ['--ddb-focus-ring-color', '--ddb-bg', UI],
     ['--ddb-focus-ring-color', '--ddb-bg-surface', UI],
     ['--ddb-focus-ring-color', '--ddb-focus-ring-halo', UI],
-    // FR-EXP-10: the 2px outline of a selected tile against the page, the hover grey and the selected tint,
+    // The 2px outline of a selected tile against the page, the hover grey and the selected tint,
     // and the white check of its badge on the primary fill
     ['--ddb-primary', '--ddb-bg', UI],
     ['--ddb-primary', '--ddb-bg-hover', UI],
@@ -178,7 +178,7 @@ describe.each(THEMES)('the %s theme', (scheme, tokens) => {
         expect(tokenRatio(fg, bg, tokens, scheme)).toBeGreaterThanOrEqual(min);
     });
 
-    // FR-VWR-06: the text of a message (and an inline message and a toast) on its tint, which is
+    // The text of a message (and an inline message and a toast) on its tint, which is
     // drawn on a card or a dialog (Lara's content background)
     it.each(['info', 'success', 'warn', 'error'])('a %s message passes 4.5:1 on its tint', severity => {
         const content = colour(scheme === 'light' ? '{surface.0}' : '{surface.900}', tokens, scheme);
@@ -228,14 +228,14 @@ describe('the surfaces that are dark in both themes', () => {
     });
 });
 
-// ---- The findings that FR-XC-21 closes draw with the tokens ----
+// ---- Components draw with the tokens ----
 
 describe('the findings drawn with the tokens', () => {
     const JS = path.resolve(__dirname, '..');
     const CSS = path.resolve(__dirname, '../../css');
     const RING = /outline:\s*var\(--ddb-focus-ring-width\)\s+solid\s+var\(--ddb-focus-ring-color\)/;
 
-    it('FR-NAV-05: the focus-ring mixin is the token set, and app.scss gives it to every focusable element', () => {
+    it('the focus-ring mixin is the token set, and app.scss gives it to every focusable element', () => {
         const mixin = readSource(CSS, '_focus-ring.scss');
         expect(mixin).toMatch(RING);
         expect(mixin).toMatch(/outline-offset:\s*var\(--ddb-focus-ring-offset\)/);
@@ -266,12 +266,12 @@ describe('the findings drawn with the tokens', () => {
         }
     });
 
-    it('FR-ACC (tree): the folder tree takes the ring of the Hub, inside its edge', () => {
+    it('the folder tree takes the ring of the Hub, inside its edge', () => {
         const tree = readSource(JS, 'features/dataset/explorer/TreeView.vue');
         expect(tree).toMatch(/&:focus-visible\s*\{\s*@include focus-ring\(\$inset: true\);/);
     });
 
-    it('FR-MAP-11: a map button takes the ring with its halo on keyboard focus, and none on mouse focus', () => {
+    it('a map button takes the ring with its halo on keyboard focus, and none on mouse focus', () => {
         const ol = readSource(CSS, 'ol-controls.css');
         const ring = ruleOf(ol, '.ol-control button:focus-visible');
         expect(ring).toMatch(/outline:\s*var\(--ddb-focus-ring-width\)\s+solid\s+var\(--ddb-focus-ring-color\)\s*!important/);
@@ -281,8 +281,8 @@ describe('the findings drawn with the tokens', () => {
     });
 
     // The list of organizations is a table: the name of an organization is a link in its cell, which takes the ring of
-    // every focusable element (FR-NAV-05) inside the padding of the cell, so no edge of the list cuts it
-    it('FR-ORG-07: the name of an organization takes the ring of the tokens, and the page does not take it away', () => {
+    // every focusable element inside the padding of the cell, so no edge of the list cuts it
+    it('the name of an organization takes the ring of the tokens, and the page does not take it away', () => {
         const page = readSource(JS, 'features/organizations/OrganizationsPage.vue');
         expect(page).toMatch(/<router-link [^>]*class="org-name stretched-link"/);
         const name = ruleOf(page, '.org-name');
@@ -296,17 +296,17 @@ describe('the findings drawn with the tokens', () => {
         ['features/dataset/TaskHistory.vue', '.duration.running'],
         ['features/tasks/TasksTable.vue', '.duration.running'],
         ['features/dataset/dialogs/PasteConflictDialog.vue', '.amber']
-    ])('FR-UPL-06: %s writes %s in the warning text, not the warning fill', (file, selector) => {
+    ])('%s writes %s in the warning text, not the warning fill', (file, selector) => {
         expect(ruleOf(readSource(JS, file), selector)).toMatch(/color:\s*var\(--ddb-warning-text\)/);
     });
 
-    it('FR-ADM-15: a configuration section in its default state is not faded', () => {
+    it('a configuration section in its default state is not faded', () => {
         const config = readSource(JS, 'features/admin/AdminConfig.vue');
         expect(config).not.toMatch(/config-section-inactive|opacity:\s*0\.5|grayscale/);
         expect(ruleOf(config, '.config-section-custom')).toMatch(/border-left:[^;]*var\(--ddb-primary\)/);
     });
 
-    it('FR-MAP-21: Map Settings has one label size and one select, and the panels one field', () => {
+    it('Map Settings has one label size and one select, and the panels one field', () => {
         const settings = readSource(JS, 'features/viewers/map/MapSettingsDialog.vue');
         expect(ruleOf(settings, '.setting-label')).not.toMatch(/font-size/);
         expect(ruleOf(settings, '.setting-select')).not.toMatch(/font-size/);
@@ -321,7 +321,7 @@ describe('the findings drawn with the tokens', () => {
         expect(panels.slice(start, panels.indexOf('}', start))).not.toMatch(/outline/);
     });
 
-    it('FR-MAP-21: the band selector is the panel field, with no focus rule of its own', () => {
+    it('the band selector is the panel field, with no focus rule of its own', () => {
         const bands = readSource(JS, 'features/viewers/map/BandSelector.vue');
         expect(bands).toMatch(/<select [^>]*class="panel-select"/);
         expect(bands).not.toMatch(/channel-select|outline:\s*none/);
@@ -382,7 +382,7 @@ describe('the status of a task (HeavyTaskStatus)', () => {
         });
 });
 
-// ---- No colour of its own (FR-XC-21: the colours of scoped styles and viewers are tokens) ----
+// ---- No colour of its own (the colours of scoped styles and viewers are tokens) ----
 
 describe('the stylesheets of the components', () => {
     const JS = path.resolve(__dirname, '..');

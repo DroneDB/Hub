@@ -29,7 +29,7 @@ describe('the status tests of an ApiError', () => {
     });
 });
 
-describe('loadErrorKind (FR-XC-13)', () => {
+describe('loadErrorKind', () => {
     it('gives the page state of a primary resource that did not load', async () => {
         const { loadErrorKind, LoadErrorKind, InvalidLinkError } = await import('./apiError');
         expect(loadErrorKind(new ApiError('nf', 404))).toBe(LoadErrorKind.NOT_FOUND);

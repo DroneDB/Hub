@@ -112,7 +112,7 @@ class MeasureControls extends Control {
         [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList, btnCallouts, btnReferences].forEach(btn => { btn.style.display = 'none'; });
 
         // The 'Measure' toggle: on a compact map (css/ol-controls.css: a phone, a small frame) it is the one button of the
-        // measure tools in the rail, and the toolbars below open from it (FR-MAP-12). Elsewhere it is not shown
+        // measure tools in the rail, and the toolbars below open from it. Elsewhere it is not shown
         const btnToggle = controlButton('Measure', 'Show the measure tools.', MEASURE_ICON);
         btnToggle.setAttribute('aria-expanded', 'false');
         const toolbarToggle = controlGroup('Measure', 'ol-measure-toggle');
@@ -1659,7 +1659,7 @@ class MeasureControls extends Control {
                     return;
                 }
 
-                // One hint for the tool, with its gestures (D-027); the eraser is not a drawing
+                // One hint for the tool, with its gestures; the eraser is not a drawing
                 const helpMsg = tool === 'erase' ? 'Click a measurement to remove it. Esc exits.' : this.session ? this.session.hint : '';
 
                 this.helpTooltipElement.innerHTML = helpMsg;
@@ -1788,7 +1788,7 @@ class MeasureControls extends Control {
                 if (self.measureTooltip) self.measureTooltip.setPosition(undefined);
             };
 
-            // The shared drawing session (D-027, FR-XC-17): double click, Enter and right click finish the
+            // The shared drawing session: double click, Enter and right click finish the
             // shape, Esc and Stop cancel it, Space adds the point under the crosshair
             let session = null;
             session = this.session = startDrawingSession({

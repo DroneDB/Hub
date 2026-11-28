@@ -157,9 +157,9 @@
             </div>
 
         </div>
-        <!-- Outside the scrolling content: Import is in view after Verify (FR-UPL-08) -->
+        <!-- Outside the scrolling content: Import is in view after Verify -->
         <template #footer>
-            <!-- The refusal of the Import, next to the button that was pressed (FR-UPL-19) -->
+            <!-- The refusal of the Import, next to the button that was pressed -->
             <span v-if="importError && !importing" id="import-dataset-dialog-import-error" class="import-error flex-grow-1 align-self-center text-danger text-start" role="alert">{{ importError }}</span>
             <Button v-if="!importing" severity="secondary" label="Close" data-cancel @click="emitClose('close')" />
             <Button v-if="!importing" severity="primary" icon="fa-solid fa-download" :disabled="!canImport" data-confirm
@@ -273,11 +273,11 @@ export default {
         },
         // What the Registry URL field holds as a link: the registry, the organization and the dataset it names, or null.
         // Verify, Browse and the hints read it, so that a link that is typed (no change event yet) counts as it does once
-        // it is applied (FR-UPL-20, FR-UPL-18)
+        // it is applied
         parsedLink() {
             return this.sourceType === 'registry' ? splitRegistryLink(this.params.url) : null;
         },
-        // The field holds a '/' but no registry could be read from it (FR-UPL-18)
+        // The field holds a '/' but no registry could be read from it
         registryHint() {
             return this.sourceType === 'registry' && needsRegistryAddress(this.params.url) ? REGISTRY_ADDRESS_HINT : '';
         },
@@ -295,7 +295,7 @@ export default {
                 .filter(f => f.required)
                 .every(f => (this.params[f.name] || '').trim().length > 0);
         },
-        // The Registry's slug rule and its text (FR-XC-12)
+        // The Registry's slug rule and its text
         slugFormatProblem() {
             return slugProblem(this.slug, 'Dataset');
         },
@@ -367,7 +367,7 @@ export default {
             this._resetBrowseState();
         },
 
-        // The verify state is about the values that were verified: when they change it goes with them (FR-UPL-17)
+        // The verify state is about the values that were verified: when they change it goes with them
         resetVerify() {
             this.verifyError = null;
             this.verifyResult = null;
@@ -483,7 +483,6 @@ export default {
                 this.verifyResult = res;
                 if (res.reachable) {
                     // The remote display name and slug; a second import of the same dataset gets 'Name (2)' and 'slug-2'
-                    // (FR-UPL-14)
                     const suggestedName = res.suggestedName || this.name || '';
                     const next = uniqueNameAndSlug(suggestedName, res.suggestedSlug || suggestSlug(suggestedName), this.forbiddenSlugs);
                     this.suggesting = true;
@@ -530,7 +529,7 @@ export default {
             } catch (e) {
                 this.submitting = false;
                 // The refusal is about the Import, not about the source: 'Source reachable' goes, the reason shows next to
-                // the button (FR-UPL-19, FR-UPL-17)
+                // the button
                 this.resetVerify();
                 this.importError = e.message || 'Could not start the import.';
                 return;
@@ -572,7 +571,7 @@ export default {
             this.phase = entry.phase;
             this.logTail = entry.logTail || [];
 
-            // The time left from the speed of the last 30 seconds (FR-UPL-21), not the average since the start
+            // The time left from the speed of the last 30 seconds, not the average since the start
             const p = entry.percent || 0;
             if (!this._eta) {
                 this._eta = createEtaEstimator();

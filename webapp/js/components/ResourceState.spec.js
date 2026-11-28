@@ -1,5 +1,5 @@
 /**
- * ResourceState (FR-XC-13): the one page state of a primary resource that cannot be shown. Each
+ * ResourceState: the one page state of a primary resource that cannot be shown. Each
  * kind has its h1, its plain text naming what was asked for, and its ways out as SPA links; the
  * heading is the page title.
  */
@@ -104,7 +104,7 @@ describe('ResourceState', () => {
         expect(wrapper.text()).not.toMatch(/Create|Import/);
     });
 
-    it('goes home: the datasets of a one-organization install, once (homeLocation, FR-NAV-06)', async () => {
+    it('goes home: the datasets of a one-organization install, once (homeLocation)', async () => {
         h.loggedIn = true;
         globalThis.HubOptions = { singleOrganization: 'acme' };
         await render({ kind: 'not-found', resource: 'dataset', name: 'x' }, '/r/acme/x');
@@ -125,7 +125,7 @@ describe('ResourceState', () => {
         expect(push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/acme/site' } });
     });
 
-    it('sign in: the first action signs in and comes back to the page (D-048)', async () => {
+    it('sign in: the first action signs in and comes back to the page', async () => {
         await render({ kind: 'sign-in', resource: 'dataset', name: 'brighton-beach' }, '/r/r3sharing/brighton-beach');
         expect(heading()).toBe('Sign in to open this dataset');
         expect(links()[0]).toEqual(['Sign in', '/login?redirect=/r/r3sharing/brighton-beach']);

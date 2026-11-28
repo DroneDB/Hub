@@ -55,7 +55,7 @@ describe('resolveLayer', () => {
         expect(r).toMatchObject({ status: 'unavailable', reason: 'Building' });
     });
 
-    it('is building, with the footprint of the file, while the checker says its build runs (FR-RAS-09)', async () => {
+    it('is building, with the footprint of the file, while the checker says its build runs', async () => {
         const footprint = { type: 'Polygon', coordinates: [[[1, 2], [3, 2], [3, 4], [1, 2]]] };
         const built = { ...raster('a.tif'), polygon_geom: footprint };
         FileAvailabilityChecker.check.mockResolvedValue({ available: false, status: 'building', title: 'File Being Processed' });
@@ -166,7 +166,7 @@ describe('pickGeoraster', () => {
         const [component, props] = dialogs.open.mock.calls[0];
         expect(component).toBe(FolderPicker);
         expect(props).toMatchObject({ dataset: ds, mode: 'file', title: 'Add raster', initialPath: 'f/sub', exclude: ['f/sub/a.tif'] });
-        // What the disabled rows say (FR-MAP-22)
+        // What the disabled rows say
         expect(props).toMatchObject({ excludeReason: 'Already on the map', rejectReason: 'Not a map layer' });
         expect(props.accept).toBe(isGeoraster);
         expect(props.accept(raster('x.tif'))).toBe(true);

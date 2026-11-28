@@ -212,7 +212,7 @@ export default {
     overflow: hidden;
 }
 
-/* The video fills the free area and keeps its aspect ratio (FR-VWR-35): a 320x240 clip is not 0.9% of a 4K screen */
+/* The video fills the free area and keeps its aspect ratio: a 320x240 clip is not 0.9% of a 4K screen */
 .video-lightbox-player {
     width: 100%;
     height: 100%;

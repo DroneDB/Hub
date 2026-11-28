@@ -89,7 +89,7 @@ function press(code, ev) {
 }
 
 /* A phone: the bar of buttons takes the bottom edge from the left to about three quarters of the width, so the pad goes
-   above it (the bar's height, from the viewer, and the spacing of the viewer's edges) and the two never meet (FR-VWR-14) */
+   above it (the bar's height, from the viewer, and the spacing of the viewer's edges) and the two never meet */
 @media (max-width: 575.98px) {
     .nav-controls {
         bottom: calc(var(--splat-bar-height) + 2 * var(--ddb-spacing-md));

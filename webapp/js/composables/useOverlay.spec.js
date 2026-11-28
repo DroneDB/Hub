@@ -1,6 +1,6 @@
 /**
- * The overlay stack (FR-XC-19): the focus target on open (FR-XC-02), the return to the opener
- * on close (FR-XC-03), and Escape for the topmost overlay only, unless an open Select or menu
+ * The overlay stack: the focus target on open, the return to the opener
+ * on close, and Escape for the topmost overlay only, unless an open Select or menu
  * in it (ARIA state) keeps the key.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -51,7 +51,7 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
-describe('focusTargetIn (FR-XC-02)', () => {
+describe('focusTargetIn', () => {
     const root = html => page(html);
 
     it('skips a field that is not rendered (a hidden tab panel) and takes the visible one', () => {
@@ -92,7 +92,7 @@ describe('useOverlay focus', () => {
         expect(document.activeElement.getAttribute('tabindex')).toBe('-1');
     });
 
-    it('gives the focus back to the control that opened it (FR-XC-03)', async () => {
+    it('gives the focus back to the control that opened it', async () => {
         const opener = page('<button class="opener">Open</button>').querySelector('button');
         opener.focus();
         const w = await open({ html: '<input class="name">' });

@@ -1,5 +1,5 @@
 /**
- * The Users table on a phone and a tablet (D-026, FR-ADM-18, FR-ORG-18): one stacked card per row from the
+ * The Users table on a phone and a tablet: one stacked card per row from the
  * shared renderer with every field labelled, e-mail, roles and storage kept from `sm` up, the search field
  * that clears (button, Escape), and the empty state that names the query.
  */
@@ -50,11 +50,11 @@ describe('UsersPage as stacked cards', () => {
         await render();
         expect(wrapper.find('.p-datatable').classes()).toContain('stacked-table');
         const labels = wrapper.find('tbody tr').findAll('td').map(td => td.attributes('data-label') ?? null);
-        // The first cell is the checkbox of the row (FR-ADM-23)
+        // The first cell is the checkbox of the row
         expect(labels).toEqual([null, null, 'Email', 'Roles', 'Organizations', 'Datasets', 'Storage', 'Created', null]);
     });
 
-    it('shows e-mail, roles and storage from sm up, in the card and in the row (FR-ADM-18)', async () => {
+    it('shows e-mail, roles and storage from sm up, in the card and in the row', async () => {
         await render();
         const classes = wrapper.find('tbody tr').findAll('td').map(stackClasses);
         expect(classes).toEqual(['stack-col', 'stack-col', 'stack-col', 'stack-col', 'stack-col stack-col-md', 'stack-col stack-col-lg', 'stack-col', 'stack-col stack-col-xl', 'stack-col']);

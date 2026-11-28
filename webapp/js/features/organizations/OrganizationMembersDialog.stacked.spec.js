@@ -1,5 +1,5 @@
 /**
- * The Members dialog on a phone (D-026, FR-ORG-22, FR-XC-20): the table is stacked cards below `sm` from the shared
+ * The Members dialog on a phone: the table is stacked cards below `sm` from the shared
  * renderer, every cell carries the label of its card, the role select is full width, and Remove is an icon named
  * for the member (its label hides on a phone, the accessible name stays).
  */
@@ -66,7 +66,7 @@ describe('OrganizationMembersDialog as stacked cards', () => {
     it('has a Remove button per member named for it, which a phone shows as its icon', async () => {
         await render();
         const buttons = [...table().querySelectorAll('tbody button')];
-        expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Remove bob', 'Remove me']); // by user name (FR-ORG-26)
+        expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Remove bob', 'Remove me']); // by user name
         expect(buttons.every(b => b.classList.contains('member-remove'))).toBe(true);
         expect(buttons[0].textContent.trim()).toBe('Remove');
     });

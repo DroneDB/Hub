@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The result of an Align (align-raster) task, in words: what the Align window keeps on screen when the task is
- * done, and what the toast of the page says. The numbers go through the one formatter (libs/format, FR-XC-08).
+ * done, and what the toast of the page says. The numbers go through the one formatter (libs/format).
  */
 import { formatNumber } from '@/libs/format';
 

@@ -1,5 +1,5 @@
 /**
- * The delete confirmation of explorer files (FR-EXP-08, D-011): the title, the items, the folder
+ * The delete confirmation of explorer files: the title, the items, the folder
  * warning and the total size ("Calculating size…" until a folder's size has been read).
  */
 import { describe, it, expect } from 'vitest';

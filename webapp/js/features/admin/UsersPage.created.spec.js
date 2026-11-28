@@ -1,5 +1,5 @@
 /**
- * The Created column of User Management (FR-ADM-19): the date the Registry stored when the user was
+ * The Created column of User Management: the date the Registry stored when the user was
  * created, written with formatDateTime (libs/format.js); a user created before the Registry stored it
  * has no date (null) and shows "Unknown".
  */

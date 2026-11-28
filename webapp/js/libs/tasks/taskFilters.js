@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The filters, the page and the order of the admin Tasks list (FR-PRC-28), as the page keeps them in
+ * The filters, the page and the order of the admin Tasks list, as the page keeps them in
  * the address (`?toolId=&state=&userId=&skip=&take=&sortField=&sortOrder=`): a reload or a shared link
  * shows the same list. A key at its default is left out of the address.
  */
@@ -10,7 +10,7 @@ import { pageStart } from '@/libs/pageSize';
 /** The columns the server orders by (the whitelist of the Registry) */
 export const TASK_SORT_FIELDS = Object.freeze(['createdAt', 'state', 'toolId']);
 
-/** The page sizes of the list that the paginator offers next to the one that fits the height (FR-XC-34) */
+/** The page sizes of the list that the paginator offers next to the one that fits the height */
 export const TASK_PAGE_SIZES = Object.freeze([10, 25, 50, 100]);
 
 const DEFAULT_SORT_FIELD = 'createdAt';
@@ -22,7 +22,7 @@ const DEFAULT_SORT_ORDER = -1;
  * @property {string} state   '' for all states
  * @property {string} userId  '' for all users
  * @property {number} skip  the offset of the first task of the page
- * @property {number|null} take  the page size the user chose; null: the size that fits the height (FR-XC-34)
+ * @property {number|null} take  the page size the user chose; null: the size that fits the height
  * @property {string} sortField  one of TASK_SORT_FIELDS
  * @property {1|-1} sortOrder    1 ascending, -1 descending
  */

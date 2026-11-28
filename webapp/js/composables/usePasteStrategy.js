@@ -43,7 +43,7 @@ function buildResult() {
 }
 
 /**
- * A move inside one dataset (PUT /obj). The Registry refuses a move onto a name that exists (409, D-040) and the
+ * A move inside one dataset (PUT /obj). The Registry refuses a move onto a name that exists (409) and the
  * endpoint has no overwrite: a conflict is decided before the paste, per item, as Keep both (`options.names`: the
  * free name the item gets in the target folder) or Skip (`options.skip`: not sent). Any refusal is a failure.
  */

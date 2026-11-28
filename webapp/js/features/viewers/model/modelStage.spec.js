@@ -313,7 +313,7 @@ describe('render loop', () => {
         expect(stage.renderer.setSize).toHaveBeenCalledTimes(1);
     });
 
-    it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s (FR-VWR-34)', (dpr, applied) => {
+    it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s', (dpr, applied) => {
         vi.stubGlobal('devicePixelRatio', dpr);
         makeStage();
         expect(stage.renderer.setPixelRatio).toHaveBeenCalledWith(applied);

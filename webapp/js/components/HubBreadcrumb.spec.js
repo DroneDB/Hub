@@ -1,5 +1,5 @@
 /**
- * HubBreadcrumb (FR-NAV-03): organization / dataset on the pages of an organization and of a dataset (the
+ * HubBreadcrumb: organization / dataset on the pages of an organization and of a dataset (the
  * Organizations link of the main navigation is its root; without that link, an Organizations crumb), the last crumb the page (aria-current), the slug until a name is known and when the organization cannot be
  * read, and no redirect when it answers 401.
  */
@@ -148,7 +148,7 @@ describe('HubBreadcrumb crumbs', () => {
     });
 });
 
-describe('HubBreadcrumb organization look-up (FR-XC-05)', () => {
+describe('HubBreadcrumb organization look-up', () => {
     it('opts out of the global 401 redirect', async () => {
         await render({ org: 'acme', ds: 'site' });
         expect(h.Organization).toHaveBeenCalledWith('acme');

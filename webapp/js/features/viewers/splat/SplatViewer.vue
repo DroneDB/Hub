@@ -146,7 +146,7 @@ defineOptions({ name: 'SplatViewer' });
 const { entry, dataset, ddbURI, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.GAUSSIAN_SPLAT], typeLabel: 'a Gaussian Splat', title: 'Gaussian Splat'
 });
-// A splat that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends (FR-VWR-08)
+// A splat that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends
 const { notice: buildNotice, setAvailability, build: startBuild } = useViewerBuild({
     dataset, path: () => entry.value?.path, canWrite, reload: reloadAfterBuild
 });
@@ -214,7 +214,7 @@ const { annotations, activePin } = views;
 const { removePin, movePin, renamePin, editPin, updatePinView } = views;
 const shownPin = computed(() => (activePin.value === null ? null : annotations.value[activePin.value] ?? null));
 const shownPinCoordinates = computed(() => (shownPin.value && coordWriter.value ? coordWriter.value(shownPin.value.position) : ''));
-// The card is 22 rem wide at most (352 css px): the bitmap follows the pixel ratio (FR-XC-32)
+// The card is 22 rem wide at most (352 css px): the bitmap follows the pixel ratio
 const PIN_IMAGE_CSS_PX = 352;
 const shownPinImage = computed(() => (shownPin.value?.image
     ? dataset.value.thumbUrl(shownPin.value.image, thumbnailRequestSize(PIN_IMAGE_CSS_PX))
@@ -450,7 +450,7 @@ async function loadSplat() {
     frameRetry.start();
     loaded.value = true;
     applyNavMode();
-    // The tour waits for the user (FR-VWR-31): the scene opens without moving, and the rail
+    // The tour waits for the user: the scene opens without moving, and the rail
     // highlights 'Start cycling' with a hint to press P
     stage.start();
 }

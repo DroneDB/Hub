@@ -53,7 +53,7 @@ describe('SavedViews', () => {
         expect(w.find('ul[role="tree"]').attributes('aria-label')).toBe('Saved views');
     });
 
-    // FR-MAP-24: the Views group is a bookmark, not the split of Compare
+    // The Views group is a bookmark, not the split of Compare
     it('marks the Views group with a bookmark', () => {
         const w = mountViews();
         const icons = w.find('button.group').findAll('i').map(i => i.classes().join(' '));

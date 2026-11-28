@@ -1,5 +1,5 @@
 /**
- * The dataset page when the dataset does not load (FR-ACC-18, FR-ACC-14, D-048): the page state of
+ * The dataset page when the dataset does not load: the page state of
  * ResourceState in place of the panels, with no error modal and no spinner, and the header's
  * Download, Share and Settings withdrawn through the dataset session store.
  */
@@ -108,7 +108,7 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('ViewDataset and the uploads that go on in the background (FR-UPL-04)', () => {
+describe('ViewDataset and the uploads that go on in the background', () => {
     it('shows the entries that an upload of this dataset added in its listing, and stops listening when it goes', async () => {
         await open(Promise.resolve({ path: '', type: 3, properties: {}, size: 0 }));
         const entries = [{ path: 'orto/a.tif' }, { path: 'b.txt' }];
@@ -145,7 +145,7 @@ describe('ViewDataset page states', () => {
         expect(h_.showError).not.toHaveBeenCalled();
     });
 
-    it('a 401 to a visitor without a session shows the sign-in state (D-048)', async () => {
+    it('a 401 to a visitor without a session shows the sign-in state', async () => {
         h_.loggedIn = false;
         await open(Promise.reject(new ApiError('Unauthorized', 401)));
         expect(wrapper.find('h1').text()).toBe('Sign in to open this dataset');
@@ -241,7 +241,7 @@ describe('ViewDataset keyboard shortcuts', () => {
     });
 });
 
-describe('ViewDataset when the dataset is deleted while it is open (FR-UPL-05, D-004)', () => {
+describe('ViewDataset when the dataset is deleted while it is open', () => {
     const OPEN = [{ path: '', type: 1, properties: { permissions: { canRead: true } } }];
 
     it('shows the not found state in place of the panels, as for a dataset that is not there', async () => {
@@ -274,7 +274,7 @@ describe('ViewDataset when the dataset is deleted while it is open (FR-UPL-05, D
     });
 });
 
-describe('ViewDataset empty folder (FR-EXP-37)', () => {
+describe('ViewDataset empty folder', () => {
     it('runs the Import from URL action of the dataset, with no address, when the file list asks for it', async () => {
         // The grid, whose events are the page's (the empty folder's buttons emit them)
         const Grid = defineComponent({ name: 'FileGridStub', inheritAttrs: false, emits: ['importFromUrl', 'upload'], render: () => h('div', { class: 'file-list' }) });

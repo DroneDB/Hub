@@ -26,7 +26,7 @@ import { horizontalDefinition, isGeocentricDefinition, crsToWgs84, cloudUnitsOf 
 // How often the progress row follows the tiles while the scene waits for its first frame
 const PROGRESS_POLL_MS = 250;
 
-// What a screen reader says of the canvas (FR-VWR-16); the Controls help of the toolbar lists the rest
+// What a screen reader says of the canvas; the Controls help of the toolbar lists the rest
 const CANVAS_LABEL = '3D view. Arrow keys rotate, Shift and arrow keys pan, plus and minus zoom, Home resets the view.';
 
 // Direction (east, south, up) the camera looks at a framed model from
@@ -103,7 +103,7 @@ export class UnifiedScene {
         this.stopPixelRatio = null;
     }
 
-    // ---- Pixel ratio (FR-XC-32, D-042) ------------------------------------------------
+    // ---- Pixel ratio ------------------------------------------------
 
     /**
      * Makes the canvas the CSS size x the applied ratio, and keeps it so when the screen's ratio changes. The point
@@ -225,7 +225,7 @@ export class UnifiedScene {
         // A touch drag must never scroll the page
         instance.domElement.style.touchAction = 'none';
         // Focusable (a click on the view takes the keyboard focus), named, and moved by the keys of
-        // navKeys while it has the focus (FR-VWR-16)
+        // navKeys while it has the focus
         const canvas = instance.domElement;
         canvas.tabIndex = 0;
         canvas.setAttribute('role', 'application');
@@ -276,7 +276,7 @@ export class UnifiedScene {
             const map = new Map({ extent: extentWithMargin });
             this.instance.add(map);
             this.map = map;
-            // How far out the camera can go before the basemap no longer fills the view (FR-VWR-15)
+            // How far out the camera can go before the basemap no longer fills the view
             const { x, y } = extentWithMargin.dimensions();
             this.basemapRadius = Math.min(x, y) / 2;
             if (typeof elevation === 'number' && isFinite(elevation) && map.object3d) {
@@ -554,7 +554,7 @@ export class UnifiedScene {
     /**
      * Runs `action` once, after the first frame at which `isReady()` (the data is on screen): what
      * needs the streamed geometry (the grounding of a tileset) when waitForFirstRender stopped
-     * waiting before it came (FR-VWR-20). The listener goes after its run, with the scene
+     * waiting before it came. The listener goes after its run, with the scene
      * (dispose), or when `isReady` throws. An error of `action` is shown, not thrown into Giro3D's
      * render loop.
      * @returns {() => void} cancels it
@@ -594,7 +594,7 @@ export class UnifiedScene {
 
     savePose(target) {
         const camera = this.instance.view.camera;
-        // The field of view too: Home gives back what Shift+wheel changed (FR-VWR-29)
+        // The field of view too: Home gives back what Shift+wheel changed
         this.homePose = {
             position: camera.position.clone(), target: target.clone(), up: camera.up.clone(), quaternion: camera.quaternion.clone(), fov: camera.fov
         };
@@ -708,7 +708,7 @@ export class UnifiedScene {
         stopNavAnimation(controls);
         controls.target.copy(navPivot(controls));
         const orbit = orbitTweenStep(this.libs.THREE, camera, controls, quaternion, position.distanceTo(target));
-        // The field of view goes back with the pose (setPose takes it; FR-VWR-29)
+        // The field of view goes back with the pose (setPose takes it)
         const fromFov = camera.fov;
         const onStep = e => {
             orbit(e);

@@ -1,5 +1,5 @@
 /**
- * Merge Multispectral from the dataset page (FR-PRC-02, FR-PRC-04): the dialog gets the folder's
+ * Merge Multispectral from the dataset page: the dialog gets the folder's
  * listing (to propose a free name and warn of an existing one), and the page no longer deletes the
  * source bands itself: the merge task does, once its output is written and opens.
  */

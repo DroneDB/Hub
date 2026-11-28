@@ -142,7 +142,7 @@ export function sameOutline(a, b, tolerance = 1e-7) {
  * viewer's among them, and of the stockpile panel). Nothing is written. A missing file, or one that
  * cannot be used (not GeoJSON, of another application), has no stockpile to show: null.
  * The file is asked for only when the listing of its folder holds it: most rasters have none, and
- * the request would be a 404 that the browser logs as an error each time the panel opens (FR-XC-10).
+ * the request would be a 404 that the browser logs as an error each time the panel opens.
  */
 async function readExisting(dataset, path) {
     if (!(await isListed(dataset, path))) return null;

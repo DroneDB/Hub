@@ -1,5 +1,5 @@
 /**
- * The tile follows the size the user chooses (FR-EXP-43): the box of the thumbnail grows with the `size` prop (it was fixed
+ * The tile follows the size the user chooses: the box of the thumbnail grows with the `size` prop (it was fixed
  * when the tile was created), and a thumbnail on show is requested again at the step of the new size
  * (thumbnailRequestSize: 192 CSS px is 256 at ratio 1, so S to M loads another bitmap, M to L does not).
  */
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe('EntryThumbnail size (FR-EXP-43)', () => {
+describe('EntryThumbnail size', () => {
     it('draws its box and its icon at the size, in rem', () => {
         const w = mountTile(192);
         expect(w.find('.container').attributes('style')).toContain('width: 12rem');
@@ -76,7 +76,7 @@ describe('EntryThumbnail size (FR-EXP-43)', () => {
  * moment the request starts, only tiles in view load again at a new size (the others when they come into view), and a
  * thumbnail shown stays on show, without a spinner, until the new one is there.
  */
-describe('EntryThumbnail size in the Explorer queue (FR-EXP-43)', () => {
+describe('EntryThumbnail size in the Explorer queue', () => {
     const S = '/orgs/acme/ds/site/thumb?size=128';
     const L = '/orgs/acme/ds/site/thumb?size=256';
 
@@ -114,7 +114,7 @@ describe('EntryThumbnail size in the Explorer queue (FR-EXP-43)', () => {
     });
 
     it('gives its turn back when a build starts while its image loads or waits (the image is no longer shown)', async () => {
-        // A file that libddb builds: the build the user starts is the BuildManager's, which the tile follows (FR-XC-16)
+        // A file that libddb builds: the build the user starts is the BuildManager's, which the tile follows
         const dataset = {
             org: 'acme', ds: 'site', baseApi: '/orgs/acme/ds/site', getTasks: async () => [],
             listOne: async () => ({ type: ddbEntry.type.POINTCLOUD }), build: async () => true

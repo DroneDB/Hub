@@ -58,7 +58,7 @@
     top: 0.5rem;
     right: 4rem;
     z-index: var(--map-layer-panel);
-    // The width grows with the screen, 16rem on a laptop to 28rem on a 4K one (FR-RAS-35, the token of FR-XC-33); the text of
+    // The width grows with the screen, 16rem on a laptop to 28rem on a 4K one (a width token); the text of
     // the panel is 0.875rem, the size of the body text
     width: var(--ddb-panel-analysis-width);
     background: var(--panel-bg);
@@ -271,7 +271,7 @@
         margin-top: 0.5rem;
     }
 
-    // The foot of the panel (AnalysisPanel's #actions slot, FR-RAS-23): the action grid stays at the bottom of the visible
+    // The foot of the panel (AnalysisPanel's #actions slot): the action grid stays at the bottom of the visible
     // panel while the body above it scrolls, on the solid panel colour so that the body does not show through. While more
     // of the body is hidden under it (.has-more), the body fades out above it, a cue that the panel scrolls. The one
     // footer of the three analysis panels
@@ -701,7 +701,7 @@
             padding: 0.375rem 0.5rem;
         }
 
-        // The footer stays in view on the sheet too (FR-RAS-23), so it is short there (U-415): the icon beside the label,
+        // The footer stays in view on the sheet too, so it is short there: the icon beside the label,
         // rows of 2rem rather than 2.6rem
         .panel-actions {
             padding: 0.4rem 0.5rem 0.5rem;

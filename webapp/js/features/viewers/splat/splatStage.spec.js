@@ -107,7 +107,7 @@ describe('scene up', () => {
 });
 
 describe('renderer', () => {
-    it('applies the ratio again when the screen changes, with the cap of the quality in force (FR-XC-32)', () => {
+    it('applies the ratio again when the screen changes, with the cap of the quality in force', () => {
         let onChange;
         const stop = vi.fn();
         vi.stubGlobal('matchMedia', () => ({ addEventListener: (type, fn) => { onChange = fn; }, removeEventListener: stop }));
@@ -570,7 +570,7 @@ describe('WebGL 2 check', () => {
     });
 });
 
-describe('memory budget of the paged splats (FR-VWR-22, NFR-003)', () => {
+describe('memory budget of the paged splats', () => {
     const LOW = { maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1, pagedScale: 0.5 };
     const HIGH = { maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2, pagedScale: 1 };
     const DESKTOP_4GB = { memoryGb: 4, mobile: false, shDegree: 3 };

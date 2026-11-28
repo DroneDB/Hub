@@ -1,5 +1,5 @@
 /**
- * The guide to the vegetation indices (FR-RAS-33): every formula of ddb lists its bands, from the structured
+ * The guide to the vegetation indices: every formula of ddb lists its bands, from the structured
  * `requiredBands` of the list, and has its own text of what it measures and when to use it.
  */
 import { describe, it, expect } from 'vitest';

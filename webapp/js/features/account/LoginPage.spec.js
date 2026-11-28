@@ -1,6 +1,6 @@
 /**
- * LoginPage and the one-shot notice of FR-XC-13: an expired session says why (FR-ACC-09), and
- * the landing after sign-in is the page that asked, or home (FR-NAV-06), without the notice.
+ * LoginPage and its one-shot notice: an expired session says why, and
+ * the landing after sign-in is the page that asked, or home, without the notice.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
@@ -70,7 +70,7 @@ describe('LoginPage after sign-in', () => {
     });
 });
 
-// ---- The sign-in form (FR-ACC-04, FR-ACC-05, FR-ACC-07, FR-XC-11) -------------------------------
+// ---- The sign-in form -------------------------------
 
 const login = vi.fn();
 // mapStores names the store by its $id
@@ -110,7 +110,7 @@ const deferred = () => {
 describe('LoginPage form', () => {
     afterEach(() => { wrapper?.unmount(); wrapper = null; document.body.innerHTML = ''; login.mockReset(); });
 
-    it('is a real form with the autocomplete values, and the focus starts in Username (FR-ACC-07)', async () => {
+    it('is a real form with the autocomplete values, and the focus starts in Username', async () => {
         await renderForm();
         const form = wrapper.find('form');
         expect(form.exists()).toBe(true);
@@ -120,7 +120,7 @@ describe('LoginPage form', () => {
         expect(document.activeElement).toBe(wrapper.find('input[name="username"]').element);
     });
 
-    it('sends no request for an empty submit and shows both field errors, with the focus on the first (FR-ACC-05)', async () => {
+    it('sends no request for an empty submit and shows both field errors, with the focus on the first', async () => {
         await renderForm();
         await submit();
         expect(login).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe('LoginPage form', () => {
         expect(login).toHaveBeenCalledWith('admin', 'secret');
     });
 
-    it('two submits while the first request is pending call login once, and the fields are read-only (FR-ACC-04)', async () => {
+    it('two submits while the first request is pending call login once, and the fields are read-only', async () => {
         const pending = deferred();
         login.mockReturnValue(pending.promise);
         await renderForm();
@@ -168,7 +168,7 @@ describe('LoginPage form', () => {
         expect(wrapper.find('input[name="username"]').attributes('readonly')).toBeUndefined();
     });
 
-    it('shows a refused sign-in as a plain message in the card, and typing clears it (FR-ACC-05)', async () => {
+    it('shows a refused sign-in as a plain message in the card, and typing clears it', async () => {
         const { ApiError } = await import('@/libs/ddb/apiError');
         login.mockRejectedValue(new ApiError('Unauthorized', 401));
         await renderForm();
@@ -207,7 +207,7 @@ describe('LoginPage form', () => {
         expect(wrapper.find('.login-form [role="alert"]').text()).toBe('Incorrect username or password.');
     });
 
-    it('shows a 400 ValidationProblemDetails as the same plain message, at no field (FR-ACC-05)', async () => {
+    it('shows a 400 ValidationProblemDetails as the same plain message, at no field', async () => {
         const { ApiError } = await import('@/libs/ddb/apiError');
         login.mockRejectedValue(new ApiError('One or more validation errors occurred.', 400, {
             type: 'https://tools.ietf.org/html/rfc9110#section-15.5.1', title: 'One or more validation errors occurred.', status: 400,

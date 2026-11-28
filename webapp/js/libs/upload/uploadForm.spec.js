@@ -1,4 +1,4 @@
-/** The form of the upload page: the organizations, the default name, the refusal of a field (FR-UPL-02, D-047). */
+/** The form of the upload page: the organizations, the default name, the refusal of a field. */
 import { describe, it, expect } from 'vitest';
 import {
     DATASET_NAME_MAX_LENGTH, writableOrganizations, defaultOrganization, defaultDatasetName, fieldErrorOf
@@ -57,7 +57,7 @@ describe('defaultDatasetName', () => {
 });
 
 describe('fieldErrorOf', () => {
-    it('reads the first message of errors.<field> (D-047), whatever the letter case of the member', () => {
+    it('reads the first message of errors.<field>, whatever the letter case of the member', () => {
         expect(fieldErrorOf({ errors: { datasetName: ['Use at least one Latin letter'] } }, 'datasetName')).toBe('Use at least one Latin letter');
         expect(fieldErrorOf({ errors: { DatasetName: 'Too long' } }, 'datasetName')).toBe('Too long');
     });

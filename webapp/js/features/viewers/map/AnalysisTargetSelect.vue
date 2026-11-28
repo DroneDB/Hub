@@ -24,13 +24,13 @@ const props = defineProps({
     candidates: { type: Array, default: () => [] },
     /** Path of the raster the tools work on now */
     modelValue: { type: String, default: null },
-    /** What the rasters are called: the stockpile tool takes elevation models, Raster Analysis any raster (FR-RAS-25) */
+    /** What the rasters are called: the stockpile tool takes elevation models, Raster Analysis any raster */
     label: { type: String, default: 'Elevation model' }
 });
 const emit = defineEmits(['update:modelValue']);
 
 const selectId = useId();
-// The part of each name that tells the rasters apart (the date of two mosaics), cut in the middle if still long (FR-RAS-12)
+// The part of each name that tells the rasters apart (the date of two mosaics), cut in the middle if still long
 const labels = computed(() => distinctLabels(props.candidates.map(c => c.label), 32));
 const select = ref(null);
 

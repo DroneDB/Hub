@@ -11,7 +11,7 @@ import { colorToken, tokenRgba } from '@/libs/colorScheme';
 
 /**
  * File-layer colours: the --ddb-map-* tokens of css/_variables.scss, read when a style is made
- * (FR-XC-21; the map redraws with createFileLayerStyles() when the colour scheme changes).
+ * (the map redraws with createFileLayerStyles() when the colour scheme changes).
  * Shots, clusters and the flight path are the brand blue at shade 300: a light blue that stands
  * out on dark satellite imagery with the same weight as the sky blue these markers had before
  * (the darker shades sink into vegetation and roofs). A selected shot is orange.

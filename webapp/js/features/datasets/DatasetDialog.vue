@@ -13,7 +13,7 @@
                                            class="w-100" :maxlength="nameMaxLength" :readonly="busy" :invalid="!!errorOf($form, 'name')"
                                            :aria-invalid="errorOf($form, 'name') ? 'true' : undefined"
                                            :aria-describedby="describedBy('dataset-dialog-name', errorOf($form, 'name'), 'count')" />
-                                <!-- The Registry's rule text, at the field (D-035) -->
+                                <!-- The Registry's rule text, at the field -->
                                 <FieldError id="dataset-dialog-name-error" :message="errorOf($form, 'name')" />
                                 <small id="dataset-dialog-name-count" class="char-count">{{ lengthOf($form, 'name') }}/{{ nameMaxLength }}</small>
                             </div>
@@ -25,7 +25,7 @@
                             </div>
                         </div>
                     </div>
-                    <!-- A new dataset has its slug, the URL, made from the name and editable (FR-ORG-05); it is what must be unique -->
+                    <!-- A new dataset has its slug, the URL, made from the name and editable; it is what must be unique -->
                     <div v-if="isNew" class="mb-3">
                         <label for="dataset-dialog-new-slug" class="d-block mb-1 fw-semibold">Dataset Slug</label>
                         <InputText id="dataset-dialog-new-slug" name="slug" class="w-100" placeholder="dataset-slug" autocomplete="off" spellcheck="false"
@@ -36,7 +36,7 @@
                         <FieldError id="dataset-dialog-new-slug-error" :message="errorOf($form, 'slug')" />
                         <small id="dataset-dialog-new-slug-help" class="d-block text-muted">The dataset will be at /r/{{ orgSlug || '&lt;organization&gt;' }}/{{ $form.slug?.value || '…' }}. A slug: {{ slugRuleText }}</small>
                     </div>
-                    <!-- Editing keeps the URL: the name is the display name only, unless the user asks for a new slug (FR-ORG-08) -->
+                    <!-- Editing keeps the URL: the name is the display name only, unless the user asks for a new slug -->
                     <div v-else class="mb-3">
                         <span class="d-block mb-1 fw-semibold">Dataset Slug</span>
                         <PrimeMessage severity="info" :closable="false">
@@ -106,7 +106,7 @@ import { latinNameProblem, displayNameLimits, displayNameLengthProblem } from '@
 const SLUG_TAKEN = 'A dataset with this slug already exists in this organization.';
 
 /**
- * DatasetDialog - create or edit a dataset (FR-ORG-04, FR-ORG-05, FR-ORG-08, D-046).
+ * DatasetDialog - create or edit a dataset.
  *
  * A new dataset has a name and a slug (its URL), made from the name until the user edits it (and
  * again once the user empties it). An edit keeps the slug unless the user ticks Change URL. The
@@ -114,7 +114,7 @@ const SLUG_TAKEN = 'A dataset with this slug already exists in this organization
  * request while one is invalid (a slug of the loaded list included).
  *
  * The request runs in the dialog (`save`): a refusal of the Registry shows at the field its
- * `errors` member names (`name`, `slug`, D-047) or, for a 409 with none, at the slug field (what
+ * `errors` member names (`name`, `slug`) or, for a 409 with none, at the slug field (what
  * must be unique), else in the form-level message; the dialog stays open with what was typed. It
  * closes only when the dataset is saved.
  *
@@ -175,7 +175,7 @@ export default {
             name: (value, values) => {
                 if (typeof value !== 'string' || value.trim() === '') return 'Enter a name';
                 return displayNameLengthProblem(value)
-                    // A new name needs a Latin letter or digit, or a slug the user enters (D-035); an edit is never refused
+                    // A new name needs a Latin letter or digit, or a slug the user enters; an edit is never refused
                     // for it (the dataset keeps its slug)
                     || (isNew ? latinNameProblem(value, { slug: values.slug, withSlugField: true }) : null);
             },
@@ -195,7 +195,7 @@ export default {
             fields: ['name', 'slug', 'tagline'],
             // The slug is what must be unique: a duplicate the Registry finds without naming a field shows at the slug
             statusFields: { 409: 'slug' },
-            // A slug that now holds a Latin letter makes the name valid (D-035)
+            // A slug that now holds a Latin letter makes the name valid
             dependents: { slug: ['name'] }
         });
 

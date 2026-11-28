@@ -2,7 +2,7 @@
 /**
  * Optional files of a dataset (a viewer's `<name>_measurements.geojson` and `<name>_cameras.json` sidecars): most
  * datasets have none, and a request for a file that is not there is a 404 that the browser logs as an error. The Hub
- * asks for such a file only when the listing of its folder holds it (FR-XC-10, OBS-002).
+ * asks for such a file only when the listing of its folder holds it (OBS-002).
  */
 import { pathutils } from 'ddb';
 

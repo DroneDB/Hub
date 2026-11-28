@@ -2,7 +2,7 @@
 /**
  * The question that asks before a task is cancelled, as useConfirm() options (or ConfirmDialog
  * props, see cancelDialogProps). It is a destructive confirmation (the focus starts on "Don't
- * Cancel"), like the delete ones of libs/deleteConfirmation.js (FR-UPL-05, D-004).
+ * Cancel"), like the delete ones of libs/deleteConfirmation.js.
  *
  * A cancelled task of a tool that adds files to a dataset rolls back: the Registry deletes the files
  * that the task added, and the dataset that the task created (an import of a dataset always creates
@@ -16,7 +16,6 @@ import { IRREVERSIBLE } from '@/libs/deleteConfirmation';
 
 /**
  * What a cancel deletes, by tool id (the Registry's tool ids): the tools that add files to a dataset
- * (FR-XC-26, FR-XC-27)
  */
 const ROLLED_BACK = Object.freeze({
     'import-dataset': 'The files imported so far are deleted, and so is the dataset that this import created.',
@@ -37,7 +36,7 @@ export function cancelRollbackNote(task) {
 }
 
 /**
- * The task is named by its tool and its target: the label the tool gives it (FR-PRC-22), else its path.
+ * The task is named by its tool and its target: the label the tool gives it, else its path.
  * @param {{ toolId?: string, path?: string|null, targetLabel?: string|null }} task
  * @param {string} toolName  the title of the task's tool, as the user sees it
  * @returns {{ title: string, message: string, confirmText: string, cancelText: string, danger: true, warningTitle?: string, warningMessage?: string }}

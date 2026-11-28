@@ -36,7 +36,7 @@ describe('the panels over the bottom of the map', () => {
         expect(ruleOf(css, '.map-bottom-panel')).toMatch(/max-width:\s*calc\(100% - 2 \* var\(--map-rail-reserve\)\)/);
     });
 
-    it('keep the bottom panel above the scale bar at any size (FR-MAP-30): on a narrow or short map it reaches over the bottom left', () => {
+    it('keep the bottom panel above the scale bar at any size: on a narrow or short map it reaches over the bottom left', () => {
         // The scale bar of OpenLayers with its text is about 3rem high (0.5rem + 25px + 12px of text), under the 4rem of the reserve
         const scaleBar = ruleOf(css, '.map-container .ol-scale-bar');
         expect(scaleBar).toMatch(/bottom:\s*0\.5rem/);
@@ -88,8 +88,8 @@ describe('the panels over the bottom of the map', () => {
     });
 });
 
-// FR-MAP-10: the hint "Photos are in images - Show" at the bottom centre of the map. A narrow or compact map (U-411) brings
-// the bottom-left controls under the middle: the scale bar (FR-MAP-30) stands 0.5rem up and about 3rem high
+// The hint "Photos are in images - Show" at the bottom centre of the map. A narrow or compact map brings
+// the bottom-left controls under the middle: the scale bar stands 0.5rem up and about 3rem high
 describe('the hint of a folder whose subfolder has the map entries', () => {
     const chipSource = readSource(__dirname, './GeoSubfolderChip.vue');
     const chip = ruleOf(chipSource.slice(chipSource.indexOf('<style')), '.geo-subfolder-chip');
@@ -200,7 +200,7 @@ describe('the layers of the map', () => {
     });
 });
 
-describe('the toolbar rail of a compact map (FR-MAP-12, FR-SHR-05)', () => {
+describe('the toolbar rail of a compact map', () => {
     // MapCore puts .is-compact on the map from the size of the map itself; the same rules serve a phone and a 600 x 400 frame
     it('shows the Measure toggle only on a compact map, and nowhere else', () => {
         expect(ruleOf(css, '.ol-measure-toggle')).toMatch(/display:\s*none/);
@@ -229,7 +229,7 @@ describe('the toolbar rail of a compact map (FR-MAP-12, FR-SHR-05)', () => {
     });
 });
 
-describe('the layer names of a map with several layers (FR-RAS-12)', () => {
+describe('the layer names of a map with several layers', () => {
     const split = readSource(__dirname, './RasterSplitOverlay.vue');
 
     it('centres the label of the last band in what the toolbar rail leaves of it, never wider', () => {

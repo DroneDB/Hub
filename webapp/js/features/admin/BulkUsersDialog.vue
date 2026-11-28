@@ -63,7 +63,7 @@ const PERMISSION_OPTIONS = Object.freeze([
 const LISTED = 5;
 
 /**
- * BulkUsersDialog - Add role / Add to organization for the users selected in the Users list (FR-ADM-23). One request per
+ * BulkUsersDialog - Add role / Add to organization for the users selected in the Users list. One request per
  * user, one after the other; the summary says for which users it worked and for which it did not.
  */
 export default {

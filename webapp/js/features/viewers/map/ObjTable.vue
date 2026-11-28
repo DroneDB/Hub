@@ -90,7 +90,7 @@ export default {
             return formatNumber(value, 'value', { trim: true });
         },
 
-        // As every date is written (FR-EXP-26); a capture time that is not known (missing or 0) is "Unknown"
+        // As every date is written; a capture time that is not known (missing or 0) is "Unknown"
         formatCaptureTime(value) {
             return formatDateTime(value, { placeholder: UNKNOWN, seconds: true });
         },

@@ -177,7 +177,7 @@ describe('OrganizationsPage create', () => {
     });
 });
 
-// FR-ORG-04: the dialog closed on a failed create and the typed name was lost; now it stays open at the field
+// The dialog closed on a failed create and the typed name was lost; now it stays open at the field
 describe('OrganizationsPage create with a failure', () => {
     const WindowStub = {
         props: ['busy', 'confirmLabel'],

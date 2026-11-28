@@ -7,13 +7,13 @@
             <div v-else>
                 <h1>Welcome Back</h1>
                 <p>Sign in with your credentials</p>
-                <!-- Why the app brought the user here (the one-shot notice of FR-XC-13) -->
+                <!-- Why the app brought the user here (the one-shot notice) -->
                 <Message v-if="noticeText" severity="info" :closable="false" class="login-notice">{{ noticeText }}</Message>
                 <Card>
                     <template #content>
                         <Form ref="formRef" :resolver="resolver" class="login-form" aria-label="Sign in" @submit="submit(signIn, $event)">
                             <template #default="$form">
-                                <!-- Why the sign-in failed, inside the card, above the fields (FR-ACC-05) -->
+                                <!-- Why the sign-in failed, inside the card, above the fields -->
                                 <Message v-if="formError" severity="error" :closable="false" role="alert" class="login-error">{{ formError }}</Message>
                                 <div class="login-field">
                                     <IconField>
@@ -74,8 +74,8 @@ export default {
         Message, Button, InputText, Card, IconField, InputIcon, ProgressSpinner, Form, PasswordInput, FieldError
     },
     setup: function () {
-        // One form: Enter and the button are one guarded submit (FR-ACC-04), the fields are checked
-        // before any request (FR-ACC-05), and the validators are the ones of libs/accountProblems
+        // One form: Enter and the button are one guarded submit, the fields are checked
+        // before any request, and the validators are the ones of libs/accountProblems
         const form = useHubForm({
             fields: ['username', 'password'],
             // A refusal of the credentials says one thing, whichever of the two is wrong: an
@@ -129,7 +129,7 @@ export default {
             const redirect = this.$route.query.redirect;
             this.$router.replace(isAppPath(redirect) ? withoutNotice(redirect) : homeLocation());
         },
-        // The sign-in starts with the focus in Username (FR-ACC-07)
+        // The sign-in starts with the focus in Username
         focusUsername: async function () {
             await this.$nextTick();
             this.$refs.usernameInput?.$el?.focus();
@@ -146,7 +146,7 @@ export default {
 
 <style scoped>
 #login {
-    /* The card sits at a quarter of the height on a tall screen, not in a thin strip at the top (FR-NAV-10) */
+    /* The card sits at a quarter of the height on a tall screen, not in a thin strip at the top */
     min-height: 100%;
     padding-top: clamp(2rem, 18vh, 20rem);
     text-align: center;

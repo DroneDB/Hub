@@ -4,14 +4,14 @@
  * the shared OL measurements layer so they can be persisted via the regular
  * toolbar Save button.
  *
- * Every request runs as the heavy task `raster-contours` (FR-RAS-11, NFR-001): the dialog follows the task with
+ * Every request runs as the heavy task `raster-contours`: the dialog follows the task with
  * HeavyTaskStatus (progress, Cancel), the lines are the artifact of the task, and a result the server cut at its cap says so.
  *
  * Host requirements:
  *  - this.dataset (Dataset instance exposing submitTask, getTask and taskResult)
  *  - this.rasterFilePath (shared with useRasterAnalysis / useStockpileVolume)
  *  - this.vizParamsByPath (optional; the styles of the layers, shared with useRasterAnalysis): the contours are read with
- *    the NoData value and the thermal formula of the layer, so their levels and labels are in the unit it shows (D-022)
+ *    the NoData value and the thermal formula of the layer, so their levels and labels are in the unit it shows
  *  - this.measureControls (the OL measurements controller, same one used by
  *    useStockpileVolume) for importFromGeoJSON and source access.
  *
@@ -59,7 +59,7 @@ const definition = {
             contourRasterMin: null,
             contourRasterMax: null,
             contourUnit: '',
-            // The raster is an elevation model (FR-RAS-25): the dialog says elevation or value
+            // The raster is an elevation model: the dialog says elevation or value
             contourElevation: true
         };
     },
@@ -97,8 +97,8 @@ const definition = {
         },
 
         /**
-         * The options of the values the layer is read with: the NoData value it is styled with (FR-RAS-31) and its thermal
-         * formula, so the levels and labels are in the unit it shows (D-022; never a Plant Health index formula).
+         * The options of the values the layer is read with: the NoData value it is styled with and its thermal
+         * formula, so the levels and labels are in the unit it shows (never a Plant Health index formula).
          */
         _contourValueOptions() {
             const style = this.vizParamsByPath && this.rasterFilePath ? this.vizParamsByPath[this.rasterFilePath] : null;
@@ -169,11 +169,11 @@ const definition = {
                     const n = result.features.length;
                     this.showFlash(`Generated ${formatNumber(n, 0)} contour line${n === 1 ? '' : 's'}.`, 'positive');
                 }
-                // The lines stop at the cap of the server (FR-RAS-11): a message the user acknowledges
+                // The lines stop at the cap of the server: a message the user acknowledges
                 const cut = contourTruncation(result, this.contourElevation ? 'elevation' : 'value');
                 if (cut.truncated && typeof this.showAlert === 'function') this.showAlert(cut.title, cut.message);
             } catch (e) {
-                // A task that failed or was cancelled is shown by its status in the dialog (FR-XC-06); anything else
+                // A task that failed or was cancelled is shown by its status in the dialog; anything else
                 // (the submit was refused, an unreadable result) has no task row to say it
                 if (!(e && e.task)) {
                     console.error('Contour generation failed:', e);

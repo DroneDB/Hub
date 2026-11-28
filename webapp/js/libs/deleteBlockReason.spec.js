@@ -1,5 +1,5 @@
 /**
- * The rules of the Delete action of the admin lists (FR-ADM-24): one function per list, giving the reason or null.
+ * The rules of the Delete action of the admin lists: one function per list, giving the reason or null.
  */
 import { describe, it, expect } from 'vitest';
 import { userDeleteBlockReason, userDisableBlockReason, organizationDeleteBlockReason } from './deleteBlockReason';

@@ -141,7 +141,7 @@ afterEach(() => {
     _resetPrefListenersForTests();
 });
 
-// FR-MAP-05: the label of the pile on the map writes its volume and density as the panel does
+// The label of the pile on the map writes its volume and density as the panel does
 describe('the label of a measured pile', () => {
     afterEach(() => { delete navigator.language; });
 
@@ -154,7 +154,7 @@ describe('the label of a measured pile', () => {
     });
 });
 
-describe('the label of a measured pile in imperial (FR-MAP-13)', () => {
+describe('the label of a measured pile in imperial', () => {
     afterEach(() => { delete navigator.language; });
 
     it('is built from the metric result in yd³ and ST/yd³, the properties stay metric', async () => {
@@ -169,7 +169,7 @@ describe('the label of a measured pile in imperial (FR-MAP-13)', () => {
     });
 });
 
-describe('Clear (FR-MAP-02, AC-014)', () => {
+describe('Clear', () => {
     it('removes a pile that is not saved from the map', async () => {
         await measure('gravel');
         expect(draft()).toBeDefined();
@@ -210,7 +210,7 @@ describe('Clear (FR-MAP-02, AC-014)', () => {
     });
 });
 
-describe('Clear after a save, then Save, with the real measure control and storage (FR-MAP-02, AC-014)', () => {
+describe('Clear after a save, then Save, with the real measure control and storage', () => {
     let control;
     let olMapOfControl;
     let file;
@@ -615,7 +615,7 @@ describe('the base of a pile', () => {
     });
 });
 
-// FR-MAP-06, FR-XC-17, D-027: Click map and Draw run in the shared drawing session
+// Click map and Draw run in the shared drawing session
 describe('Click map and Draw (the shared drawing session)', () => {
     const key = (k, on = document.body) => on.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
     const drawOf = () => olMap.value.getInteractions().getArray().find(i => i instanceof Draw);
@@ -722,7 +722,7 @@ describe('Click map and Draw (the shared drawing session)', () => {
     });
 });
 
-// FR-MAP-25: "Find all piles" lists the piles of the raster, and the user adopts one as the draft pile
+// "Find all piles" lists the piles of the raster, and the user adopts one as the draft pile
 describe('Find all piles (detect-all)', () => {
     const OTHER = { type: 'Polygon', coordinates: [[[9.01, 45.01], [9.011, 45.01], [9.011, 45.011], [9.01, 45.01]]] };
     const FOUND = {

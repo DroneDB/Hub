@@ -4,7 +4,7 @@
         <Message v-model="error" />
 
         <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table.
-             While the page loads, its frame is there with placeholder rows: the page size is measured on it (FR-XC-34) -->
+             While the page loads, its frame is there with placeholder rows: the page size is measured on it -->
         <ResourceState v-if="loadKind" :kind="loadKind" resource="organization" :name="$route.params.org" />
         <div v-else class="ds-content">
             <!-- Organization header -->
@@ -18,7 +18,7 @@
                             <OrgLogo v-else :org="headerOrg" size="lg" decorative />
                             <div>
                                 <div class="org-title-row">
-                                    <!-- The pencil follows the last word of the name, whatever the lines it takes (FR-ORG-21) -->
+                                    <!-- The pencil follows the last word of the name, whatever the lines it takes -->
                                     <span class="org-title">
                                         <Skeleton v-if="loading && !orgInfo" width="16rem" height="2rem" />
                                         <h1 v-else class="my-0 org-name">{{ orgName }}</h1>
@@ -29,7 +29,7 @@
                                             {{ orgInfo.owner }}
                                         </Tag>
                                         <VisibilityTag v-if="orgInfo" rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
-                                        <!-- The datasets of the organization, not those a search shows (the count is not known before the first page) (FR-ORG-10) -->
+                                        <!-- The datasets of the organization, not those a search shows (the count is not known before the first page) -->
                                         <Tag rounded severity="info" icon="fa-solid fa-database"
                                              :title="loading ? undefined : countOf(orgTotal, 'dataset')">
                                             {{ loading ? '…' : orgTotal }}
@@ -90,7 +90,7 @@
             </DataTable>
             <!-- Where the datasets are -->
             <DatasetLocationsMap v-else-if="view === 'map'" :groups="visibleLocationGroups" :loading="locationsLoading" />
-            <!-- Nothing to list: the empty state, not an empty table with its header (FR-ORG-13) -->
+            <!-- Nothing to list: the empty state, not an empty table with its header -->
             <EmptyState v-else-if="datasets.length === 0" title="No datasets found" items="datasets" :query="searchQuery"
                         class="ds-empty" @clear="searchQuery = ''; $refs.searchField?.focus()">
                 <p v-if="canCreateDataset">This organization has no datasets yet. Create one, import one from another Registry, or upload files.</p>
@@ -119,7 +119,7 @@
                     </template>
                     <template #body="slotProps">
                         <!-- A link (Tab, Enter, open in a new tab) over the whole cell; Shift+F10 or the Menu key opens the row menu -->
-                        <!-- The lock first, on the line of the name: it never wraps alone (FR-ORG-20) -->
+                        <!-- The lock first, on the line of the name: it never wraps alone -->
                         <span class="ds-name-line">
                             <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none"
                                role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
@@ -184,7 +184,7 @@
                                               :disabled-reason="busyBlockReason(slotProps.data.busy) || ''" icon="fa-solid fa-pencil"
                                               label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
                             </RowActionSlot>
-                            <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
+                            <!-- Not solid: the delete of every row would dominate the list -->
                             <RowActionSlot v-if="actionColumns.delete" :shown="rowActions.delete(slotProps.data)">
                                 <Button severity="danger" text size="small" :loading="slotProps.data.deleting"
                                         :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
@@ -209,7 +209,7 @@
                 <Paginator v-if="loading || totalPages > 1" class="ds-paginator"
                            :rows="Number(itemsPerPage)" :total-records="totalDatasets"
                            :first="(currentPage - 1) * itemsPerPage" @page="onPageChange">
-                    <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+                    <!-- The size that fits reads "N (fit)": picking it stores no size -->
                     <template #end>
                         <Select :model-value="itemsPerPage" :options="pageSizeChoices" option-label="label" option-value="value"
                                 aria-label="Datasets per page" class="page-size-select"
@@ -331,7 +331,7 @@ export default {
     },
     setup() {
         const dialogs = useDialogs();
-        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep (FR-XC-34)
+        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep
         const table = ref(null);
         const page = ref(null);
         // The bar below the rows as it is with the paginator (shown, hidden, while the first page loads)
@@ -438,10 +438,10 @@ export default {
             // An anonymous visitor (a Public organization opens without signing in) creates nothing: the Registry
             // sends them no permissions, which the fallback below would read as an older Registry
             if (!reg.isLoggedIn()) return false;
-            // Nothing is offered before the organization loaded, nor when it did not (FR-ACC-02)
+            // Nothing is offered before the organization loaded, nor when it did not
             if (!this.orgInfo) return false;
             // The organization says what the user may do: write creates, read only (a Public organization of
-            // another user, D-003) does not. Without permissions for a signed-in user (an older Registry) a
+            // another user) does not. Without permissions for a signed-in user (an older Registry) a
             // dataset the user may write decides
             const orgPermissions = this.orgInfo.permissions;
             if (orgPermissions) return orgPermissions.canWrite === true;
@@ -496,7 +496,7 @@ export default {
 
             return items;
         },
-        // Rows per page: the size the user chose, else the rows that fit the height (FR-XC-34)
+        // Rows per page: the size the user chose, else the rows that fit the height
         itemsPerPage: function () {
             return this.pageSize;
         },
@@ -507,7 +507,7 @@ export default {
                 sortColumn: this.sortColumn, sortDirection: this.sortDirection
             });
         },
-        // The datasets of the organization, whatever the search shows (FR-ORG-10): what the page counted when none narrows
+        // The datasets of the organization, whatever the search shows: what the page counted when none narrows
         // the list, else the count the organization carries (its members get one), else the last count without a search
         orgTotal: function () {
             if (!this.searchTerm) return this.totalDatasets;
@@ -518,7 +518,7 @@ export default {
         filteredOut: function () {
             return !!this.searchTerm && this.orgTotal > this.totalDatasets;
         },
-        // The map shows what the search matches, by name, slug or tagline, as the list does (FR-ORG-10)
+        // The map shows what the search matches, by name, slug or tagline, as the list does
         visibleLocationGroups: function () {
             if (!this.searchTerm.trim()) return this.locationGroups;
             return this.locationGroups.map(group => ({
@@ -605,7 +605,7 @@ export default {
             if (this.view === 'map') this.loadLocations();
 
             // The header, the toolbar, the table header and the paginator bar are on the page (placeholder rows in
-            // the place of the table): the first page asks for the rows that fit, once (FR-XC-34)
+            // the place of the table): the first page asks for the rows that fit, once
             await this.$nextTick();
             this.measurePageSize();
             // (the watchers of the size measured run before the first page is asked: they ask nothing)
@@ -768,8 +768,8 @@ export default {
             this.importDialogOpen = false;
 
             if (action === 'done') {
-                // The toast that says how it ended is the app's, one for every way an import ends (libs/tasks/importNotices,
-                // FR-UPL-11): here only the list follows
+                // The toast that says how it ended is the app's, one for every way an import ends (libs/tasks/importNotices):
+                // here only the list follows
                 if (payload.success) {
                     this.reloadDatasets();
                 } else {
@@ -786,7 +786,7 @@ export default {
         },
 
         /**
-         * The request of the dataset dialog (D-046, FR-XC-11): it runs while the dialog is open, and a failure is thrown for
+         * The request of the dataset dialog: it runs while the dialog is open, and a failure is thrown for
          * the dialog to show at its field (a slug that is taken: `errors.slug`) or in its form-level message, with the dialog
          * open and what was typed. No toast says it while the dialog is on show.
          */
@@ -853,7 +853,7 @@ export default {
                     dsobj = this.org.Dataset(slug);
                 }
 
-                // The name is the display name: saving it keeps the URL (FR-ORG-08)
+                // The name is the display name: saving it keeps the URL
                 await dsobj.metaSet('name', newds.name);
                 renamed = true;
 
@@ -1227,7 +1227,7 @@ export default {
         flex-shrink: 0;
         padding: var(--ddb-spacing-md) 0;
 
-        /* The actions go under the identity when the name needs the room (FR-ORG-21) */
+        /* The actions go under the identity when the name needs the room */
         .org-header-layout {
             display: flex;
             flex-wrap: wrap;
@@ -1318,7 +1318,7 @@ export default {
     }
 
     /* The rows keep their height, so the paginator is right below the last one; the table shrinks and
-       scrolls its rows (scroll-height="flex") only when they are more than the screen holds (FR-ORG-25) */
+       scrolls its rows (scroll-height="flex") only when they are more than the screen holds */
     .ds-table {
         flex: 0 1 auto;
         /* scroll-height="flex" gives the table the height of its parent: the height of its rows is wanted */
@@ -1327,7 +1327,7 @@ export default {
     }
 
     /* The columns take the width of their content, so the free width goes to the Dataset column and a row
-       reads in one look on a wide screen (FR-ORG-24) */
+       reads in one look on a wide screen */
     .ds-table :deep(.ds-col-date) { width: 11rem; }
     /* A count or a size is one value: "906,06 MB" does not break between the number and its unit */
     .ds-table :deep(.ds-col-count) { width: 6rem; white-space: nowrap; }

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * What an archive extraction says about the entries it did not extract (FR-PRC-30). The Registry writes one log line
+ * What an archive extraction says about the entries it did not extract. The Registry writes one log line
  * per skipped entry, `Skipped: vectors/tool.exe (file type not allowed)` (the first ones; the others are counted:
  * `Skipped: and 12 more`), and ends the extraction with `Extraction complete: 8 extracted, 1 skipped`. The entries that
  * the caller excludes (the internal files of a photogrammetry result) are never named: `Excluded 3 internal file(s)`.

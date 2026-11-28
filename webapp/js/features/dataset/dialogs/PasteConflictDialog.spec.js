@@ -1,6 +1,6 @@
 /**
  * The Paste Conflict window counts the files that clash in words that agree with the count, and
- * resolves with one choice for all of them. With `keepBoth` (uploads, FR-UPL-03) it asks file by
+ * resolves with one choice for all of them. With `keepBoth` (uploads) it asks file by
  * file (Replace / Keep both / Skip) with Apply to all, and resolves with one choice per file.
  */
 import { describe, it, expect } from 'vitest';
@@ -38,7 +38,7 @@ describe('PasteConflictDialog', () => {
         expect(wrapper.emitted('resolve')).toEqual([['overwrite'], ['skip'], ['cancel']]);
     });
 
-    // A move inside one dataset cannot replace (the Registry answers 409, D-040): Keep both or Skip only
+    // A move inside one dataset cannot replace (the Registry answers 409): Keep both or Skip only
     describe('without Replace (a move inside one dataset)', () => {
         const move = paths => open(paths, { verb: 'move', keepBoth: true, replace: false });
 

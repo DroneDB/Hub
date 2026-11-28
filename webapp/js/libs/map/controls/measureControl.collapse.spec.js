@@ -1,6 +1,6 @@
 /**
- * The measure tools of a compact map (a phone, a small embed frame) sit behind one 'Measure' toggle in the rail
- * (FR-MAP-12, FR-SHR-05). Whether the toggle is shown and the tools hidden is the CSS under `.is-compact` (see
+ * The measure tools of a compact map (a phone, a small embed frame) sit behind one 'Measure' toggle in the rail.
+ * Whether the toggle is shown and the tools hidden is the CSS under `.is-compact` (see
  * mapOverlayLayout.spec); here: what the control puts in the rail, and how the toggle opens and closes the tools.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

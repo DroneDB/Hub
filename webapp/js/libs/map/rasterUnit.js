@@ -3,7 +3,7 @@ import { formatNumber, EMPTY_CELL, PRECISION } from '@/libs/format';
 
 /**
  * The unit the values of a single-band raster are shown in (Raster Analysis: range, area
- * statistics, profile, inspected value), and the one formatter of a raster value (FR-RAS-28).
+ * statistics, profile, inspected value), and the one formatter of a raster value.
  *
  * A raster's own unit is its band's unit type, as libddb's raster value info reports it. An
  * elevation model without one is in metres: libddb reads the elevations of a band without a unit
@@ -44,7 +44,7 @@ export function rasterValueUnit(info) {
     return isElevationRaster(info) ? ELEVATION_UNIT : '';
 }
 
-// The units of the band as the files and libddb write them, in the one symbol the Hub shows (FR-RAS-28)
+// The units of the band as the files and libddb write them, in the one symbol the Hub shows
 const UNIT_SYMBOLS = new Map([
     ['c', '°C'], ['°c', '°C'], ['degc', '°C'], ['celsius', '°C'], ['degrees celsius', '°C'],
     ['k', 'K'], ['kelvin', 'K'],
@@ -65,7 +65,7 @@ export function rasterUnitSymbol(unit) {
 }
 
 /**
- * The thermal formulas of ddb (D-022): each gives the values of a thermal raster in its unit, converted from the unit of
+ * The thermal formulas of ddb: each gives the values of a thermal raster in its unit, converted from the unit of
  * the band; the Hub sends the one of the unit the user picks and only formats the answer. The order is that of the Unit select.
  */
 export const THERMAL_UNIT_OPTIONS = Object.freeze([
@@ -96,8 +96,8 @@ export function thermalUnitOfFormula(formula) {
 
 /**
  * The options the value calls of a layer (value info, point, area, profile, contours) read its raster with: the NoData value
- * of its style (FR-RAS-31) and, when it is styled with a thermal formula, that formula, so that ddb answers in the unit the
- * layer shows (D-022). A formula that is not a thermal one (a vegetation index of Plant Health on the same file) is no option
+ * of its style and, when it is styled with a thermal formula, that formula, so that ddb answers in the unit the
+ * layer shows. A formula that is not a thermal one (a vegetation index of Plant Health on the same file) is no option
  * of a value.
  * @param {{ nodata?: number|string|null, formula?: string }|null|undefined} vizParams the style of the layer
  * @returns {{ nodata?: number|string, formula?: string }}
@@ -115,7 +115,7 @@ export function layerValueOptions(vizParams) {
 /**
  * The unit the values of a thermal raster are in, as the file says it (the band's unit): '°C', 'K' or '°F'. '' for a
  * raster that is not thermal and for one whose values are raw counts of a sensor (no calibration, not direct values: they
- * are no temperatures, FR-RAS-06). A calibrated raster without a unit is in degrees Celsius.
+ * are no temperatures). A calibrated raster without a unit is in degrees Celsius.
  * @param {{ isThermal?: boolean, isDirectValue?: boolean, calibration?: unknown, unit?: string }|null|undefined} info
  * @returns {string}
  */
@@ -134,7 +134,7 @@ const roundedText = (/** @type {number} */ value, /** @type {number} */ places) 
 /**
  * A value of a raster in its unit: the one format of the tooltip, the panel, the area statistics, the legend and the
  * chart. The value is the number as shown (rounded to its decimals), the unit its symbol, the text the two with a space,
- * "29.1 °C". It does not convert: the server answers in the unit that was asked (D-022). A temperature has one decimal,
+ * "29.1 °C". It does not convert: the server answers in the unit that was asked. A temperature has one decimal,
  * an elevation in m or ft two (PRECISION), any other value up to three, without trailing zeros.
  * @param {unknown} value
  * @param {string|null|undefined} [unit]

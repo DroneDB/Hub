@@ -1,5 +1,5 @@
 /**
- * Paste of a cut inside one dataset (FR-EXP-04, D-040, FR-XC-07): the Registry refuses a move onto a name that exists (409)
+ * Paste of a cut inside one dataset: the Registry refuses a move onto a name that exists (409)
  * and PUT /obj has no overwrite, so the conflict prompt offers Keep both (a free name, "<stem> (<n>).<ext>") and Skip, never
  * Overwrite. What the paste did not move stays on the clipboard, and a failure is reported once. A copy keeps Overwrite (its
  * endpoint takes it).

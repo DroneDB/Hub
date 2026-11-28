@@ -1,7 +1,7 @@
 /**
- * The Add User window (FR-ADM-08, FR-XC-11): the shared password fields with the policy checklist,
+ * The Add User window: the shared password fields with the policy checklist,
  * the e-mail checked by the shared `emailProblem`, a submit that stays enabled and shows the errors
- * at the fields, and the Registry's `errors` mapped to the fields (D-047), never to a toast.
+ * at the fields, and the Registry's `errors` mapped to the fields, never to a toast.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
@@ -50,7 +50,7 @@ describe('AddUserDialog', () => {
         expect(wrapper.findAll('.password-requirements li').map(i => i.text())).toEqual(['At least 6 characters', 'At least one digit (0-9)']);
     });
 
-    // FR-ADM-02: the rule is stated before any input, and checked while the user types
+    // The rule is stated before any input, and checked while the user types
     it('states the user name rule of the Registry before any input', async () => {
         await render();
         const help = wrapper.find('#add-user-dialog-username-help');

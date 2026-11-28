@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * The thermal mode of the image viewer (FR-RAS-15): what a radiometric R-JPEG shows beyond its picture. The functions are
+ * The thermal mode of the image viewer: what a radiometric R-JPEG shows beyond its picture. The functions are
  * pure: which entries are thermal pictures, the pixel of the raw thermal grid under the pointer, the readout of a value, the
- * palette choices and the thermal fields of the details panel. The values are formatted by the one raster value formatter
- * (FR-RAS-28), in the unit the server answers (D-022); the Hub does not convert.
+ * palette choices and the thermal fields of the details panel. The values are formatted by the one raster value formatter,
+ * in the unit the server answers; the Hub does not convert.
  */
 import { rasterValueParts, thermalBandUnit } from '@/libs/map/rasterUnit';
 import { colormapList, THERMAL_COLORMAPS } from '@/libs/map/colormaps';
@@ -13,7 +13,7 @@ import { formatNumber, fixedLengthParts } from '@/libs/format';
 export const DEFAULT_THERMAL_FORMULA = 'CELSIUS';
 
 /**
- * Whether the entry is a picture of a thermal camera (the sensorCategory libddb gives at the scan, FR-RAS-13).
+ * Whether the entry is a picture of a thermal camera (the sensorCategory libddb gives at the scan).
  * @param {{ properties?: Record<string, any> }|null|undefined} entry
  */
 export function isThermalEntry(entry) {
@@ -29,7 +29,7 @@ export function isThermalEntry(entry) {
  * Whether the value info is that of a radiometric picture: a raw thermal grid with a size, the temperatures of its range, and
  * a calibration. A thermal picture whose values are no temperatures says no unit and no calibration, and is shown as a plain
  * picture: one without raw thermal data (its colour preview), and a DJI R-JPEG, whose raw counts need DJI's own conversion,
- * which ddb does not have (FR-RAS-14).
+ * which ddb does not have.
  * @param {ThermalInfo|null|undefined} info
  */
 export function isRadiometric(info) {
@@ -39,7 +39,7 @@ export function isRadiometric(info) {
 }
 
 /**
- * The notice of a thermal picture that has no temperatures (FR-RAS-06, FR-RAS-14): ddb read no calibration, so the viewer shows
+ * The notice of a thermal picture that has no temperatures: ddb read no calibration, so the viewer shows
  * the picture as shot. A DJI picture says why: its raw sensor values need DJI's own conversion, which is not available yet.
  * '' for a radiometric picture, a picture that is not thermal, or before the value info is known.
  * @param {{ properties?: Record<string, any> }|null|undefined} entry
@@ -54,7 +54,7 @@ export function uncalibratedThermalNotice(entry, info) {
 
 /**
  * The pixel of the raw thermal grid under the pointer. The picture is drawn in a box (the bounding box of the image as the
- * page shows it, zoom included), whatever the size of the bitmap it shows (FR-XC-32): the position in the box, as a fraction,
+ * page shows it, zoom included), whatever the size of the bitmap it shows: the position in the box, as a fraction,
  * gives the pixel of the grid. Null when the pointer is outside the box.
  * @param {{ x: number, y: number }} pointer  the pointer in the page (clientX, clientY)
  * @param {{ left: number, top: number, width: number, height: number }} box  the drawn picture in the page

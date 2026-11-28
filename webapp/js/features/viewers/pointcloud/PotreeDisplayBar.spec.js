@@ -1,5 +1,5 @@
 /**
- * The display bar of the point-cloud viewer (FR-VWR-26): the views, the colour of the points and the unit of the
+ * The display bar of the point-cloud viewer: the views, the colour of the points and the unit of the
  * measurements, in a bar of their own, apart from the tools. The views and the colour do what the icons of the Potree
  * menu do.
  */

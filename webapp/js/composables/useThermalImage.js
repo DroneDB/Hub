@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useThermalImage - the thermal mode of the image viewer (FR-RAS-15, FR-XC-24): for a picture of a thermal camera, the
+ * useThermalImage - the thermal mode of the image viewer: for a picture of a thermal camera, the
  * value info of its raw thermal grid (the range, its size, the calibration), the temperature under the pointer and the choices
  * of the Unit and the palette.
  *
@@ -9,8 +9,8 @@
  *   thermal.notice.value         // a thermal picture without temperatures (no calibration): why it is shown as shot
  *   thermal.pointerAt(pixel)     // the pixel of the raw grid under the pointer (gridPixelAt), null off the picture
  *
- * The values come from ddb in the unit of the formula that was asked (D-022), the pointer is a pixel of the raw thermal grid
- * (an R-JPEG has no geotransform, §7.1), the requests of the pointer are throttled to one in flight with the last pixel kept,
+ * The values come from ddb in the unit of the formula that was asked, the pointer is a pixel of the raw thermal grid
+ * (an R-JPEG has no geotransform), the requests of the pointer are throttled to one in flight with the last pixel kept,
  * and a late answer for another picture, unit or pixel is dropped. The unit and the palette stay while the viewer goes from
  * one picture to the next.
  */

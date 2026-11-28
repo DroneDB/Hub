@@ -4,7 +4,7 @@
  * locations the server gives per organization.
  *
  * A dataset with a location (datasetPlaces) is pinned at the point the server gives for it (a position of
- * its data in the densest cluster of it, FR-ORG-09) or, when it gives none (a dataset of one place), at the
+ * its data in the densest cluster of it) or, when it gives none (a dataset of one place), at the
  * centre of its box. It keeps the box, which the map draws on demand.
  */
 import Feature from 'ol/Feature';

@@ -173,7 +173,7 @@ watch(highlighted, pin => {
 
 /**
  * How the view fits the pins: 10% of the map around them plus the room of the toolbar rail and the bottom controls,
- * read from the tokens of the map, so no pin sits at the edge or under a control (FR-ORG-09)
+ * read from the tokens of the map, so no pin sits at the edge or under a control
  * @param {number} duration
  */
 function fitOptions(duration) {
@@ -283,7 +283,7 @@ onMounted(() => {
         layers: [createBasemapLayer(), pinLayer, boxLayer, labelLayer],
         view: new View({ center: [0, 0], zoom: 2 }),
         controls: defaultMapControls(),
-        // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042)
+        // The canvas is the CSS size x the applied ratio
         pixelRatio: appliedPixelRatio()
     });
     stopPixelRatio = watchPixelRatio(() => map.value?.setPixelRatio(appliedPixelRatio()));

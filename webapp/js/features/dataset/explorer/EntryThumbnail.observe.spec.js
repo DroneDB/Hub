@@ -1,5 +1,5 @@
 /**
- * The Explorer loads a tile's thumbnail when the tile comes into view (FR-EXP-43): it observes the tile's element. The
+ * The Explorer loads a tile's thumbnail when the tile comes into view: it observes the tile's element. The
  * comments before the root element of the template make the component a fragment in a development build (and in the
  * tests), where this.$el is a text node and IntersectionObserver.observe() throws, which broke the dataset page; the
  * tile is observed by its template ref, an element, and the same element is unobserved when it goes.
@@ -18,7 +18,7 @@ const file = {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('EntryThumbnail in view (FR-EXP-43)', () => {
+describe('EntryThumbnail in view', () => {
     it('observes the tile element, which an IntersectionObserver accepts, and unobserves it when unmounted', () => {
         vi.spyOn(thumbs, 'fetch').mockImplementation((uri, size) => `/thumb?size=${size}`);
         const observed = [];

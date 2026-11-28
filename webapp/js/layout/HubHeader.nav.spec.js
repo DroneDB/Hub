@@ -1,5 +1,5 @@
 /**
- * The navigation of the header (FR-NAV-01, FR-NAV-03, FR-NAV-04): Organizations as a link, left out on the
+ * The navigation of the header: Organizations as a link, left out on the
  * page it leads to, the user named beside the avatar (and the role of an administrator), the user menu
  * in labelled groups, the breadcrumb of an organization and of a dataset, and the labels of Download and
  * Settings from md. A real router, so the links are real ones.
@@ -82,7 +82,7 @@ beforeEach(() => {
 });
 afterEach(() => wrapper?.unmount());
 
-describe('the main navigation (FR-NAV-01)', () => {
+describe('the main navigation', () => {
     it('has Organizations as the link of a Main navigation, for a signed-in user; Upload is in the user menu', async () => {
         await renderAt('/upload');
         const nav = wrapper.find('nav[aria-label="Main"]');
@@ -151,7 +151,7 @@ describe('the main navigation (FR-NAV-01)', () => {
     });
 });
 
-describe('the breadcrumb of the header (FR-NAV-03)', () => {
+describe('the breadcrumb of the header', () => {
     it('is not on the list of organizations', async () => {
         await renderAt('/r');
         expect(wrapper.find('.hub-breadcrumb').exists()).toBe(false);
@@ -206,7 +206,7 @@ describe('the breadcrumb of the header (FR-NAV-03)', () => {
     });
 });
 
-describe('the actions of a dataset page (FR-NAV-04)', () => {
+describe('the actions of a dataset page', () => {
     async function onDataset() {
         await renderAt('/r/t-orgs-bulk/bulk-dataset-26');
         const session = useDatasetSessionStore();

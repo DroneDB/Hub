@@ -31,7 +31,7 @@ const FIELD_CHOICES = {
 const allowed = (key, name, value) => !FIELD_CHOICES[key]?.[name] || FIELD_CHOICES[key][name].includes(/** @type {string} */ (value));
 
 /**
- * Marks the page size of settings that keep one (FR-XC-34): `itemsPerPage` is a size the user chose when
+ * Marks the page size of settings that keep one: `itemsPerPage` is a size the user chose when
  * `pageSizeChosen` says so. An older Hub wrote no mark: it stored its default (10) with every save of the other
  * settings, which is no choice (the list fits its height), and any other size only when the user picked it, which is
  * kept as chosen (and written back with the mark by the next save).
@@ -115,7 +115,7 @@ function followSettings(key, apply) {
  * @typedef {object} DatasetTableSettings
  * @property {string} sortColumn
  * @property {'asc'|'desc'} sortDirection
- * @property {number|null} itemsPerPage  the page size the user chose; null: the page fits its height (FR-XC-34)
+ * @property {number|null} itemsPerPage  the page size the user chose; null: the page fits its height
  * @property {boolean} pageSizeChosen  itemsPerPage is a size the user chose (written with it)
  * @property {'list'|'map'} view
  */
@@ -149,7 +149,7 @@ export function saveOpenAfterCreatePreference(value) {
 
 /**
  * @typedef {object} OrgPageSettings
- * @property {number|null} itemsPerPage  the page size the user chose; null: the page fits its height (FR-XC-34)
+ * @property {number|null} itemsPerPage  the page size the user chose; null: the page fits its height
  * @property {boolean} pageSizeChosen  itemsPerPage is a size the user chose (written with it)
  * @property {boolean} ownedOnly
  * @property {string} sortColumn one of ORG_SORT_FIELDS
@@ -194,7 +194,7 @@ export function saveOrgPagePosition(currentPage = 1, scrollTop = 0) {
 /**
  * The rows per page that the user chose for an admin list (PREF.ADMIN_USERS, PREF.ADMIN_TASKS).
  * @param {string} key
- * @returns {number|null} null when none: the list fits its height (FR-XC-34)
+ * @returns {number|null} null when none: the list fits its height
  */
 export function getAdminPageSize(key) {
     return readSettings(key).itemsPerPage;

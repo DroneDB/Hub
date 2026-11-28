@@ -1,5 +1,5 @@
 /**
- * The photo viewer (FR-VWR-12, FR-EXP-38): an overlay dialog on an <img> with zoom, a gallery of the
+ * The photo viewer: an overlay dialog on an <img> with zoom, a gallery of the
  * folder's photos, an Information panel that follows the photo on show, and a bitmap sized to the
  * stage in device pixels (never above the photo's long side).
  */
@@ -97,8 +97,8 @@ describe('PhotoLightbox: the dialog', () => {
     });
 });
 
-describe('PhotoLightbox: the bitmap (FR-EXP-38)', () => {
-    it('asks for the stage in device pixels, in the steps of FR-XC-32', async () => {
+describe('PhotoLightbox: the bitmap', () => {
+    it('asks for the stage in device pixels, in the shared bitmap steps', async () => {
         await open();
         expect(img().getAttribute('src')).toBe('/thumb/a.jpg?size=2048');
     });
@@ -150,7 +150,7 @@ describe('PhotoLightbox: the bitmap (FR-EXP-38)', () => {
     });
 });
 
-describe('PhotoLightbox: a photo the browser cannot show (FR-EXP-38)', () => {
+describe('PhotoLightbox: a photo the browser cannot show', () => {
     it('a 1280 x 960 TIFF in a 1920 stage is a thumbnail at its own size, not the file', async () => {
         await open({ photos: [photo('scan.tif', { width: 1280, height: 960 })] });
         expect(img().getAttribute('src')).toBe('/thumb/scan.tif?size=1280');

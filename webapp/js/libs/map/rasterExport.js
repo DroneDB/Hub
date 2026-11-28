@@ -1,17 +1,17 @@
 // @ts-check
 /**
- * The export of a styled raster (FR-RAS-16, FR-RAS-26, FR-PRC-15, D-023): the words, the window and the refusal that the one
+ * The export of a styled raster: the words, the window and the refusal that the one
  * export control of Raster Analysis and Plant Health (features/viewers/map/RasterExportButton) shares. The Registry
- * counts the size of an export (the value info says it, D-023): nothing here computes one.
+ * counts the size of an export (the value info says it): nothing here computes one.
  */
 import { transformExtent } from 'ol/proj';
 import { pathutils } from 'ddb';
 import { formatBytes } from '@/libs/format';
 
-/** What the export gives with a formula, or a colormap on one band (FR-RAS-26): a picture of the style, in the CRS of the file, not its values. */
+/** What the export gives with a formula, or a colormap on one band: a picture of the style, in the CRS of the file, not its values. */
 export const EXPORT_STYLED_LABEL = 'Export styled image (RGBA GeoTIFF, in the CRS of the file)';
 
-/** What the export gives without a formula (FR-RAS-26): the bands scaled to 8 bits, in the CRS of the file, not its values. */
+/** What the export gives without a formula: the bands scaled to 8 bits, in the CRS of the file, not its values. */
 export const EXPORT_BANDS_LABEL = 'Export scaled bands (8-bit GeoTIFF, in the CRS of the file)';
 
 /**
@@ -27,7 +27,7 @@ function namedBandCount(vizParams) {
 }
 
 /**
- * Whether the export is the RGBA picture of a style (FR-RAS-26). The rule is that of ddb (raster_export.cpp, exportRaster):
+ * Whether the export is the RGBA picture of a style. The rule is that of ddb (raster_export.cpp, exportRaster):
  * a formula makes the RGBA picture, and so does a colormap when the export is exactly one band, as the
  * bands of the style name it, or as the raster has it (`singleBand`: a raster of one data band, a DEM; the panel of Raster
  * Analysis is for such a raster). Several bands, or a preset, are written as bands scaled to 8 bits and the colormap is not
@@ -62,18 +62,18 @@ export function exportNote(vizParams, options) {
     return `${exportsStyledImage(vizParams, options) ? 'The picture of the style' : 'The bands scaled to 8 bits'}, not the values.`;
 }
 
-/** The second export: what the map shows now, at the resolution of the raster (D-023). */
+/** The second export: what the map shows now, at the resolution of the raster. */
 export const EXPORT_EXTENT_LABEL = 'Export visible extent';
 
-/** Why 'Export visible extent' waits while the estimate of the new extent is read (FR-XC-22). */
+/** Why 'Export visible extent' waits while the estimate of the new extent is read. */
 export const EXPORT_CHECKING_SIZE = 'Checking size…';
 
 /** The words of the phases the raster-export task reports, as HeavyTaskStatus shows them ("Exporting 42%"). */
 export const EXPORT_PHASES = Object.freeze({ loading: 'Exporting', rendering: 'Exporting', converting: 'Exporting', done: 'Exporting' });
 
 /**
- * Why an export is refused for its size (FR-XC-22), or '' when it is not: the estimate and the limit of the Registry, with
- * the sizes of the one formatter (FR-XC-08).
+ * Why an export is refused for its size, or '' when it is not: the estimate and the limit of the Registry, with
+ * the sizes of the one formatter.
  * @param {number | null | undefined} bytes  the estimate
  * @param {number | null | undefined} limit  the limit (none: null, 0 or less)
  * @param {{ extent?: boolean }} [options]  extent: the estimate is that of the visible extent
@@ -86,7 +86,7 @@ export function exportRefusal(bytes, limit, { extent = false } = {}) {
 }
 
 /**
- * The visible extent of the map as the WGS 84 window of the export task and of the value info (§7.1).
+ * The visible extent of the map as the WGS 84 window of the export task and of the value info.
  * @param {number[] | null | undefined} extent  [minX, minY, maxX, maxY] in Web Mercator (the map's view)
  * @returns {number[] | null}  [minLon, minLat, maxLon, maxLat] in degrees, or null for an extent that is no place
  */

@@ -52,10 +52,10 @@ describe('DeleteSavedMeasurementsDialog', () => {
     });
 });
 
-// FR-MAP-04: the actions of a row are hidden at rest (opacity 0) and shown on hover; a keyboard user who Tabs onto
+// The actions of a row are hidden at rest (opacity 0) and shown on hover; a keyboard user who Tabs onto
 // Edit, Delete or Move-to-group must see them. The rules are read from the component's own style block (the test
 // environment does not apply it), so the rule that shows the container of the focused control is the one tested.
-describe('MeasurementListDialog row actions for the keyboard (FR-MAP-04)', () => {
+describe('MeasurementListDialog row actions for the keyboard', () => {
     // The rows of the measurements are MeasurementRow's, the group rows the list's
     const styleOf = file => readFileSync(path.resolve(__dirname, file), 'utf8').match(/<style[^>]*>([\s\S]*?)<\/style>/)[1].replace(/\/\*[\s\S]*?\*\//g, '');
     const style = styleOf('MeasurementListDialog.vue') + styleOf('MeasurementRow.vue');

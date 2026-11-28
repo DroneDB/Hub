@@ -21,7 +21,7 @@ export function reportsDeviceMemory(nav = typeof navigator === 'undefined' ? und
 }
 
 /**
- * The memory of this device in GB, for the budgets of the 3D viewers (FR-XC-18): the tile cache
+ * The memory of this device in GB, for the budgets of the 3D viewers: the tile cache
  * of the 3D viewer, the points of the point cloud viewer, the paged splats. Browsers round it down
  * to a power of two and cap it at 8; one that gives no usable value (reportsDeviceMemory) is taken
  * to have DEFAULT_DEVICE_MEMORY_GB.

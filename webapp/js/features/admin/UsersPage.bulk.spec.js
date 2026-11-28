@@ -1,5 +1,5 @@
 /**
- * The Users list (FR-ADM-09, FR-ADM-16, FR-ADM-23, D-030): the button of the organizations is named with the user and
+ * The Users list: the button of the organizations is named with the user and
  * its count, the storage bar is amber from 90 % and red from 100 %, and the rows have checkboxes with bulk actions. A
  * bulk delete asks once, with the choices and the typed confirmation of the delete of one user, and its successor list
  * leaves out every selected user and every disabled user.
@@ -59,7 +59,7 @@ async function typeConfirmation(value) {
 const successors = () => wrapper.findAllComponents({ name: 'Select' }).find(s => s.props('inputId') === 'users-transfer-data-to-successor')
     .props('options').map(o => o.value);
 
-describe('UsersPage organization count (FR-ADM-09)', () => {
+describe('UsersPage organization count', () => {
     it('names the button with the user and the count, for the screen reader and in its tooltip', async () => {
         await render();
         const button = row('alice').find('button[title^="Manage organizations"]');
@@ -70,7 +70,7 @@ describe('UsersPage organization count (FR-ADM-09)', () => {
     });
 });
 
-describe('UsersPage storage column (FR-ADM-16, D-030)', () => {
+describe('UsersPage storage column', () => {
     const storage = name => row(name).find('td[data-label="Storage"]');
 
     it('shows a bar in the colour of its severity, the real percentage over 100, and no bar without a quota', async () => {
@@ -112,7 +112,7 @@ describe('UsersPage storage column when the quota is not enforced', () => {
     });
 });
 
-describe('UsersPage selection and bulk actions (FR-ADM-23)', () => {
+describe('UsersPage selection and bulk actions', () => {
     it('has a checkbox on every row but the built-in admin, and no bulk bar until a user is ticked', async () => {
         await render();
         expect(row('admin').find('input[type="checkbox"]').exists()).toBe(false);

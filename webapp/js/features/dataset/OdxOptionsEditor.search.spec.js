@@ -1,5 +1,5 @@
 /**
- * The options search of the Run Photogrammetry window (FR-PRC-25, FR-PRC-38): the one SearchField (its Escape clears
+ * The options search of the Run Photogrammetry window: the one SearchField (its Escape clears
  * the query and the event is handled, so the dialog around it stays open with every field it holds; with nothing to
  * clear Escape closes the search only), the matching options shown with their groups expanded, and a message when
  * no option matches.
@@ -61,7 +61,7 @@ const escape = () => {
 };
 const rowNames = () => editor().findAllComponents(OdxOptionRow).map(r => r.props('option').name);
 
-describe('Esc in the options search (FR-PRC-25)', () => {
+describe('Esc in the options search', () => {
     it('uses the SearchField, with its clear button, and focuses it when the search opens', async () => {
         await mountInWindow();
         clickButton('Search');
@@ -115,7 +115,7 @@ describe('Esc in the options search (FR-PRC-25)', () => {
     });
 });
 
-describe('the options search results (FR-PRC-38)', () => {
+describe('the options search results', () => {
     it('shows the matching options with their groups expanded', async () => {
         await mountInWindow();
         // every group starts collapsed: its rows are hidden

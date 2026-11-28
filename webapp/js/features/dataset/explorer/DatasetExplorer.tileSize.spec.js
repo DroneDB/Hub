@@ -1,5 +1,5 @@
 /**
- * Another thumbnail size lays the grid out again (FR-EXP-43): in the virtual grid the tile the keyboard is on, else the
+ * Another thumbnail size lays the grid out again: in the virtual grid the tile the keyboard is on, else the
  * first one on screen, stays in view, at its row of the new layout.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -54,7 +54,7 @@ async function mountGrid() {
 
 afterEach(() => { w?.unmount(); scrollElement.scrollTop = 0; vi.clearAllMocks(); });
 
-describe('DatasetExplorer thumbnail size (FR-EXP-43)', () => {
+describe('DatasetExplorer thumbnail size', () => {
     it('keeps the tile the keyboard is on in view: tile 100 is on row 33 of 3 columns at L', async () => {
         await mountGrid();
         w.vm.nav.setActive(100);

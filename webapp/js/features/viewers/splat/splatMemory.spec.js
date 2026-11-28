@@ -25,7 +25,7 @@ describe('pagedSplatBudget', () => {
         expect(budget).toEqual({
             pages: 68, maxPagedSplats: 4456448, bytes: 855638016, bytesPerSplat: 192, memoryGb: 4, mobile: false
         });
-        // NFR-003: the pool of a 4 GB device is within a fifth of its memory
+        // The pool of a 4 GB device is within a fifth of its memory
         expect(budget.bytes).toBeLessThanOrEqual(4 * 1024 ** 3 * 0.2);
         expect(budget.maxPagedSplats % PAGE_SPLATS).toBe(0);
     });

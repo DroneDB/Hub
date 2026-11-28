@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * The summary of a selection of explorer items (FR-EXP-32): how many, how big, of what types, and
+ * The summary of a selection of explorer items: how many, how big, of what types, and
  * the first names. The one place that counts a selection, so the detail panel ("4 items selected
- * — 9.3 MB"), the properties window, the delete confirmation (FR-EXP-08) and the download
- * confirmation (FR-EXP-27) say the same numbers the same way.
+ * — 9.3 MB"), the properties window, the delete confirmation and the download
+ * confirmation say the same numbers the same way.
  *
  * An item is an explorer item ({ path, label, entry }). A folder's entry has size 0, so `size`
  * is the size of the files of the selection; `hasFolder` says that the folders' contents are not

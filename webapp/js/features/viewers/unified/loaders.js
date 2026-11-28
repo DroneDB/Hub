@@ -4,7 +4,7 @@
  * globe), adds its data and frames it. Rasters, vectors and models are placed in Web
  * Mercator (the server serves them so); point clouds in their own CRS, for precision.
  *
- * The loader also picks the navigation of the scene it builds, once (FR-XC-18, D-001): a geo
+ * The loader also picks the navigation of the scene it builds, once: a geo
  * scene (a georeferenced orthophoto, DEM, vector, point cloud or 3D Tiles set) gets the
  * constrained orbit, every other one the free trackball; a 3D model keeps the free trackball even
  * when it is georeferenced.
@@ -23,7 +23,7 @@ import { appliedPixelRatio } from '@/libs/pixelRatio';
 // detail). Older tilesets carry inflated errors and still load their finest LOD here.
 const MODEL_TILES_ERROR_TARGET = 6;
 
-// How long the loading indicator waits for the first frame of a 3D Tiles archive (FR-VWR-20):
+// How long the loading indicator waits for the first frame of a 3D Tiles archive:
 // framed to fit the view its root tile is in the frustum at once, so a longer wait means the tiles
 // are slow; the viewer opens, they go on streaming, and what needs them runs when they come
 const TILES3D_FIRST_RENDER_MS = 5000;
@@ -121,7 +121,7 @@ async function loadLocalVector(scene, entry, dataset) {
         style: {
             stroke: { color: ANALYSIS_COLOR, lineWidth: 2 },
             fill: { color: ANALYSIS_COLOR, opacity: 0.25 },
-            // 8 CSS px: Giro3D sizes the points in the pixels of the drawing buffer (FR-XC-32)
+            // 8 CSS px: Giro3D sizes the points in the pixels of the drawing buffer
             point: { color: '#ffeb3b', pointSize: 8 * appliedPixelRatio() }
         }
     });
@@ -135,7 +135,7 @@ async function loadModel(scene, entry, dataset) {
     scene.view.loadingText = 'Loading 3D model...';
     const url = dataset.Entry(entry).get3DTiles();
     if (!url) throw new Error(`The 3D model '${name(entry)}' is not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been produced for this model yet.`);
-    // A model keeps the free trackball, georeferenced or not (D-001)
+    // A model keeps the free trackball, georeferenced or not
     scene.setupInstance(scene.libs.CoordinateSystem.epsg3857, { nav: 'free' });
     const tileset = await addTileset(scene, url, MODEL_TILES_ERROR_TARGET);
     // Obj2Tiles can emit an empty tileset (infinite volume): it "loads" and shows nothing

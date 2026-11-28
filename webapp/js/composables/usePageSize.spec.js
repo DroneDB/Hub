@@ -23,7 +23,7 @@ function use(options) {
     return sizing;
 }
 
-describe('usePageSize (FR-XC-34)', () => {
+describe('usePageSize', () => {
     it('calculates the size at mount: a list of 1850 px with rows of 48 px holds 38 rows', () => {
         const sizing = use({ height: () => 1850, rowHeight: 48 });
         expect(sizing.pageFit.value).toBe(38);

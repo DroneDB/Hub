@@ -86,7 +86,7 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
         path = camerasPathFor(entry.value.path);
         let text;
         try {
-            // Most splats have no sidecar: it is asked for only when the folder lists it (no 404 in the console, FR-XC-10)
+            // Most splats have no sidecar: it is asked for only when the folder lists it (no 404 in the console)
             if (!(await isListed(dataset.value, path))) {
                 cameras.value = [];
                 return;

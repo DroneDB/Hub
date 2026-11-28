@@ -1,5 +1,5 @@
 /**
- * Admin > Tasks runs the row actions of the dataset Tasks tab (useTaskActions, FR-XC-15) on the task's own dataset:
+ * Admin > Tasks runs the row actions of the dataset Tasks tab (useTaskActions) on the task's own dataset:
  * a cancel, a retry and the log go through the per-dataset endpoints of the row's organization and dataset, a
  * delete through the admin endpoint, and the list is read again after each. The behaviour of the actions themselves
  * is in useTaskActions.spec.
@@ -59,7 +59,7 @@ describe('TasksPage row actions', () => {
     });
 });
 
-// FR-ACC-15: the server refuses the admin rights the client believed in
+// The server refuses the admin rights the client believed in
 describe('TasksPage refused (403)', () => {
     it('goes home with the notice of the guard, not silently', async () => {
         const { deniedLocation } = await import('@/libs/authRoutes');
@@ -86,7 +86,7 @@ describe('TasksPage cancel question', () => {
         return dialog.props;
     }
 
-    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', async () => {
+    it('tells an import that its files and the dataset it created are deleted', async () => {
         const props = await questionFor({ ...TASK, state: 'Processing', toolId: 'import-dataset', targetLabel: null });
         expect(props).toMatchObject({ title: 'Cancel Task', confirmText: 'Cancel Task', cancelText: "Don't Cancel", confirmButtonClass: 'danger' });
         expect(props.warningMessage).toBe('The files imported so far are deleted, and so is the dataset that this import created.');

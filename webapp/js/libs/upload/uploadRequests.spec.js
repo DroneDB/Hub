@@ -1,5 +1,5 @@
 /**
- * uploadRequests and names that exist (FR-UPL-03, D-040): `overwrite=true` goes before the file part
+ * uploadRequests and names that exist: `overwrite=true` goes before the file part
  * (the Registry reads the flag sent before the file), only for an item that replaces; a 409 with
  * conflictPath is passed on, and the next attempt is a new upload (a new id).
  * Run with: npx vitest run webapp/js/libs/upload
@@ -160,7 +160,7 @@ describe('uploadRequests conflicts', () => {
     });
 });
 
-describe('uploadRequests chunk file id (FR-UPL-04, §7.1)', () => {
+describe('uploadRequests chunk file id', () => {
     const LAMB = 'orthos/Lamb.tif';
     const bigFile = (lastModified = 1731000000123, name = 'Lamb-Hill.tif', size = 35) =>
         new File(['x'.repeat(size)], name, { lastModified });
@@ -187,7 +187,7 @@ describe('uploadRequests chunk file id (FR-UPL-04, §7.1)', () => {
         const expected = '067e1f8df03556fe4190e13ec1e3964dcfe96fcb27d84d293694ee63bf016c7e';
         expect(first.calls[0].body.get('fileId')).toBe(expected);
         expect(second.calls[0].body.get('fileId')).toBe(expected);
-        // The commit is asked for by that id (a new file has no state to ask for: FR-XC-10)
+        // The commit is asked for by that id (a new file has no state to ask for)
         expect(first.calls.at(-1).url).toBe(`http://hub/orgs/o/ds/d/obj/chunk/${expected}/commit`);
     });
 
@@ -287,9 +287,9 @@ describe('uploadRequests and the session', () => {
     });
 });
 
-// FR-XC-10: the status of a chunked upload is asked only for an upload that the server holds; a new file's id is
+// The status of a chunked upload is asked only for an upload that the server holds; a new file's id is
 // unknown to it, and a 404 per file would log a console error
-describe('uploadRequests and the open uploads (FR-XC-10)', () => {
+describe('uploadRequests and the open uploads', () => {
     const STORED = 'stored-upload-id';
     const STATUS_URL = `${LIST_URL}/${STORED}`;
 

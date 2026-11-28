@@ -58,7 +58,7 @@ describe('splitRegistryLink', () => {
     });
 });
 
-describe('splitRegistryLink, a ddb tag without a host (FR-UPL-18)', () => {
+describe('splitRegistryLink, a ddb tag without a host', () => {
     it('takes "org/dataset" for a dataset of the default registry, like the ddb command line', () => {
         expect(splitRegistryLink('admin/brighton-beach')).toEqual({
             url: 'https://hub.dronedb.app', organization: 'admin', dataset: 'brighton-beach'

@@ -1,5 +1,5 @@
 /**
- * useStackedLayout (D-026, FR-XC-20): whether the stacked tables are cards, from the media query of the
+ * useStackedLayout: whether the stacked tables are cards, from the media query of the
  * card renderer (below sm, 575.98 px), following the window and letting go of it with its scope.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

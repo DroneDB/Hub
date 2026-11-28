@@ -1,5 +1,5 @@
 /**
- * FR-MAP-29, FR-XC-32: on a screen above ratio 1 the basemap comes from 2x tiles (512 px in 256 px slots) when it has a
+ * On a screen above ratio 1 the basemap comes from 2x tiles (512 px in 256 px slots) when it has a
  * 2x source: Google satellite and hybrid (`scale=2`), a custom XYZ URL with `{r}` (`@2x`). OpenStreetMap and a custom URL
  * without `{r}` have none and stay at 1x.
  */
@@ -38,7 +38,7 @@ afterEach(() => {
     safeStorage.removeItem(PREF.CUSTOM_BASEMAP);
 });
 
-describe('basemap tiles at the screen ratio (FR-MAP-29)', () => {
+describe('basemap tiles at the screen ratio', () => {
     it('at ratio 2 the satellite source has tilePixelRatio 2 and a URL with scale=2', () => {
         vi.stubGlobal('devicePixelRatio', 2);
         setPref(PREF.BASEMAP, 'satellite');

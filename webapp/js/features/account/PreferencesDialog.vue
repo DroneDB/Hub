@@ -65,7 +65,7 @@
  * The preferences store sends what changes to the account. Each tab resets its own sections;
  * "Reset all" asks first, with a confirm window that opens above this one.
  *
- * The Appearance tab (the light or dark theme, D-044) is kept on this device, not with the account:
+ * The Appearance tab (the light or dark theme) is kept on this device, not with the account:
  * its "Reset section" and "Reset all" remove it here.
  *
  * The Notifications tab exists only on a server that sends e-mail; its setting is disabled,
@@ -121,7 +121,7 @@ const confirm = useConfirm(dialogs);
 
 /**
  * The list settings as the lists read them (libs/storageUtils): a page size that an older Hub stored without its mark
- * reads as it meant (FR-XC-34), and a change here is saved with the mark. A change from elsewhere (another tab, the
+ * reads as it meant, and a change here is saved with the mark. A change from elsewhere (another tab, the
  * account, Reset section) is followed without being saved again.
  * @template {Record<string, any>} T
  * @param {() => T} read @param {(settings: T) => void} save @param {(apply: (settings: T) => void) => () => void} follow
@@ -150,7 +150,7 @@ const unifiedViewer = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.
 /** @param {Array<string|number>} values @param {(v: any) => string} [label] */
 const optionsOf = (values, label = String) => values.map(value => ({ value, label: label(value) }));
 
-// No size chosen: a page holds the rows that fit the height of the list (FR-XC-34), which stores nothing
+// No size chosen: a page holds the rows that fit the height of the list, which stores nothing
 const AUTO_PAGE_SIZE = 'auto';
 const PAGE_SIZES = [{ value: AUTO_PAGE_SIZE, label: 'Fit the screen' }, ...optionsOf([5, 10, 25, 50, 100])];
 
@@ -227,7 +227,7 @@ const BUILD_NOTIFICATION_OPTIONS = [
     { value: 'all', label: 'All' },
     { value: 'failed', label: 'Failed or waiting for files' }
 ];
-// The tasks the server e-mails about (FR-PRC-40): photogrammetry, imports, extracts, exports. "Failed only" means the
+// The tasks the server e-mails about: photogrammetry, imports, extracts, exports. "Failed only" means the
 // tasks that failed; a build is the setting above
 const TASK_NOTIFICATION_OPTIONS = [
     { value: 'none', label: 'None' },
@@ -443,7 +443,7 @@ async function resetAll() {
 
 <style scoped>
 /* The window keeps one size for every tab: the panels scroll inside it, not the page. Its width is the size class's
-   (dialog-xl, --ddb-dialog-form-max, FR-XC-33), the tabs take all of it so the 7 labels fit (FR-ACC-23) */
+   (dialog-xl, --ddb-dialog-form-max), the tabs take all of it so the 7 labels fit */
 .pref-tabs {
     width: 100%;
 }

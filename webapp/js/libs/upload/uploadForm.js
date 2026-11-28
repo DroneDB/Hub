@@ -1,18 +1,18 @@
 // @ts-check
 /**
- * The form of the upload page (FR-UPL-02): where the files go (organization), what the dataset is called and who may
+ * The form of the upload page: where the files go (organization), what the dataset is called and who may
  * see it. Pure functions: the page keeps the state.
  */
 
 /**
- * The longest dataset name the Registry accepts (FR-ORG-14; `DatasetDto`): the default name made from a file name is
+ * The longest dataset name the Registry accepts (`DatasetDto`): the default name made from a file name is
  * cut to it.
  */
 export const DATASET_NAME_MAX_LENGTH = 256;
 
 /**
  * The organizations the user may upload to. `GET /orgs` also lists the Public organizations of other users, which can
- * only be read (D-003, FR-ORG-02): they are not destinations.
+ * only be read: they are not destinations.
  * @param {Array<{ slug: string, name?: string, owner?: string, permissions?: { canWrite?: boolean } }>} organizations
  */
 export function writableOrganizations(organizations) {
@@ -52,7 +52,7 @@ export function defaultDatasetName(files) {
 }
 
 /**
- * The refusal that a failed request names for one field of its form (D-047): the first message of
+ * The refusal that a failed request names for one field of its form: the first message of
  * `errors.<field>` of the ValidationProblemDetails the ApiError carries. The member name is read without regard to
  * letter case (the model binder keys by the property name, a handwritten refusal by the camelCase field).
  * @param {unknown} error

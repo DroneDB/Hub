@@ -1,5 +1,5 @@
 /**
- * The point-cloud viewer's controls (FR-VWR-26, D-027), in two bars of one look. Top left, what the user does to the
+ * The point-cloud viewer's controls, in two bars of one look. Top left, what the user does to the
  * cloud: the one MeasureToolbar with labelled measuring tools that start what the icons of the Potree menu start, then
  * the clip volume once the cloud is loaded, and undo and Save once there are measurements. Bottom left, how the cloud
  * is shown: the views, Colour by and the unit. Potree is a stand-in that records what it is asked.
@@ -143,7 +143,7 @@ afterEach(() => {
     delete globalThis.$;
 });
 
-describe('PotreeViewer on a HiDPI screen (FR-VWR-33, FR-VWR-36)', () => {
+describe('PotreeViewer on a HiDPI screen', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it('draws at the applied ratio: min(devicePixelRatio, 2), and the labels of Potree at the same one', async () => {
@@ -390,7 +390,7 @@ describe('PotreeViewer menu style (the sidebar of Potree kept for the advanced s
     });
 });
 
-describe('PotreeViewer fullscreen (FR-VWR-38)', () => {
+describe('PotreeViewer fullscreen', () => {
     let shellProps;
     const Shell = {
         props: { fullscreenButton: Boolean, fullscreenCorner: { type: String, default: null }, fullscreenKey: { type: Function, default: null } },

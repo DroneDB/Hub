@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Zoom and pan of one picture inside a stage (the photo viewer, FR-VWR-12): the wheel, a
+ * Zoom and pan of one picture inside a stage (the photo viewer): the wheel, a
  * pinch, a double click or tap, and a drag while zoomed. The state is a scale and an offset
  * from the centre of the stage; the picture is drawn with
  * `transform: translate(x px, y px) scale(s)` from its centre.

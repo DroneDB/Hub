@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * Why an entry of an admin list cannot be deleted, one rule per list, written once (FR-ADM-24): the list's Delete
- * action is off while it gives a reason, and says that reason (ActionButton: aria-describedby and tooltip, FR-XC-22).
+ * Why an entry of an admin list cannot be deleted, one rule per list, written once: the list's Delete
+ * action is off while it gives a reason, and says that reason (ActionButton: aria-describedby and tooltip).
  * The Registry refuses the same deletions: these rules only tell the user before the click.
  */
 

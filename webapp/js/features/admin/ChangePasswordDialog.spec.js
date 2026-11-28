@@ -1,5 +1,5 @@
 /**
- * The admin's Change Password window (FR-ADM-08, FR-ADM-20, FR-XC-11): it uses the shared password
+ * The admin's Change Password window: it uses the shared password
  * fields (rules, live mismatch), the current password stays optional, errors show at the fields
  * and in the window, never in a toast.
  */
@@ -50,7 +50,7 @@ describe('admin ChangePasswordDialog', () => {
         expect(wrapper.findAll('button.password-toggle')).toHaveLength(3);
     });
 
-    it('turns autocomplete off on the three fields: the passwords are not the admin\'s own (FR-ACC-07)', async () => {
+    it('turns autocomplete off on the three fields: the passwords are not the admin\'s own', async () => {
         await render();
         expect(wrapper.find('input[name="currentPassword"]').attributes('autocomplete')).toBe('off');
         expect(wrapper.find('input[name="newPassword"]').attributes('autocomplete')).toBe('off');

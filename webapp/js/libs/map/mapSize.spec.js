@@ -1,5 +1,5 @@
 /**
- * The size class of a map follows the size of the map, not the window (FR-MAP-12, FR-SHR-05): a phone, a narrow pane
+ * The size class of a map follows the size of the map, not the window: a phone, a narrow pane
  * and the default 600 x 400 frame of an embed are all handled by the same rule.
  */
 import { describe, it, expect, afterEach } from 'vitest';

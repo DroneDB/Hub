@@ -1,5 +1,5 @@
 /**
- * The toast of a background import that ends (FR-UPL-11, FR-XC-16, D-004): the store of the app tracks the import after the
+ * The toast of a background import that ends: the store of the app tracks the import after the
  * dialog is closed with "Run in background", and a finished task gives "Import complete" with a link to the dataset; a failed
  * one gives "Import failed" with the task error, and the link only while the dataset still exists.
  */

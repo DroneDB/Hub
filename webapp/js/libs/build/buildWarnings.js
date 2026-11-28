@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The words of the warning codes of an entry (FR-EXP-18): libddb tags a warning it can name (`properties.warningCode`)
+ * The words of the warning codes of an entry: libddb tags a warning it can name (`properties.warningCode`)
  * besides its free text. This table is the one place that turns a code into words for users, and says what the warning
  * means for the file: the Properties of a file and the check before a viewer opens (fileAvailabilityChecker) both read it.
  *

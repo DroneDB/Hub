@@ -1,6 +1,6 @@
 /**
  * An index histogram with outliers is shown on the range of the values the index can have (the server bins the range
- * worth showing itself, D-041: the Hub takes no percentiles); without bins enough there, no bars but the handles keep apart.
+ * worth showing itself: the Hub takes no percentiles); without bins enough there, no bars but the handles keep apart.
  */
 import { describe, it, expect } from 'vitest';
 import * as histogramRange from './histogramRange';
@@ -59,7 +59,7 @@ describe('shownHistogram', () => {
         expect(shownHistogram(plain, stats, [-1, 1]).trimmed).toBe(true);
     });
 
-    it('does not trim a formula without a range: the Hub takes no range from percentiles (D-041)', () => {
+    it('does not trim a formula without a range: the Hub takes no range from percentiles', () => {
         const h = histogram(-1000, 1000, 2000, () => 1);
         const shown = shownHistogram(h, { min: -1000, max: 1000, percentiles: { p2: 0, p98: 10 } }, null);
         expect(shown.domain).toEqual([-1000, 1000]);
@@ -80,7 +80,7 @@ describe('shownHistogram', () => {
 });
 
 describe('the Hub computes no stretch', () => {
-    it('has no percentile range any more (D-041, FR-RAS-34)', () => {
+    it('has no percentile range any more', () => {
         expect(histogramRange.percentileRange).toBeUndefined();
     });
 });

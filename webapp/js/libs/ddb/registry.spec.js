@@ -138,7 +138,7 @@ describe('Registry writes and the request cache', () => {
         expect(gets('/users/preferences')).toBe(2);
     });
 
-    // FR-XC-05: skipUnauthorized is part of the cache key
+    // SkipUnauthorized is part of the cache key
     it('a silent and a normal GET of the same endpoint are two flights', async () => {
         const reg = newRegistry();
         await Promise.all([

@@ -1,5 +1,5 @@
 /**
- * What an archive extraction says about the entries it skipped (FR-PRC-30). The lines are those the Registry writes to the
+ * What an archive extraction says about the entries it skipped. The lines are those the Registry writes to the
  * task log (DatasetArchiveExtractor, ArchiveExtractionResult.LogLines); the expected texts are literals.
  */
 import { describe, it, expect } from 'vitest';

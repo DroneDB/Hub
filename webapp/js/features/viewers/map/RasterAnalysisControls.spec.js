@@ -66,7 +66,7 @@ describe('RasterAnalysisControls area statistics', () => {
         expect(statRows().some(r => r.startsWith('No data'))).toBe(false);
     });
 
-    // D-022: ddb answers in the unit of the selected formula, the panel adds nothing to the numbers
+    // Ddb answers in the unit of the selected formula, the panel adds nothing to the numbers
     it('shows the values of a thermal area as the server sends them, in the unit of the selected formula', async () => {
         await render();
         wrapper.vm.rasterInfo = { valueMin: 20, valueMax: 40, isThermal: true, calibration: {} };
@@ -117,7 +117,7 @@ describe('RasterAnalysisControls spot value', () => {
         expect(byId('raster-spot-value').text()).toContain('50.981127, 21.430550');
     });
 
-    // Spot coordinates are the clicked point (FR-RAS-02): the server answers with it
+    // Spot coordinates are the clicked point: the server answers with it
     it('shows the clicked point, not the centre of its pixel', async () => {
         await render({ spotInfo: { value: 12.9, x: 50, y: 50, hasGeo: true, geoX: 15.0012848, geoY: 45.152568, lon: 15.0012849, lat: 45.1525681 } });
         expect(byId('raster-spot-value').text()).toContain('45.152568, 15.001285');
@@ -135,7 +135,7 @@ describe('RasterAnalysisControls elevation model', () => {
 
     it('shows the selector with two rasters to work on, and the current one', async () => {
         await render({ filePath: 'odm_dem/dsm.tif', targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
-        // Any raster can be analysed, so the label is neutral (FR-RAS-25); only the stockpile tool takes elevation models
+        // Any raster can be analysed, so the label is neutral; only the stockpile tool takes elevation models
         expect(wrapper.find('.analysis-target label').text()).toBe('Raster');
         expect(wrapper.text()).not.toContain('Elevation model');
         expect(select().findAll('option').map(o => o.text())).toEqual(['dtm.tif', 'dsm.tif']);
@@ -154,7 +154,7 @@ describe('RasterAnalysisControls elevation model', () => {
     });
 });
 
-// FR-RAS-10: Rescale is two number fields; a range that is not valid shows its error at the field and the map does not change
+// Rescale is two number fields; a range that is not valid shows its error at the field and the map does not change
 describe('RasterAnalysisControls rescale fields', () => {
     const min = () => wrapper.find('#raster-analysis-controls-rescale-min');
     const max = () => wrapper.find('#raster-analysis-controls-rescale-max');
@@ -193,7 +193,7 @@ describe('RasterAnalysisControls rescale fields', () => {
     });
 });
 
-// FR-RAS-31: the NoData value of the panel goes with the vizParams of the layer, and the file's own is explained
+// The NoData value of the panel goes with the vizParams of the layer, and the file's own is explained
 describe('RasterAnalysisControls NoData value', () => {
     const input = () => byId('raster-nodata-input');
 
@@ -262,14 +262,14 @@ describe('RasterAnalysisControls NoData value', () => {
 });
 
 
-// FR-RAS-01, FR-RAS-17, FR-RAS-24: the default style is the one function (defaultVizParams) over the value info of the
+// The default style is the one function (defaultVizParams) over the value info of the
 // server; a panel that is closed styles nothing, and closing it keeps the style of the layer
 describe('RasterAnalysisControls default style', () => {
-    // The value info of LisbonElevation.tif: negative heights, no NoData value, the stretch of ddb (D-041)
+    // The value info of LisbonElevation.tif: negative heights, no NoData value, the stretch of ddb
     const LISBON = { valueMin: -6.3, valueMax: 216, bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', stretch: [{ min: -6.3, max: 216 }] };
     const last = () => wrapper.emitted('vizParamsChanged').at(-1)[0];
     const unitInput = () => wrapper.find('#raster-analysis-controls-unit-name');
-    // The Rescale range of the two fields (U-401 RescaleFields) as the panel's machine value "min,max", '' when both are empty
+    // The Rescale range of the two fields (RescaleFields) as the panel's machine value "min,max", '' when both are empty
     const rescaleShown = () => {
         const min = wrapper.find('#raster-analysis-controls-rescale-min').element.value;
         const max = wrapper.find('#raster-analysis-controls-rescale-max').element.value;
@@ -319,7 +319,7 @@ describe('RasterAnalysisControls default style', () => {
         expect(last()).toEqual({ colormap: 'plasma', rescale: '1,2' });
     });
 
-    // FR-RAS-17: Stockpile Volume takes the raster with the panel closed
+    // Stockpile Volume takes the raster with the panel closed
     it('reads and styles nothing while it is closed, whatever raster the other tools take', async () => {
         await render({ visible: false, filePath: null }, LISBON);
         const dataset = wrapper.props('dataset');
@@ -358,7 +358,7 @@ describe('RasterAnalysisControls default style', () => {
         expect(last()).toEqual({ colormap: 'viridis', rescale: '-6.3,216' });
     });
 
-    // FR-RAS-24: without value info there is no range: Reset keeps the server's own stretch, not the 0-65535 fallback
+    // Without value info there is no range: Reset keeps the server's own stretch, not the 0-65535 fallback
     it('Reset after a value info that failed to load sets no rescale', async () => {
         vi.spyOn(console, 'error').mockImplementation(() => {});
         const dataset = { getRasterValueInfo: vi.fn(async () => { throw new Error('500'); }) };
@@ -377,7 +377,7 @@ describe('RasterAnalysisControls default style', () => {
     });
 });
 
-// FR-RAS-28: one format for a value and its unit
+// One format for a value and its unit
 describe('RasterAnalysisControls value format', () => {
     it('writes a Celsius value with one decimal and the symbol after a space', async () => {
         await render({ spotInfo: { value: 29.06, x: 1, y: 1, hasGeo: false } },
@@ -387,7 +387,7 @@ describe('RasterAnalysisControls value format', () => {
     });
 });
 
-// FR-RAS-16: the export of Raster Analysis is the one export control (a task), not a direct download; one over the limit is a
+// The export of Raster Analysis is the one export control (a task), not a direct download; one over the limit is a
 // button that can be focused with its reason as visible text
 describe('RasterAnalysisControls export', () => {
     // The items are in the menu of the Export button, which is closed until it is opened
@@ -422,7 +422,7 @@ describe('RasterAnalysisControls export', () => {
         expect(byId('raster-export-extent').attributes('aria-disabled')).toBeUndefined();
     });
 
-    // FR-RAS-26: ddb writes the RGBA image of a DEM painted with a colormap (as of a formula, the thermal unit)
+    // Ddb writes the RGBA image of a DEM painted with a colormap (as of a formula, the thermal unit)
     it('names the file of the export after the style: a styled image for an elevation raster with its colormap and for a thermal unit', async () => {
         await render();
         await openMenu();
@@ -459,7 +459,7 @@ describe('RasterAnalysisControls export', () => {
     });
 });
 
-// FR-RAS-25: a raster that is not an elevation model has values and no elevations
+// A raster that is not an elevation model has values and no elevations
 describe('RasterAnalysisControls Contours button wording', () => {
     const contours = () => byId('raster-contours-btn');
 
@@ -486,7 +486,7 @@ describe('RasterAnalysisControls Contours button wording', () => {
     });
 });
 
-// FR-RAS-23: the action grid is the footer of the panel, not part of the body that scrolls
+// The action grid is the footer of the panel, not part of the body that scrolls
 describe('RasterAnalysisControls footer', () => {
     it('has its actions in one row in the footer of the panel, the export menu closed', async () => {
         await render();
@@ -531,7 +531,7 @@ describe('RasterAnalysisControls footer', () => {
     });
 });
 
-// The thermal units (FR-RAS-03, FR-RAS-06, D-022, AC-011): the panel shows the values of ddb in the unit of its Unit select,
+// The thermal units: the panel shows the values of ddb in the unit of its Unit select,
 // which starts at the unit of the band. As libddb's raster value info answers a Float32 GeoTIFF in K, one in degrees Celsius,
 // and the raw counts of a sensor.
 describe('RasterAnalysisControls thermal units', () => {
@@ -561,7 +561,7 @@ describe('RasterAnalysisControls thermal units', () => {
     const last = () => wrapper.emitted('vizParamsChanged').at(-1)[0];
     // The range of the values, as the Range row's caption says it
     const range = () => byId('rescale-data-range').find('.rescale-data').text();
-    // The Rescale range of the two fields (U-401 RescaleFields) as the panel's machine value "min,max"
+    // The Rescale range of the two fields (RescaleFields) as the panel's machine value "min,max"
     const rescaleShown = () => `${wrapper.find('#raster-analysis-controls-rescale-min').element.value},${wrapper.find('#raster-analysis-controls-rescale-max').element.value}`;
     // The user types a range and leaves the field (the commit the panel applies)
     const typeRescale = async (min, max) => {
@@ -630,7 +630,7 @@ describe('RasterAnalysisControls thermal units', () => {
         expect(wrapper.vm.rasterInfo).toMatchObject({ unit: '°F', valueMin: 44.51, valueMax: 95.45 });
     });
 
-    // D-022: a rescale keeps its temperatures when the unit changes: it goes with the unit it was written in
+    // A rescale keeps its temperatures when the unit changes: it goes with the unit it was written in
     it('sends the rescale with the unit it was written in after the unit changed', async () => {
         await mountThermal(KELVIN, KELVIN_IN);
         expect(rescaleLabel()).toBe('Range (K)');
@@ -670,7 +670,6 @@ describe('RasterAnalysisControls thermal units', () => {
         expect(select().element.value).toBe('KELVIN');
     });
 
-    // FR-RAS-06
     it('says that the values of a raster in degrees Celsius are in the file, with its Unit select and no notice', async () => {
         await mountThermal(CELSIUS);
         expect(wrapper.find('[data-testid="raster-thermal-notice"]').exists()).toBe(false);

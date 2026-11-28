@@ -24,7 +24,7 @@ export const PRIMARY = Object.freeze({
 });
 
 /**
- * The keyboard focus ring of the Hub, in the light and the dark theme (FR-XC-21): the one set the
+ * The keyboard focus ring of the Hub, in the light and the dark theme: the one set the
  * PrimeVue preset (theme.js), the focus-ring mixin of css/app.scss and css/ol-controls.css draw
  * with. css/_variables.scss keeps a copy (--ddb-focus-ring-*) that a spec holds equal to it.
  *

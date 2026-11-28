@@ -1,5 +1,5 @@
 /**
- * SearchField (FR-XC-20, FR-ORG-18, FR-EXP-31): the one search box. A 'Clear search' button while it
+ * SearchField: the one search box. A 'Clear search' button while it
  * has text, Escape empties it, and the dialog around it keeps the key only while there is something to clear.
  */
 import { describe, it, expect } from 'vitest';

@@ -140,7 +140,7 @@ describe('TransferDialog', () => {
         expect(label.text()).toBe('Dest');
     });
 
-    it('starts in the current organization, with its datasets loaded (EXP-13)', async () => {
+    it('starts in the current organization, with its datasets loaded', async () => {
         const datasets = vi.fn(async () => [{ slug: 'ds', properties: {} }, { slug: 'other', properties: { meta: { name: { data: 'Other' } } } }]);
         getOrganizations.mockResolvedValueOnce([{ org: { slug: 'org', name: 'Org', permissions: writable } }, { org: { slug: 'dest', name: 'Dest', permissions: writable } }]);
         const spy = vi.spyOn(await import('@/libs/api/sharedRegistry').then(m => m.default), 'Organization')

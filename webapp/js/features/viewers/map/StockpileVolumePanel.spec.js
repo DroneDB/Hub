@@ -48,7 +48,7 @@ const twoDecimals = n => n.toLocaleString(navigator.language, { minimumFractionD
 beforeEach(() => { h.auth.isLoggedIn = true; });
 afterEach(() => wrapper?.unmount());
 
-describe('StockpileVolumePanel icon (FR-MAP-24)', () => {
+describe('StockpileVolumePanel icon', () => {
     it('has a heap in front of its title, not the stacked layers nor a mountain', () => {
         render();
         const icon = wrapper.find('.panel-title i');
@@ -169,7 +169,7 @@ describe('StockpileVolumePanel elevation model', () => {
     });
 });
 
-// FR-MAP-06: the buttons show the tool the map is in; at rest none looks selected
+// The buttons show the tool the map is in; at rest none looks selected
 describe('StockpileVolumePanel Click map and Draw state', () => {
     const click = () => wrapper.find('[data-testid="stockpile-click-btn"]');
     const draw = () => wrapper.find('[data-testid="stockpile-draw-btn"]');
@@ -206,7 +206,7 @@ describe('StockpileVolumePanel Click map and Draw state', () => {
     });
 });
 
-describe('StockpileVolumePanel on a map narrower than sm (FR-MAP-16)', () => {
+describe('StockpileVolumePanel on a map narrower than sm', () => {
     const scrolled = vi.fn();
     beforeEach(() => { Element.prototype.scrollIntoView = scrolled; scrolled.mockClear(); });
     afterEach(() => { delete Element.prototype.scrollIntoView; });
@@ -298,7 +298,7 @@ describe('StockpileVolumePanel on a map narrower than sm (FR-MAP-16)', () => {
     });
 });
 
-// FR-MAP-27: a custom material with a density the catalog refuses says so at the field, and the rows stay with the reason
+// A custom material with a density the catalog refuses says so at the field, and the rows stay with the reason
 describe('StockpileVolumePanel custom density', () => {
     const density = () => wrapper.find('[data-testid="stockpile-custom-density"]');
     const error = () => wrapper.find('[data-testid="stockpile-density-error"]');
@@ -352,7 +352,7 @@ describe('StockpileVolumePanel custom density', () => {
     });
 });
 
-// FR-MAP-25: "Find all piles" and the list of what it found
+// "Find all piles" and the list of what it found
 describe('StockpileVolumePanel Find all piles', () => {
     // Each pile of the list: the detection, with its measured volume (`measured`) and the state of that measuring
     const PILES = [
@@ -445,7 +445,7 @@ describe('StockpileVolumePanel Find all piles', () => {
     it('lists them in yd³ and imperial areas for an imperial map', () => {
         render({ piles: [PILES[0]], unitPref: 'imperial' });
         const cells = rows()[0].findAll('span').map(s => s.text());
-        // 8097.19 m³ is 10,590.72 yd³ and 1234.5 m² is 13,288.05 ft² (FR-XC-08)
+        // 8097.19 m³ is 10,590.72 yd³ and 1234.5 m² is 13,288.05 ft²
         expect(cells[2]).toBe('10,590.72 yd³');
         expect(cells[1]).toBe('13,288.05 ft²');
     });

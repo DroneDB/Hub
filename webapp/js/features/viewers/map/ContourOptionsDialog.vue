@@ -86,7 +86,7 @@
                 <small class="form-hint">0 disables simplification.</small>
             </div>
 
-            <!-- A long run: the levels it will draw (FR-RAS-11); Generate asks before it starts -->
+            <!-- A long run: the levels it will draw; Generate asks before it starts -->
             <div v-if="levelsWarning" class="form-warning" role="status" data-testid="contour-levels-warning">
                 <i class="fas fa-exclamation-triangle" aria-hidden="true" /> {{ levelsWarning }}
             </div>
@@ -101,7 +101,7 @@
                 <i class="fas fa-exclamation-triangle" /> {{ error }}
             </div>
 
-            <!-- The task: queued, running with its progress and a Cancel, failed with its reason, cancelled (FR-XC-15) -->
+            <!-- The task: queued, running with its progress and a Cancel, failed with its reason, cancelled -->
             <HeavyTaskStatus :task="task" label="Contours" cancellable :cancelling="cancelling"
                              @cancel="cancelHeavyTask($event, 'Contour lines')" />
         </div>
@@ -143,7 +143,7 @@ export default {
         task: { type: Object, default: null },
         // Why the latest request has no task: it was refused, or its result could not be read
         error: { type: String, default: '' },
-        // The raster is an elevation model (isElevationRaster): any other raster (a thermal mosaic) has values, not elevations (FR-RAS-25)
+        // The raster is an elevation model (isElevationRaster): any other raster (a thermal mosaic) has values, not elevations
         elevation: { type: Boolean, default: true }
     },
     emits: ['update:visible', 'generate', 'cancel'],

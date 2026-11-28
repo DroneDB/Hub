@@ -28,7 +28,7 @@
                 </div>
             </div>
 
-            <!-- The users selected in the table, and what can be done to all of them at once (FR-ADM-23) -->
+            <!-- The users selected in the table, and what can be done to all of them at once -->
             <div v-if="selectedUsers.length" class="bulk-bar" role="region" aria-label="Actions for the selected users">
                 <span class="bulk-count" role="status">{{ countOf(selectedUsers.length, 'user') }} selected</span>
                 <Button severity="secondary" size="small" icon="fa-solid fa-user-tag" label="Add role" @click="bulkMode = 'role'" />
@@ -42,14 +42,14 @@
             </div>
 
             <!-- Users Table -->
-            <!-- A page holds the rows that fit the height, or the rows the user chose (FR-ADM-29) -->
+            <!-- A page holds the rows that fit the height, or the rows the user chose -->
             <DataTable ref="table" v-model:first="first" :value="filteredUsers" data-key="userName" :class="STACKED_TABLE_CLASS"
                        paginator :rows="pageSize" :page-link-size="3"
                        :always-show-paginator="false"
                        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink"
                        sort-field="userName" :sort-order="1"
                        striped-rows row-hover @page="onPage">
-                <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+                <!-- The size that fits reads "N (fit)": picking it stores no size -->
                 <template #paginatorend>
                     <Select :model-value="pageSize" :options="pageSizeChoices" option-label="label" option-value="value"
                             aria-label="Users per page" class="page-size-select" @update:model-value="rows => onPage({ rows })" />
@@ -101,7 +101,7 @@
                 <Column field="datasetCount" header="Datasets" :sortable="true" class="col-fit" v-bind="stackedColumn('Datasets', 'lg', {}, sortableHeaderPt(stacked))" />
                 <Column field="storageUsed" header="Storage" :sortable="true" class="col-fit" v-bind="stackedColumn('Storage', undefined, {}, sortableHeaderPt(stacked))">
                     <template #body="slotProps">
-                        <!-- The bar is amber from 90 % and red from 100 % (D-030); with no quota there is no bar -->
+                        <!-- The bar is amber from 90 % and red from 100 %; with no quota there is no bar -->
                         <div v-if="!usageOf(slotProps.data).unlimited">
                             {{ usageOf(slotProps.data).usedText }} / {{ usageOf(slotProps.data).totalText }}
                             <ProgressBar :value="usageOf(slotProps.data).barValue" :show-value="false" style="height: 1rem;" class="mt-1"
@@ -173,7 +173,7 @@
         <!-- The Disable question -->
         <DialogHost :dialogs="dialogs" />
 
-        <!-- Delete User Confirmation Dialog: one user, or the selected ones with the same choices (FR-ADM-17, FR-ADM-23) -->
+        <!-- Delete User Confirmation Dialog: one user, or the selected ones with the same choices -->
         <!-- Deleting all the data asks for the user name (several users: their number) to be typed; a transfer does not -->
         <ConfirmDialog v-if="showDeleteDialog"
                        v-bind="deleteDialog" :busy="deleteBusy"
@@ -316,7 +316,7 @@ export default {
     },
     setup() {
         const dialogs = useDialogs();
-        // A page holds the rows that fit the height until the user chooses a size, which stays across visits (FR-XC-34)
+        // A page holds the rows that fit the height until the user chooses a size, which stays across visits
         const table = ref(null);
         const page = ref(null);
         const sizing = usePageSize({
@@ -327,7 +327,7 @@ export default {
             rowHeight: () => averageRowHeight(table.value, 'tbody tr', 60),
             initial: getAdminPageSize(PREF.ADMIN_USERS)
         });
-        // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order (D-026)
+        // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order
         return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), selectableUser, countOf, ...sizing, table, page };
     },
     data: function () {
@@ -350,7 +350,7 @@ export default {
             // The user name of the session: its own account cannot be disabled
             signedInUserName: reg.getUsername(),
 
-            // The user names ticked in the table (FR-ADM-23), and the bulk action that runs
+            // The user names ticked in the table, and the bulk action that runs
             selected: [],
             bulkBusy: false,
             // The delete request runs: the question stays open but cannot be answered again
@@ -459,7 +459,7 @@ export default {
         bytesToSize,
         // The quota is a bar only where the server applies it: the storage limiter is on and the user is not an administrator
         usageOf: user => storageUsage(user.storageUsed, reg.features.get(Features.STORAGE_LIMITER) && !(user.roles ?? []).some(isAdminRole) ? user.storageQuota : null),
-        // 'Manage organizations of tadminuser (2)': the name of the button, which shows only the number (FR-ADM-09)
+        // 'Manage organizations of tadminuser (2)': the name of the button, which shows only the number
         organizationsLabel: user => `Manage organizations of ${user.userName} (${user.organizationCount})`,
         isDisabledUser,
         pickableRoles,
@@ -564,7 +564,7 @@ export default {
             }
         },
 
-        // ---- selection (FR-ADM-23) ----
+        // ---- selection ----
 
         toggleUser(user, checked) {
             const others = this.selected.filter(name => name !== user.userName);
@@ -635,7 +635,7 @@ export default {
             this.startDelete([user]);
         },
 
-        // The question for one user or several: the same choices and the same typed confirmation (FR-ADM-17, FR-ADM-23)
+        // The question for one user or several: the same choices and the same typed confirmation
         startDelete(users) {
             if (!users.length) return;
             this.usersToDelete = users;

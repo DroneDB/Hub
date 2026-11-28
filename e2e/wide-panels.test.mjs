@@ -1,11 +1,10 @@
 /**
- * Side panels, analysis panels and tool windows on wide screens, end to end (AC-038, AC-001; FR-XC-33; FR-EXP-40,
- * FR-RAS-35, FR-PRC-44, FR-PRC-45): drives the real Hub in Chromium against a running Registry. Not part of `npm test`
+ * Side panels, analysis panels and tool windows on wide screens, end to end: drives the real Hub in Chromium against a running Registry. Not part of `npm test`
  * (needs a server); same environment and conventions as wide-layout.test.mjs:
  *
  *   HUB_URL=http://localhost:5100 HUB_DATASET=admin/brighton-beach node --test e2e/wide-panels.test.mjs
  *
- * HUB_DATASET is a dataset the user can write, with images/ holding a JPG (DJI_0020.JPG), the tasks of FR-PRC-44 need one
+ * HUB_DATASET is a dataset the user can write, with images/ holding a JPG (DJI_0020.JPG), the task log checks need one
  * finished task in it, and the map checks use HUB_RASTER (default dsm.tif of the dataset). A check that finds no data to
  * measure is skipped, not passed.
  */
@@ -58,7 +57,7 @@ after(async () => { for (const c of contexts) await c.close(); await browser?.cl
 for (const viewport of VIEWPORTS) {
     const at = `${viewport.width}x${viewport.height}`;
 
-    test(`${at}: the tree has the width of its token and the detail panel is wide (FR-EXP-40)`, async () => {
+    test(`${at}: the tree has the width of its token and the detail panel is wide`, async () => {
         const page = await newPage(viewport);
         // A folder has no URL of its own: open the dataset and enter images/ when its photos are not at the root
         await page.goto(`${URL_}/r/${DATASET}`);
@@ -78,7 +77,7 @@ for (const viewport of VIEWPORTS) {
         }
     });
 
-    test(`${at}: Run Photogrammetry has one scroll area, the options list takes the height (FR-PRC-45)`, async () => {
+    test(`${at}: Run Photogrammetry has one scroll area, the options list takes the height`, async () => {
         const page = await newPage(viewport);
         await page.goto(`${URL_}/r/${DATASET}`);
         await appReady(page);
@@ -96,7 +95,7 @@ for (const viewport of VIEWPORTS) {
         assert.ok(r.list >= r.dialog * 0.6, `the list is ${r.list} px of ${r.dialog}`);
     });
 
-    test(`${at}: the task log is 80rem wide and high, fills the screen when maximized and scrolls sideways with Wrap lines off (FR-PRC-44)`, async (t) => {
+    test(`${at}: the task log is 80rem wide and high, fills the screen when maximized and scrolls sideways with Wrap lines off`, async (t) => {
         const page = await newPage(viewport);
         await page.goto(`${URL_}/r/${DATASET}`);
         await appReady(page);
@@ -183,7 +182,7 @@ for (const viewport of VIEWPORTS) {
         assert.equal(scrolls, true, 'a line of 1000 characters does not scroll sideways');
     });
 
-    test(`${at}: the analysis panel is 400 px wide or more at 4K, the chart text is 12 px, the Expand window is wide (FR-RAS-35)`, async (t) => {
+    test(`${at}: the analysis panel is 400 px wide or more at 4K, the chart text is 12 px, the Expand window is wide`, async (t) => {
         const page = await newPage(viewport);
         await page.goto(`${URL_}/r/${DATASET}/view/${Buffer.from(RASTER, 'utf8').toString('base64')}/map`);
         await appReady(page);

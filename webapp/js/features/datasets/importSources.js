@@ -45,7 +45,7 @@ const hostRe = /^(localhost|[^\s/:]+\.[^\s/:]+|[^\s/:]+:\d+)(:\d+)?$/i;
 const slugLikeRe = /^[a-z0-9_-]+$/i;
 
 /**
- * The hint that a text with a '/' in the Registry URL field is not understood (FR-UPL-18): the text has no scheme, holds a
+ * The hint that a text with a '/' in the Registry URL field is not understood: the text has no scheme, holds a
  * '/', does not start with a host (example.org/registry is the address of a registry served below a prefix), and
  * `splitRegistryLink` found no registry in it. The example comes from the default registry, as the ddb command line
  * takes it.
@@ -77,7 +77,7 @@ export function splitRegistryLink(text) {
     if (!raw) return null;
     if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
         if (!hostRe.test(raw.split('/')[0])) {
-            // Like the ddb command line, 'org/dataset' is a dataset of the default registry (FR-UPL-18)
+            // Like the ddb command line, 'org/dataset' is a dataset of the default registry
             const tag = raw.split('/');
             if (tag.length === 2 && tag.every(part => slugLikeRe.test(part)))
                 return { url: `https://${DEFAULT_REGISTRY}`, organization: tag[0], dataset: tag[1] };

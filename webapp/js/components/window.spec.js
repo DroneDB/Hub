@@ -100,7 +100,7 @@ describe('Window Enter', () => {
     });
 });
 
-describe('Window in the overlay stack (FR-XC-19)', () => {
+describe('Window in the overlay stack', () => {
     const withSelect = () => defineComponent({
         components: { Window, Select },
         emits: ['close'],
@@ -111,7 +111,7 @@ describe('Window in the overlay stack (FR-XC-19)', () => {
     });
     const escapeOn = target => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
 
-    it('closes on Escape from a closed Select, which stops the key itself (MAP-03)', async () => {
+    it('closes on Escape from a closed Select, which stops the key itself', async () => {
         const w = mount(withSelect(), { attachTo: document.body, global: { plugins: [PrimeVue] } });
         await flushPromises();
         const combo = document.getElementById('pick');
@@ -140,7 +140,7 @@ describe('Window in the overlay stack (FR-XC-19)', () => {
         w.unmount();
     });
 
-    it('takes the focus from the opener and gives it back on close (AC-026)', async () => {
+    it('takes the focus from the opener and gives it back on close', async () => {
         const opener = document.createElement('button');
         document.body.appendChild(opener);
         opener.focus();

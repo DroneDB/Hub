@@ -1,5 +1,5 @@
 /**
- * The table of the warning codes of an entry (FR-EXP-18): the words for users, the hint for the administrator, and whether
+ * The table of the warning codes of an entry: the words for users, the hint for the administrator, and whether
  * processing the file again can help.
  */
 import { describe, it, expect } from 'vitest';

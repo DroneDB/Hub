@@ -62,7 +62,7 @@ describe('resolvePasteStrategy', () => {
         expect(result.failed).toEqual({});
     });
 
-    // D-040: PUT /obj cannot overwrite; a conflict is decided before the move, as Keep both (a free name) or Skip
+    // PUT /obj cannot overwrite; a conflict is decided before the move, as Keep both (a free name) or Skip
     it('moves inside one dataset to the free name of a Keep both, sends nothing for a Skip, and reports a refusal as failed', async () => {
         const moveObj = vi.fn(async (from) => {
             if (from === 'a/three.jpg') throw Object.assign(new Error("A file or folder named 'three.jpg' already exists in this folder"), { status: 409 });

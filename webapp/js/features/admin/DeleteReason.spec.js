@@ -1,5 +1,5 @@
 /**
- * The disabled Delete of the admin lists says why (FR-ADM-24, FR-XC-22): the button stays focusable (aria-disabled), and its
+ * The disabled Delete of the admin lists says why: the button stays focusable (aria-disabled), and its
  * description and tooltip hold the reason of the rule; a click does nothing. The reason comes from deleteBlockReason.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

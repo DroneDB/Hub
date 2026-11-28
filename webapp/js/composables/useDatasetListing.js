@@ -41,7 +41,7 @@ export function useDatasetListing(dataset) {
     }
 
     /**
-     * The tree hears of items of any folder (FR-EXP-36), one folder at a time: a tree node takes the items for the folder it
+     * The tree hears of items of any folder, one folder at a time: a tree node takes the items for the folder it
      * shows, so a list of several folders would put the items of one under another.
      */
     function announce(items) {
@@ -90,7 +90,7 @@ export function useDatasetListing(dataset) {
 
     /**
      * An entry created or rewritten on the server (merge, align output, the map's measurements, a README, the photo of
-     * an annotation): the list shows it when it is in the folder, the tree shows it wherever it is (FR-EXP-36); an item
+     * an annotation): the list shows it when it is in the folder, the tree shows it wherever it is; an item
      * already on show is replaced (its size and date follow) and stays selected. A file written into a folder the list
      * does not have (the first photo of an annotation creates `annotations/`) brings that folder to the list and the
      * tree, as an upload does; a folder the list has stays as it is.
@@ -130,7 +130,7 @@ export function useDatasetListing(dataset) {
 
     /**
      * Uploaded entries. The list shows them as the folder on show sees them (a subfolder's content as its top folder, the
-     * in-view filter); the tree hears of every entry by its own parent folder, whatever is on show (FR-EXP-36): a nested
+     * in-view filter); the tree hears of every entry by its own parent folder, whatever is on show: a nested
      * `a/b/c.jpg` with the root on show, a folder that the list already has, an upload that ends in another folder. One
      * event per parent folder, no entry twice (the top folder of the list stands in for a folder the entries do not name).
      * A file uploaded again under a name on show replaces its item (size, date, hash and thumbnail follow, the selection

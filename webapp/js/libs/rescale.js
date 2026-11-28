@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The Rescale range of a raster panel (FR-RAS-10, FR-RAS-20, D-025): two numbers, Min and Max. The
+ * The Rescale range of a raster panel: two numbers, Min and Max. The
  * user types them as numbers are written in their locale ("12,5" and "12.5" are both 12.5,
  * libs/format.js parseNumber); the `rescale` request parameter keeps its machine format "min,max"
  * with "." as the decimal sign, which the Registry also checks (a bad value is a 400 there).

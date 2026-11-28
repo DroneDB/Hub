@@ -81,7 +81,7 @@
             <!-- The toolbar's Copy link button opens and closes it: a press on it is not a press outside -->
             <MapLinkPanel v-if="linkPanelOpen && linkTarget" :dataset="dataset" :link-target="linkTarget" :note="shareNote" :can-save="canSave"
                           toggle="[data-map-link-toggle]" @close="linkPanelOpen = false" @save="$emit('save')" />
-            <!-- What the page puts over the map (DatasetMap: the hint of FR-MAP-10): in the map, so it has its reserves -->
+            <!-- What the page puts over the map (DatasetMap: its hint): in the map, so it has its reserves -->
             <slot name="overlay" />
         </div>
         <MapDialogs :alert-dialog-open="alertDialogOpen" :alert-title="alertTitle" :alert-message="alertMessage"
@@ -266,7 +266,7 @@ export default {
             default: null
         },
         // Paths of the layers of the saved view the map shows, as it was saved: the style the view records for them
-        // (none included) is the user's, so the map gives them no default style (FR-RAS-01). Empty on a new view and on
+        // (none included) is the user's, so the map gives them no default style. Empty on a new view and on
         // the dataset map, whose rasters without a style get the default of their value info
         savedLayers: {
             type: Array,
@@ -372,7 +372,7 @@ export default {
             },
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
-            // The units of the scale bar (FR-MAP-30): the measurement units, which the Preferences page and the measure tools change
+            // The units of the scale bar: the measurement units, which the Preferences page and the measure tools change
             measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]),
             mapSize,
             observeMapSize,
@@ -394,7 +394,7 @@ export default {
             vectorGeneration: 0,
             mapSettingsDialogOpen: false,
             linkPanelOpen: false,
-            // The visible extent in WGS 84, for 'Export visible extent' of the raster panels (FR-RAS-16)
+            // The visible extent in WGS 84, for 'Export visible extent' of the raster panels
             visibleBbox: null
         };
     },
@@ -516,7 +516,7 @@ export default {
             // A view fits once, unless its state has a position; the standalone map fits once
             this.fitPending = this.view ? !this.view.view : this.standalone;
             this.vectorLayers = [];
-            // The canvas colours are tokens (FR-XC-21): draw again with the values of a new scheme
+            // The canvas colours are tokens: draw again with the values of a new scheme
             this.stopColorScheme = onColorSchemeChange(() => this.restyleCanvas());
             this.fileLayers = new FileLayers();
             this.fileLayers.setFlightPathVisible(this.showFlightPath);
@@ -557,7 +557,7 @@ export default {
                 // element has a tabindex, and this one has (the photo popup gives the focus back to it): the first drag
                 // only focused the map, and the wheel did nothing until a click had
                 interactions: defaultInteractions({ onFocusOnly: false }),
-                // The canvas is the CSS size x the applied ratio (FR-XC-32, D-042): OpenLayers would draw at the device ratio, uncapped
+                // The canvas is the CSS size x the applied ratio: OpenLayers would draw at the device ratio, uncapped
                 pixelRatio: appliedPixelRatio()
             });
             this.stopPixelRatio = watchPixelRatio(() => this.map.setPixelRatio(appliedPixelRatio()));
@@ -635,7 +635,7 @@ export default {
             this.reconcileAnalysisTarget();
             this.loadSavedMeasurements();
             this.restorePlantHealthFromHash(this.files);
-            // After the link's style: a raster without a style gets the default of its value info (FR-RAS-01)
+            // After the link's style: a raster without a style gets the default of its value info
             this.seedRasterDefaults();
             this.viewZoomCap.schedule();
         },
@@ -656,7 +656,7 @@ export default {
             return geom ? mercatorExtent(geom) : null;
         },
 
-        // The window the map shows, as the WGS 84 box of the export of the visible extent (D-023)
+        // The window the map shows, as the WGS 84 box of the export of the visible extent
         updateVisibleBbox: function () {
             const size = this.map && this.map.getSize();
             this.visibleBbox = size ? visibleBbox(this.map.getView().calculateExtent(size)) : null;
@@ -841,7 +841,7 @@ export default {
                     const geom = f.entry && f.entry.type === ddb.entry.type.VECTOR && (f.entry.polygon_geom || f.entry.point_geom);
                     if (geom) extendExtent(ext, mercatorExtent(geom));
                 });
-                // A raster that is building has no layer yet: the map looks at where it will be (FR-RAS-09)
+                // A raster that is building has no layer yet: the map looks at where it will be
                 this.files.forEach(f => {
                     if (f.placeholder?.footprint) extendExtent(ext, mercatorExtent(f.placeholder.footprint));
                 });
@@ -865,7 +865,7 @@ export default {
             return extent && !isEmptyExtent(extent) ? extent : null;
         },
 
-        // "Zoom to layer": the map fits the extent of one raster layer (FR-MAP-08)
+        // "Zoom to layer": the map fits the extent of one raster layer
         zoomToLayer: function (path) {
             const extent = this.layerExtent(path);
             if (!this.map || !extent) return false;
@@ -874,7 +874,7 @@ export default {
         },
 
         // A layer was added to the view (the parent calls it with the path). A layer that lands where the map is not
-        // looking would show nothing happened: the toast says where it is, with "Zoom to layer" (FR-MAP-08, FR-XC-23).
+        // looking would show nothing happened: the toast says where it is, with "Zoom to layer".
         // The layer is drawn a moment after the add: it is asked for until it is there
         announceAddedLayer: function (path, attempt = 0) {
             const extent = this.layerExtent(path);

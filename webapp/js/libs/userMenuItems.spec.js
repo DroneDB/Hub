@@ -10,7 +10,7 @@ const state = (over = {}) => ({
 const group = (items, title) => items.find(i => i.label === title);
 const labels = items => items.filter(i => !i.separator).map(i => i.label);
 
-describe('userMenuItems (FR-NAV-01)', () => {
+describe('userMenuItems', () => {
     it('is empty for nobody', () => {
         expect(userMenuItems(state({ loggedIn: false }))).toEqual([]);
     });
@@ -75,7 +75,7 @@ describe('userMenuItems (FR-NAV-01)', () => {
     });
 });
 
-describe('storageEntry (FR-ACC-11)', () => {
+describe('storageEntry', () => {
     const MB = 1024 * 1024;
     const rowOf = info => { const e = storageEntry(info, () => {}); return e && e.label; };
 
@@ -104,7 +104,7 @@ describe('storageEntry (FR-ACC-11)', () => {
         }
     });
 
-    it('is amber from 90 % and red from 100 % of the quota (D-030), and plain below', () => {
+    it('is amber from 90 % and red from 100 % of the quota, and plain below', () => {
         expect(storageEntry({ total: 100, used: 89 }, () => {}).class).toBe('user-menu-storage');
         expect(storageEntry({ total: 100, used: 90 }, () => {}).class).toBe('user-menu-storage user-menu-storage-warn');
         expect(storageEntry({ total: 100, used: 130 }, () => {}).class).toBe('user-menu-storage user-menu-storage-over');
@@ -113,7 +113,7 @@ describe('storageEntry (FR-ACC-11)', () => {
     });
 });
 
-describe('versions and System health (FR-NAV-08)', () => {
+describe('versions and System health', () => {
     const adminState = over => state({ isAdmin: true, ...over });
     const adminItems = s => group(userMenuItems(s), 'Administration').items;
 
@@ -150,7 +150,7 @@ describe('versions and System health (FR-NAV-08)', () => {
     });
 });
 
-describe('primaryNavItems (FR-NAV-01)', () => {
+describe('primaryNavItems', () => {
     const home = { name: 'Organizations' };
 
     it('are Organizations alone for a signed-in user: Upload is in the user menu', () => {

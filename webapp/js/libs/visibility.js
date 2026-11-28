@@ -34,7 +34,7 @@ export const VISIBILITY_OPTIONS = Object.freeze(
     [Visibility.PRIVATE, Visibility.UNLISTED, Visibility.PUBLIC]
         .map(value => Object.freeze({ value, label: LOOKS[value].label })));
 
-/** What a new dataset starts as: private (D-009). */
+/** What a new dataset starts as: private. */
 export const DEFAULT_VISIBILITY = Visibility.PRIVATE;
 
 /** The names the task parameters carry, by visibility. @type {Readonly<Record<number, string>>} */

@@ -23,7 +23,7 @@ export const PREF = Object.freeze({
     SHOW_POINT_CALLOUTS: 'showPointCallouts', // true: the callouts of the point annotations are always shown; false: only while their point is hovered
     FILE_VIEW_MODE: 'fileViewMode',
     TABLE_EXPANDED_GRID: 'tableExpandedGrid',
-    TILE_SIZE: 'explorerTileSize', // 's' | 'm' | 'l': the thumbnails of the grid view; device only (a size follows the screen), M from a 4K screen until chosen (FR-EXP-43)
+    TILE_SIZE: 'explorerTileSize', // 's' | 'm' | 'l': the thumbnails of the grid view; device only (a size follows the screen), M from a 4K screen until chosen
     SORT_DESCENDING: 'sortDescending',
     LOCATIONS_MAP_NAMES: 'locationsMapNames', // true: the map of dataset locations shows the names of its pins
     SPLAT_NAV_MODE: 'ddb.splat.navMode',
@@ -33,7 +33,7 @@ export const PREF = Object.freeze({
     OPEN_AFTER_CREATE: 'open_dataset_after_create',
     ORG_PAGE: 'org_page_prefs',
     ORG_PAGE_POSITION: 'org_page_position', // { currentPage, scrollTop } of the organisations page
-    ADMIN_USERS: 'admin_users_prefs', // { itemsPerPage, pageSizeChosen } of Admin > Users: the rows per page the user chose (FR-XC-34)
+    ADMIN_USERS: 'admin_users_prefs', // { itemsPerPage, pageSizeChosen } of Admin > Users: the rows per page the user chose
     ADMIN_TASKS: 'admin_tasks_prefs', // { itemsPerPage } of Admin > Tasks
     UNIFIED_VIEWER: 'unified-viewer-settings',
     UNIFIED_NAV_HINT: 'ddb.unified.navHint', // true once the 3D viewer told the user how to move (keys, Controls help); device only
@@ -43,7 +43,7 @@ export const PREF = Object.freeze({
     STOCKPILE_MATERIALS: 'stockpileMaterials', // { overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     README_OPEN: 'datasetReadmeOpen', // false once the user folded the README panel of the dataset page, true when they opened it again; device only, for every dataset (as its height)
-    // 'system' | 'light' | 'dark': the colour scheme (libs/colorScheme.js); device only (D-044). The
+    // 'system' | 'light' | 'dark': the colour scheme (libs/colorScheme.js); device only. The
     // inline script of public/index.html reads it too, before the app mounts
     APPEARANCE: 'ddb.appearance',
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
@@ -210,7 +210,7 @@ export const PREF_DEFAULTS = frozen({
     [PREF.FILE_VIEW_MODE]: 'grid',
     [PREF.TABLE_EXPANDED_GRID]: true,
     [PREF.SORT_DESCENDING]: false,
-    // itemsPerPage is the page size the user chose: none by default, the list then shows the rows that fit its height (FR-XC-34).
+    // itemsPerPage is the page size the user chose: none by default, the list then shows the rows that fit its height.
     // pageSizeChosen marks it as chosen: an older Hub stored its default 10 with every other setting, which is no choice
     [PREF.DATASET_TABLE]: frozen({ sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), itemsPerPage: /** @type {number|null} */ (null), pageSizeChosen: false, view: DEFAULT_LIST_VIEW }),
     [PREF.OPEN_AFTER_CREATE]: false,
@@ -233,7 +233,7 @@ export const PREF_DEFAULTS = frozen({
  * account preferences have theirs in PREF_DEFAULTS).
  */
 export const DEVICE_PREF_DEFAULTS = frozen({
-    // The system's scheme, until the user picks one (D-044)
+    // The system's scheme, until the user picks one
     [PREF.APPEARANCE]: 'system',
     // The README of a dataset shows until the user folds the panel
     [PREF.README_OPEN]: true

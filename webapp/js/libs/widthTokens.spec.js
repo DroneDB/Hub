@@ -1,9 +1,9 @@
 /**
- * The maximum widths of a wide screen (FR-XC-33, U-503): the width tokens, the breakpoints and the classes that
+ * The maximum widths of a wide screen: the width tokens, the breakpoints and the classes that
  * give a page its column, read from css/_variables.scss, css/_breakpoints.scss and css/app.scss; and what each page
- * of FR-ORG-24, FR-EXP-39, FR-ADM-27, FR-ADM-28, FR-NAV-10, FR-EXP-42, FR-ACC-23, FR-UPL-22 and FR-ORG-26 takes
+ * takes
  * from them (a class, a token, a breakpoint mixin) and no longer sets itself. A browser measures the result (the
- * Playwright pass of AC-038); the expected values here are the SPEC's, written out.
+ * Playwright pass of e2e/wide-layout.test.mjs); the expected values here are written out.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ function blockAt(text, start) {
 const styleOf = file => read(file).split(/<style[^>]*>/)[1];
 const templateOf = file => read(file).split('<script')[0];
 
-describe('the width tokens (FR-XC-33)', () => {
+describe('the width tokens', () => {
     const tokens = {
         '--ddb-prose-max': '72ch',
         '--ddb-editor-max': '100ch',
@@ -91,7 +91,7 @@ describe('the column classes of app.scss', () => {
     });
 });
 
-describe('FR-ORG-24: the organization and dataset lists take the whole width', () => {
+describe('the organization and dataset lists take the whole width', () => {
     it.each(['OrganizationsPage', 'DatasetsPage'])('%s takes the whole width in its list and its map view', file => {
         const id = file === 'OrganizationsPage' ? 'organizations' : 'datasets';
         const dir = file === 'OrganizationsPage' ? 'organizations' : 'datasets';
@@ -127,7 +127,7 @@ describe('FR-ORG-24: the organization and dataset lists take the whole width', (
     });
 });
 
-describe('FR-EXP-39: the Markdown text and editor are centred columns', () => {
+describe('the Markdown text and editor are centred columns', () => {
     it('has no float or absolute position for Edit, and no width value of its own', () => {
         const style = styleOf('js/features/viewers/markdown/MarkdownViewer.vue');
         expect(style).not.toMatch(/float:/);
@@ -136,7 +136,7 @@ describe('FR-EXP-39: the Markdown text and editor are centred columns', () => {
     });
 });
 
-describe('FR-ADM-27: the widths of the admin tables', () => {
+describe('the widths of the admin tables', () => {
     it('/admin/users takes the whole width, with the side padding of the routed pages', () => {
         const template = templateOf('js/features/admin/UsersPage.vue');
         expect(template).toContain('class="page-scroll"');
@@ -167,7 +167,7 @@ describe('FR-ADM-27: the widths of the admin tables', () => {
     });
 });
 
-describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name', () => {
+describe('the Files and Tasks tables keep their columns near the name', () => {
     it('.col-fit gives a column the width of its content, on one line, in a table and not in a phone card', () => {
         const media = blockAt(scss, scss.indexOf('@media only screen and (min-width: 576px) {\n    .col-fit {'));
         expect(media).toMatch(/\.col-fit \{\s*width: 1%;\s*white-space: nowrap;\s*\}/);
@@ -216,7 +216,7 @@ describe('FR-EXP-42: the Files and Tasks tables keep their columns near the name
     });
 });
 
-describe('FR-ADM-28: the configuration page has one centred column of two cards', () => {
+describe('the configuration page has one centred column of two cards', () => {
     const file = 'js/features/admin/AdminConfig.vue';
 
     it('the scroll container is a page column, and the cards share one grid row', () => {
@@ -236,7 +236,7 @@ describe('FR-ADM-28: the configuration page has one centred column of two cards'
     });
 });
 
-describe('FR-NAV-10: the Login and Upload pages use the height of the screen', () => {
+describe('the Login and Upload pages use the height of the screen', () => {
     it('the login card starts at clamp(2rem, 18vh, 20rem) from the top', () => {
         const style = styleOf('js/features/account/LoginPage.vue');
         expect(blockAt(style, style.indexOf('#login {'))).toMatch(/min-height: 100%;\s*padding-top: clamp\(2rem, 18vh, 20rem\);/);
@@ -252,7 +252,7 @@ describe('FR-NAV-10: the Login and Upload pages use the height of the screen', (
     });
 });
 
-describe('FR-ACC-23 and FR-UPL-22: a dialog takes its width from its size class', () => {
+describe('a dialog takes its width from its size class', () => {
     it('Preferences is dialog-xl and its tabs take the width of the window, so the 7 labels fit', () => {
         const file = 'js/features/account/PreferencesDialog.vue';
         expect(templateOf(file)).toContain('size-class="dialog-xl"');

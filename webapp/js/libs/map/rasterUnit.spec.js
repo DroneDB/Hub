@@ -42,7 +42,7 @@ describe('rasterValueUnit', () => {
     });
 });
 
-// FR-RAS-28: one format of a raster value, {value, unit, text}; it does not convert (D-022)
+// One format of a raster value, {value, unit, text}; it does not convert
 describe('rasterValueParts', () => {
     it('writes a temperature with one decimal and the normalised symbol after a space', () => {
         expect(rasterValueParts(29.06, 'Celsius')).toEqual({ value: 29.1, unit: '°C', text: '29.1 °C' });
@@ -88,7 +88,7 @@ describe('rasterUnitSymbol', () => {
     });
 });
 
-// The thermal units (D-022): the unit of the band, and the formula of ddb that gives the values in a unit
+// The thermal units: the unit of the band, and the formula of ddb that gives the values in a unit
 describe('thermal units', () => {
     it('names the formula of a unit, as the files and libddb write it', () => {
         expect(thermalFormulaOfUnit('K')).toBe('KELVIN');
@@ -125,7 +125,7 @@ describe('thermal units', () => {
     });
 });
 
-// D-022, FR-RAS-31: the value calls of a layer (value info, point, area, profile, contours) read it as it is styled
+// The value calls of a layer (value info, point, area, profile, contours) read it as it is styled
 describe('layerValueOptions', () => {
     it('has the NoData value and the thermal formula of the style of the layer', () => {
         expect(layerValueOptions({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280,310', nodata: 0 }))

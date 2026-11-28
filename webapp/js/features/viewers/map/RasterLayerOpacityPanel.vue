@@ -49,8 +49,8 @@
                         title="Pick another raster" aria-label="Pick another raster" @click.stop="$emit('repick', layer.path)">
                     <i class="fa-solid fa-arrows-rotate" />
                 </button>
-                <!-- Where the layer is: the map fits its extent (FR-MAP-08) -->
-                <!-- A raster that is building has no layer yet, but a footprint to look at (FR-RAS-09) -->
+                <!-- Where the layer is: the map fits its extent -->
+                <!-- A raster that is building has no layer yet, but a footprint to look at -->
                 <button v-if="!layer.placeholder || layer.placeholder.footprint" class="row-btn zoom-btn" type="button" title="Zoom to layer"
                         :aria-label="'Zoom to layer: ' + layer.name" @click.stop="$emit('zoom-to', layer.path)">
                     <i class="fa-solid fa-location-crosshairs" />
@@ -155,11 +155,11 @@ export default {
         };
     },
     computed: {
-        // A map narrower than `sm` starts with the panel folded, so no panel covers it on load (FR-MAP-12)
+        // A map narrower than `sm` starts with the panel folded, so no panel covers it on load
         narrow() {
             return !!this.mapSize?.narrow;
         },
-        // What the rows show: the part of the name that tells the layers apart (the date), cut in the middle if still long (FR-RAS-12)
+        // What the rows show: the part of the name that tells the layers apart (the date), cut in the middle if still long
         labels() {
             return distinctLabels(this.layers.map(l => l.name || ''), LABEL_MAX);
         },

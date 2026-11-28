@@ -1,5 +1,5 @@
 /**
- * The Rescale fields of the raster panels (FR-RAS-10, FR-RAS-20, D-025): Min and Max, each error at its
+ * The Rescale fields of the raster panels: Min and Max, each error at its
  * field, nothing emitted for a range that is not valid, "12,5" read as 12.5.
  */
 import { describe, it, expect, afterEach } from 'vitest';

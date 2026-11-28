@@ -1,10 +1,10 @@
 // @ts-check
 /**
- * The one resolver of the Hub forms (FR-XC-11, D-018). `@primevue/forms` calls a resolver with
+ * The one resolver of the Hub forms. `@primevue/forms` calls a resolver with
  * the values of the form and takes back its errors; this one runs one pure validator per field
  * (`xxxProblem(value, ctx) -> string | null`, in libs/) and builds the answer the library reads:
  * `{ values, errors: { field: [{ message }] } }`. A form has no other validation code, and no
- * schema library (D-018).
+ * schema library.
  *
  *   const resolver = createResolver({
  *       username: v => usernameProblem(v),

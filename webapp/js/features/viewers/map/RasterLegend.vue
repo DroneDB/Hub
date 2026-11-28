@@ -13,7 +13,7 @@
 
 <script setup>
 /**
- * RasterLegend - the colour legend of the styled rasters of the map (FR-RAS-27, FR-XC-24): a colour bar with the two ends
+ * RasterLegend - the colour legend of the styled rasters of the map: a colour bar with the two ends
  * of the rescale range and the unit of the raster, for every visible layer that has a colormap and a range. It is derived
  * from the style of the layers (`vizParams`, which saved views keep), so it has no state of its own and shows in saved views
  * and embeds. The bar is the gradient of the colormap picker, with hard stops for a discrete colormap; the numbers are

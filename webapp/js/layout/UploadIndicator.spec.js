@@ -1,5 +1,5 @@
 /**
- * UploadIndicator (FR-UPL-04, FR-XC-04): while an upload of the dataset page runs, the header shows the number of files
+ * UploadIndicator: while an upload of the dataset page runs, the header shows the number of files
  * left and the total progress and opens the upload list; Pause/Resume and Cancel are there; a route change asks nothing
  * and a page unload warns while the upload is not settled.
  */
@@ -215,7 +215,7 @@ describe('signing out', () => {
     });
 });
 
-describe('leaving the page (FR-XC-04)', () => {
+describe('leaving the page', () => {
     it('a route change asks nothing: the upload goes on in the background', async () => {
         await render();
         uploads.add('acme', 'site', files('a'));

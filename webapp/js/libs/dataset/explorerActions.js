@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The action registry of the file explorer: each action that more than one surface offers is
- * defined once here (D-017, FR-XC-14). The toolbar (libs/dataset/explorerTools.js), the context
+ * defined once here. The toolbar (libs/dataset/explorerTools.js), the context
  * menus of the grid, the table and the tree (libs/contextMenuItems.js, also on the background),
  * the keyboard shortcuts (useDatasetShortcuts and the tree), the detail panel and the header's
  * dataset actions (layout/HubHeader.vue: Download, Share/Embed, Settings) render from these

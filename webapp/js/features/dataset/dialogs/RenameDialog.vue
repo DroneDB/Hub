@@ -8,7 +8,7 @@
                            :invalid="!!errorOf($form, 'name')"
                            :aria-invalid="errorOf($form, 'name') ? 'true' : undefined"
                            :aria-describedby="errorOf($form, 'name') ? 'rename-name-error' : undefined" fluid />
-                <!-- A name that exists is refused here before the request, and a 409 of the Registry shows here too (FR-EXP-04) -->
+                <!-- A name that exists is refused here before the request, and a 409 of the Registry shows here too -->
                 <FieldError id="rename-name-error" :message="errorOf($form, 'name')" />
             </template>
         </Form>
@@ -47,10 +47,10 @@ import { entryNameProblem, displayNameLengthProblem } from '@/libs/nameRules';
 import { useHubForm } from '@/composables/useHubForm';
 
 /**
- * RenameDialog - the new name of an entry (FR-EXP-04, D-046).
+ * RenameDialog - the new name of an entry.
  *
  * The name is checked at the field with `entryNameProblem` (the published entry name rule, and a
- * sibling that has the name, letter case ignored as the Registry compares, D-040) and a refusal
+ * sibling that has the name, letter case ignored as the Registry compares) and a refusal
  * sends no request. The request runs in the dialog (`renameEntry`): a refusal of the Registry (a
  * 409 for a name that exists) shows at the field, and the dialog stays open. The dataset root is
  * a dataset: its new name is made a slug by the page (`renameDataset`), in the dialog too, so a slug
@@ -82,7 +82,7 @@ export default {
         const label = ddb.entry.isDirectory(props.file.entry) ? 'Folder' : 'File';
         const resolver = createResolver({
             name: value => isDatasetRoot
-                // The dataset root keeps its slug when the name makes none, so a rename is never refused for the Latin letter rule (D-035)
+                // The dataset root keeps its slug when the name makes none, so a rename is never refused for the Latin letter rule
                 ? ((value ?? '').trim() === '' ? 'Enter a name' : displayNameLengthProblem(value))
                 : entryNameProblem(value, props.siblings, { selfPath: props.file.entry?.path, label })
         });
@@ -106,7 +106,7 @@ export default {
             const name = this.file.label || ddb.pathutils.basename(this.file.entry?.path || '');
             return name ? `Rename "${name}"` : 'Rename';
         },
-        // A form with no change is the one disabled submit (D-046)
+        // A form with no change is the one disabled submit
         unchanged: function () {
             const typed = this.formRef?.states?.name?.value;
             return typeof typed !== 'string' || typed.trim() === this.file.label;

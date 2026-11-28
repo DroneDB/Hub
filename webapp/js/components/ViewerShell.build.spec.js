@@ -1,5 +1,5 @@
 /**
- * The build state in the shell (FR-VWR-08): a file that cannot open yet shows its state over the view, with the Build /
+ * The build state in the shell: a file that cannot open yet shows its state over the view, with the Build /
  * Rebuild button when the viewer says the user can build, and 'build' when it is clicked.
  */
 import { describe, it, expect, vi } from 'vitest';

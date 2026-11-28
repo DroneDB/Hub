@@ -1,5 +1,5 @@
 /**
- * The explorer's actions, end to end (FR-XC-14, FR-XC-20, FR-XC-22; EXP-02, EXP-11, MAP-09):
+ * The explorer's actions, end to end:
  * drives the real Hub in Chromium against a running Registry. Not part of `npm test` (needs a
  * server); same environment and conventions as smoke.test.mjs:
  *
@@ -110,7 +110,7 @@ after(async () => {
 });
 
 for (const [width, height] of [[390, 844], [820, 1180]]) {
-    test(`EXP-02 at ${width}x${height}: with a row selected, the view toggle and More are on top and work`, async () => {
+    test(`at ${width}x${height}: with a row selected, the view toggle and More are on top and work`, async () => {
         const { page, errors } = await newPage({ width, height }, { touch: true });
         await openFiles(page);
         await page.click(LIST);
@@ -143,7 +143,7 @@ for (const [width, height] of [[390, 844], [820, 1180]]) {
     });
 }
 
-test('EXP-11: a right click on the empty grid clears the selection and shows the folder menu', async () => {
+test('a right click on the empty grid clears the selection and shows the folder menu', async () => {
     const { page, errors } = await newPage();
     await openFiles(page);
     if (await page.locator(GRID).getAttribute('aria-pressed') !== 'true') await page.click(GRID);
@@ -165,7 +165,7 @@ test('EXP-11: a right click on the empty grid clears the selection and shows the
     assert.deepEqual(errors, []);
 });
 
-test('MAP-09: the map viewer refuses a file that is not a map, with a way back', async () => {
+test('the map viewer refuses a file that is not a map, with a way back', async () => {
     const { page } = await newPage();
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64('README.md')}/map`);
     await appReady(page);
@@ -173,7 +173,7 @@ test('MAP-09: the map viewer refuses a file that is not a map, with a way back',
     await page.waitForSelector('text=Back to the dataset', { timeout: 5000 });
 });
 
-test('FR-XC-22: the keyboard reaches a disabled toolbar action and its reason', async () => {
+test('the keyboard reaches a disabled toolbar action and its reason', async () => {
     const { page } = await newPage();
     await openFiles(page);
     // Nothing selected: Rename does not apply
@@ -191,8 +191,8 @@ test('FR-XC-22: the keyboard reaches a disabled toolbar action and its reason', 
     assert.deepEqual(found, { disabled: 'true', reason: 'Select one file to rename', title: 'Rename: Select one file to rename' });
 });
 
-// FR-EXP-04, FR-EXP-05, FR-EXP-15 (written, not run in the unit's own check: needs a running Registry and a browser)
-test('EXP-04: renaming a file to the name of a sibling shows an inline error, and the dialog stays open', async () => {
+// Written, not run in the unit's own check: needs a running Registry and a browser
+test('renaming a file to the name of a sibling shows an inline error, and the dialog stays open', async () => {
     const { page, errors } = await newPage();
     await openFiles(page);
     await page.waitForSelector(`#explorer .thumbnail:has-text("README.md"), #explorer tr:has-text("README.md")`, { timeout: 15000 });
@@ -210,7 +210,7 @@ test('EXP-04: renaming a file to the name of a sibling shows an inline error, an
     assert.deepEqual(errors, []);
 });
 
-test('EXP-15/EXP-05: the New folder field is neutral, refuses a / and a name that exists, and keeps the typed text', async () => {
+test('the New folder field is neutral, refuses a / and a name that exists, and keeps the typed text', async () => {
     const { page } = await newPage();
     await openFiles(page);
     await page.click('.hub-toolbar button[aria-label="New folder"]');

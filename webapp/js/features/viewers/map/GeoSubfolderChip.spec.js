@@ -1,4 +1,4 @@
-/** The chip over the empty map of a folder whose subfolder has the photos (FR-MAP-10). */
+/** The chip over the empty map of a folder whose subfolder has the photos. */
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import GeoSubfolderChip from './GeoSubfolderChip.vue';

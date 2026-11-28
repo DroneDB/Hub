@@ -1,5 +1,5 @@
 /**
- * The system roles are the ones the Registry lists in /sys/features (FR-ADM-04), "admin" and
+ * The system roles are the ones the Registry lists in /sys/features, "admin" and
  * "deactivated" when it lists none; role names compare without regard to case.
  */
 import { describe, it, expect, afterEach } from 'vitest';

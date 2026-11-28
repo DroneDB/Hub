@@ -14,8 +14,8 @@
 
 <script setup>
 /**
- * FolderEmptyState - what the file list (grid and table) shows for a folder with nothing in it
- * (FR-EXP-37): where files come from. Somebody who may write sees 'Drop files here or click Upload'
+ * FolderEmptyState - what the file list (grid and table) shows for a folder with nothing in it:
+ * where files come from. Somebody who may write sees 'Drop files here or click Upload'
  * and the Upload and Import from URL buttons, which run the dataset's own actions (the `upload` and
  * `importFromUrl` events the toolbar's Upload goes through); a reader sees the plain text.
  */

@@ -1,9 +1,9 @@
 /**
- * useTaskActions (FR-XC-15): the row actions of the dataset Tasks tab and Admin > Tasks. The buttons come from the
- * server's `actions` (D-024); a cancel refused for a task that has already ended is a neutral result told by the
- * status and a re-read of the task, never by the message text (FR-PRC-10, D-002), and the rows are read again in
- * every case; a retry says so and shows the row queued at once (FR-PRC-19); every action confirms its result
- * (FR-PRC-29); the log title names the tool, the target, the dataset and the time (FR-PRC-29).
+ * useTaskActions: the row actions of the dataset Tasks tab and Admin > Tasks. The buttons come from the
+ * server's `actions`; a cancel refused for a task that has already ended is a neutral result told by the
+ * status and a re-read of the task, never by the message text, and the rows are read again in
+ * every case; a retry says so and shows the row queued at once; every action confirms its result;
+ * the log title names the tool, the target, the dataset and the time.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { useTaskActions, cancelTaskOutcome, offersAction } from './useTaskActions';
@@ -101,7 +101,7 @@ describe('useTaskActions.cancel', () => {
         expect(question.message).toContain('<strong>Merge &lt;bands&gt;</strong> (→ out&lt;1&gt;.tif)');
     });
 
-    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', async () => {
+    it('tells an import that its files and the dataset it created are deleted', async () => {
         const { actions, confirm } = setup();
         await actions.cancel({ ...TASK, toolId: 'import-dataset' });
         expect(confirm.mock.calls[0][0]).toMatchObject({

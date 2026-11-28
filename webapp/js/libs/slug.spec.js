@@ -1,5 +1,5 @@
 /**
- * slug: the slug rule comes from /sys/features (FR-XC-12); the Hub runs the Registry's test cases
+ * slug: the slug rule comes from /sys/features; the Hub runs the Registry's test cases
  * (SlugRulesTests, __vectors__/input-rules.json) against it.
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -48,7 +48,7 @@ describe('slug texts', () => {
     });
 });
 
-// FR-ORG-05, FR-ORG-14: the Hub's generator gives what the Registry's ToSlug gives (the same cases run in SlugRulesTests)
+// The Hub's generator gives what the Registry's ToSlug gives (the same cases run in SlugRulesTests)
 describe('slugFromName', () => {
     it('gives the slug the Registry makes of each shared case', () => {
         expect(vectors.toSlug.length).toBeGreaterThan(10);
@@ -67,7 +67,7 @@ describe('slugFromName', () => {
         }
     });
 
-    // FR-ORG-14: a 200-character name gives a slug within the limit that does not end with a dash
+    // A 200-character name gives a slug within the limit that does not end with a dash
     it('cuts a long name to the limit and never ends with a dash or an underscore', () => {
         const long = Array.from({ length: 40 }, () => 'word').join(' ');
         const slug = slugFromName(long);
@@ -86,7 +86,7 @@ describe('slugFromName', () => {
 });
 
 describe('suggestSlug', () => {
-    it('proposes the slug of a name, and none for a name without a Latin letter or digit (D-035)', () => {
+    it('proposes the slug of a name, and none for a name without a Latin letter or digit', () => {
         expect(suggestSlug('Survey Team')).toBe('survey-team');
         expect(suggestSlug('Orsted Café')).toBe('orsted-cafe');
         expect(suggestSlug('Москва')).toBe('');
@@ -104,7 +104,7 @@ describe('uniqueSlug', () => {
         expect(uniqueSlug('', ['x'])).toBe('');
     });
 
-    // FR-ORG-14: the suffix replaces the end of the base, so the result stays within the limit
+    // The suffix replaces the end of the base, so the result stays within the limit
     it('keeps a taken slug of the limit length at the limit, ending in -2', () => {
         const taken = 'a'.repeat(128);
         const next = uniqueSlug(taken, [taken]);
@@ -123,7 +123,7 @@ describe('uniqueSlug', () => {
     });
 });
 
-describe('uniqueNameAndSlug (FR-UPL-14)', () => {
+describe('uniqueNameAndSlug', () => {
     it('keeps the name and the slug when the slug is free', () => {
         expect(uniqueNameAndSlug('Aukerman', 'aukerman', ['other'])).toEqual({ name: 'Aukerman', slug: 'aukerman' });
     });

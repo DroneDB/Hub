@@ -1,6 +1,6 @@
 /**
  * Admin > Users: the page size follows the height, and the rows per page that the user chose stay across a
- * reload (FR-XC-34, FR-ADM-29).
+ * reload.
  *
  * jsdom has no layout: the boxes come from a stub of getBoundingClientRect. The table starts at 200 px, a header
  * is 45 px, the paginator 56 px and a row 60 px (what the page expects before its rows are there): a page 1530 px

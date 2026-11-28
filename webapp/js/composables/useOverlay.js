@@ -1,18 +1,18 @@
 // @ts-check
 /**
- * The overlay stack (FR-XC-19): every overlay that takes the keyboard (HubWindow, the video
+ * The overlay stack: every overlay that takes the keyboard (HubWindow, the video
  * lightbox, the photo popup of the dataset map) is pushed here while it is shown, in opening
  * order, and this module does for all of them what an overlay needs:
  *
  * - Escape closes the topmost overlay only. An open Select or menu inside it keeps the key:
  *   its open state is read from ARIA (aria-expanded="true" on a combobox or a popup button),
  *   before the control sees the key, as PrimeVue's Select stops every Escape, closed or not.
- * - `data-owns-escape` is the one way a control keeps Escape for itself (FR-XC-19, FR-XC-20):
+ * - `data-owns-escape` is the one way a control keeps Escape for itself:
  *   inside the topmost overlay, Escape from within a [data-owns-escape] element is left to it
  *   (no preventDefault, no close), e.g. the SearchField, which clears its query on Escape
  *   while the dialog stays open. Not marked yet: the CodeMirror editor of TextEditorDialog
  *   (a later unit).
- * - The focus target on open (FR-XC-02, `focusTargetIn`): the first focusable element of a
+ * - The focus target on open (`focusTargetIn`): the first focusable element of a
  *   [data-autofocus] element (a typed confirmation's input is one); for a destructive
  *   confirmation the [data-cancel] button; the first visible, enabled field; for any other
  *   dialog the [data-confirm] button; the first visible, enabled control; else the overlay
@@ -20,7 +20,7 @@
  * - The focus stays inside on open: a menu that opened the overlay can take the focus back
  *   after its command (PrimeVue's Menu focuses its trigger on Enter, a context menu its list),
  *   so the target is focused again on the next frames while the focus is outside.
- * - The return on close (FR-XC-03): to the control that had the focus when the overlay was
+ * - The return on close: to the control that had the focus when the overlay was
  *   pushed (for an overlay opened from a menu, the control focused before the menu), when it
  *   is still in the page; else to the page's h1, else to main. Only when the focus was in the
  *   overlay (or nowhere): a click elsewhere keeps its focus.
@@ -111,7 +111,7 @@ function first(root, selector, ok) {
 }
 
 /**
- * The element that gets the focus when an overlay opens (FR-XC-02), or null.
+ * The element that gets the focus when an overlay opens, or null.
  * @param {HTMLElement | null | undefined} root
  * @param {{ danger?: boolean }} [options]
  * @returns {HTMLElement | null}
@@ -163,7 +163,7 @@ function pageFocusTarget() {
     return /** @type {HTMLElement | null} */ (heading || document.querySelector('main'));
 }
 
-/** @returns {HTMLElement | null} the page's h1, else main (FR-XC-03), made focusable */
+/** @returns {HTMLElement | null} the page's h1, else main, made focusable */
 function pageFocus() {
     return focusable(pageFocusTarget());
 }
@@ -284,7 +284,7 @@ export function useOverlay(options) {
         overlay.frames.push(id);
     }
 
-    /** Focuses the target of FR-XC-02 (else the overlay itself); returns it. */
+    /** Focuses the focus target of the overlay (else the overlay itself); returns it. */
     function focusInitial() {
         if (!stack.includes(overlay)) return null;
         const target = focusTargetIn(overlay.focusRoot(), { danger: overlay.danger() }) || focusable(overlay.container());

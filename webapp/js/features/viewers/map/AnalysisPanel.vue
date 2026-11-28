@@ -43,7 +43,7 @@
  * body scrolls. `subtitle` is a second, muted line under the title (a prop, or the `subtitle` slot when
  * the line needs an attribute of its own).
  *
- * The `actions` slot is the foot of the panel (FR-RAS-23): a sticky footer that stays in view while
+ * The `actions` slot is the foot of the panel: a sticky footer that stays in view while
  * the body above it scrolls, with a fade over the bottom of the body while more of it is hidden
  * under the footer. The three panels put their buttons there; none has footer CSS of its own.
  *

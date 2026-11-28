@@ -1,6 +1,6 @@
 /**
- * The styles of the dataset page on a tablet and a phone, read from the components (FR-EXP-17, FR-EXP-29). A browser
- * measures the result (the Playwright pass of AC-031, e2e/phone-tablet-layout.test.mjs); here the rules are pinned to
+ * The styles of the dataset page on a tablet and a phone, read from the components. A browser
+ * measures the result (e2e/phone-tablet-layout.test.mjs); here the rules are pinned to
  * the breakpoints of libs/responsiveColumns.js.
  */
 import { describe, it, expect } from 'vitest';
@@ -21,7 +21,7 @@ function blockAt(text, start) {
     throw new Error('unbalanced');
 }
 
-describe('the detail panel (FR-EXP-17)', () => {
+describe('the detail panel', () => {
     const page = read('ViewDataset.vue');
     const table = read('explorer/PropsTable.vue');
 
@@ -47,7 +47,7 @@ describe('the detail panel (FR-EXP-17)', () => {
     });
 });
 
-describe('the tabs below sm (FR-EXP-29)', () => {
+describe('the tabs below sm', () => {
     const tabs = read('TabSwitcher.vue');
     const phone = blockAt(tabs, tabs.indexOf(`@media only screen and (max-width: ${BREAKPOINT_PX.sm - 0.02}px)`));
 
@@ -68,7 +68,7 @@ describe('the tabs below sm (FR-EXP-29)', () => {
     });
 });
 
-describe('the dataset page (FR-EXP-29)', () => {
+describe('the dataset page', () => {
     const page = read('ViewDataset.vue');
 
     it('asks for a single pane and the bottom navigation on a phone', () => {

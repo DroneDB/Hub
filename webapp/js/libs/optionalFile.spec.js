@@ -1,5 +1,5 @@
 /**
- * Optional files are asked for only when the listing of their folder holds them (FR-XC-10, OBS-002).
+ * Optional files are asked for only when the listing of their folder holds them (OBS-002).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { isListed, datasetThumbnailUrl } from './optionalFile';

@@ -5,7 +5,7 @@
         <span v-if="dirty && canWrite" class="view-dirty">Unsaved changes</span>
         <!-- A new view of a file: what Save view is for, as the name alone does not say it is not a saved view -->
         <span v-else-if="!saved && canWrite" class="view-dirty" data-testid="view-not-saved" :title="SAVE_HELP">Not saved</span>
-        <!-- A phone: the saves are in one menu, so the name keeps its room (FR-MAP-12) -->
+        <!-- A phone: the saves are in one menu, so the name keeps its room -->
         <template v-if="canWrite && stacked">
             <Button class="view-more" size="small" severity="secondary" text icon="fa-solid fa-ellipsis-vertical" aria-label="View actions"
                     title="Save this view" aria-haspopup="true" :aria-controls="menuId" :aria-expanded="String(menuOpen)"

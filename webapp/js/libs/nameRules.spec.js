@@ -1,5 +1,5 @@
 /**
- * nameRules: the input rules come from /sys/features (FR-XC-12); the Hub runs the Registry's own
+ * nameRules: the input rules come from /sys/features; the Hub runs the Registry's own
  * test cases (__vectors__/input-rules.json, a copy of Registry.Web.UnitTest/Rules/input-rule-vectors.json)
  * against them, with the published rules and with the built-in copy an older Registry gets.
  */
@@ -28,7 +28,7 @@ describe.each([
         expect(vectors.email.map(v => [v.value, isEmail(v.value)])).toEqual(vectors.email.map(v => [v.value, v.precheck]));
     });
 
-    it('user and role names (D-007): the pattern answers as the Registry does', () => {
+    it('user and role names: the pattern answers as the Registry does', () => {
         setup();
         expect(vectors.name.accept.filter(n => !isName(n))).toEqual([]);
         expect(vectors.name.reject.filter(n => isName(n))).toEqual([]);
@@ -92,7 +92,7 @@ describe('reading the rules', () => {
     });
 });
 
-describe('user and role names (FR-ADM-01, FR-ADM-02)', () => {
+describe('user and role names', () => {
     const RULE = '1 to 127 characters: lowercase letters (a–z) and digits (0–9)';
 
     it('say the rule at the field in the words of the Registry 400, before submit', () => {
@@ -176,7 +176,7 @@ describe('the rule texts', () => {
     });
 });
 
-describe('freeName (FR-XC-07)', () => {
+describe('freeName', () => {
     it('keeps a name no sibling has', () => {
         expect(freeName('merged.tif', ['a.tif', 'b.tif'])).toBe('merged.tif');
         expect(freeName('merged.tif', [])).toBe('merged.tif');
@@ -200,7 +200,7 @@ describe('freeName (FR-XC-07)', () => {
         expect(freeName('notes', ['notes', 'notes (2)'])).toBe('notes (3)');
     });
 
-    it('compares names without regard to case (D-040), and keeps the case asked for', () => {
+    it('compares names without regard to case, and keeps the case asked for', () => {
         expect(freeName('Merged.TIF', ['merged.tif'])).toBe('Merged (2).TIF');
         expect(freeName('merged.tif', ['MERGED.TIF', 'Merged (2).tif'])).toBe('merged (3).tif');
         serve({ inputRules: { nameClash: { caseInsensitive: false } } });
@@ -222,7 +222,6 @@ describe('namesInFolder', () => {
     });
 });
 
-// FR-EXP-04, FR-EXP-05, FR-EXP-15, D-034, D-040
 describe('entryNameProblem', () => {
     const entries = ['README.md', 'odm_orthophoto.tif', 'Sub', 'Sub/inner.txt'];
 
@@ -232,7 +231,7 @@ describe('entryNameProblem', () => {
         expect(entryNameProblem(null, entries)).toBe('Enter a name');
     });
 
-    it("refuses a '/' or a '\\' as the dialogs do (D-034), saying what the name is of", () => {
+    it("refuses a '/' or a '\\' as the dialogs do, saying what the name is of", () => {
         expect(entryNameProblem('x/y', entries)).toBe('Names cannot contain /');
         expect(entryNameProblem('x/y', entries, { label: 'Folder' })).toBe('Folder names cannot contain /');
         expect(entryNameProblem('x\\y', entries, { label: 'File' })).toBe('File names cannot contain \\');
@@ -277,7 +276,7 @@ describe('entryNameProblem', () => {
     });
 });
 
-// FR-ORG-14: the limits of the Registry (published, with the built-in copy for an older one)
+// The limits of the Registry (published, with the built-in copy for an older one)
 describe('name and description limits', () => {
     it('are 1 to 256 characters for a name and 2000 for a description, as the Registry publishes them', () => {
         expect(displayNameLimits()).toEqual({ min: 1, max: 256 });

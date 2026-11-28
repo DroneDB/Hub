@@ -38,7 +38,7 @@ describe('usePlantHealth refreshRasterLayers', () => {
     });
 });
 
-// FR-RAS-17: a new style does not blank the layer while its tiles load
+// A new style does not blank the layer while its tiles load
 describe('usePlantHealth restyle in place', () => {
     it('keeps the source of the layer and gives its tiles a new key, so the tiles it has stay drawn until the new ones load', () => {
         const a = layerFor('a.tif');
@@ -79,7 +79,7 @@ const rasterLayer = (path, bands) => {
     layer.file.entry = georaster(path, bands);
     return layer;
 };
-// LisbonElevation.tif: negative heights, no NoData value; the stretch is ddb's (D-041)
+// LisbonElevation.tif: negative heights, no NoData value; the stretch is ddb's
 const LISBON = { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', valueMin: -6.3, valueMax: 216, stretch: [{ min: -6.3, max: 216 }] };
 
 function seedSetup(layers, getRasterValueInfo = vi.fn(async () => ({ ...LISBON })), savedLayers = []) {
@@ -90,7 +90,7 @@ function seedSetup(layers, getRasterValueInfo = vi.fn(async () => ({ ...LISBON }
     return { ph, dataset, saved };
 }
 
-// FR-RAS-01: a single-band georaster is drawn with a ramp stretched to its values when the map loads it
+// A single-band georaster is drawn with a ramp stretched to its values when the map loads it
 describe('usePlantHealth seedRasterDefaults', () => {
     it('gives a single-band georaster without a style the default of its value info, once', async () => {
         const dem = rasterLayer('dem/LisbonElevation.tif', 1);
@@ -130,7 +130,7 @@ describe('usePlantHealth seedRasterDefaults', () => {
         expect(ph.vizParamsByPath.value['dem.tif']).toEqual({ colormap: 'magma', rescale: '0,5' });
     });
 
-    // FR-RAS-01: a saved view records the style of its layers, none included (a view saved before the default, or in
+    // A saved view records the style of its layers, none included (a view saved before the default, or in
     // the Original view): opening it changes no style
     it('leaves a layer of the saved view without a style, and seeds one the user added to it', async () => {
         const saved = rasterLayer('dem/saved.tif', 1);
@@ -189,7 +189,7 @@ describe('usePlantHealth seedRasterDefaults', () => {
     });
 });
 
-// FR-RAS-05: the link restores the formula, the colormap and the range
+// The link restores the formula, the colormap and the range
 describe('usePlantHealth restorePlantHealthFromHash', () => {
     afterEach(() => {
         window.location.hash = '';
@@ -209,7 +209,7 @@ describe('usePlantHealth restorePlantHealthFromHash', () => {
         expect(layer.getSource().vizParams).toEqual(style);
     });
 
-    // FR-RAS-05: the Copy Link of earlier releases wrote a rescale and a stretch without a formula
+    // The Copy Link of earlier releases wrote a rescale and a stretch without a formula
     it('decodes an old link with a rescale and no formula, and applies it', () => {
         const layer = layerFor('rinconada/odm_orthophoto.tif');
         const ph = effectScope().run(() => usePlantHealth({ dataset: () => null, rasterLayer: shallowRef(new LayerGroup({ layers: [layer] })), entry: () => null }));
@@ -234,7 +234,7 @@ describe('usePlantHealth restorePlantHealthFromHash', () => {
     });
 });
 
-// FR-RAS-19: a formula the raster cannot compute (the server refuses its tiles) is told to the panel
+// A formula the raster cannot compute (the server refuses its tiles) is told to the panel
 describe('usePlantHealth formula tile errors', () => {
     const setup = () => {
         const a = layerFor('a.tif');

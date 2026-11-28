@@ -1,8 +1,8 @@
 /**
- * The size classes of the windows (FR-XC-20, FR-XC-33) read from css/app.scss and css/_variables.scss: a class gives a
+ * The size classes of the windows read from css/app.scss and css/_variables.scss: a class gives a
  * stable width, min(<class width>, 100vw - 2rem), not only a maximum, so a dialog keeps its width while its content
- * changes (FR-ORG-19, FR-SHR-06, FR-UPL-08). dialog-xl, dialog-log and dialog-wide read the width tokens of FR-XC-33. A
- * browser measures the result (the Playwright pass of AC-031).
+ * changes. dialog-xl, dialog-log and dialog-wide read the width tokens. A
+ * browser measures the result.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -23,7 +23,7 @@ function blockAt(text, start) {
     throw new Error('unbalanced');
 }
 
-describe('the dialog width tokens (FR-XC-33)', () => {
+describe('the dialog width tokens', () => {
     it('--ddb-dialog-form-max is 47rem, --ddb-dialog-log-max 80rem and --ddb-dialog-wide-max 120rem, once, in :root', () => {
         expect(variables.match(/--ddb-dialog-form-max: 47rem;/g)).toHaveLength(1);
         expect(variables.match(/--ddb-dialog-log-max: 80rem;/g)).toHaveLength(1);
@@ -69,7 +69,7 @@ describe('the size classes', () => {
 });
 
 describe('the footer of a window', () => {
-    it('sticks to the bottom of the scrolling content, so the buttons stay in view (FR-UPL-08)', () => {
+    it('sticks to the bottom of the scrolling content, so the buttons stay in view', () => {
         const rule = blockAt(scss, scss.indexOf('.window-footer {'));
         // at the edge of the scrolling content: a sticky box sticks inside the padding, so bottom: 0 held it over the last row
         expect(rule).toMatch(/position: sticky;\s*bottom: calc\(-1 \* var\(--window-pad\)\);/);

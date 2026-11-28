@@ -1,19 +1,19 @@
 // @ts-check
 /**
- * The uploads of the dataset page, app-wide (FR-UPL-04). The queue of a dataset's upload lives here, not in the upload
+ * The uploads of the dataset page, app-wide. The queue of a dataset's upload lives here, not in the upload
  * dialog or on the route: it goes on when the user opens another page of the Hub, and the header's indicator and its
  * list read it. One queue per dataset (a bundle is one request to one dataset); a queue is created by the first file
  * and dropped when its files are settled and nobody looks at it.
  *
  * - `add(org, ds, files)` queues files; `pause`, `resume` and `cancel` act on one dataset's queue. Cancel stops the
- *   queue and removes the chunks the server stores for the files that were not committed (the only cleanup, D-045): the
- *   files already sent stay in the dataset. It goes through `useUploadQueue.cancel({ confirm, cleanup })` (FR-XC-27).
+ *   queue and removes the chunks the server stores for the files that were not committed (the only cleanup): the
+ *   files already sent stay in the dataset. It goes through `useUploadQueue.cancel({ confirm, cleanup })`.
  * - `subscribe(org, ds, { added, failed })` hears the entries that the server added, in batches (the listing of the
  *   dataset, when it is open, shows them: an upload that ends while the user is elsewhere is in the listing when they
  *   come back), and the files that failed for good (the dialog asks again about a name that was taken meanwhile).
  * - `attach` / `detach`: the upload dialog shows a queue. A queue that settles while nobody shows it tells the user in a
  *   toast and is dropped; the dialog drops it when it closes.
- * - `active` is what the page-unload warning reads (FR-XC-04): an upload that is not settled is unsaved work for a
+ * - `active` is what the page-unload warning reads: an upload that is not settled is unsaved work for a
  *   reload or a closed tab, never for a route change.
  * - The "uploading" signal of the event bus (the task monitor pauses its stream meanwhile) is one for all the queues.
  *
@@ -49,7 +49,7 @@ const DELIVER_EVERY_MS = 300;
 
 const EMPTY_COUNTS = Object.freeze({ total: 0, pending: 0, uploading: 0, processing: 0, done: 0, error: 0 });
 
-/** Files whose chunks the server may still store: not committed (a commit in flight keeps its chunks, D-045). */
+/** Files whose chunks the server may still store: not committed (a commit in flight keeps its chunks). */
 const CHUNKS_STILL_THERE = new Set(['pending', 'uploading', 'error']);
 
 const keyOf = (/** @type {string} */ org, /** @type {string} */ ds) => `${org}/${ds}`;
@@ -78,7 +78,7 @@ export const useUploadsStore = defineStore('uploads', () => {
     const subscribers = new Map();
     const sending = new Set();
     // The open uploads that `listOpen` read last, per dataset, with the session it read them in: the next `add` of
-    // that dataset hands them to its batch, which then lists nothing itself (FR-XC-10)
+    // that dataset hands them to its batch, which then lists nothing itself
     /** @type {Map<string, { session: number, open: Array<{ fileId: string }> }>} */
     const listed = new Map();
     let announced = false;
@@ -126,7 +126,7 @@ export const useUploadsStore = defineStore('uploads', () => {
         };
     }));
 
-    /** Whether an upload is not settled: the unsaved work of a page unload (FR-XC-04). */
+    /** Whether an upload is not settled: the unsaved work of a page unload. */
     const active = computed(() => uploads.value.some(u => u.left > 0));
     /** The files still to be added, in every dataset. */
     const filesLeft = computed(() => uploads.value.reduce((sum, u) => sum + u.left, 0));
@@ -370,8 +370,8 @@ export const useUploadsStore = defineStore('uploads', () => {
     }
 
     /**
-     * Cancels the dataset's upload (FR-UPL-04, FR-XC-27): the queue stops, and the chunks that the server stores for the
-     * files not committed are removed. The files already sent stay in the dataset (D-045).
+     * Cancels the dataset's upload: the queue stops, and the chunks that the server stores for the
+     * files not committed are removed. The files already sent stay in the dataset.
      * @param {string} org @param {string} ds
      * @param {{ confirm?: () => boolean | Promise<boolean> }} [steps]
      * @returns {Promise<{ cancelled: boolean, cleanupError: unknown }>}
@@ -447,7 +447,7 @@ export const useUploadsStore = defineStore('uploads', () => {
     /**
      * The open chunked uploads of the caller in the dataset that no queue holds: what the dialog offers to resume.
      * A listing that fails offers nothing (the upload itself does not depend on it). The whole list is kept for the
-     * next `add` of the dataset: its batch asks the chunk status only of the uploads it holds (FR-XC-10).
+     * next `add` of the dataset: its batch asks the chunk status only of the uploads it holds.
      * @param {string} org @param {string} ds
      */
     async function listOpen(org, ds) {

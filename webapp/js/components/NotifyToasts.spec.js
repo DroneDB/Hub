@@ -1,5 +1,5 @@
 /**
- * The toast hosts of the app (FR-XC-09, FR-NAV-09, FR-XC-23): the pages' toasts are top right, the viewers' have their
+ * The toast hosts of the app: the pages' toasts are top right, the viewers' have their
  * own host, and a toast with an action shows its button, which runs it and closes the toast.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

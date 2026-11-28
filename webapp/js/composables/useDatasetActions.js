@@ -106,7 +106,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     /**
      * The New folder dialog. It runs the request itself (`createFolder` below), so that a refusal of the Registry (a name
-     * that exists: 409) shows at its name field and the dialog stays open with the typed text (FR-EXP-15, FR-XC-11).
+     * that exists: 409) shows at its name field and the dialog stays open with the typed text.
      */
     function newFolder() {
         const folder = listing.currentPath.value || '';
@@ -134,7 +134,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     // ---- Delete --------------------------------------------------------------------------
 
     /**
-     * Asks, then deletes (FR-EXP-08, D-011): the question names the items and gives their total
+     * Asks, then deletes: the question names the items and gives their total
      * size. A folder's size is read from the server meanwhile ("Calculating size…"); the user can
      * delete before it arrives.
      */
@@ -181,8 +181,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     /**
      * Moves or renames an item on the server and in the views. A pure move never triggers a
      * build (builds are by hash); a rename does when it makes the file buildable. A drag move offers Undo in its
-     * toast (FR-EXP-16, FR-XC-23): the item goes back to the path it came from. The Registry never moves onto a name
-     * that exists (409, D-040): a move replaces nothing, and a refused one says that the name is taken, with no Undo.
+     * toast: the item goes back to the path it came from. The Registry never moves onto a name
+     * that exists (409): a move replaces nothing, and a refused one says that the name is taken, with no Undo.
      * Resolves to the item at its new path, or null when the move failed (with `throws`, the failure is thrown instead).
      */
     async function moveItem(file, newPath, { action = 'rename', silent = false, throws = false } = {}) {
@@ -217,7 +217,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             // A caller that shows the failure itself (the Rename dialog, at its field) gets it thrown
             if (throws) throw e;
             if (action === 'move' && e?.status === 409) {
-                // The name is taken in the destination folder (D-040): the Registry's words, and nothing moved
+                // The name is taken in the destination folder: the Registry's words, and nothing moved
                 showError(e.message || nameClashMessage(pathutils.basename(newPath)), 'Name already taken');
                 return null;
             }
@@ -248,7 +248,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         });
     }
 
-    /** Whether the dataset has an entry at `path` (any letter case, D-040), from the server's listing of its folder. */
+    /** Whether the dataset has an entry at `path` (any letter case), from the server's listing of its folder. */
     async function pathTaken(path) {
         const entries = await dataset.list(pathutils.getParentFolder(path) || undefined);
         return (entries || []).some(e => namesClash(e?.path, path));
@@ -257,7 +257,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     /**
      * The Rename dialog. It runs the request itself (`renameEntry`, `renameDataset` for the dataset root): a name that exists
      * is refused at its field before any request, and a refusal of the Registry (a 409, a slug that is taken) shows there
-     * too, with the dialog open and the typed name (FR-EXP-04, FR-XC-11).
+     * too, with the dialog open and the typed name.
      */
     function rename(file) {
         if (!file) return;
@@ -322,7 +322,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         } else if (ddb.entry.isDirectory(source.entry) && (destPath + '/').startsWith(source.entry.path + '/')) {
             notify.warn('Cannot move a folder onto itself or one of its descendants', { summary: 'Move' });
         } else {
-            // A move onto a name that exists is refused by the Registry (409, D-040): it says that the name is taken, with no Undo
+            // A move onto a name that exists is refused by the Registry (409): it says that the name is taken, with no Undo
             await withBusy(() => moveItem(source, destPath, { action: 'move' }));
         }
     }
@@ -349,8 +349,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     /**
      * The Settings window. A new README opens in the text editor, in this page and wherever the list is (no new
-     * browser tab, which a popup blocker stops, FR-EXP-36); the README of the dataset opens from there in its viewer
-     * and in the editor (FR-EXP-24). A new URL slug takes the page to it.
+     * browser tab, which a popup blocker stops); the README of the dataset opens from there in its viewer
+     * and in the editor. A new URL slug takes the page to it.
      */
     function settings() {
         const dialog = dialogs.open(SettingsDialog, () => ({
@@ -377,7 +377,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     }
 
     /**
-     * Asked on Save in the Settings window when the URL slug changed (FR-EXP-24): links to the old address stop working,
+     * Asked on Save in the Settings window when the URL slug changed: links to the old address stop working,
      * and the page goes to the new one, which stops the uploads of this dataset that are still running (their queue
      * belongs to the old address): said when there are some. True when the user agrees.
      * @param {string} from  the slug the dataset has
@@ -464,7 +464,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         }
     }
 
-    /** The cover is a file of the dataset (in its root): the list and the tree show it, and no longer the ones it replaced (FR-EXP-30). */
+    /** The cover is a file of the dataset (in its root): the list and the tree show it, and no longer the ones it replaced. */
     function showCoverFiles(written, removed) {
         if (removed.length) listing.removed(removed);
         if (written) listing.addEntry(written).catch(e => console.warn(`Could not show ${written} in the file list:`, e));
@@ -483,7 +483,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 notify.success(`${list} merged into ${result.outputPath || 'output'}`, { summary: 'Merge Completed', life: 'long' });
                 try {
                     await listing.addEntry(result.outputPath);
-                    // The merge task deleted the sources itself, after the output was written and opened (FR-PRC-02)
+                    // The merge task deleted the sources itself, after the output was written and opened
                     if (result.deleteSource && result.sourcePaths && result.sourcePaths.length) {
                         listing.removed(result.sourcePaths);
                     }
@@ -498,7 +498,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         if (!entry) return;
         dialogs.open(AlignDialog, () => ({
             sourceEntry: entry, dataset, allEntries: listing.files.value,
-            // The window stays open with the result until the user closes it (FR-PRC-11): the page refreshes its
+            // The window stays open with the result until the user closes it: the page refreshes its
             // list and says the numbers when the align is done, and opens the output on the map when asked
             onAligned: async result => {
                 if (!result || !result.outputPath) return;
@@ -551,14 +551,14 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             file, dataset,
             onClose: async (action, result) => {
                 if (action !== 'extracted' || !result) return;
-                // The entries the extraction skipped are named with their reason (FR-PRC-30)
+                // The entries the extraction skipped are named with their reason
                 const skipped = skippedSentence(result.summary);
                 const where = `Archive extracted to ${result.destPath || 'root folder'}`;
                 if (skipped) notify.warn(`${where}. ${skipped}`, { summary: 'Extract Completed', life: 'long' });
                 else notify.success(where, { summary: 'Extract Completed', life: 'normal' });
                 await listing.reload(result.destPath);
                 if (result.deletedArchive && result.archivePath) listing.removed([result.archivePath]);
-                // The page shows the destination, and the tree its new folders (FR-EXP-19), as the docs say
+                // The page shows the destination, and the tree its new folders, as the docs say
                 showFolder?.(result.destPath || '');
             }
         });
@@ -570,9 +570,9 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
     }
 
     /**
-     * Mask Borders is a heavy task like Align (FR-PRC-12, D-013): the Registry writes `<name>_masked.tif` next to the source,
+     * Mask Borders is a heavy task like Align: the Registry writes `<name>_masked.tif` next to the source,
      * indexes it and queues its build under its own name. When the task ends the new file joins the list at once and the
-     * toast names it. An existing copy is replaced only after the user confirmed it (FR-XC-07): from the listing in view,
+     * toast names it. An existing copy is replaced only after the user confirmed it: from the listing in view,
      * or from the 409 of a copy that appeared since.
      */
     function maskBorders(item) {
@@ -586,7 +586,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                     onSubmitted: () => notify.info(`Masking started for ${item.label}...`, { summary: 'Mask Borders', life: 'normal' })
                 });
                 try {
-                    // The copy is where the Registry writes it, in the letter case of an existing entry (D-040)
+                    // The copy is where the Registry writes it, in the letter case of an existing entry
                     let outputPath = maskedOutputPath(source);
                     const listed = existingItem(outputPath, listing.files.value);
                     let overwrite = false;

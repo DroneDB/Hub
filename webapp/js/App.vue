@@ -34,7 +34,7 @@ const props = defineProps({
 
 const route = useRoute();
 
-// A viewer route has its own corner for the toasts, off the viewer's controls (FR-XC-09)
+// A viewer route has its own corner for the toasts, off the viewer's controls
 setToastGroupResolver(() => (route.meta.viewer ? VIEWER_GROUP : undefined));
 onScopeDispose(() => setToastGroupResolver(null));
 

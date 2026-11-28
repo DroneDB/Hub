@@ -16,7 +16,7 @@ import Button from 'primevue/button';
 
 /**
  * ActionButton - a button of an action that may not apply now: the one pattern of a disabled
- * action (FR-XC-22). A disabled action stays focusable (aria-disabled, not disabled) and says why,
+ * action. A disabled action stays focusable (aria-disabled, not disabled) and says why,
  * through aria-describedby (a hidden text) and its tooltip; a click on it does nothing. A toggle
  * gives `pressed` (aria-pressed).
  *

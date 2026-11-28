@@ -1,7 +1,7 @@
 /**
- * The counts of the organization page (FR-ORG-10, FR-ORG-17): the header counts the datasets of the organization, not
+ * The counts of the organization page: the header counts the datasets of the organization, not
  * those a search shows; the map keeps the search and shows the datasets it matches; a count of one is singular;
- * the delete of a row is not solid (FR-ORG-15); the pencil follows the name (FR-ORG-21).
+ * the delete of a row is not solid; the pencil follows the name.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -78,7 +78,7 @@ afterEach(() => {
     _resetPrefListenersForTests();
 });
 
-describe('the header count with a search (FR-ORG-10)', () => {
+describe('the header count with a search', () => {
     it('is the datasets of the organization, not those the search shows, in the list and in the map', async () => {
         await render();
         expect(headerCount()).toBe('26');
@@ -107,7 +107,7 @@ describe('the header count with a search (FR-ORG-10)', () => {
     });
 });
 
-describe('the map view keeps the search (FR-ORG-10)', () => {
+describe('the map view keeps the search', () => {
     it('shows the datasets the search matches, by name or slug, and all of them without one', async () => {
         await render({ view: 'map' });
         expect(wrapper.find('input[aria-label="Search datasets"]').exists()).toBe(true);
@@ -138,7 +138,7 @@ describe('the map view keeps the search (FR-ORG-10)', () => {
     });
 });
 
-describe('plural counts (FR-ORG-17)', () => {
+describe('plural counts', () => {
     it('says "1 dataset" for one result, and "datasets" for the others', async () => {
         await render({ items: [dataset('only', 'Only one')], total: 1, orgInfo: { name: 'Org', slug: 'org', permissions: {} } });
         expect(wrapper.find('.ds-pagination-text').text()).toBe('Showing 1 to 1 of 1 dataset');
@@ -148,7 +148,7 @@ describe('plural counts (FR-ORG-17)', () => {
     });
 });
 
-describe('the delete of a row (FR-ORG-15)', () => {
+describe('the delete of a row', () => {
     it('is a text button in the danger severity, not a solid one, and the edit stays outlined', async () => {
         await render();
         const del = wrapper.find('button[aria-label="Delete dataset"]');
@@ -158,7 +158,7 @@ describe('the delete of a row (FR-ORG-15)', () => {
     });
 });
 
-describe('the title of the organization (FR-ORG-21)', () => {
+describe('the title of the organization', () => {
     const sfc = fs.readFileSync(path.resolve(__dirname, 'DatasetsPage.vue'), 'utf8');
 
     it('keeps the name and the pencil in one run of text, the pencil outside the heading', async () => {

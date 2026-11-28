@@ -177,7 +177,7 @@ export default {
         scope() {
             return ddb.entry.isDirectory(this.file.entry) ? 'folder' : 'entry';
         },
-        // Names the item, so a wrong target is seen (FR-SHR-06): 'Share odm_orthophoto.tif', 'Share Folder images'
+        // Names the item, so a wrong target is seen: 'Share odm_orthophoto.tif', 'Share Folder images'
         windowTitle() {
             const name = ddb.pathutils.basename(this.file.entry.path || '');
             if (this.scope === 'folder') return name ? `Share Folder ${name}` : 'Share Folder';

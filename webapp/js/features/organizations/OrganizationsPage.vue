@@ -69,7 +69,7 @@
         <div v-else ref="listArea" class="org-list">
             <EmptyState v-if="paginatedOrganizations.length === 0" title="No organizations found" items="organizations" :query="searchQuery"
                         @clear="searchQuery = ''; $refs.searchField?.focus()">
-                <!-- The default list holds the organizations the user owns, belongs to, or that are Public (D-003) -->
+                <!-- The default list holds the organizations the user owns, belongs to, or that are Public -->
                 <p v-if="!showAll" data-org-empty-hint>No organizations yet: you don't own or belong to any, and none is public.</p>
                 <p v-else data-org-empty-hint>No organizations yet.</p>
                 <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization"
@@ -140,7 +140,7 @@
                                         :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
                                         title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
                             </RowActionSlot>
-                            <!-- Not solid: the delete of every row would dominate the list (FR-ORG-15) -->
+                            <!-- Not solid: the delete of every row would dominate the list -->
                             <RowActionSlot v-if="actionColumns.delete" :shown="rowActions.delete(org)">
                                 <Button severity="danger" text size="small" :loading="org.deleting"
                                         :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
@@ -156,7 +156,7 @@
         <div v-if="!loadKind && !showSkeleton && view === 'list' && filteredOrganizations.length > 0" class="org-pagination">
             <Paginator :rows="Number(itemsPerPage)" :total-records="filteredOrganizations.length"
                        :first="(currentPage - 1) * itemsPerPage" @page="onPageChange">
-                <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+                <!-- The size that fits reads "N (fit)": picking it stores no size -->
                 <template #end>
                     <Select :model-value="itemsPerPage" :options="pageSizeChoices" option-label="label" option-value="value"
                             aria-label="Organizations per page" class="page-size-select"
@@ -274,7 +274,7 @@ export default {
 
     setup() {
         const dialogs = useDialogs();
-        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep (FR-XC-34)
+        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep
         const listArea = ref(null);
         const page = ref(null);
         const sizing = usePageSize({
@@ -291,7 +291,7 @@ export default {
         const settings = getOrgPageSettings();
         return {
             error: "",
-            // The list did not load: sign in, no access (ResourceState, FR-XC-13)
+            // The list did not load: sign in, no access (ResourceState)
             loadError: null,
             organizations: [],
             // The list is being asked; `loaded` once a first answer came
@@ -375,7 +375,7 @@ export default {
         showSkeleton() {
             return this.loading && (!this.loaded || this.view !== 'map');
         },
-        // Rows per page: the size the user chose, else the rows that fit the height (FR-XC-34)
+        // Rows per page: the size the user chose, else the rows that fit the height
         itemsPerPage() {
             return this.pageSize;
         },
@@ -506,7 +506,7 @@ export default {
                     listed = true;
                 }
             } catch (e) {
-                // A 401 to a visitor without a session (D-048) or a 403: the page state in place of the
+                // A 401 to a visitor without a session or a 403: the page state in place of the
                 // list (with a session, a 401 has already sent the user to Login); other errors are a toast
                 if (isLatest()) {
                     if (loadErrorKind(e)) this.loadError = e;
@@ -630,7 +630,7 @@ export default {
         },
 
         // The dialog is closed when the organization is saved or the user gives up; a failure of the save stays in the
-        // dialog, at the field the Registry names, with the typed values (FR-ORG-04)
+        // dialog, at the field the Registry names, with the typed values
         handleOrganizationClose() {
             this.orgDialogOpen = false;
             this.orgDialogModel = null;
@@ -638,7 +638,7 @@ export default {
 
         /**
          * The request of the dialog: creates or updates the organization and the list. A failure is thrown for the dialog
-         * to show (it names the field, D-047), so the dialog stays open with what the user typed.
+         * to show (it names the field), so the dialog stays open with what the user typed.
          */
         async saveOrganization(neworg) {
             if (this.orgDialogMode == "new") {
@@ -816,7 +816,7 @@ export default {
     }
 
     /* The rows keep their height, so the paginator is right below the last one; the area shrinks and
-       scrolls its rows only when they are more than the screen holds (FR-ORG-25) */
+       scrolls its rows only when they are more than the screen holds */
     .org-list {
         flex: 0 1 auto;
         overflow-y: auto;
@@ -910,7 +910,7 @@ export default {
         overflow-wrap: anywhere;
     }
 
-    /* A long description is two lines, the whole of it in the tooltip (FR-ORG-14) */
+    /* A long description is two lines, the whole of it in the tooltip */
     .org-description-line {
         margin-top: var(--ddb-spacing-xs);
         color: var(--ddb-text-secondary);

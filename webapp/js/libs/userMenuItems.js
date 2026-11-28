@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * userMenuItems - what the header offers a signed-in user, as pure functions of the state (FR-NAV-01): the model
+ * userMenuItems - what the header offers a signed-in user, as pure functions of the state: the model
  * of the user menu in labelled groups (Account, Administration), and the main destination the header shows as
  * a link (Organizations). The header renders them and owns what each command does, which it passes in.
  * The same pattern as libs/dataset/explorerTools.js and libs/contextMenuItems.js.
@@ -44,9 +44,9 @@ import { storageUsage } from '@/libs/storageUsage';
  */
 
 /**
- * The storage row of the menu (FR-ACC-11): the text says what the numbers are ("Storage: 190.86 MB used · Unlimited",
+ * The storage row of the menu: the text says what the numbers are ("Storage: 190.86 MB used · Unlimited",
  * "Storage: 0 B of 40 MB", "Storage: 5 MB of 40 MB · 12.5%") whatever the shape of the storage, and the row always does one
- * thing: it opens the Storage Info (`open`). From 90 % of the quota the row is amber, from 100 % red (D-030). Null when
+ * thing: it opens the Storage Info (`open`). From 90 % of the quota the row is amber, from 100 % red. Null when
  * there is nothing to show.
  * @param {StorageInfo|null|undefined} info
  * @param {() => void} open  what the row does
@@ -96,7 +96,7 @@ function externalEntry(label, icon, url) {
  * Upload (unless creating datasets is off), their storage, My Account (a local user), Preferences and Logout; the
  * Administration group, for an administrator, has Users (local authentication), Tasks, Configuration, and the
  * Hangfire, API documentation and System health pages, which open in a new tab (their names say so), and the
- * running versions on a line of their own (FR-NAV-08).
+ * running versions on a line of their own.
  * @param {MenuState} state
  * @returns {MenuItem[]}  empty when nobody is signed in
  */

@@ -1,5 +1,5 @@
 /**
- * The dialog about a file that cannot open (FR-EXP-18): for a file the server cannot read (a DWG without its converter) it
+ * The dialog about a file that cannot open: for a file the server cannot read (a DWG without its converter) it
  * says so in words for the user, offers no processing, and keeps the setup hint for the administrator behind Show Details.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

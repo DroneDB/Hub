@@ -138,7 +138,7 @@ describe('PropsTable', () => {
         expect(mountTable({ obj: { type: 'Vector' }, entryType: '14' }).find('button.type-info-btn').exists()).toBe(true);
     });
 
-    // FR-EXP-26, FR-RAS-29: the capture time is written as Modified is, and "Unknown" when it is not known
+    // The capture time is written as Modified is, and "Unknown" when it is not known
     it('writes the capture time as Modified is written, in local time with seconds', () => {
         const ms = new Date(2016, 5, 23, 23, 32, 13).getTime();
         const wrapper = mountTable({ obj: { captureTime: ms } });

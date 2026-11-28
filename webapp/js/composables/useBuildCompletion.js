@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useBuildCompletion - a view that waits for a build (FR-XC-16). One composable on the BuildManager's
+ * useBuildCompletion - a view that waits for a build. One composable on the BuildManager's
  * `buildStateChanged` event, so no view polls on its own: a tile, a viewer opened while its file builds.
  *
  *   const { buildState, building, percent } = useBuildCompletion(() => dataset.value, () => [entry.value.path],

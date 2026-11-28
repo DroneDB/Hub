@@ -113,7 +113,7 @@ const fullscreen = useFullscreen();
 // Provided by the app: true on a map embedded in another page
 const embed = inject('embed', false);
 // The size class of the map (MapCore provides it): a map narrower than `sm` leaves its Back button out of the rail,
-// which keeps 6 buttons with the Measure toggle; the bar of the viewer has the way back to the dataset (FR-MAP-12)
+// which keeps 6 buttons with the Measure toggle; the bar of the viewer has the way back to the dataset
 const mapSize = inject('mapSize', { narrow: false });
 // No georaster: nothing to compare, no button. An embedded map only views what it was given:
 // it splits the georasters it has, but does not pick another one to compare to.

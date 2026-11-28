@@ -1,5 +1,5 @@
 /**
- * HubWindow busy (FR-XC-11, FR-PRC-13): while a dialog's request or task runs the window cannot be closed (X,
+ * HubWindow busy: while a dialog's request or task runs the window cannot be closed (X,
  * Escape, mask, Cancel) and cannot confirm again (button, Enter); when the request ends it works as before.
  */
 import { describe, it, expect, afterEach } from 'vitest';

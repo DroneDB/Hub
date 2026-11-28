@@ -10,7 +10,7 @@
 export const TILE_THUMBNAIL_SIZE = 128;
 
 /**
- * The thumbnail sizes the user chooses between (FR-EXP-43): S, M and L, in px at a 16 px root font.
+ * The thumbnail sizes the user chooses between: S, M and L, in px at a 16 px root font.
  * The tile, the grid columns and the height of a virtual row all follow the size.
  */
 export const TILE_SIZES = Object.freeze({ s: TILE_THUMBNAIL_SIZE, m: 192, l: 256 });

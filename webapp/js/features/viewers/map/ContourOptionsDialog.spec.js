@@ -1,5 +1,5 @@
 /**
- * The contour dialog closes without an error (FR-RAS-22): PrimeVue's Dialog focuses again, as
+ * The contour dialog closes without an error: PrimeVue's Dialog focuses again, as
  * it hides, the element that had the focus when it showed. That is the opener, not one of its
  * InputNumbers, whose handlers fail once it is gone; and the focus goes back to the opener.
  */
@@ -52,7 +52,7 @@ describe('ContourOptionsDialog', () => {
         });
     }
 
-    // FR-RAS-25: a thermal mosaic is not an elevation model
+    // A thermal mosaic is not an elevation model
     describe('wording', () => {
         const labels = () => [...document.querySelectorAll('.contour-dialog-body label.form-label')].map(l => l.textContent.trim());
         const help = () => document.querySelector('.dialog-help').textContent.replace(/\s+/g, ' ').trim();
@@ -91,7 +91,7 @@ describe('ContourOptionsDialog', () => {
             w.unmount();
         });
 
-        it('asks for a narrower value range, not elevation range, before many levels (with the task of FR-RAS-11)', async () => {
+        it('asks for a narrower value range, not elevation range, before many levels', async () => {
             const w = await open({ elevation: false, rasterMin: 145, rasterMax: 402 });
             const warning = document.querySelector('[data-testid="contour-levels-warning"]').textContent.replace(/\s+/g, ' ').trim();
             expect(warning).toBe('About 257 contour levels (the range divided by the interval). A large raster can take several minutes, and the result is limited in size. Use a larger interval, or limit the value range, to make it faster.');

@@ -1,5 +1,5 @@
 /**
- * configValidators (FR-ADM-06, FR-ADM-13): one validator per field type of the Configuration page.
+ * configValidators: one validator per field type of the Configuration page.
  * The timespan cases are the shared Registry cases (__vectors__/input-rules.json), which the Registry
  * unit tests run against .NET `TimeSpan.TryParse`.
  */

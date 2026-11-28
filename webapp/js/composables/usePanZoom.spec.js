@@ -1,5 +1,5 @@
 /**
- * usePanZoom: the zoom and pan of the photo viewer (FR-VWR-12): the wheel, a pinch, a double click
+ * usePanZoom: the zoom and pan of the photo viewer: the wheel, a pinch, a double click
  * or tap, the buttons, and the offset kept inside the picture.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';

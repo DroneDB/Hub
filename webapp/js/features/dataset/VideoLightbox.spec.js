@@ -1,5 +1,5 @@
 /**
- * The video lightbox is an overlay of the overlay stack (FR-VWR-30): the focus moves into it
+ * The video lightbox is an overlay of the overlay stack: the focus moves into it
  * when it is mounted visible, Tab stays inside, Escape closes it, and the focus goes back to
  * the opener.
  */
@@ -75,7 +75,7 @@ describe('VideoLightbox', () => {
         expect(w.emitted('close')).toBeUndefined();
     });
 
-    describe('when the video fails (FR-VWR-32)', () => {
+    describe('when the video fails', () => {
         it('hides the player so that the message does not cover its controls', async () => {
             const w = await open();
             const video = await fail(w, 4);
@@ -165,8 +165,8 @@ describe('VideoLightbox', () => {
     });
 });
 
-// jsdom has no layout: the rule of the player is read from the component's style (FR-VWR-35)
-describe('VideoLightbox player size (FR-VWR-35)', () => {
+// jsdom has no layout: the rule of the player is read from the component's style
+describe('VideoLightbox player size', () => {
     const css = fs.readFileSync(path.join(__dirname, 'VideoLightbox.vue'), 'utf8').split('<style')[1];
     const rule = selector => new RegExp(`${selector.replace('.', '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
 

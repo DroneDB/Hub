@@ -1,12 +1,12 @@
 // @ts-check
 /**
- * The default style of a raster layer (FR-XC-24, FR-RAS-24, D-041): the one function the map seeds a raster with when it
+ * The default style of a raster layer: the one function the map seeds a raster with when it
  * loads, and the Raster Analysis panel opens with and goes back to on Reset. The stretch is ddb's: the value info of the
  * raster carries it (`stretch`, one {min, max} per band, one for an index, none for a Byte raster of several bands); the
- * Hub computes none. A panel never changes the default (FR-RAS-17).
+ * Hub computes none. A panel never changes the default.
  *
  * The colour map is ironbow for thermal, rdylgn for a vegetation index and viridis for any other single band. A thermal
- * raster opens in the unit of its band (D-022): a Kelvin raster in K, with the formula of that unit (ddb converts from the
+ * raster opens in the unit of its band: a Kelvin raster in K, with the formula of that unit (ddb converts from the
  * band unit, so the formula of the band's own unit changes no value) and the rescale of ddb, which is in the band unit.
  */
 import { rasterValueUnit, thermalBandUnit, thermalFormulaOfUnit } from '@/libs/map/rasterUnit';

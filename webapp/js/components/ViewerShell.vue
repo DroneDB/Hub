@@ -36,7 +36,7 @@
 
             <div class="container-wrapper">
                 <slot />
-                <!-- The file cannot open yet: its build is missing, running, on hold or failed (FR-VWR-08, FR-XC-16) -->
+                <!-- The file cannot open yet: its build is missing, running, on hold or failed -->
                 <div v-if="build" class="viewer-build" role="status" aria-live="polite" :data-status="build.status">
                     <i class="fa-solid viewer-build-icon" :class="build.status === 'building' ? 'fa-circle-notch fa-spin' : 'fa-triangle-exclamation'" aria-hidden="true" />
                     <div class="viewer-build-title">{{ build.title }}</div>
@@ -123,7 +123,7 @@
  * Home, H and 0 unless a field has the focus), fullscreen of the shell and a "?" help that lists
  * the `gestures` the viewer passes in. A viewer adds its own buttons in the `nav` slot.
  *
- * Fullscreen of the shell is on the toolbar, and on the F key (FR-VWR-38) unless a field has the focus. A viewer
+ * Fullscreen of the shell is on the toolbar, and on the F key unless a field has the focus. A viewer
  * that has no navigation toolbar (`fullscreen-button`) has the same button, at the end of its view bar, and the F key;
  * embedded (no view bar) the button stands over the view, in its `fullscreen-corner`. The F key is not taken while a
  * modal dialog has the focus, when a handler before the shell has taken the key, or when the viewer's

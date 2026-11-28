@@ -1,8 +1,8 @@
 /**
- * The dataset page follows the window (FR-EXP-29, FR-XC-20): one decision, below `sm` (575.98 px), picks the phone
+ * The dataset page follows the window: one decision, below `sm` (575.98 px), picks the phone
  * layout (the tree in a Browser tab, the detail in a Properties tab, the splitter's first pane hidden), and a phone
  * that rotates or a window resized across `sm` keeps the tabs, the Map and the opened tabs: the second pane is never
- * rendered again. Below `lg` (991.98 px) the detail panel is a drawer (FR-EXP-17): Escape closes it, and a selection
+ * rendered again. Below `lg` (991.98 px) the detail panel is a drawer: Escape closes it, and a selection
  * does not open it again once the user closed it (its Details button does); from `lg` it follows the selection.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -76,7 +76,7 @@ const ROOT = { path: 'ddb://h/acme/site', type: T.DRONEDB, size: 1, properties: 
 
 let width = 1280;
 const queries = [];
-// The max-width queries (phone, tablet) and the min-width one of the wide screens (the tile size of the grid, FR-EXP-43)
+// The max-width queries (phone, tablet) and the min-width one of the wide screens (the tile size of the grid)
 const matches = query => {
     const max = /max-width:\s*([\d.]+)px/.exec(query);
     return max ? width <= Number(max[1]) : width >= Number(/min-width:\s*([\d.]+)px/.exec(query)[1]);
@@ -163,7 +163,7 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('ViewDataset follows the window across sm (FR-EXP-29)', () => {
+describe('ViewDataset follows the window across sm', () => {
     it('at 390 px: Browser, Files, Properties, Map, Tasks; the splitter collapsed, no sidebar tree', async () => {
         await open(390);
         expect(tabLabels()).toEqual(['Browser', 'Files', 'Properties', 'Map', 'Tasks']);
@@ -209,7 +209,7 @@ describe('ViewDataset follows the window across sm (FR-EXP-29)', () => {
         expect(h_.maps).toEqual({ mounted: 1, unmounted: 0 });
     });
 
-    // FR-MAP-10: the Map stays mounted once opened; its hint searches only while it is the tab on show
+    // The Map stays mounted once opened; its hint searches only while it is the tab on show
     it('tells the Map whether it is the tab on show', async () => {
         await open(1280);
         const tabs = wrapper.findComponent(TabSwitcher);
@@ -232,7 +232,7 @@ describe('ViewDataset follows the window across sm (FR-EXP-29)', () => {
     });
 });
 
-describe('ViewDataset detail drawer below lg (FR-EXP-17)', () => {
+describe('ViewDataset detail drawer below lg', () => {
     it('at 820 px: Escape closes the drawer, the next selection does not open it again, Details does', async () => {
         await open(820);
         const [a, b] = [file('a.tif'), file('b.tif')];
@@ -288,7 +288,7 @@ describe('ViewDataset detail drawer below lg (FR-EXP-17)', () => {
     });
 });
 
-describe('ViewDataset thumbnail size of the grid (FR-EXP-43)', () => {
+describe('ViewDataset thumbnail size of the grid', () => {
     const tileSize = () => h_.explorerAttrs['tile-size'] ?? h_.explorerAttrs.tileSize;
     const tool = id => h_.explorerAttrs.tools.find(t => t.id === id);
 

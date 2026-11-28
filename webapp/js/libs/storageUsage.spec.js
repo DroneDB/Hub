@@ -3,7 +3,7 @@ import { storageUsage, severityOf, percentOf, WARN_AT, OVER_AT } from './storage
 
 const MB = 1024 * 1024;
 
-describe('storageUsage (D-030)', () => {
+describe('storageUsage', () => {
     it('is amber from 90 % and red from 100 %', () => {
         expect(WARN_AT).toBe(90);
         expect(OVER_AT).toBe(100);

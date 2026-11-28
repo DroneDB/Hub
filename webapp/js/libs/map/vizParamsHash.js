@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The style of a raster layer in the address of the map (FR-RAS-05): Plant Health's Copy Link writes it, the map reads it
+ * The style of a raster layer in the address of the map: Plant Health's Copy Link writes it, the map reads it
  * back when it opens. One codec for both, so what a link carries is what the map restores. The style is the shape of a
  * saved view's layer (libs/views/viewState.js, Layer.vizParams): the same keys, the same values.
  *

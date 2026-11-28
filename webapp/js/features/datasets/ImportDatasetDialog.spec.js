@@ -1,6 +1,6 @@
 /**
  * ImportDatasetDialog: the import is tracked until it ends, and its dataset may be deleted while the
- * dialog waits (a cancelled or failed import rolls back, FR-UPL-05, D-004). The dialog then settles
+ * dialog waits (a cancelled or failed import rolls back). The dialog then settles
  * once, with the reason, instead of showing the progress for ever.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

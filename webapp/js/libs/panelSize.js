@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The size of a pane that the user resizes, in CSS px (FR-EXP-40). A pane is asked for in px or rem, or as a CSS length
+ * The size of a pane that the user resizes, in CSS px. A pane is asked for in px or rem, or as a CSS length
  * that only the browser can resolve (`var(--ddb-panel-tree-width)`, a clamp of vw units): the Splitter of PrimeVue takes
  * percents, so a size is resolved to px, kept in px and converted to the percent of the container it has now. The sizes
  * the user chose are kept on this device (PREF.PANEL_SIZES), one value per key.

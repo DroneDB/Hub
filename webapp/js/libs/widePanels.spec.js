@@ -1,7 +1,7 @@
 /**
- * Side panels, analysis panels and tool windows on a wide screen (FR-EXP-40, FR-RAS-35, FR-PRC-44, FR-PRC-45; U-504):
- * what each component takes from the width tokens of FR-XC-33 (css/_variables.scss), read from its source. A browser
- * measures the result (e2e/wide-panels.test.mjs); the expected values here are the SPEC's, written out.
+ * Side panels, analysis panels and tool windows on a wide screen:
+ * what each component takes from the width tokens (css/_variables.scss), read from its source. A browser
+ * measures the result (e2e/wide-panels.test.mjs); the expected values here are written out.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -27,7 +27,7 @@ const rule = (text, selector) => {
     return blockAt(text, at);
 };
 
-describe('FR-EXP-40: the tree and the detail panel have the width of their token', () => {
+describe('the tree and the detail panel have the width of their token', () => {
     const page = read('js/features/dataset/ViewDataset.vue');
 
     it('the tree is the first pane with --ddb-panel-tree-width, kept in px', () => {
@@ -45,7 +45,7 @@ describe('FR-EXP-40: the tree and the detail panel have the width of their token
     });
 });
 
-describe('FR-RAS-35: the analysis panels, the profile chart and the split labels', () => {
+describe('the analysis panels, the profile chart and the split labels', () => {
     const scss = read('css/_analysis-panel.scss');
 
     it('the panel is --ddb-panel-analysis-width wide and its text 0.875rem', () => {
@@ -63,7 +63,7 @@ describe('FR-RAS-35: the analysis panels, the profile chart and the split labels
     it('the axis text of the chart is 0.75rem (12px) and the paddings leave room for it', () => {
         const style = styleOf('js/features/viewers/map/RasterProfileChart.vue');
         expect(rule(style, '.profile-svg .label')).toContain('font-size: 0.75rem;');
-        // The left padding is that of the longest y label, 6.5 px a character at that font (FR-RAS-08)
+        // The left padding is that of the longest y label, 6.5 px a character at that font
         expect(read('js/features/viewers/map/RasterProfileChart.vue')).toMatch(/padTop: 12,\s*padBottom: 20,\s*padRight: 8,/);
         expect(read('js/features/viewers/map/RasterProfileChart.vue')).toContain('const LABEL_CHAR_WIDTH = 6.5;');
     });
@@ -73,7 +73,7 @@ describe('FR-RAS-35: the analysis panels, the profile chart and the split labels
     });
 });
 
-describe('FR-PRC-44: the task log window', () => {
+describe('the task log window', () => {
     const file = 'js/features/tasks/TaskLogDialog.vue';
     const style = styleOf(file);
 
@@ -106,7 +106,7 @@ describe('FR-PRC-44: the task log window', () => {
     });
 });
 
-describe('FR-PRC-45: the Run Photogrammetry window', () => {
+describe('the Run Photogrammetry window', () => {
     const file = 'js/features/dataset/TaskHistory.vue';
     const style = styleOf(file);
 

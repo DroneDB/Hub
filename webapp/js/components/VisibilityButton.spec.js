@@ -1,5 +1,5 @@
 /**
- * VisibilityButton (FR-NAV-03): the visibility of the open dataset after its name in the header. A user who can write
+ * VisibilityButton: the visibility of the open dataset after its name in the header. A user who can write
  * the dataset changes it from its menu (the three visibilities, what each means, the current one checked), and every
  * change asks first; anyone else sees the tag. It follows the session's root entry.
  */

@@ -47,7 +47,7 @@ describe('the brand blue', () => {
     });
 });
 
-// FR-XC-21: one focus-ring token set; the stylesheets keep a copy of it, in both themes
+// One focus-ring token set; the stylesheets keep a copy of it, in both themes
 describe('the focus ring', () => {
     /** The declarations of the light (:root) or the dark (:root.app-dark) block. @param {boolean} dark */
     const block = dark => {

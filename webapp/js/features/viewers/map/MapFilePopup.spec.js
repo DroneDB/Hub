@@ -55,7 +55,7 @@ describe('MapFilePopup', () => {
     });
 });
 
-describe('MapFilePopup in the overlay stack (MAP-20)', () => {
+describe('MapFilePopup in the overlay stack', () => {
     const escape = () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 
     it('closes on Escape and tells the map the user closed it', async () => {
@@ -126,7 +126,7 @@ describe('MapFilePopup in the overlay stack (MAP-20)', () => {
     });
 });
 
-describe('MapFilePopup photo size (FR-MAP-31)', () => {
+describe('MapFilePopup photo size', () => {
     afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); thumbs.fetch.mockClear(); });
 
     /** The popup is `maxWidth` CSS px wide at most (--ddb-popup-width: jsdom has no layout) */

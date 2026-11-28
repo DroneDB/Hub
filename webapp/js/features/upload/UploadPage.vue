@@ -4,7 +4,7 @@
             <Message v-model="error" />
         </div>
 
-        <!-- Where the files go, before the upload starts (FR-UPL-02): organization, name, visibility -->
+        <!-- Where the files go, before the upload starts: organization, name, visibility -->
         <form v-if="!batchOpen" class="upload-form form-column" novalidate @submit.prevent="startUpload">
             <div v-if="orgsLoaded && organizations.length === 0" class="field">
                 <Message :model-value="NO_WRITABLE_ORG" no-dismiss />
@@ -52,7 +52,7 @@
                     :disabled="!canUpload" :loading="starting" />
         </form>
 
-        <!-- The files of the batch (FR-UPL-16): the filter bar, every file with its status, the total, and Cancel, which asks -->
+        <!-- The files of the batch: the filter bar, every file with its status, the total, and Cancel, which asks -->
         <div v-if="batchOpen" class="upload-batch">
             <LoadingSpinner v-if="!snapshot" />
 
@@ -116,7 +116,7 @@ const pathOf = file => file.fullPath || file.webkitRelativePath || file.name;
  * Upload - the share page: it asks for the organization, the dataset name and the visibility (Private unless the
  * user chooses another), then the files dropped or picked here go to a new share batch, which is committed (and the
  * dataset opened) once every file is uploaded. Cancel, and leaving the page before the commit, roll the batch back
- * on the Registry through the upload queue's cancel (FR-XC-27): no half-filled dataset stays (FR-UPL-01). The
+ * on the Registry through the upload queue's cancel: no half-filled dataset stays. The
  * Registry also rolls back a batch with no upload for 24 hours. When some files fail for good the user may
  * finish without them (the others are kept), and a commit that failed can be tried again; neither Cancel's rollback
  * nor leaving the page is the only way out. Same upload queue as the dataset upload dialog (useUploadQueue).
@@ -217,7 +217,7 @@ export default {
         const token = this.uploadToken;
         if (token && !this.committing && !this.committed && !this.commitAttempted) {
             this.queue.cancel({ cleanup: () => reg.share.rollback(token) }).then(({ cleanupError }) => {
-                // The Registry rolls the batch back itself after 24 hours (D-049)
+                // The Registry rolls the batch back itself after 24 hours
                 if (cleanupError) console.warn('Cannot roll back the upload batch', cleanupError);
             });
         } else {
@@ -316,7 +316,7 @@ export default {
                 // (beforeUnmount had no token to roll back)
                 if (this._isUnmounted) {
                     reg.share.rollback(r.token).catch(e => {
-                        // The Registry rolls the batch back itself after 24 hours (D-049)
+                        // The Registry rolls the batch back itself after 24 hours
                         console.warn('Cannot roll back the upload batch', e);
                     });
                     return;
@@ -336,7 +336,7 @@ export default {
                 this.staged = [];
                 this.queue.add(files.map(file => ({ file, path: pathOf(file) })));
             } catch (e) {
-                // A refused name shows at its field, not in a toast (D-047)
+                // A refused name shows at its field, not in a toast
                 const nameError = fieldErrorOf(e, 'datasetName');
                 if (nameError) this.nameError = nameError;
                 else this.error = `Cannot initialize upload: ${e.message}`;
@@ -423,8 +423,8 @@ export default {
             this.queue.retry(file.id);
         },
 
-        // Cancel asks first (FR-UPL-16: nothing is kept), then discards the batch: the Registry removes its files and the dataset
-        // it created (FR-UPL-01)
+        // Cancel asks first (nothing is kept), then discards the batch: the Registry removes its files and the dataset
+        // it created
         async handleCancel() {
             const token = this.uploadToken;
             if (this.cancelling || this.asking) return;
@@ -482,7 +482,7 @@ export default {
     display: flex;
     flex-direction: column;
     gap: var(--ddb-spacing-lg);
-    /* One column of --ddb-form-max (.form-column of css/app.scss, FR-XC-33) */
+    /* One column of --ddb-form-max (.form-column of css/app.scss) */
     margin: var(--ddb-spacing-xl) auto;
     padding: 0 var(--ddb-spacing-lg);
     text-align: left;
@@ -505,7 +505,7 @@ export default {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* A zone of its own, not a strip under the fields: half the height of the screen (FR-NAV-10) */
+    /* A zone of its own, not a strip under the fields: half the height of the screen */
     min-height: 50vh;
     gap: var(--ddb-spacing-sm);
     padding: var(--ddb-spacing-xl);

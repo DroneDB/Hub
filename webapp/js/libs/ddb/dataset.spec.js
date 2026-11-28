@@ -260,7 +260,7 @@ describe('Dataset file writes', () => {
     }
     const names = formData => [...formData.keys()];
 
-    // FR-UPL-03: the Registry refuses a name that exists unless overwrite comes before the file
+    // The Registry refuses a name that exists unless overwrite comes before the file
     // A request without the field is the one of a client that knows nothing of it, and the Registry replaces for it
     it('writeObj and uploadObj always send overwrite, false unless asked', async () => {
         const { ds, post } = datasetPosting();
@@ -311,7 +311,7 @@ describe('Dataset.getFileContents', () => {
     });
 });
 
-// FR-EXP-08: the size of a folder is read with one recursive search of its path
+// The size of a folder is read with one recursive search of its path
 describe('Dataset.search', () => {
     function datasetPosting() {
         const registry = { remote: 'hub.example.com', secure: true, postFormData: vi.fn(async () => []) };
@@ -336,7 +336,7 @@ describe('Dataset.search', () => {
         expect(options.signal).toBe(signal);
     });
 
-    // FR-MAP-10: the hint of the Map tab asks for one entry type (the server's EntryType: GeoImage is 3)
+    // The hint of the Map tab asks for one entry type (the server's EntryType: GeoImage is 3)
     it('posts the entry type to return when asked', async () => {
         const { ds, post } = datasetPosting();
         await ds.search('*', { path: 'site', recursive: true, type: 3 });
@@ -346,7 +346,7 @@ describe('Dataset.search', () => {
     });
 });
 
-describe('Dataset chunked upload sessions (FR-UPL-04, §7.1)', () => {
+describe('Dataset chunked upload sessions', () => {
     function setup(answer = []) {
         const registry = { remote: 'hub.example.com', secure: true, makeRequest: vi.fn(async () => answer) };
         return { ds: new Dataset(registry, 'my_org', 'my_ds'), request: registry.makeRequest };
@@ -370,7 +370,7 @@ describe('Dataset chunked upload sessions (FR-UPL-04, §7.1)', () => {
     });
 });
 
-describe('Dataset.detectAllStockpiles (FR-MAP-25)', () => {
+describe('Dataset.detectAllStockpiles', () => {
     it('posts the path, the sensitivity, the smallest area and the most piles to stockpile/detect-all', async () => {
         const ds = makeDataset();
         const answer = { stockpiles: [], totalFound: 0, sensitivityUsed: 0.7, minAreaUsed: 20 };
@@ -393,7 +393,7 @@ describe('Dataset.detectAllStockpiles (FR-MAP-25)', () => {
     });
 });
 
-// U-201 (D-021, FR-RAS-02, FR-RAS-31): the value calls send map coordinates and the options of the values, never pixels
+// The value calls send map coordinates and the options of the values, never pixels
 describe('Dataset raster value calls', () => {
     const base = '/orgs/my_org/ds/my_ds';
     function datasetGetting() {
@@ -486,7 +486,7 @@ describe('Dataset raster value calls', () => {
         });
     });
 
-    // D-022: the contours of a thermal layer are in its unit (levels, limits, labels), and they skip its NoData value
+    // The contours of a thermal layer are in its unit (levels, limits, labels), and they skip its NoData value
     it('contours send the NoData value and the thermal formula of the layer in the body', async () => {
         const { ds, post } = datasetGetting();
         await ds.generateContours('t.tif', { interval: 5 }, { nodata: '0', formula: 'KELVIN' });
@@ -508,7 +508,7 @@ describe('Dataset raster value calls', () => {
         expect(ds.exportUrl('t.tif', { rescale: '0,1', nodata: 65535 })).toContain('&nodata=65535');
     });
 
-    // D-022: a rescale written in another unit than the formula's goes with its unit
+    // A rescale written in another unit than the formula's goes with its unit
     it('the tiles and the export of a thermal layer carry the unit its rescale was written in', () => {
         const { ds } = datasetGetting();
         const style = { formula: 'CELSIUS', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' };
@@ -523,7 +523,7 @@ describe('Dataset raster value calls', () => {
 });
 
 
-// U-603 (FR-RAS-15): the thermal viewer draws an R-JPEG through thumb-ex, with a thermal formula and a colormap
+// The thermal viewer draws an R-JPEG through thumb-ex, with a thermal formula and a colormap
 describe('Dataset.thumbExUrl', () => {
     const ds = new Dataset({ remote: 'h', secure: true }, 'my_org', 'my_ds');
     const base = '/orgs/my_org/ds/my_ds';

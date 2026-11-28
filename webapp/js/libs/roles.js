@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The roles the Registry keeps for itself (FR-ADM-04, D-043). `GET /sys/features` lists them in
+ * The roles the Registry keeps for itself. `GET /sys/features` lists them in
  * `systemRoles`: "admin" grants administration, "deactivated" blocks sign-in. The Registry compares
  * role names without regard to case, so the Hub does the same. Edit User grants and removes
  * "admin"; only the disable and enable endpoints change "deactivated".

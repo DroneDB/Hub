@@ -1,5 +1,5 @@
 /**
- * TaskLogDialog (FR-EXP-26): the "[HH:mm:ss]" the Registry writes at the start of each log line is
+ * TaskLogDialog: the "[HH:mm:ss]" the Registry writes at the start of each log line is
  * UTC (LogRingBuffer); the dialog shows it in local time, as the task table shows its dates.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -42,7 +42,7 @@ describe('TaskLogDialog', () => {
     });
 });
 
-describe('TaskLogDialog window (FR-PRC-44)', () => {
+describe('TaskLogDialog window', () => {
     it('is the window of a log with a maximize button', async () => {
         await show('line');
         const dialog = document.querySelector('#task-log');

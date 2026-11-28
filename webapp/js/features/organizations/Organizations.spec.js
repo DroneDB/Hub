@@ -91,7 +91,7 @@ describe('handleUnauthorized', () => {
         };
     };
 
-    it('ends the session and signs in again, told why (FR-ACC-09), coming back afterwards', async () => {
+    it('ends the session and signs in again, told why, coming back afterwards', async () => {
         const { handleUnauthorized } = await import('@/libs/authRoutes');
         const r = router('/r');
         const auth = { isLoggedIn: true, logout: vi.fn() };
@@ -110,7 +110,7 @@ describe('handleUnauthorized', () => {
         expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/o/d/view/abc/map?t=1&layer=a', notice: 'expired' } });
     });
 
-    it('leaves a visitor without a session on the page, which shows the sign-in state (D-048)', async () => {
+    it('leaves a visitor without a session on the page, which shows the sign-in state', async () => {
         const { handleUnauthorized } = await import('@/libs/authRoutes');
         const r = router('/r/acme/private-ds');
         const auth = { isLoggedIn: false, logout: vi.fn() };
@@ -127,8 +127,8 @@ describe('handleUnauthorized', () => {
     });
 });
 
-// What the page and the dialog show now that Public organizations are listed and readable for everyone (D-003)
-describe('Public organizations (D-003)', () => {
+// What the page and the dialog show now that Public organizations are listed and readable for everyone
+describe('Public organizations', () => {
     let wrapper;
     afterEach(() => {
         wrapper?.unmount();
@@ -184,7 +184,7 @@ describe('Public organizations (D-003)', () => {
         expect(card('Team').findAll('.org-row-buttons > *').map(el => el.attributes('aria-label'))).toEqual(['Report settings']);
     });
 
-    it('draws the delete of a card as a text button, not a solid one, and keeps the edit outlined (FR-ORG-15)', async () => {
+    it('draws the delete of a card as a text button, not a solid one, and keeps the edit outlined', async () => {
         const owner = { canRead: true, canWrite: true, canDelete: true, canManageMembers: true };
         await renderPage([{ slug: 'mine', name: 'Mine', owner: 'ann', isPublic: false, permissions: owner }]);
         const del = card('Mine').find('button[aria-label="Delete organization"]');
@@ -200,7 +200,7 @@ describe('Public organizations (D-003)', () => {
         expect(wrapper.find('[data-org-empty-create]').exists()).toBe(true);
     });
 
-    it('shows a visitor without a session the sign-in state, with no cards and no Create (D-048)', async () => {
+    it('shows a visitor without a session the sign-in state, with no cards and no Create', async () => {
         globalThis.HubOptions = {};
         localStorage.clear();
         reg.orgs.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Unauthorized', 401)));

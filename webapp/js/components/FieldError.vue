@@ -4,7 +4,7 @@
 
 <script setup>
 /**
- * The error of one form field, under it (FR-XC-11): the field names it with aria-describedby
+ * The error of one form field, under it: the field names it with aria-describedby
  * (its id) and aria-invalid.
  */
 defineProps({

@@ -1,8 +1,8 @@
 /**
- * The task table below `sm` (D-026, FR-ADM-18, FR-PRC-27, FR-XC-20): one stacked card per row from the shared
+ * The task table below `sm`: one stacked card per row from the shared
  * renderer (the `stacked-table` class and the `data-label` of every cell, read by css/app.scss), the columns that
  * join the table late (Dataset, Owner, Progress, Created, Duration) kept in the card, the whole path as small
- * text, and, for FR-PRC-28, the sort of the admin list and the empty state that clears the filters.
+ * text, and the sort of the admin list and the empty state that clears the filters.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -73,7 +73,7 @@ describe('TasksTable below sm', () => {
         const row = mountTable().find('tbody tr');
         expect(row.find('.path-full').text().replace(/\u200B/g, '')).toBe('flights/2026/north/site/ortho.tif');
         expect(row.find('.path-details').text().replace(/\u200B/g, '')).toBe('.../north/site/ortho.tif');
-        // No special case for a task without a path (FR-PRC-43): the tool's label, else nothing
+        // No special case for a task without a path: the tool's label, else nothing
         expect(mountTable({ tasks: [{ ...task, path: '' }] }).find('.path-full').exists()).toBe(false);
         expect(mountTable({ tasks: [{ ...task, path: '', targetLabel: 'Pending builds check' }] }).find('.path-full').text())
             .toBe('Pending builds check');
@@ -97,7 +97,7 @@ describe('TasksTable below sm', () => {
     });
 });
 
-describe('TasksTable order and empty state (FR-PRC-28)', () => {
+describe('TasksTable order and empty state', () => {
     it('sorts State, Tool and Created, also in the lazy admin table', () => {
         const w = mountTable({ lazy: true, totalRecords: 1 });
         const sortable = w.findAll('thead th').filter(th => th.attributes('data-p-sortable-column') === 'true').map(th => th.text());

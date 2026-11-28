@@ -55,7 +55,7 @@
  * Save is available when the form differs from the saved values (the same dirty state the
  * Configuration page asks about before it is left); with no change it is disabled and says why.
  * A Save checks the e-mail (the one `emailProblem` of the Add User and Edit User windows) and the
- * consent first: it shows the error at the field and saves nothing (FR-ADM-21, D-046).
+ * consent first: it shows the error at the field and saves nothing.
  */
 import { ref, computed, watch, nextTick } from 'vue';
 import Button from 'primevue/button';
@@ -177,7 +177,7 @@ defineExpose({ dirty });
     padding: var(--ddb-spacing-md);
     border: 1px solid var(--ddb-border);
     border-radius: var(--ddb-radius-md);
-    /* The width is the row's of AdminConfig (FR-ADM-28); alone, a form of one column keeps a readable width */
+    /* The width is the row's of AdminConfig; alone, a form of one column keeps a readable width */
     max-width: var(--ddb-form-max);
 }
 

@@ -1,5 +1,5 @@
 /**
- * The style of a raster layer in the address (FR-RAS-05): one codec for Copy Link and for the map that opens the link.
+ * The style of a raster layer in the address: one codec for Copy Link and for the map that opens the link.
  */
 import { describe, it, expect } from 'vitest';
 import { encodeVizParamsHash, decodeVizParamsHash } from './vizParamsHash';
@@ -23,7 +23,7 @@ describe('vizParamsHash', () => {
         }
     });
 
-    // D-022: a rescale of a thermal layer keeps the unit it was written in
+    // A rescale of a thermal layer keeps the unit it was written in
     it('keeps the unit of the rescale of a thermal layer', () => {
         const thermal = { formula: 'CELSIUS', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' };
         expect(encodeVizParamsHash('t.tif', thermal))

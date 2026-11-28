@@ -35,7 +35,7 @@ describe('httpClient error messages', () => {
         expect(error.status).toBe(409);
     });
 
-    it('keeps the errors member of a ValidationProblemDetails body on the error (D-047)', async () => {
+    it('keeps the errors member of a ValidationProblemDetails body on the error', async () => {
         respondWith(400, { type: 'https://tools.ietf.org/html/rfc9110#section-15.5.1', title: 'One or more validation errors occurred.',
             status: 400, errors: { currentPassword: ['The current password is incorrect.'], newPassword: ['Too short.'] } },
         'application/problem+json; charset=utf-8');
@@ -75,8 +75,8 @@ describe('httpClient error messages', () => {
     });
 });
 
-// FR-XC-05: a request the user did not start can opt out of the global 401 handler
-// FR-ORG-23: the Registry's 404 says what is missing ("No user named x"); callers test the status, never the text
+// A request the user did not start can opt out of the global 401 handler
+// The Registry's 404 says what is missing ("No user named x"); callers test the status, never the text
 describe('httpClient forced response types', () => {
     it('returns a Blob when asked for one, even for a JSON body (the GeoJSON result of a contour task)', async () => {
         const geojson = { type: 'FeatureCollection', features: [] };

@@ -1,5 +1,5 @@
 /**
- * ModelViewerShell, the frame of the 3D model viewers (FR-VWR-11): the navigation toolbar with
+ * ModelViewerShell, the frame of the 3D model viewers: the navigation toolbar with
  * Home (the button and the keys Home, H and 0), and the lighting settings in a panel docked beside
  * the settings button, not over the model.
  */

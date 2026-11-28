@@ -1,6 +1,6 @@
 /**
  * ImportFromUrlDialog: the import-file task is tracked in the dialog, and its dataset may be deleted
- * while the dialog waits (FR-UPL-05, D-004). The dialog then stops waiting and shows the reason.
+ * while the dialog waits. The dialog then stops waiting and shows the reason.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope } from 'vue';

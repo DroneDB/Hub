@@ -1,6 +1,6 @@
 <template>
-    <!-- The size of a log (FR-XC-20): a line of about 140 characters fits without a break; the log takes the height
-         the window has, all of the screen when the window is maximized (FR-PRC-44) -->
+    <!-- The size of a log: a line of about 140 characters fits without a break; the log takes the height
+         the window has, all of the screen when the window is maximized -->
     <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position size-class="dialog-log" maximizable
             @update:visible="$emit('update:visible', $event)" @show="onShow">
         <pre ref="logContainer" class="task-log" :class="{ 'no-wrap': !wrapLines }" @scroll.passive="onScroll">{{ shownText || 'No log output.' }}</pre>

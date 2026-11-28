@@ -50,7 +50,7 @@ import Tab from 'primevue/tab';
  *   position   - Tab strip position: 'top' (default) or 'bottom'.
  *   hideSingle - Hide the tab strip when only one tab is present (default: false).
  *   bottomNavPhone - Below `sm` (576px, the phone breakpoint of libs/responsiveColumns.js) the strip is a bottom
- *                navigation: equal cells, each with its icon and its short label (FR-EXP-29). From `sm` up it
+ *                navigation: equal cells, each with its icon and its short label. From `sm` up it
  *                is the strip of `position`.
  */
 export default {
@@ -366,7 +366,7 @@ export default {
 }
 
 /* Below sm: the strip is the bottom navigation, five equal cells that all show their icon and label (the global rule
-   that leaves a phone only the label of the active tab does not apply here, FR-EXP-29) */
+   that leaves a phone only the label of the active tab does not apply here) */
 @media only screen and (max-width: 575.98px) {
     .tab-switcher.bottom-nav-phone .tab-buttons-strip {
         order: 1;

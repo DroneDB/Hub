@@ -67,7 +67,7 @@ describe('MeasurementStorage.load', () => {
     });
 });
 
-describe('MeasurementStorage.load of a file that is not listed (FR-XC-10)', () => {
+describe('MeasurementStorage.load of a file that is not listed', () => {
     it('does not ask for the file when the listing of its folder does not hold it', async () => {
         const { dataset, storage } = storageWith([cloud('distance', 'd3')], POINT_CLOUD);
         dataset.list = vi.fn().mockResolvedValue([{ path: 'cloud.laz' }]);
@@ -102,7 +102,7 @@ describe('MeasurementStorage.save', () => {
         const result = await storage.save(collection(mine()));
         expect(ids(await written())).toEqual(['l1', 's1', 'c1', 'r1']);
         expect(result).toMatchObject({ count: 4, deleted: false });
-        // The file of the measurements is replaced, not refused as a name that exists (FR-UPL-03)
+        // The file of the measurements is replaced, not refused as a name that exists
         expect(dataset.writeObj.mock.calls[0][2]).toEqual({ overwrite: true });
     });
 
@@ -323,7 +323,7 @@ describe('a file written before 2.0', () => {
         expect(file().metadata.views.map.groups).toEqual(GROUPS);
     });
 
-    it('AC-033: map save, 3D save, then a third save changes nothing', async () => {
+    it('map save, 3D save, then a third save changes nothing', async () => {
         const { dataset, file } = memoryDataset(JSON.stringify(mixedFile()));
         const map = storageFor(dataset, MAP);
         await mapSave(map, await map.load());
@@ -576,7 +576,7 @@ function registryDataset(content) {
         }
         throw new Error(`Unexpected ${method} ${path}`);
     });
-    const dataset = new Registry(`http://u205-${Math.random().toString(36).slice(2)}.test`).Organization('org').Dataset('ds');
+    const dataset = new Registry(`http://measurement-storage-${Math.random().toString(36).slice(2)}.test`).Organization('org').Dataset('ds');
     return { dataset, state, file: () => JSON.parse(state.content) };
 }
 
@@ -588,7 +588,7 @@ describe('with the Registry client: a missing file is the client\'s 404, and the
         const error = await dataset.getFileContents('cloud_measurements.geojson').catch(e => e);
         expect(error).toBeInstanceOf(ApiError);
         expect(error.status).toBe(404);
-        // The 404 carries the Registry's own text now (FR-ORG-23); callers test the status
+        // The 404 carries the Registry's own text now; callers test the status
         expect(error.message).toBe("Cannot find 'cloud_measurements.geojson'");
     });
 

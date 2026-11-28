@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * useViewerBuild - what a viewer does with a file that cannot open yet because its build is missing, running, on hold or
- * failed (FR-VWR-08, FR-XC-16). The viewer asks the availability check, and hands the result of a file that cannot open to
+ * failed. The viewer asks the availability check, and hands the result of a file that cannot open to
  * `setAvailability`; the composable gives `notice`, which ViewerShell shows (the build state, 'Building… 40 %', and the
  * Build / Rebuild button for somebody who can write), and calls `reload` when the build ends (useBuildCompletion on the
  * BuildManager's event: no poll and no taskMonitor subscription of its own), so the viewer loads the file by itself.

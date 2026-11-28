@@ -1,5 +1,5 @@
 /**
- * The thermal mode of the image viewer (U-603: FR-RAS-15, FR-XC-24, FR-XC-32). The pixel of the raw thermal grid under the
+ * The thermal mode of the image viewer. The pixel of the raw thermal grid under the
  * pointer comes from the box the picture is drawn in, at any size of the bitmap on show; the values are written by the one
  * raster value formatter in the unit the server answered. The expected numbers are literals.
  */
@@ -64,7 +64,7 @@ describe('the radiometric picture', () => {
         expect(isRadiometric(info)).toBe(true);
     });
 
-    it('is not radiometric when ddb read only the colour preview: no unit and no calibration (FR-RAS-14)', () => {
+    it('is not radiometric when ddb read only the colour preview: no unit and no calibration', () => {
         expect(isRadiometric({ ...info, unit: '', calibration: undefined })).toBe(false);
         // the raw counts of a DJI R-JPEG: no unit, no calibration (they need DJI's own conversion)
         expect(isRadiometric({ width: 640, height: 512, valueMin: 13537, valueMax: 20670, unit: '', isThermal: true,

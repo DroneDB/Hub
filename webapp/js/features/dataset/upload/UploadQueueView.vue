@@ -76,7 +76,7 @@ import { countOf, formatNumber, formatDurationSeconds, PRECISION } from '@/libs/
 const EMPTY_COUNTS = { total: 0, pending: 0, uploading: 0, processing: 0, done: 0, error: 0 };
 
 /**
- * UploadQueueView - what an upload shows while its queue runs (FR-UPL-16): the filter bar (All, In Progress, Done, Errors,
+ * UploadQueueView - what an upload shows while its queue runs: the filter bar (All, In Progress, Done, Errors,
  * each with its count), the list of every file with its status and its whole-number percentage (a VirtualScroller of
  * FileUploadRow), and the total: bytes sent, "x of y files", the percentage, the speed and the time left. The dataset
  * upload dialog and the /upload page show the same, from the snapshot of their useUploadQueue; each puts its own summary and
@@ -120,7 +120,7 @@ export default {
             const total = this.snapshot?.totalBytes ?? 0;
             return total === 0 ? 0 : (this.snapshot.bytesSent / total) * 100.0;
         },
-        // A whole number, by the one number formatter (FR-XC-08)
+        // A whole number, by the one number formatter
         totalPercentText() {
             return `${formatNumber(this.totalProgress, PRECISION.count)}%`;
         },

@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Keeps an overlay of the map (the label of a feature, the popup of a point) inside the visible
- * map (FR-MAP-19, FR-MAP-26): not under the toolbar rail on the right (the `--map-rail-reserve`
+ * map: not under the toolbar rail on the right (the `--map-rail-reserve`
  * token of the map, css/ol-controls.css), not above its top edge, not below its bottom edge.
  * `placeOverlay` is the rule, from numbers; `keepOverlayInView` reads the map and applies it.
  */

@@ -25,7 +25,7 @@ import { getPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 import { watchPixelRatio } from '@/libs/pixelRatio';
 
-/** Whether the screen takes 2x tiles (FR-XC-32: above 1, as libs/map/olHybridXYZ.js decides for the DroneDB tiles). */
+/** Whether the screen takes 2x tiles (above 1, as libs/map/olHybridXYZ.js decides for the DroneDB tiles). */
 const wantsRetina = () => (globalThis.devicePixelRatio || 1) > 1;
 
 /**
@@ -77,7 +77,7 @@ function basemapTileLayer({ name, custom, retina, crossOrigin }) {
     if (name === 'custom' && custom) return customLayer(custom, retina, crossOrigin);
     const chosen = Basemaps[name];
     const basemap = chosen?.url ? chosen : Basemaps[PREF_DEFAULTS[PREF.BASEMAP]];
-    // 512 px tiles in 256 px slots on a screen above ratio 1, for a basemap that has them (FR-MAP-29)
+    // 512 px tiles in 256 px slots on a screen above ratio 1, for a basemap that has them
     const twice = retina && !!basemap.url2x;
     return new TileLayer({
         source: new XYZ({

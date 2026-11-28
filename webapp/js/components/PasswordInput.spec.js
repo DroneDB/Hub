@@ -10,7 +10,7 @@ const render = (props = {}, attrs = {}) => {
 };
 afterEach(() => { wrapper?.unmount(); });
 
-describe('PasswordInput (FR-ACC-06, FR-ADM-20)', () => {
+describe('PasswordInput', () => {
     it('has a toggle that is a button named "Show password" with aria-pressed false', () => {
         render();
         const toggle = wrapper.find('button.password-toggle');
@@ -34,7 +34,7 @@ describe('PasswordInput (FR-ACC-06, FR-ADM-20)', () => {
         expect(wrapper.find('input').attributes('type')).toBe('password');
     });
 
-    it('keeps the keyboard focus on the toggle: it is the same button in both states (FR-ACC-06)', async () => {
+    it('keeps the keyboard focus on the toggle: it is the same button in both states', async () => {
         render();
         const toggle = /** @type {HTMLButtonElement} */ (wrapper.find('button.password-toggle').element);
         toggle.focus();

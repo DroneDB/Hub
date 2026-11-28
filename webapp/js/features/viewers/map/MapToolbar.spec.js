@@ -92,7 +92,7 @@ describe('MapToolbar analysis buttons', () => {
         expect(button('raster-analysis-toolbar-btn').title).toBe('Raster Analysis (turns off split compare)');
     });
 
-    // FR-MAP-24: the pile is a heap, not the stack of layers, the split of Compare or the hills Raster Analysis had too
+    // The pile is a heap, not the stack of layers, the split of Compare or the hills Raster Analysis had too
     it('have a heap for the Stockpile button, apart from the glyphs of Raster Analysis and of Compare', () => {
         mountWith({ rasterCount: 2, canCompare: true });
         expect(button('stockpile-toolbar-btn').querySelector('i').className).toBe('ddb-icon ddb-icon-stockpile');
@@ -159,7 +159,7 @@ describe('MapToolbar back and copy link', () => {
     });
 });
 
-describe('MapToolbar on a map narrower than sm (FR-MAP-12)', () => {
+describe('MapToolbar on a map narrower than sm', () => {
     const labels = () => [...zones.topRight.querySelectorAll('button')].map(b => b.getAttribute('aria-label'));
     const mountOn = (mapSize, props) => {
         wrapper = mount(MapToolbar, {

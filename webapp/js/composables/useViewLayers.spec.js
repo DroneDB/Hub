@@ -6,7 +6,7 @@ import { defaultState, newLayer } from '@/libs/views/viewState';
 const warn = vi.fn();
 vi.mock('@/libs/build/fileAvailabilityChecker', () => ({ default: { check: vi.fn().mockResolvedValue({ available: true }) } }));
 vi.mock('@/components/FolderPicker.vue', () => ({ default: { name: 'FolderPicker' } }));
-// The BuildManager as an event source the test fires (FR-RAS-09): no task list, no poll
+// The BuildManager as an event source the test fires: no task list, no poll
 vi.mock('@/libs/build/buildManager', () => {
     const listeners = new Set();
     return {
@@ -278,7 +278,7 @@ describe('useViewLayers add', () => {
         expect(state.value.layers[0].hash).toBe('h-h/c.tif');
     });
 
-    it('tells the map the path of the layer it added (FR-MAP-08), and nothing for a cancelled or refused pick', async () => {
+    it('tells the map the path of the layer it added, and nothing for a cancelled or refused pick', async () => {
         const onAdded = vi.fn();
         const { layers, dialogs } = open(viewOf('f/a.tif', ['f/a.tif']), { onAdded });
         await settled(layers);
@@ -470,7 +470,7 @@ describe('useViewLayers in Viewer only', () => {
     });
 });
 
-describe('useViewLayers a file that is building (FR-RAS-09, FR-XC-16)', () => {
+describe('useViewLayers a file that is building', () => {
     const FOOTPRINT = { type: 'Polygon', coordinates: [[[10, 45], [10.01, 45], [10.01, 45.01], [10, 45]]] };
     const BUILDING = { available: false, status: 'building', title: 'File Being Processed' };
     const buildEnd = (filePath, newState = 'Succeeded') => BuildManager.fire({ dataset, filePath, newState });

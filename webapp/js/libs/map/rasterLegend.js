@@ -1,9 +1,9 @@
 // @ts-check
 /**
- * The colour legend of a styled raster on the map (FR-RAS-27, the `RasterLegend` of FR-XC-24): what it draws is derived
+ * The colour legend of a styled raster on the map (the `RasterLegend`): what it draws is derived
  * from the style of the layer (`vizParams`: colormap, rescale, formula), which saved views already keep, so it needs no
  * state of its own and shows in a saved view and in an embed. One function turns the style into the model the component
- * draws; the numbers are written by the raster value formatter (FR-RAS-28) with the unit of the raster.
+ * draws; the numbers are written by the raster value formatter with the unit of the raster.
  */
 import { colormap, colormapGradient } from '@/libs/map/colormaps';
 import { rasterValueParts, rasterUnitSymbol } from '@/libs/map/rasterUnit';
@@ -14,11 +14,11 @@ import { machineRange } from '@/libs/rescale';
  * @typedef {{ path: string, name?: string, visible?: boolean }} LayerRow  a row of the layer list
  * @typedef {{ path: string, name: string, colormap: string, colormapName: string, discrete: boolean, min: number, max: number,
  *             formula: string, rescaleUnit?: string }} LegendLayer  a layer that has a legend: its colormap and the range the colours
- *             span (in `rescaleUnit` when the rescale was written in another temperature unit than the formula's, D-022)
+ *             span (in `rescaleUnit` when the rescale was written in another temperature unit than the formula's)
  * @typedef {LegendLayer & { unit: string, gradient: string, minText: string, maxText: string, label: string }} LegendEntry
  */
 
-/** The formulas that give a temperature, and the unit each gives (D-022) */
+/** The formulas that give a temperature, and the unit each gives */
 const FORMULA_UNITS = new Map([['CELSIUS', '°C'], ['KELVIN', 'K'], ['FAHRENHEIT', '°F']]);
 
 /**
@@ -58,7 +58,7 @@ export function legendLayers(rows, styles) {
 
 /**
  * The unit of the values a layer shows: that of its thermal formula (°C, K, °F); none for a vegetation index; else the unit
- * of the raster (D-022: the legend shows the unit of the values the tiles are drawn in). A thermal layer whose rescale was
+ * of the raster (the legend shows the unit of the values the tiles are drawn in). A thermal layer whose rescale was
  * written in another temperature unit (`rescaleUnit`, kept across a change of the unit) has its range in that unit.
  * @param {{ formula?: string, rescaleUnit?: string }} layer
  * @param {string|null|undefined} rasterUnit  the unit of the raster, when it is known: `defaultVizParams(info).unit` of its value info

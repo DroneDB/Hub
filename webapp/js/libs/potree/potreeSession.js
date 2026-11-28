@@ -381,7 +381,7 @@ function jqueryWindowHandlers($, win) {
  * less memory (deviceMemoryGb() of libs/responsive.js, GB, capped at 8 by browsers; a value that
  * is not usable is the default of that helper) and on phones. A desktop whose browser does not
  * report its memory (`reported` false: desktop Firefox and Safari) keeps the 10 M it always had;
- * the 4 GB default of deviceMemoryGb() sizes the other budgets (NFR-003) and a phone's.
+ * the 4 GB default of deviceMemoryGb() sizes the other budgets and a phone's.
  * @param {number} memoryGb deviceMemoryGb()
  * @param {boolean} mobile isMobile()
  * @param {boolean} [reported] whether the browser gave memoryGb (reportsDeviceMemory())

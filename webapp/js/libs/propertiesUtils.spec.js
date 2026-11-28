@@ -260,7 +260,7 @@ describe('raw metadata rows', () => {
 });
 
 describe('buildAllProperties of the dataset entry', () => {
-    it('shows neither the permissions nor the cover flag that the Registry adds to the dataset entry (FR-EXP-28)', () => {
+    it('shows neither the permissions nor the cover flag that the Registry adds to the dataset entry', () => {
         const file = {
             entry: {
                 path: 'ddb://h/o/d', type: ddb.entry.type.DRONEDB, size: 5, mtime: 1,
@@ -274,7 +274,7 @@ describe('buildAllProperties of the dataset entry', () => {
     });
 });
 
-describe('the properties of the dataset root (FR-EXP-25)', () => {
+describe('the properties of the dataset root', () => {
     const root = {
         path: 'ddb://h/o/explorer-copy', type: ddb.entry.type.DRONEDB, size: 42050000, mtime: 1700000000,
         properties: {
@@ -354,7 +354,7 @@ describe('the properties of the dataset root (FR-EXP-25)', () => {
     });
 });
 
-describe('a warning that libddb tags with a code (FR-EXP-18)', () => {
+describe('a warning that libddb tags with a code', () => {
     const dwg = properties => ({ entry: { path: 'plan.dwg', type: ddb.entry.type.VECTOR, size: 10, properties } });
 
     it('says it in words for users, not as the setup message of the server, and shows no code row', () => {

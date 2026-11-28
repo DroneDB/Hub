@@ -86,7 +86,7 @@ describe('MergeMultispectralDialog band misalignment', () => {
     });
 });
 
-// ---- The check says each thing once, names the files and the bands (FR-PRC-14) --------------------
+// ---- The check says each thing once, names the files and the bands --------------------
 
 describe('MergeMultispectralDialog check', () => {
     it('says an identical warning once, with how many there were', async () => {
@@ -169,7 +169,7 @@ describe('MergeMultispectralDialog check', () => {
     });
 });
 
-// ---- The preview is requested at the size it is shown (FR-PRC-46) ------------------------------
+// ---- The preview is requested at the size it is shown ------------------------------
 
 describe('MergeMultispectralDialog preview', () => {
     afterEach(() => vi.unstubAllGlobals());
@@ -222,7 +222,7 @@ describe('MergeMultispectralDialog preview', () => {
     });
 });
 
-// ---- Submit: one task per click, and no silent replace (FR-PRC-02, FR-PRC-04) ------------------
+// ---- Submit: one task per click, and no silent replace ------------------
 
 const WindowStub = { props: ['busy'], template: '<div><slot /><slot name="footer" /></div>' };
 
@@ -409,7 +409,7 @@ describe('MergeMultispectralDialog submit', () => {
 });
 
 
-// ---- The task state and the busy lock (FR-PRC-13, FR-XC-15, FR-XC-11) -----------------------------------
+// ---- The task state and the busy lock -----------------------------------
 
 describe('MergeMultispectralDialog task status', () => {
     beforeEach(() => {
@@ -504,7 +504,7 @@ describe('MergeMultispectralDialog task status', () => {
     });
 });
 
-// ---- Cancel of a task that waits for a node or runs (FR-PRC-10, FR-XC-15) --------------------------------
+// ---- Cancel of a task that waits for a node or runs --------------------------------
 
 describe('MergeMultispectralDialog cancel', () => {
     beforeEach(() => {
@@ -572,7 +572,7 @@ describe('MergeMultispectralDialog cancel', () => {
 
 });
 
-// FR-PRC-18: the list is rebuilt by a move, and the browser drops the focus of a node that moves
+// The list is rebuilt by a move, and the browser drops the focus of a node that moves
 describe('MergeMultispectralDialog moving a band with the arrows', () => {
     const arrow = (w, index, direction) => w.findAll('.band-item')[index].findAll('.band-move button')[direction === 'up' ? 0 : 1];
 

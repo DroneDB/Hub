@@ -23,8 +23,8 @@
  * closes with the length in metres, or with nothing when it is cancelled. The scale itself (metres
  * per unit) is worked out from it by measureMath.
  *
- * The length is typed as text and read with parseNumber (libs/format.js, D-025): "12.5" and "12,5"
- * are 12.5 in every locale. Set scale stays enabled while the user types (D-046): a Set with a value
+ * The length is typed as text and read with parseNumber (libs/format.js): "12.5" and "12,5"
+ * are 12.5 in every locale. Set scale stays enabled while the user types: a Set with a value
  * that is not a positive length shows the rule at the field and keeps the dialog open.
  */
 import { ref, computed, nextTick } from 'vue';

@@ -70,7 +70,7 @@
             </span>
         </div>
 
-        <!-- The same chart in a window of the wide size, 40vh high (FR-RAS-35); the panel's colours come with the
+        <!-- The same chart in a window of the wide size, 40vh high; the panel's colours come with the
              classes of the panel, the window is outside it -->
         <Window v-if="expandedOpen" id="raster-profile-expanded" :title="title" modal size-class="dialog-wide" close-button
                 @close="expandedOpen = false">
@@ -128,7 +128,7 @@ export default {
         return {
             // The drawing's size: the chart's own, once measured (a phone's bottom sheet, the desktop panel and the
             // larger window differ), so the text and the line keep their proportions. The paddings leave room for the
-            // axis text, 12px (FR-RAS-35)
+            // axis text, 12px
             width: 320,
             height: 160,
             padTop: 12,
@@ -142,7 +142,7 @@ export default {
         viewBox() { return `0 0 ${this.width} ${this.height}`; },
         title() { return this.isThermal ? 'Thermal Profile' : 'Value Profile'; },
         // The room of the y labels: the longest of them at the label font (12px: about 6.5 px a character), so a value with its
-        // unit is never cut (FR-RAS-08)
+        // unit is never cut
         padLeft() {
             const chars = Math.max(...[this.yMin, this.yMax].map(v => this.formatValue(v).length));
             return Math.max(MIN_PAD_LEFT, Math.ceil(chars * LABEL_CHAR_WIDTH) + LABEL_GAP + 4);
@@ -242,7 +242,7 @@ export default {
             const t = (v - this.yMin) / this.yRange;
             return this.padTop + (1 - t) * this.chartHeight;
         },
-        // The value with its unit, as every raster value is written (FR-RAS-28)
+        // The value with its unit, as every raster value is written
         formatValue(v) {
             return rasterValueParts(v, this.unit, { placeholder: 'n/d' }).text;
         },

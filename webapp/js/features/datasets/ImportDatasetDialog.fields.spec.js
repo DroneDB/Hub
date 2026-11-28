@@ -1,5 +1,5 @@
 /**
- * The Registry URL field and the Import step of the Import dialog (FR-UPL-14, -17, -18, -19, -20, -21): a typed link counts
+ * The Registry URL field and the Import step of the Import dialog (-17, -18, -19, -20, -21): a typed link counts
  * as an applied one, a stale error goes with the values it was about, a refused Import shows its reason next to the Import
  * button and not next to "Source reachable", and a second import of a dataset gets a different name.
  */
@@ -61,7 +61,7 @@ const click = async button => {
 };
 const text = () => document.body.textContent;
 
-describe('ImportDatasetDialog, verify state (FR-UPL-17)', () => {
+describe('ImportDatasetDialog, verify state', () => {
     it('editing the Registry URL removes the old error with the values it was about', async () => {
         const api = await render({ org: { verifyImport: vi.fn(async () => ({ reachable: false, note: 'The source is not reachable.' })) } });
         await type('https://example.com/r/admin/brighton-beach');
@@ -88,7 +88,7 @@ describe('ImportDatasetDialog, verify state (FR-UPL-17)', () => {
     });
 });
 
-describe('ImportDatasetDialog, a tag without a host (FR-UPL-18)', () => {
+describe('ImportDatasetDialog, a tag without a host', () => {
     it('"org/dataset" fills the fields from the default registry', async () => {
         await render();
         await type('admin/brighton-beach');
@@ -112,7 +112,7 @@ describe('ImportDatasetDialog, a tag without a host (FR-UPL-18)', () => {
     });
 });
 
-describe('ImportDatasetDialog, a typed link (FR-UPL-20)', () => {
+describe('ImportDatasetDialog, a typed link', () => {
     it('enables Verify and Browse datasets while the link is only typed, and Verify applies it', async () => {
         const api = await render();
         expect(isDisabled(buttonOf('Verify'))).toBe(true);
@@ -137,7 +137,7 @@ describe('ImportDatasetDialog, a typed link (FR-UPL-20)', () => {
     });
 });
 
-describe('ImportDatasetDialog, a refused Import (FR-UPL-19)', () => {
+describe('ImportDatasetDialog, a refused Import', () => {
     it('shows the reason next to the Import button and not "Source reachable"', async () => {
         const reason = 'This server cannot import from local or private network addresses (localhost). Use the public address of the registry.';
         await render({ org: { createImport: vi.fn(async () => { throw new Error(reason); }) } });
@@ -168,7 +168,7 @@ describe('ImportDatasetDialog, a refused Import (FR-UPL-19)', () => {
     });
 });
 
-describe('ImportDatasetDialog, the name of a second import (FR-UPL-14)', () => {
+describe('ImportDatasetDialog, the name of a second import', () => {
     it('suggests the remote name and slug at first', async () => {
         await render({ org: { verifyImport: vi.fn(async () => ({ ...REACHABLE, suggestedName: 'Aukerman Mine' })) } });
         await type('https://hub.dronedb.app/r/odm/aukerman');
@@ -198,7 +198,7 @@ describe('ImportDatasetDialog, the name of a second import (FR-UPL-14)', () => {
     });
 });
 
-describe('ImportDatasetDialog, the time left (FR-UPL-21)', () => {
+describe('ImportDatasetDialog, the time left', () => {
     it('follows the speed of the last seconds, not the average since the start', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(0);

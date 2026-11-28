@@ -1,5 +1,5 @@
 /**
- * The detail panel with several items selected (FR-EXP-32): the summary of the selection, not the
+ * The detail panel with several items selected: the summary of the selection, not the
  * properties of the last-clicked file, and the shared actions of the registry (Download, Delete).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

@@ -1,5 +1,5 @@
 /**
- * Page states (FR-XC-13, D-048), end to end: a primary resource that cannot be shown gives the one
+ * Page states, end to end: a primary resource that cannot be shown gives the one
  * ResourceState page state (not found, no access, sign in) instead of a redirect, a modal or a
  * broken page. Drives the real Hub in Chromium against a running Registry. Not part of `npm test`
  * (needs a server); same environment and conventions as smoke.test.mjs:
@@ -102,7 +102,7 @@ test('a missing dataset shows the not found state, with no modal', async () => {
     assert.equal(await page.title(), 'Dataset not found - DroneDB');
 });
 
-test('a private dataset as anonymous shows the sign-in state and stays on its address (D-048)', async () => {
+test('a private dataset as anonymous shows the sign-in state and stays on its address', async () => {
     const page = await newPage();
     const url = `/r/${USER}/${DS}`;
     assert.equal(await stateAt(page, url), 'Sign in to open this dataset');
@@ -122,7 +122,7 @@ test('a viewer of a missing file shows the not found state and the way back to t
     assert.equal(await page.locator('.viewer-bar a[aria-label="Back to the dataset"]').count(), 1);
 });
 
-test('a viewer link whose path cannot be read says the link is not valid (FR-VWR-23)', async () => {
+test('a viewer link whose path cannot be read says the link is not valid', async () => {
     const page = await newPage(USER, PASS);
     assert.equal(await stateAt(page, `/r/${USER}/${DS}/view/%25%25%25garbage/markdown`), 'This link is not valid');
 });
@@ -146,14 +146,14 @@ test('the organizations as anonymous show the sign-in state, with no Create', as
     assert.equal(await page.locator('.org-row').count(), 0);
 });
 
-test('an organization as a non-member shows the no access state, with no Create or Import (FR-ACC-02)', async () => {
+test('an organization as a non-member shows the no access state, with no Create or Import', async () => {
     const page = await newPage(OTHER, OTHER_PASS);
     assert.equal(await stateAt(page, `/r/${USER}`), 'You do not have access to this organization');
     assert.equal(await page.locator('button:has-text("Create Dataset"), button[aria-label="Import dataset"]').count(), 0);
     assert.equal(await page.locator('.resource-state a', { hasText: 'Go to my datasets' }).getAttribute('href'), `/r/${OTHER}`);
 });
 
-test('a private dataset as a non-member shows the no access state, and the header offers nothing on it (FR-ACC-18)', async () => {
+test('a private dataset as a non-member shows the no access state, and the header offers nothing on it', async () => {
     const page = await newPage(OTHER, OTHER_PASS);
     assert.equal(await stateAt(page, `/r/${USER}/${DS}`), 'You do not have access to this dataset');
     assert.equal(await page.locator('#header [aria-label="Settings"], #header [aria-label="Download"]').count(), 0);

@@ -63,8 +63,8 @@ describe('unified viewer gate', () => {
         expect(dataset.listOne).not.toHaveBeenCalled();
     });
 
-    // FR-VWR-08: a missing artifact does not give a fixed message: the build state says why (running, on hold, failed)
-    describe('a model without its 3D Tiles output (FR-VWR-08)', () => {
+    // A missing artifact does not give a fixed message: the build state says why (running, on hold, failed)
+    describe('a model without its 3D Tiles output', () => {
         const current = { current: true };
 
         it('is building while a build job runs', async () => {
@@ -222,7 +222,7 @@ describe('model viewer gate: either multiresolution model opens it', () => {
         expect(dataset.listOne).not.toHaveBeenCalled();
     });
 
-    it('is not ready with only the 3D Tiles listed: the model is built, so it needs a rebuild (FR-VWR-08)', async () => {
+    it('is not ready with only the 3D Tiles listed: the model is built, so it needs a rebuild', async () => {
         const result = await checker.check(datasetListing(model({ artifacts: [TILES] })), model({ artifacts: [TILES] }), 'model', { current: true });
         expect(result).toMatchObject({ available: false, status: 'rebuild' });
     });
@@ -385,8 +385,8 @@ describe('which types need a build (the server decides)', () => {
     });
 });
 
-// FR-EXP-18: a DWG on a server without the converter is not a corrupted file and a build cannot help
-describe('a vector that the server cannot read (FR-EXP-18)', () => {
+// A DWG on a server without the converter is not a corrupted file and a build cannot help
+describe('a vector that the server cannot read', () => {
     const dwg = (extra = {}) => ({
         path: 'house_plan.dwg', hash: 'd', type: T.VECTOR,
         properties: { warning: 'vector parse failed: DWG support needs dwg2dxf (LibreDWG); set DDB_DWG2DXF_PATH or install dwg2dxf next to ddb', warningCode: 'dwg-converter-missing' },

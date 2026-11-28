@@ -2,7 +2,7 @@
  * Area statistics: the Area tool draws a rectangle on the map, asks the statistics of the
  * pixels under it and shows them; one map tool at a time, and the measurement toolbar waits
  * while the rectangle is drawn. Inspect reads the value of a pixel and the panel keeps it.
- * Both send map coordinates (WGS 84): the server finds the pixels of the file (U-201, D-021, FR-RAS-02). The expected
+ * Both send map coordinates (WGS 84): the server finds the pixels of the file. The expected
  * longitude and latitude of the Web Mercator metres are the ones of the spherical formula, written as literals.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -172,7 +172,7 @@ describe('useRasterAnalysis queryRasterPoint', () => {
     });
 });
 
-// ---- The gesture rule and the keyboard (FR-RAS-30, FR-XC-17, D-027) ----
+// ---- The gesture rule and the keyboard ----
 
 const key = (k, on = document.body) => on.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
 const rightClick = (map, x = 50, y = 50, upX = x, upY = y) => {
@@ -181,7 +181,7 @@ const rightClick = (map, x = 50, y = 50, upX = x, upY = y) => {
     vp.dispatchEvent(new MouseEvent('pointerup', { clientX: upX, clientY: upY, button: 2, bubbles: true }));
 };
 
-describe('Inspect from the keyboard (FR-RAS-30)', () => {
+describe('Inspect from the keyboard', () => {
     it('Space on the focused map reads the value at the centre of the view', async () => {
         const { map, raster, dataset, measureControls } = setup();
         const target = document.body.appendChild(document.createElement('div'));
@@ -318,7 +318,7 @@ describe('useRasterAnalysis spot answers that are over', () => {
     });
 });
 
-describe('Profile from the keyboard and the mouse (FR-RAS-30, D-027)', () => {
+describe('Profile from the keyboard and the mouse', () => {
     it('Space adds a vertex, Enter finishes the line: one profile measurement, asked of the server', async () => {
         const { map, raster, dataset, measureControls } = setup();
         raster.startRasterProfileDrawing();
@@ -368,7 +368,7 @@ describe('Profile from the keyboard and the mouse (FR-RAS-30, D-027)', () => {
     });
 });
 
-describe('Area from the keyboard (FR-RAS-30)', () => {
+describe('Area from the keyboard', () => {
     it('Space places the first corner, Enter the opposite one: the statistics of the window in between', async () => {
         const { map, raster, dataset } = setup();
         raster.toggleRasterAreaDrawing();
@@ -419,7 +419,7 @@ describe('useRasterAnalysis queryRasterPointAt', () => {
         expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: 0 });
     });
 
-    // FR-RAS-28: the tooltip writes a value as the panel does
+    // The tooltip writes a value as the panel does
     it('Inspect writes the value in the one format of a raster value, "29.1 °C"', async () => {
         const { map, raster, dataset } = setup();
         dataset.getRasterPointValueAt.mockResolvedValueOnce({ value: 29.06, unit: 'Celsius', isThermal: true, lon: 0, lat: 0 });
@@ -454,7 +454,7 @@ describe('useRasterAnalysis queryRasterPointAt', () => {
     it('Inspect on a click inside the raster asks the server; beside the raster it does not ask', async () => {
         const { map, raster, dataset } = setup();
         raster.toggleRasterInspect();
-        // A click ends the point of the drawing session (FR-RAS-30), as OpenLayers does
+        // A click ends the point of the drawing session, as OpenLayers does
         const click = coordinate => drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(new Point(coordinate))));
         click([505, 255]);
         await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1));
@@ -487,7 +487,7 @@ describe('useRasterAnalysis profile', () => {
     });
 });
 
-// D-022: ddb converts the values to the unit of the layer's thermal formula; the panel asks in it, and again when it changes
+// Ddb converts the values to the unit of the layer's thermal formula; the panel asks in it, and again when it changes
 describe('useRasterAnalysis thermal units', () => {
     const KELVIN_LAYER = { [PATH]: { formula: 'KELVIN', colormap: 'ironbow', rescale: '280,310' } };
 

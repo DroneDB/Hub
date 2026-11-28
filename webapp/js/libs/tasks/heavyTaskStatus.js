@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * What a tool dialog says about its task (FR-XC-15): queued, running (the phase, the percent), done, failed
- * with the message of the task (FR-XC-06), or cancelled. The one reading of a task entry (composables/useHeavyTask)
+ * What a tool dialog says about its task: queued, running (the phase, the percent), done, failed
+ * with the message of the task, or cancelled. The one reading of a task entry (composables/useHeavyTask)
  * for the HeavyTaskStatus component, so Merge, Align, Extract, the training export and the export control say the
  * same thing. The states come from libs/tasks/taskStates and the labels from libs/tasks/taskFormat.
  */
@@ -47,7 +47,7 @@ export function describeHeavyTask(task, { error = null, phases = {} } = {}) {
         return { kind: 'done', icon: 'fa-solid fa-check', text: 'Done', percent: '', value: null, error: '', title: '' };
     }
     if (state === 'Failed') {
-        // A failed task never shows a full progress bar (FR-XC-06): no percent
+        // A failed task never shows a full progress bar: no percent
         return { kind: 'failed', icon: 'fa-solid fa-xmark', text: 'Failed', percent: '', value: null, error: task.error || error || FAILED_WITHOUT_MESSAGE, title: '' };
     }
     if (isTerminalState(state)) {

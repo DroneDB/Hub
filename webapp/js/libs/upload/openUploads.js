@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * The open chunked uploads of the caller in a dataset (`Dataset.listChunkUploads`, §7.1) and the rule that matches a file
- * the user selects again to one of them (FR-UPL-04): the name of the file on the disk, its size and its last-modified
+ * The open chunked uploads of the caller in a dataset (`Dataset.listChunkUploads`) and the rule that matches a file
+ * the user selects again to one of them: the name of the file on the disk, its size and its last-modified
  * time. The path of the upload is not part of the rule: Keep both renamed it, and the upload resumes at the path it
  * has stored.
  */

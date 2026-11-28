@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { drawingHint } from './measureHints';
 
-describe('drawingHint (the one hint text of every measuring tool, D-027)', () => {
+describe('drawingHint (the one hint text of every measuring tool)', () => {
     it('says how to finish and cancel a line and an area', () => {
         expect(drawingHint('line')).toBe('Click the points of the line. Double-click, right-click or Enter finishes; Esc cancels.');
         expect(drawingHint('area')).toBe('Click the corners of the area (3 or more). Double-click, right-click or Enter finishes; Esc cancels.');

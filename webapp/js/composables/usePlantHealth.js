@@ -15,7 +15,7 @@ import { isRasterAnalysisCapable } from '@/libs/entryTypes';
 import { defaultVizParams, hasDefaultRamp, layerStyleOf } from '@/libs/map/defaultVizParams';
 import { decodeVizParamsHash } from '@/libs/map/vizParamsHash';
 
-/** The value infos the map reads at once to seed the default styles (FR-RAS-01) */
+/** The value infos the map reads at once to seed the default styles */
 export const SEED_CONCURRENCY = 3;
 
 const definition = {
@@ -24,7 +24,7 @@ const definition = {
             plantHealthVisible: false,
             plantHealthFilePath: null,
             plantHealthInitialParams: null,
-            // The tiles of the formula of the open panel failed to load: the raster cannot compute it (FR-RAS-19)
+            // The tiles of the formula of the open panel failed to load: the raster cannot compute it
             plantHealthFormulaError: false,
             // Per-file viz-params cache. Each Plant Health / Raster Analysis
             // panel writes its current params here when the user changes the
@@ -34,10 +34,10 @@ const definition = {
             // `refreshRasterLayers` so any layer with a remembered viz state
             // stays styled even when no panel is currently open.
             vizParamsByPath: {},
-            // The layers that were offered their default style (FR-RAS-01): once each, so that a Reset, the Original
+            // The layers that were offered their default style: once each, so that a Reset, the Original
             // view or a style a user removed is not undone by the next load
             _seededPaths: new Set(),
-            // The unit of the raster of each layer whose value info was read, for the legend (FR-RAS-27)
+            // The unit of the raster of each layer whose value info was read, for the legend
             rasterUnits: {}
         };
     },
@@ -92,7 +92,7 @@ const definition = {
          * Only a layer whose params changed is restyled: the others keep their loaded
          * tiles (another layer's plant health, a closed panel, a rebuilt file list). The source is
          * restyled in place, so the layer keeps drawing its tiles until those of the new style have
-         * loaded (FR-RAS-17): a new source would blank it meanwhile.
+         * loaded: a new source would blank it meanwhile.
          */
         refreshRasterLayers() {
             if (!this.rasterLayer) return;
@@ -127,7 +127,7 @@ const definition = {
         },
 
         /**
-         * Tells the panel when the tiles of a formula cannot be made (FR-RAS-19): the server refuses (400) a formula whose
+         * Tells the panel when the tiles of a formula cannot be made: the server refuses (400) a formula whose
          * bands the raster does not have, and the layer would just stay blank. The tiles are counted per style (the key
          * of the source, which every tile carries): the flag is set only while no tile of the current style has loaded
          * and some failed, so a timeout, a 5xx or a lost connection after tiles of the formula loaded is not a refusal,
@@ -172,7 +172,7 @@ const definition = {
         },
 
         /**
-         * Gives each single-band non-Byte georaster that has no style the default of its value info (FR-RAS-01, D-041):
+         * Gives each single-band non-Byte georaster that has no style the default of its value info:
          * a colour ramp stretched to the range of its values, as Raster Analysis draws it. Once per layer; a layer that
          * has a style (a view's, a link's, a user's) is left as it is, and so is one whose value info cannot be read.
          * A layer of the saved view the map shows keeps the style the view records, none included: that is the

@@ -72,7 +72,7 @@ describe('loading the sidecar', () => {
         expect(orientation.upAxis.value).toBe('-y');
     });
 
-    it('does not ask for a sidecar that the folder does not list (no 404 in the console, FR-XC-10)', async () => {
+    it('does not ask for a sidecar that the folder does not list (no 404 in the console)', async () => {
         dataset.list = vi.fn().mockResolvedValue([{ path: 'scenes/site.spz' }, { path: 'scenes/other_cameras.json' }]);
         const cams = make();
         await cams.load();
@@ -154,7 +154,7 @@ describe('saving', () => {
         expect(await cams.save()).toBe(true);
         const [path, content, options] = dataset.writeObj.mock.calls[0];
         expect(path).toBe('scenes/site_cameras.json');
-        // Its own views file: the save replaces it (FR-UPL-03)
+        // Its own views file: the save replaces it
         expect(options).toEqual({ overwrite: true });
         expect(JSON.parse(content)).toMatchObject({ orientation: { upAxis: '+z', flipped: false, tiltRoll: 3, tiltPitch: -2 } });
         expect(JSON.parse(content).cameras).toHaveLength(2);

@@ -24,7 +24,7 @@ describe('taskFormat', () => {
         expect(f.taskDuration({ createdAt: '2026-10-20T10:00:00Z' })).toBe('');
     });
 
-    // FR-PRC-15: the time a task waited in the queue, next to its duration
+    // The time a task waited in the queue, next to its duration
     it('measures the wait in the queue: startedAt less createdAt', () => {
         expect(f.taskWaiting({ createdAt: '2026-10-20T10:00:00Z', startedAt: '2026-10-20T10:01:05Z' })).toBe('1m 5s');
         expect(f.taskWaiting({ createdAt: '2026-10-20T10:00:00Z', startedAt: '2026-10-20T10:00:00.400Z' })).toBe('');
@@ -64,7 +64,7 @@ describe('taskFormat', () => {
 });
 
 describe('taskFormat, cancelled and node-queued tasks', () => {
-    it('labels a Deleted task "Cancelled" only when a user cancelled it (FR-PRC-20, D-038)', () => {
+    it('labels a Deleted task "Cancelled" only when a user cancelled it', () => {
         const cancelled = { state: 'Deleted', cancelledBy: 'admin' };
         expect(f.stateLabel(cancelled)).toBe('Cancelled');
         expect(f.stateTag(cancelled)).toMatchObject({ label: 'Cancelled', title: 'Cancelled by admin', icon: 'fa-solid fa-ban' });
@@ -78,7 +78,7 @@ describe('taskFormat, cancelled and node-queued tasks', () => {
         expect(f.stateFilterLabel('Enqueued')).toBe('Enqueued');
     });
 
-    it('shows a task a processing node keeps queued as waiting, from the server flag (FR-PRC-37, D-024)', () => {
+    it('shows a task a processing node keeps queued as waiting, from the server flag', () => {
         const queued = { state: 'Processing', waitingForNode: true, startedAt: '2026-10-20T10:00:00Z', phaseMessage: 'processing' };
         expect(f.stateTag(queued)).toMatchObject({ severity: 'info', icon: 'fa-regular fa-clock', label: 'Queued on node' });
         expect(f.runningTime(queued, Date.parse('2026-10-20T10:05:00Z'))).toBe('waiting');
@@ -88,7 +88,7 @@ describe('taskFormat, cancelled and node-queued tasks', () => {
         expect(f.stateTag({ state: 'Processing' }).label).toBe('Processing');
     });
 
-    it('filters a task queued on a node as Enqueued, not Processing, as the Registry does (FR-PRC-37)', () => {
+    it('filters a task queued on a node as Enqueued, not Processing, as the Registry does', () => {
         const queued = { state: 'Processing', waitingForNode: true };
         const running = { state: 'Processing', waitingForNode: false };
         expect(f.matchesStateFilter(queued, 'Enqueued')).toBe(true);
@@ -107,7 +107,7 @@ describe('taskFormat, cancelled and node-queued tasks', () => {
 });
 
 
-describe('nodeLoad (FR-PRC-35)', () => {
+describe('nodeLoad', () => {
     it('splits the queue count of a node into the tasks it runs and the ones that wait', () => {
         expect(f.nodeLoad({ taskQueueCount: 1, maxParallelTasks: 1 })).toEqual({ running: 1, waiting: 0 });
         expect(f.nodeLoad({ taskQueueCount: 4, maxParallelTasks: 2 })).toEqual({ running: 2, waiting: 2 });

@@ -46,7 +46,7 @@
                         <small v-if="taskTarget(slotProps.data)" class="path-details">{{ targetText(slotProps.data) }}</small>
                         <!-- On a phone the card has the room for the whole target -->
                         <small v-if="taskTarget(slotProps.data)" class="path-full">{{ fullTargetText(slotProps.data) }}</small>
-                        <!-- The builds this task started: one line with their count (FR-PRC-26) -->
+                        <!-- The builds this task started: one line with their count -->
                         <small v-if="slotProps.data.childBuilds" class="child-builds">{{ childBuildsText(slotProps.data.childBuilds) }}</small>
                     </div>
                 </template>
@@ -81,7 +81,7 @@
                          :title="stateTag(slotProps.data).title">
                         <Tag severity="info" icon="fa-regular fa-clock" :value="stateTag(slotProps.data).label" />
                     </div>
-                    <!-- A task that waits its turn says so with the label of its state, and what it waits behind (FR-PRC-42) -->
+                    <!-- A task that waits its turn says so with the label of its state, and what it waits behind -->
                     <div v-else-if="progressKind(slotProps.data) === 'queued'" class="task-queued"
                          :title="stateTag(slotProps.data).title">
                         <Tag severity="info" icon="fa-regular fa-clock" :value="stateTag(slotProps.data).label" />
@@ -90,7 +90,7 @@
                     <!-- A task that is done says so: a full bar adds nothing -->
                     <div v-else-if="progressKind(slotProps.data) === 'done'" class="task-done">Done</div>
                     <div v-else-if="progressKind(slotProps.data) === 'bar'" class="task-progress">
-                        <!-- The percent is text of its own: the bar's own label is clipped at 1-9 % (FR-PRC-39) -->
+                        <!-- The percent is text of its own: the bar's own label is clipped at 1-9 % -->
                         <div class="task-bar">
                             <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
                                          :show-value="false" style="height: 1rem;" />
@@ -166,7 +166,7 @@ import { offersAction } from '@/composables/useTaskActions';
  * Presentational task table shared by the per-dataset Task History tab and the
  * admin Tasks dashboard. Contains no fetch logic: data, loading and
  * paging are driven by the parent via props/events. The action buttons of a row
- * are the ones the server lists in its `actions` (D-024, FR-XC-15); the parent runs
+ * are the ones the server lists in its `actions`; the parent runs
  * them through useTaskActions.
  */
 export default {
@@ -187,7 +187,7 @@ export default {
         first: { type: Number, default: 0 },
         rows: { type: Number, default: 10 },
         emptyMessage: { type: String, default: 'No processing tasks have been run yet.' },
-        // The list is empty because filters hide tasks: the empty state offers 'Clear filters' (FR-PRC-28)
+        // The list is empty because filters hide tasks: the empty state offers 'Clear filters'
         filtered: { type: Boolean, default: false },
         // The server-side order of a lazy table: a field of the whitelist (createdAt, state, toolId) and 1 / -1
         sortField: { type: String, default: 'createdAt' },
@@ -205,7 +205,7 @@ export default {
     emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'sort', 'clear-filters'],
 
     setup() {
-        // Secondary columns leave a narrow table; below `sm` every row is a stacked card with all of them (D-026),
+        // Secondary columns leave a narrow table; below `sm` every row is a stacked card with all of them,
         // and the hidden header's sortable cells leave the tab order
         return { ...useTaskFormatting(), childBuildsText, stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout() };
     },
@@ -229,9 +229,9 @@ export default {
          * A build that succeeded without building, its entry waiting for files, shows
          * what it waits for. A failed task shows a red Failed tag and why it failed (the
          * task's error), never a bar. A task a user cancelled says so, with the percent it
-         * had reached (FR-PRC-20). A task a processing node keeps queued says so (FR-PRC-37).
+         * had reached. A task a processing node keeps queued says so.
          * Only Processing and Succeeded (100%) render a bar. A task that has not started (Created, Enqueued, Scheduled,
-         * Reused, Awaiting) shows its state's label, 'queued' (FR-PRC-42); a Deleted task nobody cancelled shows a muted
+         * Reused, Awaiting) shows its state's label, 'queued'; a Deleted task nobody cancelled shows a muted
          * placeholder.
          */
         progressKind(task) {
@@ -250,7 +250,7 @@ export default {
             return task.progressPercent != null ? `Cancelled at ${task.progressPercent} %` : 'Cancelled';
         },
 
-        /** Whether the server offers `action` on the row (D-024). */
+        /** Whether the server offers `action` on the row. */
         offers(task, action) {
             return offersAction(task, action);
         },

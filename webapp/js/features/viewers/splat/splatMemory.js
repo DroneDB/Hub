@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The memory budget of the splat viewer (FR-VWR-22, NFR-003).
+ * The memory budget of the splat viewer.
  *
  * A paged .rad streams through Spark's pager: one pool of pages (65536 splats each) that is
  * allocated whole, at its maximum size, when the first chunk is asked for, and then filled and

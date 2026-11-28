@@ -45,7 +45,7 @@
  * UnifiedViewer - one Giro3D scene for every DroneDB build artifact: OGC 3D Tiles (models,
  * .3tz archives, on a globe when georeferenced), COPC point clouds, georasters (server XYZ
  * tiles) and vectors (MVT, or local CAD drawings), over an OSM basemap, with point /
- * distance / area measurements (the gesture rule of D-027: click adds a point; double click, Enter or right click ends it; Escape cancels). Opt-in ("Open in 3D Viewer"); the default viewers of each
+ * distance / area measurements (the gesture rule: click adds a point; double click, Enter or right click ends it; Escape cancels). Opt-in ("Open in 3D Viewer"); the default viewers of each
  * type are unchanged. The scene, the loaders and the measure tool are modules next
  * to this view.
  */
@@ -73,7 +73,7 @@ defineOptions({ name: 'UnifiedViewer' });
 
 // Type checks are the viewer's own (several types; .3tz indexed as generic)
 const { entry, dataset, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
-// A file that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends (FR-VWR-08)
+// A file that is not built (yet) shows its build state with Build / Rebuild, and opens when the build ends
 // A model whose 3D Tiles could not be generated is offered in the model viewer, which shows its bm3d output; from an
 // embedded viewer (Viewer only) the model viewer opens as Viewer only too
 const embed = inject('embed', false);

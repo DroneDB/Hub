@@ -72,8 +72,8 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
     });
 
     /**
-     * A move inside one dataset cannot replace (the Registry answers 409 for a name that exists, D-040, and PUT /obj
-     * has no overwrite): each conflict is Keep both (the item gets a free name, FR-XC-07) or Skip. Resolves to the
+     * A move inside one dataset cannot replace (the Registry answers 409 for a name that exists, and PUT /obj
+     * has no overwrite): each conflict is Keep both (the item gets a free name) or Skip. Resolves to the
      * options of the move ({ names, skip }), or null when the user cancelled.
      * @param {object[]} conflicts  the clipboard items whose names exist in the folder
      * @param {object[]} items  every item that is moved
@@ -156,7 +156,7 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
             return showError(e, 'Paste');
         }
         const existing = [...await namesIn(target.basePath)];
-        // Names in a folder are compared as the Registry compares them (letter case ignored, D-040)
+        // Names in a folder are compared as the Registry compares them (letter case ignored)
         const conflicts = items.filter(it => existing.some(name => namesClash(name, pathutils.basename(it.path))));
         let options;
         if (sameDataset && mode === 'cut') {

@@ -1,11 +1,11 @@
 /**
- * The default style of a raster (FR-XC-24, FR-RAS-24, D-041): the stretch is the one of the value info (ddb's), the colour
+ * The default style of a raster: the stretch is the one of the value info (ddb's), the colour
  * map follows the kind of raster. The expected texts are written out, not computed.
  */
 import { describe, it, expect } from 'vitest';
 import { defaultVizParams, defaultRescale, hasDefaultRamp, layerStyleOf } from './defaultVizParams';
 
-// LisbonElevation.tif: negative heights, no NoData value (FR-RAS-01)
+// LisbonElevation.tif: negative heights, no NoData value
 const LISBON = { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', valueMin: -6.3, valueMax: 216, stretch: [{ min: -6.3, max: 216 }] };
 
 describe('defaultVizParams', () => {
@@ -18,7 +18,7 @@ describe('defaultVizParams', () => {
         expect(defaultVizParams(info)).toEqual({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '12.76,35.27', unit: '°C' });
     });
 
-    // D-022: the default unit is the band unit
+    // The default unit is the band unit
     it('opens a Kelvin raster in K, with the formula of the unit of its band', () => {
         const info = { isThermal: true, isDirectValue: true, unit: 'K', stretch: [{ min: 280.1, max: 308.4 }] };
         expect(defaultVizParams(info)).toEqual({ formula: 'KELVIN', colormap: 'ironbow', rescale: '280.1,308.4', unit: 'K' });

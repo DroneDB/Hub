@@ -39,7 +39,7 @@
     box-shadow: inset 0 0 0 0.25rem rgba(var(--ddb-glass-rgb), 0.5);
 }
 
-/* The keyboard focus ring: the --ddb-focus-ring-* set (FR-XC-21), with its halo, as the button sits
+/* The keyboard focus ring: the --ddb-focus-ring-* set, with its halo, as the button sits
    on the map, whose colours are not known: the ring and the halo are 3:1 or more against each other,
    so one of them always shows. A mouse focus draws no ring (OpenLayers draws a 1px one on :focus). */
 .ol-control button:hover,
@@ -192,7 +192,7 @@
 
 /* A compact map (MapCore sets .is-compact from the size of the map itself: narrower than `sm`, or too low
    for the whole rail, as the default 600x400 frame of an embed is) keeps one button of the measure tools
-   in the rail, 'Measure', and the tools open from it (FR-MAP-12, FR-SHR-05). The same rule serves a phone
+   in the rail, 'Measure', and the tools open from it. The same rule serves a phone
    and a small frame. The rail scrolls when the open tools are still taller than the map (.ol-zone-top-right). */
 .ol-measure-toggle {
     display: none;
@@ -211,7 +211,7 @@
     left: 0.5rem;
 }
 
-/* The scale bar (FR-MAP-30), beside the settings button (about 3rem wide) and clear of the attribution at the bottom right;
+/* The scale bar, beside the settings button (about 3rem wide) and clear of the attribution at the bottom right;
    with its text it is about 3rem high, under --map-bottom-reserve, which the bottom panels keep clear */
 .map-container .ol-scale-bar {
     bottom: 0.5rem;
@@ -292,7 +292,7 @@
     white-space: normal;
 }
 
-/* The point of the keyboard (FR-XC-17): while a tool draws, Space adds the centre of the map. A cross with
+/* The point of the keyboard: while a tool draws, Space adds the centre of the map. A cross with
    a dark edge, so it shows on a light and on a dark map; it takes no click */
 .map-crosshair {
     position: absolute;

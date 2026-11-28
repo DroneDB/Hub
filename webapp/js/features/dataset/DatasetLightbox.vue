@@ -7,7 +7,7 @@
 <script setup>
 /**
  * The dataset page's photo and video lightboxes: the photos of the folder on show in the zoom
- * viewer (PhotoLightbox, FR-VWR-12), or one video.
+ * viewer (PhotoLightbox), or one video.
  *
  *   lightbox.value.open(node, files)   // a photo: every photo of `files`; a video: just it
  */

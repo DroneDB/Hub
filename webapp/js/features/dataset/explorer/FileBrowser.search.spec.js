@@ -104,7 +104,7 @@ describe('FileBrowser search box', () => {
     });
 });
 
-describe('FileBrowser search field (FR-EXP-31, FR-ORG-18)', () => {
+describe('FileBrowser search field', () => {
     let searchEntries;
     const found = n => Array.from({ length: n }, (_, i) => ({ path: `flight/DJI_${i}.JPG`, type: ddb.entry.type.IMAGE }));
 

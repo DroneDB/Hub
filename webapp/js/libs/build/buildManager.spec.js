@@ -95,7 +95,7 @@ describe('the build state of a file follows the task list', async () => {
         expect(events[0]).toMatchObject({ previousState: 'Failed', newState: 'Succeeded' });
     });
 
-    it('says which task started the build that ended (FR-PRC-26)', () => {
+    it('says which task started the build that ended', () => {
         const { listChanges, events } = setup([failed]);
         listChanges([{ ...succeeded, parentJobId: 'pg-1' }, failed]);
         expect(events[0]).toMatchObject({ newState: 'Succeeded', parentJobId: 'pg-1' });

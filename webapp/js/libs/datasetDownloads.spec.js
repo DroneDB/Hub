@@ -74,7 +74,7 @@ describe('notifyDownloadError', () => {
     });
 });
 
-// FR-EXP-27: one set of rules for the header and the menus
+// One set of rules for the header and the menus
 describe('the download question', () => {
     const named = (name, size, type = ddb.entry.type.IMAGE) => ({ label: name, entry: { path: name, size, type } });
     const MB = 1048576;

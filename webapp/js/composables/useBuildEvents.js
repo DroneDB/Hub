@@ -17,7 +17,7 @@ import { isSameDataset } from '@/libs/build/datasetIdentity';
 import { notify } from '@/libs/notify';
 import { useTimerGroup } from '@/composables/useTimers';
 
-/** How long the builds that end together are collected into one toast (FR-PRC-26). */
+/** How long the builds that end together are collected into one toast. */
 export const BUILD_TOAST_WINDOW_MS = 1500;
 /** A task whose builds have not all ended says what it has after this long without a build ending. */
 const TASK_QUIET_MS = 30_000;
@@ -33,7 +33,7 @@ export function useBuildEvents() {
     /** @type {(message: string, title: string) => void} */
     let showError = (message, title) => notify.error(message, { summary: title });
 
-    // The builds that ended together are one toast (FR-PRC-26): a run of photogrammetry builds nine files, and nine
+    // The builds that ended together are one toast: a run of photogrammetry builds nine files, and nine
     // toasts cover the page. Collected per dataset for a short window; the builds a listed task started (parentJobId)
     // are collected per task, until the last of them ended: "Photogrammetry finished - 9 files built".
     const later = useTimerGroup();

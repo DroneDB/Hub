@@ -38,7 +38,7 @@ function mountFields({ withPolicy = policy, autocomplete = undefined } = {}) {
 const type = async (selector, value) => { await wrapper.find(selector).setValue(value); await flushPromises(); };
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; });
 
-describe('NewPasswordFields (FR-ADM-08, FR-ACC-21)', () => {
+describe('NewPasswordFields', () => {
     it('lists the requirements from the start, with no verdict yet', async () => {
         mountFields();
         await flushPromises();

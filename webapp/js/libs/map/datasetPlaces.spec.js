@@ -62,7 +62,7 @@ describe('unlocatedDatasets', () => {
     });
 });
 
-describe('datasetMatchesSearch (FR-ORG-10)', () => {
+describe('datasetMatchesSearch', () => {
     const ds = { slug: 'roof-2024', name: 'Roof Survey', tagline: 'Tiles and Gutters', bbox: [1, 1, 2, 2] };
 
     it.each([['survey'], ['ROOF-20'], ['gutters'], ['  tiles and  '], ['']])('matches %j in the name, the slug or the tagline, trimmed and without regard to case', text => {

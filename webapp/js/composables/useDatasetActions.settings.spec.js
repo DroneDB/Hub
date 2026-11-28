@@ -1,5 +1,5 @@
 /**
- * The Settings window of the dataset page and what it asks of the page (FR-EXP-36, FR-EXP-24, FR-EXP-30): a README that
+ * The Settings window of the dataset page and what it asks of the page: a README that
  * the window creates opens in the text editor of the page, not in a new browser tab; the README of the dataset opens from
  * the window in its viewer or in the editor; a new URL slug takes the page to it; the cover is announced with its file name
  * and joins the list.
@@ -47,7 +47,7 @@ const editorCall = () => dialogs.open.mock.calls.find(call => call[1] && typeof 
 beforeEach(() => { vi.clearAllMocks(); h_.uploads = []; });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('Add Readme from the Settings window (FR-EXP-36)', () => {
+describe('Add Readme from the Settings window', () => {
     it('opens README.md in the text editor of the page, from a subfolder too, and never in a new tab', () => {
         const open = vi.fn();
         vi.stubGlobal('open', open);
@@ -64,7 +64,7 @@ describe('Add Readme from the Settings window (FR-EXP-36)', () => {
     });
 });
 
-describe('the README of the dataset from the Settings window (FR-EXP-24)', () => {
+describe('the README of the dataset from the Settings window', () => {
     it('Open shows the file in its viewer, as a double click does', async () => {
         const { settingsDialog, props } = setup();
 
@@ -126,7 +126,7 @@ describe('a new visibility, asked on Save in the Settings window', () => {
     });
 });
 
-describe('a new URL slug, asked on Save in the Settings window (FR-EXP-24)', () => {
+describe('a new URL slug, asked on Save in the Settings window', () => {
     const upload = (ds, left, org = 'acme') => ({ key: `${org}/${ds}`, org, ds, left });
 
     it('always asks, naming the old and the new address, and goes on when the user agrees', async () => {
@@ -183,7 +183,7 @@ describe('closing the Settings window with changes that are not saved', () => {
     });
 });
 
-describe('Set as Dataset Thumbnail (FR-EXP-30)', () => {
+describe('Set as Dataset Thumbnail', () => {
     it('names the file in the toast, and the file joins the list', async () => {
         const { actions } = setup();
 

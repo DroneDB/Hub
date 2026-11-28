@@ -12,7 +12,7 @@
  * @typedef {object} LocatedDataset
  * @property {string} slug
  * @property {string|null} [name]
- * @property {string|null} [tagline]  what the dataset list's search also matches (FR-ORG-10)
+ * @property {string|null} [tagline]  what the dataset list's search also matches
  * @property {number[]|null} [bbox]
  * @property {number[]|null} [point]  where to pin it, [lon, lat]: a position of its data (none: the centre of the box)
  *
@@ -52,7 +52,7 @@ export const groupName = group => group.orgName || group.org;
 export const datasetName = dataset => dataset.name || dataset.slug;
 
 /**
- * Whether the dataset matches the text of the search, as the server's search of the dataset list does (FR-ORG-10): the
+ * Whether the dataset matches the text of the search, as the server's search of the dataset list does: the
  * text, trimmed and without regard to case, is in its name, its slug or its tagline. An empty text matches every dataset.
  * @param {LocatedDataset} dataset
  * @param {string} text

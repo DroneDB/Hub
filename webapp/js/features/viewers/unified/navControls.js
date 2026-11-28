@@ -1,6 +1,6 @@
 /**
- * navControls - the navigation of the scenes of the unified viewer. Two strategies (D-019),
- * picked once per scene by the loader that builds it (D-001): geo scenes (a georeferenced
+ * navControls - the navigation of the scenes of the unified viewer. Two strategies,
+ * picked once per scene by the loader that builds it: geo scenes (a georeferenced
  * orthophoto, DEM, vector, point cloud or 3D Tiles set) get the constrained orbit
  * (constrainedOrbit.js: the heading about the scene's up axis, the tilt between 5° and 89°, the
  * ground always below); the others, 3D models included, get the free trackball of the bm3d viewer
@@ -25,7 +25,7 @@
  * the view), and whatever moves the camera from outside goes through setPose, which keeps
  * camera.up the up of the screen too. The scene's own up axis is never camera.up: the scene keeps it.
  *
- * One navigation interface, whatever the strategy (FR-XC-18, D-019): orbit, pan, zoomAt, setFov,
+ * One navigation interface, whatever the strategy: orbit, pan, zoomAt, setFov,
  * setPose, saveState, dispose. Home, the double-click focus, the tweens and the keys move the
  * camera only through it. The strategy is also what Giro3D's view.setControls() registers: it
  * has a target, enabled, update(), minDistance / maxDistance, scaleFactor, pivot(),
@@ -44,7 +44,7 @@ const NAV = {
     // A double-click focus and the flight Home
     dblClickDurationMs: 600,
     // The near plane is this fraction of the framing distance: a model that fills the view is never
-    // inside it, however small the scene is (FR-VWR-09)
+    // inside it, however small the scene is
     nearFraction: 0.01,
     // ...and never nearer than this (scene units), so that a zoom to a point cannot ask for a zero
     minNear: 1e-3,
@@ -85,11 +85,11 @@ const START_EVENT = { type: 'start' };
 const END_EVENT = { type: 'end' };
 
 /**
- * The free trackball (D-019): the ArcballControls of the bm3d viewer (modelStage) with their
+ * The free trackball: the ArcballControls of the bm3d viewer (modelStage) with their
  * defaults and hidden gizmos, behind the navigation interface. The pointer and touch are the
  * ArcballControls' own; its events reach the listeners of the strategy. The wheel is the
- * strategy's (FR-XC-18): a notch (100 px in Chrome, where ArcballControls count 125) zooms toward
- * the point under the cursor through zoomAt (FR-VWR-28), Shift+wheel changes the field of view
+ * strategy's: a notch (100 px in Chrome, where ArcballControls count 125) zooms toward
+ * the point under the cursor through zoomAt, Shift+wheel changes the field of view
  * through setFov.
  *
  * ArcballControls move the camera from a matrix state they take at the start of a gesture
@@ -341,13 +341,13 @@ export class FreeTrackball {
     }
 }
 
-// The strategies of D-019 by name. Read when a scene is built: constrainedOrbit.js imports this
+// The navigation strategies by name. Read when a scene is built: constrainedOrbit.js imports this
 // module's helpers, so its class may not exist yet while this module is first evaluated.
 const STRATEGIES = { free: () => FreeTrackball, constrained: () => ConstrainedOrbit };
 
 /**
  * Builds the navigation strategy of a scene, the one object Home, the focus, the tweens and the
- * keys move the camera through (FR-XC-18). Picked once: the scene keeps it until it is rebuilt.
+ * keys move the camera through. Picked once: the scene keeps it until it is rebuilt.
  *
  * @param libs - { THREE, ArcballControls } of the viewer's three.js build.
  * @param camera - the camera to control.
@@ -414,7 +414,7 @@ function horizonDistance(height, radius = NAV.earthRadius) {
 }
 
 /**
- * The one place that sizes the camera's range to the framed scene (FR-XC-18): the distance limits
+ * The one place that sizes the camera's range to the framed scene: the distance limits
  * of the controls (so the camera can neither pass through the pivot to an inverted view nor
  * scroll out past the far plane and lose the data), and, with a `view`, its near and far planes.
  * The framing methods of the scene call it and set none of these themselves.
@@ -422,10 +422,10 @@ function horizonDistance(height, radius = NAV.earthRadius) {
  *  - minDistance is a fraction of the scene size, maxDistance (the zoom cap) a multiple of it: 20
  *    for a flat scene, 2000 for a globe (to stay zoomable out to continent scale). With
  *    `fillDistance` (a flat scene with a basemap: the distance at which the basemap fills the
- *    view) the cap is the nearer of the two, so the camera does not leave the map (FR-VWR-15). The
+ *    view) the cap is the nearer of the two, so the camera does not leave the map. The
  *    cap never ends before the framing distance, with room (NAV.homeRoom) to zoom out from Home;
- *  - near is a fraction (1/100) of the framing distance: a small scene is never inside it
- *    (FR-VWR-09); and at most a quarter of minDistance, which is at least four near planes, so that
+ *  - near is a fraction (1/100) of the framing distance: a small scene is never inside it;
+ * and at most a quarter of minDistance, which is at least four near planes, so that
  *    a camera zoomed in (or focused) to the limit sees its pivot instead of clipping it (a framing
  *    stands about 1.5 to 2 scene sizes away, where a hundredth would pass 0.02 scene sizes);
  *  - far is bounded by the cap: twice the cap and the scene size in a flat scene; on a globe the
@@ -539,7 +539,7 @@ export function createCameraTweener({ onFrame } = {}) {
             const e = easeInOutCubic(t);
             camera.position.lerpVectors(startPosition, targetPosition, e);
             controls.target.lerpVectors(startTarget, targetTarget, e);
-            // What onStep returns is more of the pose the step moves (the field of view: FR-VWR-29)
+            // What onStep returns is more of the pose the step moves (the field of view)
             const more = onStep ? onStep(e) : undefined;
             if (typeof controls.setPose === 'function') {
                 controls.setPose({ position: camera.position, target: controls.target, ...more }, { save: t >= 1 });

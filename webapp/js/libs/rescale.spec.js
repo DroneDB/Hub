@@ -1,5 +1,5 @@
 /**
- * The Rescale range of the raster panels (FR-RAS-10, FR-RAS-20, D-025): two numbers typed the way the
+ * The Rescale range of the raster panels: two numbers typed the way the
  * user's locale writes them, Min below Max, sent as the machine value "min,max".
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -28,7 +28,7 @@ describe('rescaleProblem', () => {
 });
 
 describe('rescaleValue', () => {
-    it('reads "12,5" and "12.5" as the same number, and sends "." (D-025)', () => {
+    it('reads "12,5" and "12.5" as the same number, and sends "."', () => {
         expect(rescaleValue('0', '12,5')).toBe('0,12.5');
         expect(rescaleValue('0', '12.5')).toBe('0,12.5');
         expect(rescaleValue(' -1,5 ', ' 2,25')).toBe('-1.5,2.25');

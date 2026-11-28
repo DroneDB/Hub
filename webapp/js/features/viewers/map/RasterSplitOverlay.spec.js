@@ -38,7 +38,7 @@ describe('RasterSplitOverlay band controls', () => {
     });
 });
 
-// FR-MAP-17: a divider is a focusable separator that the keyboard moves
+// A divider is a focusable separator that the keyboard moves
 describe('RasterSplitOverlay dividers', () => {
     const handles = () => wrapper.findAll('[role="separator"]');
 
@@ -101,7 +101,7 @@ describe('RasterSplitOverlay dividers', () => {
     });
 });
 
-describe('RasterSplitOverlay labels (FR-RAS-12)', () => {
+describe('RasterSplitOverlay labels', () => {
     const A = 'Hat_Creek_Fire_Thermal_08242018_16bit.tif';
     const B = 'Hat_Creek_Fire_Thermal_08252018_16bit.tif';
     const texts = () => wrapper.findAll('.split-label-text').map(label => label.text());

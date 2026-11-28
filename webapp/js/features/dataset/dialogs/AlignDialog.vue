@@ -63,11 +63,11 @@
                 </div>
             </div>
 
-            <!-- The two tasks: the align and the build of its output, each with its real state (FR-XC-15) -->
+            <!-- The two tasks: the align and the build of its output, each with its real state -->
             <HeavyTaskStatus :task="alignTask" label="Align" cancellable :cancelling="cancelling" @cancel="cancelHeavyTask($event, 'Align GeoTIFF')" />
             <HeavyTaskStatus :task="buildTask" label="Build" cancellable :cancelling="cancelling" @cancel="cancelHeavyTask($event, 'Build')" />
 
-            <!-- Align result (parsed from the log tail): stays until the user closes the window (FR-PRC-11) -->
+            <!-- Align result (parsed from the log tail): stays until the user closes the window -->
             <div v-if="alignResult" ref="resultBox" class="result-msg ok" data-testid="align-result">
                 Aligned - {{ resultText }}
                 <span v-if="alignResult.warning"> - {{ alignResult.warning }}</span>
@@ -116,11 +116,11 @@ import { formatNumber } from '@/libs/format';
 import { formatAlignResult } from '@/libs/dataset/alignResult';
 
 /**
- * One click starts one task (FR-PRC-02): the form is busy from the click until the tasks end. The align and the
- * build of its output show their state through HeavyTaskStatus, read from useHeavyTask (FR-XC-15). When both are
+ * One click starts one task: the form is busy from the click until the tasks end. The align and the
+ * build of its output show their state through HeavyTaskStatus, read from useHeavyTask. When both are
  * done the window stays open with the result (tx, ty, rotation, scale, confidence): it emits `aligned` (the page
- * refreshes its list and says the numbers in a toast) and closes only on Close or Open on map (FR-PRC-11). The
- * proposed output is a free name of the source's folder (FR-PRC-04); a name that exists is replaced
+ * refreshes its list and says the numbers in a toast) and closes only on Close or Open on map. The
+ * proposed output is a free name of the source's folder; a name that exists is replaced
  * only after the user confirmed it (overwrite: true), also when the Registry finds it at the submit
  * (409 with conflictPath).
  */
@@ -197,7 +197,7 @@ export default {
         outputPath() {
             return this.outputName.trim();
         },
-        // The listed entry the output would replace (letter case ignored, D-040)
+        // The listed entry the output would replace (letter case ignored)
         existingOutput() {
             return existingItem(this.outputPath, this.allEntries);
         },
@@ -302,7 +302,7 @@ export default {
             this.clearRun();
 
             const requested = this.outputPath;
-            // The path written: a replaced file keeps its own (the Registry writes the existing entry, D-040)
+            // The path written: a replaced file keeps its own (the Registry writes the existing entry)
             let outputPath = requested;
 
             // ── Step 1: align-raster heavy task ───────────────────────────────
@@ -356,7 +356,7 @@ export default {
                 if (!e?.task) this.errorMsg = `Alignment complete but the build could not start: ${e?.message ?? String(e)}`;
             }
 
-            // The output exists: the window stays open with the result until the user closes it (FR-PRC-11), and
+            // The output exists: the window stays open with the result until the user closes it, and
             // the page refreshes its list
             this.writtenPath = outputPath;
             this.done        = true;

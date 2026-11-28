@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The page size of the paged lists (Organizations, the datasets of an organization, Admin > Users and
- * Admin > Tasks, FR-XC-34): when the user did not choose a size, a page holds the rows that the visible
+ * Admin > Tasks): when the user did not choose a size, a page holds the rows that the visible
  * height holds. The arithmetic is here; composables/usePageSize.js measures and keeps it.
  */
 
@@ -38,7 +38,7 @@ export function rowsThatFit({ height, rowHeight, columns = 1, min = PAGE_SIZE_MI
 
 /**
  * The offset of the first item of the page of `size` items that holds the item at `first`: the page a
- * list shows after its size changed, so the first item that was visible is still visible (FR-XC-34).
+ * list shows after its size changed, so the first item that was visible is still visible.
  * @param {number} first  offset of the first visible item (0-based)
  * @param {number} size  the new page size
  * @returns {number}
@@ -76,7 +76,7 @@ export function pageSizeOptions(base, fit, chosen = null) {
 /**
  * The sizes a paginator offers (pageSizeOptions), each with its label. The size that fits reads "N (fit)": picking
  * it is no choice of a size, the page goes on fitting its height and nothing is stored; any other size is the
- * user's choice and is stored (FR-XC-34).
+ * user's choice and is stored.
  * @param {readonly number[]} base
  * @param {number} fit
  * @param {number|null} [chosen]

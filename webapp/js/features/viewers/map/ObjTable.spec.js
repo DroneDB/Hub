@@ -1,6 +1,6 @@
 /**
- * ObjTable writes numbers and dates with the one formatter (libs/format.js, FR-XC-08): the
- * browser's locale, at most 3 decimals; the capture time as every date (FR-EXP-26).
+ * ObjTable writes numbers and dates with the one formatter (libs/format.js): the
+ * browser's locale, at most 3 decimals; the capture time as every date.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';

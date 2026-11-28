@@ -105,7 +105,7 @@ export default class AdminApi {
     }
 
     /**
-     * Sets or removes the storage quota of a user (FR-ADM-16). Only the quota key of the user's metadata is sent: the Registry
+     * Sets or removes the storage quota of a user. Only the quota key of the user's metadata is sent: the Registry
      * merges it into the metadata, which keeps its other keys. This is the one place that names the key (`MagicStrings.MaxStorageKey`).
      * @param {string} userName
      * @param {number|null} megabytes  the quota in MB; null removes it (no limit)

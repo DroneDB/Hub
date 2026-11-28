@@ -1,5 +1,5 @@
 /**
- * The point-cloud-only tools (FR-VWR-26): each one calls what the icon of the Potree menu calls.
+ * The point-cloud-only tools: each one calls what the icon of the Potree menu calls.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { VIEWS, COLOR_BY, CLIP_HINT, setView, startClipVolume, placeClipVolume, clipVolumeCount, colorOptions, rangeSignature, setColorBy } from './potreeTools';

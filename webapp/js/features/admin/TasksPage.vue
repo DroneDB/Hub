@@ -23,7 +23,7 @@
                     class="clear-filters" @click="clearFilters" />
         </div>
 
-        <!-- The rows fill the height (the page size follows it) and the paginator is right below them (FR-ADM-29) -->
+        <!-- The rows fill the height (the page size follows it) and the paginator is right below them -->
         <TasksTable ref="table" :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
                     :total-records="total" :first="skip" :rows="pageSize" :filtered="filtered"
                     :sort-field="sortField" :sort-order="sortOrder"
@@ -32,7 +32,7 @@
                     empty-message="No tasks match the current filters."
                     @page="onPage" @sort="onSort" @clear-filters="clearFilters" @view-log="openLog" @download-result="downloadResult"
                     @cancel="taskActions.cancel" @retry="taskActions.retry" @delete="taskActions.remove">
-            <!-- The size that fits reads "N (fit)": picking it stores no size (FR-XC-34) -->
+            <!-- The size that fits reads "N (fit)": picking it stores no size -->
             <template #paginatorend>
                 <Select :model-value="pageSize" :options="pageSizeChoices" option-label="label" option-value="value"
                         aria-label="Tasks per page" class="page-size-select" @update:model-value="take => onPage({ skip, take })" />
@@ -78,7 +78,7 @@ export default {
     components: { Button, Select, TasksTable, TaskLogDialog, DialogHost },
 
     setup() {
-        // The size the user chose: the address (a link) or what the user kept; none: the rows that fit the height (FR-XC-34)
+        // The size the user chose: the address (a link) or what the user kept; none: the rows that fit the height
         const table = ref(null);
         const page = ref(null);
         const sizing = usePageSize({
@@ -93,7 +93,7 @@ export default {
         });
         const dialogs = useDialogs();
         const formatting = useTaskFormatting();
-        // The same row actions as the dataset Tasks tab (FR-XC-15), on the task's own dataset
+        // The same row actions as the dataset Tasks tab, on the task's own dataset
         const vm = /** @type {any} */ (getCurrentInstance()?.proxy);
         const taskActions = useTaskActions({
             datasetOf: task => reg.Organization(task.orgSlug).Dataset(task.dsSlug),
@@ -166,7 +166,7 @@ export default {
 
     async mounted() {
         // The table and its header are on the page (placeholder rows) while the users load: the first page is
-        // measured on them, so it asks for the size that fits once (FR-ADM-29)
+        // measured on them, so it asks for the size that fits once
         this.loading = true;
         await this.loadUsers();
         await this.$nextTick();
@@ -271,7 +271,7 @@ export default {
             this.loadTasks();
         },
 
-        /** Every filter back to all, the same for the three (FR-PRC-28) */
+        /** Every filter back to all, the same for the three */
         clearFilters() {
             this.selectedUser = '';
             this.selectedTool = '';

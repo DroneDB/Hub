@@ -45,7 +45,7 @@
                                 <span class="available">{{ usage.unlimited ? 'Unlimited' : `of ${usage.totalText}` }}</span>
                             </div>
                             <!-- With no quota there is no bar and no percentage: nothing is full. With one, the bar and the text
-                                 give the real percentage (over 100 % too) in the colour of its severity (D-030) -->
+                                 give the real percentage (over 100 % too) in the colour of its severity -->
                             <template v-if="!usage.unlimited">
                                 <ProgressBar :value="usage.barValue" :show-value="false" aria-label="Storage used"
                                              :aria-valuetext="`${usage.percentText} of ${usage.totalText} used`"

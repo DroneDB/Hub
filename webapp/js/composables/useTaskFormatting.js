@@ -17,7 +17,7 @@ export function useTaskFormatting() {
     const taskTools = computed(() => reg.features.value('taskTools') || []);
     /** @type {import('vue').ComputedRef<import('@/libs/tasks/taskFormat').TaskState[]>} */
     const taskStates = computed(() => reg.features.value('taskStates') || []);
-    // Deleted selects the cancelled tasks too (FR-PRC-20)
+    // Deleted selects the cancelled tasks too
     const stateOptions = computed(() => [{ label: 'All States', value: '' }]
         .concat(taskStates.value.map(s => ({ label: fmt.stateFilterLabel(s.value), value: s.value }))));
 
@@ -26,7 +26,7 @@ export function useTaskFormatting() {
 
     return {
         now, taskTools, taskStates, stateOptions,
-        // The one list of states (libs/tasks/taskStates.js, FR-XC-15): a state it does not know is still running
+        // The one list of states (libs/tasks/taskStates.js): a state it does not know is still running
         isActive: state => !isTerminalState(state),
         stateTag: fmt.stateTag,
         stateLabel: fmt.stateLabel,

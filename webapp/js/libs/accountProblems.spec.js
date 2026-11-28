@@ -5,7 +5,7 @@ import {
 
 const policy = { minLength: 8, requireDigit: true, requireUppercase: true, requireLowercase: true, requireNonAlphanumeric: false };
 
-describe('sign-in validators (FR-ACC-05)', () => {
+describe('sign-in validators', () => {
     it('require a username, and a username of spaces is empty', () => {
         expect(usernameProblem('')).toBe('Enter your username.');
         expect(usernameProblem('   ')).toBe('Enter your username.');
@@ -21,7 +21,7 @@ describe('sign-in validators (FR-ACC-05)', () => {
     });
 });
 
-describe('password change validators (FR-ADM-08, FR-ACC-21)', () => {
+describe('password change validators', () => {
     it('requires the current password unless it is optional', () => {
         expect(currentPasswordProblem('')).toBe('Enter the current password.');
         expect(currentPasswordProblem('', { optional: true })).toBeNull();

@@ -1,5 +1,5 @@
 /**
- * The one measuring toolbar of the 3D, splat and point-cloud viewers (FR-XC-17, D-027): the tools it is given, Clear
+ * The one measuring toolbar of the 3D, splat and point-cloud viewers: the tools it is given, Clear
  * (on while a shape is drawn), the hint with Done and Cancel while one is, and a slot for the tools of a viewer.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';

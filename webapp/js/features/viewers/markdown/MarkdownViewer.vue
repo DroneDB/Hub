@@ -12,7 +12,7 @@
                 <textarea ref="editor" v-model="rawContent" aria-label="Markdown source" :readonly="saving" />
             </div>
             <template v-else>
-                <!-- Edit is in a toolbar row above the text, at its right edge, and stays in view (FR-EXP-39) -->
+                <!-- Edit is in a toolbar row above the text, at its right edge, and stays in view -->
                 <div v-if="canWrite && textRead" class="view-toolbar">
                     <Button severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" label="Edit"
                             @click="edit" />

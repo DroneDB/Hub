@@ -3,7 +3,7 @@
  * The signed-in user: one reactive copy of what the Registry client knows,
  * shared by the header, the route guards and the pages. The store is the only
  * subscriber to the client's login/logout events, and to the storage events of the other tabs: a sign-out in
- * another tab ends the session here too (FR-ACC-19).
+ * another tab ends the session here too.
  */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
@@ -62,7 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     /**
      * Another tab signed in or out: the token (or the whole storage, key null) changed. This tab follows it, and a
-     * session that ended there is told once, with the way back in (FR-ACC-19, FR-XC-13: the `signed-out` notice).
+     * session that ended there is told once, with the way back in (the `signed-out` notice).
      * @param {StorageEvent} e
      */
     function onStorage(e) {

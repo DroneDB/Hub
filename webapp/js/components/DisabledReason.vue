@@ -11,7 +11,7 @@
 
 <script setup>
 /**
- * DisabledReason - wraps what a disabled item shows and says why it is disabled (FR-XC-22): with a `reason`, the content
+ * DisabledReason - wraps what a disabled item shows and says why it is disabled: with a `reason`, the content
  * stays focusable (aria-disabled, not removed from the tab order) and the reason is its description (aria-describedby,
  * read by screen readers) and its tooltip. Without a reason it is the content alone. `role` is what the item is in its
  * context (a button by default; a row of a list passes the role of what a click on the row does), one of the roles

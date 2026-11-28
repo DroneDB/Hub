@@ -17,7 +17,7 @@
                                    :readonly="busy" :invalid="!!errorOf($form, 'email')"
                                    :aria-invalid="errorOf($form, 'email') ? 'true' : undefined"
                                    :aria-describedby="errorOf($form, 'email') ? 'edit-user-dialog-email-error edit-user-dialog-email-help' : 'edit-user-dialog-email-help'" />
-                        <!-- The address is optional: an empty one removes it (FR-ADM-07) -->
+                        <!-- The address is optional: an empty one removes it -->
                         <small id="edit-user-dialog-email-help" class="field-help">Optional. Leave it empty for a user without an address.</small>
                         <FieldError id="edit-user-dialog-email-error" :message="errorOf($form, 'email')" />
                     </div>
@@ -25,7 +25,7 @@
                         <label id="edit-user-dialog-roles-label" for="edit-user-dialog-roles" class="d-block mb-1 fw-semibold">Roles</label>
                         <MultiSelect name="roles" input-id="edit-user-dialog-roles" aria-labelledby="edit-user-dialog-roles-label" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                     </div>
-                    <!-- The quota of storage of the user (FR-ADM-16): empty is no limit; off, with the reason, when the server does not apply it -->
+                    <!-- The quota of storage of the user: empty is no limit; off, with the reason, when the server does not apply it -->
                     <div class="mb-3">
                         <label for="edit-user-dialog-quota" class="d-block mb-1 fw-semibold">Storage quota (MB, empty = unlimited)</label>
                         <InputNumber name="storageQuotaMb" input-id="edit-user-dialog-quota" placeholder="Unlimited" class="w-100"
@@ -91,9 +91,9 @@ export default {
     emits: ['close'],
 
     setup() {
-        // The e-mail is optional; the rule text of the server, at the field, as the user types (FR-ADM-07)
+        // The e-mail is optional; the rule text of the server, at the field, as the user types
         const resolver = createResolver({ email: v => emailProblem(v) });
-        // The Registry names the field of a refusal by the member of the request (D-047): the same names
+        // The Registry names the field of a refusal by the member of the request: the same names
         const form = useHubForm({ fields: ['email', 'roles', 'storageQuotaMb'] });
         return { ...form, resolver, MAX_QUOTA_MB };
     },
@@ -140,7 +140,7 @@ export default {
         update: async function (values) {
             // An empty address is sent as it is: the Registry stores none (the address is optional). An address left as it
             // was is not sent at all: the Registry keeps it, and a Registry that takes the profile from its identity
-            // provider has no address to refuse, so the roles still go (FR-ADM-07)
+            // provider has no address to refuse, so the roles still go
             const email = (values.email ?? '').trim();
             const unchanged = email === (this.user.email ?? '').trim();
             await reg.admin.updateUser(this.user.userName, unchanged ? undefined : email, this.rolesToSend(values.roles));

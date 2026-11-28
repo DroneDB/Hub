@@ -1,5 +1,5 @@
 /**
- * navKeys - the keys of the 3D viewer's canvas (FR-VWR-16, D-001, D-019): arrows orbit, Shift+arrows
+ * navKeys - the keys of the 3D viewer's canvas: arrows orbit, Shift+arrows
  * pan, +/- zoom, all through the navigation interface; the list of the Controls help; the one-time
  * hint. The keys on a real scene with both strategies: navControls.spec.
  */
@@ -105,7 +105,7 @@ describe('the help of the controls', () => {
     });
 });
 
-describe('the "?" button of the toolbar (FR-VWR-16)', () => {
+describe('the "?" button of the toolbar', () => {
     let wrapper;
     afterEach(() => {
         wrapper?.unmount();

@@ -1,6 +1,6 @@
 /**
  * The preview of the detail panel is requested at the width of its box times the pixel ratio, in the steps of
- * thumbnailRequestSize (FR-EXP-41), not at a fixed 512 px: a wide panel on a 2x screen asks for 1024 px, and a
+ * thumbnailRequestSize, not at a fixed 512 px: a wide panel on a 2x screen asks for 1024 px, and a
  * panel dragged wider later loads the larger step.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -46,7 +46,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const mountPanel = () => mount(DetailPanel, { props: { file: photo, dataset: { org: 'o', ds: 'd' } }, global: { plugins: [PrimeVue] }, attachTo: document.body });
 const sizes = () => thumbs.fetch.mock.calls.map(c => c[1]);
 
-describe('DetailPanel preview size (FR-EXP-41)', () => {
+describe('DetailPanel preview size', () => {
     it('asks for 1024 px for a 400 px box at ratio 2', async () => {
         vi.stubGlobal('devicePixelRatio', 2);
         boxWidth(400);

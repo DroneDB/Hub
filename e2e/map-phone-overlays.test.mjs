@@ -1,6 +1,5 @@
 /**
- * Map overlays on phones and in embeds, end to end (AC-001, AC-031; FR-XC-20; FR-MAP-12, FR-MAP-16, FR-SHR-05,
- * FR-VWR-14, FR-VWR-27): drives the real Hub in Chromium against a running Registry. Not part of `npm test`
+ * Map overlays on phones and in embeds, end to end: drives the real Hub in Chromium against a running Registry. Not part of `npm test`
  * (needs a server); same environment and conventions as smoke.test.mjs and phone-tablet-layout.test.mjs:
  *
  *   HUB_URL=http://localhost:5100 node --test e2e/map-phone-overlays.test.mjs
@@ -102,7 +101,7 @@ after(async () => {
     try { await api('DELETE', `/orgs/${USER}/ds/${DS}`); } catch { /* best effort */ }
 });
 
-test('FR-MAP-12 at 390x844: a map with two layers has no panel over it on load, and a rail of at most 6 buttons', async () => {
+test('at 390x844: a map with two layers has no panel over it on load, and a rail of at most 6 buttons', async () => {
     const page = await newPage(PHONE, { touch: true });
     await openMap(page, ORTHO, `?add=${Buffer.from(ORTHO_2).toString('base64url')}`);
     // Two layers open side by side, and the split overlay takes the place of the layer panel: switch the split off
@@ -123,7 +122,7 @@ test('FR-MAP-12 at 390x844: a map with two layers has no panel over it on load, 
     assert.ok(!intersects(rail, panel), 'the layer panel is under the rail');
 });
 
-test('FR-MAP-12 at 390x844: the Measure toggle opens the tools, and the saves of the view bar are in a menu', async () => {
+test('at 390x844: the Measure toggle opens the tools, and the saves of the view bar are in a menu', async () => {
     const page = await newPage(PHONE, { touch: true });
     await openMap(page, ORTHO);
     await page.locator('.ol-measure-toggle button').click();
@@ -135,7 +134,7 @@ test('FR-MAP-12 at 390x844: the Measure toggle opens the tools, and the saves of
     await page.locator('[role="menuitem"]:has-text("Save")').first().waitFor({ state: 'visible' });
 });
 
-test('FR-SHR-05 in a 600x400 frame: every button of the rail is in the frame, or behind the Measure toggle', async () => {
+test('in a 600x400 frame: every button of the rail is in the frame, or behind the Measure toggle', async () => {
     const page = await newPage(FRAME);
     await openMap(page, ORTHO, '?embed=1');
     assert.match(await page.locator('.map-container').getAttribute('class'), /\bis-short\b/);
@@ -151,7 +150,7 @@ test('FR-SHR-05 in a 600x400 frame: every button of the rail is in the frame, or
     assert.equal(await page.locator('.ol-measure-control [aria-label="Measure Area"]:visible').count(), 0);
 });
 
-test('FR-MAP-16 at 390x844: Click map shows its banner, and the result shows without scrolling', async () => {
+test('at 390x844: Click map shows its banner, and the result shows without scrolling', async () => {
     const page = await newPage(PHONE, { touch: true });
     await openMap(page, DEM);
     await page.locator('[data-testid="stockpile-toolbar-btn"]').click();
@@ -175,7 +174,7 @@ test('FR-MAP-16 at 390x844: Click map shows its banner, and the result shows wit
     }
 });
 
-test('FR-VWR-14 at 390x844: the movement pad of a splat does not touch the bottom bar', { skip: !process.env.HUB_TEST_SPLAT }, async () => {
+test('at 390x844: the movement pad of a splat does not touch the bottom bar', { skip: !process.env.HUB_TEST_SPLAT }, async () => {
     const page = await newPage(PHONE, { touch: true });
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${Buffer.from(process.env.HUB_TEST_SPLAT).toString('base64')}/splat`);
     await appReady(page);
@@ -185,7 +184,7 @@ test('FR-VWR-14 at 390x844: the movement pad of a splat does not touch the botto
     assert.ok(!intersects(pad, bar), 'the movement pad overlaps the bottom bar');
 });
 
-test('FR-VWR-27 at 390x844: the Local coordinates badge, the measure toolbar and the Layers panel do not overlap', { skip: !process.env.HUB_TEST_POINTCLOUD }, async () => {
+test('at 390x844: the Local coordinates badge, the measure toolbar and the Layers panel do not overlap', { skip: !process.env.HUB_TEST_POINTCLOUD }, async () => {
     const page = await newPage(PHONE, { touch: true });
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${Buffer.from(process.env.HUB_TEST_POINTCLOUD).toString('base64')}/unified`);
     await appReady(page);

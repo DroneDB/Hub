@@ -9,7 +9,7 @@
  * Counts and bytes are kept as the files change state; listeners get a snapshot at most
  * every `throttleMs`, so the dialog does not recompute anything per progress event.
  *
- * Pause and resume (FR-UPL-04): `pause()` stops pumping and aborts the requests in flight whose files are still being
+ * Pause and resume: `pause()` stops pumping and aborts the requests in flight whose files are still being
  * sent; their files stay in the queue as pending (a chunked file goes on from the chunks the server stored, any other
  * file is sent again). A file whose bytes are all sent is left to finish: aborting it could not tell whether the server
  * added it. `resume()` pumps again.
@@ -39,7 +39,7 @@ const SPEED_WINDOW_MS = 5000;
  * @param {(active: boolean) => void} [opts.onActivity] true when the first request starts, false when the queue is idle
  * @param {(item, entry) => void} [opts.onItemDone]
  * @param {(item) => void} [opts.onItemFailed] a file failed for good (after its retries); `item.conflictPath`
- *   is set when its name exists (409, D-040)
+ *   is set when its name exists (409)
  * @param {number} [opts.throttleMs]
  * @param {{now: () => number, setTimeout: Function, clearTimeout: Function}} [opts.clock]
  */

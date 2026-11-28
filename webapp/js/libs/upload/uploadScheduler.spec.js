@@ -137,7 +137,7 @@ describe('uploadScheduler', () => {
         expect(scheduler.snapshot().items[1].status).toBe(STATUS.DONE);
     });
 
-    // FR-UPL-07: a refusal (noRetry) is never sent again by Retry Failed
+    // A refusal (noRetry) is never sent again by Retry Failed
     it('marks a 403 as not retryable, and Retry Failed skips it', async () => {
         const server = heldServer();
         const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, throttleMs: 0, policy: policy() });
@@ -171,7 +171,7 @@ describe('uploadScheduler', () => {
         expect(scheduler.snapshot().doneBytes).toBe(2_000_000);
     });
 
-    // FR-UPL-03: a 409 with conflictPath goes back to the conflict prompt, whose answer sends it again
+    // A 409 with conflictPath goes back to the conflict prompt, whose answer sends it again
     it('reports a name clash, and sends the file again with the decision of the prompt', async () => {
         const server = heldServer();
         const failed = [];
@@ -387,7 +387,7 @@ describe('protocol limits and probe hint', () => {
     });
 });
 
-describe('uploadScheduler pause and resume (FR-UPL-04)', () => {
+describe('uploadScheduler pause and resume', () => {
     /** A server that ends a request with an AbortError when its signal aborts (as the XHR transport does) */
     function abortableServer() {
         const server = heldServer();

@@ -1,8 +1,8 @@
-/** The highest ratio a canvas renderer draws at (D-042): beyond it the cost grows faster than the sharpness. */
+/** The highest ratio a canvas renderer draws at: beyond it the cost grows faster than the sharpness. */
 export const MAX_PIXEL_RATIO = 2;
 
 /**
- * The pixel ratio a canvas renderer applies: `min(devicePixelRatio, 2, presetCap)` (FR-XC-32, D-042).
+ * The pixel ratio a canvas renderer applies: `min(devicePixelRatio, 2, presetCap)`.
  * The one place it is calculated; a renderer without a quality preset passes no cap.
  * @param {number} [presetCap]  the cap of the quality preset in force (High 2, Medium 1.5, Low 1)
  * @param {number} [devicePixelRatio]
@@ -14,7 +14,7 @@ export function appliedPixelRatio(presetCap = MAX_PIXEL_RATIO, devicePixelRatio 
 
 /**
  * Calls `onChange(devicePixelRatio)` whenever the screen's ratio changes (the window moves to another screen, the
- * browser zoom changes): every canvas renderer applies its ratio again (FR-XC-32). The `resolution` media query
+ * browser zoom changes): every canvas renderer applies its ratio again. The `resolution` media query
  * matches one ratio, so it is made again for each new one. Returns the function that stops watching.
  * @param {(devicePixelRatio: number) => void} onChange
  * @param {Pick<Window, 'matchMedia'> & { devicePixelRatio?: number }} [win]

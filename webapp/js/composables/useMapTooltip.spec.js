@@ -1,5 +1,5 @@
 /**
- * The label of a vector feature stays inside the visible map and out of the toolbar rail (FR-MAP-19).
+ * The label of a vector feature stays inside the visible map and out of the toolbar rail.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ref } from 'vue';
@@ -33,7 +33,7 @@ describe('showFeatureTooltip', () => {
         expect(overlay.getOffset()).toEqual([12, 0]);
     });
 
-    it('puts it on the left of a marker near the right edge, where the toolbar is (FR-MAP-19)', () => {
+    it('puts it on the left of a marker near the right edge, where the toolbar is', () => {
         // 700 + 12 + 150 = 862 is beyond the map (800) and its rail (800 - 64)
         const overlay = labelAt([700, 300]);
         expect(overlay.getPositioning()).toBe('center-right');

@@ -52,7 +52,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     const canRedo = ref(false);
     const later = useTimerGroup();
     /**
-     * Typed history (FR-VWR-13). `ref` follows the measure through undo and redo (a restored measure is a new
+     * Typed history. `ref` follows the measure through undo and redo (a restored measure is a new
      * object): an add undoes by removing `ref.measure` (its points are read at that moment, Potree adds the
      * measure before the user has clicked its points), a removal undoes by adding a copy of `snapshot`.
      * @type {import('@/libs/undoStack').UndoStack<{ op: 'add' | 'remove', ref: { measure: any }, snapshot: any }>}

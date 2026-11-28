@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * What a failed request says about the fields of a form (FR-XC-11, D-047).
+ * What a failed request says about the fields of a form.
  *
  * A Registry refusal that concerns one input field carries a ValidationProblemDetails `errors`
  * member keyed by the request member (`{ errors: { currentPassword: ['...'] } }`); ApiError keeps

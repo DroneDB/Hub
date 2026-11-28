@@ -14,7 +14,7 @@
                         <div class="progress-timer">{{ formatWaitTime() }}</div>
                     </div>
 
-                    <!-- What the administrator of the server does, for a file the server cannot read (FR-EXP-18) -->
+                    <!-- What the administrator of the server does, for a file the server cannot read -->
                     <p v-if="hint && showDetails" class="admin-hint">
                         <strong>For the administrator:</strong> {{ hint }}
                     </p>

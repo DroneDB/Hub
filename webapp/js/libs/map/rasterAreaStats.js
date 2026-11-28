@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * What the Registry answers for the statistics of an area of a raster (raster-area-stats): the pixels of the file under
- * the rectangle. The server converts the rectangle to pixels (D-021); the Hub never maps map coordinates to pixels.
+ * the rectangle. The server converts the rectangle to pixels; the Hub never maps map coordinates to pixels.
  */
 
 /**

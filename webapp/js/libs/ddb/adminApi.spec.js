@@ -1,5 +1,5 @@
 /**
- * adminTasks (FR-PRC-28): the filters, the page and the order go to GET /sys/tasks as query keys; no order
+ * adminTasks: the filters, the page and the order go to GET /sys/tasks as query keys; no order
  * is asked for unless the caller gives one.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -24,7 +24,7 @@ describe('AdminApi.adminTasks', () => {
     });
 });
 
-describe('AdminApi.updateUser (FR-ADM-07)', () => {
+describe('AdminApi.updateUser', () => {
     const put = () => {
         const putRequest = vi.fn(() => Promise.resolve(true));
         return { admin: new AdminApi(/** @type {any} */ ({ putRequest })), putRequest };
@@ -46,7 +46,7 @@ describe('AdminApi.updateUser (FR-ADM-07)', () => {
     });
 });
 
-describe('AdminApi.setUserQuota (FR-ADM-16)', () => {
+describe('AdminApi.setUserQuota', () => {
     const post = () => {
         const postRequest = vi.fn(() => Promise.resolve({}));
         return { admin: new AdminApi(/** @type {any} */ ({ postRequest })), postRequest };

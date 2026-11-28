@@ -49,7 +49,7 @@ const CLEAN_STATS = {
     }
 };
 
-// The default stretch of the index, as ddb gives it in the value info read with the formula (D-041): its 2nd to 98th
+// The default stretch of the index, as ddb gives it in the value info read with the formula: its 2nd to 98th
 // percentile, inside the range of the formula
 const STRETCH = { OUTLIER: [{ min: 0.3706, max: 0.9467 }], CLEAN: [{ min: 0.1, max: 0.85 }] };
 
@@ -110,7 +110,7 @@ describe('PlantHealthPanel histogram with outliers', () => {
         expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.9467');
         const { edges, counts } = chart().props('data');
         expect(counts).toEqual([]);
-        // The Hub takes no percentiles (D-041): the range of the index, -1 to 1
+        // The Hub takes no percentiles: the range of the index, -1 to 1
         expect(edges).toEqual([-1, 1]);
         const [min, max] = handlePositions();
         expect(max - min).toBeGreaterThan(25);
@@ -127,7 +127,7 @@ describe('PlantHealthPanel histogram with outliers', () => {
     });
 });
 
-// FR-RAS-34: the values of an index inside its own range are no outliers
+// The values of an index inside its own range are no outliers
 describe('PlantHealthPanel histogram note', () => {
     // NDRE of the rinconada ortho: the values stay inside -1 to 1, the server shows the central part
     const NDRE_STATS = {
@@ -176,7 +176,7 @@ describe('PlantHealthPanel Link', () => {
         expect(copyText).toHaveBeenCalledWith(window.location.href);
     });
 
-    // FR-RAS-05: the copy is confirmed, and a failed one says so
+    // The copy is confirmed, and a failed one says so
     it('says that the link was copied, and when it could not be', async () => {
         notify.success.mockClear();
         notify.error.mockClear();
@@ -206,7 +206,7 @@ describe('PlantHealthPanel Link', () => {
     });
 });
 
-// D-041: the default stretch of an index is ddb's, from the value info read with the formula; the Hub computes none
+// The default stretch of an index is ddb's, from the value info read with the formula; the Hub computes none
 describe('PlantHealthPanel default stretch', () => {
     it('takes the stretch of the value info read with the formula, not one of its own', async () => {
         // Percentiles in the statistics that differ from the stretch of ddb: the Hub must not use them
@@ -244,7 +244,7 @@ describe('PlantHealthPanel default stretch', () => {
         });
     });
 
-    // FR-RAS-05: the link of earlier releases wrote the rescale and the stretch without a formula
+    // The link of earlier releases wrote the rescale and the stretch without a formula
     it('opens an old link with a rescale and no formula: the bands, without a stretch or a request for one', async () => {
         await renderWith(CLEAN_STATS, { pick: null, initialParams: { bands: '4,2,1', rescale: '0.1,0.9', stretch: 'percentile' } });
         expect(wrapper.find('#plant-health-panel-formula').element.value).toBe('');
@@ -266,7 +266,7 @@ describe('HistogramChart handles', () => {
     });
 });
 
-// FR-RAS-20: the Rescale of the layer is two number fields; a range that is not valid marks its field and the last valid one is kept
+// The Rescale of the layer is two number fields; a range that is not valid marks its field and the last valid one is kept
 describe('PlantHealthPanel rescale fields', () => {
     const min = () => wrapper.find('#plant-health-panel-rescale-min');
     const max = () => wrapper.find('#plant-health-panel-rescale-max');
@@ -301,7 +301,7 @@ describe('PlantHealthPanel rescale fields', () => {
     });
 });
 
-describe('PlantHealthPanel close (FR-RAS-01)', () => {
+describe('PlantHealthPanel close', () => {
     it('closes without changing the style of the layer', () => {
         const vm = { $emit: vi.fn(), reset: vi.fn() };
         PlantHealthPanel.methods.close.call(vm);
@@ -311,7 +311,7 @@ describe('PlantHealthPanel close (FR-RAS-01)', () => {
     });
 });
 
-// FR-RAS-16, FR-PRC-15, FR-RAS-26: the export of Plant Health is the one export control, with the state of its task
+// The export of Plant Health is the one export control, with the state of its task
 describe('PlantHealthPanel export', () => {
     const exportWhole = () => wrapper.find('[data-testid="raster-export-whole"]');
     // The items are in the menu of the Export button: open it first
@@ -359,7 +359,7 @@ describe('PlantHealthPanel export', () => {
         expect(heavy.runHeavyTask.mock.calls[0][2].params).toMatchObject({ bbox: [15, 45, 15.5, 45.5], fileName: 'odm_orthophoto_extent_export.tif' });
     });
 
-    // FR-RAS-16, FR-XC-22: in Plant Health too, an export refused for its size is a focusable button with its reason as
+    // In Plant Health too, an export refused for its size is a focusable button with its reason as
     // visible text. Plant Health reads the info of its bands, so the control reads the estimate of the raster itself
     it('refuses an export over the limit with a focusable button and the reason as visible text', async () => {
         heavy.runHeavyTask.mockReset();
@@ -390,7 +390,7 @@ describe('PlantHealthPanel export', () => {
     });
 });
 
-// FR-RAS-18: the presets and the sensor
+// The presets and the sensor
 describe('PlantHealthPanel presets', () => {
     // As libddb gives them for a 4-band Green/Red/NIR/RedEdge raster (a generic profile): no True Color, the composite maps NIR to red
     const INFO = {
@@ -429,7 +429,7 @@ describe('PlantHealthPanel presets', () => {
         expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toEqual({ preset: 'false-color-ir' });
     });
 
-    // FR-RAS-26: a band preset has no formula, so ddb exports the bands scaled to 8 bits, and the label says so; an index is the styled image
+    // A band preset has no formula, so ddb exports the bands scaled to 8 bits, and the label says so; an index is the styled image
     it('names the export after the style: scaled bands for a band preset, a styled image for an index', async () => {
         await renderWith(CLEAN_STATS, { info: INFO, algorithms: [{ id: 'NDWI', name: 'NDWI', range: [-1, 1] }], pick: '' });
         const label = () => wrapper.find('[data-testid="raster-export-whole"]').attributes('aria-label');
@@ -452,7 +452,7 @@ describe('PlantHealthPanel presets', () => {
     });
 });
 
-// FR-RAS-32: the formula list
+// The formula list
 describe('PlantHealthPanel formula list', () => {
     const LIST = [
         { id: 'NDVI', name: 'Normalized Difference Vegetation Index', category: 'multispectral', requiredBands: ['Red', 'NIR'], range: [-1, 1] },
@@ -539,7 +539,7 @@ describe('PlantHealthPanel formula list', () => {
     });
 });
 
-// FR-RAS-19: the tiles of a formula the raster cannot compute
+// The tiles of a formula the raster cannot compute
 describe('PlantHealthPanel formula error', () => {
     const REFUSED = [
         { id: 'NDVI', name: 'Normalized Difference Vegetation Index', category: 'multispectral', disabled: true, disabledReason: 'Requires bands: RN' },
@@ -569,7 +569,7 @@ describe('PlantHealthPanel formula error', () => {
     });
 });
 
-// FR-RAS-23: the actions are the footer of the panel
+// The actions are the footer of the panel
 describe('PlantHealthPanel footer', () => {
     it('has Reset, Original, Link and the export control in one footer row', async () => {
         await renderWith(CLEAN_STATS);

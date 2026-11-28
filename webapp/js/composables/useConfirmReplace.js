@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useConfirmReplace - the one question asked before the Hub replaces a file that exists (FR-XC-07):
+ * useConfirmReplace - the one question asked before the Hub replaces a file that exists:
  *
  *   const confirmReplace = useConfirmReplace(dialogs);
  *   if (await confirmReplace('images/IMG_0180_merged.tif')) send({ overwrite: true });
@@ -18,7 +18,7 @@ import { escapeHtml } from '@/libs/sanitize';
 
 /**
  * The item of a listing (file browser items, `{ entry: { path, type } }`) at `path`, compared by the
- * rule of D-040 (letter case is ignored), or null when the listing does not have it.
+ * Registry's rule (letter case is ignored), or null when the listing does not have it.
  * @param {string} path @param {Array<{ entry?: { path?: string } }>|null|undefined} items
  */
 export function existingItem(path, items) {
@@ -62,7 +62,7 @@ export function replaceConfirmation(path) {
 
 /**
  * The path of the existing file when `error` is the Registry's refusal of an existing output
- * (409 with `conflictPath`, D-040); null for any other error.
+ * (409 with `conflictPath`); null for any other error.
  * @param {unknown} error
  * @returns {string|null}
  */

@@ -34,7 +34,7 @@ const type = async (name, value) => { await wrapper.find(`input[name="${name}"]`
 const submit = async () => { await wrapper.find('form').trigger('submit'); await flushPromises(); };
 afterEach(() => { wrapper?.unmount(); document.body.innerHTML = ''; });
 
-describe('useHubForm (FR-XC-11)', () => {
+describe('useHubForm', () => {
     it('an invalid submit sends nothing, shows every error and focuses the first invalid field', async () => {
         const action = vi.fn();
         mountForm(action);
@@ -115,7 +115,7 @@ describe('useHubForm (FR-XC-11)', () => {
         expect(wrapper.find('.ef').text()).toBe('Nope.');
     });
 
-    // D-040: a name that exists is a 409 without a field member: it belongs to the name field (statusFields)
+    // A name that exists is a 409 without a field member: it belongs to the name field (statusFields)
     it('puts an answer of a mapped status that names no field at the field of that status', async () => {
         mountForm(vi.fn().mockRejectedValue(new ApiError('A file or folder named "x" already exists in this folder', 409, { conflictPath: 'x' })),
             { statusFields: { 409: 'a' } });

@@ -1,5 +1,5 @@
 /**
- * The dataset page and the selection (FR-EXP-32, FR-EXP-27): the detail panel gets the live
+ * The dataset page and the selection: the detail panel gets the live
  * selection (several items: the summary), the page stores the dataset's root entry for the header's
  * whole-dataset question, and a download from the menu asks for several items or a folder but not
  * for one file.
@@ -117,7 +117,7 @@ describe('ViewDataset detail panel and root entry', () => {
         expect(useDatasetSessionStore().rootEntry).toBeNull();
     });
 
-    it('starts without the root entry of another dataset a late answer left in the session, until its own arrives (FR-NAV-03)', async () => {
+    it('starts without the root entry of another dataset a late answer left in the session, until its own arrives', async () => {
         const pinia = createPinia();
         setActivePinia(pinia);
         useDatasetSessionStore().setRootEntry({ path: 'ddb://h/acme/other', properties: { meta: { name: { data: 'Other' } } } });
@@ -159,7 +159,7 @@ describe('ViewDataset detail panel and root entry', () => {
     });
 });
 
-describe('ViewDataset downloads from the menu (FR-EXP-27)', () => {
+describe('ViewDataset downloads from the menu', () => {
     it('downloads one file at once, without a question', async () => {
         await open();
         await h_.explorerAttrs.onDownloadItems([file('a.jpg', T.IMAGE, MB)]);

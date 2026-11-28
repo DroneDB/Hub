@@ -13,7 +13,7 @@
  * Everything stops when the owning component (effect scope) goes away: a task still
  * running then never settles its promise, and the poller is released.
  * A task whose dataset is deleted while it runs (a cancelled or failed import rolls back and
- * deletes the dataset it created, FR-UPL-05, D-004) rejects with DATASET_GONE_MESSAGE and
+ * deletes the dataset it created) rejects with DATASET_GONE_MESSAGE and
  * `datasetGone: true`, once: its state can never be read again.
  */
 import { ref, getCurrentScope, onScopeDispose } from 'vue';
@@ -37,7 +37,7 @@ export const DATASET_GONE_MESSAGE = 'The dataset was deleted.';
  * @property {(entry: object) => void} [onProgress] Called with the live task entry on each poll
  * @property {(entry: any) => void} [onSubmitted] Called once with the entry (state Enqueued, or Reused) as soon as the
  *   Registry answers the submit, before the first poll: a dialog shows "Queued" from then on, reading
- *   `heavyTasks.value[entry.taskId]` (HeavyTaskStatus, FR-XC-15)
+ *   `heavyTasks.value[entry.taskId]` (HeavyTaskStatus)
  * @property {boolean} [notify] Show a toast on the terminal state (default true)
  */
 
@@ -144,7 +144,7 @@ export function useHeavyTask() {
                         // Why it failed: the server's message, or only the exception type of a task that
                         // failed before the server kept messages
                         error: summary.error || summary.errorType || null,
-                        // A processing node holds the task in its queue (D-024); who cancelled it (D-038)
+                        // A processing node holds the task in its queue; who cancelled it
                         waitingForNode: summary.waitingForNode === true,
                         cancelledBy: summary.cancelledBy ?? null,
                         artifact: null, // not in the summary; fetched on the terminal state

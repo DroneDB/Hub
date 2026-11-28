@@ -1,5 +1,5 @@
 <template>
-    <!-- Several items selected: the summary of the selection, not the properties of one file (FR-EXP-32) -->
+    <!-- Several items selected: the summary of the selection, not the properties of one file -->
     <div v-if="multiple" class="detail-panel" role="region" aria-label="Selection">
         <div class="detail-header">
             <h3 class="ui header">
@@ -303,7 +303,7 @@ export default {
         file: {
             immediate: true,
             handler(newFile) {
-                // Another file starts at the top: the scroll position of the one before would show its preview cropped (FR-EXP-34)
+                // Another file starts at the top: the scroll position of the one before would show its preview cropped
                 this.scrollToTop();
                 if (newFile) {
                     this.loadDetails();
@@ -337,7 +337,7 @@ export default {
         },
 
         // The size to request for the preview: the box's width times the pixel ratio, in the steps of
-        // FR-XC-32 (a bitmap of the box's CSS size is soft on a 2x screen, FR-EXP-41)
+        // A bitmap of the box's CSS size is soft on a 2x screen
         previewRequestSize() {
             const box = this.$refs.thumbnailContainer;
             const width = box ? box.clientWidth : 0;

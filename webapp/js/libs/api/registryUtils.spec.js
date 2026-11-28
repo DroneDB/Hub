@@ -1,5 +1,5 @@
 /**
- * The rename of a dataset from its name (FR-ORG-08, FR-XC-11): the slug made of the name goes first, so that a slug the
+ * The rename of a dataset from its name: the slug made of the name goes first, so that a slug the
  * Registry refuses (taken) changes nothing, and the name is saved on the dataset at its new slug.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -41,7 +41,7 @@ describe('renameDataset', () => {
         expect(calls).toEqual([['metaSet', 'org/survey-b', 'name', 'Survey  B']]);
     });
 
-    // D-035: a name with no Latin letter or digit makes no slug; the dataset keeps its own
+    // A name with no Latin letter or digit makes no slug; the dataset keeps its own
     it('keeps the slug and saves only the name when the name makes no slug', async () => {
         await expect(renameDataset('org', 'survey-a', 'Москва')).resolves.toEqual({ slug: 'survey-a' });
         expect(calls).toEqual([['metaSet', 'org/survey-a', 'name', 'Москва']]);

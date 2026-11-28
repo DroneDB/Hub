@@ -57,7 +57,7 @@ class InvalidLinkError extends Error {
 }
 
 /**
- * The page states of a primary resource that did not load (FR-XC-13): ResourceState shows one
+ * The page states of a primary resource that did not load: ResourceState shows one
  * for each, with its own text and ways out.
  */
 export const LoadErrorKind = Object.freeze({

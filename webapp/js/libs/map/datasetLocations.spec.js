@@ -7,7 +7,7 @@ import { organizationColour } from './vectorColours';
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const dataset = (slug, bbox, name) => ({ slug, name, bbox });
 
-describe('pinCoordinate (FR-ORG-09)', () => {
+describe('pinCoordinate', () => {
     // A dataset with data in New York and Rome: the centre of its box is in the Atlantic
     const bbox = [-74, 40.5, 12.6, 42];
 

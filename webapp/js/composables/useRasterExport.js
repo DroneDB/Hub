@@ -1,18 +1,17 @@
 // @ts-check
 /**
- * useRasterExport - the export of a styled raster as the `raster-export` task (FR-RAS-16, FR-PRC-15, FR-RAS-26, D-023): the
+ * useRasterExport - the export of a styled raster as the `raster-export` task: the
  * one export of Raster Analysis and Plant Health. The whole raster or the visible extent is submitted as a task whose
- * state, progress and Cancel the control shows with HeavyTaskStatus (FR-XC-15); when it succeeds the file is downloaded and
+ * state, progress and Cancel the control shows with HeavyTaskStatus; when it succeeds the file is downloaded and
  * a toast says so. The size of an export and the limit come from the value info of the Registry (the same function checks
- * the submit, D-023): the visible extent has its own estimate, read with the window.
+ * the submit): the visible extent has its own estimate, read with the window.
  *
  *   const exporter = useRasterExport({ dataset: () => props.dataset, path: () => props.filePath,
  *                                      vizParams: () => style, bbox: () => props.visibleBbox, info: () => rasterInfo, dialogs });
  *   exporter.exportWhole() / exporter.exportExtent() / exporter.cancel()
  *   exporter.wholeReason, exporter.extentReason, exporter.task, exporter.error, exporter.running
  *
- * While the estimate of a new extent is read, the last one is kept and the reason of 'Visible extent' is 'Checking size…'
- * (FR-XC-22).
+ * While the estimate of a new extent is read, the last one is kept and the reason of 'Visible extent' is 'Checking size…'.
  */
 import { ref, computed, watch } from 'vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
@@ -105,7 +104,7 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
             const value = await d.getRasterValueInfo(p, { nodata: nodataOf() });
             if (current === requests) fetched.value = { bytes: bytesOf(value?.estimatedExportBytes), limit: 'exportLimitBytes' in (value || {}) ? value.exportLimitBytes : undefined };
         } catch (e) {
-            // The submit decides (D-023): the estimate is a help
+            // The submit decides: the estimate is a help
             console.error('Failed to read the export estimate:', e);
         }
     }
@@ -128,7 +127,7 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
             const value = await d.getRasterValueInfo(p, { nodata: nodataOf(), bbox: box });
             if (current === extentRequests) extentEstimate.value = bytesOf(value?.estimatedExportBytes);
         } catch (e) {
-            // The submit decides (D-023)
+            // The submit decides
             if (current === extentRequests) extentEstimate.value = null;
             console.error('Failed to read the export estimate of the visible extent:', e);
         } finally {

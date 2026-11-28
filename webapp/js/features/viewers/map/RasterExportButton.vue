@@ -13,7 +13,7 @@
                     <span class="export-item-text">
                         <span class="export-item-name">{{ wholeLabel }}</span>
                         <span class="export-item-detail">{{ wholeDetail }}</span>
-                        <!-- The reasons are text, not a tooltip: a keyboard user reads them at the item (FR-XC-22). Whatever turns
+                        <!-- The reasons are text, not a tooltip: a keyboard user reads them at the item. Whatever turns
                              the item off says so here, a running export or a missing raster too, not only a refused size -->
                         <span v-if="wholeDisabled" :id="wholeReasonId" class="export-item-reason"
                               :data-testid="exporter.wholeReason.value ? 'raster-export-whole-reason' : 'raster-export-whole-unavailable'">
@@ -58,14 +58,13 @@
 
 <script setup>
 /**
- * RasterExportButton - the one export control of Raster Analysis and Plant Health (FR-RAS-16, FR-XC-24, D-023): it exports the
- * styled raster as the `raster-export` task, with the state, the progress and the Cancel of HeavyTaskStatus (FR-PRC-15,
- * FR-XC-15), and a toast and the download when the file is ready. 'Visible extent' exports the window of the map at the
+ * RasterExportButton - the one export control of Raster Analysis and Plant Health: it exports the
+ * styled raster as the `raster-export` task, with the state, the progress and the Cancel of HeavyTaskStatus, and a toast and the download when the file is ready. 'Visible extent' exports the window of the map at the
  * native resolution of the raster, so a raster over the limit goes out in parts. An export that is refused for its size
- * stays a button that can be focused, with the reason as visible text (FR-XC-22: 'Too large to export: about 9.3 GB >
+ * stays a button that can be focused, with the reason as visible text ('Too large to export: about 9.3 GB >
  * 1 GB limit'); the size and the limit are those of the Registry (value info). 'Visible extent' is disabled the same way
- * while the estimate of a new extent is read ('Checking size…'). The label says what the file is and follows the style
- * (FR-RAS-26): a styled RGBA picture when there is a formula, or a colormap on one band, the bands scaled to 8 bits
+ * while the estimate of a new extent is read ('Checking size…'). The label says what the file is and follows the style:
+ * a styled RGBA picture when there is a formula, or a colormap on one band, the bands scaled to 8 bits
  * otherwise (the rule of ddb), never the values.
  *
  * It is one Export button with a menu of the two exports, in the footer row of the panel: the button, the menu (a row of

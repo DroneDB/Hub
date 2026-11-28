@@ -16,7 +16,7 @@ import { unByKey } from 'ol/Observable';
 
 const DEFAULT_ACCENT = PRIMARY[500];
 
-// The popup is above its point; placeOverlay puts it below when there is no room above (FR-MAP-26)
+// The popup is above its point; placeOverlay puts it below when there is no room above
 const POPUP_PLACEMENT = Object.freeze({ positioning: 'bottom-center', offset: [0, -12] });
 /** The class of a popup below its point: its arrow points up */
 export const POPUP_BELOW_CLASS = 'ol-point-popup-below';
@@ -68,7 +68,7 @@ export function pointPopupHtml({ lat, lon, name, accent, description, actions = 
 
 /**
  * The popups a map shows now, and the listeners that keep them in view: one `moveend` listener and
- * one listener of the map's overlays for the whole map, however many popups there are (FR-MAP-26).
+ * one listener of the map's overlays for the whole map, however many popups there are.
  * @typedef {{ popups: Map<Overlay, HTMLElement>, pending: Set<Overlay>, keys: import('ol/events').EventsKey[], renderKey: any }} MapPopups
  */
 /** @type {WeakMap<import('ol/Map').default, MapPopups>} */

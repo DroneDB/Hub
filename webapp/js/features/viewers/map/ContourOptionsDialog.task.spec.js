@@ -1,5 +1,5 @@
 /**
- * The contour dialog follows its task (FR-RAS-11, NFR-001, FR-XC-15): a long run (more than 50 levels) shows the estimate and
+ * The contour dialog follows its task: a long run (more than 50 levels) shows the estimate and
  * asks before it starts, the task has its progress and its Cancel (HeavyTaskStatus) and nothing covers the dialog meanwhile.
  * The Hat Creek mosaic has the range 145 to 402: at the default interval of 1 that is 257 levels, at 50 it is 6.
  */

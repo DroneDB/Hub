@@ -1,4 +1,4 @@
-/** The rule that matches a file selected again to an open upload (FR-UPL-04, §7.1): source name, size, last-modified. */
+/** The rule that matches a file selected again to an open upload: source name, size, last-modified. */
 import { describe, it, expect } from 'vitest';
 import { matchesOpenUpload, matchOpenUploads, storedPercent } from './openUploads';
 

@@ -1,5 +1,5 @@
 /**
- * copyLinkWithNotice: every Copy Link says that the link was copied, or that it could not be (FR-RAS-05).
+ * copyLinkWithNotice: every Copy Link says that the link was copied, or that it could not be.
  */
 import { describe, it, expect, vi } from 'vitest';
 

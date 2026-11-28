@@ -143,7 +143,7 @@ test('organization list: Enter on the delete question keeps it; the typed slug a
     const card = page.locator('.org-row', { hasText: victim });
     await card.locator('button[aria-label="Delete organization"]').click({ timeout: 15000 });
     await page.waitForSelector(`.p-dialog >> text=Delete organization “${victim}”`, { timeout: 10000 });
-    // The slug input has the focus: Enter before typing it deletes nothing (AC-004)
+    // The slug input has the focus: Enter before typing it deletes nothing
     await page.waitForSelector('.p-dialog input:focus', { timeout: 10000 });
     await page.keyboard.press('Enter');
     assert.equal(await page.locator('.p-dialog button[data-confirm]').isDisabled(), true);
@@ -206,7 +206,7 @@ test('dialogs: Escape closes, Enter confirms', async () => {
 
 test('dataset page: the file grid works from the keyboard', async () => {
     const tile = page.locator('#explorer [role="option"]', { hasText: 'smoke-folder' });
-    // The list holds the focus and names its active tile (FR-EXP-09): Home makes the first one (the folder) active and selected
+    // The list holds the focus and names its active tile: Home makes the first one (the folder) active and selected
     await page.locator('#explorer[data-file-list]').focus();
     await page.keyboard.press('Home');
     assert.equal(await tile.getAttribute('aria-selected'), 'true');
@@ -538,7 +538,7 @@ test('admin users: Disable asks, tags the user and refuses their sign-in; Enable
     }
 });
 
-test('organizations: a new member sees the organization at once; a non-member sees a Public one, read-only (D-003)', async () => {
+test('organizations: a new member sees the organization at once; a non-member sees a Public one, read-only', async () => {
     const other = `smoke${Date.now().toString(36)}m`;
     const password = 'a-long-passw0rd';
     const team = `${DS}-team`;

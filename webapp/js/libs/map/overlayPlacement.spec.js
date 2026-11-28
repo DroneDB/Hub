@@ -1,6 +1,6 @@
 /**
  * The rule that keeps the label of a feature and the popup of a point inside the visible map and out of
- * the toolbar rail (FR-MAP-19, FR-MAP-26). The expected placements are worked out from the geometry, not read
+ * the toolbar rail. The expected placements are worked out from the geometry, not read
  * from the code: a map of 800 x 600 px whose rail takes 64 px (4rem) on the right.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -26,7 +26,7 @@ describe('placeOverlay: a label beside its point (center-left, 12 px to the righ
         expect(place([605, 300], SIZE, LABEL)).toEqual({ positioning: 'center-right', offset: [-12, 0] });
     });
 
-    it('goes to the left of a point near the right edge (FR-MAP-19)', () => {
+    it('goes to the left of a point near the right edge', () => {
         expect(place([760, 300], SIZE, LABEL)).toEqual({ positioning: 'center-right', offset: [-12, 0] });
     });
 
@@ -52,7 +52,7 @@ describe('placeOverlay: a label beside its point (center-left, 12 px to the righ
     });
 });
 
-describe('placeOverlay: a popup above its point (bottom-center, 12 px up) (FR-MAP-26)', () => {
+describe('placeOverlay: a popup above its point (bottom-center, 12 px up)', () => {
     const SIZE = [224, 80];
 
     it('stays above the point with room', () => {

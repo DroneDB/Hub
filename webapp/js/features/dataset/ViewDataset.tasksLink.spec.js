@@ -1,5 +1,5 @@
 /**
- * The link of the task notification e-mail (FR-PRC-40) is `/r/{org}/{ds}?tab=tasks`: the dataset page opens on its Tasks
+ * The link of the task notification e-mail is `/r/{org}/{ds}?tab=tasks`: the dataset page opens on its Tasks
  * tab for it, and on its first tab for any other query. The page follows the query afterwards (back/forward, a link to
  * the same dataset) and drops it, with router.replace, once the user switches to another tab.
  */

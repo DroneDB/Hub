@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * The size class of a MAP, which depends on the size of its container and not on the window
- * (FR-MAP-12, FR-XC-20): the same rule serves a phone, a narrow pane of the dataset page and an
- * embedded frame (FR-SHR-05). Its breakpoint is `sm` of libs/responsiveColumns.js.
+ * The size class of a MAP, which depends on the size of its container and not on the window:
+ * the same rule serves a phone, a narrow pane of the dataset page and an
+ * embedded frame. Its breakpoint is `sm` of libs/responsiveColumns.js.
  *
  *   narrow  - the map is narrower than `sm`: the layer panel starts folded, the stockpile settings
  *             fold when a mode is active, the Back button leaves the rail (the viewer bar has it);

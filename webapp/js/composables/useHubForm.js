@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useHubForm - the state a Hub form keeps around `@primevue/forms` (FR-XC-11):
+ * useHubForm - the state a Hub form keeps around `@primevue/forms`:
  *
  *   const { formRef, busy, formError, submit, errorOf, submitForm } = useHubForm({ fields: ['username', 'password'] });
  *   <Form ref="formRef" :resolver="resolver" @submit="submit(save, $event)" v-slot="$form"> ... errorOf($form, 'username') ...
@@ -9,8 +9,8 @@
  *   nothing (`busy`);
  * - a submit validates every field first (the library does, through the resolver); when one is
  *   invalid no request is sent, every field shows its error and the focus goes to the first
- *   invalid field (the submit control itself stays enabled, D-046);
- * - a failed request maps to a field by the `errors` member of the answer (D-047, never by its
+ *   invalid field (the submit control itself stays enabled);
+ * - a failed request maps to a field by the `errors` member of the answer (never by its
  *   text), else to the one form-level message (`formError`, shown in the form, never in a toast);
  *   a form that must not say which field the server refused (sign-in) turns the mapping off
  *   (`fieldErrors: false`) and always gets the form-level message;
@@ -36,7 +36,7 @@ import { fieldErrorsOf, formMessageOf } from '@/libs/forms/serverErrors';
  *   formMessage: the text of an error that names no field (default: the message of the error);
  *   fieldErrors: false to never map a failed request to the fields (default true);
  *   statusFields: the field that an answer of a status refuses when its body names none (`{ 409: 'name' }`:
- *   a name that exists is a 409 that belongs to the name field, D-040)
+ *   a name that exists is a 409 that belongs to the name field)
  */
 export function useHubForm({ fields, aliases = {}, dependents = {}, formMessage = formMessageOf, fieldErrors = true, statusFields = {} }) {
     /** The Form component (`ref="formRef"`). */

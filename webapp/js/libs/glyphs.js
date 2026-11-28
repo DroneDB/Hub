@@ -14,7 +14,7 @@
 const drawn = name => `ddb-icon ddb-icon-${name}`;
 
 /**
- * One icon per meaning on the map, in the viewers and in the explorer (FR-MAP-24), and one meaning per icon: no two
+ * One icon per meaning on the map, in the viewers and in the explorer, and one meaning per icon: no two
  * of these are the same glyph. Where the tool makes something on the map, the glyph is what it makes: a polygon with
  * its vertices for an area, the back-and-forth track of a survey for the flight path, a frame cut by the slider for
  * the split compare, a heap on its base plane for a pile (not a mountain range, the outline the area chart of Raster

@@ -279,7 +279,7 @@ defineExpose({ dirty });
     padding: var(--ddb-spacing-md);
     border: 1px solid var(--ddb-border);
     border-radius: var(--ddb-radius-md);
-    /* The width is the row's of AdminConfig (FR-ADM-28); alone, a form of one column keeps a readable width */
+    /* The width is the row's of AdminConfig; alone, a form of one column keeps a readable width */
     max-width: var(--ddb-form-max);
 }
 

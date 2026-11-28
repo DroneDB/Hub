@@ -52,7 +52,7 @@
                                                class="w-100" autocomplete="off" :readonly="busy" :invalid="!!errorOf($form, 'roleName')"
                                                :aria-invalid="errorOf($form, 'roleName') ? 'true' : undefined"
                                                :aria-describedby="errorOf($form, 'roleName') ? 'role-management-dialog-role-name-error role-management-dialog-role-name-help' : 'role-management-dialog-role-name-help'" />
-                                    <!-- The rule of the Registry, before any input (FR-ADM-01); user names follow the same one -->
+                                    <!-- The rule of the Registry, before any input; user names follow the same one -->
                                     <small id="role-management-dialog-role-name-help">Use {{ nameRule }}</small>
                                     <FieldError id="role-management-dialog-role-name-error" :message="errorOf($form, 'roleName')" />
                                 </div>
@@ -211,8 +211,8 @@ export default {
                 this.showDeleteDialog = false;
                 this.roleToDelete = null;
             } catch (e) {
-                // The question is closed, so the error shows in this window and not behind the question (FR-ADM-01);
-                // it is shown once, here, with no toast (FR-ADM-22)
+                // The question is closed, so the error shows in this window and not behind the question;
+                // it is shown once, here, with no toast
                 this.showDeleteDialog = false;
                 this.roleToDelete = null;
                 // The Registry words a refusal of Identity as "Failed to delete role: ...": the prefix is said once

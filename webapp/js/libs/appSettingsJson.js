@@ -95,7 +95,7 @@ export function settingName(path) {
  */
 
 /**
- * The text to put in appsettings.json from the sections of GET /sys/config and the fields the admin edited (D-005).
+ * The text to put in appsettings.json from the sections of GET /sys/config and the fields the admin edited.
  *
  *   'changes'  only the edited fields: the admin merges them into the file they have. A secret that was not typed
  *              again is not a change.

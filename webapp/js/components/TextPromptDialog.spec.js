@@ -1,5 +1,5 @@
 /**
- * TextPromptDialog (FR-MAP-23): the name it offers is in the field and selected when the field first gets the focus,
+ * TextPromptDialog: the name it offers is in the field and selected when the field first gets the focus,
  * so typing replaces it and Enter keeps it; the answer is the trimmed text, null when cancelled.
  */
 import { describe, it, expect, afterEach } from 'vitest';

@@ -98,7 +98,7 @@
         <PasteConflictDialog v-if="conflictPrompt" verb="upload" keep-both :items="conflictPrompt.items"
                              @resolve="conflictPrompt.resolve" />
 
-        <!-- The question before Cancel (FR-UPL-16) -->
+        <!-- The question before Cancel -->
         <DialogHost :dialogs="dialogs" />
     </div>
 </template>
@@ -134,14 +134,14 @@ const joinPath = (folder, name) => (folder ? `${folder}/${name}` : name);
  * requests start as soon as a slot frees, small files go in bundles, large ones as resumable chunks, and a file whose
  * bytes are all sent shows "Processing on server" until the server has added it.
  *
- * The queue outlives this dialog (FR-UPL-04): "Continue in background" closes it and the upload goes on, also on
+ * The queue outlives this dialog: "Continue in background" closes it and the upload goes on, also on
  * another page (the header shows it); Pause and Resume stop and restart it; Cancel stops it and removes the chunks the
  * server stores (the files already sent stay). After a reload the dialog offers the chunked uploads that the server
  * still stores: a file selected again that has the source name, size and last-modified time of one of them resumes it,
  * at the path it was started at, before the question about names that exist.
  *
- * Names that exist (FR-UPL-03, AC-023): before the files are queued, each destination folder is
- * listed once, and the files whose names exist there (by the case rule of D-040) go to one prompt:
+ * Names that exist: before the files are queued, each destination folder is
+ * listed once, and the files whose names exist there (by the Registry's letter case rule) go to one prompt:
  * Replace (sent with overwrite), Keep both (a free name from freeName) or Skip (not sent). A file
  * the Registry still refuses with 409 and conflictPath (another upload took the name meanwhile)
  * goes back to the prompt once.
@@ -271,7 +271,7 @@ export default {
         }
     },
     beforeUnmount() {
-        // The upload does not stop with the dialog (FR-UPL-04): the queue is the store's, and Cancel is a button
+        // The upload does not stop with the dialog: the queue is the store's, and Cancel is a button
         this.prompts.closed = true;
         this.hooks.unsubscribe?.();
         useUploadsStore().detach(this.organization, this.dataset);
@@ -490,7 +490,7 @@ export default {
             this.queue.retryFailed();
         },
 
-        // Asks first (FR-UPL-16), then stops the queue and removes the chunks the server stores; the files already sent stay (D-045)
+        // Asks first, then stops the queue and removes the chunks the server stores; the files already sent stay
         async handleCancel() {
             let declined = false;
             await useUploadsStore().cancel(this.organization, this.dataset, {

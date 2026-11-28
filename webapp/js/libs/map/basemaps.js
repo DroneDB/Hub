@@ -2,7 +2,7 @@ import { expandUrl, renderXYZTemplate } from 'ol/uri';
 import { getPref, setPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 // `url2x` is the source of 512 px tiles (the map draws them in 256 px slots, tilePixelRatio 2) that a screen with a
-// devicePixelRatio above 1 uses (FR-XC-32, FR-MAP-29); a basemap with no 2x source (OpenStreetMap) has none and stays at 1x
+// devicePixelRatio above 1 uses; a basemap with no 2x source (OpenStreetMap) has none and stays at 1x
 const Basemaps = {
     'satellite': {
         label: "Satellite",
@@ -116,7 +116,7 @@ function buildCustomBasemapConfig({ sourceType, url, layerName = '', tileSize, w
 
 /**
  * The URL of one tile of a custom source, loaded to check the source before it is saved: the
- * first XYZ tile (its 1x tile when the URL has the `{r}` of a 2x source, FR-MAP-29; the first server of an
+ * first XYZ tile (its 1x tile when the URL has the `{r}` of a 2x source; the first server of an
  * `{a-c}` range; `{-y}` as the map counts it), or a WMS GetMap
  * of one quarter of the world at the tile size.
  * @param {{ sourceType: 'wms'|'xyz', url: string, layerName: string, tileSize?: number, defaultTime?: string }} config

@@ -15,7 +15,7 @@ describe('counts', () => {
         for (const bad of [undefined, null, '12', NaN, -1]) expect(formatSplatCount(bad)).toBe('Unknown');
     });
 
-    it('writes the count with the group separator of the browser locale (FR-MAP-05)', () => {
+    it('writes the count with the group separator of the browser locale', () => {
         Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
         try {
             expect(formatSplatCount(59090002)).toBe('59.090.002');
@@ -158,7 +158,7 @@ describe('rows', () => {
         });
     });
 
-    it('adds the memory rows when the memory state is known (FR-VWR-22)', () => {
+    it('adds the memory rows when the memory state is known', () => {
         const budget = pagedSplatBudget({ memoryGb: 4, mobile: false, shDegree: 3 });
         const rows = splatInfoRows({
             entry, bounds, scale: METRES, streaming: true, quality: 'High',

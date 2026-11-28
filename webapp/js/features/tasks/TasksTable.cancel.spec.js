@@ -1,5 +1,5 @@
 /**
- * The Cancel action of a task row (FR-XC-27, FR-UPL-05, D-024): shown when the Registry lists
+ * The Cancel action of a task row: shown when the Registry lists
  * `cancel` in the row's actions, hidden (not disabled) when it does not: a committed task, an ended
  * one, or a reader who may not cancel it. The row does not decide it from the state.
  */

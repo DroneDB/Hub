@@ -1,6 +1,6 @@
 /**
  * The create dialogs of a dataset and an organization, and the import dialog, take their width from a size
- * class (FR-ORG-19, FR-UPL-08, FR-XC-20): one class, no inline size, no width of their own, so the width stays
+ * class: one class, no inline size, no width of their own, so the width stays
  * the same while the user types a name that is a duplicate and then another one. The import dialog's buttons are
  * the window's footer, outside the content that scrolls.
  */
@@ -62,7 +62,7 @@ describe('a size class gives the dialog its width', () => {
     });
 });
 
-describe('ImportDatasetDialog after Verify (FR-UPL-08)', () => {
+describe('ImportDatasetDialog after Verify', () => {
     async function verified() {
         const scrollIntoView = vi.fn();
         Element.prototype.scrollIntoView = scrollIntoView;

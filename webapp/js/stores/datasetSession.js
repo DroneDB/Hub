@@ -21,10 +21,10 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
     // The user may write the dataset (the page's permissions): the header's actions follow them
     const canWrite = ref(false);
     // The dataset's root entry: its file count (properties.entries) and total size, for the header's
-    // whole-dataset download question (FR-EXP-27)
+    // whole-dataset download question
     const rootEntry = shallowRef(null);
     // When the dataset was created, from the Registry's dataset list (the root entry does not carry it): the
-    // Created row of its Properties (FR-EXP-25). Null until it is read.
+    // Created row of its Properties. Null until it is read.
     const creationDate = ref(/** @type {number|string|null} */ (null));
 
     /** @param {Array<object>} files */

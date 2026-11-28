@@ -4,7 +4,7 @@ import { readSource, ruleOf, mediaBlock } from '@/specs/cssSource';
 // The overlays of the 3D viewer are CSS: the rules are read from the source
 const scss = readSource(__dirname, './UnifiedViewer.scss');
 
-describe('the local coordinates badge of the 3D viewer on a phone (FR-VWR-27)', () => {
+describe('the local coordinates badge of the 3D viewer on a phone', () => {
     it('is at the top centre from sm up, as it was', () => {
         const badge = ruleOf(scss, '#unified-viewer .local-coords-badge');
         expect(badge).toMatch(/top:\s*var\(--ddb-spacing-md\)/);

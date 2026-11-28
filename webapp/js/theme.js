@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The Hub's PrimeVue theme: Lara with the DroneDB blue, in a light and a dark scheme (FR-XC-21).
+ * The Hub's PrimeVue theme: Lara with the DroneDB blue, in a light and a dark scheme.
  * Every colour block has both (`colorScheme.light` and `colorScheme.dark`, theme.spec.js holds it):
  * the dark one applies under the class that libs/colorScheme.js puts on <html>.
  */
@@ -13,7 +13,7 @@ import { FOCUS_RING, PRIMARY } from '@/libs/palette';
 // (css/_variables.scss writes the same recipe for --ddb-selected-active-bg)
 const SELECTED_ACTIVE = `color-mix(in srgb, ${PRIMARY[100]} 25%, ${PRIMARY[50]})`;
 
-// One focus ring (FR-NAV-05): the outline of the semantic focusRing (FOCUS_RING of libs/palette.js,
+// One focus ring: the outline of the semantic focusRing (FOCUS_RING of libs/palette.js,
 // which css/_variables.scss copies for the stylesheets), not Lara's light halo of each component,
 // which is about 2:1 on white. RING puts a component back on it where Lara gives it a ring of its own.
 const RING = { color: '{focus.ring.color}', shadow: 'none' };

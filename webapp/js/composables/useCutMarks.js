@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * useCutMarks - which entries of the dataset an explorer shows are cut (Ctrl+X) and wait for a paste, so that it dims
- * them as a file manager does (FR-EXP-16). It reads the clipboard store when the app has one: a view mounted without it
+ * them as a file manager does. It reads the clipboard store when the app has one: a view mounted without it
  * (a test, an embedded page) dims nothing.
  *
  *   const { isCut } = useCutMarks(() => props.dataset);

@@ -1,5 +1,5 @@
 /**
- * The legend of a styled raster (FR-RAS-27): derived from the vizParams of the layers, with the unit of the raster. The
+ * The legend of a styled raster: derived from the vizParams of the layers, with the unit of the raster. The
  * expected texts are written by hand.
  */
 import { describe, it, expect } from 'vitest';
@@ -56,7 +56,7 @@ describe('legendUnit', () => {
         expect(legendUnit({}, null)).toBe('');
     });
 
-    // D-022: a rescale kept across a change of the unit is in the unit it was written in
+    // A rescale kept across a change of the unit is in the unit it was written in
     it('is the unit of the rescale of a thermal layer when it was written in another temperature unit', () => {
         expect(legendUnit({ formula: 'FAHRENHEIT' }, null)).toBe('°F');
         expect(legendUnit({ formula: 'CELSIUS', rescaleUnit: 'K' }, null)).toBe('K');

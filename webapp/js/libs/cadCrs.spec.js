@@ -49,7 +49,7 @@ describe('Tools › Set Coordinate System', () => {
     });
 });
 
-// FR-PRC-31: the form of the value, checked before Apply; the server says whether it exists
+// The form of the value, checked before Apply; the server says whether it exists
 describe('crsProblem', () => {
     it.each(['EPSG:32632', 'epsg:2193', 'PROJCS["WGS 84 / UTM zone 32N",GEOGCS["WGS 84"]]', 'GEOGCS["WGS 84"]', 'PROJCRS["x"]', 'GEOGCRS["x"]', 'COMPD_CS["x"]', 'COMPD["x"]'])(
         'accepts %s', value => {

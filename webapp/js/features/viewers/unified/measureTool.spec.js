@@ -105,7 +105,7 @@ beforeEach(() => {
 });
 afterEach(() => { tool.dispose(); domElement.remove(); });
 
-describe('drawing a distance (FR-VWR-10, D-027)', () => {
+describe('drawing a distance', () => {
     it('is ended by a right click: the points that were clicked, without the one that followed the pointer', async () => {
         const drawing = tool.measure('distance');
         expect(scene.view.activeTool).toBe('distance');
@@ -200,7 +200,7 @@ describe('drawing a distance (FR-VWR-10, D-027)', () => {
 
     it('labels its segments with the shared formatter', async () => {
         tool.measure('distance');
-        // The shared measureFormatters (FR-XC-08), not a text of its own
+        // The shared measureFormatters, not a text of its own
         expect(created[0].segmentLabelFormatter).toBe(tool.format.length);
         tool.cancel();
     });
@@ -285,7 +285,7 @@ describe('Clear, and a new shape', () => {
     });
 });
 
-describe('label size and line width follow the canvas (FR-VWR-37)', () => {
+describe('label size and line width follow the canvas', () => {
     const height = px => Object.defineProperty(domElement, 'clientHeight', { configurable: true, value: px });
 
     it('on a canvas 2104 CSS px high every kind gets fontSize 18 and lineWidth 3', async () => {

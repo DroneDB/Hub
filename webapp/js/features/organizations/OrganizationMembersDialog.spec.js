@@ -63,8 +63,8 @@ afterEach(() => {
 });
 
 describe('OrganizationMembersDialog', () => {
-    // FR-ORG-26: 30 members must not grow the window or push Close away
-    it('shows the members in user name order, whatever the order the server sends (FR-ORG-26)', async () => {
+    // 30 members must not grow the window or push Close away
+    it('shows the members in user name order, whatever the order the server sends', async () => {
         reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve([
             { userName: 'Zed', permissions: 1 }, { userName: 'bob', permissions: 1 }, { userName: 'Alice', permissions: 1 }, { userName: 'me', permissions: ADMIN }
         ]));
@@ -74,7 +74,7 @@ describe('OrganizationMembersDialog', () => {
         expect(wrapper.vm.members.map(m => m.userName)).toEqual(['Alice', 'bob', 'me', 'Zed']);
     });
 
-    it('puts Close in the footer of the window, outside the box that scrolls the table (FR-ORG-26)', async () => {
+    it('puts Close in the footer of the window, outside the box that scrolls the table', async () => {
         reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
         await render();
         const dialog = document.querySelector('.p-dialog.window-dialog');
@@ -88,7 +88,7 @@ describe('OrganizationMembersDialog', () => {
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
 
-    it('takes its width from the dialog-xl size class, with no width of its own (FR-XC-33)', async () => {
+    it('takes its width from the dialog-xl size class, with no width of its own', async () => {
         await render();
         const dialog = document.querySelector('.p-dialog.window-dialog');
         expect(dialog.classList.contains('dialog-xl')).toBe(true);
@@ -123,7 +123,7 @@ describe('OrganizationMembersDialog', () => {
         expect(nameInput().value).toBe('nobody');
     });
 
-    // FR-ORG-23: the Registry names the field of its refusal (errors.userName, D-047)
+    // The Registry names the field of its refusal (errors.userName)
     it('shows "No user named x" at the user name field, from errors.userName, not in the banner', async () => {
         reg.orgs.addOrganizationMember = vi.fn(() => Promise.reject(new ApiError('No user named nosuchuser123', 404, {
             errors: { userName: ['No user named nosuchuser123'] }

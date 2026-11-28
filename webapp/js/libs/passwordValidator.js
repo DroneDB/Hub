@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * The password policy of the server (`Features.PASSWORD_POLICY`) as the Hub forms show and check
- * it (FR-ADM-08): the checklist of requirements and the one problem message. When there is no
+ * it: the checklist of requirements and the one problem message. When there is no
  * policy, every password is accepted and there is no checklist.
  */
 

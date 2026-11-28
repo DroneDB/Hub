@@ -1,5 +1,5 @@
 /**
- * SplatInfoPanel (FR-VWR-22): the About panel documents the budget of the paged splats and what
+ * SplatInfoPanel: the About panel documents the budget of the paged splats and what
  * Spark holds, and follows the pager while it is open.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';

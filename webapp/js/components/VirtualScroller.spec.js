@@ -1,6 +1,6 @@
 /**
- * The rows follow another item size even when their count stays the same (the thumbnail size of the explorer grid,
- * FR-EXP-43): a row placed at the old size would overlap the next one.
+ * The rows follow another item size even when their count stays the same (the thumbnail size of the explorer grid):
+ * a row placed at the old size would overlap the next one.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defineComponent, h, ref } from 'vue';

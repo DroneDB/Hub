@@ -1,5 +1,5 @@
 /**
- * Extract Archive (FR-PRC-02): one click starts one task, not forced, so the Registry's dedup and
+ * Extract Archive: one click starts one task, not forced, so the Registry's dedup and
  * output checks apply; the dialog is busy while it runs, and a refusal (409) shows the server's message.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -52,7 +52,7 @@ describe('ExtractDialog submit', () => {
         expect(toolId).toBe('archive-extract');
         expect(options.force).toBeUndefined();
         expect(options.params).toMatchObject({ sourcePath: 'archives/a.zip', destPath: 'archives', overwrite: false });
-        // The task is named by the tool's label (FR-PRC-22): no path is sent only for that
+        // The task is named by the tool's label: no path is sent only for that
         expect(options.path).toBeUndefined();
         expect(window.props('busy')).toBe(true);
     });
@@ -71,7 +71,7 @@ describe('ExtractDialog submit', () => {
         expect(w.findComponent(WindowStub).props('busy')).toBe(false);
     });
 
-    // FR-PRC-30: the skipped entries are read from the log of the task and handed to the page that shows the toast
+    // The skipped entries are read from the log of the task and handed to the page that shows the toast
     it('closes with the entries the extraction skipped, named with their reason', async () => {
         runHeavyTask.mockResolvedValue({
             taskId: 't1',
@@ -148,7 +148,7 @@ describe('ExtractDialog task status', () => {
     });
 });
 
-// ---- Cancel of a task that waits for a node or runs (FR-PRC-10, FR-XC-15) --------------------------------
+// ---- Cancel of a task that waits for a node or runs --------------------------------
 
 describe('ExtractDialog cancel', () => {
     beforeEach(() => {

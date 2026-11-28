@@ -68,7 +68,7 @@ export function useMapFeatures(props, fileEvents = {}) {
         onFileRemoved: () => fileEvents.onFileRemoved || (() => {}),
         onMeasurementsLoaded: () => fileEvents.onMeasurementsLoaded || (() => {})
     });
-    // The layers of a saved view keep the style it records, none included: the map seeds no default on them (FR-RAS-01)
+    // The layers of a saved view keep the style it records, none included: the map seeds no default on them
     const plantHealth = usePlantHealth({ dataset, rasterLayer, entry: () => null, savedLayers: () => props.savedLayers || [] });
     const raster = useRasterAnalysis({
         dataset, map, measureControls, rasterLayer, currentUnitPref,

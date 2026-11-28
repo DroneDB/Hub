@@ -14,7 +14,7 @@ describe('taskFilters', () => {
         expect(readTaskFilters({ skip: '1000', take: '50' }).skip).toBe(1000);
     });
 
-    it('keeps the offset as written when no page size is in the address: the page rounds it to the size that fits (FR-XC-34)', () => {
+    it('keeps the offset as written when no page size is in the address: the page rounds it to the size that fits', () => {
         expect(readTaskFilters({ skip: '27' })).toMatchObject({ skip: 27, take: null });
         // An invalid page size is none
         expect(readTaskFilters({ skip: '35', take: '7' })).toMatchObject({ skip: 35, take: null });

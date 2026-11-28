@@ -19,13 +19,13 @@
 
 <script setup>
 /**
- * HubBreadcrumb - where the user is, in the header (FR-NAV-03): <organization> / <dataset>, on the pages of an
+ * HubBreadcrumb - where the user is, in the header: <organization> / <dataset>, on the pages of an
  * organization, of a dataset and of its viewers, after the Organizations link of the main navigation, which is its
  * root. Without that link (nobody is signed in, so the header has no main navigation), the trail starts with an
  * Organizations crumb. Every crumb but the last is a link; the last one names the page (aria-current).
  *
  * The slugs come from the route (`org`, `ds`). The name of the organization is read here (the organization look-up, which
- * the user did not ask for: it opts out of the global 401 redirect, FR-XC-05); the name of the dataset is the one the page
+ * the user did not ask for: it opts out of the global 401 redirect); the name of the dataset is the one the page
  * puts in the dataset session (stores/datasetSession.js: the dataset page, and a viewer from the dataset info it reads),
  * formatted as the tree shows it; its tooltip adds the tagline of the dataset. Until a name is known, and when it cannot be read (no access, an error), the crumb shows the
  * slug; an organization the visitor has no access to is not a link, since the page would only refuse them. In a

@@ -501,7 +501,7 @@ describe('usePotreeMeasurements', () => {
             expect(loaded.canRedo.value).toBe(false);
         });
 
-        it('a drawing the user cancelled is removed, and Ctrl+Z does not bring it back (FR-VWR-10)', () => {
+        it('a drawing the user cancelled is removed, and Ctrl+Z does not bring it back', () => {
             const m = start();
             const real = startDrawing('real');
             finishDrawing(real, 5);

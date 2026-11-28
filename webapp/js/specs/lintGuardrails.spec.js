@@ -233,3 +233,61 @@ describe('the type check of the components', () => {
         expect(pkg.scripts['typecheck:components']).toMatch(/check_component_types/);
     });
 });
+
+// Comments and test titles say why in words: the ids of planning documents are not part of this repository
+describe('planning ids in comments and test titles', () => {
+    const eslint = new ESLint({ cwd: ROOT });
+    // The ids are written in two halves so that this file does not hold one itself
+    const REQUIREMENT = 'FR-' + 'XC' + '-13';
+    const DECISION = 'D-' + '049';
+    const ACCEPTANCE = 'AC-' + '031';
+    const AREA = 'ORG-' + '06';
+    const WORK_ITEM = 'U' + '405';
+    const SECTION = '§' + '7.1';
+    const ROADMAP = 'Drone' + 'DB-Roadmap/';
+
+    async function planningIdsIn(code, file = 'webapp/js/libs/sample.js') {
+        const [result] = await eslint.lintText(code, { filePath: path.join(ROOT, file) });
+        return result.messages.filter(m => m.ruleId === 'planning/no-planning-ids').map(m => m.message);
+    }
+
+    it.each([
+        ['a line comment', `// The expired notice (${REQUIREMENT}) is shown once\nexport const a = 1;\n`, REQUIREMENT],
+        ['a block comment', `/**\n * Case ignored, ${DECISION}.\n */\nexport const a = 1;\n`, DECISION],
+        ['an acceptance id', `// At 390x844 (${ACCEPTANCE}) nothing scrolls\nexport const a = 1;\n`, ACCEPTANCE],
+        ['an area code', `// Focus goes back (${AREA})\nexport const a = 1;\n`, AREA],
+        ['a work item id', `// A narrow map (${WORK_ITEM}) hides it\nexport const a = 1;\n`, WORK_ITEM],
+        ['a section mark', `// Answered as in ${SECTION}\nexport const a = 1;\n`, SECTION],
+        ['a roadmap path', `// See ${ROADMAP}notes\nexport const a = 1;\n`, ROADMAP],
+        ['a test title', `it('keeps the focus (${REQUIREMENT})', () => {});\n`, REQUIREMENT],
+        ['a test title in a template literal', `describe(\`at \${width}: ${AREA}\`, () => {});\n`, AREA]
+    ])('rejects %s', async (_name, code, id) => {
+        const messages = await planningIdsIn(code, 'webapp/js/libs/sample.spec.js');
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toContain(id);
+    });
+
+    it('rejects an id in a comment of a component template and of its script', async () => {
+        const messages = await planningIdsIn(
+            `<template><!-- ${REQUIREMENT} --><div /></template>\n<script>\n// ${DECISION}\nexport default {};\n</script>\n`,
+            'webapp/js/features/sample/Sample.vue');
+        expect(messages).toHaveLength(2);
+    });
+
+    it('accepts comments and titles that say why in words, and strings that only look like ids', async () => {
+        const clean = [
+            '// The expired notice is shown once, then dropped from the address',
+            "it('keeps the focus on the opener when the dialog closes', () => {});",
+            "const refs = ['A-1', 'B-12', 'ab-cd-12'];",
+            "// UTF-8 and SHA-256 are not ids, nor is a D-1 pile ref or 'ORG-1'"
+        ].join('\n');
+        expect(await planningIdsIn(clean, 'webapp/js/libs/sample.spec.js')).toEqual([]);
+    });
+
+    it('is on for the sources of the Hub', async () => {
+        for (const file of ['webapp/js/libs/a.js', 'webapp/js/features/a/A.vue', 'e2e/a.test.mjs', 'scripts/a.mjs']) {
+            expect(await eslint.calculateConfigForFile(path.join(ROOT, file)))
+                .toMatchObject({ rules: { 'planning/no-planning-ids': [2] } });
+        }
+    });
+});

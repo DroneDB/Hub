@@ -36,7 +36,7 @@ describe('RasterProfileChart', () => {
     });
 });
 
-// FR-RAS-08: the labels of the y axis are the values with their unit, and the chart leaves room for them
+// The labels of the y axis are the values with their unit, and the chart leaves room for them
 describe('RasterProfileChart y labels', () => {
     const thermal = {
         totalLength: 90, min: 12.76, max: 35.27, unit: '°C',
@@ -66,7 +66,7 @@ describe('RasterProfileChart y labels', () => {
     });
 });
 
-describe('RasterProfileChart Expand (FR-RAS-35)', () => {
+describe('RasterProfileChart Expand', () => {
     afterEach(() => {
         document.body.innerHTML = '';
     });

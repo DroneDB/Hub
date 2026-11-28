@@ -1,5 +1,5 @@
 /**
- * The dataset page on a phone (FR-EXP-29): below `sm` (the window's width, the breakpoint of libs/responsiveColumns.js,
+ * The dataset page on a phone: below `sm` (the window's width, the breakpoint of libs/responsiveColumns.js,
  * not the screen of `isMobile`) the page shows only its second pane: no first pane and no gutter handle at the left
  * edge; it follows the window without rendering the second pane again; the tabs are a bottom navigation with an icon
  * and a label in each of five equal cells.

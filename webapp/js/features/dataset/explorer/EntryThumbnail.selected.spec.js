@@ -1,5 +1,5 @@
 /**
- * The selected tile (FR-EXP-10): a primary tint, a 2px primary outline and a check badge, not a
+ * The selected tile: a primary tint, a 2px primary outline and a check badge, not a
  * grey that is almost the hover grey. The layout is CSS and the tests have no layout engine, so
  * the rules are read from the component's source; the contrast of the outline against the page,
  * the hover grey and the tint is in specs/colorTokens.spec.js.

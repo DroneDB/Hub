@@ -60,8 +60,8 @@ export function formatGeoreference(properties) {
 
 /**
  * The up the build estimated, as "+Z, 85% sure (ground plane)", "Not estimated" without one, or
- * "No reliable estimate (ground plane)" when `estimatedUp` finds the confidence too low to use it
- * (FR-VWR-31). A direction close to a world axis is named by it, any other is given as a vector
+ * "No reliable estimate (ground plane)" when `estimatedUp` finds the confidence too low to use it.
+ * A direction close to a world axis is named by it, any other is given as a vector
  * of the file.
  * @param {any} bounds
  */

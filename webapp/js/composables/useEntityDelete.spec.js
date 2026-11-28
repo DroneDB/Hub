@@ -1,6 +1,6 @@
 /**
  * Deleting an organization from its list: the question names it by its display name and slug,
- * says how many datasets go with it, and waits for the slug to be typed (AC-004).
+ * says how many datasets go with it, and waits for the slug to be typed.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { defineComponent, h } from 'vue';

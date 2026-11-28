@@ -1,5 +1,5 @@
 /**
- * The error of an upload row (FR-UPL-07): the whole reason, two lines in the row and all of it on
+ * The error of an upload row: the whole reason, two lines in the row and all of it on
  * click or Enter, read in full through aria-describedby; Retry only for a failure that can succeed.
  */
 import { describe, it, expect } from 'vitest';
@@ -15,7 +15,7 @@ const row = file => mount(FileUploadRow, {
 });
 
 describe('FileUploadRow', () => {
-    it('shows the progress of a file as a whole-number percentage (FR-UPL-16)', () => {
+    it('shows the progress of a file as a whole-number percentage', () => {
         expect(row({ status: 'uploading', progress: 41.6 }).find('.progress-text').text()).toBe('42%');
         expect(row({ status: 'uploading', progress: 0.2 }).find('.progress-text').text()).toBe('0%');
         expect(row({ status: 'uploading', progress: 100 }).find('.progress-text').text()).toBe('100%');

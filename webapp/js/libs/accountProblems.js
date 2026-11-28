@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The validators of the sign-in and password forms (FR-XC-11): pure `xxxProblem(value, ctx)`
+ * The validators of the sign-in and password forms: pure `xxxProblem(value, ctx)`
  * functions that give the text to show at the field, or null. The Hub resolver
  * (libs/forms/resolver.js) runs them; no component holds a rule of its own. The server checks
  * again and stays the authority.

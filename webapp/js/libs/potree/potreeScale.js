@@ -1,5 +1,5 @@
 /**
- * How the point cloud viewer draws on a HiDPI or a large screen (FR-XC-32, FR-VWR-33, FR-VWR-37, D-042):
+ * How the point cloud viewer draws on a HiDPI or a large screen:
  * - the canvas is the CSS size x the applied ratio, min(devicePixelRatio, 2); a screen with another ratio applies it
  *   again. The vendored potree.js sizes its EDL and HQ splat targets from the drawing buffer, draws point sizes (CSS px
  *   in the material and in the Appearance menu) in buffer pixels, and draws the text of its labels at

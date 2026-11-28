@@ -1,5 +1,5 @@
 /**
- * A failed task says why it failed (FR-XC-06, AC-025): the per-dataset Tasks tab and the admin Tasks page both draw
+ * A failed task says why it failed: the per-dataset Tasks tab and the admin Tasks page both draw
  * their rows with this table, and a Failed row shows a red "Failed" tag and the task's error (the server's message,
  * without server paths), with the exception type as the tooltip; never a full 100% bar.
  */

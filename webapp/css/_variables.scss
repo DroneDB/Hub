@@ -172,12 +172,12 @@
     --ddb-login-max-width: 26.25rem;   // 420px
     --ddb-page-padding-x: var(--ddb-spacing-md); // 12px - side padding of the routed pages
 
-    // The width of a dialog comes from its size class (HubWindow size-class, FR-XC-20), not from its content.
+    // The width of a dialog comes from its size class (HubWindow size-class), not from its content.
     --ddb-dialog-form-max: 47rem;      // 752px - a form dialog (dialog-xl)
     --ddb-dialog-log-max: 80rem;       // 1280px - a log, about 140 characters of its text in a line (dialog-log)
     --ddb-dialog-wide-max: 120rem;     // 1920px - a chart or a form in two columns (dialog-wide)
 
-    // The maximum widths of the content on a wide screen (FR-XC-33). A page, a text or a panel takes its width from
+    // The maximum widths of the content on a wide screen. A page, a text or a panel takes its width from
     // one of these, never from a value of its own: css/app.scss has the classes (.page-column, .prose-column,
     // .editor-column, .form-column) and the breakpoints they change at (wide 1600px, xwide 2560px) are in
     // css/_breakpoints.scss and libs/responsiveColumns.js.

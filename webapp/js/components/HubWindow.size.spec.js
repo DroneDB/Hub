@@ -1,5 +1,5 @@
 /**
- * HubWindow size-class and #footer (FR-XC-20): the class is on the dialog and no size is set inline, so the width is
+ * HubWindow size-class and #footer: the class is on the dialog and no size is set inline, so the width is
  * the one of the class (css/app.scss) and does not follow the content; the footer is the window's own element, after
  * the content.
  */
@@ -47,7 +47,7 @@ describe('HubWindow size-class', () => {
     });
 });
 
-describe('HubWindow maximizable (FR-PRC-44)', () => {
+describe('HubWindow maximizable', () => {
     it('has no maximize button by default', async () => {
         const dialog = await show({ sizeClass: 'dialog-wide', fixedSize: true });
         expect(dialog.querySelector('.p-dialog-maximize-button')).toBeNull();

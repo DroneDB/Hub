@@ -123,7 +123,7 @@ vi.mock('@/libs/map/mapUtils', async importOriginal => {
 const { default: MapCore } = await import('./MapCore.vue');
 
 let wrapper;
-// The value info of a DEM with negative heights and no NoData value (the stretch is ddb's, D-041)
+// The value info of a DEM with negative heights and no NoData value (the stretch is ddb's)
 const DEM_INFO = { bandCount: 1, dataType: 'Float32', isThermal: false, unit: '', valueMin: -6.3, valueMax: 216, stretch: [{ min: -6.3, max: 216 }] };
 const dataset = {
     org: 'acme', ds: 'site',
@@ -213,7 +213,7 @@ const SAVED_POSITION = { center: [123, 456], zoom: 7, rotation: 0 };
 afterEach(() => reported.splice(0));
 
 
-describe('the canvas ratio of the map (FR-XC-32, D-042)', () => {
+describe('the canvas ratio of the map', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it.each([[3, 2], [2, 2], [1.5, 1.5], [1, 1]])('draws at min(devicePixelRatio, 2): %s gives %s', async (dpr, applied) => {
@@ -384,7 +384,7 @@ describe('the position of the map in a view', () => {
     });
 });
 
-describe('the fit to the files (FR-MAP-28)', () => {
+describe('the fit to the files', () => {
     // Literal numbers: about 1.1 m wide at 45 degrees (the old fit stopped at 0.5 m per pixel, which a survey never reaches in a 100 px view)
     const TINY = { type: 'Polygon', coordinates: [[[10, 45], [10.00001, 45], [10.00001, 45.00001], [10, 45.00001], [10, 45]]] };
     const POINT = { type: 'Polygon', coordinates: [[[10, 45], [10, 45], [10, 45], [10, 45], [10, 45]]] };
@@ -451,7 +451,7 @@ describe('the fit to the files (FR-MAP-28)', () => {
     });
 });
 
-describe('the scale bar (FR-MAP-30)', () => {
+describe('the scale bar', () => {
     afterEach(() => setPref(PREF.MEASURE_UNIT, 'metric'));
     const scaleLine = () => wrapper.vm.map.getControls().getArray().find(c => c instanceof ScaleLine);
 
@@ -511,8 +511,8 @@ describe('the state of a view', () => {
     });
 });
 
-// FR-RAS-16: the raster panels export the visible extent; the map says it as the WGS 84 window of the export task
-describe('the visible extent for the raster panels (FR-RAS-16)', () => {
+// The raster panels export the visible extent; the map says it as the WGS 84 window of the export task
+describe('the visible extent for the raster panels', () => {
     it('is the window the map shows, in degrees, after each move, and reaches both panels', async () => {
         await mountMap([file(MAIN)]);
         const map = wrapper.vm.map;
@@ -540,7 +540,7 @@ describe('the visible extent for the raster panels (FR-RAS-16)', () => {
     });
 });
 
-// FR-RAS-01: a DEM opens as a colour ramp over its range, not as the grey of the tiles; an orthophoto keeps its colours
+// A DEM opens as a colour ramp over its range, not as the grey of the tiles; an orthophoto keeps its colours
 describe('the default style of a raster', () => {
     it('seeds a single-band georaster with the default of its value info, and leaves the orthophoto alone', async () => {
         dataset.getRasterValueInfo.mockClear();
@@ -580,7 +580,7 @@ describe('the default style of a raster', () => {
     });
 });
 
-// FR-RAS-27: the colour legend of the styled rasters, derived from the style of the layers
+// The colour legend of the styled rasters, derived from the style of the layers
 describe('the colour legend', () => {
     const legend = () => wrapper.find('[data-testid="raster-legend"]');
 
@@ -953,7 +953,7 @@ describe('the panels over the map', () => {
 });
 
 describe('the photo popup', () => {
-    it('closed by the user (Escape, Close) clears the footprint and leaves the focus to the overlay stack (MAP-20)', async () => {
+    it('closed by the user (Escape, Close) clears the footprint and leaves the focus to the overlay stack', async () => {
         await mountMap([]);
         const outside = document.createElement('button');
         document.body.appendChild(outside);
@@ -971,7 +971,7 @@ describe('the photo popup', () => {
     });
 });
 
-describe('the size class of the map (FR-MAP-12, FR-SHR-05)', () => {
+describe('the size class of the map', () => {
     /** The container of the map has this size (jsdom has no layout: its elements have none) */
     const sized = (width, height) => {
         Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => width });
@@ -1005,7 +1005,7 @@ describe('the size class of the map (FR-MAP-12, FR-SHR-05)', () => {
 });
 
 
-describe('Zoom to layer (FR-MAP-08, FR-XC-23)', () => {
+describe('Zoom to layer', () => {
     it('fits the map to the extent of the layer of a row, which the panel asks for with zoom-to', async () => {
         await mountView([MAIN, ADDED], { base: MAIN });
         expect(near(center(), mainCenter)).toBe(true);
@@ -1040,7 +1040,7 @@ describe('Zoom to layer (FR-MAP-08, FR-XC-23)', () => {
         info.mockRestore();
     });
 
-    // A raster that is building (FR-RAS-09): no layer to draw yet, but a footprint to look at
+    // A raster that is building: no layer to draw yet, but a footprint to look at
     const BUILDING = {
         path: 'ddb://acme/site/new.tif', entry: null, label: 'new.tif', selected: false,
         placeholder: { path: 'new.tif', kind: 'building', text: 'Building: new.tif', footprint: FAR_POLYGON, progress: () => 40 }

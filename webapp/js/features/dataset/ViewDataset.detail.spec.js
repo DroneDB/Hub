@@ -1,6 +1,6 @@
 /**
- * The dataset page: the detail panel follows the list (FR-EXP-06), the page has a header with the name, the visibility and the
- * tagline of the dataset (FR-EXP-14), and the README of the dataset shows under the files at its root (FR-EXP-14).
+ * The dataset page: the detail panel follows the list, the page has a header with the name, the visibility and the
+ * tagline of the dataset, and the README of the dataset shows under the files at its root.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils';
@@ -112,7 +112,7 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-describe('ViewDataset detail panel follows the list (FR-EXP-06)', () => {
+describe('ViewDataset detail panel follows the list', () => {
     it('closes the panel of a file that is removed from the list', async () => {
         const file = item('DJI_0022.JPG');
         await open({ files: [file, item('DJI_0023.JPG', false)] });
@@ -167,7 +167,7 @@ describe('ViewDataset detail panel follows the list (FR-EXP-06)', () => {
     });
 });
 
-describe('ViewDataset header (FR-EXP-14)', () => {
+describe('ViewDataset header', () => {
     it('has the name of the dataset as its heading, for screen readers only: no title block above the tabs', async () => {
         await open();
         const heading = wrapper.find('h1.visually-hidden');
@@ -182,7 +182,7 @@ describe('ViewDataset header (FR-EXP-14)', () => {
         expect(wrapper.find('h1.visually-hidden').text()).toBe('site');
     });
 
-    it('keeps the root entry in the session, for the header of the page (FR-NAV-03)', async () => {
+    it('keeps the root entry in the session, for the header of the page', async () => {
         await open();
         expect(useDatasetSessionStore().rootEntry.properties.meta.name.data).toBe('Brighton Beach');
     });
@@ -199,7 +199,7 @@ describe('ViewDataset header (FR-EXP-14)', () => {
     });
 });
 
-describe('ViewDataset README panel (FR-EXP-14)', () => {
+describe('ViewDataset README panel', () => {
     it('renders the README of the dataset under the files at the root, as Markdown', async () => {
         await open();
         const panel = wrapper.find('.dataset-readme');
@@ -235,7 +235,7 @@ describe('ViewDataset README panel (FR-EXP-14)', () => {
     });
 });
 
-describe('ViewDataset README load (FR-EXP-14)', () => {
+describe('ViewDataset README load', () => {
     it('does not download a README above the cap: it says so, and Open stays', async () => {
         await open({ readmeEntry: { ...README_ENTRY, size: 5 * 1024 * 1024 } });
         expect(h_.dataset.listOne).toHaveBeenCalledWith('README.md');
@@ -270,7 +270,7 @@ describe('ViewDataset README load (FR-EXP-14)', () => {
     });
 });
 
-describe('ViewDataset after a name change (FR-EXP-24)', () => {
+describe('ViewDataset after a name change', () => {
     it('patches the label of the root of the tree, in place', async () => {
         await open();
         const renamed = { ...ROOT, properties: { ...ROOT.properties, meta: { ...ROOT.properties.meta, name: { id: 'a1', data: 'New Name', mtime: 2 } } } };
@@ -285,7 +285,7 @@ describe('ViewDataset after a name change (FR-EXP-24)', () => {
     });
 });
 
-describe('ViewDataset creation date (FR-EXP-25)', () => {
+describe('ViewDataset creation date', () => {
     it('reads the creation date of the dataset once, from the dataset list of the organization, into the session', async () => {
         await open();
         expect(h_.datasets).toHaveBeenCalledTimes(1);

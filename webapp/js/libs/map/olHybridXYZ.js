@@ -65,7 +65,7 @@ class HybridXYZ extends XYZ {
     }
 
     /**
-     * Draws the tiles with another style, in place (FR-RAS-17): the tiles get a new key, so the layer keeps drawing the
+     * Draws the tiles with another style, in place: the tiles get a new key, so the layer keeps drawing the
      * tiles it has (OpenLayers' stale tiles of the same source) until those of the new style have loaded, instead of
      * blanking as a new source does.
      * @param {object|null} vizParams

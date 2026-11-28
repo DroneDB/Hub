@@ -565,7 +565,7 @@ describe('useSavedView save on a new view', () => {
 
         const [component, props] = dialogs.open.mock.calls[0];
         expect(component.name).toBe('TextPromptDialog');
-        // FR-MAP-23: the first Save offers the stem of the base file (f/a.tif -> a)
+        // The first Save offers the stem of the base file (f/a.tif -> a)
         expect(props).toMatchObject({ title: 'Save view', label: 'Name', initialValue: 'a', maxLength: 100 });
         expect(dataset.metaAdd).toHaveBeenCalledTimes(1);
         const stored = dataset.metaAdd.mock.calls[0][1];
@@ -869,7 +869,7 @@ describe('useSavedView save on a saved view', () => {
         await view.save();
 
         expect(notify.warn).toHaveBeenCalledWith('This view was deleted. Save it under a name to keep it.', { summary: 'View deleted' });
-        // FR-MAP-23: the deleted view's own name is offered, not an empty field
+        // The deleted view's own name is offered, not an empty field
         expect(dialogs.open.mock.calls[0][1]).toMatchObject({ title: 'Save view as', initialValue: 'Ortho over DSM' });
         expect(dataset.items).toHaveLength(1);
         expect(view.saved.value.name).toBe('Back again');

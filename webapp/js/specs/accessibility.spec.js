@@ -36,7 +36,7 @@ describe('accessibility of the templates', () => {
     });
 });
 
-// FR-NAV-02: the skip link first, the header as the banner, the page in the one main landmark
+// The skip link first, the header as the banner, the page in the one main landmark
 describe('the landmarks of the app', () => {
     it('renders the skip link first, then the banner and the main landmark, which the skip link focuses', async () => {
         const { default: App } = await import('@/App.vue');

@@ -1,5 +1,5 @@
 /**
- * Disable and Enable (FR-ADM-04, D-043): a Registry that lists its system roles has the endpoints,
+ * Disable and Enable: a Registry that lists its system roles has the endpoints,
  * and the Users list offers them in the Actions column. Disable asks first (it blocks sign-in);
  * a disabled user has a "Disabled" tag next to the name. Edit User does not offer 'deactivated'
  * and cannot enable a user; with an older Registry it sends the role back, so the edit keeps the

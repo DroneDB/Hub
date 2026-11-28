@@ -70,7 +70,7 @@ const props = defineProps({
     width: { type: String, default: '30%' },
     height: { type: String, default: '40%' },
     /** CSS size class (dialog-xs ... dialog-xl, dialog-log, dialog-wide): a stable width, min(<class width>, 100vw - 2rem),
-     * not only a maximum (FR-XC-20); dialog-xl, dialog-log and dialog-wide read the width tokens of FR-XC-33. No inline size. */
+     * not only a maximum; dialog-xl, dialog-log and dialog-wide read the width tokens. No inline size. */
     sizeClass: { type: String, default: null },
     /** A button in the header makes the window fill the screen (and brings it back): the PrimeVue Dialog option, for a log or a chart */
     maximizable: { type: Boolean, default: false },

@@ -1,5 +1,5 @@
 /**
- * notify: the toast group (FR-XC-09) and the one action of a toast (FR-XC-23). The values are literal: what the
+ * notify: the toast group and the one action of a toast. The values are literal: what the
  * PrimeVue service must receive.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -19,7 +19,7 @@ afterEach(() => {
     setToastService(null);
 });
 
-describe('notify group (FR-XC-09)', () => {
+describe('notify group', () => {
     it('sends no group by default, and the group that a call names', () => {
         notify.info('Plain');
         notify.warn('No splat there', { summary: 'Splat', group: 'viewer' });
@@ -41,7 +41,7 @@ describe('notify group (FR-XC-09)', () => {
     });
 });
 
-describe('notify action (FR-XC-23)', () => {
+describe('notify action', () => {
     it('carries one action in the data of the toast, and stays long enough to reach it', () => {
         const run = vi.fn();
         notify.success('File moved successfully', { summary: 'Moved', action: { label: 'Undo', run } });

@@ -2,11 +2,11 @@
 /**
  * User-visible formatting: dates, durations, sizes, numbers, coordinates and
  * measures. Components format through this module only, so the app shows one format
- * per kind of value and a later i18n pass changes one file (FR-XC-08).
+ * per kind of value and a later i18n pass changes one file.
  *
- * Numbers and dates are written in the browser's locale (navigator.language, D-006): its
+ * Numbers and dates are written in the browser's locale (navigator.language): its
  * decimal sign and its group separator, through Intl. A quantity has its number of
- * decimals in PRECISION, and a typed number is read with parseNumber (D-025).
+ * decimals in PRECISION, and a typed number is read with parseNumber.
  *
  * A number put in a text field for the user to edit is written with formatInputNumber (the
  * locale's decimal sign, no group separators), never with formatNumber: parseNumber reads a
@@ -28,7 +28,7 @@ export const UNKNOWN = 'Unknown';
 export const EMPTY_CELL = '\u2013';
 
 /**
- * The locale numbers and dates are written and read in: the browser's (D-006); the runtime's
+ * The locale numbers and dates are written and read in: the browser's; the runtime's
  * default without a navigator.
  * @returns {string|undefined}
  */
@@ -263,7 +263,7 @@ const latinOf = c => {
 };
 
 /**
- * The number a user typed, by the rule of D-025: a lone "." or "," with no other separator is the
+ * The number a user typed, by this rule: a lone "." or "," with no other separator is the
  * decimal sign, so "12.5" and "12,5" are 12.5 in every locale; any other text is read with the
  * browser's locale first ("1.234,5" is 1234.5 in it, "1,234.5" in en, "12,34,567.5" in en-IN), then
  * with the other convention. Spaces and apostrophes (group separators in fr and de-CH) are ignored,
@@ -792,7 +792,7 @@ export const formatDensity = (tonnesPerCubicMeter, units, { placeholder } = {}) 
  * volume, material and density, built at render time from the stored metric properties, in the
  * units the user has now (or the pile's own `unitSystem` when none is given), so Convert and a
  * reload show yd³ and ST like the stockpile panel. It leaves the title out: where the label is
- * shown, the title is the name heading above it (FR-MAP-26).
+ * shown, the title is the name heading above it.
  * @param {{ netVolume?: unknown, materialName?: string, materialDensity?: unknown, unitSystem?: string }} [props]
  * @param {string} [unitPref]  'metric' or 'imperial'
  * @returns {string}
@@ -829,7 +829,7 @@ export function middleEllipsis(text, max) {
 }
 
 /**
- * The labels of a set of layer or file names that are told apart at a glance (FR-RAS-12): the start
+ * The labels of a set of layer or file names that are told apart at a glance: the start
  * that all the names share (up to its last separator) is dropped, so '..._08242018_16bit.tif' and
  * '..._08252018_16bit.tif' keep their dates, and a label that is still longer than `max` gets an
  * ellipsis in the middle (middleEllipsis), which keeps its end and its extension. A single name, or

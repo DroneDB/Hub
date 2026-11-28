@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The point-cloud-only tools of the viewer's toolbar (FR-VWR-26): the clip volume, the standard views and the colour
+ * The point-cloud-only tools of the viewer's toolbar: the clip volume, the standard views and the colour
  * of the points. Each one does what the icon of the Potree 1.8 menu does, through the viewer, so the menu (kept for the
  * advanced settings) and the toolbar stay in step. The vendored Potree is not changed.
  */

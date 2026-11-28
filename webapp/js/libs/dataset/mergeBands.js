@@ -1,8 +1,8 @@
 // @ts-check
 
 /**
- * What the Merge Multispectral dialog shows of the band files and of the check libddb ran on them
- * (FR-PRC-14): the file names shortened in the middle, so the suffix that tells the bands apart
+ * What the Merge Multispectral dialog shows of the band files and of the check libddb ran on them:
+ * the file names shortened in the middle, so the suffix that tells the bands apart
  * (`_1` ... `_5`, `_GRE`, `_NIR`) stays, and the warnings of the check, each said once.
  */
 
