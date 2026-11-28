@@ -147,6 +147,7 @@ import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
 import Keyboard from '@/libs/keyboard';
 import { isFullScreenCurrently, toggleFullScreen } from '@/libs/utils';
+import { fullscreenRoot } from '@/libs/views/viewerFullscreen';
 import { formatSpeed } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import SelectionControl from '@/libs/map/controls/selectionControl';
@@ -578,12 +579,7 @@ export default {
                     this.loadSplatFootprints();
                     this.updateVisibleBbox();
                 }),
-                this.map.on('contextmenu', e => {
-                    this.selectAt(e.pixel);
-                    e.stopPropagation();
-                    e.preventDefault();
-                    return false;
-                })
+                this.map.on('contextmenu', e => this.onContextMenu(e))
             ]);
             this.listeners.bus(emitter, 'addItems', () => this.reloadFileLayers());
 
@@ -790,6 +786,21 @@ export default {
             }
         },
 
+        // Right click. Finishing a drawing is the measure control's: the browser menu stays away and nothing is selected. The
+        // map viewer has no selection to toggle (the dataset map's file list), so there the browser keeps its own menu
+        onContextMenu: function (e) {
+            if (this.measuring) {
+                e.stopPropagation();
+                e.preventDefault();
+                return false;
+            }
+            if (this.standalone) return undefined;
+            this.selectAt(e.pixel);
+            e.stopPropagation();
+            e.preventDefault();
+            return false;
+        },
+
         // Ctrl+click / right click: toggle the selection of what is under the pointer
         selectAt: function (pixel) {
             const file = toggleSelectionAt(this.map, pixel, this.vectorLayers);
@@ -926,8 +937,9 @@ export default {
 
         toggleFullscreen: function () {
             const entering = !isFullScreenCurrently();
-            // The root by its ref: the comments before it make $el a text node in a development build
-            toggleFullScreen(this.$refs['map-root']);
+            // The page, not the map: the dialogs, toasts and lists of PrimeVue are outside the map and would not be drawn;
+            // the map fills the page in full screen (the style below)
+            toggleFullScreen(fullscreenRoot());
             if (entering) this.later(() => this.updateSize(), 500);
         },
 
@@ -966,6 +978,16 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
+}
+
+/* In full screen the page is the fullscreen element (libs/views/viewerFullscreen.js): the map fills it, over the Hub
+   header and under the overlays of PrimeVue (z-index 1000 and more) */
+html:fullscreen #map {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
+    z-index: 900;
 }
 
 .map-container {

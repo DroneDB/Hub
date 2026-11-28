@@ -70,6 +70,21 @@ describe('useViewerEntry from the route', () => {
         expect(session.rootEntry).toBeNull();
     });
 
+    it('sets neither the selection nor the title when the viewer was left while its file loaded', async () => {
+        let answer;
+        dataset.info.mockImplementation(() => new Promise(resolve => { answer = resolve; }));
+        let v;
+        const wrapper = mount(defineComponent({ setup() { v = useViewerEntry({ title: 'Map' }); return () => h('div'); } }));
+        await vi.waitFor(() => expect(dataset.info).toHaveBeenCalled());
+        wrapper.unmount();
+
+        answer(rootWith({ canRead: true }));
+        await v.entryLoaded;
+
+        expect(setSelectedFiles).not.toHaveBeenCalled();
+        expect(setTitle).not.toHaveBeenCalled();
+    });
+
     it('leaves a root entry of another page alone when the viewer goes', async () => {
         let v;
         const wrapper = mount(defineComponent({ setup() { v = useViewerEntry({ title: 'Map' }); return () => h('div'); } }));

@@ -5,13 +5,13 @@
  * `echo "x y z" | gdaltransform -s_srs EPSG:32618 -t_srs EPSG:4326` (GDAL 3.12), not computed by the code.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { exportMeasurements, importMeasurements } from './potreeMeasurementConverter';
+import { exportMeasurements, importMeasurements, measureValues, measurementFrame } from './potreeMeasurementConverter';
 import { VIEW, sectionOf, read } from './measurementFormat';
 import { loadPotree } from '@/libs/potree/potreeLibs.fixtures';
 import { UTM_18N_WKT, COPC_SCALE, COPC_OFFSET, CLOUD, cloudCoordinateSystem } from './measurementFormat.fixtures';
 import {
     WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, FOOT_WKT, US_FOOT_COMPOUND_WKT, METRE_US_FOOT_HEIGHT_WKT, METRE_US_FOOT_HEIGHT_WKT2,
-    US_FOOT_METRE_HEIGHT_WKT, EASE_GRID_WKT, EASE_GRID_WKT2
+    US_FOOT_METRE_HEIGHT_WKT, EASE_GRID_WKT, EASE_GRID_WKT2, US_FOOT_WKT
 } from './crs.fixtures';
 
 // 0.01 m is about 9e-8 degrees of latitude: 1e-7 degree is the tolerance
@@ -522,5 +522,64 @@ describe('the identity and the properties of a feature that the viewer does not 
         const rest = Object.fromEntries(Object.entries(m.properties).filter(([key]) => key !== 'createdAt'));
         const { again } = roundTrip({ ...exported(), features: [{ ...m, properties: rest }, exported().features[1]] });
         expect(again.features[0].properties.createdAt).toBeUndefined();
+    });
+});
+
+describe('measureValues: the values of a measure from its local coordinates, its type and the unit of the cloud', () => {
+    const METRES = measurementFrame(UTM_18N_WKT);
+    const FEET = measurementFrame(US_FOOT_WKT);
+    const SQUARE = [[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0]];
+
+    it('is the length along the points for a distance, with the unit of the cloud', () => {
+        expect(measureValues('distance', [[0, 0, 0], [3, 4, 0], [3, 4, 12]], METRES)).toEqual({ distance: 17, unit: 'm' });
+    });
+
+    it('is the highest less the lowest point for a height', () => {
+        expect(measureValues('height', [[0, 0, 2], [50, 50, 7.5]], METRES)).toEqual({ distance: 5.5, unit: 'm' });
+    });
+
+    it('is the area on the ground and the perimeter for an area, in the unit squared', () => {
+        expect(measureValues('area', SQUARE, METRES)).toEqual({ area: 100, perimeter: 40, unit: 'm²' });
+    });
+
+    it('is the circle through the first three points for a circle', () => {
+        const values = measureValues('circle', [[10, 0, 0], [0, 10, 0], [-10, 0, 0]], METRES);
+        expect(values.radius).toBe(10);
+        expect(values.circumference).toBeCloseTo(2 * Math.PI * 10, 9);
+        expect(values.area).toBeCloseTo(Math.PI * 100, 9);
+        expect(values.unit).toBe('m');
+    });
+
+    it('is the angle in degrees at the second point for an angle', () => {
+        expect(measureValues('angle', [[10, 0, 0], [0, 0, 0], [0, 10, 0]], METRES)).toEqual({ angle: 90, unit: 'degrees' });
+    });
+
+    it('has nothing for a point, an unknown type, or a circle or an angle with too few points', () => {
+        expect(measureValues('point', [[1, 2, 3]], METRES)).toEqual({});
+        expect(measureValues('annotation', [[1, 2, 3]], METRES)).toEqual({});
+        expect(measureValues('circle', [[0, 0, 0], [1, 0, 0]], METRES)).toEqual({});
+        expect(measureValues('angle', [[0, 0, 0], [1, 0, 0]], METRES)).toEqual({});
+    });
+
+    it('takes the unit of the cloud: a cloud in US survey feet has its lengths in them', () => {
+        expect(measureValues('distance', [[0, 0, 0], [30, 40, 0]], FEET)).toEqual({ distance: 50, unit: FEET.unit.code });
+        expect(measureValues('area', SQUARE, FEET).unit).toBe(`${FEET.unit.code}²`);
+    });
+
+    it('works in metres per axis when the heights are in another unit than x and y', () => {
+        const mixed = measurementFrame(METRE_US_FOOT_HEIGHT_WKT);
+        expect(mixed.unit.code).toBe('m');
+        // 10 US survey feet of height are 3.048 m
+        expect(measureValues('height', [[0, 0, 0], [0, 0, 10]], mixed)).toEqual({ distance: 3.05, unit: 'm' });
+    });
+
+    it('takes points as { x, y, z } too, as the points of a Potree measure are', () => {
+        expect(measureValues('distance', [{ x: 0, y: 0, z: 0 }, { x: 3, y: 4, z: 0 }], METRES)).toEqual({ distance: 5, unit: 'm' });
+    });
+
+    it('is what the export writes into a feature', () => {
+        const locals = [[1, 2, 3], [4, 6, 3]];
+        const doc = exportMeasurements(viewerWith([measure({}, locals)]), 'cloud.laz', coordinateSystem(UTM_18N_WKT));
+        expect(doc.features[0].properties).toMatchObject(measureValues('distance', locals, METRES));
     });
 });

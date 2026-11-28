@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { SIDECAR_VERSION, camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove } from './cameraPresets';
+import * as THREE from 'three';
+import { SIDECAR_VERSION, camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove, turnView, turnBetween } from './cameraPresets';
+import { upAxisQuaternion } from './upAxis';
 import { MAX_SAVED_ITEMS, MAX_SHAPE_POINTS } from './sceneData';
 
 describe('camera presets', () => {
@@ -180,5 +182,55 @@ describe('camera presets', () => {
         expect(activeAfterMove(1, 1, 2)).toBe(2);
         expect(activeAfterMove(2, 1, 2)).toBe(1);
         expect(activeAfterMove(0, 1, 2)).toBe(0);
+    });
+});
+
+describe('a saved view carried with a turn of the scene (another up axis)', () => {
+    const identity = [0, 0, 0, 1];
+    const near = (a, b) => a.forEach((v, i) => expect(v).toBeCloseTo(b[i], 9));
+
+    it('turns the position and the target and composes the orientation', () => {
+        const quarterTurnAboutZ = [0, 0, Math.SQRT1_2, Math.SQRT1_2];
+        const turned = turnView({ position: [1, 0, 0], target: [2, 0, 0], quaternion: identity, fov: 40 }, quarterTurnAboutZ);
+        near(turned.position, [0, 1, 0]);
+        near(turned.target, [0, 2, 0]);
+        near(turned.quaternion, quarterTurnAboutZ);
+        expect(turned.fov).toBe(40);
+    });
+
+    it('leaves the target out of a view that has none, and does not change the view it was given', () => {
+        const view = Object.freeze({ position: Object.freeze([1, 0, 0]), quaternion: Object.freeze(identity), target: null });
+        const turned = turnView(view, [0, 0, Math.SQRT1_2, Math.SQRT1_2]);
+        expect(turned.target).toBeNull();
+        expect(view.position).toEqual([1, 0, 0]);
+    });
+
+    it('is the identity for no turn', () => {
+        const view = { position: [1, 2, 3], target: [4, 5, 6], quaternion: [0.1, 0.2, 0.3, Math.sqrt(1 - 0.14)] };
+        const turned = turnView(view, identity);
+        near(turned.position, view.position);
+        near(turned.target, view.target);
+        near(turned.quaternion, view.quaternion);
+    });
+
+    it.each([['+y', '-z'], ['-y', '+x'], ['+z', '-y']])('shows the same part of the scene after the up axis goes from %s to %s', (from, to) => {
+        const before = upAxisQuaternion(from);
+        const after = upAxisQuaternion(to);
+        // A camera looking at a point of the file (in the frame of the file) from the side, in the world of `from`
+        const point = new THREE.Vector3(3, -1, 2);
+        const worldBefore = point.clone().applyQuaternion(new THREE.Quaternion(...before));
+        const view = { position: worldBefore.clone().add(new THREE.Vector3(5, 1, 4)).toArray(), quaternion: new THREE.Quaternion().setFromEuler(new THREE.Euler(0.3, -0.7, 0.1)).toArray(), target: worldBefore.toArray() };
+
+        const turned = turnView(view, turnBetween(before, after));
+
+        // Where the point is in the camera's own frame is the same before and after
+        const inCamera = (v, world) => world.clone().sub(new THREE.Vector3(...v.position)).applyQuaternion(new THREE.Quaternion(...v.quaternion).invert());
+        const worldAfter = point.clone().applyQuaternion(new THREE.Quaternion(...after));
+        near(inCamera(turned, worldAfter).toArray(), inCamera(view, worldBefore).toArray());
+        near(turned.target, worldAfter.toArray());
+    });
+
+    it('turnBetween of the same rotation is no turn', () => {
+        near(turnBetween(upAxisQuaternion('-z'), upAxisQuaternion('-z')), identity);
     });
 });

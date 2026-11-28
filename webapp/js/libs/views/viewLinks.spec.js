@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { b64encode, b64urlEncode } from '@/libs/base64';
+import { b64encode, b64decode, b64urlEncode } from '@/libs/base64';
+import { createAppRouter } from '@/router';
 import ddb from 'ddb';
 import { fileViewUrl, savedViewUrl, viewerUrl, absoluteUrl, openInNewTab, openInNewTabIfAllowed, notGeneratedAlternative, reportUrl, itemAnchor, itemOfAnchor, VIEWER_ONLY_HELP } from './viewLinks';
 
 const ds = { org: 'acme', ds: 'site' };
-const filePath = `/r/acme/site/view/${b64encode('flights/ortho.tif')}/map`;
+const filePath = `/r/acme/site/view/${encodeURIComponent(b64encode('flights/ortho.tif'))}/map`;
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -12,7 +13,7 @@ describe('fileViewUrl', () => {
     it('is the file route, with the path as standard base64', () => {
         expect(fileViewUrl(ds, 'flights/ortho.tif')).toBe(filePath);
         const nasty = 'ûÿ?>/ortho.tif';
-        expect(fileViewUrl(ds, nasty)).toBe(`/r/acme/site/view/${b64encode(nasty)}/map`);
+        expect(fileViewUrl(ds, nasty)).toBe(`/r/acme/site/view/${encodeURIComponent(b64encode(nasty))}/map`);
     });
 
     it('repeats add in order, base64url encoded, so a value sits in a query as it is', () => {
@@ -35,7 +36,7 @@ describe('fileViewUrl', () => {
 
     it('is absolute with a base URL, and encodes the organization and the dataset', () => {
         expect(fileViewUrl({ org: 'a b', ds: 'my/ds' }, 'x.tif', { baseUrl: 'https://hub.example.com' }))
-            .toBe(`https://hub.example.com/r/a%20b/my%2Fds/view/${b64encode('x.tif')}/map`);
+            .toBe(`https://hub.example.com/r/a%20b/my%2Fds/view/${encodeURIComponent(b64encode('x.tif'))}/map`);
     });
 });
 
@@ -54,9 +55,39 @@ describe('savedViewUrl', () => {
     });
 });
 
+// The names whose base64 holds a "/" (and "+", "="): the address must still be the route of the viewer
+describe('the address of a file whose base64 holds a slash', () => {
+    const NAMES = ['长城.tif', 'foto_ñandú.tif', 'rilievo/àrea.tif', 'Привет мир.laz', '>>>???.tif'];
+    const router = createAppRouter();
+
+    it('has the premise of the review: the base64 of these names holds "/" or "+"', () => {
+        expect(NAMES.filter(n => /[/+]/.test(b64encode(n)))).toEqual(expect.arrayContaining(['长城.tif', 'foto_ñandú.tif', 'rilievo/àrea.tif']));
+    });
+
+    it.each(NAMES)('%s: the map and the other viewers resolve to their route and give the path back', name => {
+        for (const url of [fileViewUrl(ds, name), viewerUrl({ baseUrl: '', org: 'acme', ds: 'site', path: name, view: 'pointcloud' })]) {
+            const route = router.resolve(url);
+            expect(route.name).not.toBe('NotFound');
+            expect(['MapViewer', 'PointCloud']).toContain(route.name);
+            expect(b64decode(String(route.params.encodedPath))).toBe(name);
+        }
+    });
+
+    it('keeps the query after the encoded segment', () => {
+        const route = router.resolve(fileViewUrl(ds, '长城.tif', { item: 'x', viewerOnly: true }));
+        expect(route.name).toBe('MapViewer');
+        expect(route.query).toEqual({ item: 'x', embed: '1' });
+    });
+
+    it('still opens an address with the bare base64 of an earlier link', () => {
+        const route = router.resolve(`/r/acme/site/view/${b64encode('a.tif')}/map`);
+        expect(route.name).toBe('MapViewer');
+    });
+});
+
 describe('viewerUrl', () => {
     const base = { baseUrl: 'https://hub.example.com', org: 'acme', ds: 'site', path: 'flights/ortho.tif', view: 'model' };
-    const prefix = `https://hub.example.com/r/acme/site/view/${b64encode('flights/ortho.tif')}/model`;
+    const prefix = `https://hub.example.com/r/acme/site/view/${encodeURIComponent(b64encode('flights/ortho.tif'))}/model`;
 
     it('is the plain viewer address, in the viewer of the route', () => {
         expect(viewerUrl(base)).toBe(prefix);
@@ -74,7 +105,7 @@ describe('notGeneratedAlternative', () => {
     const model = { path: 'parts/house.obj', type: ddb.entry.type.MODEL };
 
     it('offers the model viewer of a model, as Viewer only when asked', () => {
-        const to = `/r/o/d/view/${b64encode(model.path)}/model`;
+        const to = `/r/o/d/view/${encodeURIComponent(b64encode(model.path))}/model`;
         expect(notGeneratedAlternative(dataset, model)).toEqual({ label: 'Open in the model viewer', icon: 'fa-solid fa-cube', view: 'model', to });
         expect(notGeneratedAlternative(dataset, model, { viewerOnly: true }).to).toBe(`${to}?embed=1`);
     });
@@ -136,7 +167,7 @@ describe('the item of a viewer link', () => {
         expect(savedViewUrl(ds, 'v_aaaaaaaa', { item: 'a b&c' })).toBe('/r/acme/site/views/v_aaaaaaaa?item=a%20b%26c');
         expect(savedViewUrl(ds, 'v_aaaaaaaa', { item: 'x', viewerOnly: true })).toBe('/r/acme/site/views/v_aaaaaaaa?item=x&embed=1');
         expect(viewerUrl({ baseUrl: '', org: 'acme', ds: 'site', path: 'cloud.laz', view: 'pointcloud', item: 'x' }))
-            .toBe(`/r/acme/site/view/${b64encode('cloud.laz')}/pointcloud?item=x`);
+            .toBe(`/r/acme/site/view/${encodeURIComponent(b64encode('cloud.laz'))}/pointcloud?item=x`);
     });
 
     it('is left out when there is none', () => {

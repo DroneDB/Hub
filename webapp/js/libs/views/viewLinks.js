@@ -28,11 +28,18 @@ const itemQuery = item => (item ? [`item=${encodeURIComponent(item)}`] : []);
 /** @param {boolean} viewerOnly */
 const embedQuery = viewerOnly => (viewerOnly ? ['embed=1'] : []);
 
+/**
+ * The path segment of a file's viewer address: its path in base64, percent-encoded, because standard base64 holds `/`
+ * (and `+`, `=`), which a path segment cannot. The router decodes it back, so an address with the bare base64 still opens.
+ * @param {string} path  dataset-relative path of the file
+ */
+const encodedPathSegment = path => encodeURIComponent(b64encode(path));
+
 /** @param {{ org: string, ds: string }} dataset */
 const datasetRoot = ({ org, ds }) => `/r/${encodeURIComponent(org)}/${encodeURIComponent(ds)}`;
 
 /**
- * The map on a file. The path segment is the route's own encoding (base64); the `add` values are
+ * The map on a file. The path segment is the route's own encoding (base64, percent-encoded); the `add` values are
  * base64url, so they sit in a query as they are.
  * @param {{ org: string, ds: string }} dataset
  * @param {string} path  dataset-relative path of the base file
@@ -50,7 +57,7 @@ export function fileViewUrl(dataset, path, { add = [], pick = false, item, viewe
         ...itemQuery(item),
         ...embedQuery(viewerOnly)
     ];
-    return withQuery(`${baseUrl}${datasetRoot(dataset)}/view/${b64encode(path)}/map`, query);
+    return withQuery(`${baseUrl}${datasetRoot(dataset)}/view/${encodedPathSegment(path)}/map`, query);
 }
 
 /**
@@ -97,7 +104,7 @@ export function itemOfAnchor(hash) {
  * @param {boolean} [p.viewerOnly]  open without the Hub header and back button
  */
 export function viewerUrl({ baseUrl, org, ds, path, view, item, viewerOnly = false }) {
-    return withQuery(`${baseUrl}${datasetRoot({ org, ds })}/view/${b64encode(path)}/${view}`, [...itemQuery(item), ...embedQuery(viewerOnly)]);
+    return withQuery(`${baseUrl}${datasetRoot({ org, ds })}/view/${encodedPathSegment(path)}/${view}`, [...itemQuery(item), ...embedQuery(viewerOnly)]);
 }
 
 /**

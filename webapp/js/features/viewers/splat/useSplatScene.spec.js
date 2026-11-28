@@ -229,6 +229,8 @@ describe('saving', () => {
         });
 
         it('asks only once: after it was replaced the file is the editor\'s own', async () => {
+            // The file is what was written last, as in a dataset
+            dataset.writeObj.mockImplementation(async (_path, text) => { dataset.getFileContents.mockResolvedValue(text); });
             const cams = make();
             await cams.load();
             await cams.save();
@@ -397,5 +399,128 @@ describe('what only a writer changes', () => {
         expect(scene.dirty.value).toBe(true);
         await scene.save();
         expect(JSON.parse(dataset.writeObj.mock.calls[0][1]).measurements).toEqual([{ id: 1, kind: 'distance', points: [[0, 0, 0], [0, 0, 2]] }]);
+    });
+});
+
+describe('saving over a sidecar that another session changed since it was read', () => {
+    // The file is what is written to it, as in a dataset
+    const OTHER = JSON.stringify({ version: 1, orientation: { upAxis: '+z', tiltRoll: 0, tiltPitch: 0 }, cameras: [{ id: 9, name: 'Theirs', position: [0, 0, 1], quaternion: [0, 0, 0, 1], fov: 50, target: null }] });
+    beforeEach(() => {
+        dataset.writeObj.mockImplementation(async (_path, text) => { dataset.getFileContents.mockResolvedValue(text); });
+    });
+
+    it('asks before replacing it, and does not write when the user declines', async () => {
+        const cams = make();
+        await cams.load();
+        dataset.getFileContents.mockResolvedValue(OTHER);
+        cams.add();
+        confirm.mockResolvedValue(false);
+
+        expect(await cams.save()).toBe(false);
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(confirm.mock.calls[0][0].title).toBe('The saved views changed');
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+        expect(cams.dirty.value).toBe(true);
+    });
+
+    it('writes when the user agrees to replace it', async () => {
+        const cams = make();
+        await cams.load();
+        dataset.getFileContents.mockResolvedValue(OTHER);
+        cams.add();
+
+        expect(await cams.save()).toBe(true);
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(dataset.writeObj).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask when the file is as it was read, nor for the next save of this session', async () => {
+        const cams = make();
+        await cams.load();
+        cams.add();
+        expect(await cams.save()).toBe(true);
+        cams.add();
+        expect(await cams.save()).toBe(true);
+        expect(confirm).not.toHaveBeenCalled();
+        expect(dataset.writeObj).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks when a file was made meanwhile, for a splat that had none', async () => {
+        dataset.getFileContents.mockRejectedValue(new ApiError('Not found', 404));
+        const cams = make();
+        await cams.load();
+        dataset.getFileContents.mockResolvedValue(OTHER);
+        cams.add();
+        confirm.mockResolvedValue(false);
+
+        expect(await cams.save()).toBe(false);
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+    });
+
+    it('saves a first file with no question when there is still none', async () => {
+        dataset.getFileContents.mockRejectedValue(new ApiError('Not found', 404));
+        const cams = make();
+        await cams.load();
+        cams.add();
+
+        expect(await cams.save()).toBe(true);
+        expect(confirm).not.toHaveBeenCalled();
+    });
+
+    it('does not write when the file cannot be checked: the error is reported', async () => {
+        const cams = make();
+        await cams.load();
+        dataset.getFileContents.mockRejectedValue(new ApiError('Server error', 500));
+        cams.add();
+
+        expect(await cams.save()).toBe(false);
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+        expect(notify.error).toHaveBeenCalled();
+    });
+});
+
+describe('turning the saved views with the scene', () => {
+    const quarterTurnAboutZ = [0, 0, Math.SQRT1_2, Math.SQRT1_2];
+    const PINNED = JSON.stringify({
+        version: 2,
+        orientation: { upAxis: '+z', tiltRoll: 0, tiltPitch: 0 },
+        cameras: [{ id: 1, name: 'Front', position: [1, 0, 0], quaternion: [0, 0, 0, 1], fov: 50, target: [2, 0, 0] }],
+        annotations: [
+            { id: 'p1', title: 'Gate', text: '', link: '', image: '', position: [5, 5, 5], view: { position: [0, 1, 0], quaternion: [0, 0, 0, 1], fov: 60, target: [0, 2, 0] } },
+            { id: 'p2', title: 'No view', text: '', link: '', image: '', position: [1, 1, 1] }
+        ]
+    });
+
+    it('carries the cameras and the views of the pins, and leaves the pins and a pin without a view as they are', async () => {
+        dataset.getFileContents.mockResolvedValue(PINNED);
+        const scene = make();
+        await scene.load();
+
+        scene.turnViews(quarterTurnAboutZ);
+
+        expect(scene.cameras.value[0].position[0]).toBeCloseTo(0, 9);
+        expect(scene.cameras.value[0].position[1]).toBeCloseTo(1, 9);
+        expect(scene.cameras.value[0].target[1]).toBeCloseTo(2, 9);
+        expect(scene.cameras.value[0].name).toBe('Front');
+        const [gate, plain] = scene.annotations.value;
+        expect(gate.view.position[0]).toBeCloseTo(-1, 9);
+        expect(gate.view.position[1]).toBeCloseTo(0, 9);
+        expect(gate.position).toEqual([5, 5, 5]);
+        expect(plain.view).toBeNull();
+        expect(scene.dirty.value).toBe(true);
+    });
+
+    it('is what a save writes', async () => {
+        dataset.getFileContents.mockResolvedValue(PINNED);
+        dataset.writeObj.mockImplementation(async (_path, text) => { dataset.getFileContents.mockResolvedValue(text); });
+        const scene = make();
+        await scene.load();
+        scene.turnViews(quarterTurnAboutZ);
+        await scene.save();
+
+        const saved = JSON.parse(dataset.writeObj.mock.calls[0][1]);
+        expect(saved.cameras[0].position[1]).toBeCloseTo(1, 9);
+        expect(saved.cameras[0].quaternion[2]).toBeCloseTo(Math.SQRT1_2, 9);
     });
 });

@@ -69,14 +69,16 @@ import { loadResources } from '@/libs/lazy';
 import { isMobile, deviceMemoryGb } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
-import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
+import { POTREE_RESOURCES, versioned, potreeVersion, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { labelPotreeControls } from '@/libs/potree/potreeControls';
 import { attachPotreeScale } from '@/libs/potree/potreeScale';
 import { PotreeMeasureGestures } from '@/libs/potree/measureGestures';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 import { cloudUnitsOf, LINEAR_UNITS } from '@/libs/map/crsProjection';
 import { labelCircleRadii } from '@/libs/potree/circleRadiusLabel';
+import { refuseUnsupportedDrops } from '@/libs/potree/unsupportedDrops';
 import { notify } from '@/libs/notify';
+import { escapeHtml } from '@/libs/sanitize';
 import { useRoute } from 'vue-router';
 import { replaceQueryKeys } from '@/libs/routeQuery';
 import { ITEM_GONE, itemFromQuery } from '@/libs/views/itemQuery';
@@ -109,8 +111,13 @@ const loaded = ref(false);
 const sidebarOpen = ref(false);
 // The viewer once its point cloud is loaded: the clip volume and the display bar (views, colours, unit) need it
 const toolsViewer = shallowRef(null);
+// A read of the cloud that the server refused for good (a 401 or a 404) is not asked for again: the part of the cloud it held
+// does not come, and the user is told once what to do
+const onReadRefused = error => notify.error(
+    `Part of the point cloud cannot be read: the server answered ${error.status}. Reload the page, and sign in again if it asks.`,
+    { summary: 'Point cloud', life: 'long' });
 // Owns the viewer and everything it creates (released on leave)
-let session = new PotreeSession();
+let session = new PotreeSession({ onReadRefused });
 let viewer = null;
 // Stops following the ratio of the screen (potreeScale)
 let stopScale = () => {};
@@ -189,7 +196,8 @@ async function addPointCloud(ddbEntry) {
         throw new Error(`${ddbEntry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`, { cause: e });
     }
     return new Promise((resolve, reject) => {
-        Potree.loadPointCloud(copcUrl, ddb.pathutils.basename(ddbEntry.path), e => {
+        // The name is the text of a node of the scene tree of Potree, which parses it as HTML: a file named like markup is shown as that text
+        Potree.loadPointCloud(copcUrl, escapeHtml(ddb.pathutils.basename(ddbEntry.path)), e => {
             if (unmounted) {
                 resolve();
                 return;
@@ -222,7 +230,7 @@ async function loadViewer() {
     // A previous viewer of this component is released completely first
     stopScale();
     session.dispose();
-    session = new PotreeSession();
+    session = new PotreeSession({ onReadRefused });
     toolsViewer.value = null;
     cloudUnits = cloudUnitsOf(null);
     mixedUnits.value = false;
@@ -247,8 +255,15 @@ async function loadViewer() {
     viewer.useHQ = !isMobile();
     applyUnits();
 
+    // A GeoPackage dropped on the page is refused: Potree would request libraries that the Hub does not ship
+    refuseUnsupportedDrops(session, names => notify.warn(
+        `${names.join(', ')} cannot be shown in the point cloud viewer. Open a GeoPackage in the map viewer.`, { summary: 'File not shown' }));
+
+    // The GUI loads in two requests: when the viewer was left before they came, there is nothing to set up (the session
+    // removes what the GUI still adds)
     viewer.loadGUI(() => {
-        viewer.setLanguage('en');
+        if (unmounted || viewer !== potree) return;
+        potree.setLanguage('en');
         $('#menu_tools').next().show();
         labelPotreeControls(container.value, session);
         m.onGuiLoaded($);
@@ -285,7 +300,7 @@ onMounted(async () => {
     loading.value = true;
     try {
         // One request wave: the files download in parallel, the scripts run in order
-        await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
+        await loadResources(versioned(POTREE_RESOURCES, potreeVersion(HUB_VERSION)));
         if (unmounted) return;
         fixPotreePaths(window.Potree, window.location.origin);
         labelCircleRadii(window.Potree);

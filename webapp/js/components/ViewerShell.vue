@@ -153,6 +153,8 @@ import { LoadErrorKind, loadErrorKind, datasetBusyOf } from '@/libs/ddb/apiError
 import keyboard from '@/libs/keyboard';
 import { supportsFullScreen } from '@/libs/utils';
 import { useFullscreen } from '@/composables/useFullscreen';
+import { fullscreenRoot } from '@/libs/views/viewerFullscreen';
+import { inModalDialog } from '@/libs/views/modalFocus';
 
 const error = defineModel('error', { type: String, default: '' });
 const settingsOpen = defineModel('settingsOpen', { type: Boolean, default: false });
@@ -262,17 +264,13 @@ function goHome() {
 }
 
 function toggleFullscreen() {
-    toggleFullScreenOf(shellEl.value ?? undefined);
+    // The page, not the shell: the dialogs, toasts and lists of PrimeVue are outside the shell, and would not be drawn (viewerFullscreen)
+    toggleFullScreenOf(fullscreenRoot());
 }
 
 /** Typing in a field: the keys belong to it (a slider's Home goes to its start) */
 function isTyping(target) {
     return target instanceof Element && (!!target.closest('input, textarea, select, [role="combobox"]') || target.isContentEditable);
-}
-
-/** A modal dialog has the focus: the keys belong to it (a non-modal Window of the viewers is a PrimeVue dialog too) */
-function inDialog(target) {
-    return target instanceof Element && !!target.closest('[role="dialog"][aria-modal="true"], .p-dialog');
 }
 
 /** The viewer leaves the key F to the shell: it has no `fullscreen-key`, or that does not return false */
@@ -287,7 +285,7 @@ function onNavKey(e) {
         e.preventDefault();
         goHome();
     } else if (canFullscreen && FULLSCREEN_KEYS.includes(e.key) && ((props.navToolbar && props.ready) || props.fullscreenButton)
-        && !e.defaultPrevented && !inDialog(e.target) && fullscreenKeyFree(e)) {
+        && !e.defaultPrevented && !inModalDialog(e.target) && fullscreenKeyFree(e)) {
         e.preventDefault();
         // A held key repeats: one toggle per press
         if (!e.repeat) toggleFullscreen();
@@ -360,6 +358,16 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
 
 .viewer-shell.dark {
     background: var(--ddb-viewer-bg);
+}
+
+/* In full screen the page is the fullscreen element (libs/views/viewerFullscreen.js): the shell fills it, over the Hub
+   header and under the overlays of PrimeVue (z-index 1000 and more), which are in the page too */
+html:fullscreen .viewer-shell {
+    position: fixed;
+    inset: 0;
+    width: auto;
+    height: auto;
+    z-index: 900;
 }
 
 .viewer-bar {

@@ -43,9 +43,12 @@ describe('HubMessage.vue', () => {
         expect(wrapper.text()).toBe('');
     });
 
-    it('sanitises the text', async () => {
+    it('shows markup in the text as text, and sanitises it when the host asks for markup', async () => {
         const Message = (await import('@/components/HubMessage.vue')).default;
         const wrapper = mount(Message, { props: { modelValue: '<img src=x onerror="alert(1)">Bad' }, global: { plugins: [PrimeVue] } });
+        expect(wrapper.find('img').exists()).toBe(false);
+        expect(wrapper.text()).toContain('<img src=x onerror="alert(1)">Bad');
+        await wrapper.setProps({ html: true });
         expect(wrapper.html()).not.toContain('onerror');
     });
 });

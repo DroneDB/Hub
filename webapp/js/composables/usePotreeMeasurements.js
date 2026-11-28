@@ -22,13 +22,14 @@ import { unstatedMeasurementCrs } from '@/libs/build/pointCloudCrs';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
 import { snapshotMeasure, restoreMeasure, matchesSnapshot } from '@/libs/potree/measureSnapshot';
-import { measureAt, annotationElement, updateItemLabel, updateAnnotationTooltip, hideTooltips } from '@/libs/potree/measureLabels';
+import { measureAt, annotationElement, updateItemLabel, removeItemLabel, updateAnnotationTooltip, hideTooltips } from '@/libs/potree/measureLabels';
 import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { focusItem as focusViewerItem } from '@/libs/potree/itemFocus';
 import { captureForReport } from '@/libs/potree/captureForReport';
 import { flash } from '@/composables/useMapAlerts';
 import { notify } from '@/libs/notify';
 import { textToHtml } from '@/libs/sanitize';
+import { inModalDialog } from '@/libs/views/modalFocus';
 import { useTimerGroup } from '@/composables/useTimers';
 
 const isTyping = t => t instanceof Element && (t.closest('input, textarea, select') || t.isContentEditable);
@@ -146,6 +147,9 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             run: () => captureForReport({ viewer, item: target, dataset: dataset.value, measurementPath: storageFor().measurementPath })
         };
     }
+
+    // A modal dialog of the viewer is open (its properties, Delete saved), or the key comes from one
+    const behindModal = target => !!dialog || deleteDialogOpen.value || inModalDialog(target);
 
     function openDialog(component, props) {
         if (dialog) dialog.close();
@@ -333,6 +337,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         session.track(scene, 'measurement_removed', e => {
             countMeasurements();
             recordRemoved(e && e.measurement);
+            // A measure that is gone has no label to follow the camera, nor a tooltip in the page
+            if (e && e.measurement) removeItemLabel(e.measurement, labelCtx());
         });
         session.track(scene.annotations, 'annotation_added', e => {
             countMeasurements();
@@ -355,10 +361,11 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             editMeasure(measure);
         }, true);
 
+        // Ctrl+Z undoes, Ctrl+Shift+Z and Ctrl+Y redo (Cmd for the Mac); what is behind a modal dialog is not touched
         session.track(document, 'keydown', event => {
-            if (!(event.ctrlKey || event.metaKey) || isTyping(event.target)) return;
+            if (!(event.ctrlKey || event.metaKey) || isTyping(event.target) || behindModal(event.target)) return;
             const key = event.key.toLowerCase();
-            if (key === 'z') { event.preventDefault(); undo(); }
+            if (key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
             else if (key === 'y') { event.preventDefault(); redo(); }
         });
 
@@ -378,8 +385,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     let loadErrorText = '';
 
     async function load() {
+        // The viewer can be left (or replaced) while the file is read: what the file brings is for the viewer that asked
+        const forViewer = viewer;
+        const gone = () => !alive || viewer !== forViewer;
         try {
             const geojson = await storageFor().load();
+            if (gone()) return;
             storageFor().annotationSchema().then(schema => {
                 annotationSchema = schema;
                 // The labels drawn before the schema came show its names and colours now
@@ -406,6 +417,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
             if (count) flash(`${count} measurement${count > 1 ? 's' : ''} loaded`);
         } catch (e) {
             console.error('Error loading measurements:', e);
+            if (gone()) return;
             loadErrorText = `Could not load measurements: ${e.message}`;
             error.value = loadErrorText;
         }

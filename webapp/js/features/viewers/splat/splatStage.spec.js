@@ -43,7 +43,15 @@ class FakeSplatMesh extends THREE_BUILD.Object3D {
 
 /** Spark's paged splats: what they were made with. */
 class FakePagedSplats {
-    constructor(options) { this.options = options; }
+    constructor(options) {
+        this.options = options;
+        // The read of the header of the file: it is there, unless the spec holds it and ends it (`FakePagedSplats.held`)
+        this.header = FakePagedSplats.held
+            ? new Promise((resolve, reject) => { this.headerRead = () => resolve({ meta: {} }); this.headerFailed = reject; })
+            : Promise.resolve({ meta: {} });
+        FakePagedSplats.last = this;
+    }
+    getRadMeta() { return this.header; }
 }
 const SplatFileType = { RAD: 'rad' };
 
@@ -439,7 +447,7 @@ describe('dispose', () => {
 });
 
 describe('reading a paged file', () => {
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => { vi.unstubAllGlobals(); FakePagedSplats.held = false; });
 
     it('streams a paged .rad through the Hub range transport, past the HTTP cache', async () => {
         const fetch = vi.fn(async () => new Response(new Uint8Array([1, 2, 3, 4]), {
@@ -458,6 +466,40 @@ describe('reading a paged file', () => {
         expect([...bytes]).toEqual([1, 2, 3, 4]);
         expect(fetch).toHaveBeenCalledWith('/build/h@v/splat/scene.rad',
             expect.objectContaining({ cache: 'no-store', headers: { Range: 'bytes=0-3' } }));
+    });
+
+    it('fails when the header of a paged file cannot be read, though Spark says the mesh is initialized', async () => {
+        FakePagedSplats.held = true;
+        makeStage();
+        const loading = stage.loadMesh({ url: '/build/h@v/splat/scene.rad', paged: true });
+        FakeSplatMesh.last.finish();
+        FakePagedSplats.last.headerFailed(new Error('answered 404'));
+        await expect(loading).rejects.toThrow('answered 404');
+    });
+
+    it('is loaded once the header of a paged file is read, and not before', async () => {
+        FakePagedSplats.held = true;
+        makeStage();
+        const settled = vi.fn();
+        const loading = stage.loadMesh({ url: '/build/h@v/splat/scene.rad', paged: true }).then(settled);
+        FakeSplatMesh.last.finish();
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(settled).not.toHaveBeenCalled();
+
+        FakePagedSplats.last.headerRead();
+        await loading;
+        expect(settled).toHaveBeenCalledWith(FakeSplatMesh.last);
+    });
+
+    it('ends with nothing when the stage is disposed while the header is read, even if that read fails then', async () => {
+        FakePagedSplats.held = true;
+        makeStage();
+        const loading = stage.loadMesh({ url: '/build/h@v/splat/scene.rad', paged: true });
+        FakeSplatMesh.last.finish();
+        stage.dispose();
+        FakePagedSplats.last.headerFailed(new DOMException('Aborted', 'AbortError'));
+        expect(await loading).toBeNull();
     });
 
     it('leaves a whole file to Spark', () => {

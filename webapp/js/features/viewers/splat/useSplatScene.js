@@ -22,11 +22,13 @@
  * for the session (it is neither kept nor saved).
  *
  * A sidecar that cannot be read is not the same as none: it is reported, and saving, which would
- * replace it, asks first.
+ * replace it, asks first. So does a sidecar that another session changed (or made) since this one read it: the file is
+ * written whole, so saving would silently drop what that session saved. The text read at load (and the text last
+ * written) is what the file must still be when it is saved.
  */
 import { ref, shallowRef } from 'vue';
 import { isListed } from '@/libs/optionalFile';
-import { camerasPathFor, parseCamerasFile, serializeCamerasFile, viewFromRig, cameraFromRig } from './cameraPresets';
+import { camerasPathFor, parseCamerasFile, serializeCamerasFile, viewFromRig, cameraFromRig, turnView } from './cameraPresets';
 import { editableList } from './editableList';
 import { newId } from './sceneData';
 import { isNotFound } from '@/libs/ddb/apiError';
@@ -54,6 +56,9 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
     // The sidecar exists but could not be read: saving replaces it
     const unreadable = ref(false);
     let path = '';
+    // What the sidecar held when this session last read or wrote it (null: no file). Saving checks the file is still that
+    /** @type {string | null} */
+    let knownText = null;
 
     const markDirty = () => { dirty.value = true; };
     const cameraList = editableList(cameras, { nameKey: 'name', markDirty });
@@ -92,6 +97,7 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
             else markUnreadable(e);
             return;
         }
+        knownText = text;
         try {
             const parsed = parseCamerasFile(text);
             cameras.value = parsed.cameras;
@@ -121,6 +127,17 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
         Object.assign(c, viewFromRig(getRig()));
         markDirty();
         cameraList.active.value = index;
+    }
+
+    /**
+     * The scene turned (another up axis): every saved view, the cameras and the views of the pins, turns with it, so it
+     * shows what it showed. The pins themselves are in the frame of the file and turn with the scene.
+     * @param {number[]} turn  [x, y, z, w], from cameraPresets.turnBetween
+     */
+    function turnViews(turn) {
+        cameras.value = cameras.value.map(c => turnView(c, turn));
+        annotations.value = annotations.value.map(a => (a.view ? { ...a, view: turnView(a.view, turn) } : a));
+        markDirty();
     }
 
     // ---- Pins -----------------------------------------------------------------------------
@@ -173,6 +190,27 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
 
     // ---- Saving ---------------------------------------------------------------------------
 
+    /**
+     * The sidecar as it is now, for the check before a save: its text, or null when there is no file. Read without the
+     * folder listing, which may be older than a save of another session.
+     * @returns {Promise<string | null>}
+     */
+    async function currentText() {
+        try {
+            return await dataset.value.getFileContents(path);
+        } catch (e) {
+            if (isNotFound(e)) return null;
+            throw e;
+        }
+    }
+
+    /** Whether the file was changed by another session since this one read or wrote it. @returns {Promise<boolean>} */
+    async function changedElsewhere() {
+        // An unreadable file is replaced on the user's word (asked above); there is nothing known to compare with
+        if (unreadable.value) return false;
+        return (await currentText()) !== knownText;
+    }
+
     /** Writes the sidecar. Every failure is a notification (the page keeps working). @returns {Promise<boolean>} whether it was written */
     async function save() {
         if (!canWrite.value) {
@@ -190,11 +228,21 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
         }
         const upAxis = /** @type {string} */ (orientation.upAxis.value);
         try {
-            await dataset.value.writeObj(path, serializeCamerasFile(cameras.value, {
+            if (await changedElsewhere()) {
+                const replace = await confirm({
+                    title: 'The saved views changed',
+                    message: 'Another session saved the views of this splat (camera views, pins and measurements) since you opened them. Saving replaces its changes with what is shown now.',
+                    confirmText: 'Replace',
+                    danger: true
+                });
+                if (!replace) return false;
+            }
+            const text = serializeCamerasFile(cameras.value, {
                 upAxis, up: orientation.autoUp?.value?.up ?? null, tiltRoll: orientation.tiltRoll.value, tiltPitch: orientation.tiltPitch.value
-            }, { scale: scale.value, annotations: annotations.value, measurements: measurements.value }),
+            }, { scale: scale.value, annotations: annotations.value, measurements: measurements.value });
             // Its own views file, or one the user agreed to replace above
-            { overwrite: true });
+            await dataset.value.writeObj(path, text, { overwrite: true });
+            knownText = text;
         } catch (e) {
             notify.error(`Failed to save the views: ${e instanceof Error ? e.message : e}`, { summary: 'Saved views' });
             return false;
@@ -207,7 +255,7 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
 
     return {
         cameras, activeIndex: cameraList.active, dirty, unreadable, savedUp,
-        load, add, update, remove: cameraList.remove, move: cameraList.move, rename: cameraList.rename,
+        load, add, update, turnViews, remove: cameraList.remove, move: cameraList.move, rename: cameraList.rename,
         annotations, activePin: pinList.active, addPin, editPin, updatePinView,
         removePin: forWriters(pinList.remove), movePin: forWriters(pinList.move), renamePin: forWriters(pinList.rename),
         scale, setScale, measurements, setMeasurements,

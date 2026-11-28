@@ -15,34 +15,41 @@ const flash = vi.fn();
 vi.mock('@/composables/useMapAlerts', () => ({ flash: (...args) => flash(...args) }));
 // The labels need Potree's sprites and a camera: what matters here is that a measure gets its label
 const labels = vi.hoisted(() => ({ measureAt: null }));
+// Some specs read the file with the real importer: the measures it makes are the ones that Potree's own class makes
+const real = vi.hoisted(() => ({ import: false }));
 vi.mock('@/libs/potree/measureLabels', () => ({
     measureAt: vi.fn((...args) => (labels.measureAt ? labels.measureAt(...args) : null)),
     annotationElement: () => null,
     updateItemLabel: vi.fn(),
+    removeItemLabel: vi.fn(),
     updateAnnotationTooltip: vi.fn(),
     hideTooltips: vi.fn()
 }));
 // The viewer's measures are plain objects here: the converter writes and reads them as features
-vi.mock('@/libs/map/potreeMeasurementConverter', async importOriginal => ({
-    // The property bag helpers are the real ones: a measure made in the viewer gets its id and ref
-    ...(await importOriginal()),
-    exportMeasurements: viewer => ({
-        type: 'FeatureCollection',
-        metadata: {},
-        features: viewer.scene.measurements.map(m => ({ type: 'Feature', geometry: null,
-            properties: { name: m.name, measurementType: 'distance', localCoordinates: [[0, 0, 0]], ...(m.ddbProperties ? { id: m.ddbProperties.id, ref: m.ddbProperties.ref } : {}) } }))
-    }),
-    // A feature marked `unplaced` stands for one in a CRS that cannot be converted to the cloud's: it is left out
-    importMeasurements: (geojson, viewer) => {
-        const placed = geojson.features.filter(f => !f.properties.unplaced);
-        const imported = placed.map(f => {
-            const measure = { name: f.properties.name, points: [{ position: { x: 0, y: 0, z: 0 } }] };
-            viewer.scene.addMeasurement(measure);
-            return measure;
-        });
-        return { imported, unplaced: geojson.features.length - placed.length };
-    }
-}));
+vi.mock('@/libs/map/potreeMeasurementConverter', async importOriginal => {
+    const original = await importOriginal();
+    return {
+        // The property bag helpers are the real ones: a measure made in the viewer gets its id and ref
+        ...original,
+        exportMeasurements: viewer => ({
+            type: 'FeatureCollection',
+            metadata: {},
+            features: viewer.scene.measurements.map(m => ({ type: 'Feature', geometry: null,
+                properties: { name: m.name, measurementType: 'distance', localCoordinates: [[0, 0, 0]], ...(m.ddbProperties ? { id: m.ddbProperties.id, ref: m.ddbProperties.ref } : {}) } }))
+        }),
+        // A feature marked `unplaced` stands for one in a CRS that cannot be converted to the cloud's: it is left out
+        importMeasurements: (geojson, viewer, coordinateSystem) => {
+            if (real.import) return original.importMeasurements(geojson, viewer, coordinateSystem);
+            const placed = geojson.features.filter(f => !f.properties.unplaced);
+            const imported = placed.map(f => {
+                const measure = { name: f.properties.name, points: [{ position: { x: 0, y: 0, z: 0 } }] };
+                viewer.scene.addMeasurement(measure);
+                return measure;
+            });
+            return { imported, unplaced: geojson.features.length - placed.length };
+        }
+    };
+});
 
 // The organization's schema comes from the Registry: the default one here
 vi.mock('@/libs/reports/reportSettings', async importOriginal => {
@@ -51,7 +58,7 @@ vi.mock('@/libs/reports/reportSettings', async importOriginal => {
 });
 
 const { usePotreeMeasurements } = await import('./usePotreeMeasurements');
-const { updateItemLabel, hideTooltips } = await import('@/libs/potree/measureLabels');
+const { updateItemLabel, removeItemLabel, hideTooltips } = await import('@/libs/potree/measureLabels');
 
 // Minimal stand-ins for the THREE / Potree globals the viewer loads: a restored measure is a new
 // Potree.Measure, with Potree's defaults (maxMarkers has no limit)
@@ -136,6 +143,7 @@ beforeEach(() => {
     flash.mockClear();
     updateItemLabel.mockClear();
     labels.measureAt = null;
+    real.import = false;
     stored = { [PATH]: JSON.stringify({ type: 'FeatureCollection', features: [mapFeature('m1'), viewerFeature('v1')] }) };
     dataset = {
         getFileContents: vi.fn(async path => {
@@ -341,6 +349,52 @@ describe('usePotreeMeasurements', () => {
         vi.restoreAllMocks();
     });
 
+    describe('a viewer that is left while the file is read', () => {
+        it('gets nothing: no measure imported into it, no toast, no label, no flash', async () => {
+            real.import = true;
+            stored[PATH] = JSON.stringify({ type: 'FeatureCollection', features: [
+                { type: 'Feature', geometry: null, properties: { name: 'Pole', measurementType: 'point', localCoordinates: [[3, 4, 5]] } }
+            ] });
+            const warn = vi.spyOn(notify, 'warn');
+            const scope = effectScope();
+            let m;
+            scope.run(() => { m = start(); });
+            let release;
+            const gate = new Promise(resolve => { release = resolve; });
+            const read = dataset.getFileContents.getMockImplementation();
+            dataset.getFileContents.mockImplementation(async path => { await gate; return read(path); });
+            const loading = m.load();
+            scope.stop();
+            release();
+            await loading;
+
+            expect(viewer.scene.measurements).toEqual([]);
+            expect(m.hasSavedMeasurements.value).toBe(false);
+            expect(flash).not.toHaveBeenCalled();
+            expect(warn).not.toHaveBeenCalled();
+            expect(updateItemLabel).not.toHaveBeenCalled();
+            vi.restoreAllMocks();
+        });
+
+        it('shows no failure to read either', async () => {
+            const error = ref('');
+            const scope = effectScope();
+            let m;
+            scope.run(() => { m = start(error); });
+            let fail;
+            dataset.getFileContents.mockImplementation(() => new Promise((_, reject) => { fail = reject; }));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+            const loading = m.load();
+            await vi.waitFor(() => expect(fail).toBeTypeOf('function'));
+            scope.stop();
+            fail(new Error('boom'));
+            await loading;
+
+            expect(error.value).toBe('');
+            vi.restoreAllMocks();
+        });
+    });
+
     describe('undo and redo', () => {
         const pointsOf = (...xs) => xs.map(x => ({ position: { x, y: 0, z: 0 } }));
         // Potree adds the measure when the drawing starts, with one marker; the user clicks the others afterwards
@@ -501,7 +555,10 @@ describe('usePotreeMeasurements', () => {
         const editWith = (measure, properties) => {
             labels.measureAt = () => measure;
             doubleClick();
-            dialogs.open.mock.calls.at(-1)[1].onSave(properties);
+            const { onSave, onClose } = dialogs.open.mock.calls.at(-1)[1];
+            onSave(properties);
+            // The dialog closes itself once it has saved
+            onClose();
         };
         const style = { name: 'Fence', description: 'North side', stroke: '#00ff00', 'stroke-width': 4, 'stroke-opacity': 0.5, fill: '#0000ff', 'fill-opacity': 0.6 };
         const expectStyled = measure => {
@@ -559,6 +616,110 @@ describe('usePotreeMeasurements', () => {
             expect(viewer.scene.measurements).toEqual([]);
             m.undo();
             expect(viewer.scene.measurements.map(x => x.points.map(p => p.position.x))).toEqual([[7]]);
+        });
+
+        it('a point that came from the saved file, once deleted, can be undone: it is a finished measure, not a drawing Potree takes back', async () => {
+            real.import = true;
+            stored[PATH] = JSON.stringify({ type: 'FeatureCollection', features: [
+                { type: 'Feature', geometry: null, properties: { name: 'Pole', measurementType: 'point', localCoordinates: [[3, 4, 5]] } },
+                { type: 'Feature', geometry: null, properties: { name: 'Fence', measurementType: 'height', localCoordinates: [[0, 0, 0], [0, 0, 9]] } }
+            ] });
+            const m = start();
+            await m.load();
+            const [pole, fence] = viewer.scene.measurements;
+            expect([pole.name, pole.maxMarkers, fence.maxMarkers]).toEqual(['Pole', 1, 2]);
+            expect(m.canUndo.value).toBe(false);
+
+            viewer.scene.removeMeasurement(pole);
+            viewer.scene.removeMeasurement(fence);
+            expect(m.canUndo.value).toBe(true);
+            m.undo();
+            m.undo();
+
+            expect(viewer.scene.measurements.map(x => x.name).sort()).toEqual(['Fence', 'Pole']);
+        });
+
+        it('a distance and an area that came from the file keep no limit of markers', async () => {
+            real.import = true;
+            stored[PATH] = JSON.stringify({ type: 'FeatureCollection', features: [
+                { type: 'Feature', geometry: null, properties: { name: 'Run', measurementType: 'distance', localCoordinates: [[0, 0, 0], [1, 0, 0]] } }
+            ] });
+            const m = start();
+            await m.load();
+            expect(viewer.scene.measurements[0].maxMarkers).toBe(Number.MAX_SAFE_INTEGER);
+        });
+
+        describe('Ctrl+Shift+Z and the dialogs', () => {
+            const drawn = () => {
+                const measure = startDrawing('d1');
+                finishDrawing(measure, 5);
+                return measure;
+            };
+
+            it('Ctrl+Shift+Z, and Cmd+Shift+Z, redo what Ctrl+Z undid, and do not undo again', () => {
+                const m = start();
+                drawn();
+                keydown('z');
+                expect(viewer.scene.measurements).toHaveLength(0);
+
+                const event = keydown('Z', { shiftKey: true });
+                expect(event.defaultPrevented).toBe(true);
+                expect(viewer.scene.measurements).toHaveLength(1);
+                expect(m.canUndo.value).toBe(true);
+
+                keydown('z');
+                expect(viewer.scene.measurements).toHaveLength(0);
+                keydown('z', { ctrlKey: false, metaKey: true, shiftKey: true });
+                expect(viewer.scene.measurements).toHaveLength(1);
+            });
+
+            it('Ctrl+Z and Ctrl+Y do nothing while the properties dialog of a measure is open', () => {
+                const m = start();
+                const measure = drawn();
+                labels.measureAt = () => measure;
+                doubleClick();
+                expect(dialogs.open).toHaveBeenCalledTimes(1);
+
+                keydown('z');
+                expect(viewer.scene.measurements).toHaveLength(1);
+                expect(m.canUndo.value).toBe(true);
+                // Closed, the keys are the viewer's again
+                dialogs.open.mock.calls[0][1].onClose();
+                keydown('z');
+                expect(viewer.scene.measurements).toHaveLength(0);
+            });
+
+            it('Ctrl+Z does nothing while the Delete saved question is open, nor when the key comes from inside a dialog', () => {
+                const m = start();
+                drawn();
+                m.requestDelete();
+                keydown('z');
+                expect(viewer.scene.measurements).toHaveLength(1);
+                m.deleteDialogOpen.value = false;
+
+                const dialog = document.createElement('div');
+                dialog.setAttribute('role', 'dialog');
+                dialog.setAttribute('aria-modal', 'true');
+                const button = dialog.appendChild(document.createElement('button'));
+                document.body.appendChild(dialog);
+                const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+                Object.defineProperty(event, 'target', { value: button });
+                listeners.get('other:keydown')(event);
+                expect(viewer.scene.measurements).toHaveLength(1);
+                dialog.remove();
+            });
+        });
+
+        it('a measure that leaves the scene loses its label and tooltip, whichever way it goes', () => {
+            start();
+            const measure = startDrawing('d1');
+            finishDrawing(measure, 5);
+            removeItemLabel.mockClear();
+
+            viewer.scene.removeMeasurement(measure);
+
+            expect(removeItemLabel).toHaveBeenCalledTimes(1);
+            expect(removeItemLabel.mock.calls[0][0]).toBe(measure);
         });
 
         it('a double click while a measure is drawn ends it: no properties dialog', () => {

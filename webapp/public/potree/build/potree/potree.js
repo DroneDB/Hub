@@ -57024,10 +57024,14 @@
 			--Potree.numNodesLoading;
 			this.failures = (this.failures || 0) + 1;
 			const delay = Math.min(1000 * Math.pow(2, this.failures - 1), 30000);
-			this.retryAt = Date.now() + delay;
+			// A read the server refused for good (a 401 or a 404: the transport says retryable === false) is never asked
+			// for again: the same answer would come every 30 s for the rest of the session
+			const forGood = !!error && error.retryable === false;
+			this.retryAt = forGood ? Infinity : Date.now() + delay;
 			// Reads stopped on purpose (the viewer closed) are no failure to report
 			if (error && error.name === 'AbortError') return;
-			console.warn(`Point cloud node ${this.name} did not load, asked again in ${delay / 1000} s:`, error);
+			if (forGood) console.warn(`Point cloud node ${this.name} cannot be loaded:`, error);
+			else console.warn(`Point cloud node ${this.name} did not load, asked again in ${delay / 1000} s:`, error);
 		}
 
 		async loadHierarchy() {

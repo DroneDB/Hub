@@ -44,6 +44,29 @@ describe('loadResources', () => {
         expect(links()).toHaveLength(2);
     });
 
+    it('forgets the scripts after a failed one, which ran or will run without it, so a new call loads them all again in order', async () => {
+        const first = loadResources(['/lib-a.js', '/lib-broken.js', '/lib-c.js', '/lib-d.css']);
+        const [a, broken, c] = scripts();
+        const [link] = links();
+        const removed = [broken, c, link].map(el => vi.spyOn(el, 'remove'));
+        const keptA = vi.spyOn(a, 'remove');
+        a.onload();
+        broken.onerror();
+        await expect(first).rejects.toThrow('/lib-broken.js');
+        // The failed script and the ones after it leave the page; the one before it ran as it should
+        removed.forEach(spy => expect(spy).toHaveBeenCalled());
+        expect(keptA).not.toHaveBeenCalled();
+
+        added.length = 0;
+        const again = loadResources(['/lib-a.js', '/lib-broken.js', '/lib-c.js', '/lib-d.css']);
+        // a is cached as loaded; the others are requested again, in order
+        expect(scripts().map(s => s.getAttribute('src'))).toEqual(['/lib-broken.js', '/lib-c.js']);
+        expect(links()).toHaveLength(1);
+        scripts().forEach(s => s.onload());
+        links()[0].onload();
+        await expect(again).resolves.toHaveLength(4);
+    });
+
     it('takes the type from the path of a versioned URL', async () => {
         const done = loadResources(['/v.css?v=2.7.0', '/v.js?v=2.7.0']);
         expect(links().map(l => l.getAttribute('href'))).toEqual(['/v.css?v=2.7.0']);

@@ -52,7 +52,7 @@ async function render(loadError) {
             { path: '/r/:org/:ds/view/:encodedPath/map', name: 'Map', component: Page }
         ]
     });
-    await router.push(`/r/acme/site/view/${b64encode('ortho.tif')}/map`);
+    await router.push(`/r/acme/site/view/${encodeURIComponent(b64encode('ortho.tif'))}/map`);
     wrapper = mount(ViewerShell, { props: { loadError }, slots: { default: '<div class="viewer-content" />' }, global: { plugins: [router, PrimeVue], provide: { embed: false } } });
     await flushPromises();
 }

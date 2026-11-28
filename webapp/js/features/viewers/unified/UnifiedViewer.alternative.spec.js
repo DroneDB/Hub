@@ -42,7 +42,7 @@ const stubs = { ViewerShell: { template: '<div><slot /></div>' } };
 let wrapper;
 afterEach(() => { wrapper?.unmount(); wrapper = null; gate.buildOptions = null; });
 
-const MODEL_VIEWER = `/r/o/d/view/${b64encode('parts/house.obj')}/model`;
+const MODEL_VIEWER = `/r/o/d/view/${encodeURIComponent(b64encode('parts/house.obj'))}/model`;
 
 describe('the model viewer the 3D viewer offers for a model without 3D Tiles', () => {
     it('opens in the Hub from the 3D viewer of the Hub', async () => {

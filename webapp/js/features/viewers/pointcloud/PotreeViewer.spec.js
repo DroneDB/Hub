@@ -34,10 +34,12 @@ const access = vi.hoisted(() => ({}));
 const measurements = vi.hoisted(() => ({}));
 // The query of the address of the viewer (`?item=`: the annotation to frame)
 const routing = vi.hoisted(() => ({ query: {}, found: true }));
+// The path of the entry the viewer opens
+const opened = vi.hoisted(() => ({ path: 'cloud.laz' }));
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: routing.query }) }));
 vi.mock('@/composables/useViewerEntry', () => ({
     useViewerEntry: () => ({
-        entry: ref({ path: 'cloud.laz' }),
+        entry: ref({ path: opened.path }),
         dataset: ref({ Entry: e => ({ path: e.path, getCopc: () => 'https://hub.test/cloud.copc.laz' }) }),
         canWrite: (access.canWrite = ref(true)), canDelete: (access.canDelete = ref(true)), loading: ref(false), error: (shown.error = ref('')), loadError: ref(null),
         entryLoaded: Promise.resolve(true)
@@ -56,10 +58,16 @@ vi.mock('@/libs/lazy', () => ({ loadResources: () => lazy.gate ?? Promise.resolv
 const calls = vi.hoisted(() => []);
 // The WKT of the COPC header
 const copcWkt = vi.hoisted(() => ({ value: 'PROJCS["x"]' }));
-vi.mock('@/libs/potree/potreeResources', () => ({ POTREE_RESOURCES: [], versioned: r => r, fixPotreePaths() {} }));
+// The version that the URLs of the Potree files get: the Hub's and the digest of the files (potreeVersion)
+const urlVersion = vi.hoisted(() => ({ used: null }));
+vi.mock('@/libs/potree/potreeResources', () => ({
+    POTREE_RESOURCES: [], versioned: (r, version) => { urlVersion.used = version; return r; }, potreeVersion: v => `${v}+files`, fixPotreePaths() {}
+}));
+const sessionOptions = vi.hoisted(() => ({ last: null }));
 vi.mock('@/libs/potree/potreeSession', () => ({
     pointBudgetFor: () => 1000000,
     PotreeSession: class {
+        constructor(options) { sessionOptions.last = options; }
         create(factory) { return factory(); }
         track(target, type, fn, options) { target.addEventListener(type, fn, options); }
         untrack(target, type, fn) { target.removeEventListener(type, fn); }
@@ -127,7 +135,7 @@ const button = id => wrapper.find(`[data-testid="${id}"]`);
 const tools = () => wrapper.find('[role="toolbar"][aria-label="Measure"]');
 const display = () => wrapper.find('[role="toolbar"][aria-label="Display"]');
 
-beforeEach(() => { calls.length = 0; routing.query = {}; routing.found = true; lazy.gate = null; copcWkt.value = 'PROJCS["x"]'; stubPotree(); });
+beforeEach(() => { calls.length = 0; opened.path = 'cloud.laz'; routing.query = {}; routing.found = true; lazy.gate = null; copcWkt.value = 'PROJCS["x"]'; stubPotree(); });
 afterEach(() => {
     wrapper?.unmount();
     delete globalThis.Potree;
@@ -439,6 +447,40 @@ describe('PotreeViewer reading the point cloud', () => {
             srs: 'PROJCS["x"]', scale: [0.01, 0.01, 0.001], offset: [100, 200, 0],
             bounds: { minx: 0, miny: 1, minz: 2, maxx: 10, maxy: 11, maxz: 12 }
         });
+    });
+
+    it('gives Potree the name of a file named like markup as text: its scene tree parses the name as HTML', async () => {
+        opened.path = 'a/<img src=x onerror=alert(1)>&.laz';
+        const loadPointCloud = vi.spyOn(globalThis.Potree, 'loadPointCloud');
+        await mountViewer();
+        const name = loadPointCloud.mock.calls[0][1];
+        expect(name).not.toContain('<');
+        expect(name).toBe('&lt;img src=x onerror=alert(1)&gt;&amp;.laz');
+    });
+
+    it('loads the files of Potree under the version of the Hub and of the files, so a changed file is fetched again', async () => {
+        urlVersion.used = null;
+        await mountViewer();
+        expect(urlVersion.used).toBe('test+files');
+    });
+
+    it('does nothing when the GUI of Potree finishes loading after the viewer was left', async () => {
+        let guiLoaded;
+        viewer.loadGUI = callback => { guiLoaded = callback; };
+        await mountViewer();
+        wrapper.unmount();
+        wrapper = null;
+        expect(() => guiLoaded()).not.toThrow();
+    });
+
+    it('tells the user once, in words, that a part of the cloud cannot be read when the server refuses it', async () => {
+        const warn = vi.spyOn(notify, 'error').mockImplementation(() => {});
+        await mountViewer();
+        sessionOptions.last.onReadRefused({ status: 401 });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain('401');
+        expect(warn.mock.calls[0][0]).toContain('Reload the page');
+        warn.mockRestore();
     });
 
     it('shows an error when the cloud cannot be loaded', async () => {

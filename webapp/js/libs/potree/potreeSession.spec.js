@@ -2,7 +2,7 @@
  * Unit tests for libs/potree/potreeSession.js
  * Run with: npx vitest run webapp/js/libs/potree/potreeSession.spec.js
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PotreeSession, pointBudgetFor } from './potreeSession';
@@ -142,6 +142,64 @@ describe('PotreeSession, what Potree adds to the page after the viewer exists', 
     });
 });
 
+describe('PotreeSession, a viewer closed while its GUI still loads', () => {
+    // What Potree's loadGUI does: it queues the callbacks until profile.html is in, then they run
+    function lateGuiViewer() {
+        const viewer = fakeViewer();
+        viewer.guiLoaded = false;
+        viewer.guiLoadTasks = [];
+        viewer.onGUILoaded = callback => { if (viewer.guiLoaded) callback(); else viewer.guiLoadTasks.push(callback); };
+        viewer.finishGui = ($, profileRenderer) => {
+            // profile.html arrives: the window with its renderer, a resize handler, a colour picker
+            $('<div id="profile_window"><canvas></canvas></div>').appendTo(document.body);
+            $('<div class="sp-container sp-hidden"></div>').appendTo(document.body);
+            $(window).resize(viewer.onResize);
+            viewer.profileWindow = { renderer: profileRenderer };
+            viewer.guiLoaded = true;
+            viewer.guiLoadTasks.forEach(task => task());
+        };
+        viewer.onResize = vi.fn();
+        return viewer;
+    }
+
+    it('removes the profile window, its renderer, the colour pickers and its resize handler once the GUI has added them', () => {
+        const $ = vendoredJQuery();
+        window.$ = $;
+        const keep = () => {};
+        $(window).resize(keep);
+        const viewer = lateGuiViewer();
+        const session = new PotreeSession({ window });
+        session.attach(viewer, document.createElement('div'));
+
+        // The viewer is left before profile.html is in
+        session.dispose();
+        expect(viewer.guiLoadTasks).toHaveLength(1);
+
+        const renderer = { dispose: vi.fn(), forceContextLoss: vi.fn() };
+        viewer.finishGui($, renderer);
+
+        expect(document.getElementById('profile_window')).toBeNull();
+        expect(document.querySelectorAll('.sp-container').length).toBe(0);
+        expect(renderer.dispose).toHaveBeenCalled();
+        expect(renderer.forceContextLoss).toHaveBeenCalled();
+        $(window).trigger('resize');
+        expect(viewer.onResize).not.toHaveBeenCalled();
+        expect($._data(window, 'events').resize.map(h => h.handler)).toEqual([keep]);
+
+        $(window).off('resize');
+        delete window.$;
+    });
+
+    it('asks for nothing more when the GUI had finished before the viewer was left', () => {
+        const viewer = lateGuiViewer();
+        viewer.guiLoaded = true;
+        const session = new PotreeSession({ window: {} });
+        session.attach(viewer, []);
+        session.dispose();
+        expect(viewer.guiLoadTasks).toHaveLength(0);
+    });
+});
+
 describe('PotreeSession, Potree caches', () => {
     it('drops the nodes of its point clouds from the global LRU and frees them, not the others', () => {
         const mine = {}, other = {};
@@ -269,6 +327,46 @@ describe('PotreeSession, jQuery ready callbacks', () => {
     });
 });
 
+describe('PotreeSession, jQuery ready after the viewer is closed', () => {
+    it('gives $.fn.ready back to jQuery, so nothing of the closed viewer stays in the replacement', async () => {
+        const $ = vendoredJQuery();
+        await new Promise(resolve => $(resolve));
+        window.$ = $;
+        const original = $.fn.ready;
+        const first = new PotreeSession({ window });
+        first.create(() => fakeViewer(), null);
+        expect($.fn.ready).not.toBe(original);
+
+        first.dispose();
+        expect($.fn.ready).toBe(original);
+
+        // A later viewer installs its own again, and puts it back too
+        const second = new PotreeSession({ window });
+        second.create(() => fakeViewer(), null);
+        expect($.fn.ready.nonRetaining).toBe(true);
+        second.dispose();
+        expect($.fn.ready).toBe(original);
+        delete window.$;
+    });
+
+    it('is put back only by the session that installed it', async () => {
+        const $ = vendoredJQuery();
+        await new Promise(resolve => $(resolve));
+        window.$ = $;
+        const original = $.fn.ready;
+        const old = new PotreeSession({ window });
+        old.create(() => fakeViewer(), null);
+        const current = new PotreeSession({ window });
+        current.create(() => fakeViewer(), null);
+        current.dispose();
+        // The older one installed it and puts it back with its own end
+        expect($.fn.ready.nonRetaining).toBe(true);
+        old.dispose();
+        expect($.fn.ready).toBe(original);
+        delete window.$;
+    });
+});
+
 describe('PotreeSession.create', () => {
     it('owns the window and document listeners the viewer constructor adds, and restores addEventListener', () => {
         const onOrientation = vi.fn();
@@ -330,6 +428,44 @@ describe('PotreeSession, reading COPC files', () => {
         } finally {
             vi.unstubAllGlobals();
         }
+    });
+
+    describe('a read the server refuses for good', () => {
+        const readAnswering = async status => {
+            vi.stubGlobal('fetch', vi.fn(async () => new Response('no', { status })));
+            const win = { Potree: { createCopcGetter: null } };
+            const onReadRefused = vi.fn();
+            const session = new PotreeSession({ window: win, onReadRefused });
+            session.attach(fakeViewer(), []);
+            const get = win.Potree.createCopcGetter('/copc/cloud.copc.laz');
+            const results = [await get(0, 4).catch(e => e), await get(4, 8).catch(e => e)];
+            return { onReadRefused, results };
+        };
+        afterEach(() => vi.unstubAllGlobals());
+
+        it.each([401, 404])('is told once whatever the number of reads that fail (%i)', async status => {
+            const { onReadRefused, results } = await readAnswering(status);
+            expect(results.map(e => e.status)).toEqual([status, status]);
+            expect(onReadRefused).toHaveBeenCalledTimes(1);
+            expect(onReadRefused.mock.calls[0][0].status).toBe(status);
+        });
+
+        it('is not told of a failure that can pass (a 503) nor of a stopped read', async () => {
+            vi.useFakeTimers();
+            try {
+                vi.stubGlobal('fetch', vi.fn(async () => new Response('busy', { status: 503 })));
+                const win = { Potree: { createCopcGetter: null } };
+                const onReadRefused = vi.fn();
+                const session = new PotreeSession({ window: win, onReadRefused });
+                session.attach(fakeViewer(), []);
+                const reading = win.Potree.createCopcGetter('/copc/cloud.copc.laz')(0, 4).catch(e => e);
+                await vi.advanceTimersByTimeAsync(10000);
+                expect((await reading).status).toBe(503);
+                expect(onReadRefused).not.toHaveBeenCalled();
+            } finally {
+                vi.useRealTimers();
+            }
+        });
     });
 
     it('leaves the transport of a newer viewer in place when it is disposed', () => {

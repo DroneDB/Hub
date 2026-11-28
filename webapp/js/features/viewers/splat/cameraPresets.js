@@ -112,6 +112,44 @@ export function viewFromRig(rig) {
     };
 }
 
+// Quaternions are [x, y, z, w], as the rig and the file keep them
+/** @param {number[]} a @param {number[]} b */
+const multiply = (a, b) => [
+    a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+    a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+    a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+    a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]
+];
+/** @param {number[]} q */
+const conjugate = q => [-q[0], -q[1], -q[2], q[3]];
+/** @param {number[]} q @param {number[]} v */
+const rotate = (q, v) => multiply(multiply(q, [v[0], v[1], v[2], 0]), conjugate(q)).slice(0, 3);
+
+/**
+ * The turn that takes a rotation of the scene `from` to `to` (both [x, y, z, w]): what a view saved under `from` needs to
+ * look at the same part of the scene under `to`.
+ * @param {number[]} from @param {number[]} to
+ */
+export function turnBetween(from, to) {
+    return multiply(to, conjugate(from));
+}
+
+/**
+ * A saved view (a camera, or the view of a pin) carried with a turn of the scene about its origin: its position and its
+ * target turn, and its orientation follows. A view is a pose in the world, and the scene turned under it when the up axis
+ * changed: left as it was, it showed another part of the scene, or the scene on its side.
+ * @param {{ position: number[], quaternion: number[], target?: number[] | null }} view
+ * @param {number[]} turn  [x, y, z, w]
+ */
+export function turnView(view, turn) {
+    return {
+        ...view,
+        position: rotate(turn, view.position),
+        quaternion: multiply(turn, view.quaternion),
+        ...(view.target ? { target: rotate(turn, view.target) } : {})
+    };
+}
+
 /** The rig's current view as a camera. */
 export function cameraFromRig(rig, name) {
     return { id: newId(), name, ...viewFromRig(rig) };

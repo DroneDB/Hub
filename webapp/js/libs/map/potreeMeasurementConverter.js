@@ -63,6 +63,11 @@ export function ensureProperties(target) {
     return bag;
 }
 
+// The markers a kind of measure has when it is finished, as the tools of Potree start them (`maxMarkers`): the others (a
+// distance, an area) take as many as the user clicks. A measure that Potree did not draw keeps the default of its class,
+// which counts a lone point as a drawing that is not finished: it could not be undone once it was deleted.
+const MARKERS_OF_TYPE = Object.freeze({ point: 1, height: 2, angle: 3, circle: 3 });
+
 /** @param {number} value  to 2 decimals */
 const rounded = value => parseFloat(value.toFixed(2));
 
@@ -72,9 +77,69 @@ const rounded = value => parseFloat(value.toFixed(2));
  * @param {string | null} srs
  * @returns {{ scale: ArrayLike<number>, unit: import('@/libs/map/crsProjection').LinearUnit }}
  */
-function measurementFrame(srs) {
+export function measurementFrame(srs) {
     const units = cloudUnitsOf(srs);
     return units.mixed ? { scale: units.metresPerAxis, unit: LINEAR_UNITS.METRE } : { scale: SAME_UNITS, unit: units.horizontal };
+}
+
+/**
+ * The values a measure of the 3D viewers has, worked out from its local coordinates (the coordinates of the cloud's CRS,
+ * as a feature keeps them in `localCoordinates`): what a save writes into the file, and what a report shows for a measure
+ * it has no live viewer for. Lengths, areas and radii are rounded to 2 decimals, in the unit of the frame; the keys are the
+ * ones of the properties of the feature.
+ *
+ *   - `area`: `area`, `perimeter` and `unit` (the unit squared) of the ring on the ground;
+ *   - `distance`: `distance` along the points, and `unit`;
+ *   - `height`: `distance` (the highest less the lowest point, as Potree's label shows) and `unit`;
+ *   - `circle` (three points or more): `radius` of the circle through the first three, `circumference`, `area` and `unit`;
+ *   - `angle` (three points or more): `angle` at the second point, in degrees, and `unit` ('degrees');
+ *   - `point`, or too few points: nothing.
+ *
+ * @param {string} measurementType  'point', 'distance', 'height', 'area', 'circle' or 'angle'
+ * @param {import('@/libs/map/scaledGeometry').Point[]} localCoordinates  the points, [x, y, z] or { x, y, z }
+ * @param {{ scale: ArrayLike<number>, unit: import('@/libs/map/crsProjection').LinearUnit }} frame  what the lengths are
+ *   measured in: `measurementFrame(srs)` of the cloud (its unit of length, or metres with a scale per axis when its heights
+ *   are in another unit)
+ * @returns {Record<string, number | string>}
+ */
+export function measureValues(measurementType, localCoordinates, { scale, unit }) {
+    const positions = localCoordinates;
+    /** @type {Record<string, number | string>} */
+    const values = {};
+
+    if (measurementType === 'area') {
+        values.area = rounded(groundArea(positions, scale));
+        values.perimeter = rounded(pathLength([...positions, positions[0]], scale));
+        values.unit = `${unit.code}²`;
+    }
+
+    if (measurementType === 'distance') {
+        values.distance = rounded(pathLength(positions, scale));
+        values.unit = unit.code;
+    }
+
+    // A height is what Potree's label shows: the difference between the highest and the lowest point, not the length
+    // of the line between them
+    if (measurementType === 'height') {
+        values.distance = rounded(heightDifference(positions, scale));
+        values.unit = unit.code;
+    }
+
+    // Potree draws the circle through the three points of the measure
+    if (measurementType === 'circle' && positions.length >= 3) {
+        const radius = rounded(circumradius(positions[0], positions[1], positions[2], scale));
+        values.radius = radius;
+        values.circumference = 2 * Math.PI * radius;
+        values.area = Math.PI * radius * radius;
+        values.unit = unit.code;
+    }
+
+    if (measurementType === 'angle' && positions.length >= 3) {
+        values.angle = rounded(angleAt(positions[0], positions[1], positions[2], scale));
+        values.unit = 'degrees';
+    }
+
+    return values;
 }
 
 /**
@@ -122,7 +187,7 @@ export function applyRefs(viewer, refs) {
  *   measured in (measurementFrame)
  * @returns {Object} GeoJSON Feature
  */
-function measureToGeoJSON(measure, projector, { scale, unit }) {
+function measureToGeoJSON(measure, projector, frame) {
     const points = measure.points.map(point => projector.toGeographic(point.position));
 
     // The kind of measurement, from what the measure shows
@@ -161,38 +226,9 @@ function measureToGeoJSON(measure, projector, { scale, unit }) {
         groupId: measure.groupId || null
     };
 
-    // Add calculated values if available (2 decimals, in the unit of the frame)
-    const positions = measure.points.map(p => p.position);
-    if (measure.showArea && measure.closed) {
-        properties.area = rounded(groundArea(positions, scale));
-        properties.perimeter = rounded(pathLength([...positions, positions[0]], scale));
-        properties.unit = `${unit.code}²`;
-    }
-
-    if (measurementType === 'distance') {
-        properties.distance = rounded(pathLength(positions, scale));
-        properties.unit = unit.code;
-    }
-
-    // A height is what Potree's label shows: the difference between the highest and the lowest point, not the length
-    // of the line between them
-    if (measurementType === 'height') {
-        properties.distance = rounded(heightDifference(positions, scale));
-        properties.unit = unit.code;
-    }
-
-    // Potree draws the circle through the three points of the measure
-    if (measurementType === 'circle' && positions.length >= 3) {
-        const radius = rounded(circumradius(positions[0], positions[1], positions[2], scale));
-        properties.radius = radius;
-        properties.circumference = 2 * Math.PI * radius;
-        properties.area = Math.PI * radius * radius;
-        properties.unit = unit.code;
-    }
-
-    if (measurementType === 'angle' && positions.length >= 3) {
-        properties.angle = rounded(angleAt(positions[0], positions[1], positions[2], scale));
-        properties.unit = 'degrees';
+    // The calculated values (2 decimals, in the unit of the frame)
+    Object.assign(properties, measureValues(measurementType, measure.points.map(p => p.position), frame));
+    if (measurementType === 'angle' && measure.points.length >= 3) {
         properties.vertices = measure.points.map(p => [p.position.x, p.position.y, p.position.z]);
     }
 
@@ -255,6 +291,10 @@ function geoJSONToMeasure(feature, positions) {
     if (props.fill) {
         measure.fillColor = new THREE.Color(props.fill);
     }
+
+    // A finished measure of a kind that has a number of markers (a point, a height)
+    const markers = /** @type {Record<string, number>} */ (MARKERS_OF_TYPE)[props.measurementType];
+    if (markers) measure.maxMarkers = markers;
 
     // Add points to measurement
     positions.forEach(coord => {

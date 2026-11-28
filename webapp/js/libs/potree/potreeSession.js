@@ -19,6 +19,12 @@
  *   window (with its own WebGL renderer) and the colour pickers it appends to document.body,
  *   and the jQuery handlers it binds on window (the profile window's resize handler keeps
  *   the whole viewer reachable);
+ * - when the viewer is closed before its GUI has finished loading (sidebar.html, then profile.html), removes what the
+ *   GUI adds after that moment too, once it has added it (viewer.onGUILoaded): the profile window, its renderer and
+ *   its resize handler would stay for the life of the page;
+ * - gives jQuery's $(fn) back its own implementation when the viewer closes (the replacement above is the session's);
+ * - tells once, through `onReadRefused`, that the server refused a read of the COPC for good (a 401 or a 404), which
+ *   Potree then never asks for again;
  * - reads the COPC files of its viewer through the Hub's range transport (Potree.createCopcGetter,
  *   libs/http/rangeRequests) and stops those reads, and their retries, when it is disposed.
  */
@@ -42,7 +48,29 @@ export class PotreeSession {
         this.containers = [];
         this.disposed = false;
         this.reads = new AbortController();
-        this.createCopcGetter = url => createRangeGetter(url, { signal: this.reads.signal });
+        // Called once with the error when the server refused a read of the COPC for good (4xx: the transport does not retry)
+        this.onReadRefused = env.onReadRefused ?? null;
+        this.readRefusedTold = false;
+        this.createCopcGetter = url => this.telling(createRangeGetter(url, { signal: this.reads.signal }));
+    }
+
+    /** The getter of the transport, telling `onReadRefused` of the first read the server refused for good. */
+    telling(get) {
+        return async (begin, end) => {
+            try {
+                return await get(begin, end);
+            } catch (error) {
+                this.tellRefused(error);
+                throw error;
+            }
+        };
+    }
+
+    tellRefused(error) {
+        const refused = error?.retryable === false && error.status >= 400 && error.status < 500;
+        if (!refused || this.readRefusedTold || this.disposed) return;
+        this.readRefusedTold = true;
+        this.onReadRefused?.(error);
     }
 
     /**
@@ -51,7 +79,7 @@ export class PotreeSession {
      * the viewer, its scene and its point clouds reachable after the viewer is closed.
      */
     create(factory, containers) {
-        nonRetainingReady(this.jquery(), this.win?.document);
+        this.restoreReady = nonRetainingReady(this.jquery(), this.win?.document);
         const doc = this.win?.document;
         const restores = [this.win, doc, doc?.body]
             .filter(t => typeof t?.addEventListener === 'function')
@@ -138,6 +166,8 @@ export class PotreeSession {
         this.nodes = [];
 
         const viewer = this.viewer;
+        const bodyBefore = this.bodyBefore;
+        const windowHandlersBefore = this.windowHandlersBefore;
         if (viewer) {
             const renderer = viewer.renderer;
             // Potree 1.8 renders through renderer.setAnimationLoop(viewer.loop)
@@ -156,7 +186,6 @@ export class PotreeSession {
             releaseCachedNodes(this.win?.Potree?.lru, new Set(pointclouds.map(pc => pc.pcoGeometry).filter(Boolean)));
 
             releaseRenderer(renderer);
-            releaseRenderer(viewer.profileWindow?.renderer);
             releaseScreenPass(this.win?.Potree?.Utils?.screenPass);
             endWorkers(this.win?.Potree, this.workers);
             closeWorkerPool(this.pool);
@@ -173,22 +202,17 @@ export class PotreeSession {
             else container.innerHTML = '';
         }
 
-        // What Potree added outside the container since attach()
-        const body = this.win?.document?.body;
-        if (body && this.bodyBefore) {
-            for (const node of Array.from(body.children)) {
-                if (this.bodyBefore.has(node) || !node.matches?.(BODY_NODES)) continue;
-                if ($) $(node).remove();
-                else node.remove();
-            }
-        }
-        if ($ && this.windowHandlersBefore) {
-            for (const h of jqueryWindowHandlers($, this.win)) {
-                if (!this.windowHandlersBefore.has(h.handler)) $(this.win).off(h.type, h.handler);
-            }
-        }
+        // What Potree added outside the container since attach(). A viewer closed while its GUI still loads gets the
+        // profile window, the colour pickers and the resize handler after this moment: the same clean-up runs again then
+        const leftovers = () => releaseGuiLeftovers(this.win, $, viewer, bodyBefore, windowHandlersBefore);
+        leftovers();
+        if (viewer && !viewer.guiLoaded && typeof viewer.onGUILoaded === 'function') viewer.onGUILoaded(leftovers);
         this.bodyBefore = null;
         this.windowHandlersBefore = null;
+
+        // $(fn) is jQuery's own again (the replacement of create() was this viewer's)
+        this.restoreReady?.();
+        this.restoreReady = null;
 
         if (this.win && this.win.viewer === viewer) delete this.win.viewer;
         this.viewer = null;
@@ -202,7 +226,8 @@ export class PotreeSession {
 // of the page. Once the document is ready, $(fn) only has to call fn soon, which needs no list.
 function nonRetainingReady($, doc) {
     const ready = $?.fn?.ready;
-    if (typeof ready !== 'function' || ready.nonRetaining) return;
+    // Another viewer of the page has it replaced already, and puts it back
+    if (typeof ready !== 'function' || ready.nonRetaining) return () => {};
     const patched = function (fn) {
         if ($.isReady && typeof fn === 'function') {
             setTimeout(() => fn.call(doc, $));
@@ -212,6 +237,30 @@ function nonRetainingReady($, doc) {
     };
     patched.nonRetaining = true;
     $.fn.ready = patched;
+    // Put back with the viewer: left in place, the replacement (and what it was made in) outlives every viewer
+    return () => {
+        if ($.fn.ready === patched) $.fn.ready = ready;
+    };
+}
+
+// What Potree puts outside the container after the viewer is created: the profile window (profile.html) with its own
+// WebGL renderer, the colour pickers of the sidebar, and the handlers bound with jQuery on window (the profile window's
+// resize handler keeps the whole viewer reachable). Safe to run more than once.
+function releaseGuiLeftovers(win, $, viewer, bodyBefore, windowHandlersBefore) {
+    releaseRenderer(viewer?.profileWindow?.renderer);
+    const body = win?.document?.body;
+    if (body && bodyBefore) {
+        for (const node of Array.from(body.children)) {
+            if (bodyBefore.has(node) || !node.matches?.(BODY_NODES)) continue;
+            if ($) $(node).remove();
+            else node.remove();
+        }
+    }
+    if ($ && windowHandlersBefore) {
+        for (const h of jqueryWindowHandlers($, win)) {
+            if (!windowHandlersBefore.has(h.handler)) $(win).off(h.type, h.handler);
+        }
+    }
 }
 
 // Potree.Utils.screenPass is one quad for every viewer of the page: it keeps the material of

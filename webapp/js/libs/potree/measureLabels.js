@@ -65,8 +65,13 @@ const placeAt = (tooltip, x, y) => {
     tooltip.style.top = (y - 10) + 'px';
 };
 
-/** Removes a measure's label, its tooltip and their listeners. */
-function clearItemLabel(measure, { viewer, session }) {
+/**
+ * Removes a measure's label, its tooltip and their listeners: when it is drawn again, and when the measure leaves the
+ * scene (its per-frame handler and its tooltip would stay live until the viewer closed).
+ * @param {any} measure
+ * @param {{ viewer: any, session: import('@/libs/potree/potreeSession').PotreeSession }} ctx
+ */
+export function removeItemLabel(measure, { viewer, session }) {
     if (measure._itemLabel) {
         measure.remove(measure._itemLabel);
         measure._itemLabel.dispose?.();
@@ -201,7 +206,7 @@ const labelItemOf = measure => {
  */
 export function updateItemLabel(measure, ctx) {
     const { viewer, session } = ctx;
-    clearItemLabel(measure, ctx);
+    removeItemLabel(measure, ctx);
     const item = labelItemOf(measure);
     const lines = itemLabelLines(item, ctx.schema?.());
     if (!lines.length || !measure.points || !measure.points.length) return;

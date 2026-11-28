@@ -19,6 +19,13 @@
  *     (`RIGHT_CLICK_MAX_MOVE_PX`), so a hand that moves a pixel or two adds no segment;
  *   - Enter on a focused button or link is the button's or the link's (Escape still drops the measure); a field keeps both.
  *
+ * A finger places points too. Potree takes the points of a measure from mouse events (the marker that follows the
+ * pointer, and a mouse release that places it), and a touch gives none: it calls preventDefault() on touchstart and
+ * lets go of the marker. A tap on the canvas (a touch released where it was pressed) is therefore placed here: the
+ * marker is taken in hand again, moved to the point of the cloud under the finger, and released as a mouse release
+ * does it. A tap that is on no point of the cloud places nothing; a touch that moves the view (a drag, a pinch) gives
+ * the marker back to the pointer afterwards, as a right-drag does.
+ *
  * The measure of the tools of the Hub (`start(kind)`) and the one that the icons of the Potree sidebar start are
  * both followed: Potree tells the measuring tool starts one (`start_inserting_measurement`).
  */
@@ -36,6 +43,9 @@ export const MEASURE_TOOLS = Object.freeze({
 });
 
 const KIND_BY_NAME = Object.freeze({ Point: 'point', Distance: 'distance', Height: 'height', Area: 'area' });
+
+/** A touch released this far (CSS px) or less from where it was pressed is a tap; more is a drag of the view. */
+const TAP_MAX_MOVE_PX = 10;
 
 /** The points a measure of an open kind needs to be kept. */
 const MIN_OPEN = Object.freeze({ distance: 2, area: 3 });
@@ -71,6 +81,11 @@ export class PotreeMeasureGestures {
         this.carriedAtPress = /** @type {any} */ (null);
         /** The last two left releases of the measure being drawn (each one places a point of an open measure) */
         this.leftUps = /** @type {{ clientX: number, clientY: number, detail: number }[]} */ ([]);
+        /** The fingers on the canvas, by pointer id, and whether the gesture is more than one tap (a second finger, a drag) */
+        this.touches = /** @type {Map<number, { clientX: number, clientY: number }>} */ (new Map());
+        this.touchGesture = /** @type {{ start: { clientX: number, clientY: number }, carried: any, tap: boolean } | null} */ (null);
+        /** The measure whose marker is given back to the pointer when Potree's touchend, which lets go of it, has run */
+        this.restoreFollower = /** @type {any} */ (null);
 
         const canvas = viewer.renderer.domElement;
         this.canvas = canvas;
@@ -87,6 +102,14 @@ export class PotreeMeasureGestures {
         // and can keep it from the insertion
         session.track(canvas, 'mouseup', (/** @type {MouseEvent} */ e) => this.onMouseUp(e));
         session.track(doc, 'keydown', (/** @type {KeyboardEvent} */ e) => this.onKey(e));
+        // A touch gives Potree no mouse events: the pointer events are the only ones a finger sends (seen before Potree's
+        // touchstart, which lets go of the marker that follows the pointer)
+        session.track(doc, 'pointerdown', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchDown(e); }, true);
+        session.track(doc, 'pointermove', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchMove(e); }, true);
+        session.track(doc, 'pointerup', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchUp(e, true); }, true);
+        session.track(doc, 'pointercancel', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchUp(e, false); }, true);
+        // Potree's touchend (on the canvas) lets go of what it drags: this one, on the document, runs after it
+        session.track(doc, 'touchend', () => this.onTouchEnded());
     }
 
     /** The kind being drawn ('point', 'distance', 'height', 'area', 'other'), or null. */
@@ -273,6 +296,87 @@ export class PotreeMeasureGestures {
     carry(measure) {
         const marker = (measure.spheres || []).at(-1);
         if (marker) this.viewer.inputHandler?.startDragging(marker);
+    }
+
+    // ---- Touch ----------------------------------------------------------------------------
+
+    /** @param {PointerEvent} e */
+    onTouchDown(e) {
+        if (e.pointerType !== 'touch') return;
+        this.touches.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+        if (this.touchGesture) {
+            // A second finger: a pinch or a pan of the view, not a tap
+            this.touchGesture.tap = false;
+            return;
+        }
+        const measure = this.measure;
+        this.touchGesture = {
+            start: { clientX: e.clientX, clientY: e.clientY },
+            // The marker that follows the pointer: Potree's touchstart lets go of it
+            carried: measure && this.carrying(measure) ? this.viewer.inputHandler.drag.object : null,
+            tap: true
+        };
+    }
+
+    /** @param {PointerEvent} e */
+    onTouchMove(e) {
+        const gesture = this.touchGesture;
+        if (e.pointerType !== 'touch' || !gesture || !gesture.tap) return;
+        const { start } = gesture;
+        if (Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY) > TAP_MAX_MOVE_PX) gesture.tap = false;
+    }
+
+    /**
+     * The last finger leaves: a tap places a point; any other touch gives the marker back to the pointer.
+     * @param {PointerEvent} e
+     * @param {boolean} released  false when the touch was cancelled (it places nothing)
+     */
+    onTouchUp(e, released) {
+        if (e.pointerType !== 'touch') return;
+        this.touches.delete(e.pointerId);
+        const gesture = this.touchGesture;
+        if (!gesture || this.touches.size > 0) return;
+        this.touchGesture = null;
+        const measure = this.measure;
+        if (!measure) return;
+        if (!gesture.carried) return;
+        const moved = Math.hypot(e.clientX - gesture.start.clientX, e.clientY - gesture.start.clientY) > TAP_MAX_MOVE_PX;
+        // Whether a marker follows the pointer after this touch: after a tap that placed the last point of the measure, none
+        const follows = released && gesture.tap && !moved ? this.placeAt(measure, e) : true;
+        if (!follows) return;
+        // Potree lets go of the marker at touchend, which comes after this event: it is given back then
+        if (released) this.restoreFollower = measure;
+        else this.carry(measure);
+    }
+
+    /** Potree's touchend has run: the marker that follows the pointer is taken in hand again. */
+    onTouchEnded() {
+        const measure = this.restoreFollower;
+        this.restoreFollower = null;
+        if (measure && this.measure === measure) this.carry(measure);
+    }
+
+    /**
+     * Places the point of the measure that follows the pointer where a tap was made, as a mouse release does: the marker
+     * is taken in hand, moved to the point of the cloud under the finger, and released. Where no point of the cloud is, the
+     * marker does not move, and nothing is placed.
+     * @param {any} measure
+     * @param {PointerEvent} e
+     * @returns {boolean} whether a marker follows the pointer after the tap (the measure goes on)
+     */
+    placeAt(measure, e) {
+        const marker = (measure.spheres || []).at(-1);
+        const point = this.pointsOf(measure).at(-1);
+        if (!marker || !point) return false;
+        const init = { bubbles: true, cancelable: true, clientX: e.clientX, clientY: e.clientY };
+        const before = { ...point.position };
+        this.carry(measure);
+        this.canvas.dispatchEvent(new MouseEvent('mousemove', { ...init, buttons: 0 }));
+        const { x, y, z } = point.position;
+        // No point of the cloud under the finger: the marker stays in hand, unplaced
+        if (x === before.x && y === before.y && z === before.z) return true;
+        this.canvas.dispatchEvent(new MouseEvent('mouseup', { ...init, button: LEFT_BUTTON, detail: 1 }));
+        return this.carrying(measure);
     }
 
     /** @param {KeyboardEvent} e */

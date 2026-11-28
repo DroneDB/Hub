@@ -13,7 +13,7 @@
             </div>
             <template v-else>
                 <!-- Edit is in a toolbar row above the text, at its right edge, and stays in view (FR-EXP-39) -->
-                <div v-if="canWrite" class="view-toolbar">
+                <div v-if="canWrite && textRead" class="view-toolbar">
                     <Button severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" label="Edit"
                             @click="edit" />
                 </div>
@@ -57,6 +57,8 @@ const confirm = useConfirm(dialogs);
 const notify = useNotify();
 
 const rawContent = ref('');
+// The text was read from the file: only then can it be edited, or Save would replace the file with what was typed alone
+const textRead = ref(false);
 // The text of the file when the edit started (and after each save)
 const original = ref('');
 const editing = ref(false);
@@ -76,6 +78,7 @@ onMounted(async () => {
     loading.value = true;
     try {
         rawContent.value = await dataset.value.getFileContents(entry.value.path);
+        textRead.value = true;
     } catch (e) {
         error.value = `Cannot fetch ${entry.value.path}: ${e}`;
     } finally {
@@ -84,6 +87,7 @@ onMounted(async () => {
 });
 
 async function edit() {
+    if (!textRead.value) return;
     original.value = rawContent.value;
     editing.value = true;
     await nextTick();

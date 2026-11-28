@@ -10,12 +10,13 @@ import { createRouter, createMemoryHistory } from 'vue-router';
 import PrimeVue from 'primevue/config';
 import { b64encode } from '@/libs/base64';
 import { ApiError, InvalidLinkError } from '@/libs/ddb/apiError';
+import { readSource, ruleOf } from '@/specs/cssSource';
 import ViewerShell from './ViewerShell.vue';
 
 const Page = { render: () => null };
 let wrapper;
 
-async function render(props = {}, { path = `/r/acme/site/view/${b64encode('odm/report/README.md')}/markdown`, embed = false, slots } = {}) {
+async function render(props = {}, { path = `/r/acme/site/view/${encodeURIComponent(b64encode('odm/report/README.md'))}/markdown`, embed = false, slots } = {}) {
     globalThis.HubOptions = {};
     const router = createRouter({
         history: createMemoryHistory(),
@@ -227,7 +228,7 @@ describe('ViewerShell navigation toolbar (FR-VWR-11)', () => {
         expect(wrapper.find('.viewer-help').exists()).toBe(false);
     });
 
-    it('fullscreen asks the shell element for it, and leaves it again', async () => {
+    it('fullscreen asks the page for it (the overlays of PrimeVue are in it), and leaves it again', async () => {
         const request = vi.fn();
         const exit = vi.fn();
         // supportsFullScreen asks the body; the request goes to the element
@@ -238,7 +239,7 @@ describe('ViewerShell navigation toolbar (FR-VWR-11)', () => {
         expect(button.attributes('aria-pressed')).toBe('false');
         await button.trigger('click');
         expect(request).toHaveBeenCalledTimes(1);
-        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        expect(request.mock.contexts[0]).toBe(document.documentElement);
 
         Object.defineProperty(document, 'fullscreenElement', { value: wrapper.element, configurable: true });
         document.dispatchEvent(new Event('fullscreenchange'));
@@ -338,7 +339,7 @@ describe('ViewerShell fullscreen (FR-VWR-38)', () => {
         await flushPromises();
     };
 
-    it('a viewer without the toolbar has the button in its view bar, which asks the root of the shell for fullscreen', async () => {
+    it('a viewer without the toolbar has the button in its view bar, which asks the page for fullscreen', async () => {
         supportFullscreen();
         await render({ fullscreenButton: true });
         expect(nav().exists()).toBe(false);
@@ -346,7 +347,7 @@ describe('ViewerShell fullscreen (FR-VWR-38)', () => {
         expect(barButton().attributes('title')).toBe('Fullscreen (F)');
         await barButton().trigger('click');
         expect(request).toHaveBeenCalledTimes(1);
-        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        expect(request.mock.contexts[0]).toBe(document.documentElement);
         expect(wrapper.element.classList.contains('viewer-shell')).toBe(true);
     });
 
@@ -380,7 +381,7 @@ describe('ViewerShell fullscreen (FR-VWR-38)', () => {
         expect(press('f').defaultPrevented).toBe(true);
         expect(press('F').defaultPrevented).toBe(true);
         expect(request).toHaveBeenCalledTimes(2);
-        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        expect(request.mock.contexts[0]).toBe(document.documentElement);
         wrapper.unmount();
         request.mockClear();
         await render({ fullscreenButton: true });
@@ -457,7 +458,7 @@ describe('ViewerShell fullscreen when embedded (FR-VWR-38)', () => {
         expect(overlay().find('i').classes()).toContain('fa-expand');
         await overlay().trigger('click');
         expect(request).toHaveBeenCalledTimes(1);
-        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        expect(request.mock.contexts[0]).toBe(document.documentElement);
 
         Object.defineProperty(document, 'fullscreenElement', { value: wrapper.element, configurable: true });
         document.dispatchEvent(new Event('fullscreenchange'));
@@ -562,5 +563,17 @@ describe('ViewerShell key F and the keys of others (FR-VWR-38)', () => {
         expect(request).not.toHaveBeenCalled();
         expect(press('f', { target: popup.querySelector('button') }).defaultPrevented).toBe(true);
         expect(request).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('ViewerShell in full screen (the overlays of PrimeVue are appended to the body)', () => {
+    it('fills the page, which is the fullscreen element, over the header and under the overlays', () => {
+        const rule = ruleOf(readSource(__dirname, 'ViewerShell.vue'), 'html:fullscreen .viewer-shell');
+        expect(rule).toMatch(/position:\s*fixed/);
+        expect(rule).toMatch(/inset:\s*0/);
+        // The overlays of PrimeVue start at 1000: the shell is below them
+        const z = Number(/z-index:\s*(\d+)/.exec(rule)?.[1]);
+        expect(z).toBeGreaterThan(2);
+        expect(z).toBeLessThan(1000);
     });
 });

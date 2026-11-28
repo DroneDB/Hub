@@ -2,9 +2,42 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createFrameRetry, FRAME_ATTEMPTS, FRAME_RETRY_MS, coreBox, residentSplatCenters, CORE_QUANTILES, MIN_CORE_SAMPLES, MIN_ROOM_SAMPLES, framingHint, chooseFraming, crowdingOf } from './framing';
 import { FRAMING } from './cameraRig';
 import { MIN_UP_CONFIDENCE } from './upAxis';
+import { Presentation } from './presentation';
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
+
+describe('frame retry with the presentation, as the viewer wires them', () => {
+    // The viewer takes the start of an orbit, a tour or a flight as the user taking the camera (the onMode hook)
+    function wired(start) {
+        let userInteracted = false;
+        const rig = {
+            camera: { fov: 60, position: { x: 0, y: 0, z: 0 } },
+            controls: { target: {}, update() {}, autoRotate: false, autoRotateSpeed: 0 }, syncYawPitch() {}, setFov() {}
+        };
+        const presentation = new Presentation(rig, {
+            cameras: () => [], onMode: mode => { if (mode) userInteracted = true; }, onCamera() {}
+        });
+        const frame = vi.fn(() => false);
+        createFrameRetry({ frame, userInteracted: () => userInteracted }).start();
+        vi.advanceTimersByTime(2 * FRAME_RETRY_MS);
+        expect(frame).toHaveBeenCalledTimes(3);
+        start(presentation);
+        vi.advanceTimersByTime(10 * FRAME_RETRY_MS);
+        return { frame, presentation };
+    }
+
+    it('does not pull the view back to the opening one once an orbit was started', () => {
+        const { frame } = wired(presentation => presentation.orbit());
+        expect(frame).toHaveBeenCalledTimes(3);
+    });
+
+    it('nor once a tour was started (an orbit when there are no cameras), even when it has ended since', () => {
+        const { frame, presentation } = wired(p => { p.start(); p.stop(); });
+        expect(presentation.mode).toBeNull();
+        expect(frame).toHaveBeenCalledTimes(3);
+    });
+});
 
 describe('frame retry', () => {
     it('frames at once, and stops when a real box was framed', () => {

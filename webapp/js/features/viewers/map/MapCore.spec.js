@@ -10,6 +10,7 @@ import { defineComponent, h, nextTick } from 'vue';
 import { fromLonLat } from 'ol/proj';
 import ddb from 'ddb';
 import { ScaleLine } from 'ol/control';
+import { readSource, ruleOf } from '@/specs/cssSource';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import MapBrowserEvent from 'ol/MapBrowserEvent';
@@ -240,12 +241,54 @@ describe('the canvas ratio of the map (FR-XC-32, D-042)', () => {
 describe('full screen', () => {
     afterEach(() => { delete Element.prototype.requestFullscreen; });
 
-    it('makes the map element full screen, not $el (a text node before the comments of the template in a development build)', async () => {
+    it('makes the page full screen, which holds the dialogs, toasts and lists of PrimeVue that are appended to the body', async () => {
         const asked = [];
         Element.prototype.requestFullscreen = function () { asked.push(this); return Promise.resolve(); };
         await mountMap([MAIN]);
         wrapper.vm.toggleFullscreen();
-        expect(asked).toEqual([wrapper.find('#map').element]);
+        expect(asked).toEqual([document.documentElement]);
+    });
+
+    it('fills the page in full screen, over the header and under the overlays of PrimeVue', () => {
+        const rule = ruleOf(readSource(__dirname, 'MapCore.vue'), 'html:fullscreen #map');
+        expect(rule).toMatch(/position:\s*fixed/);
+        expect(rule).toMatch(/inset:\s*0/);
+        const z = Number(/z-index:\s*(\d+)/.exec(rule)?.[1]);
+        expect(z).toBeGreaterThan(2);
+        expect(z).toBeLessThan(1000);
+    });
+});
+
+describe('a right click on the map', () => {
+    const rightClick = () => {
+        const event = { type: 'contextmenu', pixel: [10, 10], stopPropagation: vi.fn(), preventDefault: vi.fn() };
+        wrapper.vm.map.dispatchEvent(event);
+        return event;
+    };
+
+    it('selects nothing in the map viewer, which has no selection, and leaves the browser its menu', async () => {
+        await mountMap([MAIN], { standalone: true });
+        const select = vi.spyOn(wrapper.vm, 'selectAt');
+        const event = rightClick();
+        expect(select).not.toHaveBeenCalled();
+        expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('toggles the selection of what is under it on the dataset map', async () => {
+        await mountMap([MAIN], { standalone: false });
+        const select = vi.spyOn(wrapper.vm, 'selectAt');
+        const event = rightClick();
+        expect(select).toHaveBeenCalledWith([10, 10]);
+        expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('finishes a drawing without selecting anything, also on the dataset map, with no browser menu', async () => {
+        await mountMap([MAIN], { standalone: false });
+        wrapper.vm.measuring = true;
+        const select = vi.spyOn(wrapper.vm, 'selectAt');
+        const event = rightClick();
+        expect(select).not.toHaveBeenCalled();
+        expect(event.preventDefault).toHaveBeenCalled();
     });
 });
 
@@ -787,7 +830,7 @@ describe('the toolbar', () => {
         expect(toolbar().props('pickToCompare')).toBe(true);
         await toolbar().find('[data-split]').trigger('click');
         expect(open).toHaveBeenCalledTimes(1);
-        expect(open).toHaveBeenCalledWith(`/r/acme/site/view/${b64encode(MAIN.path)}/map?pick=1`, '_blank', 'noopener');
+        expect(open).toHaveBeenCalledWith(`/r/acme/site/view/${encodeURIComponent(b64encode(MAIN.path))}/map?pick=1`, '_blank', 'noopener');
         open.mockRestore();
     });
 

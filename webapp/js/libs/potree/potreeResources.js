@@ -28,6 +28,24 @@ export const POTREE_RESOURCES = [
     '/potree/libs/plasio/js/laslaz.js'
 ];
 
+/**
+ * The digest of the files of POTREE_RESOURCES as they are shipped (public/potree, SHA-256 of their text with the line
+ * ends as LF, one digest of every file in order, the first 12 hex digits). It follows the Hub version in the URL of the
+ * files (potreeVersion): the Registry serves a versioned URL as immutable for a year, so a build that changed a file of
+ * Potree without a new version would never be fetched again by a browser that has the old one. potreeResources.spec
+ * fails when a file changes without this digest: update it with the one it reports.
+ */
+export const POTREE_FILES_DIGEST = '6c7d3b769330';
+
+/**
+ * What the URLs of the Potree files carry after `?v=`: the Hub version and the digest of the files, so that either one
+ * changing gives new URLs. Without a Hub version (a development build) there is none, as before.
+ * @param {string | null | undefined} hubVersion
+ */
+export function potreeVersion(hubVersion) {
+    return hubVersion ? `${hubVersion}-${POTREE_FILES_DIGEST}` : hubVersion;
+}
+
 /** The URLs with `?v=<version>` (unchanged without a version). */
 export function versioned(urls, version) {
     if (!version) return urls.slice();

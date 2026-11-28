@@ -115,7 +115,7 @@ async function open(url, { dataset = fakeDataset(), history = null, embed = fals
     await view.loaded;
     return { view, dataset };
 }
-const fileUrl = (path, search = '', hash = '') => `/r/o/d/view/${b64encode(path)}/map${search}${hash}`;
+const fileUrl = (path, search = '', hash = '') => `/r/o/d/view/${encodeURIComponent(b64encode(path))}/map${search}${hash}`;
 const viewUrl = (uid, search = '') => `/r/o/d/views/${uid}${search}`;
 const held = () => window.history.state[HISTORY_KEY];
 
@@ -365,7 +365,7 @@ describe('useSavedView new view that changes its base file', () => {
         expect(next.base.path).toBe('f/b.tif');
         expect(router.replace).toHaveBeenCalledTimes(1);
         const location = router.replace.mock.calls[0][0];
-        expect(location.path).toBe(`/r/o/d/view/${b64encode('f/b.tif')}/map`);
+        expect(location.path).toBe(`/r/o/d/view/${encodeURIComponent(b64encode('f/b.tif'))}/map`);
         expect(location.query).toEqual({ keep: '1' });
         expect(location.hash).toBe('#h=1');
         expect(location.state[HISTORY_KEY]).toEqual({ identity: 'file:f/b.tif', state: next });

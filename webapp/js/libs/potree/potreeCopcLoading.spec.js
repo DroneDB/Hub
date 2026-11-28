@@ -145,6 +145,25 @@ describe('a node of a COPC point cloud whose load fails', () => {
         expect(next.loading).toBe(true);
     });
 
+    it('is never asked for again after the server refused the read for good (a 401, a 404), and is after one that can pass', async () => {
+        const refused = Object.assign(new Error('answered 401'), { name: 'RangeReadError', status: 401, retryable: false });
+        const root = rootOf(vi.fn().mockRejectedValue(refused));
+        await root.load();
+        expect(root.loading).toBe(false);
+        expect(Potree.numNodesLoading).toBe(0);
+        expect(root.isWaitingToRetry()).toBe(true);
+        // Not after a minute, nor an hour: the same answer would come every 30 s for the rest of the session
+        vi.advanceTimersByTime(60 * 60 * 1000);
+        expect(root.isWaitingToRetry()).toBe(true);
+        expect(console.warn).toHaveBeenCalledTimes(1);
+        expect(String(console.warn.mock.calls[0][0])).toContain('cannot be loaded');
+
+        const passing = rootOf(vi.fn().mockRejectedValue(Object.assign(new Error('answered 503'), { name: 'RangeReadError', status: 503, retryable: true })));
+        await passing.load();
+        vi.advanceTimersByTime(1000);
+        expect(passing.isWaitingToRetry()).toBe(false);
+    });
+
     it('reports no failure when the reads were stopped on purpose (the viewer closed)', async () => {
         const root = rootOf(vi.fn().mockRejectedValue(new DOMException('The viewer closed', 'AbortError')));
         await root.load();

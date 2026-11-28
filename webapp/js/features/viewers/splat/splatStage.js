@@ -232,11 +232,12 @@ export function createSplatStage({
      */
     async function loadMesh(meshOptions, onProgress) {
         if (disposed) return null;
+        const paged = meshOptions.paged === true ? pagedSplatsOf(meshOptions.url) : null;
         // raycastable: the splats can be picked (measurements and pins)
         const loading = new Spark.SplatMesh({
             raycastable: true,
             ...meshOptions,
-            ...(meshOptions.paged === true && { paged: pagedSplatsOf(meshOptions.url) }),
+            ...(paged && { paged }),
             onProgress: onProgress && (event => { if (!disposed) onProgress(progressFraction(event)); })
         });
         mesh = loading;
@@ -244,6 +245,9 @@ export function createSplatStage({
         scene.add(loading);
         try {
             await loading.initialized;
+            // Spark's `initialized` resolves without a request for a paged mesh: its header is the first read, and a file
+            // that cannot be read ends here, not in a viewer that is "loaded" and empty
+            if (paged) await paged.getRadMeta();
         } catch (e) {
             if (disposed) return null;
             throw e;

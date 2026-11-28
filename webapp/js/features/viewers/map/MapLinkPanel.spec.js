@@ -18,7 +18,7 @@ const { default: MapLinkPanel } = await import('./MapLinkPanel.vue');
 
 const PATH = 'flights/ortho.tif';
 const FILE = { path: PATH };
-const prefix = () => `${window.location.origin}/r/acme/site/view/${b64encode(PATH)}/map`;
+const prefix = () => `${window.location.origin}/r/acme/site/view/${encodeURIComponent(b64encode(PATH))}/map`;
 const savedPrefix = () => `${window.location.origin}/r/acme/site/views/v_k3j9x2ab`;
 
 let wrapper;

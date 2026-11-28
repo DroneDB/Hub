@@ -28,6 +28,8 @@ let tracked;
 let controls;
 // The height of the cloud under the pointer: where a marker that follows it is
 let pointerZ = 0;
+// No point of the cloud under the pointer (the empty sky): a marker that follows it does not move
+let pointerMisses = false;
 
 function makeViewer() {
     canvas = document.createElement('canvas');
@@ -49,11 +51,16 @@ function makeViewer() {
         const drag = inputHandler.drag;
         if (!drag) return;
         drag.mouse = e.buttons;
-        if (drag.object) Object.assign(drag.object.point.position, { x: e.clientX, y: e.clientY, z: pointerZ });
+        if (drag.object) {
+            if (!pointerMisses) Object.assign(drag.object.point.position, { x: e.clientX, y: e.clientY, z: pointerZ });
+        }
         else if (e.buttons === 1) controls.rotations.push(dx);
         else if (e.buttons === 2) controls.pans.push(dx);
     });
     canvas.addEventListener('mouseup', () => { inputHandler.drag = null; });
+    // A touch gives Potree's input handler no mouse events: it lets go of what it drags at touchstart, and again at touchend
+    canvas.addEventListener('touchstart', () => inputHandler.startDragging(null));
+    canvas.addEventListener('touchend', () => { inputHandler.drag = null; });
     canvas.addEventListener('dblclick', e => { if (controls.doubleClockZoomEnabled) controls.zooms.push([e.clientX, e.clientY]); });
     const v = new Dispatcher();
     Object.assign(v, { scene, inputHandler, renderer: { domElement: canvas } });
@@ -129,6 +136,7 @@ const flushTimers = () => { const run = timers.splice(0); run.forEach(fn => fn()
 const coords = m => m.points.map(p => [p.position.x, p.position.y, p.position.z]);
 
 beforeEach(() => {
+    pointerMisses = false;
     measures = [];
     active = [];
     discarded = [];
@@ -462,5 +470,152 @@ describe('after a measure ends', () => {
         drag(0, [10, 10], [25, 10]);
         expect(controls.rotations).toEqual([15]);
         expect(coords(measures[0])).toEqual([[0, 0, 0], [4, 0, 0], [4, 3, 0]]);
+    });
+});
+
+// A finger sends pointer events, then touch events (Potree's input handler hears those): no mouse events at all
+describe('a measure drawn with a finger', () => {
+    const pointer = (type, x, y, init = {}) => canvas.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 1, clientX: x, clientY: y, ...init }));
+    const touch = type => canvas.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+    /** A tap at a point of the cloud (z the height there) */
+    function tap(x, y, z = 0) {
+        pointerZ = z;
+        pointer('pointerdown', x, y);
+        touch('touchstart');
+        pointer('pointerup', x, y);
+        touch('touchend');
+    }
+    /** A finger that moves the view: down, a drag of 40 px, up */
+    function pan(x = 100, y = 100) {
+        pointer('pointerdown', x, y);
+        touch('touchstart');
+        pointer('pointermove', x + 40, y);
+        touch('touchmove');
+        pointer('pointerup', x + 40, y);
+        touch('touchend');
+    }
+
+    it('a tap places a point of a distance where it is made, and the marker follows again for the next tap', () => {
+        gestures.start('distance');
+        flushTimers();
+        tap(1, 1, 5);
+        tap(2, 2, 6);
+        tap(3, 3, 7);
+        expect(measures[0].points).toHaveLength(4);
+        expect(viewer.inputHandler.drag.object).toBe(measures[0].spheres.at(-1));
+        key('Enter');
+        expect(coords(measures[0])).toEqual([[1, 1, 5], [2, 2, 6], [3, 3, 7]]);
+    });
+
+    it('a tap places a point, which then ends by itself, at the point of the cloud under the finger and not at the origin', () => {
+        gestures.start('point');
+        flushTimers();
+        tap(30, 40, 9);
+        flushTimers();
+        expect(coords(measures[0])).toEqual([[30, 40, 9]]);
+        expect(gestures.activeKind).toBeNull();
+    });
+
+    it('a height ends with its second tap', () => {
+        gestures.start('height');
+        flushTimers();
+        tap(1, 1, 0);
+        flushTimers();
+        expect(gestures.activeKind).toBe('height');
+        tap(1, 1, 8);
+        flushTimers();
+        expect(gestures.activeKind).toBeNull();
+        expect(coords(measures[0])).toEqual([[1, 1, 0], [1, 1, 8]]);
+    });
+
+    it('Done on a Point nobody placed keeps nothing: the marker at the origin is not a placement', () => {
+        gestures.start('point');
+        flushTimers();
+        // The finger only moved the view: Potree let go of the marker, which stays where it began
+        pan();
+        expect(gestures.placed(measures[0])).toBe(0);
+        expect(gestures.finish({ dropShort: false })).toBe(false);
+        expect(gestures.activeKind).toBe('point');
+        expect(discarded).toEqual([]);
+        expect(coords(measures[0])).toEqual([[0, 0, 0]]);
+    });
+
+    it('Done on a Distance with one tap placed ends nothing (two points are needed), and with two keeps them', () => {
+        gestures.start('distance');
+        flushTimers();
+        tap(1, 1);
+        expect(gestures.finish({ dropShort: false })).toBe(false);
+        tap(5, 5);
+        expect(gestures.finish({ dropShort: false })).toBe(true);
+        expect(coords(measures[0])).toEqual([[1, 1, 0], [5, 5, 0]]);
+    });
+
+    it('a tap on no point of the cloud places nothing and keeps the marker in hand', () => {
+        gestures.start('distance');
+        flushTimers();
+        tap(1, 1, 2);
+        pointerMisses = true;
+        tap(50, 50);
+        pointerMisses = false;
+        expect(measures[0].points).toHaveLength(2);
+        expect(viewer.inputHandler.drag.object).toBe(measures[0].spheres.at(-1));
+        tap(4, 4, 3);
+        key('Enter');
+        expect(coords(measures[0])).toEqual([[1, 1, 2], [4, 4, 3]]);
+    });
+
+    it('a drag of the view between taps places nothing, and the next tap places its point where it is made', () => {
+        gestures.start('distance');
+        flushTimers();
+        tap(1, 1);
+        pan();
+        expect(measures[0].points).toHaveLength(2);
+        expect(viewer.inputHandler.drag.object).toBe(measures[0].spheres.at(-1));
+        tap(6, 8);
+        key('Enter');
+        expect(coords(measures[0])).toEqual([[1, 1, 0], [6, 8, 0]]);
+    });
+
+    it('a pinch of two fingers places nothing', () => {
+        gestures.start('distance');
+        flushTimers();
+        pointer('pointerdown', 10, 10, { pointerId: 1 });
+        touch('touchstart');
+        pointer('pointerdown', 20, 20, { pointerId: 2 });
+        pointer('pointerup', 10, 10, { pointerId: 1 });
+        pointer('pointerup', 20, 20, { pointerId: 2 });
+        touch('touchend');
+        expect(measures[0].points).toHaveLength(1);
+        expect(viewer.inputHandler.drag.object).toBe(measures[0].spheres[0]);
+    });
+
+    it('a touch that is cancelled places nothing and gives the marker back', () => {
+        gestures.start('distance');
+        flushTimers();
+        pointer('pointerdown', 10, 10);
+        touch('touchstart');
+        pointer('pointercancel', 10, 10);
+        expect(measures[0].points).toHaveLength(1);
+        expect(viewer.inputHandler.drag.object).toBe(measures[0].spheres[0]);
+    });
+
+    it('leaves the pointer events of a mouse alone: a click places one point, not two', () => {
+        gestures.start('distance');
+        flushTimers();
+        const mouse = (type, x, y) => pointer(type, x, y, { pointerType: 'mouse' });
+        pointerZ = 0;
+        fire('mousemove', { clientX: 5, clientY: 5, buttons: 0 });
+        mouse('pointerdown', 5, 5);
+        fire('mousedown', { clientX: 5, clientY: 5, buttons: 1 });
+        mouse('pointerup', 5, 5);
+        fire('mouseup', { clientX: 5, clientY: 5 });
+        expect(measures[0].points).toHaveLength(2);
+    });
+
+    it('does nothing with no measure being drawn', () => {
+        tap(1, 1);
+        pan();
+        expect(measures).toEqual([]);
+        expect(viewer.inputHandler.drag).toBeNull();
     });
 });

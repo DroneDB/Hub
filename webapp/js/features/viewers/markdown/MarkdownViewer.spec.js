@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
-const source = vi.hoisted(() => ({ text: '', path: 'readme.md', canWrite: false, writeObj: null, refused: '' }));
+const source = vi.hoisted(() => ({ text: '', path: 'readme.md', canWrite: false, writeObj: null, refused: '', readError: null }));
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const guards = vi.hoisted(() => ({ leave: null, update: null }));
 vi.mock('vue-router', async importOriginal => ({
@@ -34,7 +34,7 @@ vi.mock('@/composables/useViewerEntry', async () => {
         useViewerEntry: () => source.refused ? refusedEntry(source.refused) : ({
             entry: shallowRef({ path: source.path }),
             dataset: shallowRef({
-                getFileContents: () => Promise.resolve(source.text), writeObj: source.writeObj,
+                getFileContents: () => (source.readError ? Promise.reject(source.readError) : Promise.resolve(source.text)), writeObj: source.writeObj,
                 downloadUrl: (path, { inline } = {}) => `/orgs/o/ds/d/download/${path}${inline ? '?inline=1' : ''}`
             }),
             canWrite: ref(source.canWrite),
@@ -54,6 +54,7 @@ beforeEach(() => {
     source.canWrite = false;
     source.writeObj = vi.fn(() => Promise.resolve());
     source.refused = '';
+    source.readError = null;
 });
 
 let wrapper;
@@ -132,6 +133,19 @@ describe('MarkdownViewer', () => {
     it('shows no edit button to a user who cannot write', async () => {
         await render('# Title');
         expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
+    });
+
+    it('offers no Edit for a file that could not be read: Save would replace it with only what is typed', async () => {
+        source.canWrite = true;
+        source.readError = new Error('503 Service Unavailable');
+        await render('');
+        expect(wrapper.find('.view-toolbar').exists()).toBe(false);
+        expect(wrapper.find('button[aria-label="Edit"]').exists()).toBe(false);
+        expect(wrapper.vm.rawContent).toBe('');
+        // The editor cannot be opened either
+        await wrapper.vm.edit?.();
+        expect(wrapper.find('textarea').exists()).toBe(false);
+        expect(source.writeObj).not.toHaveBeenCalled();
     });
 
     it('labels Edit and Save with visible text, not only an icon', async () => {

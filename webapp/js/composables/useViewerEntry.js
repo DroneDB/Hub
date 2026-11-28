@@ -125,7 +125,8 @@ export function useViewerEntry({ types, accepts, typeLabel = 'this view', title,
         dataset.value = ds;
         entry.value = e;
 
-        if (e) {
+        // A viewer left while its file loads writes neither the selection nor the title: the next page has its own
+        if (e && !unmounted) {
             session.setSelectedFiles([{ path: ddbURI.value }]);
             if (title !== null) setTitle(`${ddb.pathutils.basename(e.path)} - ${title}`);
         }

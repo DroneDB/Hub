@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { loadPotree } from './potreeLibs.fixtures';
-import { updateItemLabel, measureAt, hideTooltips } from './measureLabels';
+import { updateItemLabel, removeItemLabel, measureAt, hideTooltips } from './measureLabels';
 import { ensureProperties } from '@/libs/map/potreeMeasurementConverter';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportDefaults';
 
@@ -103,6 +103,26 @@ describe('updateItemLabel', () => {
         expect(measure._itemLabel.lines).toEqual([{ text: 'Urgent', kind: 'fields', colour: '#ff0000' }]);
         expect(measure.children).not.toContain(first);
         expect(session.untrack).toHaveBeenCalledWith(viewer, 'update', expect.any(Function));
+    });
+});
+
+describe('removeItemLabel', () => {
+    it('takes the label, the per-frame handler, the tooltip and the hover listener of a measure away', () => {
+        const { viewer, session } = setup();
+        const measure = point({ name: 'Crepa', description: 'Crack in the roof' });
+        updateItemLabel(measure, { viewer, session, schema: () => DEFAULT_SCHEMA });
+        const { _itemLabel: label, _itemLabelTooltip: tooltip, _labelUpdateHandler: onFrame, _tooltipHoverHandler: onHover } = measure;
+        expect(document.body.contains(tooltip)).toBe(true);
+
+        removeItemLabel(measure, { viewer, session });
+
+        expect(measure.children).not.toContain(label);
+        expect(document.body.contains(tooltip)).toBe(false);
+        expect(session.untrack).toHaveBeenCalledWith(viewer, 'update', onFrame);
+        expect(session.untrack).toHaveBeenCalledWith(viewer.renderer.domElement, 'mousemove', onHover);
+        expect(measure._itemLabel).toBeNull();
+        // A measure with no label is left alone
+        expect(() => removeItemLabel(measure, { viewer, session })).not.toThrow();
     });
 });
 

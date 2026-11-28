@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { loadPotree } from './potreeLibs.fixtures';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { updateItemLabel } from './measureLabels';
+import { escapeHtml } from '@/libs/sanitize';
 import { measureAsFeature, assignMeasureProperties } from './measureStyle';
 
 const NAME = 'Gate A & B <img src=x onerror=alert(1)>';
@@ -77,6 +78,23 @@ describe('the scene tree of Potree', () => {
         expect(tree.find('img')).toHaveLength(0);
         // The headers are still bold
         expect(tree.find('#measurements > a b').text()).toBe('Measurements');
+    });
+});
+
+describe('the point cloud in the scene tree', () => {
+    it('is named by the text of the file name, which makes no element when it is escaped as the viewer escapes it', () => {
+        const { tree } = sceneTree();
+        tree.jstree('create_node', 'pointclouds', { text: escapeHtml(NAME) }, 'last', false, false);
+        tree.jstree('open_all');
+        expect(tree.find('#pointclouds li > a').text()).toBe(NAME);
+        expect(tree.find('img')).toHaveLength(0);
+    });
+
+    it('would make an element of the name if it were not escaped', () => {
+        const { tree } = sceneTree();
+        tree.jstree('create_node', 'pointclouds', { text: NAME }, 'last', false, false);
+        tree.jstree('open_all');
+        expect(tree.find('img')).toHaveLength(1);
     });
 });
 

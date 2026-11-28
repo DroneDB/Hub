@@ -37,7 +37,7 @@ const rasterEntry = (path, hash = `h-${path}`) => ({ path, type: T.GEORASTER, ha
 const vectorEntry = path => ({ path, type: T.VECTOR, hash: `h-${path}` });
 const base = path => ({ path, hash: `h-${path}` });
 const enc = path => b64urlEncode(path);
-const fileUrl = (path, search = '') => `/r/acme/site/view/${b64encode(path)}/map${search}`;
+const fileUrl = (path, search = '') => `/r/acme/site/view/${encodeURIComponent(b64encode(path))}/map${search}`;
 
 /** A dataset whose meta list `views` behaves like the server's. */
 function fakeDataset({ items = [], missing = [], canWrite = true } = {}) {
