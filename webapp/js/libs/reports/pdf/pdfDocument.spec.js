@@ -212,6 +212,32 @@ describe('the sections and their values: the page and the PDF are the same repor
         }
     });
 
+    it('draws a donut per group of counts for a template that chose them, with the legend the page has, and no donut for bars', () => {
+        const donutsOf = content => nodesOf(content).filter(n => typeof n.svg === 'string' && n.svg.includes('stroke-linejoin'));
+        const model = pdfModel({ templateExtra: { breakdownChart: 'donuts' } });
+        const summary = model.sections.find(s => s.kind === 'summary').blocks.find(b => b.type === 'summaryStats');
+        const content = build(model).content;
+        const donuts = donutsOf(content);
+        expect(donuts).toHaveLength(summary.groups.length);
+        summary.groups.forEach((group, index) => {
+            const svg = donuts[index].svg;
+            expect(svg.match(/<path /g)).toHaveLength(group.counts.length);
+            for (const count of group.counts) expect(svg).toContain(`fill="${count.colour}"`);
+            expect(svg).toContain(`>${group.middle.number}</text>`);
+            expect(svg).toContain(`>${group.middle.word}</text>`);
+        });
+        const all = textsOf(content);
+        for (const group of summary.groups) {
+            expect(all).toContain(group.title);
+            for (const count of group.counts) {
+                expect(all).toContain(count.label);
+                expect(all).toContain(String(count.count));
+                expect(all).toContain(count.share);
+            }
+        }
+        expect(donutsOf(build(pdfModel()).content)).toEqual([]);
+    });
+
     it('writes the titles of the summary groups, the headline and the sign-off the model gives, as they are', () => {
         const model = pdfModel();
         const blocks = model.sections.flatMap(s => s.blocks);

@@ -46,6 +46,11 @@
                         <Select v-model="template.orientation" input-id="report-template-orientation" aria-labelledby="report-template-orientation-label" :options="orientations" option-label="label"
                                 option-value="value" :disabled="readOnly" :aria-describedby="describedBy" />
                     </ReportSettingsField>
+                    <ReportSettingsField id="report-template-breakdown" v-slot="{ describedBy }" label="Summary charts" :error="errorAt('breakdownChart')"
+                                         hint="The Breakdown of the summary">
+                        <Select v-model="template.breakdownChart" input-id="report-template-breakdown" aria-labelledby="report-template-breakdown-label" :options="breakdownCharts" option-label="label"
+                                option-value="value" :disabled="readOnly" :aria-describedby="describedBy" />
+                    </ReportSettingsField>
                 </div>
 
                 <ReportSettingsField id="report-template-header" v-slot="{ describedBy, invalid }" label="Header text" :error="errorAt('headerText')" :count="`${(template.headerText ?? '').length}/${limits.headerText}`">
@@ -135,7 +140,7 @@ import { LOGO_INPUT_HINT, prepareLogoFor } from '@/libs/logoImage';
 import { LOGO_MAX_SIDE } from '@/libs/reports/pdf/pdfImages';
 import { resolveLogo } from '@/libs/reports/reportModel';
 import {
-    LIMITS, ORIENTATIONS, PAPERS, REPORT_SWATCHES, SECTION_KINDS, SECTION_LABELS,
+    BREAKDOWN_CHARTS, LIMITS, ORIENTATIONS, PAPERS, REPORT_SWATCHES, SECTION_KINDS, SECTION_LABELS,
     canAddEntry, canRemoveEntry, idFromName, logoProblem, newTemplate, problemAt, takenIds
 } from '@/libs/reports/reportSettings';
 
@@ -163,6 +168,7 @@ const swatches = REPORT_SWATCHES;
 const colourFields = [{ field: 'primary', label: 'Primary colour' }, { field: 'accent', label: 'Accent colour' }];
 const papers = PAPERS;
 const orientations = ORIENTATIONS.map(value => ({ value, label: value === 'portrait' ? 'Portrait' : 'Landscape' }));
+const breakdownCharts = BREAKDOWN_CHARTS.map(value => ({ value, label: value === 'bars' ? 'Bars' : 'Donuts' }));
 const sectionKinds = SECTION_KINDS;
 const sectionLabels = SECTION_LABELS;
 const logoHint = LOGO_INPUT_HINT;
@@ -177,7 +183,7 @@ const preparing = ref(false);
 const customChosen = ref(null);
 const logoModeKey = ref(0);
 
-const template = computed(() => templates.value[selected.value] ?? null);
+const template = computed(() => /** @type {import('@/libs/reports/reportSettings').ReportTemplate | null} */ (templates.value[selected.value] ?? null));
 const options = computed(() => templates.value.map((t, index) => ({ value: index, label: t.name?.trim() || `Template ${index + 1}` })));
 const isSaved = computed(() => !!template.value && props.savedIds.has(template.value.id));
 const canAdd = computed(() => canAddEntry('templates', templates.value));

@@ -19,11 +19,11 @@
 import { PRIMARY } from '@/libs/palette';
 import { slugFromName } from '@/libs/slug';
 import { SECTION_KINDS } from '@/libs/reports/reportDefinition';
-import { SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings } from '@/libs/reports/reportDefaults';
+import { SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, BREAKDOWN_CHARTS, breakdownChartOf, cloneSettings } from '@/libs/reports/reportDefaults';
 import { DARK_TEXT, readableTextOnChannels } from '@/libs/readableText';
 import { LOGO_TYPES, logoProblem as logoFileProblem } from '@/libs/logoCheck';
 
-export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, cloneSettings, LOGO_TYPES };
+export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, BREAKDOWN_CHARTS, breakdownChartOf, cloneSettings, LOGO_TYPES };
 
 /** @typedef {import('./reportDefaults').SchemaChoice} SchemaChoice */
 /** @typedef {import('./reportDefaults').SchemaStatus} SchemaStatus */
@@ -332,6 +332,7 @@ export function templateProblems(template) {
     put(errors, 'accent', isColour(template.accent) ? null : 'Choose a colour (#rrggbb)');
     put(errors, 'paper', PAPERS.includes(template.paper) ? null : 'Choose a paper size');
     put(errors, 'orientation', ORIENTATIONS.includes(template.orientation) ? null : 'Choose an orientation');
+    put(errors, 'breakdownChart', BREAKDOWN_CHARTS.includes(/** @type {any} */ (template.breakdownChart)) ? null : 'Choose how the summary draws its counts');
     put(errors, 'headerText', textProblem(template.headerText, LIMITS.headerText, 'The header text'));
     put(errors, 'footerText', textProblem(template.footerText, LIMITS.footerText, 'The footer text'));
     put(errors, 'disclaimer', textProblem(template.disclaimer, LIMITS.disclaimer, 'The disclaimer'));

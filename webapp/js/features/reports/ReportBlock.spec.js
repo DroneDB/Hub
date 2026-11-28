@@ -8,7 +8,8 @@ import { h } from 'vue';
 import { mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import { buildReportModel } from '@/libs/reports/reportModel';
-import { cloudFeature, inputOf, mapFeature } from '@/libs/reports/reportModel.fixtures';
+import { cloudFeature, inputOf, mapFeature, settings, template } from '@/libs/reports/reportModel.fixtures';
+import { donutGeometry } from '@/libs/reports/donutChart';
 import ReportBlock from './ReportBlock.vue';
 import ReportSection from './ReportSection.vue';
 import { BLOCK_COMPONENTS } from './blocks/blockComponents';
@@ -84,6 +85,43 @@ describe('the texts of the summary and the sign-off', () => {
         const text = mount(SummaryStatsBlock, { props: { block: stats } }).text();
         for (const group of stats.groups) expect(text).toContain(group.title);
         expect(mount(SignOffBlock, { props: { block: blocks.find(b => b.type === 'signOff') } }).text()).toContain('Prepared by J. Doe');
+    });
+});
+
+describe('the counts of the summary as donuts', () => {
+    const features = [
+        mapFeature('a', '1', 'point', { type: 'Point', coordinates: [11, 45] }, { severity: 'high', status: 'open' }),
+        mapFeature('b', '2', 'point', { type: 'Point', coordinates: [11, 45] }, { severity: 'high' }),
+        mapFeature('c', '3', 'point', { type: 'Point', coordinates: [11, 45] }, { severity: 'low' })
+    ];
+    const statsWith = breakdownChart => buildReportModel(inputOf(features, { settings: settings({ templates: [template({ breakdownChart })] }) }))
+        .sections.flatMap(s => s.blocks).find(b => b.type === 'summaryStats');
+
+    it('draw a ring per group with a slice per count, the items in the hole, and a legend of names, counts and shares', () => {
+        const stats = statsWith('donuts');
+        const wrapper = mount(SummaryStatsBlock, { props: { block: stats } });
+        const donuts = wrapper.findAll('.report-donut');
+        expect(donuts).toHaveLength(stats.groups.length);
+        expect(wrapper.find('.report-summary-bar').exists()).toBe(false);
+        stats.groups.forEach((group, index) => {
+            const donut = donuts[index];
+            expect(donut.find('.report-donut-title').text()).toBe(group.title);
+            const paths = donut.findAll('path');
+            expect(paths.map(p => p.attributes('fill'))).toEqual(group.counts.map(c => c.colour));
+            expect(paths.map(p => p.attributes('d'))).toEqual(donutGeometry(group.counts).slices.map(s => s.d));
+            expect(paths.map(p => p.find('title').text())).toEqual(group.counts.map(c => `${c.label}: ${c.count}`));
+            expect(donut.findAll('text').map(t => t.text())).toEqual(['3', 'items']);
+            expect(donut.findAll('.report-donut-legend li').map(li => [li.find('.report-donut-label').text(), li.find('.report-donut-count').text(), li.find('.report-donut-share').text()]))
+                .toEqual(group.counts.map(c => [c.label, String(c.count), c.share]));
+        });
+        const severity = stats.groups.find(g => g.key === 'severity');
+        expect(severity.counts.map(c => [c.label, c.share])).toEqual([['Low', '33%'], ['High', '67%']]);
+    });
+
+    it('are not drawn for a template that keeps bars', () => {
+        const wrapper = mount(SummaryStatsBlock, { props: { block: statsWith('bars') } });
+        expect(wrapper.find('.report-donut').exists()).toBe(false);
+        expect(wrapper.find('.report-summary-bar').exists()).toBe(true);
     });
 });
 

@@ -17,18 +17,20 @@
  *   capture3d     { type, itemId, ref, path, camera, capturedAt, text }   the capture of a 3D item, or "No 3D snapshot"
  *   photoGrid     { type, itemId, photos: [{ path, caption, source, pixel }] }
  *   markdown      { type, text }   markdown the renderer sanitises
- *   summaryStats  { type, total, overdue, headline, totals, groups: [{ key, title, counts: [{ key, label, count, colour }] }] }
- *                   the groups that have counts
+ *   summaryStats  { type, chart: 'bars' | 'donuts', total, overdue, headline, totals,
+ *                   groups: [{ key, title, middle: { number, word }, counts: [{ key, label, count, share, colour }] }] }
+ *                   the groups that have counts; chart: how the template draws them; share: the count as a percentage
+ *                   of its group ("26%"); middle: the number of items of the group, for the hole of a donut
  *   qr            { type, url, label }
  *   note          { type, tone: 'info' | 'warning', text }
  *   signOff       { type, byline, lines: [{ label }] }   byline: "Prepared by <name>", or empty
  */
-import { formatDate } from '@/libs/format';
-import { SECTION_LABELS } from '@/libs/reports/reportDefaults';
+import { formatDate, formatNumber } from '@/libs/format';
+import { SECTION_LABELS, breakdownChartOf } from '@/libs/reports/reportDefaults';
 import { buildTables, itemRows } from '@/libs/reports/reportTables';
-import { countByKind, countByChoice, itemCountText } from '@/libs/reports/reportTotals';
+import { countByKind, countByChoice, itemCountText, shareText } from '@/libs/reports/reportTotals';
 import { extentOf, frameOf } from '@/libs/reports/reportFrames';
-import { itemBadges, kindLabel, reportKpis, choiceColour, UNSET_COLOUR } from '@/libs/reports/reportStyling';
+import { itemBadges, kindLabel, reportKpis, choiceColour, kindShades, UNSET_COLOUR } from '@/libs/reports/reportStyling';
 import { NO_VALUE } from '@/libs/reports/reportItems';
 
 export const NO_ELEVATION_LAYER = 'No elevation layer in the cover view';
@@ -204,19 +206,35 @@ function coverSection(ctx) {
     ];
 }
 
+/**
+ * A group of counts of the summary, with the share of each count and the number of items in the group.
+ * @param {string} key @param {string} title @param {{ key: string, label: string, count: number, colour: string }[]} counts
+ */
+function countGroup(key, title, counts) {
+    const total = counts.reduce((sum, c) => sum + c.count, 0);
+    return {
+        key, title,
+        middle: { number: formatNumber(total, 0), word: total === 1 ? 'item' : 'items' },
+        counts: counts.map(c => ({ ...c, share: shareText(c.count, total) }))
+    };
+}
+
 /** @param {SectionContext} ctx */
 function summarySection(ctx) {
     const { items, text } = ctx;
     const overdue = items.filter(i => i.overdue).length;
     const total = itemCountText(items.length);
-    // Each count has the colour of what it counts (a kind the accent of the template, a value not set grey)
+    const chart = breakdownChartOf(ctx.template);
+    // Each count has the colour of what it counts (a value not set grey). A bar of a kind has the accent of the
+    // template; a slice of a donut a shade of it, so that the kinds of one donut can be told apart
     const coloured = (/** @type {'category' | 'severity' | 'status'} */ field, /** @type {any[]} */ counts) =>
         counts.map(c => ({ ...c, colour: c.key ? choiceColour(text.schema, field, c.key) : UNSET_COLOUR }));
+    const shades = chart === 'donuts' ? kindShades(ctx.template.accent) : null;
     const groups = [
-        { key: 'kind', title: 'By kind', counts: countByKind(items).map(c => ({ ...c, colour: ctx.template.accent })) },
-        { key: 'category', title: 'By category', counts: coloured('category', countByChoice(items, 'category', text.schema.categories)) },
-        { key: 'severity', title: 'By severity', counts: coloured('severity', countByChoice(items, 'severity', text.schema.severities)) },
-        { key: 'status', title: 'By status', counts: coloured('status', countByChoice(items, 'status', text.schema.statuses)) }
+        countGroup('kind', 'By kind', countByKind(items).map(c => ({ ...c, colour: shades ? shades[c.key] : ctx.template.accent }))),
+        countGroup('category', 'By category', coloured('category', countByChoice(items, 'category', text.schema.categories))),
+        countGroup('severity', 'By severity', coloured('severity', countByChoice(items, 'severity', text.schema.severities))),
+        countGroup('status', 'By status', coloured('status', countByChoice(items, 'status', text.schema.statuses)))
     ];
     return [
         heading(1, SECTION_LABELS.summary),
@@ -224,6 +242,7 @@ function summarySection(ctx) {
         kpisBlock(ctx),
         {
             type: /** @type {const} */ ('summaryStats'),
+            chart,
             total: { count: items.length, text: total },
             overdue: { count: overdue, text: itemCountText(overdue) },
             headline: overdue ? `${total} (${itemCountText(overdue)} overdue)` : total,

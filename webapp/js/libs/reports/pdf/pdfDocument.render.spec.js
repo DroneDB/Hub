@@ -77,6 +77,26 @@ describe('the PDF pdfmake writes', () => {
         expect(pageCount(text)).toBeGreaterThanOrEqual(9);
     }, 60000);
 
+    it('draws the donuts of the summary inside the margins, on A4 portrait and Letter landscape', async () => {
+        for (const page of [{ paper: 'A4', orientation: 'portrait' }, { paper: 'Letter', orientation: 'landscape' }]) {
+            const model = pdfModel({ templateExtra: { ...page, breakdownChart: 'donuts' } });
+            const groups = model.sections.find(s => s.kind === 'summary').blocks.find(b => b.type === 'summaryStats').groups;
+            const doc = await pdfMake.createPdf(buildPdfDocument(model, options(model, fullAssets(model)))).getStream();
+            const pages = doc._pdfMakePages;
+            const { width } = pages[0].pageSize;
+            const donuts = pages.flatMap(p => p.items).filter(entry => entry.type === 'svg' && entry.item.svg.includes('stroke-linejoin')).map(entry => entry.item);
+            doc.end();
+            expect(donuts).toHaveLength(groups.length);
+            for (const donut of donuts) {
+                expect(donut.x).toBeGreaterThanOrEqual(39.5);
+                expect(donut.x + donut._width).toBeLessThanOrEqual(width - 39.5);
+                expect(donut._width).toBe(donut._height);
+            }
+            const laid = await laidOut(model, fullAssets(model));
+            expect(names(pastMargin(laid))).toEqual([]);
+        }
+    }, 60000);
+
     it('embeds a font and writes the title in the information of the file', async () => {
         const model = pdfModel();
         const { text } = await render(model, fullAssets(model));

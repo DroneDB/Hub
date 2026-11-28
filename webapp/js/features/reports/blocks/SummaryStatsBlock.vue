@@ -16,7 +16,10 @@
         </template>
 
         <h3 v-if="block.groups.length" class="report-summary-title">Breakdown</h3>
-        <div class="report-summary-counts">
+        <div v-if="block.chart === 'donuts'" class="report-summary-donuts">
+            <SummaryDonut v-for="group in block.groups" :key="group.key" :group="group" />
+        </div>
+        <div v-else class="report-summary-counts">
             <section v-for="group in block.groups" :key="group.key" class="report-summary-group">
                 <h4 class="report-summary-group-title">{{ group.title }}</h4>
                 <ul>
@@ -36,12 +39,15 @@
 <script setup>
 /**
  * The summary block: how many items there are (overdue ones apart), the totals the items add up to as tiles, and the
- * counts by kind, category, severity and status as bars, each as long as its count is of the largest of its group, in
- * the colour of what it counts. A count says its name and its number: no meaning is carried by colour alone. Every
- * text, the titles of the groups too, is the model's, so the PDF writes the same.
+ * counts by kind, category, severity and status in the chart the template chose: bars, each as long as its count is of
+ * the largest of its group, or a donut per group (SummaryDonut). Each count is in the colour of what it counts and says
+ * its name and its number: no meaning is carried by colour alone. Every text, the titles of the groups too, is the
+ * model's, so the PDF writes the same.
  */
+import SummaryDonut from './SummaryDonut.vue';
+
 defineProps({
-    /** { total, overdue, headline, totals, groups: [{ key, title, counts: [{ key, label, count, colour }] }] } */
+    /** { chart, total, overdue, headline, totals, groups: [{ key, title, middle, counts: [{ key, label, count, share, colour }] }] } */
     block: { type: Object, required: true }
 });
 
@@ -109,6 +115,12 @@ dd {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
     gap: var(--ddb-spacing-md) var(--ddb-spacing-xl);
+}
+
+.report-summary-donuts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--ddb-spacing-lg) var(--ddb-spacing-xl);
 }
 
 .report-summary-group-title {

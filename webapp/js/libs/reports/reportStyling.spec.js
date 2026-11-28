@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { statusColour, choiceColour, itemBadges, rowMarks, reportKpis, kindLabel, tint, shade, textOn, softBadge, CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
+import { statusColour, choiceColour, itemBadges, rowMarks, reportKpis, kindLabel, kindShades, tint, shade, textOn, softBadge, CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
+import { KIND_ORDER } from './reportKinds';
 import { DEFAULT_SCHEMA } from './reportDefaults';
 import { DARK_TEXT } from '@/libs/readableText';
 
@@ -125,5 +126,32 @@ describe('a soft badge', () => {
         expect(contrast('#1e293b', '#0f172a')).toBeLessThan(1.5);
         const { fill, text } = softBadge('#1e293b');
         expect(contrast(text, fill)).toBeGreaterThan(7);
+    });
+});
+
+describe('the shades of the kinds', () => {
+    const luminance = hex => {
+        const n = parseInt(hex.slice(1), 16);
+        return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+    };
+
+    it('give every kind a shade of the accent, from darker to lighter in the order of the kinds, all different', () => {
+        const shades = kindShades('#0891b2');
+        expect(Object.keys(shades)).toEqual([...KIND_ORDER]);
+        const values = KIND_ORDER.map(kind => shades[kind]);
+        expect(new Set(values).size).toBe(KIND_ORDER.length);
+        for (const value of values) expect(value).toMatch(/^#[0-9a-f]{6}$/);
+        const lights = values.map(luminance);
+        for (let i = 1; i < lights.length; i++) expect(lights[i]).toBeGreaterThan(lights[i - 1]);
+        expect(lights[0]).toBeLessThan(luminance('#0891b2'));
+        expect(lights.at(-1)).toBeGreaterThan(luminance('#0891b2'));
+    });
+
+    it('stay apart for a very dark or a very light accent, and stop short of black and white', () => {
+        for (const accent of ['#000000', '#1e293b', '#eab308', '#ffffff']) {
+            const values = Object.values(kindShades(accent));
+            expect(new Set(values).size).toBe(KIND_ORDER.length);
+        }
+        expect(Object.values(kindShades('#ffffff'))).not.toContain('#ffffff');
     });
 });

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-    DEFAULT_SCHEMA, DEFAULT_TEMPLATE, LIMITS, REPORT_SWATCHES, SECTION_KINDS, ID_PATTERN,
+    DEFAULT_SCHEMA, DEFAULT_TEMPLATE, BREAKDOWN_CHARTS, breakdownChartOf, LIMITS, REPORT_SWATCHES, SECTION_KINDS, ID_PATTERN,
     datasetReportSettings, orgReportSettings, saveOrgReportSettings, uploadTemplateLogo, deleteTemplateLogo,
     templateLogoUrl, datasetTemplateLogoUrl, isEndpointMissing,
     idFromName, newTemplate, newSchemaEntry, canRemoveEntry, canAddEntry,
@@ -203,6 +203,9 @@ describe('the rules', () => {
         expect(Object.keys(templateProblems({ ...t, id: 'Bad Id' }))).toEqual(['id']);
         expect(Object.keys(templateProblems({ ...t, primary: 'red', accent: '#12' })).sort()).toEqual(['accent', 'primary']);
         expect(Object.keys(templateProblems({ ...t, paper: 'A3', orientation: 'tilted' })).sort()).toEqual(['orientation', 'paper']);
+        expect(Object.keys(templateProblems({ ...t, breakdownChart: 'pies' }))).toEqual(['breakdownChart']);
+        expect(Object.keys(templateProblems({ ...t, breakdownChart: undefined }))).toEqual(['breakdownChart']);
+        expect(templateProblems({ ...t, breakdownChart: 'donuts' })).toEqual({});
         expect(Object.keys(templateProblems({ ...t, headerText: 'x'.repeat(201), footerText: 'x'.repeat(201), disclaimer: 'x'.repeat(5001) })).sort())
             .toEqual(['disclaimer', 'footerText', 'headerText']);
         expect(templateProblems({ ...t, headerText: 'x'.repeat(200), disclaimer: 'x'.repeat(5000) })).toEqual({});
@@ -272,5 +275,17 @@ describe('what the Registry refuses with', () => {
         expect(problemPathsOf(new ApiError('boom', 500))).toEqual({});
         expect(problemPathsOf(null)).toEqual({});
         expect(problemPathsOf({ errors: ['a'] })).toEqual({});
+    });
+});
+
+describe('the summary charts of a template', () => {
+    it('are bars by default, for a template stored without the choice and for a choice this Hub does not know', () => {
+        expect(DEFAULT_TEMPLATE.breakdownChart).toBe('bars');
+        expect(BREAKDOWN_CHARTS).toEqual(['bars', 'donuts']);
+        expect(breakdownChartOf({ breakdownChart: 'donuts' })).toBe('donuts');
+        expect(breakdownChartOf({})).toBe('bars');
+        expect(breakdownChartOf({ breakdownChart: null })).toBe('bars');
+        expect(breakdownChartOf({ breakdownChart: 'pies' })).toBe('bars');
+        expect(breakdownChartOf(null)).toBe('bars');
     });
 });

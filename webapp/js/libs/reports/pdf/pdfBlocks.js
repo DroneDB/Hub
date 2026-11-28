@@ -10,6 +10,7 @@ import { markdownToPdf } from '@/libs/reports/pdf/pdfMarkdown';
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
 import { INK, MUTED, RULE, SUBTLE, TRACK, WHITE, INFO_FILL, WARNING_FILL, tint, textOn, toneColour } from '@/libs/reports/pdf/pdfTheme';
 import { softBadge } from '@/libs/reports/reportStyling';
+import { donutSvg } from '@/libs/reports/donutChart';
 import { qrSvg } from '@/libs/qr';
 import { isOriginUrl } from '@/libs/originUrl';
 import { MISSING_PHOTO, figureCaption } from '@/libs/reports/reportSections';
@@ -311,9 +312,45 @@ function barRow(count, max, track) {
     ];
 }
 
-/** The summary: the totals as tiles, then the counts as bars. @param {any} block @param {BlockContext} ctx */
+/** The side of the donut of a group of counts, in points */
+const DONUT_SIDE = 74;
+
+/**
+ * A group of counts as bars, one per count, as long as the count is of the largest of the group.
+ * @param {any} group @param {number} columnWidth
+ */
+function barGroup(group, columnWidth) {
+    const labelWidth = Math.min(110, columnWidth * 0.42);
+    const track = Math.max(20, columnWidth - labelWidth - 26 - 8);
+    const max = Math.max(...group.counts.map((/** @type {any} */ c) => c.count), 0);
+    return { table: { widths: [labelWidth, track, 22], body: group.counts.map((/** @type {any} */ c) => barRow(c, max, track)) }, layout: PLAIN };
+}
+
+/**
+ * A group of counts as a donut (the ring of the live page) with a legend beside it: the colour, the name, the count and
+ * its share of the group.
+ * @param {any} group
+ */
+function donutGroup(group) {
+    const legend = group.counts.map((/** @type {any} */ c) => [
+        { canvas: [{ type: 'rect', x: 0, y: 2.5, w: 7, h: 7, r: 2, color: c.colour || MUTED }] },
+        { text: c.label, fontSize: 8.5, color: INK, margin: [0, 1, 2, 0] },
+        { text: String(c.count), fontSize: 8.5, bold: true, alignment: 'right', margin: [0, 1, 0, 0] },
+        { text: c.share, fontSize: 8, color: MUTED, alignment: 'right', margin: [0, 1.5, 0, 0] }
+    ]);
+    return {
+        columns: [
+            { svg: donutSvg(group.counts, group.middle, { background: WHITE, ink: INK, muted: MUTED }), width: DONUT_SIDE },
+            { table: { widths: [11, '*', 18, 26], body: legend }, layout: PLAIN, width: '*', margin: [0, Math.max(0, (DONUT_SIDE - legend.length * 13) / 2), 0, 0] }
+        ],
+        columnGap: 10
+    };
+}
+
+/** The summary: the totals as tiles, then the counts as bars or donuts (the template's choice). @param {any} block @param {BlockContext} ctx */
 function summaryStats(block, ctx) {
     const landscape = ctx.layout.pageOrientation === 'landscape';
+    const donuts = block.chart === 'donuts';
     const totals = block.totals.map((/** @type {any} */ total) => ({
         colour: ctx.colours.accent,
         stack: [
@@ -322,21 +359,17 @@ function summaryStats(block, ctx) {
             ...(total.partsText ? [{ text: total.partsText, fontSize: 7.5, color: MUTED }] : [])
         ]
     }));
-    const perRow = landscape ? 4 : 2;
+    // A donut and its legend need more width than a column of bars: three in a landscape row, not four
+    const perRow = landscape ? (donuts ? 3 : 4) : 2;
     const columnWidth = (ctx.layout.contentWidth - 18 * (perRow - 1)) / perRow;
-    const labelWidth = Math.min(110, columnWidth * 0.42);
-    const track = Math.max(20, columnWidth - labelWidth - 26 - 8);
-    const groups = block.groups.map((/** @type {any} */ group) => {
-        const max = Math.max(...group.counts.map((/** @type {any} */ c) => c.count), 0);
-        return {
-            width: columnWidth,
-            stack: [
-                { text: group.title, bold: true, fontSize: 10, color: ctx.colours.primary, margin: [0, 0, 0, 5] },
-                { table: { widths: [labelWidth, track, 22], body: group.counts.map((/** @type {any} */ c) => barRow(c, max, track)) }, layout: PLAIN }
-            ],
-            unbreakable: true
-        };
-    });
+    const groups = block.groups.map((/** @type {any} */ group) => ({
+        width: columnWidth,
+        stack: [
+            { text: group.title, bold: true, fontSize: 10, color: ctx.colours.primary, margin: [0, 0, 0, 5] },
+            donuts ? donutGroup(group) : barGroup(group, columnWidth)
+        ],
+        unbreakable: true
+    }));
     /** @type {any[]} */
     const rows = [];
     for (let i = 0; i < groups.length; i += perRow) rows.push({ columns: groups.slice(i, i + perRow), columnGap: 18, margin: [0, 0, 0, 16] });

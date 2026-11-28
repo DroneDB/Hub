@@ -149,3 +149,17 @@ export function countByKind(items) {
 
 /** A count as text: "3 items". @param {number} count */
 export const itemCountText = count => `${formatNumber(count, 0)} ${count === 1 ? 'item' : 'items'}`;
+
+/**
+ * A count as a share of its group, as a percentage without decimals: "<1%" for a count above zero too small to round to
+ * 1%, and never "100%" for a share that is not the whole group ("99%"), so the share of a count never says more or less
+ * than there is.
+ * @param {number} count @param {number} total
+ */
+export function shareText(count, total) {
+    if (!total) return `${formatNumber(0, 0)}%`;
+    const percent = (count / total) * 100;
+    if (percent > 0 && percent < 0.5) return '<1%';
+    const rounded = count < total ? Math.min(99, Math.round(percent)) : 100;
+    return `${formatNumber(rounded, 0)}%`;
+}

@@ -10,7 +10,7 @@
  */
 import { choiceLabel } from '@/libs/map/annotationIds';
 import { formatNumber } from '@/libs/format';
-import { KIND_SINGULAR, OWNER_TAGS } from '@/libs/reports/reportKinds';
+import { KIND_ORDER, KIND_SINGULAR, OWNER_TAGS } from '@/libs/reports/reportKinds';
 import { DARK_TEXT, readableTextOnChannels } from '@/libs/readableText';
 
 /** The colour of an item or a count that has no value for a field */
@@ -116,6 +116,36 @@ export function shade(hex, amount) {
     if (!rgb) return '#1f2937';
     const ink = [0x1f, 0x29, 0x37];
     return `#${rgb.map((c, i) => Math.round(c + (ink[i] - c) * amount).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * The darkest and the lightest shade of the kinds: the accent mixed with the ink, and the accent mixed with white then
+ * a little ink, so that the lightest slice of a donut is never the white of the page (an accent that is white itself).
+ */
+const KIND_SHADE_ENDS = Object.freeze({ darker: 0.45, lighter: 0.6, lightestInk: 0.08 });
+
+/**
+ * The colour between `from` (0) and `to` (1). Both are #rrggbb.
+ * @param {string} from @param {string} to @param {number} amount
+ */
+function mix(from, to, amount) {
+    const a = /** @type {number[]} */ (rgbOf(from));
+    const b = /** @type {number[]} */ (rgbOf(to));
+    return `#${a.map((c, i) => Math.round(c + (b[i] - c) * amount).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * The colour of each kind in a chart that needs one per kind (a donut): shades of the accent, from darker to lighter in
+ * the order of the kinds, evenly apart whatever the accent (a very dark or a very light one too). A kind has its shade by
+ * its place among all the kinds, not among those a report has, so Points is the same shade in every report of a template.
+ * @param {string} accent
+ * @returns {Record<string, string>}  kind -> colour
+ */
+export function kindShades(accent) {
+    const darkest = shade(accent, KIND_SHADE_ENDS.darker);
+    const lightest = shade(tint(accent, KIND_SHADE_ENDS.lighter), KIND_SHADE_ENDS.lightestInk);
+    const steps = KIND_ORDER.length - 1;
+    return Object.fromEntries(KIND_ORDER.map((kind, index) => [kind, mix(darkest, lightest, index / steps)]));
 }
 
 /**

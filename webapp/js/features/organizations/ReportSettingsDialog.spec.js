@@ -179,6 +179,36 @@ describe('ReportSettingsDialog: saving', () => {
     });
 });
 
+describe('ReportSettingsDialog: summary charts', () => {
+    const chartSelect = () => wrapper.findAllComponents(Select).find(c => c.props('inputId') === 'report-template-breakdown');
+
+    it('shows a template stored before the choice existed as Bars, and sends bars', async () => {
+        for (const stored of server.templates) delete stored.breakdownChart;
+        await render();
+        expect(chartSelect().props('modelValue')).toBe('bars');
+        await type('report-template-header', 'Acme');
+        await save();
+        expect(sentTemplates()[0].breakdownChart).toBe('bars');
+    });
+
+    it('sends Donuts once chosen, and shows it when the dialog reads the settings again', async () => {
+        await render();
+        expect(chartSelect().props('options').map(o => o.label)).toEqual(['Bars', 'Donuts']);
+        chartSelect().vm.$emit('update:modelValue', 'donuts');
+        await flushPromises();
+        await save();
+        expect(sentTemplates()[0].breakdownChart).toBe('donuts');
+        wrapper.unmount();
+        await render();
+        expect(chartSelect().props('modelValue')).toBe('donuts');
+    });
+
+    it('is read-only for a member', async () => {
+        await render({ canEdit: false });
+        expect(chartSelect().props('disabled')).toBe(true);
+    });
+});
+
 describe('ReportSettingsDialog: templates', () => {
     async function addTemplate(name) {
         await click(buttonNamed('Add template'));

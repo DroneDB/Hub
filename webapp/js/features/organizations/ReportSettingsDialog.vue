@@ -94,7 +94,7 @@ import { escapeHtml } from '@/libs/sanitize';
 import { isNotFound } from '@/libs/ddb/apiError';
 import { formMessageOf } from '@/libs/forms/serverErrors';
 import {
-    SCHEMA_LISTS, cloneSettings, deleteTemplateLogo, keyProblems, orgReportSettings, problemPathsOf, saveOrgReportSettings,
+    SCHEMA_LISTS, breakdownChartOf, cloneSettings, deleteTemplateLogo, keyProblems, orgReportSettings, problemPathsOf, saveOrgReportSettings,
     settingsProblems, templateLogoUrl, uploadTemplateLogo
 } from '@/libs/reports/reportSettings';
 
@@ -153,7 +153,8 @@ watch(snapshot, () => {
 });
 
 function apply(settings) {
-    draft.templates = cloneSettings(settings.templates ?? []);
+    // A template stored before the summary had a choice of charts draws bars: the dialog shows it so
+    draft.templates = cloneSettings(settings.templates ?? []).map(t => ({ ...t, breakdownChart: breakdownChartOf(t) }));
     draft.schema = {
         categories: cloneSettings(settings.schema?.categories ?? []),
         severities: cloneSettings(settings.schema?.severities ?? []),

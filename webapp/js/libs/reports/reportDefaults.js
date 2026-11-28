@@ -25,7 +25,25 @@ import { SECTION_KINDS } from '@/libs/reports/reportDefinition';
  * @property {string} footerText
  * @property {string} disclaimer  markdown
  * @property {SectionKind[]} defaultSections
+ * @property {BreakdownChart} [breakdownChart]  how the summary draws its counts; a template stored before it existed has
+ *   none and draws bars (`breakdownChartOf`)
  */
+/** @typedef {'bars' | 'donuts'} BreakdownChart */
+
+/**
+ * How the summary of a report can draw its counts by kind, category, severity and status: a bar per count, as long as
+ * the count is of the largest of its group, or a donut per group with a slice per count.
+ */
+export const BREAKDOWN_CHARTS = Object.freeze(/** @type {BreakdownChart[]} */ (['bars', 'donuts']));
+
+/**
+ * How a template draws the counts of the summary: bars when it names none (it was stored before the choice existed) or
+ * names one this Hub does not know.
+ * @param {{ breakdownChart?: unknown } | null | undefined} template
+ * @returns {BreakdownChart}
+ */
+export const breakdownChartOf = template =>
+    BREAKDOWN_CHARTS.includes(/** @type {any} */ (template?.breakdownChart)) ? /** @type {BreakdownChart} */ (template?.breakdownChart) : 'bars';
 
 /** What the settings dialog and the report call the sections (their kinds and order are the definition's: SECTION_KINDS). */
 export const SECTION_LABELS = Object.freeze(/** @type {Record<SectionKind, string>} */ ({
@@ -80,7 +98,8 @@ export const DEFAULT_TEMPLATE = deepFreeze(/** @type {ReportTemplate} */ ({
     headerText: '',
     footerText: '',
     disclaimer: '',
-    defaultSections: [...SECTION_KINDS]
+    defaultSections: [...SECTION_KINDS],
+    breakdownChart: 'bars'
 }));
 
 /**

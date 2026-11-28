@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { buildReportModel, resolveTemplate, resolveLogo, resolveCover, templateMissingText } from './reportModel';
 import { newDefinition } from './reportDefinition';
 import { NO_MAP, NOT_GEOREFERENCED } from './reportSections';
-import { CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
+import { CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR, kindShades } from './reportStyling';
 import { defaultState } from '@/libs/views/viewState';
 import { DEFAULT_TEMPLATE, DEFAULT_SCHEMA, cloneSettings } from './reportSettings';
 import { formatArea, formatLength, formatDate } from '@/libs/format';
@@ -605,7 +605,7 @@ describe('the item pages', () => {
         const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT, { category: 'old', status: 'gone' })]));
         const rows = Object.fromEntries(blocksOf(model, 'items', 'keyValue')[0].rows.map(r => [r.label, r.value]));
         expect(rows).toMatchObject({ Category: 'Unknown (old)', Status: 'Unknown (gone)' });
-        expect(blocksOf(model, 'summary', 'summaryStats')[0].groups.find(g => g.key === 'category').counts).toEqual([{ key: 'old', label: 'Unknown (old)', count: 1, colour: UNSET_COLOUR }]);
+        expect(blocksOf(model, 'summary', 'summaryStats')[0].groups.find(g => g.key === 'category').counts).toEqual([{ key: 'old', label: 'Unknown (old)', count: 1, share: '100%', colour: UNSET_COLOUR }]);
     });
 
     it('use the anchor and the viewer address the caller makes', () => {
@@ -674,6 +674,39 @@ describe('the summary', () => {
         expect(colours.category).toEqual({ defect: '#dc2626', '': UNSET_COLOUR });
         expect(colours.severity).toEqual({ high: '#dc2626', '': UNSET_COLOUR });
         expect(colours.status).toEqual({ open: '#0070e0', 'in-progress': '#0891b2', resolved: CLOSED_COLOUR, '': UNSET_COLOUR });
+    });
+
+    const withChart = breakdownChart => blocksOf(buildReportModel(inputOf(features, { settings: settings({ templates: [template({ breakdownChart })] }) })), 'summary', 'summaryStats')[0];
+
+    it('draws the counts as the template says: bars by default and for a template stored without the choice, donuts when chosen', () => {
+        expect(stats().chart).toBe('bars');
+        expect(withChart(undefined).chart).toBe('bars');
+        expect(withChart('pies').chart).toBe('bars');
+        expect(withChart('donuts').chart).toBe('donuts');
+    });
+
+    it('gives each count its share of the group, and each group the number of its items for the hole of a donut', () => {
+        const s = stats();
+        const shares = Object.fromEntries(s.groups.map(g => [g.key, g.counts.map(c => c.share)]));
+        expect(shares.kind).toEqual(['40%', '60%']);
+        expect(shares.status).toEqual(['40%', '20%', '20%', '20%']);
+        expect(s.groups.map(g => g.middle)).toEqual(s.groups.map(() => ({ number: '5', word: 'items' })));
+        const one = blocksOf(buildReportModel(inputOf(features.slice(0, 1))), 'summary', 'summaryStats')[0];
+        expect(one.groups[0].middle).toEqual({ number: '1', word: 'item' });
+        expect(one.groups[0].counts[0].share).toBe('100%');
+    });
+
+    it('gives the kinds of a donut shades of the accent, the same shade for a kind whatever other kinds the report has', () => {
+        const donut = withChart('donuts');
+        const accent = template().accent;
+        const kinds = Object.fromEntries(donut.groups.find(g => g.key === 'kind').counts.map(c => [c.key, c.colour]));
+        expect(kinds.point).not.toBe(kinds.length);
+        expect(Object.values(kinds)).not.toContain(accent);
+        expect(kinds).toEqual({ point: kindShades(accent).point, length: kindShades(accent).length });
+        const linesOnly = blocksOf(buildReportModel(inputOf(features.slice(2), { settings: settings({ templates: [template({ breakdownChart: 'donuts' })] }) })), 'summary', 'summaryStats')[0];
+        expect(linesOnly.groups.find(g => g.key === 'kind').counts[0].colour).toBe(kinds.length);
+        // The other groups keep the colours of what they count
+        expect(donut.groups.find(g => g.key === 'category').counts.map(c => c.colour)).toEqual(stats().groups.find(g => g.key === 'category').counts.map(c => c.colour));
     });
 
     it('titles the groups of counts, in their order, and leaves out a group that has none', () => {
