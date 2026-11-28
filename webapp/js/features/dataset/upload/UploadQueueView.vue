@@ -36,6 +36,7 @@
                 v-slot="{ item }"
                 class="file-list-scroller"
                 :items="rows"
+                item-key="id"
                 :item-size="48"
             >
                 <FileUploadRow :file="item" @retry="$emit('retry', $event)" />
