@@ -1,3 +1,4 @@
+import { markRaw } from 'vue';
 import { createUndoStack } from '@/libs/undoStack';
 import { newId } from '@/libs/ids';
 import { RefSequence, choiceLabel, isAnnotationType } from '@/libs/map/annotationIds';
@@ -152,6 +153,12 @@ class MeasureControls extends Control {
             element: element,
             target: options.target,
         });
+        // Never a reactive proxy, nor are the features of its source (see the addfeature listener): the map's features
+        // (feature scopes, components) hold the control and lists of its features in reactive state, where a proxy would
+        // stand for each. The control compares features by identity (the one a properties dialog edits is not counted
+        // among the others), and a proxy is not the feature: a saved point edited from its callout or from the
+        // measurement list found its own reference taken
+        markRaw(this);
 
         // lifetime: element (the control's own toolbar buttons, dropped with the control)
         btnToggle.addEventListener('click', this.handleToggle.bind(this), false);
@@ -210,7 +217,9 @@ class MeasureControls extends Control {
         // (its draw end identifies it)
         // lifetime: owner (the control's own measurement source)
         this.source.on('addfeature', evt => {
-            if (evt.feature && evt.feature.get('measurementType') && !evt.feature.get('id')) this.identify(evt.feature);
+            if (!evt.feature) return;
+            markRaw(evt.feature);
+            if (evt.feature.get('measurementType') && !evt.feature.get('id')) this.identify(evt.feature);
         });
         // lifetime: owner (the control's own measurement source)
         this.source.on('removefeature', (evt) => {

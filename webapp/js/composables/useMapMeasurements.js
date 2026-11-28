@@ -225,9 +225,9 @@ const definition = {
                 if (result && result.features) fromFile = new Set(result.features);
             }
             this._setSaved(!!geojson);
-            // A measurement drawn while the file was being read is on the map but not in the file. The control is read raw:
-            // its features are matched by identity with the ones the import gave
-            this._markSaved(toRaw(this.measureControls).snapshot(fromFile));
+            // A measurement drawn while the file was being read is on the map but not in the file: its features are matched
+            // by identity with the ones the import gave (a MeasureControls is never a reactive proxy)
+            this._markSaved(this.measureControls.snapshot(fromFile));
             this.onMeasurementsLoaded();
         },
 

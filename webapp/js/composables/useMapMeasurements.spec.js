@@ -10,6 +10,8 @@ import { mount } from '@vue/test-utils';
 import ddb from 'ddb';
 import Feature from 'ol/Feature';
 import { LineString } from 'ol/geom';
+import OlMap from 'ol/Map';
+import View from 'ol/View';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import * as csv from '@/libs/csv';
 import { notify } from '@/libs/notify';
@@ -891,6 +893,52 @@ describe('useMapMeasurements', () => {
             return feature;
         };
         const refOf = name => controls.source.getFeatures().find(f => f.get('name') === name).get('ref');
+
+        it('a saved point edited from its callout right after the load keeps its own reference: it is not "already used"', async () => {
+            // The callout of a point is made while the file is read, by the measurements of the map: the dialog its
+            // Edit button opens compares the point with the ones on the map by identity, so the control must be the
+            // object itself there, not a reactive proxy of it (whose features are proxies of the map's features)
+            stored['a/ortho_measurements.geojson'] = JSON.stringify({ type: 'FeatureCollection', features: [{
+                type: 'Feature', geometry: { type: 'Point', coordinates: [10, 45] },
+                properties: { id: 'p1', ref: '1', measurementType: 'point', name: 'Gate', createdAt: '2026-11-01T10:00:00.000Z' }
+            }] });
+            const opened = [];
+            const holder = shallowRef(null);
+            scope = effectScope();
+            const m = scope.run(() => useMapMeasurements({
+                measureControls: holder, files: () => files.value, dataset: () => dataset, canWrite: () => true, canDelete: () => true,
+                currentUnitPref: ref('metric'), showAlert: () => () => {}, showFlash: () => () => {}, choose: () => async () => 'confirm'
+            }));
+            m.createMeasureControls({ openDialog: (component, props) => { opened.push(props); return Object.assign(new Promise(() => {}), { close() {} }); } });
+            controls = holder.value;
+            const target = document.createElement('div');
+            document.body.appendChild(target);
+            const map = new OlMap({ target, view: new View({ center: [0, 0], zoom: 10 }) });
+            controls.setMap(map);
+            try {
+                await m.loadSavedMeasurements();
+                /** @type {HTMLElement} */ (document.querySelector('.ol-point-popup-edit')).click();
+
+                const dialog = opened.at(-1);
+                expect(dialog.feature.get('name')).toBe('Gate');
+                expect(dialog.isRefTaken('1')).toBe(false);
+                // Another reference of the file is still taken
+                controls.importFromGeoJSON({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [10.001, 45] },
+                    properties: { id: 'p2', ref: '2', measurementType: 'point', createdAt: '2026-11-01T10:00:00.000Z' } }] });
+                expect(dialog.isRefTaken('2')).toBe(true);
+
+                // The same from the Edit of the measurement list, whose rows are reactive state
+                m.openMeasurementListDialog();
+                m.handleEditMeasurementFromList(m.measurementListItems.value.find(item => item.name === 'Gate'));
+                expect(opened.at(-1).feature.get('name')).toBe('Gate');
+                expect(opened.at(-1).isRefTaken('1')).toBe(false);
+                expect(opened.at(-1).isRefTaken('2')).toBe(true);
+            } finally {
+                controls.setMap(null);
+                map.setTarget(undefined);
+                target.remove();
+            }
+        });
 
         it('a file with none is loaded with ids and no references, and is not unsaved', async () => {
             const m = startWired();
