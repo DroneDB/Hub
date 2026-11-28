@@ -43,10 +43,13 @@ afterEach(() => {
 });
 
 describe('ReportsList', () => {
-    it('groups the reports under "Reports" with the report glyph, in the order given', () => {
+    it('groups the reports under "Reports" with the glyph of the group, each report with the report glyph, in the order given', () => {
         const w = mountList();
         expect(w.find('button.group').text()).toBe('Reports');
-        expect(w.find('button.group').findAll('i').map(i => i.classes().join(' '))).toContain('icon fa-solid fa-file-lines');
+        const heading = w.find('button.group').findAll('i').map(i => i.classes().join(' '));
+        expect(heading).toContain('icon fa-solid fa-clipboard-list');
+        expect(heading.join(' ')).not.toContain('fa-file-lines');
+        expect(rows(w).map(r => r.find('i.icon').classes().join(' '))).toEqual(['icon fa-solid fa-file-lines', 'icon fa-solid fa-file-lines']);
         expect(w.find('[role="tree"]').attributes('aria-label')).toBe('Reports');
         expect(rows(w).map(r => r.attributes('title'))).toEqual(['Alpha (double-click to open)', '<img src=x onerror=alert(1)> (double-click to open)']);
     });
@@ -141,6 +144,7 @@ describe('ReportsList', () => {
             await button.trigger('click');
             const dialog = w.findComponent(InfoDialogStub);
             expect(dialog.props('title')).toBe('About reports');
+            expect(dialog.props('icon')).toBe('fa-solid fa-clipboard-list');
             expect(dialog.props('summary')).toContain('A report turns the measurements');
             expect(dialog.props('docsUrl')).toBe(DOCS.reports);
             expect(dialog.props('sections').length).toBeGreaterThan(0);

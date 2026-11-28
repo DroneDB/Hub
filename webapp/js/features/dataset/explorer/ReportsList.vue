@@ -1,5 +1,5 @@
 <template>
-    <SidebarGroup v-model:current="current" label="Reports" aria-label="Reports" :icon="REPORT_ICON" item-key="key" :items="rows" :menu="menu" :info="REPORTS_INFO"
+    <SidebarGroup v-model:current="current" label="Reports" aria-label="Reports" :icon="REPORTS_ICON" item-key="key" :items="rows" :menu="menu" :info="REPORTS_INFO"
                   :item-icon="r => r.unreadable ? 'fa-solid fa-triangle-exclamation' : REPORT_ICON"
                   :item-title="r => r.unreadable ? `${r.name} cannot be read: ${r.error}` : `${r.name} (double-click to open)`" :action-label="canWrite ? 'New report' : ''"
                   @open="open" @action="emit('new')" />
@@ -13,7 +13,7 @@
  * read is listed as unreadable, and a writer can delete it. Names are shown as text, whatever they contain. The (i) button of the heading explains reports.
  */
 import { computed, ref } from 'vue';
-import { REPORT_ICON } from '@/libs/glyphs';
+import { REPORT_ICON, REPORTS_ICON } from '@/libs/glyphs';
 import { REPORTS_INFO, GROUP_ACTION_ICONS as ICONS } from '@/libs/datasetGroupInfo';
 import SidebarGroup from './SidebarGroup.vue';
 import { reportUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';

@@ -5,7 +5,7 @@
  * button it tells the user to press with the icon and the label of that button, so the user knows what to look for.
  */
 import { DOCS } from './docsLinks';
-import { VIEWS_ICON, REPORT_ICON, SAVE_ICON, COPY_LINK_ICON, DELETE_ICON } from './glyphs';
+import { VIEWS_ICON, REPORT_ICON, REPORTS_ICON, SAVE_ICON, COPY_LINK_ICON, DELETE_ICON } from './glyphs';
 
 /**
  * The icons of the menu and the add button of the groups (SavedViews, ReportsList, SidebarGroup use them), so the
@@ -96,7 +96,7 @@ export const SAVED_VIEWS_INFO = Object.freeze({
 export const REPORTS_INFO = Object.freeze({
     id: 'reports-info',
     title: 'About reports',
-    icon: REPORT_ICON,
+    icon: REPORTS_ICON,
     summary: 'A report turns the measurements and annotations of this dataset into a page with its own link: a cover map, '
         + 'a summary, tables and a section for each item with its map, values and photos. It shows the measurements as '
         + 'they are now, and gives a PDF to download or to publish in the dataset.',

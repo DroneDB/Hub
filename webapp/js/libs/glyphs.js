@@ -40,6 +40,9 @@ export const CALLOUTS_ICON = drawn('callouts');
 // The reference (`ref`) each annotation shows on the map, and the report made from the annotations of a map
 export const REFERENCES_ICON = 'fa-solid fa-hashtag';
 export const REPORT_ICON = 'fa-solid fa-file-lines';
+// The reports of a dataset as a group (the heading above them in the explorer): a clipboard with its list, so the
+// heading is not one more report under it, as the bookmark of the saved views is not the map of each view
+export const REPORTS_ICON = 'fa-solid fa-clipboard-list';
 // The saved views of a dataset: a bookmark (not the split of "Compare")
 export const VIEWS_ICON = 'fa-solid fa-bookmark';
 // The analysis tools

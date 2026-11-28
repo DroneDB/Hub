@@ -65,8 +65,9 @@ describe('the icons of the map, the viewers and the explorer', () => {
 });
 
 describe('the glyphs of the annotation reports', () => {
-    it('are a page of lines for a report and a hash for the references of the annotations', () => {
+    it('are a page of lines for a report, a clipboard with a list for the reports of a dataset and a hash for the references of the annotations', () => {
         expect(icons.REPORT_ICON).toBe('fa-solid fa-file-lines');
+        expect(icons.REPORTS_ICON).toBe('fa-solid fa-clipboard-list');
         expect(icons.REFERENCES_ICON).toBe('fa-solid fa-hashtag');
     });
 });
@@ -125,7 +126,7 @@ describe('the files that show a meaning', () => {
         ['the map of the datasets', '../features/datasets/DatasetLocationsMap.vue', ['RESET_VIEW_ICON']],
         ['the Preferences tab', '../features/account/PreferencesDialog.vue', ['STOCKPILE_ICON']],
         ['the saved views of the explorer', '../features/dataset/explorer/SavedViews.vue', ['VIEWS_ICON']],
-        ['the reports of the explorer', '../features/dataset/explorer/ReportsList.vue', ['REPORT_ICON']],
+        ['the reports of the explorer', '../features/dataset/explorer/ReportsList.vue', ['REPORT_ICON', 'REPORTS_ICON']],
         ['the bar of the report page', '../features/reports/ReportBar.vue', ['REPORT_ICON']]
     ])('%s takes its glyphs from the registry', (name, file, constants) => {
         const text = source(file);
