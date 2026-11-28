@@ -37,6 +37,9 @@ export async function publishedCopyExists(dataset, fileName) {
  * @property {AbortSignal} signal
  * @property {(progress: import('./pdfAssets').Progress) => void} [onProgress]
  * @property {() => void} [onGenerating]  called when the PDF starts to be made (after the question about a published copy)
+ * @property {(message: string) => void} [onNotice]  what the user should know before the work starts (see generateReportPdf)
+ * @property {(characters: string[]) => boolean | Promise<boolean>} [confirmUnsupported]  asks about the characters the font cannot draw
+ * @property {() => void} [onLayout]  called when the pages are being laid out, which a cancel no longer stops
  * @property {() => void} [onWriting]  called before a published copy is written: a cancel no longer stops anything
  * @property {(path: string) => Promise<boolean>} [confirmReplace]  asks whether to replace the published copy at that path
  * @property {Date} [now]
@@ -48,7 +51,7 @@ export async function publishedCopyExists(dataset, fileName) {
  * @param {ExportRequest} request
  * @returns {Promise<{ status: 'downloaded' | 'published' | 'cancelled', fileName: string, path?: string, hash?: string }>}
  */
-export async function exportReportPdf({ mode, model, uid, dataset, signal, onProgress, onGenerating, onWriting, confirmReplace = async () => false, now = new Date(), generate = generateReportPdf, save = downloadBlob }) {
+export async function exportReportPdf({ mode, model, uid, dataset, signal, onProgress, onGenerating, onWriting, onNotice, confirmUnsupported, onLayout, confirmReplace = async () => false, now = new Date(), generate = generateReportPdf, save = downloadBlob }) {
     const fileName = pdfFileName({ name: model.name, uid }, now);
     const path = publishedPath(fileName);
     const cancelled = /** @type {const} */ ({ status: 'cancelled', fileName });
@@ -63,9 +66,10 @@ export async function exportReportPdf({ mode, model, uid, dataset, signal, onPro
     onGenerating?.();
     let blob;
     try {
-        blob = await generate(model, { dataset, signal, onProgress });
+        blob = await generate(model, { dataset, signal, onProgress, onNotice, confirmUnsupported, onLayout });
     } catch (e) {
-        if (signal.aborted) return cancelled;
+        // A cancel of the user, or an answer of theirs that stops the PDF (the AbortError of the generator)
+        if (signal.aborted || /** @type {any} */ (e)?.name === 'AbortError') return cancelled;
         throw e;
     }
     if (signal.aborted) return cancelled;

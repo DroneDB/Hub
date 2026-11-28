@@ -1,71 +1,74 @@
-// @ts-check
 /**
  * The cover page of the PDF: a band of the primary colour across the top of the page with the title and the subtitle in
  * it, the logo on a white card above it, then the facts (prepared by and for, date, dataset), the headline figures, the
  * overview map and the QR code of the live page. On a portrait page they follow one another; on a landscape page the
  * facts, the figures and the code are on the left and the map on the right.
  *
- * The band is drawn by the page background (pdfDocument), at the heights this file gives (coverBand): the title and the
- * subtitle are placed in it, and the flow of the page starts under it.
+ * The band is part of the flow: a table of one cell filled with the primary colour that runs to both edges of the page,
+ * with the title and the subtitle in it (and the QR code of the live page on a white card at its right), so that a long
+ * title makes the band taller and pushes the rest of the cover down instead of leaving the band. The stripe of the accent
+ * colour is its bottom border. The page background draws only what is behind the logo.
  */
 import { INK, MUTED, WHITE, tint, textOn } from '@/libs/reports/pdf/pdfTheme';
-import { figureOf, kpiTiles } from '@/libs/reports/pdf/pdfBlocks';
+import { figureOf, kpiTiles, qrCodeOf } from '@/libs/reports/pdf/pdfBlocks';
 import { qrSvg } from '@/libs/qr';
-import { isOriginUrl } from '@/libs/originUrl';
 
 /** The logo at the top left of the cover, in points */
 const LOGO_CARD = Object.freeze({ x: 0, y: 24, width: 190, height: 62, padding: 10 });
-/** The QR code of the live page, on a white card at the right of the band */
-const QR = Object.freeze({ side: 62, padding: 6, label: 12 });
+/** The QR code of the live page, on a white card at the right of the band (`label`: the caption under the code, as tall as pdfmake lays it out with its space) */
+const QR = Object.freeze({ side: 62, padding: 6, label: 24 });
+/** The space between the title and the white card, in points */
+const BAND_CARD_GAP = 18;
+/** The width of a character of the title as a share of its size (Roboto Bold), to tell how many lines it takes */
+const TITLE_CHARACTER = 0.56;
 
 /**
- * Where the band of the cover is: from the top of the page to `bottom`, with a stripe of the accent colour under it.
- * @param {import('./pdfLayout').PageLayout} layout
+ * Where the band of the cover begins and how tall it is at least (a taller title makes it taller): the title is `pad` from
+ * its top and `padBottom` from its bottom, there is room for the white card of the QR code when the cover has one, and
+ * `gap` is left between the stripe and the rest of the cover. A landscape page has the room for less of each.
+ * @param {import('./pdfLayout').PageLayout} layout @param {boolean} hasQr
  */
-export function coverBand(layout) {
+export function coverBand(layout, hasQr) {
     const landscape = layout.pageOrientation === 'landscape';
     const top = LOGO_CARD.y + LOGO_CARD.height + 14;
-    return { top, bottom: top + (landscape ? 100 : 150), stripe: 5 };
+    const pad = landscape ? 14 : 34;
+    const padBottom = landscape ? 8 : 16;
+    const height = Math.max(landscape ? 100 : 150, hasQr ? pad + qrCardSize().h + padBottom : 0);
+    return { top, pad, padBottom, gap: landscape ? 10 : 20, height, stripe: 5 };
 }
 
 /**
- * What the page background draws on the cover: the band, its stripe and the white card of the logo.
+ * What the page background draws on the cover: the accent rule under the title of a cover with no logo.
  * @param {import('./pdfLayout').PageLayout} layout @param {{ primary: string, accent: string }} colours @param {boolean} hasLogo
- * @param {boolean} hasQr  the cover has the QR code of the live page, on a white card
  */
-export function coverBackground(layout, colours, hasLogo, hasQr) {
-    const band = coverBand(layout);
+export function coverBackground(layout, colours, hasLogo) {
     const [left] = layout.margins;
-    const card = qrCard(layout);
-    return [{
-        canvas: [
-            { type: 'rect', x: 0, y: band.top, w: layout.width, h: band.bottom - band.top, color: colours.primary },
-            { type: 'rect', x: 0, y: band.bottom, w: layout.width, h: band.stripe, color: colours.accent },
-            // A soft lighter block at the right of the band, for depth
-            { type: 'rect', x: layout.width * 0.62, y: band.top, w: layout.width * 0.38, h: band.bottom - band.top, color: tint(colours.primary, 0.08) },
-            ...(hasLogo ? [] : [{ type: 'rect', x: left, y: LOGO_CARD.y + LOGO_CARD.height - 3, w: 40, h: 3, color: colours.accent }]),
-            ...(hasQr ? [{ type: 'rect', x: card.x, y: card.y, w: card.w, h: card.h, r: 4, color: WHITE }] : [])
-        ]
-    }];
+    return [{ canvas: hasLogo ? [] : [{ type: 'rect', x: left, y: LOGO_CARD.y + LOGO_CARD.height - 3, w: 40, h: 3, color: colours.accent }] }];
 }
 
-/** The white card of the QR code: at the right of the band, in the middle of its height. @param {import('./pdfLayout').PageLayout} layout */
-function qrCard(layout) {
-    const band = coverBand(layout);
-    const [, , right] = layout.margins;
-    const w = QR.side + QR.padding * 2;
-    const h = QR.side + QR.padding * 2 + QR.label;
-    return { x: layout.width - right - w, y: band.top + (band.bottom - band.top - h) / 2, w, h };
+/** The white card of the QR code. */
+function qrCardSize() {
+    return { w: QR.side + QR.padding * 2, h: QR.side + QR.padding * 2 + QR.label };
 }
 
 /**
- * Whether the cover has a QR code to draw: the live page is an address of this Hub.
- * @param {import('@/libs/reports/reportParts').CoverPart} part @param {string} origin
+ * The QR code of the live page of the cover, when it has one: the live page is an address of this Hub that a code can hold.
+ * @param {import('@/libs/reports/reportParts').CoverPart} part @param {import('./pdfBlocks').BlockContext} ctx
  */
-export const coverHasQr = (part, origin) => !!part.qr && isOriginUrl(part.qr.url, origin);
+export const coverQr = (part, ctx) => (part.qr ? qrCodeOf(ctx, part.qr.url) : null);
 
 /** The size of the title, smaller for a long one so that it stays in the band. @param {string} text */
 const titleSize = text => (text.length > 70 ? 20 : text.length > 45 ? 24 : 28);
+
+/**
+ * How tall the title and the subtitle are once laid out in `width`, about: a text is as many lines as its characters take.
+ * @param {string} title @param {string} subtitle @param {number} width
+ */
+function titleHeight(title, subtitle, width) {
+    const size = titleSize(title);
+    const lines = (/** @type {string} */ text, /** @type {number} */ fontSize) => Math.max(1, Math.ceil((text.length * fontSize * TITLE_CHARACTER) / width));
+    return lines(title, size) * size * 1.05 + 8 + (subtitle ? lines(subtitle, 13) * 13 * 1.15 : 0);
+}
 
 /**
  * The facts of the cover as small labelled cells, two or four to a row.
@@ -97,18 +100,78 @@ function factCells(rows, perRow, accent) {
 }
 
 /**
- * The content of the cover: the logo and the title placed on the band, then the flow under it.
+ * The band of the cover: the title and the subtitle on the primary colour, and the white card with the QR code of the live
+ * page at its right. It is a table of one cell as wide as the page, taller than its minimum when the title needs it.
+ * @param {import('@/libs/reports/reportParts').CoverPart} part
+ * @param {import('./pdfBlocks').BlockContext} ctx
+ * @param {ReturnType<typeof coverBand>} band
+ * @param {{ size: number, path: string } | null} code  the QR code of the live page
+ * @param {number} titleWidth  the room the title has, in points
+ */
+function bandNode(part, ctx, band, code, titleWidth) {
+    const { layout, colours } = ctx;
+    const [left, , right] = layout.margins;
+    const onBand = textOn(colours.primary);
+    const title = part.title?.text ?? '';
+    const { w: cardWidth } = qrCardSize();
+    const live = part.qr?.url ?? '';
+    const card = code ? [{
+        width: cardWidth,
+        table: {
+            widths: [cardWidth],
+            body: [[{
+                fillColor: WHITE,
+                margin: [QR.padding, QR.padding, QR.padding, QR.padding],
+                stack: [
+                    { svg: qrSvg(code, QR.side), width: QR.side, link: live },
+                    { text: 'Live report', fontSize: 7, bold: true, color: INK, alignment: 'center', link: live, margin: [0, 1, 0, 0] }
+                ]
+            }]]
+        },
+        layout: { hLineWidth: () => 0, vLineWidth: () => 0, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 }
+    }] : [];
+    return {
+        table: {
+            widths: ['*'],
+            body: [[{
+                fillColor: colours.primary,
+                margin: [left, band.pad, right, band.padBottom],
+                columns: [
+                    {
+                        width: titleWidth,
+                        stack: [
+                            { text: title, style: 'coverTitle', fontSize: titleSize(title), color: onBand },
+                            ...(part.subtitle ? [{ text: part.subtitle.text, style: 'coverSubtitle', color: onBand === WHITE ? tint(colours.primary, 0.78) : MUTED }] : [])
+                        ]
+                    },
+                    ...(card.length ? [{ width: BAND_CARD_GAP, text: '' }] : []),
+                    ...card,
+                    // A column of the colour of the band that is as tall as the band is at least
+                    { width: 1, canvas: [{ type: 'rect', x: 0, y: 0, w: 1, h: band.height - band.pad - band.padBottom, color: colours.primary }] }
+                ]
+            }]]
+        },
+        layout: {
+            hLineWidth: (/** @type {number} */ i) => (i === 1 ? band.stripe : 0), vLineWidth: () => 0, hLineColor: () => colours.accent,
+            paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0
+        },
+        // To both edges of the page, and a space under it
+        margin: [-left, 0, -right, band.gap]
+    };
+}
+
+/**
+ * The content of the cover: the logo on the page, the band with the title, then the flow under it.
  * @param {import('@/libs/reports/reportParts').CoverPart} part
  * @param {import('./pdfBlocks').BlockContext} ctx
  * @returns {any[]}
  */
 export function coverNodes(part, ctx) {
     const { layout, colours } = ctx;
-    const band = coverBand(layout);
-    const [left, top, right] = layout.margins;
+    const [left, top] = layout.margins;
     const landscape = layout.pageOrientation === 'landscape';
-    const onBand = textOn(colours.primary);
-    const title = part.title?.text ?? '';
+    const code = coverQr(part, ctx);
+    const band = coverBand(layout, !!code);
 
     /** @type {any[]} */
     const placed = [];
@@ -119,45 +182,32 @@ export function coverNodes(part, ctx) {
             absolutePosition: { x: left, y: LOGO_CARD.y + LOGO_CARD.padding }
         });
     }
-    const withQr = coverHasQr(part, ctx.origin);
-    const card = qrCard(layout);
-    placed.push({
-        columns: [{
-            width: (withQr ? card.x - 18 : layout.width - right) - left,
-            stack: [
-                { text: title, style: 'coverTitle', fontSize: titleSize(title), color: onBand },
-                ...(part.subtitle ? [{ text: part.subtitle.text, style: 'coverSubtitle', color: onBand === WHITE ? tint(colours.primary, 0.78) : MUTED }] : [])
-            ]
-        }],
-        absolutePosition: { x: left, y: band.top + (landscape ? 20 : 34) }
-    });
-    if (part.qr && withQr) {
-        placed.push(
-            { svg: qrSvg(ctx.qr(part.qr.url), QR.side), width: QR.side, link: part.qr.url, absolutePosition: { x: card.x + QR.padding, y: card.y + QR.padding } },
-            { text: 'Live report', fontSize: 7, bold: true, color: INK, alignment: 'center', link: part.qr.url, absolutePosition: { x: card.x, y: card.y + QR.padding + QR.side + 1 }, width: card.w }
-        );
-    }
+    const titleWidth = layout.contentWidth - 1 - (code ? qrCardSize().w + BAND_CARD_GAP : 0);
+    // The page is laid out from the top margin: the flow starts where the band does
+    const bandStart = { text: '', margin: [0, Math.max(0, band.top - top), 0, 0] };
+    const title = part.title?.text ?? '';
+    const content = Math.max(titleHeight(title, part.subtitle?.text ?? '', titleWidth), code ? qrCardSize().h : 0);
+    const bandHeight = Math.max(band.height, band.pad + content + band.padBottom);
+    const bandNodes = [bandStart, bandNode(part, ctx, band, code, titleWidth)];
 
     const facts = part.facts ? part.facts.rows : [];
-    // The flow starts under the band
-    const spacer = { text: '', margin: [0, Math.max(0, band.bottom + band.stripe + 20 - top), 0, 0] };
     // The map has the room the facts and the figures leave on the page (a page that overflows by a margin would leave
     // an empty page after the cover)
-    const flowTop = Math.max(top, band.bottom + band.stripe + 20);
+    const flowTop = Math.max(top, band.top + bandHeight + band.stripe + band.gap);
     const factRows = landscape ? Math.ceil(facts.length / 2) : Math.ceil(facts.length / Math.max(1, Math.min(4, facts.length)));
     // A row of facts (two lines of value) and the row of tiles, as tall as pdfmake lays them out
     const above = landscape ? 0 : factRows * 72 + (part.kpis ? 110 : 0);
     const room = layout.height - layout.margins[3] - flowTop - above - (part.map?.legend?.length ? 52 : 34) - 16;
     const map = part.map ? figureOf(part.map, ctx, { maxHeight: room }).map(node => ({ ...node, margin: [0, 0, 0, 0] })) : [];
-    // A live page on another site has no code: its address is written under the facts
-    const code = part.qr && !withQr ? [{ stack: [{ text: part.qr.label, bold: true, fontSize: 8 }, { text: part.qr.url, link: part.qr.url, fontSize: 8, color: MUTED }], margin: [0, 0, 0, 8] }] : [];
+    // A live page with no code (on another site, or too long for one) has its address written under the facts
+    const written = part.qr && !code ? [{ stack: [{ text: part.qr.label, bold: true, fontSize: 8 }, { text: part.qr.url, link: part.qr.url, fontSize: 8, color: MUTED }], margin: [0, 0, 0, 8] }] : [];
     const rest = part.rest.flatMap(block => (block.type === 'note' ? [{ text: block.text, fontSize: 9, color: INK, background: '#fef08a', margin: [0, 0, 0, 8] }] : []));
 
     if (landscape && map.length) {
         const leftWidth = layout.contentWidth * 0.37;
         return [
             ...placed,
-            spacer,
+            ...bandNodes,
             {
                 columns: [
                     {
@@ -166,7 +216,7 @@ export function coverNodes(part, ctx) {
                             ...(facts.length ? [factCells(facts, 2, colours.accent)] : []),
                             ...(part.kpis ? kpiTiles(part.kpis, ctx, { perRow: 2, width: leftWidth }) : []),
                             ...rest,
-                            ...code
+                            ...written
                         ]
                     },
                     { width: '*', stack: map }
@@ -177,11 +227,11 @@ export function coverNodes(part, ctx) {
     }
     return [
         ...placed,
-        spacer,
+        ...bandNodes,
         ...(facts.length ? [factCells(facts, Math.min(4, facts.length), colours.accent)] : []),
         ...(part.kpis ? kpiTiles(part.kpis, ctx) : []),
         ...rest,
         ...map,
-        ...code
+        ...written
     ];
 }

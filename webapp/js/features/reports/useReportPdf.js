@@ -7,6 +7,10 @@
  * PDF opens in a new tab to be read; when the browser blocks that tab (it opens one without asking only within a few
  * seconds of the click, and a PDF takes longer), the message that it was published has Open PDF instead.
  *
+ * Before the work: a report with many photos has them made smaller, and says so; a report with characters the font of the
+ * PDF cannot draw asks whether to go on (they print as empty boxes). From the moment the library lays the pages out a
+ * cancel can no longer stop it (the tab is busy until it is done), so the dialog says that and offers none.
+ *
  *   const pdf = useReportPdf({ model, dataset, uid, canWrite, dialogs });
  *   await pdf.run('download');
  */
@@ -14,6 +18,7 @@ import { computed, ref, shallowRef } from 'vue';
 import { useChoice } from '@/composables/useConfirm';
 import { useNotify } from '@/composables/useNotify';
 import { openInNewTab, openInNewTabIfAllowed } from '@/libs/views/viewLinks';
+import { escapeHtml } from '@/libs/sanitize';
 import ReportPdfProgressDialog from './ReportPdfProgressDialog.vue';
 
 /** The code that makes the PDF is a chunk of its own: it loads when the first PDF is asked for. @type {(request: any) => Promise<any>} */
@@ -35,6 +40,8 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
     const mode = shallowRef(/** @type {'download' | 'publish' | null} */ (null));
     const progress = ref({ done: 0, total: 0 });
     const writing = ref(false);
+    /** The library is laying out the pages: nothing can stop it now */
+    const laying = ref(false);
     const running = computed(() => mode.value !== null);
     /** @type {AbortController | null} */
     let controller = null;
@@ -47,6 +54,21 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
         title: `Replace ${path}`,
         message: 'A PDF with this name is already published in the reports folder. Replace it with this one?',
         confirmText: 'Replace',
+        cancelText: 'Cancel'
+    })) === 'confirm';
+
+    /** How many characters are listed in the question, the rest are counted */
+    const MOST_LISTED = 12;
+
+    /**
+     * Asks whether to make the PDF although some characters of the report have no glyph in its font. The characters are
+     * the user's text: they are written escaped (the message is HTML), as the characters themselves.
+     * @param {string[]} characters
+     */
+    const confirmUnsupported = async characters => (await choose({
+        title: 'Some text cannot be drawn in the PDF',
+        message: `The font of the PDF has no glyph for ${characters.length === 1 ? 'this character' : 'these characters'} of the report: <strong>${escapeHtml(characters.slice(0, MOST_LISTED).join(' '))}</strong>${characters.length > MOST_LISTED ? ` and ${characters.length - MOST_LISTED} more` : ''}. ${characters.length === 1 ? 'It' : 'They'} would be printed as empty boxes. The live page shows the text as it is.`,
+        confirmText: 'Make the PDF anyway',
         cancelText: 'Cancel'
     })) === 'confirm';
 
@@ -72,6 +94,7 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
         mode.value = requested;
         progress.value = { done: 0, total: 0 };
         writing.value = false;
+        laying.value = false;
         /** @type {any} */
         let shown = null;
         try {
@@ -82,10 +105,13 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
                 dataset,
                 signal: controller.signal,
                 onProgress: next => { progress.value = next; },
-                onWriting: () => { writing.value = true; },
+                onWriting: () => { writing.value = true; laying.value = false; },
                 confirmReplace,
+                confirmUnsupported,
+                onNotice: message => notify.warn(message, { summary: 'The photos are made smaller' }),
+                onLayout: () => { laying.value = true; },
                 onGenerating: () => {
-                    shown = dialogs.open(ReportPdfProgressDialog, () => ({ mode: requested, done: progress.value.done, total: progress.value.total, writing: writing.value }));
+                    shown = dialogs.open(ReportPdfProgressDialog, () => ({ mode: requested, done: progress.value.done, total: progress.value.total, writing: writing.value, laying: laying.value }));
                     // Cancel, the close button and Escape all answer 'cancel'
                     shown.then((/** @type {string | undefined} */ answer) => { if (answer !== 'done') cancel(); });
                 }
@@ -98,9 +124,10 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
             shown?.close('done');
             mode.value = null;
             writing.value = false;
+            laying.value = false;
             controller = null;
         }
     }
 
-    return { run, cancel, running, mode, progress, writing };
+    return { run, cancel, running, mode, progress, writing, laying };
 }

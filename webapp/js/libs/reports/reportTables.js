@@ -178,7 +178,7 @@ function rowOf(item, cells, ctx) {
         itemId: item.id,
         // The colours of the category, severity and status cells, and whether the item is overdue
         marks: rowMarks(item, ctx.schema),
-        anchor: item.numbered ? `#item-${item.id}` : null,
+        anchor: item.numbered ? `#item-${item.anchorId}` : null,
         cells: { ref: item.displayRef, name: item.name || NO_VALUE, type: OWNER_TAGS[item.owner], ...cells },
         note: item.owner === 'pointCloud' && !item.georeferenced ? NOT_GEOREFERENCED : null
     };

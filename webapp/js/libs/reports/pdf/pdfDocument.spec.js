@@ -3,7 +3,7 @@ import { buildPdfDocument, CONTENTS_TITLE } from '@/libs/reports/pdf/pdfDocument
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
 import { qrCode } from '@/libs/qr';
 import { ORIGIN, REPORT_URL, JPEG_URL, fullAssets, nodesOf, noAssets, options, pdfModel, textOf, textsOf, threeItems } from '@/libs/reports/pdf/pdfDocument.fixtures';
-import { mapFeature } from '@/libs/reports/reportModel.fixtures';
+import { definitionOf, mapFeature } from '@/libs/reports/reportModel.fixtures';
 
 const build = (model, assets) => buildPdfDocument(model, options(model, assets));
 const headings = content => nodesOf(content).filter(n => ['h1', 'h2', 'h3', 'coverTitle', 'coverSubtitle', 'itemEntry'].includes(n.style));
@@ -35,6 +35,17 @@ describe('the page', () => {
 
     it('is titled with the title of the report', () => {
         expect(build(pdfModel()).info.title).toBe('Inspection');
+    });
+});
+
+describe('the order of the sections', () => {
+    it('has the cover before the contents whatever the definition says: the band of the cover is drawn on the first page', () => {
+        const definition = definitionOf(['a.geojson'], { sections: [{ kind: 'summary', enabled: true }, { kind: 'cover', enabled: true }, { kind: 'items', enabled: true }] });
+        const model = pdfModel({ input: { definition } });
+        const order = headings(build(model).content).map(n => n.style === 'coverTitle' ? 'cover' : textOf(n));
+        expect(order[0]).toBe('cover');
+        expect(order.indexOf(CONTENTS_TITLE)).toBe(1);
+        expect(order.indexOf('Summary')).toBeGreaterThan(order.indexOf(CONTENTS_TITLE));
     });
 });
 
@@ -280,6 +291,23 @@ describe('the QR codes', () => {
         expect(textsOf(content)).toContain('https://evil.example/r/x');
     });
 
+    it('are left out, with the address written, for an address too long for a code: the PDF is still made', () => {
+        const model = pdfModel({ links: { reportUrl: `${ORIGIN}/r/acme/site/reports/r_k3x9q2m7?${'x'.repeat(3000)}`, anchorUrl: item => `${ORIGIN}/r/acme/site/reports/r_k3x9q2m7?${'y'.repeat(3000)}#item-${item.anchorId}` } });
+        let definition;
+        expect(() => { definition = build(model); }).not.toThrow();
+        expect(qrNodes(definition.content)).toHaveLength(0);
+        const written = textsOf(definition.content).join('\n').replaceAll('\u200b', '');
+        expect(written).toContain('x'.repeat(3000));
+        expect(written).toContain('y'.repeat(3000));
+    });
+
+    it('are left out only for the item whose address is too long: the cover and the other items keep theirs', () => {
+        const long = `${REPORT_URL}?${'z'.repeat(3000)}`;
+        const model = pdfModel({ links: { anchorUrl: item => (item.id === 'a2' ? long : `${REPORT_URL}#item-${item.anchorId}`) } });
+        expect(() => build(model)).not.toThrow();
+        expect(qrNodes(build(model).content)).toHaveLength(3);
+    });
+
     it('are made for the origin the build is given, port and scheme included', () => {
         const model = pdfModel();
         expect(qrNodes(buildPdfDocument(model, { assets: noAssets(), qr: qrCode, origin: 'http://hub.example' }).content)).toHaveLength(0);
@@ -369,7 +397,8 @@ describe('the text of the user', () => {
         const notes = model.sections.find(s => s.kind === 'notes');
         const hostile = { ...model, sections: model.sections.map(s => (s === notes ? { ...s, blocks: [...s.blocks, { type: 'markdown', text: '<script>alert(1)</script> <img src=x onerror=alert(2)> **bold** [x](javascript:alert(3))' }] } : s)) };
         const content = build(hostile).content;
-        const texts = textsOf(content).join('\n');
+        // A run with no place to break has a zero-width space every 16 characters, which is no text
+        const texts = textsOf(content).join('\n').replaceAll('\u200b', '');
         expect(texts).toContain('<script>alert(1)</script>');
         expect(nodesOf(content).some(n => typeof n.link === 'string' && n.link.startsWith('javascript:'))).toBe(false);
         expect(JSON.stringify(content)).not.toContain('"html"');

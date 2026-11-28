@@ -9,7 +9,7 @@
 import { markdownToPdf } from '@/libs/reports/pdf/pdfMarkdown';
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
 import { INK, MUTED, RULE, SUBTLE, TRACK, WHITE, INFO_FILL, WARNING_FILL, tint, textOn, toneColour } from '@/libs/reports/pdf/pdfTheme';
-import { shade } from '@/libs/reports/reportStyling';
+import { softBadge } from '@/libs/reports/reportStyling';
 import { qrSvg } from '@/libs/qr';
 import { isOriginUrl } from '@/libs/originUrl';
 import { MISSING_PHOTO, figureCaption } from '@/libs/reports/reportSections';
@@ -52,10 +52,11 @@ const PLAIN = Object.freeze({
  */
 export function badgeText(badge, fontSize = 8) {
     const strong = badge.tone === 'alert';
+    const soft = softBadge(badge.colour);
     return {
         text: `\u00a0${badge.label}\u00a0`,
-        background: strong ? badge.colour : tint(badge.colour, 0.82),
-        color: strong ? WHITE : shade(badge.colour, 0.4),
+        background: strong ? badge.colour : soft.fill,
+        color: strong ? WHITE : soft.text,
         bold: true,
         fontSize
     };
@@ -205,6 +206,9 @@ export function kpiTiles(block, ctx, { perRow, width } = {}) {
     return tileRows(tiles, perRow ?? tiles.length, width ?? ctx.layout.contentWidth);
 }
 
+/** The columns of a table whose cells stay on one line */
+const NEVER_WRAPPED = new Set(['ref', 'type']);
+
 /** @param {any} block @param {BlockContext} ctx */
 function table(block, ctx) {
     const align = (/** @type {string} */ a) => (a === 'right' ? 'right' : 'left');
@@ -213,8 +217,10 @@ function table(block, ctx) {
         const text = row.cells[column.key] ?? '';
         const note = row.note && column.key === 'name' ? ` (${row.note})` : '';
         const cell = /** @type {Record<string, any>} */ ({ text: `${text}${note}`, style: 'tableCell', alignment: align(column.align) });
-        // Only the name, a path and an assignee wrap: a value, a reference or a status stays on one line
-        if (!['name', 'path', 'assignee'].includes(column.key)) cell.noWrap = true;
+        // A reference and a type stay on one line (they are short); every other cell wraps where its text can break, so that
+        // a long name, material or status never pushes the last column off the page, and a figure goes to a second line at
+        // its unit when the page is narrow
+        if (NEVER_WRAPPED.has(column.key)) cell.noWrap = true;
         const marks = row.marks;
         // A category or severity has a square of its colour; a status is written in its colour, red when overdue
         if (marks && (column.key === 'category' || column.key === 'severity') && marks[column.key]) {
@@ -324,16 +330,33 @@ export function photoGrid(block, ctx, { perRow = PHOTOS_PER_ROW[ctx.layout.pageO
 }
 
 /**
+ * The QR code of an address, or null when it has none: an address of another site has no code, and one too long for a
+ * code (the encoder gives up past its capacity) has none either, as on the live page: its address is written out.
+ * @param {{ qr: BlockContext['qr'], origin: string }} ctx @param {string} url
+ * @returns {{ size: number, path: string } | null}
+ */
+export function qrCodeOf(ctx, url) {
+    if (!isOriginUrl(url, ctx.origin)) return null;
+    try {
+        return ctx.qr(url);
+    } catch (e) {
+        console.warn('The QR code could not be made:', e);
+        return null;
+    }
+}
+
+/**
  * The QR code of an address of the Hub, with its label and the address; a code is made only for this Hub.
  * @param {any} block @param {BlockContext} ctx @param {number} [side]  of the code, in points
  */
 export function qr(block, ctx, side = QR_POINTS) {
     const label = { text: block.label, bold: true, fontSize: 9 };
     // Only the address of this Hub gets a code: a report cannot print a code for another site
-    if (!isOriginUrl(block.url, ctx.origin)) return [{ stack: [label, { text: block.url, fontSize: 8, color: MUTED }], margin: [0, 0, 0, 8] }];
+    const code = qrCodeOf(ctx, block.url);
+    if (!code) return [{ stack: [label, { text: block.url, fontSize: 8, color: MUTED }], margin: [0, 0, 0, 8] }];
     return [{
         columns: [
-            { svg: qrSvg(ctx.qr(block.url), side), width: side },
+            { svg: qrSvg(code, side), width: side },
             { stack: [label, { text: block.url, fontSize: 7.5, color: MUTED, link: block.url, margin: [0, 2, 0, 0] }], margin: [10, 4, 0, 0] }
         ],
         unbreakable: true,

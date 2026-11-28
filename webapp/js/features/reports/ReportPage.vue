@@ -48,7 +48,7 @@ import { useDialogs } from '@/composables/useDialogs';
 import { useReportActions } from '@/features/reports/useReportActions';
 import { setTitle } from '@/libs/utils';
 import { loadErrorKind } from '@/libs/ddb/apiError';
-import { itemOfAnchor } from '@/libs/views/viewLinks';
+import { itemOfAnchor, reportUrl } from '@/libs/views/viewLinks';
 import { photoEntries } from '@/libs/reports/photoFiles';
 import { textOn } from '@/libs/reports/reportStyling';
 import ReportBar from './ReportBar.vue';
@@ -81,7 +81,12 @@ watch(model, async current => {
 
 // The actions on the report: Edit saves through the editor and the page shows the new values; Delete goes back to the dataset
 const actions = useReportActions({ dataset, org: String(org), ds: String(ds), dialogs, router, onChanged: () => report.reload() });
-const edit = () => actions.edit(report.entry.value);
+const edit = async () => {
+    const saved = await actions.edit(report.entry.value);
+    // "Save as new" after another session's change stores a second report and leaves this one as it was: the page moves
+    // to the one that was saved (a save of this report shows it again, through onChanged)
+    if (saved && saved.uid !== String(uid)) await router.push(reportUrl({ org: String(org), ds: String(ds) }, saved.uid));
+};
 const remove = async () => {
     if (await actions.remove(report.entry.value)) await router.push(datasetLocation);
 };

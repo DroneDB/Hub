@@ -100,6 +100,14 @@ describe('loadAssets', () => {
         expect(assets.photos.get('photos/a.jpg')).toBeTruthy();
     });
 
+    it('asks for the photos at the size it is given, and prepares them at it (a report with many has them smaller)', async () => {
+        const { calls, deps, dataset } = fakes();
+        await loadAssets(pdfModel({ features: photoFeatures() }), { dataset, layout, deps, photoMaxSide: 900 });
+        expect(calls.fetched.map(f => f.url).filter(u => u.startsWith('/thumb/')).sort()).toEqual(['/thumb/photos/a.jpg?size=900', '/thumb/photos/b.jpg?size=900']);
+        expect(calls.prepared.filter(max => max === 900)).toHaveLength(2);
+        expect(calls.prepared).not.toContain(PHOTO_MAX_SIDE);
+    });
+
     it('never reads a path that is not a path of the dataset', async () => {
         const { calls, deps, dataset } = fakes();
         const assets = await loadAssets(pdfModel({ features: photoFeatures() }), { dataset, layout, deps });

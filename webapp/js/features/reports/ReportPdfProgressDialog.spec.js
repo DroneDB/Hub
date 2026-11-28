@@ -52,4 +52,16 @@ describe('ReportPdfProgressDialog', () => {
         expect(document.querySelector('#reportPdfProgress [aria-label="Close"], #reportPdfProgress .p-dialog-close-button')).toBeNull();
         expect(wrapper.emitted('close')).toBeUndefined();
     });
+
+    it('says the pages are being laid out, and offers no way to cancel, while the library lays them out: it cannot be stopped', async () => {
+        const wrapper = await render({ mode: 'download', done: 4, total: 4, laying: true });
+        expect(text()).toContain('Laying out the pages');
+        expect(text()).toContain('cannot be cancelled');
+        expect(document.querySelector('[data-cancel]').disabled).toBe(true);
+        expect(document.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBeNull();
+        document.querySelector('[data-cancel]').click();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await wrapper.vm.$nextTick();
+        expect(wrapper.emitted('close')).toBeUndefined();
+    });
 });

@@ -6,7 +6,8 @@
  * is georeferenced and whether it is overdue. No formatting here: the sections turn the items into text.
  *
  * @typedef {object} ReportItem
- * @property {string} id
+ * @property {string} id  the id of the feature in its file (a viewer finds the item by it)
+ * @property {string} anchorId  the id of the item on the page of the report: `id`, unless an item of an earlier source has it
  * @property {string} ref  '' while the file is not numbered
  * @property {boolean} numbered  it has a ref: only a numbered item has an anchor, a viewer action and a QR code
  * @property {string} displayRef  the reference every callout, row, page and entry shows (NO_REF unnumbered)
@@ -160,6 +161,7 @@ export function buildItems(definition, loaded, schema, today) {
             const group = textOrNull(props.groupId);
             const item = /** @type {ReportItem} */ ({
                 id: idOf(feature) || `${source.label}:${index}`,
+                anchorId: '',
                 ref,
                 numbered: ref !== '',
                 displayRef: ref === '' ? NO_REF : prefixed ? `${source.label}-${ref}` : ref,
@@ -199,7 +201,25 @@ export function buildItems(definition, loaded, schema, today) {
         if (repeated.length) duplicates.push({ label: source.label, refs: repeated });
         items.push(...inReportOrder(own));
     });
+    assignAnchors(items);
     return { items, failed, duplicates, skipped };
+}
+
+/**
+ * Gives each item the id it has on the page of the report. Two measurement files can hold the same id (a file copied to
+ * make another), and the anchor of an item, the links of the rows of the tables and the QR codes are made from it: the
+ * first item keeps its id and a later one with the same id takes the label of its source after it.
+ * @param {ReportItem[]} items  in the order of the report
+ */
+function assignAnchors(items) {
+    /** @type {Set<string>} */
+    const taken = new Set();
+    for (const item of items) {
+        let anchorId = item.id;
+        for (let n = 1; taken.has(anchorId); n++) anchorId = `${item.id}-${item.sourceLabel}${n > 1 ? `-${n}` : ''}`;
+        taken.add(anchorId);
+        item.anchorId = anchorId;
+    }
 }
 
 /**

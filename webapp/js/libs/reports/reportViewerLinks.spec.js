@@ -15,7 +15,7 @@ const stateOf = (...paths) => {
     state.layers = paths.map(p => newLayer(p, { hash: 'h' }));
     return state;
 };
-const mapUrl = (path, query = '') => `/r/acme/site/view/${b64encode(path)}/map${query}`;
+const mapUrl = (path, query = '') => `/r/acme/site/view/${encodeURIComponent(b64encode(path))}/map${query}`;
 
 describe('viewFiles and viewMeasurementFile', () => {
     it('are the files as the map draws them, the layers from the bottom up', () => {
@@ -131,7 +131,7 @@ describe('itemViewerUrls', () => {
     });
 
     it('opens the point cloud viewer on the cloud the file names for a 3D item', () => {
-        expect(urls()(item({ owner: 'pointCloud', pointCloudFile: 'f/cloud.laz' }))).toBe(`/r/acme/site/view/${b64encode('f/cloud.laz')}/pointcloud?item=i1`);
+        expect(urls()(item({ owner: 'pointCloud', pointCloudFile: 'f/cloud.laz' }))).toBe(`/r/acme/site/view/${encodeURIComponent(b64encode('f/cloud.laz'))}/pointcloud?item=i1`);
         expect(urls()(item({ owner: 'pointCloud', pointCloudFile: null }))).toBeNull();
     });
 });

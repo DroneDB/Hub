@@ -101,6 +101,24 @@ describe('the sections', () => {
     });
 });
 
+describe('the status of a row', () => {
+    const schemaWith = n => ({ categories: [], severities: [], statuses: Array.from({ length: n }, (_, i) => ({ id: `s${i}`, name: `Status ${i}`, closed: false })) });
+
+    it('is a pill with a light fill of its colour and a darker text, which reads on a dark page too', async () => {
+        const features = Array.from({ length: 5 }, (_, i) => point(`p${i}`, String(i + 1), { status: `s${i}` }));
+        await render(modelOf(features, { settings: settings({ schema: schemaWith(5) }) }));
+        const pills = wrapper.find('[data-section="tables"] table').findAll('td .report-status-pill');
+        expect(pills).toHaveLength(5);
+        // The fifth open status is the darkest slate: it is no text of its own colour on the page
+        const [last] = pills.slice(-1);
+        expect(last.attributes('style')).toContain('background');
+        expect(last.attributes('style')).not.toContain('rgb(30, 41, 59)');
+        expect(last.element.style.color).not.toBe('');
+        expect(last.element.style.color).not.toBe(last.element.style.background);
+        expect(pills.map(p => p.text())).toEqual(['Status 0', 'Status 1', 'Status 2', 'Status 3', 'Status 4']);
+    });
+});
+
 describe('the tables', () => {
     it('have a caption, column headers with scope, and a row header that links to the item page', async () => {
         await render(modelOf([point('p1', '1'), point('p2', '2')]));
@@ -270,6 +288,22 @@ describe('Edit and Delete', () => {
         await wrapper.find('[data-testid="report-edit"]').trigger('click');
         expect(m.actions.edit).toHaveBeenCalledWith(m.report.entry.value);
         expect(wrapper.find('[data-testid="report-delete"]').exists()).toBe(true);
+    });
+
+    it('stay on the page when the editor saved this report, and move to the new one when it saved a copy ("Save as new" after a conflict)', async () => {
+        await render(modelOf([point('p1', '1')]));
+        m.actions.edit.mockResolvedValue({ uid: 'r_k3x9q2m7' });
+        await wrapper.find('[data-testid="report-edit"]').trigger('click');
+        await flushPromises();
+        expect(m.push).not.toHaveBeenCalled();
+        m.actions.edit.mockResolvedValue(null);
+        await wrapper.find('[data-testid="report-edit"]').trigger('click');
+        await flushPromises();
+        expect(m.push).not.toHaveBeenCalled();
+        m.actions.edit.mockResolvedValue({ uid: 'r_newnewne' });
+        await wrapper.find('[data-testid="report-edit"]').trigger('click');
+        await flushPromises();
+        expect(m.push).toHaveBeenCalledWith('/r/acme/site/reports/r_newnewne');
     });
 
     it('do not show to a reader', async () => {

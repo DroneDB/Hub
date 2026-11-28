@@ -20,13 +20,26 @@ describe('the symbols of a report in their own font', () => {
             columns: [{ table: { body: [[{ text: '↓ low' }]] }, layout: { hLineWidth: () => 0 } }]
         };
         const out = withSymbols(node);
+        // A run is not nested in a group (pdfmake draws the group without the style of the run): every part has the style
         expect(out.stack[0].text).toEqual([
-            { text: ['A ', { text: '→', font: SYMBOLS_FONT }, ' B'], bold: true, color: '#dc2626' },
+            { text: 'A ', bold: true, color: '#dc2626' },
+            { text: '→', font: SYMBOLS_FONT, bold: true, color: '#dc2626' },
+            { text: ' B', bold: true, color: '#dc2626' },
             ' and ', { text: '↑', font: SYMBOLS_FONT }
         ]);
         expect(out.columns[0].table.body[0][0].text).toEqual([{ text: '↓', font: SYMBOLS_FONT }, ' low']);
         // A layout keeps its functions
         expect(typeof out.columns[0].layout.hLineWidth).toBe('function');
+    });
+
+    it('keep the link and the style of a run whose text is itself runs, one of which has an arrow', () => {
+        const out = withSymbols({ text: [{ text: ['go ', { text: 'there → now', italics: true }], link: 'https://hub.example/a', decoration: 'underline' }] });
+        expect(out.text).toEqual([
+            { text: 'go ', link: 'https://hub.example/a', decoration: 'underline' },
+            { text: 'there ', link: 'https://hub.example/a', decoration: 'underline', italics: true },
+            { text: '→', link: 'https://hub.example/a', decoration: 'underline', italics: true, font: SYMBOLS_FONT },
+            { text: ' now', link: 'https://hub.example/a', decoration: 'underline', italics: true }
+        ]);
     });
 
     it('leave the data of an image or an SVG alone', () => {

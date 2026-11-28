@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 
-const m = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn() }, openInNewTab: vi.fn(), openInNewTabIfAllowed: vi.fn(() => true) }));
+const m = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn(), warn: vi.fn() }, openInNewTab: vi.fn(), openInNewTabIfAllowed: vi.fn(() => true) }));
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => m.notify }));
 vi.mock('@/libs/views/viewLinks', () => ({ openInNewTab: m.openInNewTab, openInNewTabIfAllowed: m.openInNewTabIfAllowed }));
 
@@ -51,6 +51,7 @@ beforeEach(() => {
     dialogs = fakeDialogs();
     m.notify.success.mockReset();
     m.notify.error.mockReset();
+    m.notify.warn.mockReset();
     m.openInNewTab.mockReset();
     m.openInNewTabIfAllowed.mockReset().mockReturnValue(true);
 });
@@ -75,7 +76,7 @@ describe('useReportPdf', () => {
         expect(dialogs.opened).toHaveLength(1);
         expect(dialogs.opened[0].component).toBe(ReportPdfProgressDialog);
         pdf.requests[0].onProgress({ done: 2, total: 5 });
-        expect(dialogs.opened[0].props()).toEqual({ mode: 'download', done: 2, total: 5, writing: false });
+        expect(dialogs.opened[0].props()).toEqual({ mode: 'download', done: 2, total: 5, writing: false, laying: false });
         pdf.finish({ status: 'downloaded', fileName: 'x.pdf' });
         await run;
         // the dialog was closed with 'done', which is not a cancel
@@ -239,6 +240,71 @@ describe('useReportPdf', () => {
         dialogs.opened.at(-1).answer('cancel');
         expect(await second).toBe(false);
         pdf.finish({ status: 'cancelled', fileName: 'x.pdf' });
+        await run;
+    });
+
+    it('tells the dialog the pages are being laid out, which a cancel no longer stops, and that the file is being written after', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('publish');
+        await flush();
+        expect(actions.laying.value).toBe(false);
+        pdf.requests[0].onLayout();
+        expect(actions.laying.value).toBe(true);
+        expect(dialogs.opened[0].props()).toMatchObject({ laying: true, writing: false });
+        pdf.requests[0].onWriting();
+        expect(dialogs.opened[0].props()).toMatchObject({ laying: false, writing: true });
+        pdf.finish({ status: 'published', fileName: 'x.pdf', path: 'reports/x.pdf' });
+        await run;
+        expect(actions.laying.value).toBe(false);
+    });
+
+    it('says in a warning that the photos are made smaller, before the work starts', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('download');
+        await flush();
+        pdf.requests[0].onNotice('This report has 900 photos. They are made smaller.');
+        expect(m.notify.warn).toHaveBeenCalledWith('This report has 900 photos. They are made smaller.', { summary: 'The photos are made smaller' });
+        actions.cancel();
+        await run;
+    });
+
+    it('asks whether to go on when the text has characters the font cannot draw, and answers the export with the choice', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('download');
+        await flush();
+        const asked = pdf.requests[0].confirmUnsupported(['\u5165', '\u53e3', '<b>']);
+        await flush();
+        const question = dialogs.opened.at(-1);
+        expect(question.props).toMatchObject({ title: 'Some text cannot be drawn in the PDF', confirmText: 'Make the PDF anyway', cancelText: 'Cancel' });
+        // The characters are the user's text: the message is HTML, so they are escaped
+        expect(question.props.message).toContain('\u5165 \u53e3 &lt;b&gt;');
+        expect(question.props.message).not.toContain('<b>');
+        question.answer('confirm');
+        expect(await asked).toBe(true);
+        const refused = pdf.requests[0].confirmUnsupported(['\u5165']);
+        await flush();
+        expect(dialogs.opened.at(-1).props.message).toContain('this character');
+        dialogs.opened.at(-1).answer('cancel');
+        expect(await refused).toBe(false);
+        actions.cancel();
+        await run;
+    });
+
+    it('counts the characters it does not list', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('download');
+        await flush();
+        const many = Array.from({ length: 20 }, (_, i) => String.fromCodePoint(0x4e00 + i));
+        const asked = pdf.requests[0].confirmUnsupported(many);
+        await flush();
+        expect(dialogs.opened.at(-1).props.message).toContain('and 8 more');
+        dialogs.opened.at(-1).answer('cancel');
+        await asked;
+        actions.cancel();
         await run;
     });
 });

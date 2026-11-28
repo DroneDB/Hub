@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * The images of a PDF: every one is a JPEG at quality 85, whose long side is at most 2000 px for a snapshot and 1600 px
- * for a photo. A PDF of 100 photos stays a few tens of megabytes and the tab does not hold full-size bitmaps.
+ * for a photo. A PDF of 100 photos stays a few tens of megabytes and the tab does not hold full-size bitmaps. The encoded
+ * images do stay in memory until the PDF library writes the file, whatever the bitmaps cost: pdfBudget bounds their bytes.
  */
 
 import { fitWithin } from '@/libs/imageFit';

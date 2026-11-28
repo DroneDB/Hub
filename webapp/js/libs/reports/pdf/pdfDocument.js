@@ -10,12 +10,13 @@
  *   the primary colour along the top of the page and of the accent colour along the bottom.
  */
 import { blockNodes } from '@/libs/reports/pdf/pdfBlocks';
-import { coverBackground, coverHasQr, coverNodes } from '@/libs/reports/pdf/pdfCover';
+import { coverBackground, coverNodes } from '@/libs/reports/pdf/pdfCover';
 import { itemNodes } from '@/libs/reports/pdf/pdfItem';
 import { INK, MUTED, tint } from '@/libs/reports/pdf/pdfTheme';
 import { pageLayout } from '@/libs/reports/pdf/pdfLayout';
 import { sectionParts } from '@/libs/reports/reportParts';
 import { withSymbols } from '@/libs/reports/pdf/pdfSymbols';
+import { withPdfText } from '@/libs/reports/pdf/pdfText';
 
 export const CONTENTS_TITLE = 'Contents';
 /** The height of the logo in the header, in points */
@@ -110,10 +111,19 @@ function itemAnchors(model) {
 }
 
 /**
- * A header or footer function whose texts have their symbols in their font.
+ * A part of the definition as the PDF writes it: its texts as the font draws them (pdfText), the symbols the font lacks
+ * in the font of the symbols.
+ * @template T
+ * @param {T} node
+ * @returns {T}
+ */
+const drawn = node => withSymbols(withPdfText(node));
+
+/**
+ * A header or footer function whose texts are drawn as the PDF writes them.
  * @param {(...args: any[]) => any} make
  */
-const symbolsOf = make => (/** @type {any[]} */ ...args) => withSymbols(make(...args));
+const drawnBy = make => (/** @type {any[]} */ ...args) => drawn(make(...args));
 
 /**
  * The PDF document definition of a report model.
@@ -172,10 +182,11 @@ export function buildPdfDocument(model, { assets, qr, origin }) {
         pageMargins: layout.margins,
         defaultStyle: { font: 'Roboto', fontSize: 10, color: INK, lineHeight: 1.15 },
         styles: styles(colours),
-        // The symbols Roboto has no glyph for (the arrows) are written in a font of their own, wherever they are
-        header: symbolsOf(header(model, layout, assets, !!coverPart)),
-        footer: symbolsOf(footer(model, layout)),
-        background: background(layout, colours, coverPart ? coverBackground(layout, colours, !!assets.logo, coverHasQr(coverPart, origin)) : null),
-        content: withSymbols(content)
+        // The texts are the ones the font draws, and the symbols Roboto has no glyph for (the arrows) are written in a font
+        // of their own, wherever they are
+        header: drawnBy(header(model, layout, assets, !!coverPart)),
+        footer: drawnBy(footer(model, layout)),
+        background: background(layout, colours, coverPart ? coverBackground(layout, colours, !!assets.logo) : null),
+        content: drawn(content)
     };
 }

@@ -37,7 +37,7 @@ describe('markdownToPdf', () => {
         expect(nodes[0].bold).toBe(true);
         expect(nodes[1].stack).toBeDefined();
         expect(nodes[2].text).toBe('code');
-        expect(nodes[3].canvas).toBeDefined();
+        expect(nodes[3].table.widths).toEqual(['*']);
         const table = nodes[4].table;
         expect(table.body.map(row => row.map(textOf))).toEqual([['a', 'b'], ['1', '2']]);
     });

@@ -116,7 +116,7 @@ export function useReport({ org, ds, uid }) {
             now: new Date(),
             links: {
                 reportUrl: pageUrl,
-                anchorUrl: item => `${pageUrl}${itemAnchor(item.id)}`,
+                anchorUrl: item => `${pageUrl}${itemAnchor(item.anchorId)}`,
                 viewerUrl: item => viewerUrl(item),
                 templateLogoUrl: template => datasetTemplateLogoUrl(dataset, template.id, template.logo)
             }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { statusColour, choiceColour, itemBadges, rowMarks, reportKpis, kindLabel, tint, shade, textOn, CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
+import { statusColour, choiceColour, itemBadges, rowMarks, reportKpis, kindLabel, tint, shade, textOn, softBadge, CLOSED_COLOUR, OVERDUE_COLOUR, UNSET_COLOUR } from './reportStyling';
 import { DEFAULT_SCHEMA } from './reportDefaults';
 import { DARK_TEXT } from '@/libs/readableText';
 
@@ -95,5 +95,35 @@ describe('the colours of a fill and of the text on it', () => {
     it('name the kind and the view of an item on one line', () => {
         expect(kindLabel({ kind: 'volume', owner: 'map' })).toBe('Volume · 2D');
         expect(kindLabel({ kind: 'measure3d', owner: 'pointCloud' })).toMatch(/· 3D$/);
+    });
+});
+
+/** The WCAG contrast of two #rrggbb colours. */
+function contrast(a, b) {
+    const luminance = hex => {
+        const [r, g, bl] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+        return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+    };
+    const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (high + 0.05) / (low + 0.05);
+}
+
+describe('a soft badge', () => {
+    it('has its text readable on its own fill (4.5:1) for every colour a status can have, the slates included', () => {
+        // The statuses of a schema with more open ones than the default has, so that each colour of the cycle is one
+        const statuses = Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, name: `Status ${i}`, closed: false }));
+        const colours = [...statuses.map(s => statusColour(statuses, s.id)), CLOSED_COLOUR, UNSET_COLOUR];
+        expect(new Set(colours).size).toBeGreaterThanOrEqual(7);
+        for (const colour of colours) {
+            const { fill, text } = softBadge(colour);
+            expect(contrast(text, fill), colour).toBeGreaterThanOrEqual(4.5);
+        }
+    });
+
+    it('does not depend on the page behind it: a status written in its colour alone is 1.3:1 for the darkest slate on a dark page', () => {
+        // What the table drew before: the colour as the text. The fill and the text of the badge are a pair of their own.
+        expect(contrast('#1e293b', '#0f172a')).toBeLessThan(1.5);
+        const { fill, text } = softBadge('#1e293b');
+        expect(contrast(text, fill)).toBeGreaterThan(7);
     });
 });

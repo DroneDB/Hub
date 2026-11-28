@@ -23,10 +23,17 @@ const tableOf = (model, id) => blocksOf(model, 'tables', 'table').find(t => t.id
 
 describe('the sections', () => {
     it('are the ones the definition switches on, in its order', () => {
+        const definition = definitionOf(['a.geojson'], { sections: [{ kind: 'notes', enabled: true }, { kind: 'items', enabled: true }, { kind: 'summary', enabled: false }, { kind: 'tables', enabled: true }] });
+        const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT)], { definition }));
+        expect(model.sections.map(s => s.kind)).toEqual(['notes', 'items', 'tables']);
+        expect(model.sections.map(s => s.title)).toEqual(['Notes', 'Items', 'Tables']);
+    });
+
+    it('have the cover first, wherever the definition puts it: the page of the cover is the first page', () => {
         const definition = definitionOf(['a.geojson'], { sections: [{ kind: 'items', enabled: true }, { kind: 'cover', enabled: true }, { kind: 'summary', enabled: false }, { kind: 'notes', enabled: true }] });
         const model = buildReportModel(inputOf([mapFeature('p1', '1', 'point', POINT)], { definition }));
-        expect(model.sections.map(s => s.kind)).toEqual(['items', 'cover', 'notes']);
-        expect(model.sections.map(s => s.title)).toEqual(['Items', 'Cover', 'Notes']);
+        expect(model.sections.map(s => s.kind)).toEqual(['cover', 'items', 'notes']);
+        expect(model.sections.map(s => s.title)).toEqual(['Cover', 'Items', 'Notes']);
     });
 
     it('make a model that is plain data, the same each time it is built', () => {
@@ -118,6 +125,26 @@ describe('two sources', () => {
         expect(overview.items.map(i => i.ref)).toEqual(['A-1', 'A-2', 'B-1']);
         expect(overview.alt).toContain('A-1, A-2, B-1');
         expect(blocksOf(model, 'items', 'mapSnapshot').map(b => b.alt)).toEqual(['Map of item A-1', 'Map of item A-2', 'Map of item B-1']);
+    });
+
+    it('give an item of the second source that has the id of one of the first an anchor of its own: the links of its row and its code open it, not the other', () => {
+        // The second file is a copy of the first: every id is in both
+        const same = [mapFeature('m1', '1', 'point', POINT, { name: 'Gate' }), mapFeature('m2', '2', 'point', POINT, { name: 'Fence' })];
+        const model = buildReportModel({
+            ...inputOf([]), definition: definitionOf(['a.geojson', 'b.geojson']),
+            sources: [{ file: 'a.geojson', document: documentOf(same) }, { file: 'b.geojson', document: documentOf(same) }]
+        });
+        expect(model.items.map(i => i.id)).toEqual(['m1', 'm2', 'm1', 'm2']);
+        const anchors = model.items.map(i => i.anchorId);
+        expect(new Set(anchors).size).toBe(4);
+        // The first source keeps its ids, so that the links made before stay good
+        expect(anchors.slice(0, 2)).toEqual(['m1', 'm2']);
+        const headings = blocksOf(model, 'items', 'heading').filter(h => h.level === 2);
+        expect(headings.map(h => h.anchor)).toEqual(anchors.map(a => `item-${a}`));
+        expect(tableOf(model, 'points').rows.map(r => r.anchor)).toEqual(anchors.map(a => `#item-${a}`));
+        expect(blocksOf(model, 'items', 'qr').map(q => q.url.split('#')[1])).toEqual(anchors.map(a => `item-${a}`));
+        // The viewer finds an item by its id in its file
+        expect(model.items[2].id).toBe('m1');
     });
 
     it('show the plain reference when the report has one source', () => {

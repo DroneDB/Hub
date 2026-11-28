@@ -13,6 +13,7 @@ markdown.validateLink = isWebUrl;
 
 const GREY = '#475569';
 const CODE_BACKGROUND = '#f1f5f9';
+const RULE_COLOUR = '#94a3b8';
 
 /**
  * @typedef {object} MarkdownStyle
@@ -111,7 +112,13 @@ function blocks(tokens, style) {
                 nodes.push({ text: token.content.replace(/\n$/, ''), fontSize: 8.5, background: CODE_BACKGROUND, preserveLeadingSpaces: true, margin: [0, 0, 0, 5] });
                 break;
             case 'hr':
-                nodes.push({ canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#94a3b8' }], margin: [0, 4, 0, 6] });
+                // A table of one empty cell with a rule above it is as wide as the column the text is in (a canvas line has a
+                // length of its own, and runs off a column that is narrower than that)
+                nodes.push({
+                    table: { widths: ['*'], body: [[{ text: '', fontSize: 0.1, lineHeight: 0.1 }]] },
+                    layout: { hLineWidth: (/** @type {number} */ i) => (i === 0 ? 0.5 : 0), vLineWidth: () => 0, hLineColor: () => RULE_COLOUR, paddingLeft: () => 0, paddingRight: () => 0, paddingTop: () => 0, paddingBottom: () => 0 },
+                    margin: [0, 4, 0, 6]
+                });
                 break;
             case 'table_open': {
                 const rows = [];

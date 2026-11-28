@@ -119,6 +119,15 @@ export function shade(hex, amount) {
 }
 
 /**
+ * A colour as a soft badge: a light fill of it with its text in a darker one, a pair that reads on whatever is around it (a
+ * colour written on its own on a dark page does not: the slate of a status is 1.3:1 on a dark theme). The badges of the
+ * PDF and the status of a row on the live page are made from it, so the page and the PDF agree.
+ * @param {string} hex
+ * @returns {{ fill: string, text: string }}
+ */
+export const softBadge = hex => ({ fill: tint(hex, 0.82), text: shade(hex, 0.5) });
+
+/**
  * The colour of a text written on a fill: white or the dark text, whichever reads better (libs/readableText, the rule of
  * the template colours and of the organization colours).
  * @param {string} hex

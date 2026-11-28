@@ -71,10 +71,10 @@ export const figureCaption = (alt, ...notes) => [...new Set([alt, ...notes].filt
  */
 
 /** @param {SectionContext} ctx @param {ReportItem} item */
-export const anchorUrlOf = (ctx, item) => (ctx.links.anchorUrl ? ctx.links.anchorUrl(item) : `${ctx.links.reportUrl ?? ''}#item-${item.id}`);
+export const anchorUrlOf = (ctx, item) => (ctx.links.anchorUrl ? ctx.links.anchorUrl(item) : `${ctx.links.reportUrl ?? ''}#item-${item.anchorId}`);
 
 /** @param {ReportItem} item */
-const anchorOf = item => (item.numbered ? `item-${item.id}` : null);
+const anchorOf = item => (item.numbered ? `item-${item.anchorId}` : null);
 
 /** @param {string} text @returns {{ type: 'note', tone: 'info' | 'warning', text: string }} */
 const warning = text => ({ type: 'note', tone: 'warning', text });
@@ -335,12 +335,15 @@ const BUILDERS = /** @type {Record<string, (ctx: SectionContext) => any[]>} */ (
 });
 
 /**
- * The sections the definition switches on, in its order.
+ * The sections the definition switches on, in its order, the cover first.
  * @param {SectionContext} ctx
  * @returns {{ kind: string, title: string, blocks: any[] }[]}
  */
 export function buildSections(ctx) {
-    return /** @type {{ kind: string, enabled: boolean }[]} */ (ctx.definition.sections)
+    const sections = /** @type {{ kind: string, enabled: boolean }[]} */ (ctx.definition.sections)
         .filter(s => s.enabled && BUILDERS[s.kind])
         .map(s => ({ kind: s.kind, title: /** @type {Record<string, string>} */ (SECTION_LABELS)[s.kind], blocks: BUILDERS[s.kind](ctx) }));
+    // The cover is the first page whatever the order of the definition: the PDF draws its band on the first page, and a
+    // cover that is not first would put it over the contents
+    return [...sections.filter(s => s.kind === 'cover'), ...sections.filter(s => s.kind !== 'cover')];
 }

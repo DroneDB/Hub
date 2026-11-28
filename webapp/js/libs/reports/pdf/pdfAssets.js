@@ -2,9 +2,10 @@
 /**
  * The images of a PDF: what the model asks to be drawn (map snapshots, charts, 3D captures, photos, the logo) is
  * rendered or fetched, then made a JPEG within the size limits. Done one item at a time, so that the tab holds the
- * images of one item at once (a report of 50 items does not hold 50 canvases), and so that "rendered items / total"
- * means something. An image that cannot be made is not an error of the report: its place says why (a note under the
- * figure, a "Missing photo" tile); only a cancel stops the work.
+ * bitmaps of one item at once (a report of 50 items does not hold 50 canvases), and so that "rendered items / total"
+ * means something. The encoded images are all kept until the file is written: pdfBudget decides how large the photos are
+ * made. An image that cannot be made is not an error of the report: its place says why (a note under the figure, a
+ * "Missing photo" tile); only a cancel stops the work.
  */
 import { isDatasetPath } from '@/libs/reports/annotationPhotos';
 import { figureBox } from '@/libs/reports/pdf/pdfLayout';
@@ -69,9 +70,10 @@ export { fetchImageBlob };
  * @param {AssetDeps} options.deps
  * @param {AbortSignal} [options.signal]  aborting it stops the work (the promise rejects with the AbortError)
  * @param {(progress: Progress) => void} [options.onProgress]  called with 0 of N, then after each item
+ * @param {number} [options.photoMaxSide]  the long side the photos are made at, in pixels (pdfBudget lowers it for a report with many)
  * @returns {Promise<PdfAssets>}
  */
-export async function loadAssets(model, { dataset, layout, deps, signal, onProgress = () => {} }) {
+export async function loadAssets(model, { dataset, layout, deps, signal, onProgress = () => {}, photoMaxSide = PHOTO_MAX_SIDE }) {
     const fetchBlob = deps.fetchBlob ?? fetchImageBlob;
     const prepare = deps.prepare ?? prepareImage;
     /** @type {PdfAssets} */
@@ -128,7 +130,7 @@ export async function loadAssets(model, { dataset, layout, deps, signal, onProgr
         assets.photos.set(path, null);
         if (!isDatasetPath(path)) return;
         assets.photos.set(path, await attempt(
-            async () => prepare(await fetchBlob(dataset, dataset.thumbUrl(path, PHOTO_MAX_SIDE), { api: true, signal }), { maxSide: PHOTO_MAX_SIDE, signal }),
+            async () => prepare(await fetchBlob(dataset, dataset.thumbUrl(path, photoMaxSide), { api: true, signal }), { maxSide: photoMaxSide, signal }),
             () => null
         ));
     }

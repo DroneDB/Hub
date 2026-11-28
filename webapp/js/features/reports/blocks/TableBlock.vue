@@ -9,15 +9,16 @@
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="row in block.rows" :key="row.itemId || row.cells.path || row.cells.name">
+                <tr v-for="(row, rowIndex) in block.rows" :key="rowIndex">
                     <template v-for="(column, index) in block.columns" :key="column.key">
                         <th v-if="index === 0" scope="row" :class="`align-${column.align}`">
                             <a v-if="row.anchor" :href="row.anchor">{{ row.cells[column.key] }}</a>
                             <template v-else>{{ row.cells[column.key] }}</template>
                         </th>
-                        <td v-else :class="[`align-${column.align}`, markClass(row, column.key)]" :style="markStyle(row, column.key)">
+                        <td v-else :class="[`align-${column.align}`, markClass(row, column.key)]">
                             <span v-if="hasSwatch(row, column.key)" class="report-swatch" :style="{ background: row.marks[column.key] }" aria-hidden="true" />
-                            {{ row.cells[column.key] }}
+                            <span v-if="isPill(row, column.key)" class="report-status-pill" :style="pillStyle(row)">{{ row.cells[column.key] }}</span>
+                            <template v-else>{{ row.cells[column.key] }}</template>
                             <span v-if="row.note && column.key === 'name'" class="report-row-note">({{ row.note }})</span>
                         </td>
                     </template>
@@ -32,19 +33,27 @@
  * A table block: the first column names the row (a link to the item's page when it has an anchor), the others are its
  * values. The text of every cell is the model's.
  */
+import { softBadge } from '@/libs/reports/reportStyling';
+
 defineProps({
     /** { title, columns: [{ key, label, align }], rows: [{ itemId, anchor, cells, note, marks }] } */
     block: { type: Object, required: true }
 });
 
-// A category or severity has a square of its colour before its name; a status is written in its colour, red and bold
-// when the item is overdue (its text says "overdue" too)
+// A category or severity has a square of its colour before its name; a status is a pill: its colour as a light fill with
+// a darker text, which reads on a dark page too (the colour alone does not), and red and bold when the item is overdue
+// (its text says "overdue" too)
 /** @param {any} row @param {string} key */
 const hasSwatch = (row, key) => (key === 'category' || key === 'severity') && !!row.marks?.[key];
 /** @param {any} row @param {string} key */
 const markClass = (row, key) => (key === 'status' && row.marks?.status ? (row.marks.overdue ? 'report-status overdue' : 'report-status') : '');
-/** @param {any} row @param {string} key */
-const markStyle = (row, key) => (key === 'status' && row.marks?.status && !row.marks.overdue ? { color: row.marks.status } : undefined);
+/** A status that is not overdue is the pill. @param {any} row @param {string} key */
+const isPill = (row, key) => key === 'status' && !!row.marks?.status && !row.marks.overdue;
+/** @param {any} row */
+const pillStyle = row => {
+    const { fill, text } = softBadge(row.marks.status);
+    return { background: fill, color: text };
+};
 </script>
 
 <style scoped>
@@ -99,6 +108,12 @@ tbody th a {
 
 .report-status {
     font-weight: 600;
+}
+
+.report-status-pill {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border-radius: 999px;
 }
 
 .report-status.overdue {

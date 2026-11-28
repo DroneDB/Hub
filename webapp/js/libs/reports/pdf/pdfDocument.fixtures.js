@@ -27,7 +27,7 @@ export function threeItems({ unnumbered = false } = {}) {
 export function pdfModel({ features = threeItems(), templateExtra = {}, links = {}, input = {} } = {}) {
     return buildReportModel(inputOf(features, {
         settings: { templates: [template({ footerText: 'Confidential', headerText: 'ACME Surveys', ...templateExtra })], schema: undefined },
-        links: { reportUrl: REPORT_URL, anchorUrl: item => `${REPORT_URL}#item-${item.id}`, ...links },
+        links: { reportUrl: REPORT_URL, anchorUrl: item => `${REPORT_URL}#item-${item.anchorId}`, ...links },
         ...input
     }));
 }

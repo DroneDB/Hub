@@ -49,6 +49,23 @@ describe('the download', () => {
         expect(save).not.toHaveBeenCalled();
     });
 
+    it('is a cancel, with no file, when the generator stops because the user answered No to a question (an AbortError of its own)', async () => {
+        const { run, save, dataset } = setup({ generate: vi.fn(async () => { throw new DOMException('The PDF was not made', 'AbortError'); }) });
+        expect(await run('download')).toEqual({ status: 'cancelled', fileName: FILE });
+        expect((await run('publish')).status).toBe('cancelled');
+        expect(save).not.toHaveBeenCalled();
+        expect(dataset.writeObj).not.toHaveBeenCalled();
+    });
+
+    it('gives the generator what it needs to ask the user and tell the page: the notice, the question and the layout callback', async () => {
+        const { run, make } = setup();
+        const onNotice = vi.fn();
+        const confirmUnsupported = vi.fn();
+        const onLayout = vi.fn();
+        await run('download', { onNotice, confirmUnsupported, onLayout });
+        expect(make.mock.calls[0][1]).toMatchObject({ onNotice, confirmUnsupported, onLayout });
+    });
+
     it('passes a failure that is no cancel on', async () => {
         const { run } = setup({ generate: vi.fn(async () => { throw new Error('out of memory'); }) });
         await expect(run('download')).rejects.toThrow('out of memory');

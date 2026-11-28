@@ -7,12 +7,11 @@
  * it, the other figures in a row under them, then the photos.
  */
 import { INK, MUTED, SUBTLE, WHITE, textOn } from '@/libs/reports/pdf/pdfTheme';
-import { badgeLine, callout, figureOf, keyValue, photoGrid } from '@/libs/reports/pdf/pdfBlocks';
+import { badgeLine, callout, figureOf, keyValue, photoGrid, qrCodeOf } from '@/libs/reports/pdf/pdfBlocks';
 import { markdownToPdf } from '@/libs/reports/pdf/pdfMarkdown';
 import { itemFacts } from '@/libs/reports/reportParts';
 import { NO_REF } from '@/libs/reports/reportItems';
 import { qrSvg } from '@/libs/qr';
-import { isOriginUrl } from '@/libs/originUrl';
 
 /** The side of the QR code in the header card, in points */
 const QR_SIDE = 50;
@@ -24,18 +23,19 @@ const QR_SIDE = 50;
 function headerCard(part, ctx) {
     const { heading } = part;
     const colour = heading.colour || ctx.colours.primary;
+    const code = part.qr ? qrCodeOf(ctx, part.qr.url) : null;
     const name = { text: heading.name || heading.text, fontSize: 14, bold: true, color: INK };
     const title = {
         stack: [
             name,
             ...(heading.kind ? [{ text: heading.kind, fontSize: 8, bold: true, color: MUTED, characterSpacing: 0.3, margin: [0, 2, 0, 4] }] : []),
             ...(heading.badges?.length ? [badgeLine(heading.badges)] : []),
-            // The address of an item on another site has no code: it is written out
-            ...(part.qr && !isOriginUrl(part.qr.url, ctx.origin) ? [{ text: [{ text: `${part.qr.label}: `, bold: true }, { text: part.qr.url, link: part.qr.url }], fontSize: 7.5, color: MUTED, margin: [0, 3, 0, 0] }] : [])
+            // An address with no code (an item on another site, or an address too long for a code) is written out
+            ...(part.qr && !code ? [{ text: [{ text: `${part.qr.label}: `, bold: true }, { text: part.qr.url, link: part.qr.url }], fontSize: 7.5, color: MUTED, margin: [0, 3, 0, 0] }] : [])
         ],
         margin: [12, 9, 8, 9]
     };
-    const linked = part.qr && isOriginUrl(part.qr.url, ctx.origin);
+    const linked = part.qr && code ? { url: part.qr.url, code } : null;
     const ref = heading.ref || NO_REF;
     return {
         table: {
@@ -45,8 +45,8 @@ function headerCard(part, ctx) {
                 { ...title, fillColor: SUBTLE },
                 ...(linked ? [{
                     stack: [
-                        { svg: qrSvg(ctx.qr(part.qr.url), QR_SIDE), width: QR_SIDE, link: part.qr.url },
-                        { text: 'Live item', fontSize: 6.5, color: MUTED, alignment: 'center', link: part.qr.url, margin: [0, 1, 0, 0] }
+                        { svg: qrSvg(linked.code, QR_SIDE), width: QR_SIDE, link: linked.url },
+                        { text: 'Live item', fontSize: 6.5, color: MUTED, alignment: 'center', link: linked.url, margin: [0, 1, 0, 0] }
                     ],
                     fillColor: SUBTLE, margin: [7, 6, 7, 4]
                 }] : [])
