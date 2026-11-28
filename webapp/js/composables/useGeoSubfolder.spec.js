@@ -1,8 +1,9 @@
 /**
  * useGeoSubfolder: a folder with nothing for the map and a subfolder that has it. The Registry is asked for the first
- * entry of each geo type below the folder (a limit of one): a few answers of one entry, however many photos a
- * subfolder holds. A Registry older than the limit is asked about the subfolders one at a time instead. The hint
- * names the first that holds geo entries; nothing is asked when it cannot help.
+ * photo below the folder (a limit of one), and for the first entry of each other geo type only when there is none: one
+ * answer of one entry, however many photos a subfolder holds. A first entry with no place on the map, which may hide
+ * others of its type that have one, and a Registry older than the limit, ask about the subfolders one at a time
+ * instead. The hint names the first that holds geo entries; nothing is asked when it cannot help.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope, ref, nextTick } from 'vue';
@@ -17,6 +18,7 @@ const plain = path => ({ path, type: T.GENERIC });
 const folder = path => ({ path, type: T.DIRECTORY });
 const item = entry => ({ entry });
 const cloud = path => ({ path, type: T.POINTCLOUD, polygon_geom: { type: 'Polygon', coordinates: [] } });
+const model = (path, georeferenced = true) => ({ path, type: T.MODEL, ...(georeferenced ? { polygon_geom: { type: 'Polygon', coordinates: [] } } : {}) });
 
 /**
  * The search of a dataset over these entries, as the Registry answers it: the entries below `path` (its own only when
@@ -96,9 +98,18 @@ describe('useGeoSubfolder', () => {
     });
     afterEach(() => scope?.stop());
 
-    it('asks for the first entry of each geo type below the folder, and names the subfolder', async () => {
+    // The common case (the photos of a dataset in images/) is one request
+    it('asks for the first photo below the folder only, in one request, and names its subfolder', async () => {
         start();
         await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images' }));
+        expect(dataset.requests).toEqual([{ path: undefined, recursive: true, type: T.GEOIMAGE, limit: 1, answered: 1 }]);
+    });
+
+    it('asks for the first entry of each other geo type when there is no photo', async () => {
+        dataset = indexOf([folder('dem'), raster('dem/dsm.tif')]);
+        files.value = [item(folder('dem'))];
+        start();
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'dem', path: 'dem', text: 'Map files are in dem' }));
         expect(dataset.requests.map(r => r.type)).toEqual([...GEO_TYPES]);
         expect(dataset.requests.every(r => r.limit === 1 && r.recursive === true && r.path === undefined)).toBe(true);
     });
@@ -122,23 +133,36 @@ describe('useGeoSubfolder', () => {
         expect(dataset.requests.every(r => r.path === 'site')).toBe(true);
     });
 
-    it('names the first subfolder by path that holds a geo entry of any type', async () => {
+    it('names the first subfolder by path that holds a geo entry of any type when there is no photo', async () => {
         files.value = [item(folder('zeta')), item(folder('alpha')), item(folder('beta')), item(folder('gamma'))];
-        dataset = indexOf([plain('alpha/readme.txt'), raster('beta/dsm.tif'), photo('gamma/p.jpg'), photo('zeta/z.jpg')]);
+        dataset = indexOf([plain('alpha/readme.txt'), raster('beta/dsm.tif'), cloud('gamma/scan.laz'), cloud('zeta/z.laz')]);
         start();
         await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'beta', path: 'beta', text: 'Map files are in beta' }));
     });
 
-    it('says "Photos" only when the subfolder holds nothing else for the map, at any depth', async () => {
-        files.value = [item(folder('a')), item(folder('b'))];
-        dataset = indexOf([photo('a/x/y/p.jpg'), cloud('b/scan.laz')]);
+    it('names the subfolder of the first photo by path, at any depth, before the other types', async () => {
+        files.value = [item(folder('a')), item(folder('b')), item(folder('c'))];
+        dataset = indexOf([raster('a/dsm.tif'), photo('b/x/y/p.jpg'), photo('c/q.jpg')]);
         start();
-        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'a', path: 'a', text: 'Photos are in a' }));
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'b', path: 'b', text: 'Photos are in b' }));
+        expect(dataset.requests).toHaveLength(1);
+    });
 
-        scope.stop();
-        dataset = indexOf([photo('a/p.jpg'), cloud('a/z/scan.laz'), photo('b/q.jpg')]);
+    // The search stops at the first model, which has no place on the map: the georeferenced one in b/ comes after it
+    it('walks the folders when the first entry of a type has no place on the map, and finds those of the type that have one', async () => {
+        files.value = [item(folder('a')), item(folder('b'))];
+        dataset = indexOf([folder('a'), folder('b'), model('a/model.obj', false), model('b/model_geo.obj')]);
         start();
-        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'a', path: 'a', text: 'Map files are in a' }));
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'b', path: 'b', text: 'Map files are in b' }));
+        expect(dataset.requests.slice(GEO_TYPES.length).map(r => [r.path, r.recursive, r.limit])).toEqual([['a', false, undefined], ['b', false, undefined]]);
+    });
+
+    it('walks the folders when the first photo has no place on the map', async () => {
+        files.value = [item(folder('a')), item(folder('b'))];
+        dataset = indexOf([folder('a'), folder('b'), { path: 'a/p.jpg', type: T.GEOIMAGE }, photo('b/q.jpg')]);
+        start();
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'b', path: 'b', text: 'Photos are in b' }));
+        expect(dataset.requests.map(r => [r.path, r.type])).toEqual([[undefined, T.GEOIMAGE], ['a', undefined], ['b', undefined]]);
     });
 
     it('asks nothing when the folder has an entry for the map itself', async () => {
@@ -346,6 +370,21 @@ describe('useGeoSubfolder with a Registry older than the search limit', () => {
         start({ registry, search: index.search });
         await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'beta', path: 'beta', text: 'Map files are in beta' }));
         expect(index.requests.map(r => [r.path, r.recursive, r.limit])).toEqual([['alpha', false, undefined], ['beta', false, undefined]]);
+    });
+
+    it('tells an older Registry by the other types when there is at most one photo, and goes folder by folder from then on', async () => {
+        const registry = {};
+        const index = indexOf([folder('a'), folder('b'), raster('b/dsm.tif'), raster('b/dtm.tif')], { limits: false });
+        files.value = [item(folder('a')), item(folder('b'))];
+        start({ registry, search: index.search });
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'b', path: 'b', text: 'Map files are in b' }));
+        expect(index.requests).toHaveLength(GEO_TYPES.length);
+        scope.stop();
+
+        index.requests.length = 0;
+        start({ registry, search: index.search });
+        await vi.waitFor(() => expect(hint.value?.folder).toBe('b'));
+        expect(index.requests.map(r => [r.path, r.recursive])).toEqual([['a', false], ['b', false]]);
     });
 
     it('follows a subfolder down its own tree before the next one, and asks about a bounded number of folders', async () => {

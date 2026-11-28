@@ -654,6 +654,86 @@ describe('preferences store: another user on the same device', () => {
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
     });
 
+    /** Splat views and a clipboard item of the device, then the store as the page opens (a session restored when logged in). */
+    async function openWithDeviceData(account) {
+        const { useClipboardStore } = await import('@/stores/clipboard');
+        setPref(PREF.SPLAT_VIEW_SETTINGS, [['ddb://h/o/d/a.spz', { upAxis: '+z' }]]);
+        setActivePinia(createPinia());
+        const clipboard = useClipboardStore();
+        clipboard.copy({ orgSlug: 'acme', dsSlug: 'site', basePath: '' }, [{ entry: { path: 'a.jpg', type: 1, size: 1 } }]);
+        h.reg.getRequest.mockResolvedValue(account);
+        store = usePreferencesStore();
+        await tick(600);
+        return clipboard;
+    }
+
+    // A Hub that did not record the owner yet set these values in the session the page now restores: they are Ann's
+    it('keeps the values, the splat views and the clipboard of a restored session on a device with no owner on record, and seeds the account with them', async () => {
+        localStorage.removeItem('accountPrefsOwner');
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        setPref(PREF.CUSTOM_BASEMAP, CUSTOM);
+        const clipboard = await openWithDeviceData({});
+
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
+        expect(getPref(PREF.CUSTOM_BASEMAP, null)).toEqual(CUSTOM);
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).not.toBeNull();
+        expect(clipboard.isEmpty).toBe(false);
+        expect(bodies()).toEqual([expect.objectContaining({
+            units: { measurement: 'imperial', currency: null },
+            map: expect.objectContaining({ customBasemap: CUSTOM })
+        })]);
+        expect(localStorage.getItem('accountPrefsOwner')).toBe('ann');
+    });
+
+    it('a restored session on a device with no owner on record lets the account win for the fields it has', async () => {
+        localStorage.removeItem('accountPrefsOwner');
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        setPref(PREF.SHOW_FLIGHT_PATH, false);
+        await openWithDeviceData({ units: { measurement: 'metric' } });
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('metric');
+        expect(getPref(PREF.SHOW_FLIGHT_PATH, true)).toBe(false);
+        expect(bodies()).toEqual([{ map: expect.objectContaining({ showFlightPath: false }) }]);
+    });
+
+    it('keeps the values, the splat views and the clipboard of a restored session on the device of the same user', async () => {
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        const clipboard = await openWithDeviceData(SYNCED_ACCOUNT);
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('metric');
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).not.toBeNull();
+        expect(clipboard.isEmpty).toBe(false);
+        expect(localStorage.getItem('accountPrefsOwner')).toBe('ann');
+    });
+
+    it('a restored session of another user than the owner on record starts without the owner\'s values and device data', async () => {
+        localStorage.setItem('accountPrefsOwner', 'ben');
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        const clipboard = await openWithDeviceData({});
+        expect(getPref(PREF.MEASURE_UNIT, null)).toBeNull();
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).toBeNull();
+        expect(clipboard.isEmpty).toBe(true);
+        expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        expect(localStorage.getItem('accountPrefsOwner')).toBe('ann');
+    });
+
+    // The previous user signed out before the owner was recorded: whose the values are is unknown
+    it('a sign-in on the page of a device with no owner on record removes the values, the splat views and the clipboard', async () => {
+        localStorage.removeItem('accountPrefsOwner');
+        h.auth.isLoggedIn = false;
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        const clipboard = await openWithDeviceData({});
+        // Nobody is signed in yet: nothing is removed
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
+        expect(clipboard.isEmpty).toBe(false);
+
+        h.auth.isLoggedIn = true;
+        await tick(600);
+        expect(getPref(PREF.MEASURE_UNIT, null)).toBeNull();
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).toBeNull();
+        expect(clipboard.isEmpty).toBe(true);
+        expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        expect(localStorage.getItem('accountPrefsOwner')).toBe('ann');
+    });
+
     // The previous session ended while no page was open (it expired): no page saw it end
     it('removes the splat views and the clipboard of the previous user when another user signs in', async () => {
         const { useClipboardStore } = await import('@/stores/clipboard');

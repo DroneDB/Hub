@@ -12,8 +12,10 @@
  *    device with a stale copy of the other fields cannot overwrite what another device saved.
  *
  * The local values of the synced keys belong to the account that last had a session on this device (OWNER_KEY): when
- * another account starts one, or the device has no owner on record, they are removed first, so that its first sign-in
- * neither shows nor sends a previous user's settings (a custom basemap with its access token, the stockpile prices).
+ * another account starts one, or someone signs in on a device that has no owner on record, they are removed first, so
+ * that its first sign-in neither shows nor sends a previous user's settings (a custom basemap with its access token, the
+ * stockpile prices). A session the page restored from storage on a device without an owner on record (one that last ran
+ * a Hub that did not record it) adopts the device as it is: its values are that user's.
  * The values that only the device keeps and that are the user's own (the splat views they set up, the clipboard) go
  * when the session ends, and when another account starts one (a session can end while no page is open).
  *
@@ -129,14 +131,20 @@ function forgetUserDeviceData() {
 /**
  * The synced local values stay with the account they were synced with: another account that signs in on this
  * device starts without them, and without the data the device kept for the previous user (which a session that
- * expired while no page was open left behind). A device with no owner on record (values from before the owner
- * was recorded, or set while nobody was signed in) cannot tell whose they are: the account alone gives the
- * values of its first session. Records `user` as their owner.
+ * expired while no page was open left behind). A device with no owner on record cannot tell whose they are by
+ * the record:
+ *  - a session restored from storage was on the device before the page opened, so its values are that user's
+ *    (a Hub that did not record the owner yet set them): they stay, and their account is seeded with them;
+ *  - a sign-in made on the page follows a sign-out (values set while nobody was signed in, or by a user who
+ *    signed out before the owner was recorded): the account alone gives the values of its first session.
+ * Records `user` as their owner.
  * @param {string} user
+ * @param {boolean} restored the session was restored from storage when the page opened, not signed in on it
  */
-function adoptDevice(user) {
+function adoptDevice(user, restored) {
     const owner = safeStorage.getItem(OWNER_KEY);
-    if (owner !== user) {
+    const theirs = owner === user || (owner === null && restored);
+    if (!theirs) {
         for (const key of Object.keys(ACCOUNT_SECTIONS)) removePref(key);
         forgetUserDeviceData();
     }
@@ -352,11 +360,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
         for (const name of SECTIONS.keys()) resetSection(name);
     }
 
-    // A new session starts for every login and every change of user; a session that ended takes the user's device-only data
+    // A new session starts for every login and every change of user; a session that ended takes the user's device-only data.
+    // The first run sees the login state the page opened with (the store is made at boot): a session there was restored.
     watch(() => (auth.isLoggedIn ? `user:${auth.username}` : ''), (who, before) => {
         stop();
         if (who) {
-            adoptDevice(auth.username);
+            adoptDevice(auth.username, before === undefined);
             void start();
         } else if (before) {
             forgetUserDeviceData();

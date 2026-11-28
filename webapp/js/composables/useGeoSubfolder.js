@@ -4,10 +4,12 @@
  * photos of a dataset are in `images/`, its root has none. The first subfolder that holds some is the hint ("Photos
  * are in images - Show"); no toggle: the user opens the subfolder, the map then shows its entries.
  *
- * The Registry is asked for the first entry of each type that can have a place on the map below the folder (a search
- * with a limit of one): a few answers of one entry, however many photos `images/` holds. A Registry older than the
- * limit answers with every entry: then, for the rest of the page's life with that Registry, the subfolders are asked
- * about one at a time instead, each for its own entries.
+ * The Registry is asked for the first photo below the folder (a search with a limit of one): one answer of one entry,
+ * however many photos `images/` holds, and the hint names its subfolder. Only when there is no photo are the other
+ * types that can have a place on the map asked about, the first entry of each. A first entry that has no place on the
+ * map (a model that is not georeferenced) may come before others of its type that have one: then the folders are
+ * walked instead, for that look. A Registry older than the limit answers with every entry: then, for the rest of the
+ * page's life with that Registry, the subfolders are asked about one at a time instead, each for its own entries.
  *
  *   const { hint } = useGeoSubfolder({ dataset, files: () => props.files, currentPath: () => props.currentPath,
  *                                      loading: () => props.loading, active: () => props.active });
@@ -102,6 +104,13 @@ function hintOfFirstEntries(entries, folder) {
 }
 
 /**
+ * Whether the first entry a probe found of its type may hide others of that type that have a place on the map: it has
+ * none itself (a model or a point cloud that is not georeferenced), and the probe stops at it.
+ * @param {any} entry
+ */
+const hidesOthers = entry => !isGeoEntry(entry);
+
+/**
  * The folders a listing holds, by path.
  * @param {any[]} entries  the entries of one folder
  * @param {string | null} folder  the folder's dataset-relative path, null at the root
@@ -143,24 +152,35 @@ export function useGeoSubfolder({ dataset, files, currentPath, loading = () => f
     const hasFolder = () => items().some(f => f.entry && ddb.entry.isDirectory(f.entry));
 
     /**
-     * The first subfolder that holds geo entries at any depth: the first entry of each geo type below the folder, the
-     * photos first (an older Registry answers that one with all its photos and is then asked folder by folder).
+     * The first subfolder that holds geo entries at any depth: the subfolder of the first photo below the folder (one
+     * request in the common case), else of the first entry of the other geo types. An older Registry answers the photo
+     * probe with all its photos and is then asked folder by folder. A probe whose first entry has no place on the map
+     * cannot tell whether others of its type have one: the folder walk answers that look.
      * @param {any} ds @param {string | null} folder @param {AbortSignal} signal
      */
     async function search(ds, folder, signal) {
         const registry = ds.registry ?? ds;
         if (ignoresLimit.has(registry)) return walk(ds, folder, signal);
-        const probe = (/** @type {number} */ type) => ds.search('*', { path: folder ?? undefined, recursive: true, type, limit: PROBE_LIMIT, signal });
-        const [first, ...others] = GEO_TYPES;
-        const photos = (await probe(first)) || [];
+        /** @param {number} type @returns {Promise<any[]>} */
+        const probe = async type => (await ds.search('*', { path: folder ?? undefined, recursive: true, type, limit: PROBE_LIMIT, signal })) || [];
+        const [photoType, ...others] = GEO_TYPES;
+        const photos = await probe(photoType);
         if (photos.length > PROBE_LIMIT) {
             ignoresLimit.add(registry);
             return hintOfFirstEntries(photos, folder) ?? walk(ds, folder, signal);
         }
-        const rest = (await Promise.all(others.map(type => probe(type)))).map(found => found || []);
-        // A Registry older than the limit, below a folder with at most one photo: what it answered still holds the first entries
-        if (rest.some(found => found.length > PROBE_LIMIT)) ignoresLimit.add(registry);
-        return hintOfFirstEntries([...photos, ...rest.flat()], folder);
+        if (photos.some(hidesOthers)) return walk(ds, folder, signal);
+        const ofPhotos = hintOfFirstEntries(photos, folder);
+        if (ofPhotos) return ofPhotos;
+
+        const rest = await Promise.all(others.map(probe));
+        // A Registry older than the limit, below a folder with at most one photo: its answers hold every entry of their type
+        if (rest.some(found => found.length > PROBE_LIMIT)) {
+            ignoresLimit.add(registry);
+            return hintOfFirstEntries([...photos, ...rest.flat()], folder);
+        }
+        if (rest.some(found => found.some(hidesOthers))) return walk(ds, folder, signal);
+        return hintOfFirstEntries(rest.flat(), folder);
     }
 
     /**
