@@ -20,6 +20,11 @@ describe('legendLayers', () => {
         ]);
     });
 
+    it('has a legend for a range of very small values, whose machine value has an exponent', () => {
+        const [layer] = legendLayers([{ path: 'a', name: 'a' }], { a: { colormap: 'viridis', rescale: '1e-7,2e-7' } });
+        expect(layer).toMatchObject({ path: 'a', min: 1e-7, max: 2e-7 });
+    });
+
     it('leaves out a hidden layer, one without a style, without a range or with a range that is not one', () => {
         const styles = {
             a: { colormap: 'viridis', rescale: '0,1' },

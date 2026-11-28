@@ -82,6 +82,8 @@ const definition = {
             _rasterAreaSource: null,
             _rasterInspectMoveKey: null,
             _rasterInspectSession: null,
+            // The click whose value the tooltip shows: the answer of an earlier click that comes late is dropped
+            _rasterInspectTurn: 0,
             _rasterInspectTooltipEl: null,
             _rasterInspectThrottle: null,
             // VectorLayer / VectorSource that hold the click marker (red dot)
@@ -843,6 +845,7 @@ const definition = {
 
         async _fetchInspectValueAtMapCoord(mapCoord) {
             if (!this.rasterFilePath || !this.dataset) return;
+            const turn = ++this._rasterInspectTurn;
             try {
                 // A coordinate beside the raster is not asked: the server would answer that it is outside
                 const tileLayer = this._findRasterTileLayer();
@@ -853,7 +856,7 @@ const definition = {
                 }
                 await this._ensureRasterDimsCache();
                 const result = await this.queryRasterPointAt(mapCoord);
-                if (!this.rasterInspectActive || !this._rasterInspectTooltipEl) return;
+                if (turn !== this._rasterInspectTurn || !this.rasterInspectActive || !this._rasterInspectTooltipEl) return;
                 if (!result || result.value == null || !isFinite(result.value)) {
                     this._rasterInspectTooltipEl.style.display = 'none';
                     return;
@@ -873,6 +876,7 @@ const definition = {
                     this._rasterInspectTooltipEl.style.display = 'none';
                 }
             } catch (e) {
+                if (turn !== this._rasterInspectTurn) return;
                 if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
                 if (!this._rasterInspectErrorLogged) {
                     this._rasterInspectErrorLogged = true;

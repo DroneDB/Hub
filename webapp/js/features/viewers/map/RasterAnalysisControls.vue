@@ -422,8 +422,12 @@ export default {
                 // A panel opened again takes the style of the layer again
                 this._initialParamsApplied = false;
                 if (!path) return;
-                // The same raster after a close keeps its Original view; another raster starts anew
-                if (path !== this._lastPath) this.originalView = false;
+                // The same raster after a close keeps its Original view and its NoData value; another raster starts anew,
+                // without the NoData value typed for the one before (it would be sent with every tile, value and export)
+                if (path !== this._lastPath) {
+                    this.originalView = false;
+                    this.nodata = '';
+                }
                 this._lastPath = path;
                 this.loadRasterInfo();
             },

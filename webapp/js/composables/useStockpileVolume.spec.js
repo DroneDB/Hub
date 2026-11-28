@@ -1692,6 +1692,27 @@ describe('the base of a pile on the map', () => {
         error.mockRestore();
     });
 
+    it('stops waiting when the chosen pile is deleted while its base is measured again', async () => {
+        const feature = addPile({ netVolume: 80 });
+        pile.selectStockpileFeature(feature);
+        await flushPromises();
+        let answer;
+        dataset.calculateStockpileVolume = () => new Promise(resolve => { answer = resolve; });
+
+        const choosing = pile.chooseStockpileBaseMethod('best_fit');
+        await flushPromises();
+        expect(pile.stockpileLoading.value).toBe(true);
+
+        source.removeFeature(feature);
+        pile.onStockpileFeatureRemoved(feature);
+        answer({ ...VOLUME });
+        await choosing;
+        await flushPromises();
+
+        // The panel is not left on "Measuring" with its buttons disabled
+        expect(pile.stockpileLoading.value).toBe(false);
+    });
+
     it('takes the flat elevation typed for a flat base, and keeps it for the others without measuring', async () => {
         const feature = addPile();
         pile.selectStockpileFeature(feature);

@@ -56,6 +56,14 @@ describe('defaultVizParams', () => {
         expect(defaultRescale({ stretch: [{ min: 12345.678, max: 99999.9 }] })).toBe('12345.68,99999.9');
     });
 
+    it('has no rescale when the limits are the same once written (the Registry refuses a range with no width)', () => {
+        expect(defaultRescale({ stretch: [{ min: 1e-9, max: 2e-9 }] })).toBe('');
+        expect(defaultRescale({ stretch: [{ min: 1.00000001, max: 1.00000002 }] })).toBe('');
+        expect(defaultRescale({ stretch: [{ min: 5, max: 5 }] })).toBe('');
+        expect(defaultRescale({ valueMin: 3, valueMax: 3 })).toBe('');
+        expect(defaultVizParams({ stretch: [{ min: 5, max: 5 }] }).rescale).toBe('');
+    });
+
     it('has no rescale for several bands (each is stretched by the tiles), a Byte raster, or no info', () => {
         expect(defaultRescale({ stretch: [{ min: 0, max: 1 }, { min: 0, max: 2 }] })).toBe('');
         expect(defaultRescale({ stretch: [], valueMin: 0, valueMax: 255 })).toBe('');

@@ -1,17 +1,18 @@
 // @ts-check
 /**
  * useGeoSubfolder - the Map tab of a folder that has nothing to put on the map, while a subfolder has (FR-MAP-10): the
- * photos of a dataset are in `images/`, its root has none. A search of the dataset for one entry type under the folder
- * finds them; the first subfolder that holds some is the hint ("Photos are in images - Show"). No recursive listing
- * and no toggle: the user opens the subfolder, the map then shows its entries.
+ * photos of a dataset are in `images/`, its root has none. The subfolders are asked about one at a time, each for its
+ * own entries; the first that holds some is the hint ("Photos are in images - Show"). No recursive search and no
+ * toggle: the user opens the subfolder, the map then shows its entries.
  *
  *   const { hint } = useGeoSubfolder({ dataset, files: () => props.files, currentPath: () => props.currentPath,
  *                                      loading: () => props.loading, active: () => props.active });
  *   hint.value   // null, or { folder: 'images', path: 'site/images', text: 'Photos are in images' }
  *
  * It asks only while the map is on show, for a folder that has a subfolder and no geo entry of its own: the geotagged
- * photos first, then the other types of the map one at a time, up to the first that some subfolder holds (the server
- * returns only that type, not the whole index). The answer is kept for the folder while the page is open; a change of
+ * subfolders in name order, each followed down its own tree, and stops at the first that holds a geo entry (at most
+ * MAX_FOLDER_PROBES folders: the server answers a recursive search with every entry it finds, which on a large
+ * dataset is the whole index). The answer is kept for the folder while the page is open; a change of
  * what the folder holds, or another dataset, asks again. An answer that a later visit overtook is dropped.
  */
 import { ref, watch, toValue, getCurrentScope, onScopeDispose } from 'vue';
@@ -50,14 +51,22 @@ export function geoSubfolderOf(entries, folder) {
     return { folder: first, path: `${prefix}${first}`, text: `${photos ? 'Photos' : 'Map files'} are in ${first}` };
 }
 
-const T = ddb.entry.type;
 /**
- * The entry types the search asks for, one request each, in this order, up to the first that a subfolder holds: the
- * photos (the common case), then the other types that have a place on the map.
+ * The most folders one look asks about. The hint is a help: a dataset with a deep tree and nothing on the map in it
+ * gets no hint rather than a request for every folder.
  */
-export const GEO_SEARCH_TYPES = Object.freeze([
-    T.GEOIMAGE, T.GEORASTER, T.POINTCLOUD, T.VECTOR, T.GEOPANORAMA, T.GEOVIDEO, T.MODEL, T.GAUSSIAN_SPLAT, T.TILES3D
-]);
+export const MAX_FOLDER_PROBES = 30;
+
+/**
+ * The folders a listing holds, by path.
+ * @param {any[]} entries  the entries of one folder
+ * @param {string | null} folder  the folder's dataset-relative path, null at the root
+ * @returns {string[]}
+ */
+const subfoldersOf = (entries, folder) => (entries || [])
+    .filter(e => e && typeof e.path === 'string' && ddb.entry.isDirectory(e) && e.path.startsWith(folder ? `${folder.replace(/\/+$/, '')}/` : ''))
+    .map(e => e.path)
+    .sort((a, b) => a.localeCompare(b));
 
 /**
  * What the folder holds, as far as the answer goes: its entries (path and type). The answer kept for a folder is
@@ -90,14 +99,23 @@ export function useGeoSubfolder({ dataset, files, currentPath, loading = () => f
     const hasFolder = () => items().some(f => f.entry && ddb.entry.isDirectory(f.entry));
 
     /**
-     * The first subfolder that holds entries of the first type the search finds under `folder`.
+     * The first subfolder (by name) that holds geo entries at any depth. The folders are asked one at a time, each for
+     * its own entries (a recursive search returns every entry of the dataset that has a place): the subfolders of a
+     * folder come after it and the next subfolder of `folder` only when it had none, so the first hit ends it.
      * @param {any} ds @param {string | null} folder @param {AbortSignal} signal
      */
     async function search(ds, folder, signal) {
-        for (const type of GEO_SEARCH_TYPES) {
-            const found = await ds.search('*', { path: folder ?? undefined, recursive: true, type, signal });
-            const answer = geoSubfolderOf(found, folder);
-            if (answer) return answer;
+        let budget = MAX_FOLDER_PROBES;
+        for (const top of subfoldersOf(items().map(f => f.entry), folder)) {
+            const queue = [top];
+            while (queue.length) {
+                if (budget-- <= 0) return null;
+                const path = /** @type {string} */ (queue.shift());
+                const found = await ds.search('*', { path, recursive: false, signal });
+                const answer = geoSubfolderOf(found, folder);
+                if (answer) return answer;
+                queue.push(...subfoldersOf(found, path));
+            }
         }
         return null;
     }

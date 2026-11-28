@@ -1,11 +1,12 @@
 /**
- * useGeoSubfolder (FR-MAP-10): a folder with nothing for the map and a subfolder that has it. One search under the
- * folder, the hint names the first subfolder that holds geo entries; nothing is asked when it cannot help.
+ * useGeoSubfolder (FR-MAP-10): a folder with nothing for the map and a subfolder that has it. The subfolders are asked
+ * one at a time (never a recursive search), the hint names the first that holds geo entries; nothing is asked when it
+ * cannot help.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope, ref, nextTick } from 'vue';
 import ddb from 'ddb';
-import { useGeoSubfolder, geoSubfolderOf, isGeoEntry } from './useGeoSubfolder';
+import { useGeoSubfolder, geoSubfolderOf, isGeoEntry, MAX_FOLDER_PROBES } from './useGeoSubfolder';
 
 const T = ddb.entry.type;
 const POINT = { type: 'Point', coordinates: [10, 45] };
@@ -73,20 +74,22 @@ describe('useGeoSubfolder', () => {
     });
     afterEach(() => scope?.stop());
 
-    it('searches the dataset once for the entries under a folder with only a subfolder, and names it', async () => {
+    it('asks about the one subfolder of a folder, only for its own entries, and names it', async () => {
         start();
         await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'images', path: 'images', text: 'Photos are in images' }));
         expect(dataset.search).toHaveBeenCalledTimes(1);
-        // The geotagged photos only (the server's EntryType GeoImage), not every entry of the dataset
-        expect(dataset.search).toHaveBeenCalledWith('*', expect.objectContaining({ path: undefined, recursive: true, type: 3 }));
+        // The subfolder, not the whole dataset, and not its subfolders: a recursive search returns every entry that has a place
+        expect(dataset.search).toHaveBeenCalledWith('*', expect.objectContaining({ path: 'images', recursive: false }));
     });
 
-    it('searches under the folder on show, not the whole dataset', async () => {
+    it('asks about the subfolders of the folder on show, not the whole dataset', async () => {
         currentPath.value = 'site';
+        files.value = [item(folder('site/images'))];
         dataset.search.mockResolvedValue([photo('site/images/a.jpg')]);
         start();
         await vi.waitFor(() => expect(hint.value?.path).toBe('site/images'));
-        expect(dataset.search).toHaveBeenCalledWith('*', expect.objectContaining({ path: 'site' }));
+        expect(dataset.search).toHaveBeenCalledWith('*', expect.objectContaining({ path: 'site/images', recursive: false }));
+        expect(dataset.search.mock.calls.every(([, o]) => o.recursive === false)).toBe(true);
     });
 
     it('asks nothing when the folder has an entry for the map itself', async () => {
@@ -131,7 +134,7 @@ describe('useGeoSubfolder', () => {
         expect(hint.value).toBeNull();
         expect(dataset.search).toHaveBeenCalledTimes(1);
 
-        files.value = [item(folder('x'))];
+        files.value = [item(folder('other/x'))];
         currentPath.value = 'other';
         dataset.search.mockResolvedValue([photo('other/x/p.jpg')]);
         await vi.waitFor(() => expect(hint.value?.path).toBe('other/x'));
@@ -206,26 +209,42 @@ describe('useGeoSubfolder', () => {
         expect(signal.aborted).toBe(true);
     });
 
-    it('asks for the photos first, then the other map types one at a time, and stops at the first a subfolder holds', async () => {
-        const types = [];
-        dataset.search.mockImplementation(async (q, { type }) => {
-            types.push(type);
-            return type === T.GEORASTER ? [raster('data/dsm.tif')] : [];
+    it('goes through the subfolders by name and stops at the first that holds a geo entry', async () => {
+        files.value = [item(folder('zeta')), item(folder('alpha')), item(folder('beta')), item(folder('gamma'))];
+        const asked = [];
+        dataset.search.mockImplementation(async (q, { path }) => {
+            asked.push(path);
+            return path === 'beta' ? [raster('beta/dsm.tif')] : [plain(`${path}/readme.txt`)];
         });
         start();
-        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'data', path: 'data', text: 'Map files are in data' }));
-        // GeoImage (3), then GeoRaster (4): no point cloud, vector or other type is asked for
-        expect(types).toEqual([3, 4]);
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'beta', path: 'beta', text: 'Map files are in beta' }));
+        // alpha, then beta: gamma and zeta are not asked about
+        expect(asked).toEqual(['alpha', 'beta']);
     });
 
-    it('asks for each map type once when no subfolder holds any, and has no hint', async () => {
-        const types = [];
-        dataset.search.mockImplementation(async (q, { type }) => { types.push(type); return [plain('images/readme.txt')]; });
+    it('follows a subfolder down its own tree before the next one, and names the folder of the folder on show', async () => {
+        files.value = [item(folder('a')), item(folder('b'))];
+        const tree = {
+            a: [folder('a/x'), plain('a/n.txt')],
+            'a/x': [folder('a/x/y')],
+            'a/x/y': [photo('a/x/y/p.jpg')]
+        };
+        const asked = [];
+        dataset.search.mockImplementation(async (q, { path }) => { asked.push(path); return tree[path] ?? []; });
         start();
-        await vi.waitFor(() => expect(types).toHaveLength(9));
+        await vi.waitFor(() => expect(hint.value).toEqual({ folder: 'a', path: 'a', text: 'Photos are in a' }));
+        expect(asked).toEqual(['a', 'a/x', 'a/x/y']);
+    });
+
+    it('asks about no more than a bounded number of folders, then has no hint', async () => {
+        files.value = [item(folder('d'))];
+        let count = 0;
+        // Every folder holds one more folder and nothing for the map
+        dataset.search.mockImplementation(async (q, { path }) => { count++; return [folder(`${path}/d`)]; });
+        start();
+        await vi.waitFor(() => expect(count).toBe(MAX_FOLDER_PROBES));
         await new Promise(r => setTimeout(r, 0));
-        // GeoImage, GeoRaster, PointCloud, Vector, GeoPanorama, GeoVideo, Model, GaussianSplat, Tiles3D
-        expect(types).toEqual([3, 4, 5, 14, 13, 10, 11, 15, 16]);
+        expect(count).toBe(MAX_FOLDER_PROBES);
         expect(hint.value).toBeNull();
     });
 

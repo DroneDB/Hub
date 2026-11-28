@@ -430,6 +430,27 @@ describe('useRasterAnalysis queryRasterPointAt', () => {
         await vi.waitFor(() => expect(tooltip()?.textContent).toBe('29.1 °C'));
     });
 
+    it('Inspect shows the value of the newest click when the answer of an earlier one comes late', async () => {
+        const { map, raster, dataset } = setup();
+        let late;
+        dataset.getRasterPointValueAt
+            .mockImplementationOnce(() => new Promise(resolve => { late = resolve; }))
+            .mockResolvedValueOnce({ value: 11, unit: 'm', isThermal: false, lon: 0, lat: 0 });
+        raster.toggleRasterInspect();
+        const click = coordinate => drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(new Point(coordinate))));
+        const tooltip = () => map.getOverlays().getArray().map(o => o.getElement()).find(el => el && el.textContent);
+        click([505, 255]);
+        await vi.waitFor(() => expect(late).toBeTypeOf('function'));
+        click([605, 255]);
+        await vi.waitFor(() => expect(tooltip()?.textContent).toBe('11.00 m'));
+
+        late({ value: 99, unit: 'm', isThermal: false, lon: 0, lat: 0 });
+        await new Promise(resolve => setTimeout(resolve, 20));
+        // The tooltip of the newest click is not replaced, or hidden, by the answer of the first
+        expect(tooltip()?.textContent).toBe('11.00 m');
+        expect(tooltip().style.display).toBe('block');
+    });
+
     it('Inspect on a click inside the raster asks the server; beside the raster it does not ask', async () => {
         const { map, raster, dataset } = setup();
         raster.toggleRasterInspect();

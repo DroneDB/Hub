@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getAttributionFromUrl, isAbsoluteHttpUrl, getCustomBasemapConfig, saveCustomBasemapConfig, Basemaps, buildCustomBasemapConfig, customBasemapTestUrl } from './basemaps';
+import { getAttributionFromUrl, isAbsoluteHttpUrl, getCustomBasemapConfig, saveCustomBasemapConfig, Basemaps, buildCustomBasemapConfig, customBasemapTestUrl, loadTestTile } from './basemaps';
 import { PREF, setPref, getPref } from '@/libs/preferences';
 
 beforeEach(() => localStorage.clear());
@@ -158,6 +158,11 @@ describe('customBasemapTestUrl', () => {
         expect(customBasemapTestUrl({ ...XYZ, url: 'https://tiles.example.com/{z}/{x}/{y}{r}.png' })).toBe('https://tiles.example.com/0/0/0.png');
     });
 
+    it('is the first tile of a source with a server range ({a-c}, {1-4}) and a {-y} row, as the map reads them', () => {
+        expect(customBasemapTestUrl({ ...XYZ, url: 'https://{a-c}.tiles.example.com/{z}/{x}/{y}.png' })).toBe('https://a.tiles.example.com/0/0/0.png');
+        expect(customBasemapTestUrl({ ...XYZ, url: 'https://s{1-4}.example.com/{z}/{x}/{-y}.png' })).toBe('https://s1.example.com/0/0/0.png');
+    });
+
     it('is a GetMap of a WMS source at its tile size, with its TIME', () => {
         const url = customBasemapTestUrl({ ...WMS, tileSize: 512, defaultTime: '2026-03-12T00:00:00Z' });
         expect(url).toBe('https://maps.example.org/wms?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=ortho&STYLES='
@@ -166,5 +171,24 @@ describe('customBasemapTestUrl', () => {
 
     it('adds to the query string a WMS URL already has', () => {
         expect(customBasemapTestUrl({ ...WMS, url: 'https://maps.example.org/wms?map=x' })).toMatch(/^https:\/\/maps\.example\.org\/wms\?map=x&SERVICE=WMS&/);
+    });
+});
+
+describe('loadTestTile', () => {
+    it('loads the tile without asking for CORS: a source with no CORS headers can be drawn by the map', async () => {
+        const images = [];
+        const RealImage = globalThis.Image;
+        globalThis.Image = class {
+            constructor() { images.push(this); }
+            set src(value) { this.requested = value; queueMicrotask(() => this.onload?.()); }
+        };
+        try {
+            await loadTestTile('https://tiles.example.com/0/0/0.png');
+        } finally {
+            globalThis.Image = RealImage;
+        }
+        expect(images).toHaveLength(1);
+        expect(images[0].requested).toBe('https://tiles.example.com/0/0/0.png');
+        expect(images[0].crossOrigin).toBeUndefined();
     });
 });

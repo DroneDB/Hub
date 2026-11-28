@@ -811,3 +811,36 @@ describe('PlantHealthPanel formulas and statistics', () => {
         expect(wrapper.get('[data-testid="plant-health-info-failed"]').text()).toContain('The raster could not be read: Not Found');
     });
 });
+
+describe('PlantHealthPanel moved to another raster', () => {
+    it('starts the new raster with the default style, not the one chosen for the raster before', async () => {
+        await renderWith(CLEAN_STATS);
+        await wrapper.find('#plant-health-panel-rescale-min').setValue('0.2');
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).toMatchObject({ formula: 'NDVI' });
+
+        await wrapper.setProps({ filePath: 'other/other.tif' });
+        await flushPromises();
+        expect(wrapper.find('#plant-health-panel-formula').element.value).toBe('');
+        expect(wrapper.find('#plant-health-panel-rescale-min').exists()).toBe(false);
+
+        // The next edit is the style of the new raster alone
+        const before = wrapper.emitted('vizParamsChanged').length;
+        await wrapper.find('#plant-health-panel-formula').setValue('EXG');
+        await flushPromises();
+        const emitted = wrapper.emitted('vizParamsChanged');
+        expect(emitted.length).toBeGreaterThan(before);
+        expect(emitted.at(-1)[0]).toEqual({ formula: 'EXG', colormap: 'rdylgn', rescale: '0.1,0.85', stretch: 'percentile' });
+    });
+});
+
+describe('PlantHealthPanel with statistics that could not be read', () => {
+    it('writes no rescale instead of "NaN,NaN" when a formula has no statistics', async () => {
+        await renderWith({}, { stretch: null });
+        const emitted = wrapper.emitted('vizParamsChanged');
+        expect(emitted.length).toBeGreaterThan(0);
+        for (const [params] of emitted) {
+            expect(params.rescale ?? '').not.toMatch(/NaN/);
+            expect(params.rescale).toBeUndefined();
+        }
+    });
+});

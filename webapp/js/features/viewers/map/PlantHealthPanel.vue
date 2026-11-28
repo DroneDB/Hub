@@ -171,12 +171,24 @@ import StyleViewActions from './StyleViewActions.vue';
 import RasterExportButton from './RasterExportButton.vue';
 import { copyLinkWithNotice } from '@/composables/useCopyText';
 import { encodeVizParamsHash } from '@/libs/map/vizParamsHash';
-import { formatNumber, parseNumber } from '@/libs/format';
-import { splitRescale } from '@/libs/rescale';
+import { formatNumber } from '@/libs/format';
+import { machineRange } from '@/libs/rescale';
 import { shownHistogram } from '@/libs/map/histogramRange';
 import { defaultVizParams } from '@/libs/map/defaultVizParams';
 import { useTimerGroup } from '@/composables/useTimers';
 import { replaceHash } from '@/libs/routeQuery';
+
+/**
+ * The "min,max" of a range, '' when either end is not a number (the statistics could not be read) or the ends are equal
+ * (the server refuses a range with no width).
+ * @param {any} min @param {any} max
+ */
+function rescaleOf(min, max) {
+    const lo = typeof min === 'number' || (typeof min === 'string' && min.trim() !== '') ? Number(min) : NaN;
+    const hi = typeof max === 'number' || (typeof max === 'string' && max.trim() !== '') ? Number(max) : NaN;
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo.toFixed(3) === hi.toFixed(3)) return '';
+    return `${lo.toFixed(3)},${hi.toFixed(3)}`;
+}
 
 /**
  * PlantHealthPanel - Plant health (NDVI / custom index) analysis panel.
@@ -349,10 +361,8 @@ export default {
                 case 'custom':
                     if (this.rescale) {
                         // The machine value "min,max" (libs/rescale.js)
-                        const { min, max } = splitRescale(this.rescale);
-                        const lo = parseNumber(min);
-                        const hi = parseNumber(max);
-                        if (Number.isFinite(lo) && Number.isFinite(hi)) return [lo, hi];
+                        const range = machineRange(this.rescale);
+                        if (range) return [range.min, range.max];
                     }
                     break;
             }
@@ -370,6 +380,12 @@ export default {
     watch: {
         filePath: {
             handler(val) {
+                // The style, the formulas and the stretch of the raster before belong to it: the next edit would write them
+                // over this one
+                this.clearStyle();
+                this.indexStretch = null;
+                this.availableFormulas = [];
+                this.availableColormaps = INDEX_COLORMAPS;
                 if (val) this.loadRasterInfo();
             },
             immediate: true
@@ -523,7 +539,8 @@ export default {
             this.applyLater(() => this.apply(), 300);
         },
 
-        async reset() {
+        // The style fields as they are for a raster nobody has styled
+        clearStyle() {
             this.selectedPreset = '';
             this.selectedFormula = '';
             this.customBands = '';
@@ -531,6 +548,10 @@ export default {
             this.selectedStretch = 'percentile';
             this.rescale = '';
             this.originalView = false;
+        },
+
+        async reset() {
+            this.clearStyle();
             this.$emit('vizParamsChanged', {});
 
             // The statistics of the bands again, and the bands the raster info found for the formulas
@@ -566,13 +587,13 @@ export default {
 
             if (this.selectedStretch === 'percentile') {
                 // ddb's default stretch of the index (D-041); the range of the values when the value info has none
-                this.rescale = this.indexRescale || `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
+                this.rescale = this.indexRescale || rescaleOf(s.min, s.max);
             } else if (this.selectedStretch === 'minmax') {
-                this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
+                this.rescale = rescaleOf(s.min, s.max);
             } else if (this.selectedStretch === 'stddev') {
                 const std = s.stddev || s.std || 0;
                 const mean = s.mean || 0;
-                this.rescale = `${(mean - 2 * std).toFixed(3)},${(mean + 2 * std).toFixed(3)}`;
+                this.rescale = rescaleOf(mean - 2 * std, mean + 2 * std);
             } else if (this.selectedStretch === 'none') {
                 this.rescale = '';
             }

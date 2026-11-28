@@ -3,7 +3,7 @@
  * user's locale writes them, Min below Max, sent as the machine value "min,max".
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { rescaleErrors, rescaleProblem, rescaleValue, splitRescale, localiseRescale } from './rescale';
+import { rescaleErrors, rescaleProblem, rescaleValue, splitRescale, machineRange, localiseRescale } from './rescale';
 
 describe('rescaleProblem', () => {
     it('refuses text that is not a number, at the field it is in', () => {
@@ -71,5 +71,19 @@ describe('localiseRescale', () => {
         expect(localiseRescale('')).toEqual({ min: '', max: '' });
         expect(localiseRescale(undefined)).toEqual({ min: '', max: '' });
         expect(localiseRescale(null)).toEqual({ min: '', max: '' });
+    });
+});
+
+describe('machineRange', () => {
+    it('reads the numbers of a machine value, with the exponent the value of a very small range has', () => {
+        expect(machineRange('0,12.5')).toEqual({ min: 0, max: 12.5 });
+        expect(machineRange(rescaleValue('0.0000001', '0.0000002'))).toEqual({ min: 1e-7, max: 2e-7 });
+        expect(machineRange('-1e-7,1E+3')).toEqual({ min: -1e-7, max: 1000 });
+    });
+
+    it('is null for a value that is not a range the Registry accepts', () => {
+        for (const value of ['', null, undefined, '5', '5,5', '9,1', 'x,3', '1,', ',1', '1,2,3', '0,Infinity']) {
+            expect(machineRange(value), String(value)).toBeNull();
+        }
     });
 });

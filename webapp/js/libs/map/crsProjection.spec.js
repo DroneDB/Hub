@@ -35,6 +35,14 @@ describe('horizontalDefinition', () => {
     it('is null for a compound CRS with no horizontal part', () => {
         expect(horizontalDefinition('COMPD_CS["only heights",VERT_CS["NAVD88 height",VERT_DATUM["x",2005],UNIT["metre",1]]]')).toBeNull();
     });
+
+    it('is null for a local CRS, which cannot be placed on the Earth', () => {
+        expect(horizontalDefinition('LOCAL_CS["Local",UNIT["metre",1]]')).toBeNull();
+        expect(horizontalDefinition('ENGCRS["Local",EDATUM["x"],CS[Cartesian,2],AXIS["x",east],AXIS["y",north],LENGTHUNIT["metre",1]]')).toBeNull();
+        expect(horizontalDefinition('+proj=identity')).toBeNull();
+        expect(crsToWgs84('LOCAL_CS["Local",UNIT["metre",1]]')).toBeNull();
+        expect(wgs84ToCrs('LOCAL_CS["Local",UNIT["metre",1]]')).toBeNull();
+    });
 });
 
 describe('crsToWgs84 and wgs84ToCrs', () => {

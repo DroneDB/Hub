@@ -7,8 +7,7 @@
  */
 import { colormap, colormapGradient } from '@/libs/map/colormaps';
 import { rasterValueParts, rasterUnitSymbol } from '@/libs/map/rasterUnit';
-import { splitRescale } from '@/libs/rescale';
-import { parseNumber } from '@/libs/format';
+import { machineRange } from '@/libs/rescale';
 
 /**
  * @typedef {{ colormap?: string, rescale?: string, formula?: string, rescaleUnit?: string }} LayerStyle  the vizParams a layer is drawn with
@@ -36,10 +35,10 @@ export function legendLayers(rows, styles) {
         if (row.visible === false) continue;
         const style = styles && styles[row.path];
         if (!style || !style.colormap || !style.rescale) continue;
-        const { min, max } = splitRescale(style.rescale);
-        const lo = parseNumber(min);
-        const hi = parseNumber(max);
-        if (!Number.isFinite(lo) || !Number.isFinite(hi) || !(hi > lo)) continue;
+        // The machine value, which has an exponent for a very small range ("1e-7,2e-7")
+        const range = machineRange(style.rescale);
+        if (!range) continue;
+        const { min: lo, max: hi } = range;
         const map = colormap(style.colormap);
         if (map.colors.length === 0) continue;
         layers.push({

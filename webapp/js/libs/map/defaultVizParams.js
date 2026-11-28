@@ -49,7 +49,10 @@ export function defaultRescale(info) {
         limits = { min: info.valueMin, max: info.valueMax };
     }
     if (!limits || !Number.isFinite(limits.min) || !Number.isFinite(limits.max)) return '';
-    return `${limitText(/** @type {number} */ (limits.min))},${limitText(/** @type {number} */ (limits.max))}`;
+    const min = limitText(/** @type {number} */ (limits.min));
+    const max = limitText(/** @type {number} */ (limits.max));
+    // Limits that round to the same text are no range: the Registry refuses it (400), the tiles keep the server's own stretch
+    return Number(min) < Number(max) ? `${min},${max}` : '';
 }
 
 /**

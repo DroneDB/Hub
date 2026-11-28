@@ -618,9 +618,11 @@ const definition = {
             const call = this._stockpileCall();
             const id = feature.get('id');
             const outcome = await this._recalculateStockpile(feature, { baseMethod, flatElevation });
-            // Cleared, or another pile or raster chosen, meanwhile
-            if (!this._isCurrentStockpileCall(call) || this._chosenStockpileFeatureId !== id) return;
+            // Cleared, or another pile or raster chosen, meanwhile: a call that is no longer the panel's leaves the waiting
+            // to the call that took over; the pile gone or another one chosen leaves nothing to wait for
+            if (!this._isCurrentStockpileCall(call)) return;
             this.stockpileLoading = false;
+            if (this._chosenStockpileFeatureId !== id) return;
             if (outcome.status !== 'failed') return;
             // The panel keeps the volumes of the pile, so it shows the base they are from
             const previous = feature.getProperties();

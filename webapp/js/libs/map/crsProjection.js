@@ -74,6 +74,9 @@ function wktNode(text) {
 // The WKT 1 and WKT 2 keywords of a CRS that can be the horizontal part of a compound one
 const HORIZONTAL_KEYWORDS = new Set(['PROJCS', 'PROJCRS', 'PROJECTEDCRS', 'GEOGCS', 'GEOGCRS', 'GEOGRAPHICCRS', 'GEODCRS', 'GEODETICCRS']);
 const COMPOUND_KEYWORDS = new Set(['COMPD_CS', 'COMPOUNDCRS']);
+// An engineering (local) CRS has no place on the Earth: proj4 reads it as the identity, which it then treats
+// as radians, so its coordinates would be turned into degrees
+const LOCAL_KEYWORDS = new Set(['LOCAL_CS', 'ENGCRS', 'ENGINEERINGCRS']);
 
 /**
  * The proj4 definition of a geocentric WKT (WKT 1 GEOCCS, or a WKT 2 geodetic CRS with a Cartesian
@@ -98,7 +101,8 @@ function geocentricDefinition(text, node) {
 /**
  * The definition proj4 is given for a CRS: the definition of a UTM code (utmDefinition), the horizontal
  * CRS of a compound one (WKT 1 COMPD_CS, WKT 2 COMPOUNDCRS), a proj string for a geocentric CRS, or
- * the text as it is. Null for a compound CRS with no horizontal part.
+ * the text as it is. Null for a compound CRS with no horizontal part and for a local (engineering) CRS,
+ * which cannot be placed on the Earth.
  * @param {string} crs  an EPSG code, a proj string or WKT
  * @returns {string | null}
  */
@@ -108,7 +112,8 @@ export function horizontalDefinition(crs) {
     const utm = utmDefinition(text);
     if (utm) return utm;
     const node = wktNode(text);
-    if (!node) return text;
+    if (!node) return /\+proj=identity\b/.test(text) ? null : text;
+    if (LOCAL_KEYWORDS.has(node.keyword)) return null;
     if (COMPOUND_KEYWORDS.has(node.keyword)) {
         const horizontal = node.members.find(m => HORIZONTAL_KEYWORDS.has(wktNode(m)?.keyword ?? ''));
         return horizontal ? horizontalDefinition(horizontal) : null;

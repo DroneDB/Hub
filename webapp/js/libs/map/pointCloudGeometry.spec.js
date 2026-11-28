@@ -50,3 +50,12 @@ describe('projectorFor a compound or geocentric CRS', () => {
         expect(height).toBeCloseTo(600.5, 3);
     });
 });
+
+describe('projectorFor a local CRS', () => {
+    it('is not usable and leaves the positions as they are (not read as radians)', () => {
+        const projector = projectorFor('LOCAL_CS["Local",UNIT["metre",1]]');
+        expect(projector.usable).toBe(false);
+        expect(projector.definition).toBeNull();
+        expect(projector.toGeographic([1000, 2000, 3])).toEqual([1000, 2000, 3]);
+    });
+});

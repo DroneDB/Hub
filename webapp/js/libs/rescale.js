@@ -60,6 +60,21 @@ export function splitRescale(value) {
 }
 
 /**
+ * The two numbers of a machine value ("min,max"), or null when it is not a range of two finite numbers with min less
+ * than max (what the Registry accepts). The numbers are read as the machine writes them, with "." as the decimal sign
+ * and an exponent when a value is very small or large ("1e-7"), never as a user types them.
+ * @param {string|null|undefined} value
+ * @returns {{ min: number, max: number }|null}
+ */
+export function machineRange(value) {
+    if (typeof value !== 'string') return null;
+    const parts = value.split(',');
+    if (parts.length !== 2 || parts.some(p => p.trim() === '')) return null;
+    const [min, max] = parts.map(Number);
+    return Number.isFinite(min) && Number.isFinite(max) && min < max ? { min, max } : null;
+}
+
+/**
  * The two texts of a machine value ("min,max") as the fields show a range the panel set: numbers in
  * the user's locale ("194,66" in it), with the digits of the value. Empty texts when there is none.
  * @param {string|null|undefined} value

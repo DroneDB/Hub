@@ -93,8 +93,10 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
         return exportRefusal(extentEstimate.value, limit.value, { extent: true });
     });
 
+    // `requests` and `extentRequests` count the changes that need an estimate (a new raster, extent or NoData value): the answer
+    // of a read that a later change overtook belongs to what was there before, and is dropped
     async function loadWholeEstimate() {
-        const current = ++requests;
+        const current = requests;
         fetched.value = null;
         const d = dataset();
         const p = path();
@@ -113,7 +115,7 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     const needsExtentEstimate = () => !!(dataset() && path() && bbox() && wholeReason.value);
 
     async function loadExtentEstimate() {
-        const current = ++extentRequests;
+        const current = extentRequests;
         const d = dataset();
         const p = path();
         const box = bbox();
@@ -137,12 +139,14 @@ export function useRasterExport({ dataset, path, vizParams, bbox, info = () => n
     // Both estimates are read once the control has rested, not at every change that follows each other
     const wholeLater = useTimerGroup();
     function scheduleWholeEstimate() {
+        requests++;
         wholeLater.clear();
         fetched.value = null;
         wholeLater(loadWholeEstimate, ESTIMATE_DELAY_MS);
     }
 
     function scheduleExtentEstimate() {
+        extentRequests++;
         later.clear();
         // The last estimate stays until the new one arrives; meanwhile the reason is 'Checking size…'
         extentPending.value = needsExtentEstimate();

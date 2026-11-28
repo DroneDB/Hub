@@ -100,11 +100,13 @@ const decimalsOf = digits => (typeof digits === 'number' ? digits : PRECISION[di
  * placeholder.
  * @param {unknown} value
  * @param {number|Quantity} [digits]  the decimals, or the quantity whose decimals (PRECISION) apply
- * @param {{ placeholder?: string, trim?: boolean, significant?: number, grouping?: boolean }} [options]
+ * @param {{ placeholder?: string, trim?: boolean, significant?: number, grouping?: boolean, latin?: boolean }} [options]
  *   trim: no trailing zeros ("1.5", not "1.50"); significant: at most this many significant
- *   digits instead of `digits` decimals; grouping false: no group separators (a coordinate)
+ *   digits instead of `digits` decimals; grouping false: no group separators (a coordinate);
+ *   latin: Latin digits and the decimal sign parseNumber reads (a text field the user edits), whatever
+ *   digits and decimal sign the locale writes (Arabic and Persian write "٣٫٥")
  */
-export function formatNumber(value, digits = PRECISION.value, { placeholder = EMPTY_CELL, trim = false, significant, grouping = true } = {}) {
+export function formatNumber(value, digits = PRECISION.value, { placeholder = EMPTY_CELL, trim = false, significant, grouping = true, latin = false } = {}) {
     if (value === null || value === undefined || value === '') return placeholder;
     if (typeof value !== 'number') return String(value);
     if (!Number.isFinite(value)) return placeholder;
@@ -119,7 +121,9 @@ export function formatNumber(value, digits = PRECISION.value, { placeholder = EM
         // No "-0.00" for a small negative value rounded to zero
         if (Math.abs(shown) < 0.5 * Math.pow(10, -decimals)) shown = 0;
     }
-    return numberFormat({ useGrouping: grouping, ...options }).format(shown);
+    if (!latin) return numberFormat({ useGrouping: grouping, ...options }).format(shown);
+    return numberFormat({ useGrouping: grouping, numberingSystem: 'latn', ...options }).formatToParts(shown)
+        .map(p => (p.type === 'decimal' ? separators().decimal : p.value)).join('');
 }
 
 /**
@@ -130,20 +134,25 @@ export function formatNumber(value, digits = PRECISION.value, { placeholder = EM
  * @param {number|Quantity} [digits]  at most this many decimals
  */
 export function formatInputNumber(value, digits = 10) {
-    return formatNumber(value, digits, { trim: true, grouping: false, placeholder: '' });
+    return formatNumber(value, digits, { trim: true, grouping: false, placeholder: '', latin: true });
 }
 
-/** The decimal sign and the group separator of the browser's locale */
+/**
+ * The decimal sign and the group separator of the browser's locale as typed in a field: with Latin digits, and the
+ * decimal sign "," or "." only (the locale's own when it is one of them, else "."): parseNumber reads no other.
+ */
 function separators() {
-    const parts = numberFormat({ useGrouping: true }).formatToParts(12345.6);
+    const parts = numberFormat({ useGrouping: true, numberingSystem: 'latn' }).formatToParts(12345.6);
+    const decimal = parts.find(p => p.type === 'decimal')?.value;
     return {
-        decimal: parts.find(p => p.type === 'decimal')?.value ?? '.',
+        decimal: decimal === ',' ? ',' : '.',
         group: parts.find(p => p.type === 'group')?.value ?? ','
     };
 }
 
 /**
- * The decimal sign of the browser's locale ("," in it, "." in en).
+ * The decimal sign of the browser's locale as written in a field ("," in it, "." in en and in the locales
+ * whose own sign is neither "," nor ".", like Arabic and Persian).
  * @returns {string}
  */
 export function decimalSeparator() {
@@ -242,6 +251,17 @@ function plainDigits(text, decimal, group) {
     return `${digits || '0'}.${fraction || '0'}`;
 }
 
+// Arabic-Indic and Eastern Arabic-Indic digits, and the Arabic decimal and thousands signs, as a keyboard of those
+// locales types them
+const NATIVE_DIGITS = /[\u0660-\u0669\u06F0-\u06F9\u066B\u066C]/g;
+/** @param {string} c */
+const latinOf = c => {
+    const code = c.charCodeAt(0);
+    if (code === 0x066B) return '.';
+    if (code === 0x066C) return ',';
+    return String(code >= 0x06F0 ? code - 0x06F0 : code - 0x0660);
+};
+
 /**
  * The number a user typed, by the rule of D-025: a lone "." or "," with no other separator is the
  * decimal sign, so "12.5" and "12,5" are 12.5 in every locale; any other text is read with the
@@ -256,7 +276,7 @@ export function parseNumber(text) {
     if (typeof text !== 'string') return NaN;
     const { decimal, group } = separators();
     // \s includes the no-break spaces some locales group digits with
-    let t = text.replace(/\s/g, '').replace(APOSTROPHES, '');
+    let t = text.replace(/\s/g, '').replace(APOSTROPHES, '').replace(NATIVE_DIGITS, latinOf);
     // Any other group separator than "." and "," is only ever a group separator
     if (group !== '.' && group !== ',' && !/\s/.test(group)) t = t.split(group).join('');
     let sign = 1;
@@ -447,10 +467,11 @@ export function formatDuration(ms, options) {
  * @param {'lat'|'lon'} axis
  */
 export function toDms(degrees, axis) {
-    const dd = Math.abs(degrees);
-    const d = Math.floor(dd);
-    const m = Math.floor((dd - d) * 60);
-    const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
+    // Whole hundredths of a second first, so that seconds that round up to 60 carry into the minute (and the minute into the degree)
+    const hundredths = Math.round(Math.abs(degrees) * 3600 * 100);
+    const d = Math.floor(hundredths / 360000);
+    const m = Math.floor((hundredths - d * 360000) / 6000);
+    const s = (hundredths - d * 360000 - m * 6000) / 100;
     const dir = axis === 'lat' ? (degrees >= 0 ? 'N' : 'S') : (degrees >= 0 ? 'E' : 'W');
     return `${d}°${m < 10 ? '0' : ''}${m}'${s < 10 ? '0' : ''}${s.toFixed(2)}" ${dir}`;
 }

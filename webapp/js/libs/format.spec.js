@@ -166,11 +166,33 @@ describe('localiseNumberText', () => {
         expect(localiseNumberText('2.50')).toBe('2,50');
     });
 
+    it('is Latin digits and "," or "." in a locale that writes its own digits and decimal sign (Arabic, Persian)', () => {
+        for (const locale of ['ar-EG', 'fa-IR', 'ar-SA']) {
+            inLocale(locale);
+            expect(decimalSeparator(), locale).toMatch(/^[.,]$/);
+            expect(localiseNumberText('194.66'), locale).toMatch(/^194[.,]66$/);
+            expect(formatInputNumber(1234.5), locale).toMatch(/^1234[.,]5$/);
+            for (const s of SAMPLES) {
+                expect(parseNumber(localiseNumberText(s)), `${locale} ${s}`).toBe(Number(s));
+            }
+            expect(parseNumber(formatInputNumber(0.0000012345, 12)), locale).toBeCloseTo(0.0000012345, 12);
+        }
+    });
+
     it('returns empty and non-numeric text as it is', () => {
         inLocale('it-IT');
         for (const text of ['', 'abc', '1.2.3', '12,5', '.', '-', '1e', '1e999']) {
             expect(localiseNumberText(text), text).toBe(text);
         }
+    });
+});
+
+describe('parseNumber of native digits', () => {
+    it('reads the Arabic-Indic and Persian digits and decimal signs a keyboard of those locales types', () => {
+        inLocale('ar-EG');
+        expect(parseNumber('\u0663\u066B\u0665')).toBe(3.5);
+        expect(parseNumber('\u06F1\u06F2\u066C\u06F3\u06F4\u06F5\u066B\u06F6')).toBe(12345.6);
+        expect(parseNumber('-\u0661\u0662')).toBe(-12);
     });
 });
 
@@ -435,6 +457,13 @@ describe('the text of a point', () => {
     it('in degrees, minutes, seconds names the hemispheres', () => {
         expect(latLonDmsText(-23.940176, 31.138658)).toBe(`23\u00B056'24.63" S / 31\u00B008'19.17" E`);
         expect(latLonDmsText(45.5, -9.25)).toBe(`45\u00B030'00.00" N / 9\u00B015'00.00" W`);
+    });
+
+    it('in degrees, minutes, seconds carries seconds that round to 60 into the minute and the minute into the degree', () => {
+        // 45 deg 29 min 59.999 s is 45 deg 30 min 00.00 s, not 29'60.00"
+        expect(latLonDmsText(45 + 29 / 60 + 59.999 / 3600, 10 + 59 / 60 + 59.999 / 3600))
+            .toBe(`45\u00B030'00.00" N / 11\u00B000'00.00" E`);
+        expect(latLonDmsText(-(12 + 59 / 60 + 59.9999 / 3600), 0)).toBe(`13\u00B000'00.00" S / 0\u00B000'00.00" E`);
     });
 });
 

@@ -1,3 +1,4 @@
+import { expandUrl, renderXYZTemplate } from 'ol/uri';
 import { getPref, setPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 // `url2x` is the source of 512 px tiles (the map draws them in 256 px slots, tilePixelRatio 2) that a screen with a
@@ -115,13 +116,16 @@ function buildCustomBasemapConfig({ sourceType, url, layerName = '', tileSize, w
 
 /**
  * The URL of one tile of a custom source, loaded to check the source before it is saved: the
- * first XYZ tile (its 1x tile when the URL has the `{r}` of a 2x source, FR-MAP-29), or a WMS GetMap
+ * first XYZ tile (its 1x tile when the URL has the `{r}` of a 2x source, FR-MAP-29; the first server of an
+ * `{a-c}` range; `{-y}` as the map counts it), or a WMS GetMap
  * of one quarter of the world at the tile size.
  * @param {{ sourceType: 'wms'|'xyz', url: string, layerName: string, tileSize?: number, defaultTime?: string }} config
  */
 function customBasemapTestUrl(config) {
     if (config.sourceType !== 'wms') {
-        return config.url.replace('{z}', '0').replace('{x}', '0').replace('{y}', '0').replaceAll('{r}', '');
+        // The template as the map reads it (OpenLayers' own functions): {a-c} and {1-4} server ranges, {-y} and {z}/{x}/{y}
+        const [first] = expandUrl(config.url.replaceAll('{r}', ''));
+        return renderXYZTemplate(first, 0, 0, 0, 0);
     }
     const separator = config.url.includes('?') ? '&' : '?';
     const size = config.tileSize || CUSTOM_TILE_SIZES[0];
@@ -157,7 +161,7 @@ function loadTestTile(url, timeoutMs = 10000) {
             clearTimeout(timeout);
             reject(new Error('Failed to load tile'));
         };
-        img.crossOrigin = 'anonymous';
+        // No crossOrigin: the map draws tiles of a server with no CORS headers too, and the test only needs the image to load
         img.src = url;
     });
 }

@@ -430,6 +430,26 @@ describe('applying the state of the parent', () => {
         expect(emit).not.toHaveBeenCalled();
     });
 
+    it('keeps the elevation model of the state when the map cannot draw it: no report, and the next report still records it', async () => {
+        const GONE = 'a/gone.tif';
+        start(stateOf([DSM, ORTHO], { analysis: { target: GONE } }));
+        await settle();
+        // The state is still the parent's: nothing to report, the view is not changed
+        expect(emit).not.toHaveBeenCalled();
+        expect(analysis.targetPath.value).toBeNull();
+
+        // A change of the user is reported with the model it records, not without
+        setRow(ORTHO, { opacity: 0.4 });
+        await settle();
+        expect(reported().analysis).toEqual({ target: GONE });
+
+        // The user chooses another model: that is the state's model now
+        emit.mockClear();
+        await analysis.requestSwitch(ORTHO);
+        await settle();
+        expect(reported().analysis).toEqual({ target: ORTHO });
+    });
+
     it('goes back to the default elevation model when the state has none', async () => {
         start(stateOf([DSM, DTM], { analysis: { target: DTM } }));
         await settle();

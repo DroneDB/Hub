@@ -84,11 +84,21 @@ export function useMapViewState(ctx) {
         return rows.length === target.layers.length && rows.every((p, i) => p === target.layers[i].path);
     };
 
-    /** The elevation model the state records: nothing when it is the one the tools pick anyway. */
-    function analysisTarget() {
+    // The elevation model the state records when the map cannot draw it (it is no raster of the map): kept in the states
+    // reported, so the view does not show as changed and a later report does not forget it, until a model is chosen
+    /** @type {string|null} */
+    let heldTarget = null;
+
+    /** The elevation model chosen on the map: nothing when it is the one the tools pick anyway. */
+    function chosenTarget() {
         const path = analysisTargetPath.value;
         if (!path) return null;
         return path === defaultAnalysisTarget() ? null : path;
+    }
+
+    /** The elevation model the state records. */
+    function analysisTarget() {
+        return analysisTargetPath.value ? chosenTarget() : heldTarget;
     }
 
     /** The state the map shows now. @param {ViewState} target */
@@ -188,9 +198,11 @@ export function useMapViewState(ctx) {
     /** @param {ViewState} target */
     function applyAnalysisTarget(target) {
         const wanted = target.analysis.target;
-        if (wanted === analysisTarget()) return;
+        heldTarget = null;
+        if (wanted === chosenTarget()) return;
         const path = wanted ?? defaultAnalysisTarget();
-        if (path) restoreAnalysisTarget(path);
+        // Each application tries again: the model may be drawn by the time the layers are
+        if (path && !restoreAnalysisTarget(path) && wanted) heldTarget = wanted;
     }
 
     function apply() {
@@ -222,6 +234,8 @@ export function useMapViewState(ctx) {
         }
         reportChange();
     });
+    // A model chosen is the state's model: the one the map could not draw is let go
+    watch(analysisTargetPath, path => { if (path) heldTarget = null; });
     watch([rasterOpacity, splitMode, splitPositions, vizParamsByPath, selectedBasemap, analysisTargetPath], reportChange);
 
     watch(map, m => {

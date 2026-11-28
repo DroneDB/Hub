@@ -208,6 +208,32 @@ describe('RasterAnalysisControls NoData value', () => {
         expect(params.nodata).toBe(0);
     });
 
+    it('is dropped when the panel moves to another raster: no tile, value or export of it carries the NoData of the one before', async () => {
+        await render();
+        const dataset = wrapper.props('dataset');
+        await input().setValue('0');
+        await input().trigger('change');
+        await flushPromises();
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0].nodata).toBe(0);
+
+        await wrapper.setProps({ filePath: 'odm_dem/dtm.tif' });
+        await flushPromises();
+        expect(input().element.value).toBe('');
+        expect(dataset.getRasterValueInfo).toHaveBeenLastCalledWith('odm_dem/dtm.tif', { nodata: undefined });
+        expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).not.toHaveProperty('nodata');
+    });
+
+    it('is kept when the panel is closed and opened again on the same raster', async () => {
+        await render();
+        await input().setValue('0');
+        await input().trigger('change');
+        await flushPromises();
+        await wrapper.setProps({ visible: false });
+        await wrapper.setProps({ visible: true });
+        await flushPromises();
+        expect(input().element.value).toBe('0');
+    });
+
     it('is not in the vizParams without a value', async () => {
         await render();
         expect(wrapper.emitted('vizParamsChanged').at(-1)[0]).not.toHaveProperty('nodata');
