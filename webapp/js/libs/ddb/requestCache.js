@@ -74,9 +74,8 @@ class RequestCache {
                 if (this.inFlight.get(key) === flight) this.inFlight.delete(key);
             });
             this.inFlight.set(key, flight);
-            // The first caller owns the answer: joiners get copies
-            return flight;
         }
+        // What the cache keeps is never handed out: every caller, the one that started the request too, gets a copy
         return copy(await flight);
     }
 

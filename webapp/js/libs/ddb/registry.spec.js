@@ -184,3 +184,56 @@ describe('Registry writes and the request cache', () => {
         expect(handler).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('Registry writes that are still running', () => {
+    let n = 0;
+    const newRegistry = () => new Registry(`http://writes${++n}.test`);
+
+    it('do not leave the read that started meanwhile in the cache: it may have seen the old state', async () => {
+        let finishWrite;
+        let version = 'old';
+        const reads = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init = {}) => {
+            const body = (data) => new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            if (init.method === 'PATCH') {
+                await new Promise(resolve => { finishWrite = resolve; });
+                version = 'new';
+                return body({ ok: true });
+            }
+            reads.push(version);
+            return body({ version });
+        });
+        const reg = newRegistry();
+
+        const write = reg.patchRequest('/users/preferences', { a: 1 });
+        // A read that starts while the write is running is answered with the state before it
+        const during = await reg.getRequest('/sys/features');
+        expect(during).toEqual({ version: 'old' });
+        finishWrite();
+        await write;
+
+        // The next read asks again: it is not the answer kept for the next 30 seconds
+        expect(await reg.getRequest('/sys/features')).toEqual({ version: 'new' });
+        expect(reads).toEqual(['old', 'new']);
+    });
+});
+
+describe('Registry endpoint validation', () => {
+    const reg = new Registry('http://validation.test');
+    beforeEach(() => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    });
+
+    it('accepts a name that only contains dots', async () => {
+        await expect(reg.getRequest('/orgs/a/ds/b/download/misc.../notes.md')).resolves.toEqual({});
+        await expect(reg.getRequest('/orgs/a/ds/b/download/v1..2/x?path=misc...%2Fnotes.md')).resolves.toEqual({});
+        await expect(reg.getRequest('/orgs/a/ds/b/download/x..')).resolves.toEqual({});
+    });
+
+    it('still refuses a segment that climbs out of the folder, in the path and in the query', async () => {
+        for (const endpoint of ['/orgs/a/../b', '/orgs/a/ds/b/download/../x', '/orgs/a/ds/b/download/x/..', '/x?path=../y', '/x\\..\\y']) {
+            await expect(reg.getRequest(endpoint)).rejects.toThrow('dangerous');
+        }
+    });
+});

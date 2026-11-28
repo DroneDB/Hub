@@ -11,6 +11,9 @@
  *   - the list GET is conditional (ETag): an unchanged list costs a 304.
  * The event stream is closed while an upload runs (it would hold one of the browser's
  * HTTP/1.1 connections; files added during an upload trigger refreshes anyway).
+ * A stream is open only for a dataset that a consumer shows (acquire): the datasets that are only followed in the
+ * background (trackBusy, a cancelled import) poll, because every stream holds one of the six HTTP/1.1 connections of
+ * the page and a few busy datasets would leave none for the page itself.
  *
  * Events:
  *   'tasksUpdated' - the store snapshot changed: a task was added or deleted, or changed state or
@@ -111,7 +114,9 @@ function getStore(dataset) {
         ent = {
             // loaded: the server returned the list at least once. Until then `tasks` is empty
             // because nothing was fetched, not because the dataset has no tasks
-            tasks: new Map(), loaded: false, timerId: null, dataset, refs: 0, _started: false, _lastSig: null,
+            tasks: new Map(), loaded: false, timerId: null, dataset, refs: 0, watchers: 0, _started: false, _lastSig: null,
+            // fetches: the sequence of the task-list requests, applied: the newest one whose answer was applied
+            fetches: 0, applied: 0,
             idleStreak: 0, stream: null, streamUp: false, streamFailedAt: 0,
             // gone: the task list answered 404, the dataset was deleted (see 'datasetGone')
             gone: false
@@ -155,6 +160,9 @@ function computeSignature(ent) {
 //                cancelled: Set<taskId> the user cancelled }
 const busyTracks = new Map();
 
+// acquire/release option of the references that follow a dataset without showing it: they never open its stream
+const BACKGROUND = Object.freeze({ background: true });
+
 // datasetKey -> { dataset, taskId }: the datasets of the imports the user cancelled, followed until they are gone
 const removals = new Map();
 
@@ -162,7 +170,7 @@ const removals = new Map();
 function endRemoval(ent) {
     const key = datasetKey(ent.dataset);
     if (!removals.delete(key)) return;
-    TaskMonitor.release(ent.dataset);
+    TaskMonitor.release(ent.dataset, BACKGROUND);
 }
 
 // datasetKey|taskId of the tracked tasks being asked for by id
@@ -181,7 +189,7 @@ function endBusy(ent, track, taskId, task, gone) {
     if (kind === IMPORTING) emit('importEnded', { dataset: ent.dataset, task, gone });
     if (track.kinds.size === 0) {
         busyTracks.delete(datasetKey(ent.dataset));
-        TaskMonitor.release(ent.dataset);
+        TaskMonitor.release(ent.dataset, BACKGROUND);
     }
 }
 
@@ -232,8 +240,13 @@ async function lookUpBusy(ent, taskId) {
 async function _fetch(ent) {
     const ds = ent.dataset;
     if (ent.gone) return;
+    const seq = ++ent.fetches;
     try {
         const arr = await ds.getTasks({ take: TAKE }) || [];
+        // The store was released while the list was on its way, or a later request has answered already: this
+        // answer is older than what the store shows, and applying it would bring back a state that is over
+        if (stores.get(datasetKey(ds)) !== ent || seq < ent.applied) return;
+        ent.applied = seq;
 
         ent.tasks.clear();
         for (const t of arr) ent.tasks.set(t.taskId, t);
@@ -250,6 +263,7 @@ async function _fetch(ent) {
             ent.idleStreak++;
         }
     } catch (err) {
+        if (stores.get(datasetKey(ds)) !== ent) return;
         if (isNotFound(err)) {
             // The dataset was deleted (a rolled back import): nothing left to poll
             if (!ent.gone) {
@@ -290,7 +304,7 @@ function _wake(ent) {
 // ----- change notifications (server-sent events) -----
 
 function _streamWanted(ent) {
-    return ent._started && !isHidden() && !uploading &&
+    return ent._started && ent.watchers > 0 && !isHidden() && !uploading &&
         ent.dataset?.registry && ent.dataset?.baseApi &&
         typeof globalThis.ReadableStream !== 'undefined' &&
         Date.now() - ent.streamFailedAt > STREAM_RETRY_MS;
@@ -334,6 +348,24 @@ function _closeStream(ent) {
     ent.stream = null;
     ent.streamUp = false;
     controller.abort();
+}
+
+// ----- sign-out -----
+
+// registry -> its 'logout' listener. The busy datasets that are followed in the background are the signed-in user's: after
+// a sign-out nothing is shown for them, and polling them goes on anonymously (a 401 or 404 a round)
+const logoutHooks = new WeakMap();
+
+function hookLogout(dataset) {
+    const registry = dataset?.registry;
+    if (!registry || typeof registry.addEventListener !== 'function' || logoutHooks.has(registry)) return;
+    const onLogout = () => {
+        for (const track of [...busyTracks.values()]) if (track.dataset?.registry === registry) TaskMonitor.forgetBusy(track.dataset);
+        for (const removal of [...removals.values()]) if (removal.dataset?.registry === registry) TaskMonitor.forgetBusy(removal.dataset);
+    };
+    logoutHooks.set(registry, onLogout);
+    // lifetime: app (the client of a Registry lives as long as the page)
+    registry.addEventListener('logout', onLogout);
 }
 
 // ----- page visibility and uploads -----
@@ -396,24 +428,43 @@ const TaskMonitor = {
      * Take a reference on this dataset's monitor, starting it if idle.
      * Ref-counted so consumers that outlive the dataset screen (e.g. a bulk download
      * tracked from the persistent Header) keep receiving fresh data until they finish.
+     * `background`: the reference only follows the dataset (a busy row, a cancelled import): it keeps the polling
+     * going and never opens the event stream. Pass the same option to release().
+     * @param {any} dataset
+     * @param {{ background?: boolean }} [options]
      */
-    acquire(dataset) {
+    acquire(dataset, { background = false } = {}) {
         const ent = getStore(dataset);
         ent.refs++;
+        if (!background) ent.watchers++;
         ent.dataset = dataset;
-        if (ent._started) return;
+        hookLogout(dataset);
+        if (ent._started) {
+            // The first consumer that shows a dataset that was only followed opens its stream
+            if (!background && ent.watchers === 1) _scheduleTick(ent);
+            return;
+        }
         ent._started = true;
         hookPage();
         if (!isHidden()) _fetch(ent);
         _scheduleTick(ent);
     },
 
-    /** Drop a reference; the last one stops polling and discards the snapshot. */
-    release(dataset) {
+    /**
+     * Drop a reference (with the option it was taken with); the last one stops polling and discards the snapshot.
+     * @param {any} dataset
+     * @param {{ background?: boolean }} [options]
+     */
+    release(dataset, { background = false } = {}) {
         const ent = peekStore(dataset);
         if (!ent) return;
         ent.refs = Math.max(0, ent.refs - 1);
-        if (ent.refs > 0) return;
+        if (!background) ent.watchers = Math.max(0, ent.watchers - 1);
+        if (ent.refs > 0) {
+            // The last consumer that showed it has gone: only followed now, so its stream closes
+            if (!background && ent.watchers === 0) _scheduleTick(ent);
+            return;
+        }
         ent._started = false;
         _clearTimer(ent);
         _closeStream(ent);
@@ -423,7 +474,8 @@ const TaskMonitor = {
 
     /** Trigger an immediate refresh (e.g. user hit Refresh, tab activated). Returns the in-flight fetch promise so callers can await freshness. */
     forceRefresh(dataset) {
-        const ent = getStore(dataset);
+        // A released store stays released: nobody reads it, and a refresh would bring back a store that nothing frees
+        const ent = peekStore(dataset);
         if (!ent) return Promise.resolve();
         return _fetch(ent).then(() => { if (ent._started) _wake(ent); });
     },
@@ -484,7 +536,7 @@ const TaskMonitor = {
         if (!track) {
             track = { dataset, kinds: new Map(), last: new Map(), cancelled: new Set() };
             busyTracks.set(key, track);
-            TaskMonitor.acquire(dataset);
+            TaskMonitor.acquire(dataset, BACKGROUND);
         }
         track.kinds.set(taskId, kind);
         const ent = peekStore(dataset);
@@ -501,12 +553,12 @@ const TaskMonitor = {
         const removal = removals.get(key);
         if (removal) {
             removals.delete(key);
-            TaskMonitor.release(removal.dataset);
+            TaskMonitor.release(removal.dataset, BACKGROUND);
         }
         const track = busyTracks.get(key);
         if (!track) return;
         busyTracks.delete(key);
-        TaskMonitor.release(track.dataset);
+        TaskMonitor.release(track.dataset, BACKGROUND);
     },
 
     /**
@@ -527,7 +579,7 @@ const TaskMonitor = {
         const key = datasetKey(dataset);
         if (!removals.has(key)) {
             removals.set(key, { dataset, taskId: task.taskId });
-            TaskMonitor.acquire(dataset);
+            TaskMonitor.acquire(dataset, BACKGROUND);
         }
         return true;
     },

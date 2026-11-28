@@ -34,6 +34,15 @@ function cacheKeyOf(endpoint, options) {
     return endpoint + (endpoint.includes('?') ? '&' : '?') + '~silent';
 }
 
+/**
+ * Whether the endpoint climbs out of its folder: a `..` that is a whole segment of the path or a whole value of the
+ * query (`..`, `../`, `a/../b`, `?path=../x`). A name that only contains dots (`misc.../notes.md`) is a name.
+ * @param {string} endpoint
+ */
+function hasParentSegment(endpoint) {
+    return endpoint.split(/[/\\?&=#]/).some(segment => segment === '..');
+}
+
 export default class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
@@ -192,14 +201,18 @@ export default class Registry {
             throw new Error("Invalid endpoint: must start with '/'");
         }
         // Validate endpoint for dangerous patterns
-        if (/\.\.[/\\]/.test(endpoint) || [...endpoint].some(c => c.charCodeAt(0) < 0x20)) {
+        if (hasParentSegment(endpoint) || [...endpoint].some(c => c.charCodeAt(0) < 0x20)) {
             throw new Error('Invalid endpoint: contains dangerous characters or patterns');
         }
 
         if (method !== "GET") {
-            // A write changes what the cached reads saw; a read sent as POST (`readOnly`) does not
-            if (!options.readOnly) this.requestCache.invalidate(options.invalidate ?? '');
-            return this._send(endpoint, method, options);
+            // A write changes what the cached reads saw; a read sent as POST (`readOnly`) does not. The cache is
+            // dropped when the write starts and again when it ends: a read that started while it ran may have
+            // seen the old state, and must not be kept as the answer for the next seconds
+            if (options.readOnly) return this._send(endpoint, method, options);
+            const drop = () => this.requestCache.invalidate(options.invalidate ?? '');
+            drop();
+            return this._send(endpoint, method, options).finally(drop);
         }
 
         if (options.cache === false || options.responseType || options.onHeaders)

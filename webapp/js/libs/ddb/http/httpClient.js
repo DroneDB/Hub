@@ -37,6 +37,27 @@ export function bearer(token) {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/**
+ * One signal that aborts when any of `signals` does. AbortSignal.any where the browser has it; a controller wired to
+ * each signal where it does not (older Safari and Firefox), so the timeout is never lost. The wiring stays: the
+ * caller's abort must still stop a body that is being read after the headers came.
+ * @param {AbortSignal[]} signals
+ * @returns {AbortSignal}
+ */
+export function anySignal(signals) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') return AbortSignal.any(signals);
+    const controller = new AbortController();
+    for (const signal of signals) {
+        if (signal.aborted) {
+            controller.abort(signal.reason);
+            break;
+        }
+        // lifetime: element (the signal that it listens to goes with the request that owns it)
+        signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+    }
+    return controller.signal;
+}
+
 /** @returns {never} */
 function fail(message, status, extra = {}) {
     throw new ApiError(message, status, extra);
@@ -222,9 +243,7 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
         const timeout = new AbortController();
         const timeoutId = setTimeout(() => timeout.abort(), timeoutMs);
         const callerSignal = init.signal || null;
-        const signal = callerSignal
-            ? (typeof AbortSignal !== 'undefined' && AbortSignal.any ? AbortSignal.any([callerSignal, timeout.signal]) : callerSignal)
-            : timeout.signal;
+        const signal = callerSignal ? anySignal([callerSignal, timeout.signal]) : timeout.signal;
         const url = endpoint.startsWith('/') ? `${baseUrl}${endpoint}` : endpoint;
         try {
             return await fetch(url, { ...init, headers: authHeaders(/** @type {Record<string, string>} */ (init.headers || {})), signal });
@@ -247,6 +266,8 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
      */
     async function send(endpoint, options = {}) {
         const method = (options.method || 'GET').toUpperCase();
+        // The session this request is sent for: a 401 of a request sent before a sign-in is the old session's
+        const sentWith = getToken();
         try {
             const headers = { ...(options.headers || {}) };
             if (options.etag) headers['If-None-Match'] = options.etag;
@@ -266,7 +287,7 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
             return await handleResponse(response, method, options.responseType ?? null);
         } catch (error) {
             if (error.status === 401 && unauthorizedHandler && !options.skipUnauthorized
-                && !endpoint.startsWith('/users/authenticate')) {
+                && !endpoint.startsWith('/users/authenticate') && getToken() === sentWith) {
                 unauthorizedHandler(error);
             }
             if (error.status !== undefined || error.name === 'AbortError') throw error;

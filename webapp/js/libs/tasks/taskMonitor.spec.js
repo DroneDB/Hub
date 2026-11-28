@@ -30,6 +30,23 @@ function makeTask(over = {}) {
     };
 }
 
+// refreshing a dataset reads what the monitor follows: the datasets that a test refreshes are followed, as the page that
+// shows them does. The first request of a followed dataset is left unanswered, so the test is the one that fills the store.
+const followedDatasets = [];
+
+function followed(dataset) {
+    const getTasks = dataset.getTasks;
+    dataset.getTasks = vi.fn(() => new Promise(() => { }));
+    taskMonitor.acquire(dataset);
+    dataset.getTasks = getTasks;
+    followedDatasets.push(dataset);
+    return dataset;
+}
+
+afterEach(() => {
+    for (const dataset of followedDatasets.splice(0)) taskMonitor.release(dataset);
+});
+
 describe('datasetKey', () => {
     it('prefers baseApi when present', () => {
         expect(datasetKey({ baseApi: 'org/dsY', org: 'org', slug: 'dsX' })).toBe('org/dsY');
@@ -73,7 +90,7 @@ describe('tasksUpdated event', () => {
     }
 
     it('emits when a fetch populates an empty store', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks.mockResolvedValueOnce([makeTask()]);
         const seen = watch('tasksUpdated');
 
@@ -84,7 +101,7 @@ describe('tasksUpdated event', () => {
     });
 
     it('emits on the first fetch of a dataset with no tasks, which is then loaded', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         const seen = watch('tasksUpdated');
         expect(taskMonitor.isLoaded(dataset)).toBe(false);
 
@@ -95,7 +112,7 @@ describe('tasksUpdated event', () => {
     });
 
     it('is not loaded after a fetch that failed', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks.mockRejectedValueOnce(new Error('offline'));
         const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -111,7 +128,7 @@ describe('tasksUpdated event', () => {
         ['cancelledBy', { cancelledBy: null }, { cancelledBy: 'alice' }],
         ['targetLabel', { targetLabel: 'a' }, { targetLabel: 'b' }],
     ])('emits when a poll changes only the %s of a task', async (_name, before, after) => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks.mockResolvedValueOnce([makeTask(before)]).mockResolvedValueOnce([makeTask(after)]);
         const seen = watch('tasksUpdated');
 
@@ -122,7 +139,7 @@ describe('tasksUpdated event', () => {
     });
 
     it('does not emit when the fetched snapshot is identical to the previous one', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         const snapshot = [makeTask(), makeTask({ taskId: 't2', state: 'Succeeded' })];
         dataset.getTasks.mockResolvedValue(snapshot);
         const seen = watch('tasksUpdated');
@@ -135,7 +152,7 @@ describe('tasksUpdated event', () => {
     });
 
     it('emits when a mission task state, progress or phase changes', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks
             .mockResolvedValueOnce([makeTask({ taskId: 'm1', toolId: 'extract' })])
             .mockResolvedValueOnce([makeTask({ taskId: 'm1', toolId: 'extract', state: 'Processing', progressPercent: 42 })])
@@ -150,7 +167,7 @@ describe('tasksUpdated event', () => {
     });
 
     it('emits when a succeeded build starts or stops waiting for files', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         const build = over => makeTask({ state: 'Succeeded', path: 'house.obj', ...over });
         dataset.getTasks
             .mockResolvedValueOnce([build({ waitingForFiles: true, missingFiles: ['house.mtl'] })])
@@ -166,7 +183,7 @@ describe('tasksUpdated event', () => {
     });
 
     it('emits when tasks are added or removed', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks
             .mockResolvedValueOnce([makeTask()])
             .mockResolvedValueOnce([]);
@@ -179,8 +196,8 @@ describe('tasksUpdated event', () => {
     });
 
     it('scopes the event to its own dataset', async () => {
-        const d1 = makeDataset();
-        const d2 = makeDataset();
+        const d1 = followed(makeDataset());
+        const d2 = followed(makeDataset());
         d1.getTasks.mockResolvedValue([makeTask({ taskId: 'a' })]);
         d2.getTasks.mockResolvedValue([makeTask({ taskId: 'b' })]);
         const seen = watch('tasksUpdated');
@@ -274,7 +291,7 @@ describe('datasetGone event (FR-UPL-05, D-004)', () => {
     }
 
     it('fires once when the task list answers 404, the dataset having been deleted by a rollback', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         const error = new ApiError('Not found', 404);
         dataset.getTasks.mockRejectedValue(error);
         const log = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -292,7 +309,7 @@ describe('datasetGone event (FR-UPL-05, D-004)', () => {
     });
 
     it('does not fire for another failure, which keeps polling', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks.mockRejectedValue(new ApiError('Server error', 500));
         const log = vi.spyOn(console, 'error').mockImplementation(() => {});
         const seen = watch('datasetGone');
@@ -306,7 +323,7 @@ describe('datasetGone event (FR-UPL-05, D-004)', () => {
     });
 
     it('ends the running tasks of a dataset that answers 404 after a Processing list, once', async () => {
-        const dataset = makeDataset();
+        const dataset = followed(makeDataset());
         dataset.getTasks.mockResolvedValueOnce([makeTask({ state: 'Processing' })]);
         const seen = watch('datasetGone');
 

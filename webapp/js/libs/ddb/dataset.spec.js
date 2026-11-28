@@ -261,13 +261,16 @@ describe('Dataset file writes', () => {
     const names = formData => [...formData.keys()];
 
     // FR-UPL-03: the Registry refuses a name that exists unless overwrite comes before the file
-    it('writeObj and uploadObj send no overwrite unless asked', async () => {
+    // A request without the field is the one of a client that knows nothing of it, and the Registry replaces for it
+    it('writeObj and uploadObj always send overwrite, false unless asked', async () => {
         const { ds, post } = datasetPosting();
         await ds.writeObj('notes.txt', 'text');
         await ds.uploadObj('photo.jpg', new Blob(['x']));
         expect(post.mock.calls[0][0]).toBe('/orgs/my_org/ds/my_ds/obj');
-        expect(names(post.mock.calls[0][1])).toEqual(['path', 'file']);
-        expect(names(post.mock.calls[1][1])).toEqual(['path', 'file']);
+        for (const [, formData] of post.mock.calls) {
+            expect(names(formData)).toEqual(['path', 'overwrite', 'file']);
+            expect(formData.get('overwrite')).toBe('false');
+        }
     });
 
     it('writeObj and uploadObj send overwrite=true before the file when they replace', async () => {
@@ -534,5 +537,79 @@ describe('Dataset.thumbExUrl', () => {
         expect(ds.thumbExUrl('a & b.jpg', undefined, { rescale: '-5,36', nodata: 0 }))
             .toBe(`${base}/thumb-ex?path=a%20%26%20b.jpg&rescale=-5%2C36&nodata=0`);
         expect(ds.thumbExUrl('r.jpg', 512)).toBe(`${base}/thumb-ex?path=r.jpg&size=512`);
+    });
+});
+
+
+describe('Dataset.downloadWithCheck', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const ok = () => new Response(null, { status: 200 });
+
+    function setup(response = ok) {
+        const registry = { remote: 'hub.example.com', secure: true, url: 'https://hub.example.com', fetchRaw: vi.fn(async () => response()) };
+        const hrefs = [];
+        vi.spyOn(window, 'location', 'get').mockReturnValue({ set href(value) { hrefs.push(value); } });
+        const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(function () { submit.forms.push(this); });
+        submit.forms = [];
+        return { ds: new Dataset(registry, 'my_org', 'my_ds'), registry, hrefs, submit };
+    }
+
+    const many = count => Array.from({ length: count }, (_, i) => `survey/flight 2026/IMG_${String(i).padStart(4, '0')}, copy.jpg`);
+
+    it('sends a short selection to the browser as the URL it checked', async () => {
+        const { ds, registry, hrefs, submit } = setup();
+        await ds.downloadWithCheck(['a.tif', 'b.tif']);
+        expect(registry.fetchRaw).toHaveBeenCalledWith(ds.downloadUrl(['a.tif', 'b.tif']), { headers: { 'X-Download-Check': '1' } });
+        expect(hrefs).toEqual([ds.downloadUrl(['a.tif', 'b.tif'])]);
+        expect(submit).not.toHaveBeenCalled();
+    });
+
+    it('posts a long selection as a hidden form with one path field per file, and never sets a non-string address', async () => {
+        const { ds, registry, hrefs, submit } = setup();
+        const paths = many(90);
+        expect(ds.downloadUrl(paths).length).toBeGreaterThan(2000);
+
+        await ds.downloadWithCheck(paths);
+
+        // The address is never assigned (the old code assigned `undefined` after reading the whole archive)
+        expect(hrefs).toEqual([]);
+        expect(submit).toHaveBeenCalledOnce();
+        const form = submit.forms[0];
+        expect(form.method).toBe('post');
+        expect(form.action).toBe('https://hub.example.com/orgs/my_org/ds/my_ds/download');
+        const sent = [...form.querySelectorAll('input')];
+        expect(sent.map(i => i.name)).toEqual(Array(90).fill('path'));
+        // Each name as it is, comma included: they are not joined
+        expect(sent.map(i => i.value)).toEqual(paths);
+        // The form is gone from the page after it was submitted
+        expect(document.querySelector('form[action$="/download"]')).toBeNull();
+        // The preflight asks the same endpoint with the same fields, as a POST
+        const [url, init] = registry.fetchRaw.mock.calls[0];
+        expect(url).toBe('/orgs/my_org/ds/my_ds/download');
+        expect(init.method).toBe('POST');
+        expect(init.headers).toEqual({ 'X-Download-Check': '1' });
+        expect(init.body.getAll('path')).toEqual(paths);
+    });
+
+    it('carries inline in the form of a long selection', async () => {
+        const { ds, submit } = setup();
+        await ds.downloadWithCheck(many(90), { inline: true });
+        const names = [...submit.forms[0].querySelectorAll('input')].map(i => i.name);
+        expect(names.at(-1)).toBe('inline');
+    });
+
+    it('does not post a long selection that the limit refused', async () => {
+        const { ds, submit } = setup(() => new Response(JSON.stringify({ detail: 'Too many downloads' }), { status: 429, headers: { 'Content-Type': 'application/problem+json' } }));
+        await expect(ds.downloadWithCheck(many(90))).rejects.toMatchObject({ status: 429, message: 'Too many downloads' });
+        expect(submit).not.toHaveBeenCalled();
+    });
+
+    it('leaves no body of the preflight open: an answer that is the download itself is cancelled', async () => {
+        let cancelled = false;
+        const body = new ReadableStream({ cancel() { cancelled = true; } });
+        const { ds } = setup(() => new Response(body, { status: 200 }));
+        await ds.downloadWithCheck('a.tif');
+        expect(cancelled).toBe(true);
     });
 });

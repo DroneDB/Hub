@@ -2,6 +2,7 @@ import { Entry } from './entry';
 import { ApiError } from './apiError';
 import { failureMessageOf, isJsonType } from './http/httpClient';
 import { BASE_METHOD } from '../stockpileBase';
+import { MAX_DOWNLOAD_URL_LENGTH, downloadFormData, submitDownloadForm } from './downloadForm';
 
 // The image format of map tiles is the extension of their URL, and the server sends exactly that format. WebP is the
 // default: smaller than PNG for the same tile (what a map pulls by the hundred). PNG is the universal one, for URLs
@@ -392,12 +393,6 @@ export default class Dataset {
         return new Entry(this, fileEntry);
     }
 
-    async download(paths) {
-        const formData = new FormData();
-        if (paths !== undefined && paths !== null) formData.append('path', paths);
-        return this.registry.postFormData(`${this.baseApi}/download`, formData);
-    }
-
     /**
      * Downloads file(s) with a preflight check to detect 429 (Too Many Requests) before
      * initiating the native browser download. This avoids loading the entire file as a blob
@@ -408,6 +403,9 @@ export default class Dataset {
      * 2. If 429, throw error so the caller can show a dialog
      * 3. If 200, proceed with window.location.href for native browser download
      *
+     * A selection whose GET URL would be too long (many files) goes the same way as a hidden form that the
+     * browser posts, one `path` field per file: the answer is the ZIP, handled as a native download.
+     *
      * @param {string|string[]} paths - Path(s) to download
      * @param {Object} options - Options (e.g. { inline: true })
      * @returns {Promise<void>}
@@ -415,17 +413,15 @@ export default class Dataset {
      */
     async downloadWithCheck(paths, options = {}) {
         const url = this.downloadUrl(paths, options);
-        await this.checkDownloadSlot(url);
-
-        // Preflight passed - initiate native browser download
-        if (url.length < 2000) {
+        if (url.length < MAX_DOWNLOAD_URL_LENGTH) {
+            await this.checkDownloadSlot(url);
             window.location.href = url;
-        } else {
-            // URL too long for browser navigation, use POST to get a temporary short URL
-            const { downloadUrl, error } = await this.download(paths);
-            if (error) throw new Error(error);
-            window.location.href = downloadUrl;
+            return;
         }
+
+        const list = typeof paths === 'string' ? [paths] : paths;
+        await this.checkDownloadSlot(`${this.baseApi}/download`, { method: 'POST', body: downloadFormData(list, options) });
+        submitDownloadForm(`${this.registry.url}${this.baseApi}/download`, list, options);
     }
 
     /**
@@ -563,7 +559,7 @@ export default class Dataset {
     }
 
     // A file that exists at `path` (any letter case) is refused with 409 and `conflictPath` unless
-    // `overwrite` is true (D-040): a caller that saves a file it opened, or one it owns, replaces it
+    // `overwrite` is true: a caller that saves a file it opened, or one it owns, replaces it
     async writeObj(path, content, { overwrite = false } = {}) {
         return this.uploadObj(path, new Blob([content]), { overwrite });
     }
@@ -571,8 +567,9 @@ export default class Dataset {
     async uploadObj(path, file, { overwrite = false } = {}) {
         const formData = new FormData();
         formData.append('path', path);
-        // Before the file: the Registry reads the flag sent before the file part
-        if (overwrite) formData.append('overwrite', 'true');
+        // Before the file: the Registry reads the flag sent before the file part. Always sent, `false` too: a
+        // request without the field is the legacy one that replaces, which this client never means
+        formData.append('overwrite', overwrite ? 'true' : 'false');
         formData.append('file', file);
         return this.registry.postFormData(`${this.baseApi}/obj`, formData);
     }
@@ -837,11 +834,17 @@ export default class Dataset {
      * Preflight of a download: asks the server whether a download slot is free
      * (X-Download-Check) before the browser navigates to `url`.
      * @param {string} url
+     * @param {RequestInit} [init]  the request (a POST for a selection too long for a URL)
      * @throws {ApiError} status 429 when the user's download limit is reached
      */
-    async checkDownloadSlot(url) {
-        const response = await this.registry.fetchRaw(url, { headers: { 'X-Download-Check': '1' } });
-        if (response.ok) return;
+    async checkDownloadSlot(url, init = {}) {
+        const response = await this.registry.fetchRaw(url, { ...init, headers: { 'X-Download-Check': '1' } });
+        // The server answers a preflight with no body, but one that answers the download itself (an older
+        // Registry, or one with the limit off) must not be left open: the connection would be held
+        if (response.ok) {
+            await response.body?.cancel();
+            return;
+        }
         let message = `Download failed (${response.status})`;
         try {
             if (isJsonType((response.headers.get('Content-Type') || '').toLowerCase())) {

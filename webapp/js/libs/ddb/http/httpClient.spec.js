@@ -4,7 +4,7 @@
  * and after the ProblemDetails switch.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createHttpClient } from './httpClient';
+import { createHttpClient, anySignal } from './httpClient';
 import { isForbidden, isNotFound } from '../apiError';
 
 afterEach(() => vi.restoreAllMocks());
@@ -170,5 +170,84 @@ describe('httpClient skipUnauthorized', () => {
         await expect(http.send('/orgs/acme/')).rejects.toMatchObject({ status: 401 });
         expect(onUnauthorized).toHaveBeenCalledTimes(1);
         expect(onUnauthorized.mock.calls[0][0].status).toBe(401);
+    });
+});
+
+describe('httpClient signals', () => {
+    it('the timeout still ends a request with a caller signal where AbortSignal.any does not exist', async () => {
+        vi.useFakeTimers();
+        const any = AbortSignal.any;
+        // @ts-expect-error older browsers have no AbortSignal.any
+        AbortSignal.any = undefined;
+        try {
+            vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => new Promise((resolve, reject) => {
+                init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+            }));
+            const http = createHttpClient({ baseUrl: 'http://t.test', getToken: () => null, timeoutMs: 1000 });
+            const caller = new AbortController();
+            const request = http.send('/x', { signal: caller.signal }).catch(e => e);
+            await vi.advanceTimersByTimeAsync(1001);
+            const error = await request;
+            expect(error.message).toBe('Request timed out after 1s');
+            expect(error.status).toBe(0);
+        } finally {
+            AbortSignal.any = any;
+            vi.useRealTimers();
+        }
+    });
+
+    it('the caller signal still aborts it, without the timeout message', async () => {
+        const any = AbortSignal.any;
+        // @ts-expect-error older browsers have no AbortSignal.any
+        AbortSignal.any = undefined;
+        try {
+            vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => new Promise((resolve, reject) => {
+                init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+            }));
+            const http = createHttpClient({ baseUrl: 'http://t.test', getToken: () => null });
+            const caller = new AbortController();
+            const request = http.send('/x', { signal: caller.signal }).catch(e => e);
+            caller.abort();
+            expect((await request).name).toBe('AbortError');
+        } finally {
+            AbortSignal.any = any;
+        }
+    });
+
+    it('anySignal follows a signal that is already aborted', () => {
+        const aborted = AbortSignal.abort();
+        const any = AbortSignal.any;
+        // @ts-expect-error older browsers have no AbortSignal.any
+        AbortSignal.any = undefined;
+        try {
+            expect(anySignal([new AbortController().signal, aborted]).aborted).toBe(true);
+        } finally {
+            AbortSignal.any = any;
+        }
+    });
+});
+
+describe('httpClient 401 of an old session', () => {
+    it('a 401 of a request sent before the sign-in does not end the new session', async () => {
+        let token = null;
+        const onUnauthorized = vi.fn();
+        let answer;
+        vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(resolve => { answer = resolve; }));
+        const http = createHttpClient({ baseUrl: 'http://t.test', getToken: () => token, onUnauthorized });
+
+        const request = http.send('/orgs/a/ds/b/tasks').catch(e => e);
+        token = 'new-session-token';   // the user signs in while the request is on its way
+        answer(new Response('{}', { status: 401, headers: { 'Content-Type': 'application/json' } }));
+
+        expect((await request).status).toBe(401);
+        expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('a 401 of the session that is current still reaches the handler', async () => {
+        const onUnauthorized = vi.fn();
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 401, headers: { 'Content-Type': 'application/json' } }));
+        const http = createHttpClient({ baseUrl: 'http://t.test', getToken: () => 'token', onUnauthorized });
+        await http.send('/x').catch(() => { });
+        expect(onUnauthorized).toHaveBeenCalledTimes(1);
     });
 });
