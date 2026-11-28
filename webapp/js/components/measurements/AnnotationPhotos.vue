@@ -86,6 +86,8 @@
  * the list only; it never deletes a file of the dataset (a removed photo is only unlisted, and an uploaded one stays
  * in the annotations folder) and the annotation is saved by its dialog. An item with no `geometry` (not georeferenced)
  * makes no coverage request. With `readOnly` the photos are shown and nothing can be changed.
+ * `uploading` is emitted with true while an upload runs and false when it ends (or the component goes): the host keeps its
+ * Save off meanwhile, so that a photo written to the dataset is never left out of the annotation.
  */
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue';
 import Button from 'primevue/button';
@@ -113,7 +115,7 @@ const props = defineProps({
     geometry: { type: Object, default: null },
     readOnly: { type: Boolean, default: false }
 });
-const emit = defineEmits(['update:modelValue', 'written']);
+const emit = defineEmits(['update:modelValue', 'written', 'uploading']);
 
 const uid = useId();
 const SOURCE_LABELS = { coverage: 'Pinned from the coverage', dataset: 'From the dataset', upload: 'Uploaded' };
@@ -209,6 +211,9 @@ onBeforeUnmount(() => controller?.abort());
 // What the editor adds from the dataset and from their computer
 const picking = ref(false);
 const uploading = ref(false);
+// The host holds its Save while a photo is being written: a save in between would leave out the photo that lands after it
+watch(uploading, busy => emit('uploading', busy));
+onBeforeUnmount(() => { if (uploading.value) emit('uploading', false); });
 const uploadError = ref('');
 const fileInput = ref(/** @type {HTMLInputElement | null} */ (null));
 

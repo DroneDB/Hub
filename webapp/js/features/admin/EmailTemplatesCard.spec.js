@@ -302,6 +302,20 @@ describe('EmailTemplatesCard', () => {
             expect(subjectInput().value).toBe('Other subject');
         });
 
+        it('keeps the picker and the text of the template shown when the other one cannot be loaded, so Save acts on that one', async () => {
+            await show();
+            h.sys.emailTemplate = vi.fn(() => Promise.reject(new ApiError('Server error', 500)));
+            await picker().vm.$emit('update:modelValue', 'other');
+            await flushPromises();
+            expect(h.notify.error).toHaveBeenCalled();
+            expect(picker().props('modelValue')).toBe(NAME);
+            expect(subjectInput().value).toBe(TEMPLATE.subject);
+            await type(subjectInput(), 'Edited');
+            await button('Save').trigger('click');
+            await flushPromises();
+            expect(h.sys.saveEmailTemplate).toHaveBeenCalledWith(NAME, { subject: 'Edited', body: TEMPLATE.body });
+        });
+
         it('asks before dropping unsaved changes', async () => {
             await show();
             await type(subjectInput(), 'Unsaved');

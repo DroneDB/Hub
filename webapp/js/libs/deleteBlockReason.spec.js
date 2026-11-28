@@ -11,6 +11,23 @@ describe('userDeleteBlockReason', () => {
         expect(userDeleteBlockReason({ userName: 'administrator' })).toBeNull();
         expect(userDeleteBlockReason(null)).toBeNull();
     });
+
+    it('says why the signed-in user cannot delete their own account, whatever the letter case', () => {
+        expect(userDeleteBlockReason({ userName: 'alice' }, 'alice')).toBe('You cannot delete your own account');
+        expect(userDeleteBlockReason({ userName: 'Alice' }, 'aLICE')).toBe('You cannot delete your own account');
+    });
+
+    it('keeps the built-in admin reason for the built-in admin, signed in or not', () => {
+        expect(userDeleteBlockReason({ userName: 'admin' }, 'admin')).toBe('The built-in admin account cannot be deleted');
+        expect(userDeleteBlockReason({ userName: 'admin' }, 'alice')).toBe('The built-in admin account cannot be deleted');
+    });
+
+    it('says nothing for another user, or when nobody is signed in', () => {
+        expect(userDeleteBlockReason({ userName: 'bob' }, 'alice')).toBeNull();
+        expect(userDeleteBlockReason({ userName: 'alice' }, null)).toBeNull();
+        expect(userDeleteBlockReason({ userName: 'alice' }, undefined)).toBeNull();
+        expect(userDeleteBlockReason({ userName: null }, null)).toBeNull();
+    });
 });
 
 describe('userDisableBlockReason', () => {

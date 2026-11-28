@@ -85,4 +85,26 @@ describe('ConfirmDialog', () => {
         document.querySelector('[data-cancel]').click();
         expect(closes()).toEqual(['cancel']);
     });
+
+    it('while busy, the answers are off: no Cancel, no Confirm (click or Enter), no close button, and Confirm shows it works', async () => {
+        await show({ confirmText: 'Delete', confirmButtonClass: 'danger', requireText: 'acme', busy: true });
+        await type('acme');
+        expect(confirmButton().disabled).toBe(true);
+        expect(document.querySelector('[data-cancel]').disabled).toBe(true);
+        expect(confirmButton().classList.contains('p-button-loading')).toBe(true);
+        expect(document.querySelector('.p-dialog-close-button')).toBeNull();
+        confirmButton().click();
+        enter(document.querySelector('.p-dialog input'));
+        document.querySelector('[data-cancel]').click();
+        await flushPromises();
+        expect(closes()).toEqual([]);
+    });
+
+    it('answers again when the request is over', async () => {
+        await show({ confirmText: 'Delete', confirmButtonClass: 'danger', requireText: 'acme', busy: true });
+        await type('acme');
+        await wrapper.setProps({ busy: false });
+        confirmButton().click();
+        expect(closes()).toEqual(['confirm']);
+    });
 });

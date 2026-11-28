@@ -71,7 +71,7 @@
                                                 option-value="value"
                                                 class="w-100"
                                                 @update:model-value="value => changePermission(member, value)" />
-                                        <span v-else>{{ member.permissionName }}</span>
+                                        <span v-else>{{ permissionLabel(member) }}</span>
                                     </td>
                                     <td v-bind="stackedCell('Granted', 'sm')">
                                         <span v-if="member.grantedAt">
@@ -150,8 +150,8 @@ export default {
         orgSlug: { type: String, required: true },
         canManageMembers: { type: Boolean, default: false }
     },
-    // permissions-changed: the user changed their own permissions (the parent reads them again
-    // and passes canManageMembers: false once they may no longer manage the members)
+    // permissions-changed: the user changed their own permissions or left the organization (the parent
+    // reads them again and passes canManageMembers: false once they may no longer manage the members)
     emits: ['close', 'permissions-changed'],
     setup() {
         return { stackedFrom, stackedCell };
@@ -265,6 +265,11 @@ export default {
             return member.userName === reg.getUsername();
         },
 
+        // The member DTO carries the level as a number: the name is the option's label
+        permissionLabel(member) {
+            return this.permissionsOptions.find(o => o.value === member.permissions)?.label ?? '';
+        },
+
         // The row shows the new level at once; dropping your own row below Admin asks first and
         // puts the previous level back on Cancel
         changePermission(member, value) {
@@ -316,8 +321,16 @@ export default {
 
             this.removingMember = this.memberToRemove.userName;
             try {
-                await reg.orgs.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
-                await this.loadData();
+                const removed = this.memberToRemove;
+                await reg.orgs.removeOrganizationMember(this.orgSlug, removed.userName);
+                if (this.isSelf(removed)) {
+                    // The user who left may no longer read the members: the list is not asked for again (it would answer
+                    // "Access denied" next to the success), the row goes, and the parent reads the rights again
+                    this.members = this.members.filter(m => m.userName !== removed.userName);
+                    this.$emit('permissions-changed');
+                } else {
+                    await this.loadData();
+                }
                 this.$notify.success('Member removed successfully', { summary: 'Member Removed' });
             } catch (e) {
                 this.error = e.message || 'Failed to remove member';

@@ -275,6 +275,74 @@ describe('UsersPage selection and bulk actions (FR-ADM-23)', () => {
         expect(reg.admin.disableUser.mock.calls).toEqual([['bob']]);
     });
 
+    it('leaves your own account out of the header checkbox, as it is left out of Disable', async () => {
+        reg.signedIn = 'alice';
+        await render();
+        await wrapper.find('thead input[type="checkbox"]').setValue(true);
+        await flushPromises();
+        expect(bulkBar().text()).toContain('4 users selected');
+        expect(row('alice').find('input[type="checkbox"]').element.checked).toBe(false);
+    });
+
+    it('does not delete your own account with the selected ones, and its row has no Delete', async () => {
+        reg.signedIn = 'alice';
+        await render();
+        await tick('alice');
+        await tick('bob');
+        const own = row('alice').find('button[aria-label="Delete User"]');
+        expect(own.attributes('aria-disabled')).toBe('true');
+        expect(document.getElementById(own.attributes('aria-describedby')).textContent).toBe('You cannot delete your own account');
+        await barButton('Delete').trigger('click');
+        await flushPromises();
+        expect(dialog().textContent).toContain('Delete user “bob”');
+        expect(dialog().textContent).not.toContain('alice');
+        await typeConfirmation('bob');
+        confirmButton().click();
+        await flushPromises();
+        expect(reg.admin.deleteUser.mock.calls).toEqual([['bob', null, 'Rename']]);
+    });
+
+    it('opens no question when only your own account is selected for Delete', async () => {
+        reg.signedIn = 'alice';
+        await render();
+        await tick('alice');
+        await barButton('Delete').trigger('click');
+        await flushPromises();
+        expect(dialog()).toBeNull();
+        expect(reg.admin.deleteUser).not.toHaveBeenCalled();
+    });
+
+    it('keeps the question busy while the delete runs: no second request from a second click or Enter', async () => {
+        let finish;
+        reg.admin.deleteUser = vi.fn(() => new Promise(resolve => { finish = () => resolve({}); }));
+        await render();
+        await row('bob').find('button[aria-label="Delete User"]').trigger('click');
+        await flushPromises();
+        await typeConfirmation('bob');
+        confirmButton().click();
+        await flushPromises();
+        expect(confirmButton().disabled).toBe(true);
+        expect(dialog().querySelector('[data-cancel]').disabled).toBe(true);
+        confirmButton().click();
+        await wrapper.vm.confirmDelete();
+        expect(reg.admin.deleteUser).toHaveBeenCalledTimes(1);
+        finish();
+        await flushPromises();
+        expect(reg.admin.deleteUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('lets the question be answered again when the delete failed', async () => {
+        reg.admin.deleteUser = vi.fn(() => Promise.reject(new Error('You cannot delete your own account')));
+        await render();
+        await row('bob').find('button[aria-label="Delete User"]').trigger('click');
+        await flushPromises();
+        await typeConfirmation('bob');
+        confirmButton().click();
+        await flushPromises();
+        expect(notify.error).toHaveBeenCalledWith('Failed to delete user: You cannot delete your own account');
+        expect(confirmButton().disabled).toBe(false);
+    });
+
     it('enables the disabled users that are selected, and reports the ones that failed', async () => {
         reg.admin.enableUser = vi.fn(() => Promise.reject(new Error('Cannot enable')));
         await render();

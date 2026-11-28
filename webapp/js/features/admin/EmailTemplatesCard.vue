@@ -180,9 +180,14 @@ async function run(action, work) {
 
 /** @param {string} name */
 async function loadTemplate(name) {
-    selectedName.value = name;
-    preview.value = null;
-    await run('load', async () => show(await reg.sys.emailTemplate(name)));
+    // The picker follows the form: a template that could not be read leaves the one shown (and its text) selected, so
+    // that Save, Reset and Test keep acting on the template the form holds
+    await run('load', async () => {
+        const loaded = await reg.sys.emailTemplate(name);
+        selectedName.value = name;
+        preview.value = null;
+        show(loaded);
+    });
 }
 
 async function loadTemplates() {

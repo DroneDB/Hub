@@ -66,14 +66,14 @@
             <span class="folder-picker-selected-label">{{ mode === 'file' ? 'Selected file:' : 'Selected folder:' }}</span>
             <InputText v-model="selectedPath" class="folder-picker-selected-input"
                        :aria-label="mode === 'file' ? 'Selected file' : 'Selected folder'"
-                       :placeholder="selectedPathPlaceholder" @keyup.enter="onConfirm" />
+                       :placeholder="selectedPathPlaceholder" @keydown.enter="onEnter($event, onConfirm)" />
         </div>
 
         <div v-if="mode !== 'file'" class="folder-picker-new-folder">
             <span class="folder-picker-new-folder-label">New folder:</span>
             <InputText ref="newFolderInput" v-model="newFolderName" aria-label="New folder name"
                        class="folder-picker-new-folder-input" :disabled="creatingFolder"
-                       placeholder="Folder name" @keyup.enter="createFolder" />
+                       placeholder="Folder name" @keydown.enter="onEnter($event, createFolder)" />
             <Button :disabled="!newFolderName || creatingFolder" :loading="creatingFolder"
                     severity="secondary" label="Create" size="small" @click="createFolder" />
         </div>
@@ -310,6 +310,13 @@ export default {
                 if (this.mode === 'folder') return isDir;
                 return true;
             }) || null;
+        },
+
+        // Enter in a field acts when it is pressed, not when it is released: a question that Enter answers
+        // (Folder does not exist) gives the focus back to the field, and the release of that same Enter would ask again
+        onEnter: function (event, action) {
+            if (event.repeat || event.isComposing) return;
+            action();
         },
 
         // Confirm handler: validates the typed/selected path exists; for folder

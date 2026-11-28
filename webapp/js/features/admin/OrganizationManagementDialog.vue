@@ -93,7 +93,7 @@
 
         <!-- Delete Organization Confirmation Dialog: the slug is typed to confirm -->
         <ConfirmDialog v-if="showDeleteDialog"
-                       v-bind="deleteDialog"
+                       v-bind="deleteDialog" :busy="!!deleting"
                        @close="handleDeleteDialogClose" />
     </Window>
 </template>
@@ -120,6 +120,8 @@ import EmptyState from '@/components/EmptyState.vue';
 import { countOf } from '@/libs/format';
 import { confirmDialogProps, namedItem } from '@/libs/deleteConfirmation';
 import { organizationDeleteBlockReason } from '@/libs/deleteBlockReason';
+import { slugProblem, suggestSlug } from '@/libs/slug';
+import { latinNameProblem, displayNameLengthProblem } from '@/libs/nameRules';
 
 export default {
     components: {
@@ -181,17 +183,9 @@ export default {
             });
         },
 
+        // The slug of the name by the generator every form uses (accents dropped, the Registry's own rule)
         suggestedSlug: function() {
-            if (!this.newOrgName.trim()) return "";
-
-            // Convert name to valid slug
-            return this.newOrgName
-                .toLowerCase()
-                .trim()
-                .replace(/[^a-z0-9\s-]/g, '') // Remove invalid characters
-                .replace(/\s+/g, '-') // Replace spaces with hyphens
-                .replace(/-+/g, '-') // Replace multiple hyphens with single
-                .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+            return suggestSlug(this.newOrgName);
         }
     },
 
@@ -233,7 +227,7 @@ export default {
         },
 
         async deleteOrganization() {
-            if (!this.orgToDelete) return;
+            if (!this.orgToDelete || this.deleting) return;
 
             try {
                 this.deleting = this.orgToDelete.slug;
@@ -261,8 +255,15 @@ export default {
             if (!this.newOrgName.trim()) return;
 
             const slug = this.suggestedSlug;
-            if (!slug) {
-                this.createError = "Please enter a valid organization name";
+            const problem = displayNameLengthProblem(this.newOrgName)
+                || latinNameProblem(this.newOrgName, { withSlugField: false })
+                || slugProblem(slug, {
+                    kind: 'Organization',
+                    forbidden: this.organizations.map(org => org.slug),
+                    taken: 'An organization with this slug already exists'
+                });
+            if (problem) {
+                this.createError = problem;
                 return;
             }
 

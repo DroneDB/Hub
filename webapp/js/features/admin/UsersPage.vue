@@ -145,8 +145,8 @@
                             <!-- Off while it is busy or the user cannot be deleted; the reason of the rule is what the button says -->
                             <ActionButton severity="danger" size="small" :loading="slotProps.data.deleting" label="Delete User"
                                           icon="fa-solid fa-trash"
-                                          :disabled="slotProps.data.deleting || slotProps.data.editing || !!userDeleteBlockReason(slotProps.data)"
-                                          :disabled-reason="userDeleteBlockReason(slotProps.data) ?? ''"
+                                          :disabled="slotProps.data.deleting || slotProps.data.editing || !!deleteBlockReason(slotProps.data)"
+                                          :disabled-reason="deleteBlockReason(slotProps.data) ?? ''"
                                           @click.stop="handleDelete(slotProps.data)" />
                         </div>
                     </template>
@@ -176,7 +176,7 @@
         <!-- Delete User Confirmation Dialog: one user, or the selected ones with the same choices (FR-ADM-17, FR-ADM-23) -->
         <!-- Deleting all the data asks for the user name (several users: their number) to be typed; a transfer does not -->
         <ConfirmDialog v-if="showDeleteDialog"
-                       v-bind="deleteDialog"
+                       v-bind="deleteDialog" :busy="deleteBusy"
                        @close="handleDeleteDialogClose">
             <template #extra>
                 <UserDeleteOptions v-model:successor="deleteSuccessor" v-model:conflict-resolution="deleteConflictResolution"
@@ -328,7 +328,7 @@ export default {
             initial: getAdminPageSize(PREF.ADMIN_USERS)
         });
         // Below `sm` the rows are cards and the hidden header's sortable cells leave the tab order (D-026)
-        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), userDeleteBlockReason, selectableUser, countOf, ...sizing, table, page };
+        return { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS, stacked: useStackedLayout(), dialogs, confirm: useConfirm(dialogs), selectableUser, countOf, ...sizing, table, page };
     },
     data: function () {
         return {
@@ -353,6 +353,8 @@ export default {
             // The user names ticked in the table (FR-ADM-23), and the bulk action that runs
             selected: [],
             bulkBusy: false,
+            // The delete request runs: the question stays open but cannot be answered again
+            deleteBusy: false,
             // 'role' or 'organization' while its dialog is open
             bulkMode: null,
 
@@ -397,9 +399,10 @@ export default {
         disabledSelected() {
             return this.selectedUsers.filter(isDisabledUser);
         },
-        // The users the header checkbox selects: those the search shows, but the built-in admin
+        // The users the header checkbox selects: those the search shows, but the ones that cannot be deleted (the built-in
+        // admin and your own account)
         selectableUsers() {
-            return this.filteredUsers.filter(selectableUser);
+            return this.filteredUsers.filter(user => !this.deleteBlockReason(user));
         },
         allSelected() {
             return this.selectableUsers.length > 0 && this.selectableUsers.every(user => this.selected.includes(user.userName));
@@ -522,6 +525,9 @@ export default {
         disableBlockReason(user) {
             return userDisableBlockReason(user, this.signedInUserName);
         },
+        deleteBlockReason(user) {
+            return userDeleteBlockReason(user, this.signedInUserName);
+        },
 
         // Disable blocks sign-in at once: it asks first, as a destructive action
         async disableUser(user) {
@@ -565,7 +571,7 @@ export default {
             this.selected = checked ? [...others, user.userName] : others;
         },
 
-        // The header checkbox: every user the search shows (but the built-in admin), or none of them
+        // The header checkbox: every user the search shows (but the ones that cannot be deleted), or none of them
         toggleAll(checked) {
             const shown = this.selectableUsers.map(user => user.userName);
             const others = this.selected.filter(name => !shown.includes(name));
@@ -614,7 +620,7 @@ export default {
         },
 
         bulkDelete() {
-            this.startDelete(this.selectedUsers.filter(selectableUser));
+            this.startDelete(this.selectedUsers.filter(user => !this.deleteBlockReason(user)));
         },
 
         handleCloseBulk(result) {
@@ -625,7 +631,7 @@ export default {
         // ---- delete ----
 
         async handleDelete(user) {
-            if (userDeleteBlockReason(user)) return;
+            if (this.deleteBlockReason(user)) return;
             this.startDelete([user]);
         },
 
@@ -651,21 +657,26 @@ export default {
         // One request per user, one after the other, then one report of what went through and what did not
         async confirmDelete() {
             const users = this.usersToDelete;
-            if (!users.length) return;
+            if (!users.length || this.deleteBusy) return;
+            this.deleteBusy = true;
 
             const done = [];
             const failed = [];
             const results = [];
-            for (const user of users) {
-                try {
-                    user.deleting = true;
-                    // Perform the delete operation with optional successor
-                    results.push(await reg.admin.deleteUser(user.userName, this.deleteSuccessor, this.deleteConflictResolution));
-                    done.push(user.userName);
-                } catch (e) {
-                    failed.push({ userName: user.userName, message: e.message });
-                    user.deleting = false;
+            try {
+                for (const user of users) {
+                    try {
+                        user.deleting = true;
+                        // Perform the delete operation with optional successor
+                        results.push(await reg.admin.deleteUser(user.userName, this.deleteSuccessor, this.deleteConflictResolution));
+                        done.push(user.userName);
+                    } catch (e) {
+                        failed.push({ userName: user.userName, message: e.message });
+                        user.deleting = false;
+                    }
                 }
+            } finally {
+                this.deleteBusy = false;
             }
 
             // One user that could not be deleted: the question stays open with its error, as it always did

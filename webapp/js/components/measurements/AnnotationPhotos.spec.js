@@ -297,6 +297,21 @@ describe('uploading', () => {
         expect(wrapper.emitted('written').map(e => e[0])).toEqual(['site/annotations/item-1-2.jpg', 'site/annotations/item-1-3.png']);
     });
 
+    it('says that it is uploading while the writes run, so the host can hold its Save, and when they end, failed or not', async () => {
+        let finish;
+        const dataset = makeDataset({ writeObj: vi.fn(() => new Promise(resolve => { finish = () => resolve({}); })) });
+        await show({ dataset });
+        await choose([image('IMG_1.JPG')]);
+        expect(wrapper.emitted('uploading')).toEqual([[true]]);
+        finish();
+        await flushPromises();
+        expect(wrapper.emitted('uploading')).toEqual([[true], [false]]);
+
+        dataset.writeObj = vi.fn(async () => { throw new Error('Quota exceeded'); });
+        await choose([image('IMG_2.JPG')]);
+        expect(wrapper.emitted('uploading').slice(2)).toEqual([[true], [false]]);
+    });
+
     it('shows the server\'s message and changes nothing when the write fails', async () => {
         const dataset = makeDataset({ writeObj: vi.fn(async () => { throw new Error('Quota exceeded'); }) });
         await show({ dataset });

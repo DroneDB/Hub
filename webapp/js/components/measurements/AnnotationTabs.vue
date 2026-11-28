@@ -12,7 +12,7 @@
                 <!-- Looks for the covering photos when the tab is first opened, not while the dialog is -->
                 <AnnotationPhotos v-if="visited" v-model="photos" :dataset="photoContext.dataset" :measurement-path="photoContext.measurementPath"
                                   :item-id="photoContext.itemId" :item-name="itemName" :geometry="photoContext.geometry"
-                                  :read-only="photoContext.readOnly" @written="written" />
+                                  :read-only="photoContext.readOnly" @written="written" @uploading="emit('uploading', $event)" />
             </TabPanel>
         </TabPanels>
     </Tabs>
@@ -32,6 +32,7 @@
  * path of the measurement file the annotation is saved in, its id, its WGS84 geometry (null: not georeferenced, no
  * coverage request), whether the user cannot change it, and what is told of a photo uploaded to the dataset (its path:
  * the file list of the page that hosts the viewer shows it).
+ * `uploading` (true / false) says that a photo is being uploaded: the dialog that holds the tabs waits with its Save.
  */
 import { computed, ref, watch } from 'vue';
 import Tab from 'primevue/tab';
@@ -51,6 +52,8 @@ const props = defineProps({
     /** The dialog can capture the item (its Capture for report button) */
     canCapture: { type: Boolean, default: false }
 });
+
+const emit = defineEmits(['uploading']);
 
 const photos = defineModel('photos', { type: Array, default: () => [] });
 

@@ -1,8 +1,9 @@
 <template>
-    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-lg" @close="cancel" @confirm="save">
+    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-lg" :busy="photoUploading" @close="cancel" @confirm="save">
         <div class="measurement-properties-form">
             <AnnotationTabs v-model:photos="photos" v-model:tab="tab" :photo-context="photoContext"
-                            :item-name="formData.name" :snapshot="captureAction.snapshot.value" :can-capture="!!capture">
+                            :item-name="formData.name" :snapshot="captureAction.snapshot.value" :can-capture="!!capture"
+                            @uploading="photoUploading = $event">
                 <!-- What names the item: its name and its reference, side by side -->
                 <div class="name-row">
                     <div class="name-field">
@@ -80,12 +81,12 @@
         <MeasurementGroupDialog v-if="groupDialogOpen" @save="chooseNewGroup" @close="groupDialogOpen = false" />
 
         <template #footer>
-            <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
+            <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto" :disabled="photoUploading"
                     :title="`Delete this ${isPoint ? 'annotation' : 'measurement'}`" @click="deleteMeasurement" />
             <Button v-if="capture" label="Capture for report" icon="fa-solid fa-camera" severity="secondary" text
                     :loading="captureAction.capturing.value" title="Frame this measurement and keep the 3D view as its picture in reports" @click="captureAction.run" />
-            <Button :label="isNew ? 'Discard' : 'Cancel'" severity="secondary" @click="cancel" />
-            <Button label="Save" data-confirm :disabled="!canSave" @click="save" />
+            <Button :label="isNew ? 'Discard' : 'Cancel'" severity="secondary" :disabled="photoUploading" @click="cancel" />
+            <Button label="Save" data-confirm :disabled="!canSave || photoUploading" :loading="photoUploading" @click="save" />
         </template>
     </Window>
 </template>
@@ -219,6 +220,8 @@ export default {
             // The photos the annotation has (the Photos tab changes them), and what they were
             photos: [],
             savedPhotos: [],
+            // A photo is being uploaded: the window cannot be closed or saved until it is in the annotation
+            photoUploading: false,
             formData: {
                 name: '',
                 description: '',
@@ -335,7 +338,7 @@ export default {
             return properties;
         },
         save() {
-            if (!this.canSave) return;
+            if (!this.canSave || this.photoUploading) return;
             this.done = true;
             this.$emit('save', this.properties());
             this.$emit('close');

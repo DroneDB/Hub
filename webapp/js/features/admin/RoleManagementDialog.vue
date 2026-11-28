@@ -72,7 +72,7 @@
 
         <!-- Delete Role Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
-                       v-bind="deleteDialog"
+                       v-bind="deleteDialog" :busy="!!deletingRole"
                        @close="handleDeleteDialogClose" />
     </Window>
 </template>
@@ -195,7 +195,7 @@ export default {
         },
 
         async confirmDeleteRole() {
-            if (!this.roleToDelete) return;
+            if (!this.roleToDelete || this.deletingRole) return;
 
             this.deletingRole = this.roleToDelete;
             try {

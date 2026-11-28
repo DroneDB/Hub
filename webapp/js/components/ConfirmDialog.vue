@@ -1,6 +1,6 @@
 <template>
     <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size
-            :danger="danger" :enter-confirms="!danger || !!requireText" :confirm-disabled="!textMatches"
+            :danger="danger" :enter-confirms="!danger || !!requireText" :confirm-disabled="!textMatches" :busy="busy"
             @close="$emit('close', 'cancel')" @confirm="confirm">
         <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
         <div v-html="safeMessage" />
@@ -20,9 +20,9 @@
         <slot name="extra" />
 
         <template #footer>
-            <Button :label="cancelText" severity="secondary" data-cancel @click="$emit('close', 'cancel')" />
-            <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="$emit('close', 'secondary')" />
-            <Button :label="confirmText" :severity="confirmButtonClass" data-confirm :disabled="!textMatches" @click="confirm" />
+            <Button :label="cancelText" severity="secondary" data-cancel :disabled="busy" @click="$emit('close', 'cancel')" />
+            <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" :disabled="busy" @click="$emit('close', 'secondary')" />
+            <Button :label="confirmText" :severity="confirmButtonClass" data-confirm :disabled="busy || !textMatches" :loading="busy" @click="confirm" />
         </template>
     </Window>
 </template>
@@ -57,6 +57,8 @@ import { sanitizeHtml } from '@/libs/sanitize';
  *   confirmButtonClass   - PrimeVue severity for the confirm button (default: 'primary'; 'danger' makes a destructive confirmation).
  *   secondaryButtonClass - PrimeVue severity for the secondary button.
  *   requireText          - Text the user types to enable Confirm (typed confirmation).
+ *   busy                 - The request the answer started is running: the question stays open, cannot be closed or answered
+ *                          again (a second click would send the request twice), and Confirm shows it is working.
  */
 export default {
     components: {
@@ -106,6 +108,10 @@ export default {
         requireText: {
             type: String,
             default: ''
+        },
+        busy: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ['close'],
@@ -130,7 +136,7 @@ export default {
     },
     methods: {
         confirm() {
-            if (this.textMatches) this.$emit('close', 'confirm');
+            if (this.textMatches && !this.busy) this.$emit('close', 'confirm');
         }
     }
 }

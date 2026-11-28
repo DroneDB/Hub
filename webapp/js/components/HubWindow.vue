@@ -25,6 +25,9 @@
  *   `update:visible` too, so `v-model:visible` works. Rendered with v-if, visible stays true.
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
  *   something else; never with `enterConfirms` false or `confirmDisabled`). That Enter is used up (default prevented).
+ *   An Enter that something handled already, that comes from outside the dialog (the filter box of a Select list is
+ *   appended to the body), or from a search box or a form that submits itself (`role="search"`, a SearchField, or
+ *   `data-owns-enter`) is not the window's: it chooses, filters or searches, and does not confirm.
  * - `busy` disables closing and the footer buttons.
  * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-log, dialog-wide) gives the window a stable width, the same
  *   whatever its content; a form dialog uses `dialog-xl`, a log `dialog-log`, a chart or a two-column form `dialog-wide`.
@@ -116,11 +119,20 @@ const overlay = useOverlay({
 
 const NOT_FOR_ENTER = 'button, a, textarea, select, [role="button"], [role="menuitem"], [role="option"], [contenteditable="true"], [aria-expanded="true"]';
 
-// Something inside the dialog that handled Enter (a dropdown choosing an option) keeps it
-const handledInside = e => e.defaultPrevented && !!dialogElement()?.contains(e.target);
+// Enter that this window must leave alone: one that something already handled (a Select choosing an option, a field
+// that submits itself), one from outside the dialog element (the filter and the list of a Select, which PrimeVue appends
+// to the body, or the page behind a window that is not modal; the body itself means that nothing has the focus), and
+// one from a field that owns it: a search box or a form that submits itself
+const OWNS_ENTER = '[role="search"], .search-field, [data-owns-enter]';
+const leavesEnterAlone = e => {
+    if (e.defaultPrevented) return true;
+    const target = e.target;
+    if (!(target instanceof Element) || target === document.body || target === document.documentElement) return false;
+    return !dialogElement()?.contains(target) || !!target.closest(OWNS_ENTER);
+};
 
 useEventListener(document, 'keydown', e => {
-    if (e.key !== 'Enter' || !props.visible || !overlay.isTopmost() || handledInside(e) || e.isComposing) return;
+    if (e.key !== 'Enter' || !props.visible || !overlay.isTopmost() || leavesEnterAlone(e) || e.isComposing) return;
     if (props.enterConfirms && !props.busy && !props.confirmDisabled && !(e.target instanceof Element && e.target.closest(NOT_FOR_ENTER))) {
         // The key is used up: a question that the confirm opens (a destructive one focuses its Cancel button) must not
         // receive the rest of this Enter, which would press that button

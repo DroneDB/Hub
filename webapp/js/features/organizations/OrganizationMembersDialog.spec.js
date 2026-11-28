@@ -14,7 +14,7 @@ const reg = vi.hoisted(() => ({
     features: { get: () => true },
     admin: { users: null },
     getUsername: () => 'me',
-    orgs: { getOrganizationMembers: null, addOrganizationMember: null, updateMemberPermissions: null }
+    orgs: { getOrganizationMembers: null, addOrganizationMember: null, updateMemberPermissions: null, removeOrganizationMember: null }
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
@@ -54,6 +54,7 @@ beforeEach(() => {
     reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve([]));
     reg.orgs.addOrganizationMember = vi.fn(() => Promise.resolve());
     reg.orgs.updateMemberPermissions = vi.fn(() => Promise.resolve());
+    reg.orgs.removeOrganizationMember = vi.fn(() => Promise.resolve());
 });
 afterEach(() => {
     wrapper?.unmount();
@@ -212,5 +213,48 @@ describe('the confirmations name a member as text', () => {
         expect(message.querySelector('img')).toBeNull();
         expect(message.textContent).toContain(`remove ${MARKUP} from this organization`);
     });
-});
 
+    it('names the permission of every member when it is read-only, from the number the server sends', async () => {
+        reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve([...rows(), { userName: 'zed', permissions: READ_ONLY }]));
+        wrapper = mount(OrganizationMembersDialog, {
+            props: { orgSlug: 'acme', canManageMembers: false },
+            attachTo: document.body,
+            global: { plugins: [PrimeVue], mocks: { $notify: { success: vi.fn() } } }
+        });
+        await flushPromises();
+        const cells = [...document.querySelectorAll('td[data-label="Permissions"]')].map(td => td.textContent.trim());
+        expect(cells).toEqual(['Read/Write', 'Admin', 'Read Only']); // bob, me, zed
+    });
+
+    describe('removing a member', () => {
+        const removeButton = name => document.querySelector(`button[aria-label="Remove ${name}"]`);
+        async function remove(name) {
+            removeButton(name).click();
+            await flushPromises();
+            confirmDialog().querySelector('[data-confirm]').click();
+            await flushPromises();
+        }
+
+        it('reads the list again after another member is removed', async () => {
+            reg.orgs.getOrganizationMembers = vi.fn(() => Promise.resolve(rows()));
+            await render();
+            await remove('bob');
+            expect(reg.orgs.removeOrganizationMember).toHaveBeenCalledWith('acme', 'bob');
+            expect(reg.orgs.getOrganizationMembers).toHaveBeenCalledTimes(2);
+            expect(wrapper.emitted('permissions-changed')).toBeUndefined();
+        });
+
+        it('tells the parent when you remove yourself, and does not read the list you may no longer see', async () => {
+            reg.orgs.getOrganizationMembers = vi.fn()
+                .mockResolvedValueOnce(rows())
+                .mockRejectedValue(new ApiError('Access denied', 403));
+            await render();
+            await remove('me');
+            expect(reg.orgs.removeOrganizationMember).toHaveBeenCalledWith('acme', 'me');
+            expect(wrapper.emitted('permissions-changed')).toHaveLength(1);
+            expect(reg.orgs.getOrganizationMembers).toHaveBeenCalledTimes(1);
+            expect(document.body.textContent).not.toContain('Access denied');
+            expect(wrapper.vm.members.map(m => m.userName)).toEqual(['bob']);
+        });
+    });
+});
