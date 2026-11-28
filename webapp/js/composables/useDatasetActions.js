@@ -333,6 +333,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         const mode = transferModeFor(canWrite.value);
         dialogs.open(TransferDialog, {
             files, sourceOrg: dataset.org, sourceDs: dataset.ds, keepSource: mode.keepSource,
+            // `sent` holds what was transferred, also when the dialog closes after a failure part-way
             onClose: (id, sent) => {
                 if (id !== 'transferred' || !sent || !sent.length) return;
                 if (!mode.keepSource) listing.removed(sent.map(f => f.entry.path));

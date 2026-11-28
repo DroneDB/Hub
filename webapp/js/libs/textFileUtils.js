@@ -5,12 +5,23 @@ const { pathutils } = ddb;
 const TEXT_EXTENSIONS = [
     'txt', 'md', 'markdown', 'json',
     'csv', 'xml', 'yml', 'yaml', 'ini', 'cfg', 'conf',
-    'log', 'properties', 'env', 'gitignore', 'dockerignore',
+    'log', 'properties', 'env',
     'sh', 'bash', 'zsh', 'bat', 'cmd', 'ps1',
     'py', 'js', 'ts', 'jsx', 'tsx', 'html', 'htm', 'css', 'scss', 'sass', 'less',
     'sql', 'c', 'cpp', 'h', 'hpp', 'java', 'cs', 'go', 'rs', 'rb', 'php',
-    'wkt', 'prj'
+    'wkt', 'prj',
+    // Text of surveys: the position logs of a drone (DJI MRK), of an RTK receiver (POS), RINEX observation and
+    // navigation files, ground control points
+    'mrk', 'pos', 'obs', 'nav', 'gcp'
 ];
+
+// Text files with no extension, by name (compared in lower case): the notes of a project and the dotfiles of tools.
+// The editor opens them as the files with an extension of the list above
+const TEXT_NAMES = new Set([
+    'license', 'licence', 'readme', 'notice', 'authors', 'contributors', 'copying', 'changelog', 'changes', 'todo',
+    'makefile', 'dockerfile',
+    '.env', '.gitignore', '.dockerignore', '.gitattributes', '.editorconfig'
+]);
 
 // Text formats that open in their viewer by default but can also be edited as text:
 // vector and model formats stored as text, and the text sidecars of drone and GIS files
@@ -22,7 +33,7 @@ const EDITABLE_TEXT_EXTENSIONS = [
     'xyz', 'asc', 'pts', 'czml', 'toml'
 ];
 
-// Every extension the text editor may open: an allow-list, by extension only (an entry type
+// Every extension the text editor may open: an allow-list, by extension or by name (an entry type
 // such as VECTOR covers binary formats too: KMZ, FlatGeobuf, GeoPackage, Shapefile, DWG)
 const OPENABLE_TEXT_EXTENSIONS = new Set([...TEXT_EXTENSIONS, ...EDITABLE_TEXT_EXTENSIONS]);
 
@@ -36,12 +47,16 @@ function getExtension(path) {
     return pathutils.extname(path).slice(1);
 }
 
+/** A file with no extension (a dotfile has none) that is a known text file by its name. */
+function isTextName(path) {
+    return !getExtension(path) && TEXT_NAMES.has(pathutils.basename(path).toLowerCase());
+}
+
 /**
- * Check if file should open as text by default (based on extension)
+ * Check if file should open as text by default (based on extension, or on its name without one)
  */
 function isDefaultTextFile(path) {
-    const ext = getExtension(path);
-    return TEXT_EXTENSIONS.includes(ext);
+    return TEXT_EXTENSIONS.includes(getExtension(path)) || isTextName(path);
 }
 
 /**
@@ -54,13 +69,13 @@ function isPdfFile(entry) {
 
 /**
  * Check if file can potentially be opened as text
- * (a known text extension AND within size limit; files without an extension cannot)
+ * (a known text extension, or a known text name without one, AND within size limit)
  */
 function canOpenAsText(entry) {
     if (!entry || !entry.path) return false;
 
     // Only known text formats
-    if (!OPENABLE_TEXT_EXTENSIONS.has(getExtension(entry.path))) return false;
+    if (!OPENABLE_TEXT_EXTENSIONS.has(getExtension(entry.path)) && !isTextName(entry.path)) return false;
 
     // Check size limit
     if (entry.size && entry.size > MAX_TEXT_FILE_SIZE) return false;

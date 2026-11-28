@@ -18,7 +18,13 @@ import { setPref, PREF } from '@/libs/preferences';
 
 const notify = vi.hoisted(() => ({ success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => notify }));
-vi.mock('@/libs/api/sharedRegistry', () => ({ default: { Organization: () => ({ Dataset: () => ({}) }), features: { value: () => null, get: () => false } } }));
+// The clipboard store follows the signed-in user (the auth store reads the client's session)
+vi.mock('@/libs/api/sharedRegistry', () => ({
+    default: {
+        Organization: () => ({ Dataset: () => ({}) }), features: { value: () => null, get: () => false },
+        getUsername: () => 'tester', isLoggedIn: () => true, isAdmin: () => false, addEventListener: () => {}, url: 'http://hub.test'
+    }
+}));
 
 const T = ddb.entry.type;
 const item = path => ({ label: path.split('/').pop(), path: `ddb://h/o/d/${path}`, entry: { path, type: T.GENERIC, size: 1, hash: 'h' } });
@@ -128,5 +134,40 @@ describe('Paste of a copy inside one dataset onto a name that exists', () => {
         expect(props.keepBoth).toBeUndefined();
         expect(dataset.copyObj).toHaveBeenCalledExactlyOnceWith('src/a.tif', 'dest/a.tif', true);
         expect(clipboard.items.map(it => it.path)).toEqual(['src/a.tif']);
+    });
+});
+
+describe('Paste twice in a row (Ctrl+V pressed again while the first paste is on its way)', () => {
+    it('moves the items once, though the second paste comes before the first ends', async () => {
+        let finish;
+        dataset.list = vi.fn(async () => []);
+        dataset.moveObj = vi.fn(() => new Promise(resolve => { finish = resolve; }));
+        clipboard.cut({ orgSlug: 'o', dsSlug: 'd', basePath: 'src' }, [item('src/b.tif')]);
+
+        const first = paste();
+        await tick();
+        const second = paste();
+        await second;
+        finish({});
+        await first;
+
+        expect(dataset.moveObj).toHaveBeenCalledTimes(1);
+        expect(notify.success).toHaveBeenCalledTimes(1);
+        expect(dialogs.stack.value).toHaveLength(0);
+    });
+
+    it('asks the conflicts once, and pastes again when the first paste is over', async () => {
+        clipboard.copy({ orgSlug: 'o', dsSlug: 'd', basePath: 'src' }, [item('src/a.tif')]);
+
+        const first = paste();
+        await tick();
+        await paste();
+        expect(dialogs.stack.value).toHaveLength(1);
+        propsOf(top()).onResolve('overwrite');
+        await first;
+
+        dataset.list = vi.fn(async () => []);
+        await paste();
+        expect(dataset.copyObj).toHaveBeenCalledTimes(2);
     });
 });

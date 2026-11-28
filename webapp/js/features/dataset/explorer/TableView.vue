@@ -329,8 +329,11 @@ export default {
             this.applySelection();
         },
 
+        // The page is told too (no file): its detail panel follows the selection, and must not stay on a file that
+        // is no longer selected
         clearSelection: function () {
             this.deselectAll();
+            this.$emit('selectionChanged');
         },
 
         // The explorer items carry the selection (the map and the file grid share them)

@@ -47,7 +47,53 @@ describe('TransferDialog', () => {
         await w.find('[data-confirm]').trigger('click');
         await flushPromises();
         expect(transferObj).toHaveBeenCalledTimes(2);
-        expect(transferObj).toHaveBeenCalledWith('a/one.jpg', 'dest', 'target', 'in', false, false);
+        // The destination is the full path each file gets: the chosen folder and its own name
+        expect(transferObj).toHaveBeenCalledWith('a/one.jpg', 'dest', 'target', 'in/one.jpg', false, false);
+        expect(transferObj).toHaveBeenCalledWith('two.jpg', 'dest', 'target', 'in/two.jpg', false, false);
+    });
+
+    it('sends no destination path when no folder is chosen, and one per file when the folder ends with a slash', async () => {
+        const w = await open({});
+        await w.setData({ destPath: '' });
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        expect(transferObj.mock.calls.map(call => call[3])).toEqual(['', '']);
+
+        transferObj.mockClear();
+        const again = await open({});
+        await again.setData({ destPath: 'archive/2026/' });
+        await again.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        expect(transferObj.mock.calls.map(call => call[3])).toEqual(['archive/2026/one.jpg', 'archive/2026/two.jpg']);
+    });
+
+    it('reports the files that moved when a later one fails, and a retry sends only the rest', async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        transferObj.mockImplementationOnce(async () => undefined).mockImplementationOnce(async () => { throw new Error('Quota'); });
+        const w = await open({});
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        expect(w.vm.errorMessage).toBe('Transfer failed: Quota');
+
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        // The first file moved once: the retry sends the second only
+        expect(transferObj.mock.calls.map(call => call[0])).toEqual(['a/one.jpg', 'two.jpg', 'two.jpg']);
+
+        transferObj.mockReset().mockResolvedValue(undefined);
+        transferObj.mockImplementationOnce(async () => undefined).mockImplementationOnce(async () => { throw new Error('Quota'); });
+        const failed = await open({});
+        await failed.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        failed.findComponent(WindowStub).vm.$emit('close');
+        expect(failed.emitted('close')[0][0]).toBe('transferred');
+        expect(failed.emitted('close')[0][1].map(f => f.entry.path)).toEqual(['a/one.jpg']);
+    });
+
+    it('closes with the plain button id when nothing was transferred', async () => {
+        const w = await open({});
+        w.findComponent(WindowStub).vm.$emit('close');
+        expect(w.emitted('close')[0][0]).toBe('close');
     });
 
     it('copies them when it keeps the source, and its texts say copy', async () => {
@@ -58,7 +104,7 @@ describe('TransferDialog', () => {
         expect(w.find('[data-transfer-note]').text()).toMatch(/stay here/);
         await w.find('[data-confirm]').trigger('click');
         await flushPromises();
-        expect(transferObj).toHaveBeenCalledWith('two.jpg', 'dest', 'target', 'in', false, true);
+        expect(transferObj).toHaveBeenCalledWith('two.jpg', 'dest', 'target', 'in/two.jpg', false, true);
         expect(w.vm.statusMessage).toBe('Copy Complete');
     });
 

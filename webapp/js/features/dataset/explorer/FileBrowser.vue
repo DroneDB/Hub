@@ -49,6 +49,7 @@ import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
 import { useRequestScope, isAbort } from '@/composables/useRequestScope';
+import { useLatestOnly } from '@/composables/useLatestOnly';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 import { isUnauthorized } from '@/libs/ddb/apiError';
@@ -95,7 +96,7 @@ export default {
     },
     emits: ['upload', 'refresh', 'renameView', 'deleteView', 'newReport', 'editReport', 'duplicateReport', 'deleteReport', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
-        return { countOf, requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
+        return { countOf, latestRefresh: useLatestOnly(), latestSelection: useLatestOnly(), requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
@@ -291,11 +292,15 @@ export default {
         },
 
         refreshNodes: async function () {
+            // Two refreshes in a row (a rename and an upload end together) each read the roots: the newest one gives
+            // the tree, built apart and set once, so the roots are never listed twice
+            const current = this.latestRefresh();
 
             this.nodes = [];
             this.loading = true;
 
             const rootNodes = await this.rootNodes();
+            const nodes = [];
 
             for (let i = 0; i < rootNodes.length; i++) {
                 const n = rootNodes[i];
@@ -306,7 +311,7 @@ export default {
                         signal: this.requestSignal
                     }))[0];
 
-                    this.nodes.push({
+                    nodes.push({
                         icon: n.icon,
                         label: n.label,
                         path: n.path,
@@ -316,10 +321,12 @@ export default {
                         entry
                     });
                 } catch (e) {
-                    this.reportLoadError(e);
+                    if (current()) this.reportLoadError(e);
                 }
             }
 
+            if (!current()) return;
+            this.nodes = nodes;
             this.loading = false;
         },
 
@@ -377,6 +384,9 @@ export default {
         },
 
         handleSelectionChanged: async function (selectedNodes) {
+            // Folders load their children before the list follows: a later click that answers first wins, an earlier
+            // answer coming after it must not put its folder over the one clicked last
+            const current = this.latestSelection();
 
             // Keep track of nodes for "Open Item Location"
             this.lastSelectedNode = selectedNodes.length > 0 ? selectedNodes[selectedNodes.length - 1] : null;
@@ -392,6 +402,7 @@ export default {
                     // (or the arrow keys) expands a node in the tree.
                     if (!n.loadedChildren) {
                         await n.loadChildren();
+                        if (!current()) return;
                     }
 
                     this.$emit('currentUriChanged', n.node.path);

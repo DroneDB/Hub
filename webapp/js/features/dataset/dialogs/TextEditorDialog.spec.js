@@ -44,4 +44,33 @@ describe('TextEditorDialog', () => {
         expect(w.findAll('button').map(b => b.text())).toContain('Format');
         w.unmount();
     });
+
+    it('keeps the text typed while a save is on its way marked as not saved', async () => {
+        const { w, dataset } = await mountEditor('{"a":1}');
+        let finish;
+        dataset.writeObj.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+
+        w.vm.currentContent = '{"a":2}';
+        const saving = w.vm.save();
+        w.vm.currentContent = '{"a":23}';
+        finish();
+        await saving;
+
+        expect(dataset.writeObj).toHaveBeenCalledWith('shapes.geojson', '{"a":2}', { overwrite: true });
+        expect(w.vm.originalContent).toBe('{"a":2}');
+        expect(w.vm.isModified).toBe(true);
+        w.unmount();
+    });
+
+    it('is saved when nothing was typed meanwhile', async () => {
+        const { w, dataset } = await mountEditor('{"a":1}');
+        dataset.writeObj.mockResolvedValue(undefined);
+
+        w.vm.currentContent = '{"a":2}';
+        await w.vm.save();
+
+        expect(w.vm.isModified).toBe(false);
+        expect(w.emitted('saved')).toEqual([['shapes.geojson']]);
+        w.unmount();
+    });
 });

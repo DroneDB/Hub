@@ -21,13 +21,36 @@ describe('resolvePasteStrategy', () => {
         }
     });
 
-    it('skips a transfer that fails when the user chose to skip conflicts, and reports it otherwise', async () => {
-        const transferObj = vi.fn().mockRejectedValue(new Error('exists'));
+    it('skips the items whose names exist when the user chose to skip, without sending them, and sends the rest', async () => {
+        const transferObj = vi.fn().mockResolvedValue(undefined);
         const src = source(transferObj);
-        const skipped = await resolvePasteStrategy(src, 'copy', target).execute(items, src, target, { conflictMode: 'skip' });
-        expect(skipped.skipped).toEqual(['a/one.jpg', 'a/two.jpg']);
-        const failed = await resolvePasteStrategy(src, 'copy', target).execute(items, src, target, { conflictMode: 'ask' });
-        expect(failed.failed).toEqual({ 'a/one.jpg': 'exists', 'a/two.jpg': 'exists' });
+        const result = await resolvePasteStrategy(src, 'copy', target)
+            .execute(items, src, target, { conflictMode: 'skip', clashing: ['a/one.jpg'] });
+        expect(result.skipped).toEqual(['a/one.jpg']);
+        expect(transferObj.mock.calls.map(call => call[0])).toEqual(['a/two.jpg']);
+        expect(result.succeeded).toEqual([{ source: 'a/two.jpg', dest: 'dest/two.jpg' }]);
+    });
+
+    it('reports a refusal that is no name clash as failed with its message, also when the user chose to skip', async () => {
+        const transferObj = vi.fn().mockRejectedValue(new Error('Quota exceeded'));
+        const src = source(transferObj);
+        const skipping = await resolvePasteStrategy(src, 'copy', target)
+            .execute(items, src, target, { conflictMode: 'skip', clashing: ['a/one.jpg'] });
+        expect(skipping.skipped).toEqual(['a/one.jpg']);
+        expect(skipping.failed).toEqual({ 'a/two.jpg': 'Quota exceeded' });
+        const asking = await resolvePasteStrategy(src, 'copy', target).execute(items, src, target, { conflictMode: 'ask' });
+        expect(asking.failed).toEqual({ 'a/one.jpg': 'Quota exceeded', 'a/two.jpg': 'Quota exceeded' });
+        expect(asking.skipped).toEqual([]);
+    });
+
+    it('skips and fails the same way for a copy inside one dataset', async () => {
+        const copyObj = vi.fn().mockRejectedValue(new Error('Forbidden'));
+        const inside = { orgSlug: 'org', dsSlug: 'ds', basePath: 'dest', dataset: { copyObj } };
+        const result = await resolvePasteStrategy({ orgSlug: 'org', dsSlug: 'ds' }, 'copy', inside)
+            .execute(items, inside, inside, { conflictMode: 'skip', clashing: ['a/two.jpg'] });
+        expect(result.skipped).toEqual(['a/two.jpg']);
+        expect(result.failed).toEqual({ 'a/one.jpg': 'Forbidden' });
+        expect(copyObj).toHaveBeenCalledTimes(1);
     });
 
     it('resolves a move inside one dataset to a server-side move', async () => {

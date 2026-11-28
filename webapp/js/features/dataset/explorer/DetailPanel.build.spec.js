@@ -80,3 +80,28 @@ describe('the Build button of the details panel', () => {
         expect(hasButton(await panel(photo), 'Build')).toBe(false);
     });
 });
+
+describe('the details panel follows the builds of its dataset', () => {
+    beforeEach(() => {
+        buildManager.on.mockClear();
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    const handler = event => buildManager.on.mock.calls.filter(([name]) => name === event).map(([, fn]) => fn).at(-1);
+
+    // The task monitor tells of builds with the dataset object that acquired it last (the header's background archive),
+    // which is another object for the same dataset
+    it('takes a build that ends from another object of the same dataset, and ignores another dataset', async () => {
+        const w = await panel(model({}));
+        const ended = (ds, newState) => handler('buildStateChanged')({
+            dataset: ds, filePath: 'site/model.obj', newState, buildInfo: { path: 'site/model.obj', currentState: newState }
+        });
+
+        ended({ org: 'org', ds: 'other' }, 'Failed');
+        expect(w.vm.buildState).toBeFalsy();
+
+        ended({ org: 'org', ds: 'ds' }, 'Failed');
+        expect(w.vm.buildState).toEqual({ path: 'site/model.obj', currentState: 'Failed' });
+    });
+});

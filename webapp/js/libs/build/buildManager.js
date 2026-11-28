@@ -127,9 +127,11 @@ class BuildManager {
 
         // A build just started (startBuild) stays shown until the list has its task: a task of the
         // file that was not listed when it started, or one that is still running (a build already
-        // in progress that the server reused)
+        // in progress that the server reused). It stops being shown once a list asked for after the server
+        // accepted the build (`settled`) has no task of it: some builds queue no job (a file the server
+        // takes without processing), and an "Enqueued" that no task will end would keep Build and Transfer off.
         for (const [path, held] of prev ?? []) {
-            if (!held.knownTaskIds) continue;
+            if (!held.knownTaskIds || held.settled) continue;
             const listed = updated.get(path);
             if (!listed || (held.knownTaskIds.has(listed.taskId) && !isActiveState(listed.state))) updated.set(path, held);
         }
@@ -144,6 +146,8 @@ class BuildManager {
             const before = prev.get(path);
             const after = updated.get(path);
             if (before?.taskId === after?.taskId && before?.state === after?.state) continue;
+            // A build that queued no job going away is no build that ended: the file shows what it showed before
+            if (before?.knownTaskIds && (!after || before.knownTaskIds.has(after.taskId))) continue;
             this.emit('buildStateChanged', {
                 dataset,
                 filePath: path,
@@ -208,15 +212,28 @@ class BuildManager {
             const next = new Map(this._buildByPath.get(key) ?? []);
             next.set(filePath, { path: filePath, state: BUILD_STATES.ENQUEUED, knownTaskIds });
             this._buildByPath.set(key, next);
+            const placeholder = next.get(filePath);
 
-            // Trigger immediate refresh so the new build task shows up
-            taskMonitor.forceRefresh(dataset);
+            // Trigger immediate refresh so the new build task shows up; the list that answers is the first one asked
+            // for after the server accepted the build: if it has no task, none will come
+            Promise.resolve(taskMonitor.forceRefresh(dataset)).then(() => this._settle(dataset, filePath, placeholder));
             this.emit('buildStarted', { dataset, filePath, force });
             return true;
         } catch (error) {
             this.emit('buildError', { dataset, filePath, error: error.message });
             throw error;
         }
+    }
+
+    /**
+     * The list asked for after a build was accepted has answered: a build shown from `startBuild` that no task of
+     * the list replaced is dropped (unless a newer build of the file replaced it meanwhile).
+     */
+    _settle(dataset, filePath, placeholder) {
+        const key = this.getDatasetKey(dataset);
+        if (this._buildByPath.get(key)?.get(filePath) !== placeholder) return;
+        placeholder.settled = true;
+        this._sync(dataset);
     }
 
     /* ---- load builds (delegates to taskMonitor) ---- */

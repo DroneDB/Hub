@@ -40,8 +40,25 @@ describe('text files', () => {
         }
     });
 
-    it('offers no file without an extension, nor one over the size limit', () => {
-        expect(canOpenAsText({ path: 'LICENSE', size: 1024 })).toBe(false);
+    // The editor keeps an allow-list, and the notes of a project and the logs of a survey are on it
+    it('offers the text files that have no extension, by their names, and the dotfiles of tools', () => {
+        for (const path of ['LICENSE', 'README', 'docs/Readme', 'NOTICE', 'Makefile', '.env', 'app/.gitignore', '.dockerignore']) {
+            expect(canOpenAsText({ path, size: 1024 })).toBe(true);
+            expect(shouldOpenAsText({ path, size: 1024 })).toBe(true);
+        }
+    });
+
+    it('offers the text of surveys: DJI MRK, position logs and RINEX files, in any letter case', () => {
+        for (const path of ['DJI_0001_Timestamp.MRK', 'rover.pos', 'base.obs', 'base.NAV', 'gcp_list.gcp']) {
+            expect(canOpenAsText({ path, size: 1024 })).toBe(true);
+            expect(shouldOpenAsText({ path, size: 1024 })).toBe(true);
+        }
+    });
+
+    it('offers no other file without an extension, nor one over the size limit', () => {
+        expect(canOpenAsText({ path: 'core', size: 1024 })).toBe(false);
+        expect(canOpenAsText({ path: 'flights/LICENSE.bin', size: 1024 })).toBe(false);
+        expect(canOpenAsText({ path: 'LICENSE', size: MAX_TEXT_FILE_SIZE + 1 })).toBe(false);
         expect(canOpenAsText({ path: 'big.geojson', size: MAX_TEXT_FILE_SIZE + 1 })).toBe(false);
         expect(canOpenAsText({ path: 'big.xyz', size: MAX_TEXT_FILE_SIZE + 1 })).toBe(false);
     });

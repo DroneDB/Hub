@@ -122,6 +122,7 @@ describe('the build state of a file follows the task list', async () => {
 
     it('keeps a build that was just started shown until the list has its task', async () => {
         const { ds, listChanges, events, state } = setup([failed]);
+        taskMonitor.forceRefresh.mockReturnValueOnce(new Promise(() => {})); // the list asked for has not answered
         await manager.startBuild(ds, PATH, true);
         expect(state()).toBe('Enqueued');
 
@@ -134,6 +135,40 @@ describe('the build state of a file follows the task list', async () => {
         // The earlier failure is never reported as the outcome of the new build
         listChanges([succeeded, failed]);
         expect(events.map(e => e.newState)).toEqual(['Processing', 'Succeeded']);
+    });
+
+    // The server takes some builds without queueing a job (a .laz under ept-data): no task will ever end the "Enqueued"
+    it('stops showing a build that was just started when the list asked for afterwards has no task of it', async () => {
+        const { ds, events, state } = setup([failed]);
+        await manager.startBuild(ds, PATH, true);
+        await Promise.resolve();
+
+        expect(state()).toBe('Failed');
+        expect(manager.hasActiveBuild(ds, PATH)).toBe(false);
+        // Nothing ended: the old failure is not reported as the outcome of this build
+        expect(events).toEqual([]);
+    });
+
+    it('shows no build at all once a build of a file that never had one is dropped', async () => {
+        const { ds, events, state } = setup([]);
+        await manager.startBuild(ds, PATH, false);
+        await Promise.resolve();
+
+        expect(state()).toBe(null);
+        expect(manager.hasActiveBuild(ds, PATH)).toBe(false);
+        expect(events).toEqual([]);
+    });
+
+    it('keeps the task of the build when the list asked for afterwards has it', async () => {
+        const { ds, listChanges, state } = setup([failed]);
+        taskMonitor.forceRefresh.mockImplementationOnce(async () => {
+            listChanges([task('5296', 'Enqueued', '2026-10-26T02:03:35Z'), failed]);
+        });
+        await manager.startBuild(ds, PATH, true);
+        await Promise.resolve();
+
+        expect(state()).toBe('Enqueued');
+        expect(manager.hasActiveBuild(ds, PATH)).toBe(true);
     });
 
     // The server defers the build of a file that waits for files again, and only adds a task for it

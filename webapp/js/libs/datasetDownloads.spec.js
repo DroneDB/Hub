@@ -9,7 +9,8 @@ const { describeSelection } = await import('./dataset/selection');
 
 const ddb = (await import('ddb')).default;
 const file = size => ({ entry: { size, type: ddb.entry.type.GENERIC } });
-const folder = () => ({ entry: { type: ddb.entry.type.DIRECTORY } });
+// A folder lists `size: 0`: that is not what is inside it
+const folder = (size = 0) => ({ entry: { type: ddb.entry.type.DIRECTORY, size } });
 
 describe('shouldDownloadAsync', () => {
     it('archives the whole dataset and selections of unknown size', () => {
@@ -17,6 +18,14 @@ describe('shouldDownloadAsync', () => {
         expect(shouldDownloadAsync([file(1), { entry: {} }], 100)).toBe(true);
         expect(shouldDownloadAsync([folder()], 100)).toBe(true);
         expect(shouldDownloadAsync([{ entry: { size: 500 } }], 100)).toBe(true);
+    });
+
+    it('archives a folder, whose listed size of 0 says nothing of what is inside it, alone or with small files', () => {
+        expect(shouldDownloadAsync([folder(0)], 100)).toBe(true);
+        expect(shouldDownloadAsync([folder(0), file(1)], 100)).toBe(true);
+        expect(shouldDownloadAsync([file(1), folder(0)], 1e12)).toBe(true);
+        // Without a threshold nothing is archived, as before
+        expect(shouldDownloadAsync([folder(0)], 0)).toBe(false);
     });
 
     it('streams one file whatever its size, so it is not wrapped in a ZIP', () => {

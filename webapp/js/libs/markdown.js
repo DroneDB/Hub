@@ -27,7 +27,7 @@ function resolveAttr(token, name, env) {
     const resolveUrl = env && env.resolveUrl;
     const url = token.attrGet(name);
     if (!resolveUrl || url == null) return true;
-    const resolved = resolveUrl(url);
+    const resolved = resolveUrl(url, name === 'src' ? 'image' : 'link');
     if (resolved == null) {
         const i = token.attrIndex(name);
         if (i >= 0) token.attrs.splice(i, 1);
@@ -53,7 +53,7 @@ withoutImages.renderer.rules.link_open = (tokens, idx, options, env, self) => {
 
 /**
  * @param {string|null|undefined} text Markdown source
- * @param {{ allowImages?: boolean, resolveUrl?: (url: string) => string | null }} [options]
+ * @param {{ allowImages?: boolean, resolveUrl?: (url: string, kind: 'image' | 'link') => string | null }} [options]
  *   allowImages: false (a text from outside) renders an image as its alt text, and only http(s)
  *   links, opened in a new tab. resolveUrl: the address an image or a link of the text loads
  *   (null for none), see datasetFileUrls
@@ -72,15 +72,17 @@ const NOT_RELATIVE = /^(?:[a-z][a-z\d+.-]*:|\/|#)/i;
  * The resolveUrl of a Markdown file of a dataset: a relative address (`![](langley.png)`,
  * `[report](odm_report/report.pdf)`) names a file of the dataset from the folder of the Markdown
  * file, as on a code host, and loads it from the dataset; one that leaves the dataset is dropped.
- * Other addresses are kept.
+ * Other addresses are kept for links. An image is only a file of the dataset: one from a host (or the root of a
+ * site) would load from a place the Hub does not control and tell it who reads the file, so it shows its description,
+ * as in release notes.
  * @param {{ downloadUrl: (path: string, options?: { inline?: boolean }) => string }} dataset
  * @param {string} markdownPath the path of the Markdown file in the dataset
- * @returns {(url: string) => string | null}
+ * @returns {(url: string, kind?: 'image' | 'link') => string | null}
  */
 export function datasetFileUrls(dataset, markdownPath) {
     const folder = pathutils.getParentFolder(markdownPath) || '';
-    return url => {
-        if (NOT_RELATIVE.test(url)) return url;
+    return (url, kind = 'link') => {
+        if (NOT_RELATIVE.test(url)) return kind === 'image' ? null : url;
         const [, pathPart, fragment = ''] = /^([^?#]*)(?:\?[^#]*)?(#.*)?$/.exec(url) || [];
         if (!pathPart) return url;
         let relative;

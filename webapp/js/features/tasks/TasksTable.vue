@@ -202,7 +202,7 @@ export default {
         currentPageFirst: { type: Number, default: 0 }
     },
 
-    emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset', 'sort', 'clear-filters'],
+    emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'sort', 'clear-filters'],
 
     setup() {
         // Secondary columns leave a narrow table; below `sm` every row is a stacked card with all of them (D-026),
@@ -220,13 +220,6 @@ export default {
         slicedTasks() {
             if (this.lazy) return this.tasks;
             return this.tasks.slice(this.currentPageFirst, this.currentPageFirst + this.rows);
-        }
-    },
-
-    watch: {
-        /** Reset to first page when tasks change (e.g. after filter or reload). */
-        tasks() {
-            this.$emit('page-reset');
         }
     },
 

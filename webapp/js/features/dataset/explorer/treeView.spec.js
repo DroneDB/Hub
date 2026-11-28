@@ -17,6 +17,7 @@ import { ref, computed } from 'vue';
 import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
 import { notify } from '@/libs/notify';
 import ddb from 'ddb';
+import { useLatestOnly } from '@/composables/useLatestOnly';
 
 const FILE = ddb.entry.type.GENERIC;
 const DIR = ddb.entry.type.DIRECTORY;
@@ -41,7 +42,8 @@ function fakeBrowser(selectedNodes, { canWrite = true } = {}) {
     const vm = {
         canWrite,
         $refs: { treeView: { selectedNodes } },
-        $emit: vi.fn()
+        $emit: vi.fn(),
+        latestSelection: useLatestOnly()
     };
     for (const name of ['getTreeSelectionEntries', 'emitTreeAction', 'handleTreeKeyDown', 'handleSelectionChanged']) {
         vm[name] = (...args) => FileBrowser.methods[name].apply(vm, args);

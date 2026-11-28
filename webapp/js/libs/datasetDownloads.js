@@ -89,11 +89,18 @@ export function shouldDownloadAsync(files, thresholdBytes) {
     if (!thresholdBytes || thresholdBytes <= 0) return false;
     let total = 0;
     for (const f of files) {
+        // A folder lists `size: 0` (its own, not what is inside it): its size is not known
+        if (isFolder(f)) return true;
         const size = f.entry && typeof f.entry.size === 'number' ? f.entry.size : null;
         if (size == null) return true;
         total += size;
     }
     return total > thresholdBytes;
+}
+
+/** A folder or a nested dataset. @param {{ entry?: { type?: number } }} file */
+function isFolder(file) {
+    return !!file.entry && typeof file.entry.type === 'number' && ddb.entry.isDirectory(file.entry);
 }
 
 /** A known entry that is not a folder (or a nested dataset). @param {{ entry?: { type?: number } }} file */

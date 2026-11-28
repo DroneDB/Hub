@@ -96,4 +96,21 @@ describe('EntryThumbnail retries', () => {
         expect(queue.running).toBe(1);
         w.unmount();
     });
+
+    it('shows the warning icon, not a broken image, when the thumbnail of a photo cannot be made', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        thumbs.fetch.mockReturnValue('/static/thumb.jpg'); // not a Registry URL: no retry
+        const file = {
+            label: 'a.jpg', path: 'ddb://hub.test/acme/site/a.jpg', icon: 'fa-solid fa-image', selected: false,
+            entry: { path: 'a.jpg', type: ddbEntry.type.IMAGE }
+        };
+        const w = mount(EntryThumbnail, { props: { file, dataset: { org: 'acme', ds: 'site', getTasks: async () => [] } } });
+        await flushPromises();
+        await w.find('img').trigger('error');
+        await flushPromises();
+
+        expect(w.find('img').exists()).toBe(false);
+        expect(w.find('i.icon-file').classes()).toContain('fa-triangle-exclamation');
+        w.unmount();
+    });
 });

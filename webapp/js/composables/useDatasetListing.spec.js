@@ -22,7 +22,7 @@ const COG = { role: 'raster.cog', url: '/orgs/o/ds/d/build/h/cog/cog.tif' };
 const entry = { path: 'ortho.tif', hash: 'h', type: 4, buildStatus: 'queued' };
 
 function setup(listed) {
-    const dataset = { remoteUri: p => `ddb://x/o/d/${p}`, listOne: vi.fn(async () => listed) };
+    const dataset = { org: 'o', ds: 'd', remoteUri: p => `ddb://x/o/d/${p}`, listOne: vi.fn(async () => listed) };
     const scope = effectScope();
     const listing = scope.run(() => useDatasetListing(dataset));
     listing.put([itemFor(dataset, { ...entry })]);
@@ -44,6 +44,15 @@ describe('build refresh', () => {
         expect(dataset.listOne).toHaveBeenCalledWith('ortho.tif');
     });
 
+    // The task monitor tells of builds with the dataset object that acquired it last (the header's background archive)
+    it('follows the builds of its dataset whichever object of it the event carries', async () => {
+        const { listing, dataset } = setup({ ...entry, buildStatus: undefined, artifacts: [COG] });
+        emit({ dataset: { org: 'o', ds: 'd' }, filePath: 'ortho.tif', newState: 'Succeeded' });
+        await flush();
+        expect(dataset.listOne).toHaveBeenCalledWith('ortho.tif');
+        expect(listing.files.value[0].entry.artifacts).toEqual([COG]);
+    });
+
     it('also follows a failed build (the entry says failed)', async () => {
         const { dataset, listing } = setup({ ...entry, buildStatus: 'failed' });
         emit({ dataset, filePath: 'ortho.tif', newState: 'Failed' });
@@ -54,7 +63,7 @@ describe('build refresh', () => {
     it('does nothing for a job that is still running, another dataset or a file not on show', async () => {
         const { dataset, listing } = setup({ ...entry });
         emit({ dataset, filePath: 'ortho.tif', newState: 'Processing' });
-        emit({ dataset: {}, filePath: 'ortho.tif', newState: 'Succeeded' });
+        emit({ dataset: { org: 'o', ds: 'another' }, filePath: 'ortho.tif', newState: 'Succeeded' });
         emit({ dataset, filePath: 'other/x.tif', newState: 'Succeeded' });
         await flush();
         expect(dataset.listOne).not.toHaveBeenCalled();
@@ -296,5 +305,75 @@ describe('the list showed only what was removed (items picked in the tree are li
         emitter.emit.mockClear();
         listing.removed(['elsewhere/x.tif']);
         expect(opened(emitter)).toEqual([]);
+    });
+});
+
+describe('a file uploaded again under the name of a file on show', () => {
+    it('replaces the item: the new size, date and hash show, and the selection stays', async () => {
+        const { listing } = setup({});
+        listing.files.value[0].selected = true;
+        listing.uploaded([{ ...entry, size: 99, hash: 'h2', buildStatus: undefined }]);
+
+        expect(listing.files.value).toHaveLength(1);
+        expect(listing.files.value[0].entry).toMatchObject({ size: 99, hash: 'h2' });
+        expect(listing.files.value[0].selected).toBe(true);
+    });
+
+    it('has its build followed again, though no item is new', async () => {
+        const { default: BuildManager } = await import('@/libs/build/buildManager');
+        BuildManager.onFilesAdded.mockClear();
+        const { listing } = setup({});
+        const again = { ...entry, hash: 'h2' };
+        listing.uploaded([again]);
+
+        expect(BuildManager.onFilesAdded).toHaveBeenCalledWith(expect.anything(), [again]);
+    });
+
+    it('tells the tree of the new entry, not the old one', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        emitter.emit.mockClear();
+        const { listing } = setup({});
+        listing.uploaded([{ ...entry, hash: 'h2' }]);
+
+        const sent = emitter.emit.mock.calls.filter(c => c[0] === 'addItems').flatMap(c => c[1]);
+        expect(sent.map(i => i.entry.hash)).toEqual(['h2']);
+    });
+});
+
+describe('reload answers late', () => {
+    const deferred = () => {
+        let resolve;
+        const promise = new Promise(r => { resolve = r; });
+        return { promise, resolve };
+    };
+    const listed = (...paths) => paths.map(path => ({ path, type: 3, size: 1 }));
+
+    it('puts nothing of the old folder under the folder opened since', async () => {
+        const { dataset, listing } = setup({});
+        const slow = deferred();
+        dataset.list = vi.fn(() => slow.promise);
+        listing.currentPath.value = 'old';
+        const pending = listing.reload();
+        listing.currentPath.value = 'new';
+        listing.files.value = [];
+        slow.resolve(listed('old/a.jpg'));
+        await pending;
+
+        expect(listing.files.value).toEqual([]);
+    });
+
+    it('lets the newest reload give the list, whichever answers first', async () => {
+        const { dataset, listing } = setup({});
+        const first = deferred();
+        const second = deferred();
+        dataset.list = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const a = listing.reload();
+        const b = listing.reload();
+        second.resolve(listed('new.jpg'));
+        await b;
+        first.resolve(listed('stale.jpg'));
+        await a;
+
+        expect(listing.files.value.map(f => f.entry.path)).toEqual(['new.jpg']);
     });
 });

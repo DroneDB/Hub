@@ -213,6 +213,36 @@ describe('Clear Concluded', () => {
     });
 });
 
+// The list is read again every 2.5 s while a task runs: a user on page 2 stays there
+describe('a background refresh of the task list', () => {
+    let wrapper;
+    afterEach(() => wrapper?.unmount());
+
+    it('keeps the page the user is on, with the real table showing the list', async () => {
+        const many = n => Array.from({ length: n }, (_, i) => ({ taskId: `t${i}`, toolId: 'extract', state: 'Succeeded', actions: [], createdAt: '2026-11-01T10:00:00Z' }));
+        const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
+        taskMonitor.getTasks.mockReturnValue(many(45));
+        taskMonitor.on.mockClear();
+        const dataset = { org: 'org', ds: 'ds', getTaskTools: vi.fn(() => Promise.resolve([])), registry: { sys: { processingNodes: vi.fn(() => Promise.resolve([])) } } };
+        wrapper = mount(TaskHistory, {
+            props: { dataset, canWrite: false },
+            global: { plugins: [PrimeVue], stubs: { TaskLogDialog: true, DialogHost: true, Window: true } }
+        });
+        await flushPromises();
+        wrapper.vm.currentPageFirst = 20;
+        await flushPromises();
+
+        // A poll brings a new array: one task more
+        taskMonitor.getTasks.mockReturnValue(many(46));
+        const [, onTasksUpdated] = taskMonitor.on.mock.calls.find(([event]) => event === 'tasksUpdated');
+        onTasksUpdated({ dataset });
+        await flushPromises();
+
+        expect(wrapper.vm.filteredTasks).toHaveLength(46);
+        expect(wrapper.vm.currentPageFirst).toBe(20);
+    });
+});
+
 describe('showClearDialog', () => {
     const { showClearDialog } = TaskHistory.methods;
 

@@ -278,8 +278,10 @@ export default {
 
             try {
                 // The file that is open: saving replaces it
-                await this.dataset.writeObj(this.entry.path, this.currentContent, { overwrite: true });
-                this.originalContent = this.currentContent;
+                // What was sent is what is saved: text typed while the request is on its way is not
+                const sent = this.currentContent;
+                await this.dataset.writeObj(this.entry.path, sent, { overwrite: true });
+                this.originalContent = sent;
                 this.$emit('saved', this.entry.path);
             } catch (e) {
                 this.error = `Failed to save file: ${e.message || e}`;

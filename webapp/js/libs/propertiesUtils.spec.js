@@ -67,6 +67,10 @@ describe('beautifyKey', () => {
         expect(beautifyKey('band1')).toBe('Band 1');
         expect(beautifyKey(3)).toBe(3);
     });
+
+    it('does not throw for an empty key (a property stored under "")', () => {
+        expect(beautifyKey('')).toBe('');
+    });
 });
 
 describe('isUrl', () => {

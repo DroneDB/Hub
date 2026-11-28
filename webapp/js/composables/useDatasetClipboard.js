@@ -125,7 +125,20 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         return made;
     }
 
+    // One paste at a time, from the first question to the end: a second Ctrl+V (or Paste) while one is on its way
+    // would ask the conflicts again, or move and transfer the same items twice
+    let pasting = false;
     async function paste() {
+        if (pasting) return;
+        pasting = true;
+        try {
+            await pasteNow();
+        } finally {
+            pasting = false;
+        }
+    }
+
+    async function pasteNow() {
         if (clipboard.isEmpty) return;
         if (!canWrite.value) return notify.warn('You do not have write access to this dataset', { summary: 'Paste', life: 'short' });
         const { mode, source } = clipboard;
@@ -154,7 +167,7 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
             // A copy and a transfer between datasets can overwrite (their endpoints take `overwrite`)
             const conflictMode = conflicts.length ? await askConflict(conflicts) : 'overwrite';
             if (conflictMode === 'cancel') return;
-            options = { conflictMode };
+            options = { conflictMode, clashing: conflicts.map(it => it.path) };
         }
 
         const sourceDataset = sameDataset ? dataset : reg.Organization(source.orgSlug).Dataset(source.dsSlug);

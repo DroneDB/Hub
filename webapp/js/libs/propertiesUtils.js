@@ -417,7 +417,7 @@ export function tidyProperties(props) {
 
 /** A property key as a label: "focalLength" becomes "Focal Length". */
 export function beautifyKey(name) {
-    if (typeof name !== 'string') return name;
+    if (typeof name !== 'string' || !name) return name;
     return name[0].toUpperCase() + name.substring(1).replace(/([a-z])([A-Z0-9])/g, '$1 $2');
 }
 

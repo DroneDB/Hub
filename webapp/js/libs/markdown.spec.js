@@ -96,11 +96,32 @@ describe('the files a Markdown file of a dataset names', () => {
         expect(resolve('%E0%A4%A')).toBeNull();
     });
 
-    it('leave web, site and page addresses as they are', () => {
+    it('leave web, site and page addresses of a link as they are', () => {
         const resolve = datasetFileUrls(dataset, 'odm/README.md');
         for (const url of ['https://example.com/a.png', '//cdn.test/a.png', '/r/org/ds', '#section', 'mailto:a@b.test']) {
+            expect(resolve(url, 'link')).toBe(url);
             expect(resolve(url)).toBe(url);
         }
+    });
+
+    // An image from a host would load from a place the Hub does not control, and tell it who reads the file
+    it('load an image from the dataset only: an image of a host or of the root of a site shows its description', () => {
+        const resolve = datasetFileUrls(dataset, 'odm/README.md');
+        for (const url of ['https://tracker.test/pixel.png', 'http://example.com/a.png', '//cdn.test/a.png', '/r/org/ds/a.png', 'data:image/png;base64,AAAA']) {
+            expect(resolve(url, 'image')).toBeNull();
+        }
+        const html = renderMarkdown('![a <b>logo</b>](https://tracker.test/pixel.png) ![site](/orgs/x/logo) ![own](langley.png)',
+            { resolveUrl: datasetFileUrls(dataset, 'README.md') });
+        expect(html).not.toContain('tracker.test');
+        expect(html).not.toContain('/orgs/x/logo');
+        expect(html).toContain('a &lt;b&gt;logo&lt;/b&gt;');
+        expect(html).toContain('src="/dl/langley.png?inline=1"');
+        expect(html.match(/<img/g)).toHaveLength(1);
+    });
+
+    it('keep a link to a host, which opens only when clicked', () => {
+        const html = renderMarkdown('[docs](https://example.com/docs)', { resolveUrl: datasetFileUrls(dataset, 'README.md') });
+        expect(html).toContain('href="https://example.com/docs"');
     });
 
     it('still refuses a javascript: link and the HTML of the source', () => {

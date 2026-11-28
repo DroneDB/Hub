@@ -77,6 +77,28 @@ describe('EntryThumbnail while its file builds', () => {
         w.unmount();
     });
 
+    // A retry that waits when a build starts would, once its time comes, take a slot of the loader for the whole build
+    it('drops the retry that waits when a build of the file starts', async () => {
+        vi.useFakeTimers();
+        try {
+            const w = mountTile({ buildStatus: 'queued' });
+            await flushPromises();
+            await w.find('img').trigger('error');
+            expect(w.vm.loadTimeout).not.toBeNull();
+
+            listChanges([build('Processing')]);
+            await flushPromises();
+            expect(w.vm.loadTimeout).toBeNull();
+            thumbs.fetch.mockClear();
+            await vi.advanceTimersByTimeAsync(10000);
+            expect(thumbs.fetch).not.toHaveBeenCalled();
+            expect(w.vm.retryNumber).toBe(0);
+            w.unmount();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('shows the type icon dimmed under the spinner, and says "Building…"', async () => {
         const w = mountTile({}, {});
         await flushPromises();

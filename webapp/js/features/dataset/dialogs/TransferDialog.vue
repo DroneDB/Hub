@@ -76,6 +76,7 @@ import ProgressBar from 'primevue/progressbar';
 import reg from '@/libs/api/sharedRegistry';
 import { useTimerGroup } from '@/composables/useTimers';
 import { transferModeOf } from '@/libs/dataset/transferMode';
+import { destFor } from '@/composables/usePasteStrategy';
 
 
 export default {
@@ -120,6 +121,7 @@ export default {
             statusMessage: "",
             errorMessage: null,
             transferredCount: 0,
+            sent: [],
             folderPickerOpen: false
         };
     },
@@ -220,15 +222,16 @@ export default {
             if (!this.canTransfer) return;
 
             this.isTransferring = true;
-            this.progress = 0;
-            this.transferredCount = 0;
+            this.progress = Math.round((this.sent.length / this.files.length) * 100);
+            this.transferredCount = this.sent.length;
             this.errorMessage = null;
 
             const sourceDataset = reg.Organization(this.sourceOrg).Dataset(this.sourceDs);
 
             try {
-                for (let i = 0; i < this.files.length; i++) {
-                    const file = this.files[i];
+                // A retry after a partial failure sends only what is still to go: the files that moved are gone
+                // from the source (and the ones that were copied are already there)
+                for (const file of this.files.filter(f => !this.sent.includes(f))) {
                     const sourcePath = file.entry.path;
 
                     this.statusMessage = `${this.mode.working} ${sourcePath}...`;
@@ -237,19 +240,20 @@ export default {
                         sourcePath,
                         this.destOrg,
                         this.destDs,
-                        this.destPath,
+                        this.destPathOf(sourcePath),
                         this.overwrite,
                         this.mode.keepSource
                     );
 
-                    this.transferredCount++;
+                    this.sent.push(file);
+                    this.transferredCount = this.sent.length;
                     this.progress = Math.round((this.transferredCount / this.files.length) * 100);
                 }
 
                 this.statusMessage = this.mode.summary;
 
                 // Close dialog after a short delay
-                this.later(() => this.$emit('close', 'transferred', this.files), 1500);
+                this.later(() => this.$emit('close', 'transferred', this.sent), 1500);
 
             } catch (e) {
                 console.error(`${this.mode.failed}:`, e);
@@ -257,6 +261,13 @@ export default {
                 this.isTransferring = false;
                 this.statusMessage = this.mode.failed;
             }
+        },
+
+        // The server takes the destination as the full path the entry gets, so the chosen folder is joined with the
+        // name of the source; no folder leaves the choice to the server (the name, in the root)
+        destPathOf(sourcePath) {
+            const folder = (this.destPath || '').trim();
+            return folder ? destFor({ path: sourcePath }, { basePath: folder }) : '';
         },
 
         // FolderPicker: { path, entry }, or null when cancelled
@@ -267,7 +278,8 @@ export default {
 
         close: function (buttonId) {
             if (this.isTransferring) return; // Prevent closing during transfer
-            this.$emit('close', buttonId);
+            // What moved before a failure is reported too: the source list must not keep it
+            this.$emit('close', this.sent.length ? 'transferred' : buttonId, this.sent);
         }
     }
 }

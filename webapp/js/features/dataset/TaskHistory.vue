@@ -27,8 +27,7 @@
                         :downloading-task-id="downloadingTaskId" :busy-task-ids="[...taskActions.busyIds]"
                         empty-message="No processing tasks have been run for this dataset yet."
                         @view-log="openLog" @download-result="downloadResult"
-                        @cancel="taskActions.cancel" @retry="taskActions.retry" @delete="taskActions.remove"
-                        @page-reset="onPageReset" />
+                        @cancel="taskActions.cancel" @retry="taskActions.retry" @delete="taskActions.remove" />
         </div>
 
         <!-- Standalone paginator (outside scrollable area, hidden when < 10 items) -->
@@ -919,10 +918,6 @@ export default {
         onPageChange(event) {
             this.currentPageFirst = event.first;
             this.pageSize = event.rows;
-        },
-
-        onPageReset() {
-            this.currentPageFirst = 0;
         }
     }
 };

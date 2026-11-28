@@ -125,6 +125,7 @@ import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { savedViewUrl, fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { viewsUsing } from '@/libs/views/viewStore';
 import { COMPARE_ICON } from '@/libs/glyphs';
+import { isSameDataset } from '@/libs/build/datasetIdentity';
 
 // The preview box is as wide as the panel, and as high as 18.75rem at most (css); a box that is not measured
 // yet (the panel is not on the page) is taken as 400 CSS px wide
@@ -485,7 +486,7 @@ export default {
         },
 
         onBuildStateChanged(data) {
-            if (this.file && data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+            if (this.file && isSameDataset(data.dataset, this.dataset) && data.filePath === this.file.entry.path) {
                 this.buildState = data.buildInfo;
                 this.buildLoading = false;
 
@@ -498,7 +499,7 @@ export default {
         },
 
         onBuildStarted(data) {
-            if (this.file && data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+            if (this.file && isSameDataset(data.dataset, this.dataset) && data.filePath === this.file.entry.path) {
                 this.buildLoading = true;
                 this.error = null;
                 this.thumbnail = null;

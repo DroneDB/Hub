@@ -129,6 +129,23 @@ describe('TableView as a grid', () => {
         expect(selectedLabels(files)).toEqual(['f3.bin']);
     });
 
+    // The detail panel follows the selection: a list that clears it without telling leaves the panel on the old file
+    it('tells the page when Escape or a click on the empty area clears the selection', async () => {
+        const files = items(3);
+        files[1].selected = true;
+        mountTable(files);
+        await flushPromises();
+
+        await w.find('#table-view').trigger('keydown', { key: 'Escape' });
+        expect(selectedLabels(files)).toEqual([]);
+        expect(w.emitted('selectionChanged')).toEqual([[]]);
+
+        files[2].selected = true;
+        await w.find('#table-view').trigger('click');
+        expect(selectedLabels(files)).toEqual([]);
+        expect(w.emitted('selectionChanged')).toEqual([[], []]);
+    });
+
     it('leaves the keys of a sort button in the header to the button', async () => {
         const files = items(3);
         mountTable(files);

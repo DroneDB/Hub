@@ -182,6 +182,8 @@ export default {
         // image away; no load or error event will come, so its turn goes to the next tile)
         buildLoading(running) {
             if (!running) return;
+            // A retry still waiting would take a slot of the loader for the whole build
+            this.clearRetryTimer();
             this.cancelImageRequest();
             this.loading = false;
             this.error = null;
@@ -219,7 +221,7 @@ export default {
     beforeUnmount() {
         if (this.observedTile) this.thumbnailLoader?.visibility.unobserve(this.observedTile);
         this.cancelImageRequest();
-        if (this.loadTimeout) clearTimeout(this.loadTimeout);
+        this.clearRetryTimer();
     },
     methods: {
         // The thumbnail URL at the size the tile has now: the tile's size times the pixel ratio, not a fixed 256 px. A
@@ -273,11 +275,13 @@ export default {
             this.stale = false;
             if (!this.thumbnail || this.imageTicket?.state === 'waiting') return;
             this.retryNumber = 0;
-            if (this.loadTimeout) {
-                clearTimeout(this.loadTimeout);
-                this.loadTimeout = null;
-            }
+            this.clearRetryTimer();
             this.showImage();
+        },
+        clearRetryTimer: function () {
+            if (!this.loadTimeout) return;
+            clearTimeout(this.loadTimeout);
+            this.loadTimeout = null;
         },
         cancelImageRequest: function () {
             if (!this.imageTicket) return;
@@ -303,10 +307,7 @@ export default {
             // at once (a build that starts or succeeds later reloads the tile).
             if (this.thumbnail && this.thumbnail.startsWith("/orgs") && shouldRetry(this.retryNumber)
                 && !isBuildStopped(this.buildState, this.file.entry)) {
-                if (this.loadTimeout) {
-                    clearTimeout(this.loadTimeout);
-                    this.loadTimeout = null;
-                }
+                this.clearRetryTimer();
                 const nextRetry = this.retryNumber + 1;
                 this.loadTimeout = setTimeout(() => {
                     this.loadTimeout = null;
@@ -319,10 +320,7 @@ export default {
             }
 
             // Retries exhausted (or non-API URL): terminal fallback.
-            if (this.loadTimeout) {
-                clearTimeout(this.loadTimeout);
-                this.loadTimeout = null;
-            }
+            this.clearRetryTimer();
             if (this.dataset && isBuildableType(this.file.entry.type)) {
                 // Buildable entry: show the file icon and let the
                 // queued/pending/failed badge explain the state (same rule as
@@ -345,6 +343,8 @@ export default {
         showError: function (e) {
             console.warn(e);
             this.error = e.message;
+            // The image that failed goes: left in place it shows as a broken image over the warning icon
+            this.thumbnail = null;
             this.icon = "fa-solid fa-triangle-exclamation";
             this.loading = false;
         },
@@ -353,10 +353,7 @@ export default {
                 // Forced reload (e.g. build Succeeded): a file that exhausted its
                 // retry budget while unbuilt gets a fresh budget now.
                 this.retryNumber = 0;
-                if (this.loadTimeout) {
-                    clearTimeout(this.loadTimeout);
-                    this.loadTimeout = null;
-                }
+                this.clearRetryTimer();
             }
 
             // Use single loading flag to prevent multiple calls

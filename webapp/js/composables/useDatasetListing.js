@@ -14,6 +14,8 @@ import { applyBuildFields } from '@/libs/build/entryBuild';
 import { isTerminalState } from '@/libs/tasks/taskStates';
 import { itemFor, sortItems, isInFolder, entriesInView } from '@/libs/dataset/explorerItems';
 import { isPathRemoved } from '@/features/dataset/explorer/treeSelection';
+import { isSameDataset } from '@/libs/build/datasetIdentity';
+import { useLatestOnly } from '@/composables/useLatestOnly';
 
 /** @param {any} dataset */
 export function useDatasetListing(dataset) {
@@ -120,7 +122,7 @@ export function useDatasetListing(dataset) {
     }
 
     const onBuildStateChanged = data => {
-        if (data.dataset === dataset && isTerminalState(data.newState)) refreshBuild(data.filePath);
+        if (isSameDataset(data.dataset, dataset) && isTerminalState(data.newState)) refreshBuild(data.filePath);
     };
     BuildManager.on('buildStateChanged', onBuildStateChanged);
     if (getCurrentScope()) onScopeDispose(() => BuildManager.off('buildStateChanged', onBuildStateChanged));
@@ -130,25 +132,38 @@ export function useDatasetListing(dataset) {
      * in-view filter); the tree hears of every entry by its own parent folder, whatever is on show (FR-EXP-36): a nested
      * `a/b/c.jpg` with the root on show, a folder that the list already has, an upload that ends in another folder. One
      * event per parent folder, no entry twice (the top folder of the list stands in for a folder the entries do not name).
+     * A file uploaded again under a name on show replaces its item (size, date, hash and thumbnail follow, the selection
+     * stays) and its build is followed again.
      */
     function uploaded(entries) {
-        const items = notShownInView(entries).map(e => itemFor(dataset, e));
+        const shown = new Map(files.value.map(f => [f.entry.path, f]));
+        const replaced = entries
+            .filter(e => shown.has(e.path) && !ddb.entry.isDirectory(e))
+            .map(e => itemFor(dataset, e, { selected: shown.get(e.path).selected }));
+        const items = [...replaced, ...notShownInView(entries).map(e => itemFor(dataset, e))];
         if (items.length) put(items.filter(i => inView(i.entry.path)));
         // The items of the list stand for their entries where they are the same entry (one object for list and tree)
         const forTree = new Map(items.map(i => [i.entry.path, i]));
         for (const e of entries) if (!forTree.has(e.path)) forTree.set(e.path, itemFor(dataset, e));
         announce([...forTree.values()]);
-        if (items.length) BuildManager.onFilesAdded(dataset, entries);
+        // Whatever the list shows: a file replaced under its name may need a build, as a new one does
+        BuildManager.onFilesAdded(dataset, entries);
     }
 
     /**
      * Re-reads the folder on show (and `destPath` for the tree) after a server-side change
      * that may have replaced entries (extract, import).
      */
+    const latestReload = useLatestOnly();
     async function reload(destPath) {
+        // An answer that comes after the folder on show changed, or after a newer reload started, belongs to a list
+        // the user has left: it must not put the items of the old folder under the new one
+        const current = latestReload();
+        const folder = currentPath.value || null;
+        const stale = () => !current() || (currentPath.value || null) !== folder;
         try {
-            const folder = currentPath.value || null;
             const items = ((await dataset.list(folder || undefined)) || []).map(e => itemFor(dataset, e));
+            if (stale()) return;
             files.value = sortItems(items);
             if (items.length) {
                 emitter.emit('addItems', items);
@@ -158,7 +173,7 @@ export function useDatasetListing(dataset) {
             if (dest && dest !== folder) {
                 // Best effort: a tree node reloads when expanded anyway
                 const destItems = ((await dataset.list(dest).catch(() => [])) || []).map(e => itemFor(dataset, e));
-                if (destItems.length) emitter.emit('addItems', destItems);
+                if (destItems.length && !stale()) emitter.emit('addItems', destItems);
             }
         } catch (e) {
             console.warn('Could not refresh the file list:', e);
