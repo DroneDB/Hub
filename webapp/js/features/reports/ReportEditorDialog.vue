@@ -32,7 +32,7 @@
                 <Accordion v-model:value="openPanel" class="report-more-options">
                     <FormSection value="more" title="More options" :summary="editor.optionsSummary.value"
                                  header-testid="more-options" summary-testid="options-summary">
-                        <ReportEditorDetails />
+                        <ReportEditorDetails @edit-template="editTemplate" />
                         <ReportEditorLabels />
                         <ReportEditorFilter />
                     </FormSection>
@@ -56,6 +56,10 @@
  * Props: dataset (the Registry's), entry (the report to edit; none for a new one), initial (what a new report was opened
  * with: the measurement files and the view of the map), user, choose (the question of the change check). It closes with `{ uid }` of the report
  * that was stored, or with nothing.
+ *
+ * Edit template opens the report settings of the organization on the template of the draft. When they are changed the
+ * editor reads the templates again and emits `settings-changed`, so that a report shown behind it is drawn again even
+ * when the editor is then cancelled.
  */
 import { computed, ref } from 'vue';
 import Accordion from 'primevue/accordion';
@@ -70,7 +74,10 @@ import ReportEditorEssentials from './ReportEditorEssentials.vue';
 import ReportEditorDetails from './ReportEditorDetails.vue';
 import ReportEditorLabels from './ReportEditorLabels.vue';
 import ReportEditorFilter from './ReportEditorFilter.vue';
+import { lazyComponent } from '@/libs/lazyComponent';
 import { MORE_OPTIONS_FIELDS, provideReportEditor, useReportEditor } from './useReportEditor';
+
+const ReportSettingsDialog = lazyComponent(() => import(/* webpackChunkName: "report-settings" */ '@/features/organizations/ReportSettingsDialog.vue'));
 
 const props = defineProps({
     dataset: { type: Object, required: true },
@@ -79,7 +86,7 @@ const props = defineProps({
     user: { type: String, default: '' },
     choose: { type: Function, required: true }
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'settings-changed']);
 
 // Questions of the editor are asked over it, on a host of its own
 const dialogs = useDialogs();
@@ -111,6 +118,20 @@ async function confirm() {
     if (!saved && Object.keys(editor.problems.value).some(field => MORE_OPTIONS_FIELDS.includes(field))) openPanel.value = 'more';
     // A save that numbered everything is done; one that could not number a file leaves the editor open to say so
     if (saved && !saved.failures.length) emit('close', { uid: saved.uid });
+}
+
+/** The report settings of the organization, on the template of the draft; a change is read again when they close. */
+async function editTemplate() {
+    let changed = false;
+    await dialogs.open(ReportSettingsDialog, {
+        orgSlug: String(props.dataset.org),
+        canEdit: true,
+        templateId: editor.resolvedTemplate.value.id,
+        onChanged: () => { changed = true; }
+    });
+    if (!changed) return;
+    await editor.reloadSettings();
+    emit('settings-changed');
 }
 
 async function requestClose() {

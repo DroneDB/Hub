@@ -91,6 +91,16 @@ describe('the editor', () => {
         expect(router.push).not.toHaveBeenCalled();
         expect(onChanged).toHaveBeenCalled();
     });
+
+    it('tells the page it changed when the report settings were changed from the editor, even when the editor is cancelled', async () => {
+        answers.editor = null;
+        dialogs.open.mockImplementationOnce(async (component, props) => {
+            props.onSettingsChanged();
+            return null;
+        });
+        expect(await actions.edit(entry)).toBeNull();
+        expect(onChanged).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe('duplicate', () => {

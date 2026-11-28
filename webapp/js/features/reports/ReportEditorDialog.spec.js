@@ -12,11 +12,22 @@ import ddb from 'ddb';
 import { DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
 
 const m = vi.hoisted(() => ({
-    saveNewReport: vi.fn(), updateReport: vi.fn(), reportChange: vi.fn(), numberMeasurementFile: vi.fn(), settings: vi.fn(), listViews: vi.fn(), listReports: vi.fn()
+    saveNewReport: vi.fn(), updateReport: vi.fn(), reportChange: vi.fn(), numberMeasurementFile: vi.fn(), settings: vi.fn(), listViews: vi.fn(), listReports: vi.fn(),
+    canEdit: vi.fn()
 }));
 vi.mock('@/libs/reports/reportSettings', async importOriginal => ({
     ...await importOriginal(),
-    datasetReportSettings: (...a) => m.settings(...a)
+    datasetReportSettings: (...a) => m.settings(...a),
+    canEditReportSettings: (...a) => m.canEdit(...a)
+}));
+// The report settings dialog is its own spec's: here it is what Edit template opens, with the props it is given
+vi.mock('@/features/organizations/ReportSettingsDialog.vue', () => ({
+    __esModule: true,
+    default: {
+        name: 'ReportSettingsDialog', props: ['orgSlug', 'canEdit', 'templateId'], emits: ['close', 'changed'],
+        template: '<div data-testid="settings-dialog" :data-org="orgSlug" :data-template="templateId" :data-can-edit="String(canEdit)">'
+            + '<button data-testid="settings-save" @click="$emit(\'changed\')" /><button data-testid="settings-close" @click="$emit(\'close\')" /></div>'
+    }
 }));
 vi.mock('@/libs/views/viewStore', async importOriginal => ({
     ...await importOriginal(),
@@ -39,7 +50,7 @@ const { default: ReportEditorDialog } = await import('./ReportEditorDialog.vue')
 const searchDataset = async (pattern, options) => (options?.type === ddb.entry.type.GEORASTER
     ? [{ path: 'ortho.tif', hash: 'h1' }]
     : [{ path: 'a/measurements.geojson' }, { path: 'b/measurements.geojson' }]);
-const dataset = { ds: 'north-pit', info: async () => [{ properties: { meta: { name: { data: 'North pit survey' } } } }], search: vi.fn(searchDataset) };
+const dataset = { org: 'acme', ds: 'north-pit', info: async () => [{ properties: { meta: { name: { data: 'North pit survey' } } } }], search: vi.fn(searchDataset) };
 const VIEWS = [{ uid: 'v_cover123', name: 'Cover view', error: null, newerVersion: false }];
 // What the map gives: its measurement file and its saved view
 const FROM_MAP = { sources: ['a/measurements.geojson'], view: { uid: 'v_cover123' } };
@@ -90,6 +101,7 @@ beforeEach(() => {
     choose = vi.fn();
     dataset.search.mockImplementation(searchDataset);
     m.settings.mockResolvedValue({ templates: [DEFAULT_TEMPLATE], schema: DEFAULT_SCHEMA });
+    m.canEdit.mockResolvedValue(false);
     m.reportChange.mockResolvedValue(null);
     m.listViews.mockResolvedValue(VIEWS);
     m.listReports.mockResolvedValue({ reports: [], unreadable: [] });
@@ -192,6 +204,55 @@ describe('the fields', () => {
         await click(confirmButton());
         expect(body().textContent).toContain('This view was deleted: choose another');
         expect(m.updateReport).not.toHaveBeenCalled();
+    });
+});
+
+describe('Edit template', () => {
+    const SITE = { ...DEFAULT_TEMPLATE, id: 'site', name: 'Site inspection' };
+    const editButton = () => body().querySelector('[data-testid="edit-template"]');
+    const settingsDialog = () => body().querySelector('[data-testid="settings-dialog"]');
+
+    beforeEach(() => {
+        m.settings.mockResolvedValue({ templates: [DEFAULT_TEMPLATE, SITE], schema: DEFAULT_SCHEMA });
+    });
+
+    it('is not there for a user who does not administer the organization', async () => {
+        await render({ entry: existing({ templateId: 'site' }) });
+        expect(m.canEdit).toHaveBeenCalledWith(dataset);
+        expect(field('report-template')).not.toBeNull();
+        expect(editButton()).toBeNull();
+    });
+
+    it('opens the report settings of the organization on the template of the report, editable', async () => {
+        m.canEdit.mockResolvedValue(true);
+        await render({ entry: existing({ templateId: 'site' }) });
+        await click(editButton());
+        expect(settingsDialog().dataset).toMatchObject({ org: 'acme', template: 'site', canEdit: 'true' });
+    });
+
+    it('reads the templates again once they changed, and says so to the page behind, even when the editor is cancelled', async () => {
+        m.canEdit.mockResolvedValue(true);
+        await render({ entry: existing({ templateId: 'site' }) });
+        await click(editButton());
+        m.settings.mockResolvedValue({ templates: [DEFAULT_TEMPLATE, { ...SITE, name: 'Site inspection (donuts)' }], schema: DEFAULT_SCHEMA });
+        await click(body().querySelector('[data-testid="settings-save"]'));
+        await click(body().querySelector('[data-testid="settings-close"]'));
+        expect(settingsDialog()).toBeNull();
+        expect(m.settings).toHaveBeenCalledTimes(2);
+        expect(wrapper.emitted('settings-changed')).toHaveLength(1);
+        expect(selectOf('report-template').props('options').map(t => t.name)).toEqual([DEFAULT_TEMPLATE.name, 'Site inspection (donuts)']);
+        // The draft is unchanged: nothing to discard
+        await click(cancelButton());
+        expect(wrapper.emitted('close')).toEqual([[null]]);
+    });
+
+    it('reads nothing again when the settings were only looked at', async () => {
+        m.canEdit.mockResolvedValue(true);
+        await render({ entry: existing({ templateId: 'site' }) });
+        await click(editButton());
+        await click(body().querySelector('[data-testid="settings-close"]'));
+        expect(m.settings).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted('settings-changed')).toBeUndefined();
     });
 });
 

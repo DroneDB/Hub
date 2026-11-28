@@ -74,6 +74,9 @@
  * Props:
  *   orgSlug - the organization
  *   canEdit - the user is an administrator of it
+ *   templateId - the template the dialog opens on (the first one when it is not there)
+ *
+ * Emits `changed` when something the reports are made with was stored (a save, a logo sent or removed), and `close`.
  */
 import { computed, nextTick, reactive, ref, shallowRef, watch } from 'vue';
 import Button from 'primevue/button';
@@ -100,9 +103,10 @@ import {
 
 const props = defineProps({
     orgSlug: { type: String, required: true },
-    canEdit: { type: Boolean, default: false }
+    canEdit: { type: Boolean, default: false },
+    templateId: { type: String, default: '' }
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'changed']);
 
 const schemaLists = SCHEMA_LISTS;
 const organization = reg.Organization(props.orgSlug);
@@ -110,6 +114,8 @@ const organization = reg.Organization(props.orgSlug);
 const root = ref(null);
 const activeTab = ref('templates');
 const selectedTemplate = ref(0);
+// The template to show once the settings are read, the first time only
+let openOn = props.templateId;
 const loading = ref(true);
 const loadError = ref('');
 const saving = ref(false);
@@ -166,6 +172,11 @@ function apply(settings) {
     for (const { key } of schemaLists) saved[key] = new Set(draft.schema[key].map(e => e.id));
     baseline.value = snapshot();
     serverProblems.value = {};
+    if (openOn) {
+        const index = draft.templates.findIndex(t => t.id === openOn);
+        if (index >= 0) selectedTemplate.value = index;
+        openOn = '';
+    }
     if (selectedTemplate.value >= draft.templates.length) selectedTemplate.value = 0;
 }
 
@@ -213,6 +224,7 @@ async function save() {
         const result = await saveOrgReportSettings(organization, { templates: draft.templates, schema: draft.schema, version: version.value });
         apply(result);
         showProblems.value = false;
+        emit('changed');
         notify.success('Report settings saved', { summary: 'Saved' });
     } catch (e) {
         await onSaveFailed(e);
@@ -253,6 +265,7 @@ async function uploadLogo(templateId, file, prepared) {
         version.value = result.version;
         const template = draft.templates.find(t => t.id === templateId);
         if (template) template.logo = result.logo;
+        emit('changed');
         notify.success(prepared ? `Saved as ${describeLogo(prepared)}` : 'Logo saved', { summary: 'Logo saved' });
     } catch (e) {
         // A 404 says the Registry has no such template (it was removed by someone else, or not saved)
@@ -276,6 +289,7 @@ async function onLogoRemovalClose(action) {
         const result = await deleteTemplateLogo(organization, template.id);
         version.value = result.version;
         template.logo = null;
+        emit('changed');
         notify.success('Logo removed', { summary: 'Saved' });
     } catch (e) {
         formError.value = formMessageOf(e, 'The logo was not removed');

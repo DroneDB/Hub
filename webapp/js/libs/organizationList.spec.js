@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
-    ORG_SORT_FIELDS, ORG_SORT_OPTIONS, SORT_DIRECTIONS, organizationRow, sortOrganizations
+    ORG_SORT_FIELDS, ORG_SORT_OPTIONS, SORT_DIRECTIONS, administersOrganization, organizationRow, sortOrganizations
 } from './organizationList';
 
 const org = (slug, extra = {}) => ({ slug, name: slug, creationDate: null, lastModified: null, datasetCount: null, ...extra });
@@ -134,5 +134,23 @@ describe('organizationRow', () => {
         expect(organizationRow({ slug: 's' })).toMatchObject({ creationDate: null, lastModified: null, datasetCount: null });
         expect(organizationRow({ ...dto, datasetCount: 0 }).datasetCount).toBe(0);
         expect(organizationRow({ ...dto, lastModified: 'not a date' }).lastModified).toBeNull();
+    });
+});
+
+describe('administersOrganization', () => {
+    const member = canManageMembers => ({ slug: 'acme', permissions: { canRead: true, canWrite: true, canDelete: false, canManageMembers } });
+    afterEach(() => { delete globalThis.HubOptions; });
+
+    it('is an administrator of the organization or of the instance', () => {
+        expect(administersOrganization(member(true))).toBe(true);
+        expect(administersOrganization(member(false))).toBe(false);
+        expect(administersOrganization(member(false), true)).toBe(true);
+        expect(administersOrganization({ slug: 'acme' })).toBe(false);
+        expect(administersOrganization(null)).toBe(false);
+    });
+
+    it('is nobody when the organizations of the instance are read-only', () => {
+        globalThis.HubOptions = { readOnlyOrgs: true };
+        expect(administersOrganization(member(true), true)).toBe(false);
     });
 });

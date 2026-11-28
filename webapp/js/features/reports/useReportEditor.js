@@ -36,7 +36,7 @@ import {
     listReports, reportChange, reportSaveProblem, saveNewReport, updateReport, MAX_REPORT_NAME_LENGTH, NEWER_REPORT_TEXT
 } from '@/libs/reports/reportStore';
 import { defaultBaseFile, freeName, newestReport, prefillReport } from '@/libs/reports/reportPrefill';
-import { datasetReportSettings, DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
+import { canEditReportSettings, datasetReportSettings, DEFAULT_SCHEMA, DEFAULT_TEMPLATE } from '@/libs/reports/reportSettings';
 import { resolveTemplate, templateMissingText } from '@/libs/reports/reportModel';
 import { loadReportSources } from '@/libs/reports/reportSources';
 
@@ -96,6 +96,8 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
 
     const templates = shallowRef([DEFAULT_TEMPLATE]);
     const schema = shallowRef(DEFAULT_SCHEMA);
+    // The user administers the organization, so the editor offers to edit its templates
+    const canEditTemplates = ref(false);
     /** @type {import('vue').ShallowRef<import('@/libs/views/viewStore').SavedView[]>} */
     const views = shallowRef([]);
     /** @type {import('vue').ShallowRef<string[]>} */
@@ -152,17 +154,18 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
             return;
         }
         try {
-            const [settings, allViews, files, bases, reports, datasetName] = await Promise.all([
+            const [settings, allViews, files, bases, reports, datasetName, administers] = await Promise.all([
                 datasetReportSettings(dataset),
                 listViews(dataset, { fresh: true }),
                 dataset.search('*measurements.geojson').catch(() => []),
                 readBaseFiles(),
                 // What a new report is filled in from: best effort, an empty form is still a form
                 entry ? null : listReports(dataset).then(r => r.reports, () => []),
-                entry ? '' : readDatasetName()
+                entry ? '' : readDatasetName(),
+                canEditReportSettings(dataset)
             ]);
-            templates.value = settings.templates?.length ? settings.templates : [DEFAULT_TEMPLATE];
-            schema.value = settings.schema ?? DEFAULT_SCHEMA;
+            applySettings(settings);
+            canEditTemplates.value = administers;
             // A cover view that cannot be drawn is a deleted one (coverDeleted), as the live page has it
             views.value = allViews.filter(isUsableView);
             measurementFiles.value = files.map(/** @param {any} f */ f => f.path).filter(isMeasurementFile).sort();
@@ -175,6 +178,24 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
         } finally {
             loading.value = false;
             baseline.value = snapshot();
+        }
+    }
+
+    /** @param {import('@/libs/reports/reportSettings').ReportSettings} settings */
+    function applySettings(settings) {
+        templates.value = settings.templates?.length ? settings.templates : [DEFAULT_TEMPLATE];
+        schema.value = settings.schema ?? DEFAULT_SCHEMA;
+    }
+
+    /**
+     * Reads the templates and the schema again, after they were changed (Edit template): the draft keeps its template,
+     * which the notice names when it is no longer there. A failed read keeps what the editor has.
+     */
+    async function reloadSettings() {
+        try {
+            applySettings(await datasetReportSettings(dataset));
+        } catch (e) {
+            console.error('Cannot read the report settings again:', e);
         }
     }
 
@@ -476,10 +497,10 @@ export function useReportEditor({ dataset, user, entry = null, initial = {}, cho
 
     return {
         draft, loading, loadError, saving, formError, showProblems, problems, firstProblem, failures, dirty,
-        templates, schema, views, measurementFiles, baseFiles, groupOptions, viewChoice, coverDeleted,
+        templates, schema, canEditTemplates, views, measurementFiles, baseFiles, groupOptions, viewChoice, coverDeleted,
         hasMapView: !!mapView, hasKeptView: !!keptCover, optionsSummary,
         resolvedTemplate: computed(() => resolved.value.template), templateNotice, storedUid,
-        load, add, setSources, removeSource, chooseTemplate, chooseView, chooseFile, nameView, moveSection, save,
+        load, reloadSettings, add, setSources, removeSource, chooseTemplate, chooseView, chooseFile, nameView, moveSection, save,
         filterChoices: { kinds: MEASUREMENT_KINDS, owners: OWNERS, sections: SECTION_KINDS }
     };
 }

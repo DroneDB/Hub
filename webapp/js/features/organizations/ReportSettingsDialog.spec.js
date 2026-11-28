@@ -179,6 +179,44 @@ describe('ReportSettingsDialog: saving', () => {
     });
 });
 
+describe('ReportSettingsDialog: opened from a report (Edit template)', () => {
+    beforeEach(() => {
+        server.templates.push({ ...cloneSettings(DEFAULT_TEMPLATE), id: 'site-inspection', name: 'Site inspection' });
+    });
+
+    it('opens on the template it is given, and on the first one when that template is not there', async () => {
+        await render({ templateId: 'site-inspection' });
+        expect(field('report-template-name').value).toBe('Site inspection');
+        wrapper.unmount();
+        await render({ templateId: 'deleted-one' });
+        expect(field('report-template-name').value).toBe('Standard');
+    });
+
+    it('stays on the template the user picks after a save reads the settings again', async () => {
+        await render({ templateId: 'site-inspection' });
+        wrapper.findAllComponents(Select).find(c => c.props('inputId') === 'report-template-picker').vm.$emit('update:modelValue', 0);
+        await flushPromises();
+        await type('report-template-header', 'Acme');
+        await save();
+        expect(field('report-template-name').value).toBe('Standard');
+    });
+
+    it('says it changed after a save and after a logo, not after an edit that is not saved', async () => {
+        await render({ templateId: 'site-inspection' });
+        await type('report-template-header', 'Acme');
+        expect(wrapper.emitted('changed')).toBeUndefined();
+        await save();
+        expect(wrapper.emitted('changed')).toHaveLength(1);
+        await click(field('report-template-logo-custom'));
+        const input = body().querySelector('input[type="file"]');
+        Object.defineProperty(input, 'files', { value: [new File(['x'], 'photo.jpg', { type: 'image/jpeg' })] });
+        input.dispatchEvent(new Event('change'));
+        await flushPromises();
+        expect(registry.putFormData).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted('changed')).toHaveLength(2);
+    });
+});
+
 describe('ReportSettingsDialog: summary charts', () => {
     const chartSelect = () => wrapper.findAllComponents(Select).find(c => c.props('inputId') === 'report-template-breakdown');
 

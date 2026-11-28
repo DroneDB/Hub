@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
     DEFAULT_SCHEMA, DEFAULT_TEMPLATE, BREAKDOWN_CHARTS, breakdownChartOf, LIMITS, REPORT_SWATCHES, SECTION_KINDS, ID_PATTERN,
-    datasetReportSettings, orgReportSettings, saveOrgReportSettings, uploadTemplateLogo, deleteTemplateLogo,
+    datasetReportSettings, canEditReportSettings, orgReportSettings, saveOrgReportSettings, uploadTemplateLogo, deleteTemplateLogo,
     templateLogoUrl, datasetTemplateLogoUrl, isEndpointMissing,
     idFromName, newTemplate, newSchemaEntry, canRemoveEntry, canAddEntry,
     isColour, readableTextOn, logoProblem, templateProblems, schemaProblems, settingsProblems,
@@ -70,6 +70,32 @@ describe('datasetReportSettings', () => {
         const registry = { getRequest: vi.fn(async () => { throw new ApiError('no', status); }) };
         await expect(datasetReportSettings(dataset(registry))).rejects.toMatchObject({ status });
         expect(isEndpointMissing(new ApiError('x', status))).toBe(false);
+    });
+});
+
+describe('canEditReportSettings', () => {
+    const datasetOf = (info, admin = false) => {
+        const registry = { Organization: vi.fn(() => ({ info })), isAdmin: () => admin };
+        return { registry, org: 'acme' };
+    };
+
+    it('reads the organization of the dataset: its administrators can edit the settings', async () => {
+        const info = vi.fn(async () => ({ slug: 'acme', permissions: { canManageMembers: true } }));
+        const ds = datasetOf(info);
+        expect(await canEditReportSettings(ds)).toBe(true);
+        expect(ds.registry.Organization).toHaveBeenCalledWith('acme');
+        // A look-up the user did not start: a 401 does not send them to the login
+        expect(info).toHaveBeenCalledWith({ skipUnauthorized: true });
+    });
+
+    it('is false for a member who is not an administrator, true for an administrator of the instance', async () => {
+        const reader = async () => ({ slug: 'acme', permissions: { canManageMembers: false } });
+        expect(await canEditReportSettings(datasetOf(reader))).toBe(false);
+        expect(await canEditReportSettings(datasetOf(reader, true))).toBe(true);
+    });
+
+    it('is false when the organization cannot be read', async () => {
+        expect(await canEditReportSettings(datasetOf(async () => { throw new ApiError('Forbidden', 403); }))).toBe(false);
     });
 });
 

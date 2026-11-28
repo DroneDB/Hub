@@ -49,6 +49,18 @@ export function organizationRow(org) {
     };
 }
 
+/**
+ * Whether the user administers an organization, and so changes its settings (the report settings among them): its
+ * permissions say so, or the user is an administrator of the instance. An instance whose organizations are read-only
+ * has no administrator of them.
+ * @param {{ permissions?: { canManageMembers?: boolean } | null } | null | undefined} org  the server's organization
+ * @param {boolean} [instanceAdmin]
+ */
+export function administersOrganization(org, instanceAdmin = false) {
+    if (/** @type {any} */ (globalThis).HubOptions?.readOnlyOrgs) return false;
+    return !!org?.permissions?.canManageMembers || instanceAdmin;
+}
+
 /** @param {unknown} value @returns {value is number} */
 const known = value => typeof value === 'number' && Number.isFinite(value);
 

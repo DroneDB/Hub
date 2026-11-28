@@ -207,7 +207,7 @@ import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
 import { countOf, formatDateTime, formatTimeAgo } from '@/libs/format';
 import { actionsOfAnyRow } from '@/libs/rowActions';
-import { ORG_SORT_OPTIONS, organizationRow, sortOrganizations } from '@/libs/organizationList';
+import { ORG_SORT_OPTIONS, administersOrganization, organizationRow, sortOrganizations } from '@/libs/organizationList';
 import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight } from '@/composables/usePageSize';
 import { useStackedLayout } from '@/composables/useStackedLayout';
 import { stackedColumn, sortableHeaderPt, STACKED_TABLE_CLASS } from '@/libs/responsiveColumns';
@@ -720,7 +720,7 @@ export default {
         // The Registry refuses the writes of anyone but an administrator of the organization (or of the instance): the
         // report settings and the logo are theirs
         canAdministerOrg(org) {
-            return !this.readyOnly && (!!org.permissions?.canManageMembers || this.isAdmin);
+            return administersOrganization(org, this.isAdmin);
         },
 
         // The logo was sent or removed in the dialog: the row shows it now, whether or not Save follows

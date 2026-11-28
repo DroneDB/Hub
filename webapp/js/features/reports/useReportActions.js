@@ -66,9 +66,13 @@ export function useReportActions({ dataset, org, ds, dialogs, router, onChanged 
      * @returns {Promise<{ uid: string } | null>}
      */
     async function openEditor(entry, initial) {
+        // A change of the report settings from the editor (Edit template) shows too, even when the editor is cancelled
+        let settingsChanged = false;
         /** @type {{ uid: string } | null} */
-        const saved = await dialogs.open(ReportEditorDialog, { dataset, entry, initial, user: reg.getUsername() || '', choose });
-        if (saved) onChanged();
+        const saved = await dialogs.open(ReportEditorDialog, {
+            dataset, entry, initial, user: reg.getUsername() || '', choose, onSettingsChanged: () => { settingsChanged = true; }
+        });
+        if (saved || settingsChanged) onChanged();
         return saved;
     }
 

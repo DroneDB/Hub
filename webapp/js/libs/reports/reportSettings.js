@@ -22,6 +22,7 @@ import { SECTION_KINDS } from '@/libs/reports/reportDefinition';
 import { SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, BREAKDOWN_CHARTS, breakdownChartOf, cloneSettings } from '@/libs/reports/reportDefaults';
 import { DARK_TEXT, readableTextOnChannels } from '@/libs/readableText';
 import { LOGO_TYPES, logoProblem as logoFileProblem } from '@/libs/logoCheck';
+import { administersOrganization } from '@/libs/organizationList';
 
 export { SECTION_KINDS, SECTION_LABELS, DEFAULT_SCHEMA, DEFAULT_TEMPLATE, BREAKDOWN_CHARTS, breakdownChartOf, cloneSettings, LOGO_TYPES };
 
@@ -110,6 +111,21 @@ export async function datasetReportSettings(dataset) {
     } catch (e) {
         if (isEndpointMissing(e)) return defaultSettings();
         throw e;
+    }
+}
+
+/**
+ * Whether the user can change the report settings of the organization of a dataset: an administrator of it
+ * (administersOrganization). False when the organization cannot be read.
+ * @param {{ registry: any, org: string }} dataset
+ * @returns {Promise<boolean>}
+ */
+export async function canEditReportSettings(dataset) {
+    try {
+        const organization = await dataset.registry.Organization(dataset.org).info({ skipUnauthorized: true });
+        return administersOrganization(organization, !!dataset.registry.isAdmin?.());
+    } catch {
+        return false;
     }
 }
 
