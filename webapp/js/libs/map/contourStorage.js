@@ -5,8 +5,52 @@
  * persisted with all the other measurements via the existing toolbar Save
  * button. They carry `measurementType: "contour"` for downstream styling
  * and an `unsaved` boolean flag that lets the composable selectively wipe
- * just the in-memory draft on regeneration.
+ * just the in-memory draft on regeneration. A file holds saved contours only:
+ * the flag is never written, and a contour keeps its type and its level
+ * (CONTOUR_PROPERTIES) through a save.
  */
+
+import { newId } from '@/libs/ids';
+import { formatRasterValue } from '@/libs/map/rasterUnit';
+
+/**
+ * What a contour has besides the properties of every measurement: its level, the unit of the level (the raster's,
+ * not a unit of length), the step between the levels and whether it is a major line (every 5th level).
+ */
+export const CONTOUR_PROPERTIES = Object.freeze(['elev', 'unit', 'interval', 'isMajor']);
+
+/** The flag of a contour that is not saved yet: generating the contours again replaces those. */
+export const UNSAVED_FLAG = 'unsaved';
+
+/**
+ * Whether a feature of a file is a contour line: its type says so, or it is a contour that an older Hub saved as a
+ * length (a line with the level and the major flag that only the Contours tool writes).
+ * @param {any} feature  a GeoJSON feature
+ */
+function isStoredContour(feature) {
+    const props = feature && typeof feature === 'object' ? feature.properties : null;
+    if (!props || typeof props !== 'object') return false;
+    if (props.measurementType === 'contour') return true;
+    return props.measurementType === 'length' && feature.geometry?.type === 'LineString'
+        && typeof props.elev === 'number' && typeof props.isMajor === 'boolean';
+}
+
+/**
+ * The features of a file with every contour as a saved contour: of type contour, without the unsaved flag. An older
+ * Hub saved a contour as a length, with the flag; a read repairs it, and the next save writes it so.
+ * @param {any[]} features
+ * @returns {any[]}  the same array when no feature needed it
+ */
+export function withSavedContours(features) {
+    const needs = (/** @type {any} */ f) => isStoredContour(f) && (f.properties.measurementType !== 'contour' || UNSAVED_FLAG in f.properties);
+    if (!features.some(needs)) return features;
+    return features.map(f => {
+        if (!needs(f)) return f;
+        const properties = { ...f.properties, measurementType: 'contour' };
+        delete properties[UNSAVED_FLAG];
+        return { ...f, properties };
+    });
+}
 
 // Default elevation color ramp (low -> high). Mirrors a terrain palette so
 // users immediately recognize "low = blue/green, high = orange/white".
@@ -54,11 +98,16 @@ export function colorForElevation(elev, min, max) {
     return rampColor((elev - min) / (max - min));
 }
 
-function makeId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+/**
+ * The text of the label of a contour: its level in the unit of the raster ("162.00 m", "29.1 °C"), as the
+ * Raster Analysis panel writes a value of the raster. Null for a feature without a level.
+ * @param {{ elev?: unknown, unit?: unknown }} properties  the properties of the contour feature
+ * @returns {string|null}
+ */
+export function contourLevelText(properties) {
+    const elev = properties && properties.elev;
+    if (typeof elev !== 'number' || !Number.isFinite(elev)) return null;
+    return formatRasterValue(elev, typeof properties.unit === 'string' ? properties.unit : '');
 }
 
 /**
@@ -88,13 +137,13 @@ export function buildContourFeature(geometry, elev, extra = {}) {
         geometry,
         properties: {
             ...extra,
-            id: extra.id || makeId(),
+            id: extra.id || newId(),
             name,
             measurementType: 'contour',
             // Discriminator for the regeneration overwrite policy: only
             // features still flagged `unsaved` are removed when the user
             // generates a fresh batch.
-            unsaved: extra.unsaved !== undefined ? extra.unsaved : true,
+            [UNSAVED_FLAG]: extra.unsaved !== undefined ? extra.unsaved : true,
             elev,
             stroke,
             'stroke-width': isMajor ? 2 : 1,

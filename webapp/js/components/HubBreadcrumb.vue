@@ -1,0 +1,194 @@
+<template>
+    <nav v-if="crumbs.length > 0" class="hub-breadcrumb" aria-label="Breadcrumb">
+        <ol>
+            <li v-for="crumb in crumbs" :key="crumb.id" :class="{ 'is-current': crumb.current }">
+                <!-- The logo of the organization, before its name, which says it already -->
+                <OrgLogo v-if="crumb.image" class="crumb-logo" :org="crumb.image" size="sm" decorative />
+                <span v-if="crumb.current" class="crumb crumb-current" :title="crumb.title ?? crumb.label" aria-current="page">{{ crumb.label }}</span>
+                <RouterLink v-else-if="crumb.to" class="crumb crumb-link" :to="crumb.to" :title="crumb.label">{{ crumb.label }}</RouterLink>
+                <span v-else class="crumb" :title="crumb.label">{{ crumb.label }}</span>
+            </li>
+        </ol>
+        <!-- What the header shows about the page, after its name (the visibility of the dataset): it never shrinks,
+             the name is cut first -->
+        <div v-if="$slots.after" class="crumbs-after">
+            <slot name="after" />
+        </div>
+    </nav>
+</template>
+
+<script setup>
+/**
+ * HubBreadcrumb - where the user is, in the header: <organization> / <dataset>, on the pages of an
+ * organization, of a dataset and of its viewers, after the Organizations link of the main navigation, which is its
+ * root. Without that link (nobody is signed in, so the header has no main navigation), the trail starts with an
+ * Organizations crumb. Every crumb but the last is a link; the last one names the page (aria-current).
+ *
+ * The slugs come from the route (`org`, `ds`). The name of the organization is read here (the organization look-up, which
+ * the user did not ask for: it opts out of the global 401 redirect); the name of the dataset is the one the page
+ * puts in the dataset session (stores/datasetSession.js: the dataset page, and a viewer from the dataset info it reads),
+ * formatted as the tree shows it; its tooltip adds the tagline of the dataset. Until a name is known, and when it cannot be read (no access, an error), the crumb shows the
+ * slug; an organization the visitor has no access to is not a link, since the page would only refuse them. In a
+ * one-organization install the organization is home, so there is no Organizations crumb either.
+ *
+ * The crumb of an organization that has a logo shows it (crumb.image, from the same look-up), small, before the name.
+ *
+ * The `after` slot follows the trail, outside the part that is cut with an ellipsis (the header puts the visibility of
+ * the dataset there).
+ *
+ *   <HubBreadcrumb :org="$route.params.org" :ds="$route.params.ds" :home-in-nav="primaryNav.length > 0">
+ *       <template #after><VisibilityButton ... /></template>
+ *   </HubBreadcrumb>
+ */
+import { computed, ref, watch } from 'vue';
+import ddb from 'ddb';
+import reg from '@/libs/api/sharedRegistry';
+import { isForbidden, isUnauthorized } from '@/libs/ddb/apiError';
+import { homeLocation } from '@/libs/authRoutes';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
+import OrgLogo from '@/components/OrgLogo.vue';
+
+defineOptions({ name: 'HubBreadcrumb' });
+
+const props = defineProps({
+    /** Slug of the organization (the route's `org`); no breadcrumb without one */
+    org: { type: String, default: '' },
+    /** Slug of the dataset (the route's `ds`); the last crumb is the organization without one */
+    ds: { type: String, default: '' },
+    /** The main navigation of the header already links the list of organizations (it is the root of the trail): no Organizations crumb */
+    homeInNav: { type: Boolean, default: false }
+});
+
+const session = useDatasetSessionStore();
+
+// The organization asked for: its name and its logo, or why there is none
+const orgName = ref('');
+const orgLogoUrl = ref(null);
+const orgDenied = ref(false);
+let request = 0;
+
+watch(() => props.org, async org => {
+    const mine = ++request;
+    orgName.value = '';
+    orgLogoUrl.value = null;
+    orgDenied.value = false;
+    if (!org) return;
+    try {
+        const info = await reg.Organization(org).info({ skipUnauthorized: true });
+        if (mine === request) {
+            orgName.value = String(info?.name ?? '').trim();
+            orgLogoUrl.value = info?.logoUrl ?? null;
+        }
+    } catch (e) {
+        // No access (a visitor of a shared dataset of a private organization): the slug, and no link. Any other
+        // failure: the slug too, the page may still open
+        if (mine === request) orgDenied.value = isUnauthorized(e) || isForbidden(e);
+    }
+}, { immediate: true });
+
+// The name of the dataset as the tree shows it, from the page's root entry
+const datasetName = computed(() => (session.rootEntry && !session.unavailable ? ddb.utils.entryLabel(session.rootEntry) : ''));
+// Its tagline: the page shows no title block, so the tooltip of the dataset's crumb carries it
+const datasetTagline = computed(() => (session.rootEntry && !session.unavailable
+    ? String(session.rootEntry.properties?.meta?.tagline?.data ?? '').trim() : ''));
+
+const crumbs = computed(() => {
+    if (!props.org) return [];
+    const home = homeLocation();
+    /** @type {Array<{ id: string, label: string, title?: string, image?: { slug: string, name: string, logoUrl: string }, to?: import('vue-router').RouteLocationRaw, current?: boolean }>} */
+    const list = [];
+    if (home.name === 'Organizations' && !props.homeInNav) list.push({ id: 'organizations', label: 'Organizations', to: { name: 'Organizations' } });
+    list.push({
+        id: 'org',
+        label: orgName.value || props.org,
+        // Only an organization that has a logo shows one: the initials of every other would fill the trail
+        image: orgLogoUrl.value ? { slug: props.org, name: orgName.value || props.org, logoUrl: orgLogoUrl.value } : undefined,
+        to: orgDenied.value ? undefined : { name: 'Datasets', params: { org: props.org } },
+        current: !props.ds
+    });
+    if (props.ds) {
+        const label = datasetName.value || props.ds;
+        list.push({ id: 'ds', label, title: datasetTagline.value ? `${label} — ${datasetTagline.value}` : label, current: true });
+    }
+    return list;
+});
+</script>
+
+<style scoped>
+/* The trail, then what follows it (the visibility): the trail shrinks, what follows does not */
+.hub-breadcrumb {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    min-width: 0;
+}
+
+/* The text size of the header (its links and buttons): one size in the bar */
+ol {
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    align-items: center;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--ddb-font-size-ui);
+}
+
+.crumbs-after {
+    display: flex;
+    flex: none;
+    align-items: center;
+}
+
+li {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.crumb-logo {
+    margin-inline-end: var(--ddb-spacing-xs);
+}
+
+/* The separator is drawn, not text: a screen reader reads the list */
+li + li::before {
+    content: "/";
+    padding: 0 var(--ddb-spacing-xs);
+    color: var(--ddb-text-secondary);
+}
+
+.crumb {
+    min-width: 0;
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The page's own name takes the room the links leave */
+.is-current {
+    flex: 1 1 auto;
+}
+
+.is-current .crumb {
+    max-width: none;
+}
+
+.crumb-link {
+    color: var(--ddb-text-secondary);
+    text-decoration: none;
+}
+
+.crumb-link:hover {
+    color: var(--ddb-text);
+    text-decoration: underline;
+}
+
+.crumb-current {
+    color: var(--ddb-text);
+    font-weight: 600;
+}
+</style>

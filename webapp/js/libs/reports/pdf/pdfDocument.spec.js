@@ -1,0 +1,438 @@
+import { describe, it, expect } from 'vitest';
+import { buildPdfDocument, CONTENTS_TITLE } from '@/libs/reports/pdf/pdfDocument';
+import { figureBox } from '@/libs/reports/pdf/pdfLayout';
+import { qrCode } from '@/libs/qr';
+import { ORIGIN, REPORT_URL, JPEG_URL, fullAssets, nodesOf, noAssets, options, pdfModel, textOf, textsOf, threeItems } from '@/libs/reports/pdf/pdfDocument.fixtures';
+import { definitionOf, mapFeature } from '@/libs/reports/reportModel.fixtures';
+
+const build = (model, assets) => buildPdfDocument(model, options(model, assets));
+const headings = content => nodesOf(content).filter(n => ['h1', 'h2', 'h3', 'coverTitle', 'coverSubtitle', 'itemEntry'].includes(n.style));
+const qrNodes = content => nodesOf(content).filter(n => typeof n.svg === 'string');
+
+describe('the page', () => {
+    it('is A4 portrait for a template that says so', () => {
+        const definition = build(pdfModel({ templateExtra: { paper: 'A4', orientation: 'portrait' } }));
+        expect(definition.pageSize).toBe('A4');
+        expect(definition.pageOrientation).toBe('portrait');
+    });
+
+    it('is Letter landscape for a template that says so', () => {
+        const definition = build(pdfModel({ templateExtra: { paper: 'Letter', orientation: 'landscape' } }));
+        expect(definition.pageSize).toBe('LETTER');
+        expect(definition.pageOrientation).toBe('landscape');
+    });
+
+    it('has the margins that leave room for the header and the footer', () => {
+        const [left, top, right, bottom] = build(pdfModel()).pageMargins;
+        expect(top).toBeGreaterThanOrEqual(60);
+        expect(bottom).toBeGreaterThanOrEqual(50);
+        expect(left).toBe(right);
+    });
+
+    it('is set in Roboto, which the PDF embeds', () => {
+        expect(build(pdfModel()).defaultStyle.font).toBe('Roboto');
+    });
+
+    it('is titled with the title of the report', () => {
+        expect(build(pdfModel()).info.title).toBe('Inspection');
+    });
+});
+
+describe('the order of the sections', () => {
+    it('has the cover before the contents whatever the definition says: the band of the cover is drawn on the first page', () => {
+        const definition = definitionOf(['a.geojson'], { sections: [{ kind: 'summary', enabled: true }, { kind: 'cover', enabled: true }, { kind: 'items', enabled: true }] });
+        const model = pdfModel({ input: { definition } });
+        const order = headings(build(model).content).map(n => n.style === 'coverTitle' ? 'cover' : textOf(n));
+        expect(order[0]).toBe('cover');
+        expect(order.indexOf(CONTENTS_TITLE)).toBe(1);
+        expect(order.indexOf('Summary')).toBeGreaterThan(order.indexOf(CONTENTS_TITLE));
+    });
+});
+
+describe('the header and the footer', () => {
+    it('has the logo, the title and the header text of the template in the header of every page', () => {
+        const model = pdfModel();
+        const header = build(model, fullAssets(model)).header(3, 9);
+        const nodes = nodesOf(header);
+        expect(nodes.some(n => n.image === JPEG_URL)).toBe(true);
+        expect(textsOf(header)).toEqual(['Inspection', 'ACME Surveys']);
+    });
+
+    it('has the logo on the cover too, above the title, as the cover of the page has it', () => {
+        const model = pdfModel({ input: { brandingLogoUrl: '/images/acme.svg' } });
+        expect(model.sections[0].blocks[0].type).toBe('logo');
+        const content = build(model, fullAssets(model)).content;
+        const nodes = nodesOf(content);
+        const logo = nodes.findIndex(n => n.image === JPEG_URL);
+        const title = nodes.findIndex(n => n.style === 'coverTitle');
+        expect(logo).toBeGreaterThanOrEqual(0);
+        expect(logo).toBeLessThan(title);
+        // A logo that could not be read leaves the cover without one, and the PDF is still made
+        expect(nodesOf(build(model, noAssets()).content).some(n => n.image)).toBe(false);
+    });
+
+    it('has no header on the cover, which has a top of its own', () => {
+        const model = pdfModel();
+        expect(build(model, fullAssets(model)).header(1, 9)).toBeNull();
+        // A report with no cover has the header on its first page
+        const noCover = { ...model, sections: model.sections.filter(s => s.kind !== 'cover') };
+        expect(build(noCover, fullAssets(model)).header(1, 9)).not.toBeNull();
+    });
+
+    it('has no logo when the report has none, and no header text when the template has none', () => {
+        const model = pdfModel({ templateExtra: { headerText: '' } });
+        const header = build(model).header(2, 2);
+        expect(nodesOf(header).some(n => n.image)).toBe(false);
+        expect(textsOf(header)).toEqual(['Inspection']);
+    });
+
+    it('has the footer text and "n / total" in the footer, for the page and the page count the library gives', () => {
+        const footer = build(pdfModel()).footer(2, 7);
+        expect(textsOf(footer).map(t => t.trim())).toEqual(['Confidential', '2 / 7']);
+        expect(textsOf(build(pdfModel()).footer(7, 7)).map(t => t.trim())).toContain('7 / 7');
+    });
+
+    it('has the page number alone when the template has no footer text', () => {
+        const footer = build(pdfModel({ templateExtra: { footerText: '' } })).footer(1, 3);
+        expect(textsOf(footer).map(t => t.trim())).toEqual(['1 / 3']);
+    });
+});
+
+describe('the contents', () => {
+    it('has a table of contents after the cover, listing the sections and the item pages', () => {
+        const { content } = build(pdfModel());
+        const nodes = nodesOf(content);
+        const tocIndex = content.findIndex(n => n.toc);
+        expect(tocIndex).toBeGreaterThan(0);
+        // its title, then the bar of the accent colour, then the list
+        expect(textOf(content[tocIndex - 2])).toBe(CONTENTS_TITLE);
+        // the cover is before it and is not listed; each other section and each item is
+        const listed = nodes.filter(n => n.tocItem).map(textOf);
+        expect(listed).toEqual(expect.arrayContaining(['Summary', 'Overview map', 'Tables', 'Items', 'Notes', '1 Point 1', '2 Line 2', '3 Gate']));
+        expect(listed).not.toContain('Inspection');
+    });
+
+    it('starts with the contents when the cover is switched off', () => {
+        const model = pdfModel({ input: {} });
+        const noCover = { ...model, sections: model.sections.filter(s => s.kind !== 'cover') };
+        const { content } = build(noCover);
+        expect(textOf(content[0])).toBe(CONTENTS_TITLE);
+        expect(content[2].toc).toBeDefined();
+    });
+
+    it('has no contents when there is nothing to list', () => {
+        const model = pdfModel();
+        const onlyCover = { ...model, sections: model.sections.filter(s => s.kind === 'cover') };
+        expect(build(onlyCover).content.some(n => n.toc)).toBe(false);
+    });
+
+    it('starts every section and the contents on a page of its own, and each item on one too', () => {
+        const { content } = build(pdfModel());
+        // contents, then summary, overview, tables, items, notes
+        expect(content.filter(n => n.pageBreak === 'before' && !n.id)).toHaveLength(6);
+        // an item heading starts a page except the first, which follows the heading of its section on its page
+        const items = nodesOf(content).filter(n => n.tocItem && n.id);
+        expect(items.map(n => Boolean(n.pageBreak))).toEqual([false, true, true]);
+    });
+});
+
+describe('the sections and their values: the page and the PDF are the same report', () => {
+    it('has the headings of the model in the order of the model', () => {
+        const model = pdfModel({ features: threeItems({ unnumbered: true }) });
+        const expected = model.sections.flatMap(s => s.blocks).filter(b => b.type === 'heading').map(b => b.text);
+        const got = headings(build(model).content).map(textOf);
+        // the contents title is the PDF's own
+        expect(got.filter(t => t !== CONTENTS_TITLE)).toEqual(expected);
+    });
+
+    it('has the items in the order of the model, the unnumbered last', () => {
+        const model = pdfModel({ features: threeItems({ unnumbered: true }) });
+        const expected = model.items.map(i => `${i.displayRef} ${i.name}`.trim());
+        const got = nodesOf(build(model).content).filter(n => n.tocItem && n.style === 'itemEntry').map(textOf);
+        expect(got).toEqual(expected);
+        expect(got.at(-1)).toMatch(/Draft$/);
+    });
+
+    it('writes every cell of every table as the model wrote it', () => {
+        const model = pdfModel();
+        const tables = model.sections.flatMap(s => s.blocks).filter(b => b.type === 'table');
+        expect(tables.length).toBeGreaterThan(0);
+        const pdfTables = nodesOf(build(model).content).filter(n => n.table?.headerRows === 1);
+        expect(pdfTables).toHaveLength(tables.length);
+        tables.forEach((table, i) => {
+            const [header, ...rows] = pdfTables[i].table.body;
+            expect(header.map(textOf)).toEqual(table.columns.map(c => c.label));
+            rows.forEach((row, r) => {
+                expect(row.map(textOf)).toEqual(table.columns.map(c => `${table.rows[r].cells[c.key]}${table.rows[r].note && c.key === 'name' ? ` (${table.rows[r].note})` : ''}`));
+            });
+        });
+    });
+
+    it('writes the key values of every block as the model wrote them; the reference, name, category, severity and status of an item are in its header', () => {
+        const model = pdfModel({ features: threeItems().map((f, i) => ({ ...f, properties: { ...f.properties, category: 'defect', severity: 'high', status: i ? 'open' : 'resolved' } })) });
+        const all = textsOf(build(model).content).map(t => t.replace(/\u00a0/g, ' ').trim());
+        const inHeader = new Set(['reference', 'name', 'category', 'severity', 'status']);
+        for (const block of model.sections.flatMap(s => s.blocks).filter(b => b.type === 'keyValue')) {
+            for (const row of block.rows) {
+                if (row.key && inHeader.has(row.key)) {
+                    // A status is its badge: "Open (overdue)" is "Open" and the Overdue badge
+                    expect(all).toContain(row.value.replace(/ \(overdue\)$/, ''));
+                    continue;
+                }
+                expect(all).toContain(row.label);
+                expect(all).toContain(row.value);
+            }
+        }
+    });
+
+    it('draws the header card of an item: its reference on its colour, its name and kind, and its badges', () => {
+        const model = pdfModel({ features: threeItems().map(f => ({ ...f, properties: { ...f.properties, category: 'defect', status: 'open', dueDate: '2020-01-01' } })) });
+        const heading = model.sections.flatMap(s => s.blocks).find(b => b.type === 'heading' && b.itemId);
+        const nodes = nodesOf(build(model).content);
+        const square = nodes.find(n => n.text === heading.ref && n.fillColor === heading.colour);
+        expect(square).toBeDefined();
+        expect(nodes.some(n => n.text === heading.name)).toBe(true);
+        expect(nodes.some(n => n.text === heading.kind)).toBe(true);
+        const badges = nodes.flatMap(n => (Array.isArray(n.text) ? n.text : [])).filter(run => run.background && run.bold).map(run => run.text.replace(/\u00a0/g, '').trim());
+        expect(badges).toEqual(expect.arrayContaining(['Defect', 'Open', 'Overdue']));
+    });
+
+    it('writes the summary counts and totals as the page does', () => {
+        const model = pdfModel();
+        const summary = model.sections.find(s => s.kind === 'summary').blocks.find(b => b.type === 'summaryStats');
+        const all = textsOf(build(model).content);
+        expect(all).toContain(summary.headline);
+        for (const group of summary.groups) {
+            expect(all).toContain(group.title);
+            // A count is a bar between its name and its number
+            for (const count of group.counts) {
+                expect(all).toContain(count.label);
+                expect(all).toContain(String(count.count));
+            }
+        }
+    });
+
+    it('draws a donut per group of counts for a template that chose them, with the legend the page has, and no donut for bars', () => {
+        const donutsOf = content => nodesOf(content).filter(n => typeof n.svg === 'string' && n.svg.includes('stroke-linejoin'));
+        const model = pdfModel({ templateExtra: { breakdownChart: 'donuts' } });
+        const summary = model.sections.find(s => s.kind === 'summary').blocks.find(b => b.type === 'summaryStats');
+        const content = build(model).content;
+        const donuts = donutsOf(content);
+        expect(donuts).toHaveLength(summary.groups.length);
+        summary.groups.forEach((group, index) => {
+            const svg = donuts[index].svg;
+            expect(svg.match(/<path /g)).toHaveLength(group.counts.length);
+            for (const count of group.counts) expect(svg).toContain(`fill="${count.colour}"`);
+            expect(svg).toContain(`>${group.middle.number}</text>`);
+            expect(svg).toContain(`>${group.middle.word}</text>`);
+        });
+        const all = textsOf(content);
+        for (const group of summary.groups) {
+            expect(all).toContain(group.title);
+            for (const count of group.counts) {
+                expect(all).toContain(count.label);
+                expect(all).toContain(String(count.count));
+                expect(all).toContain(count.share);
+            }
+        }
+        expect(donutsOf(build(pdfModel()).content)).toEqual([]);
+    });
+
+    it('writes the titles of the summary groups, the headline and the sign-off the model gives, as they are', () => {
+        const model = pdfModel();
+        const blocks = model.sections.flatMap(s => s.blocks);
+        const summary = blocks.find(b => b.type === 'summaryStats');
+        const signOff = blocks.find(b => b.type === 'signOff');
+        const renamed = {
+            ...model,
+            sections: model.sections.map(section => ({
+                ...section,
+                blocks: section.blocks.map(b => (b === summary
+                    ? { ...b, headline: 'Three things', groups: b.groups.map(g => ({ ...g, title: `Per ${g.key}` })) }
+                    : b === signOff ? { ...b, byline: 'Signed for ACME' } : b))
+            }))
+        };
+        const all = textsOf(build(renamed).content);
+        expect(all).toContain('Three things');
+        expect(all).toContain('Per kind');
+        expect(all).not.toContain('By kind');
+        expect(all).toContain('Signed for ACME');
+    });
+
+    it('has the sections the model has, and none when the definition switches them off', () => {
+        const model = pdfModel();
+        const without = { ...model, sections: model.sections.filter(s => s.kind !== 'tables') };
+        expect(textsOf(build(without).content)).not.toContain('Tables');
+        expect(textsOf(build(model).content)).toContain('Tables');
+    });
+
+    it('links the first column of a table to the page of the item', () => {
+        const nodes = nodesOf(build(pdfModel()).content);
+        const links = nodes.filter(n => n.linkToDestination);
+        expect(links.length).toBeGreaterThan(0);
+        const destinations = new Set(nodes.filter(n => n.id).map(n => n.id));
+        for (const link of links) expect(destinations.has(link.linkToDestination)).toBe(true);
+    });
+
+    it('does not link to a page the report does not have', () => {
+        const model = pdfModel();
+        const withoutItems = { ...model, sections: model.sections.filter(s => s.kind !== 'items') };
+        expect(nodesOf(build(withoutItems).content).filter(n => n.linkToDestination)).toEqual([]);
+    });
+
+    it('gives each item page one destination, even when two items share an anchor', () => {
+        const model = pdfModel();
+        const items = model.sections.find(s => s.kind === 'items');
+        const copy = items.blocks.find(b => b.type === 'heading' && b.anchor);
+        const twice = { ...model, sections: model.sections.map(s => (s === items ? { ...s, blocks: [...s.blocks, { ...copy }] } : s)) };
+        const ids = nodesOf(build(twice).content).filter(n => n.id).map(n => n.id);
+        expect(new Set(ids).size).toBe(ids.length);
+    });
+});
+
+describe('the QR codes', () => {
+    it('are one for the live page on the cover and one for each numbered item', () => {
+        const model = pdfModel({ features: threeItems({ unnumbered: true }) });
+        const qr = model.sections.flatMap(s => s.blocks).filter(b => b.type === 'qr');
+        expect(qr.map(b => b.url)).toEqual([REPORT_URL, `${REPORT_URL}#item-a1`, `${REPORT_URL}#item-a2`, `${REPORT_URL}#item-a3`]);
+        // the item that is not numbered has none
+        expect(qrNodes(build(model).content)).toHaveLength(4);
+    });
+
+    it('encode the address of the item on the live page, not a viewer route', () => {
+        const model = pdfModel({ links: { viewerUrl: item => `/r/acme/site/views/v?item=${item.id}` } });
+        const definition = build(model);
+        const svgs = qrNodes(definition.content).map(n => n.svg);
+        const expected = [REPORT_URL, ...model.items.map(i => `${REPORT_URL}#item-${i.id}`)].map(url => qrCode(url).path);
+        expect(svgs.map(svg => /d="([^"]+)"/.exec(svg)[1])).toEqual(expected);
+        const viewer = qrCode('/r/acme/site/views/v?item=a1').path;
+        expect(svgs.every(svg => !svg.includes(viewer))).toBe(true);
+    });
+
+    it('are made only for an address on the origin of the Hub', () => {
+        const model = pdfModel({ links: { reportUrl: 'https://evil.example/r/x', anchorUrl: item => `https://evil.example/r/x#item-${item.id}` } });
+        const content = build(model).content;
+        expect(qrNodes(content)).toHaveLength(0);
+        // the address is still written, so that nothing is hidden
+        expect(textsOf(content)).toContain('https://evil.example/r/x');
+    });
+
+    it('are left out, with the address written, for an address too long for a code: the PDF is still made', () => {
+        const model = pdfModel({ links: { reportUrl: `${ORIGIN}/r/acme/site/reports/r_k3x9q2m7?${'x'.repeat(3000)}`, anchorUrl: item => `${ORIGIN}/r/acme/site/reports/r_k3x9q2m7?${'y'.repeat(3000)}#item-${item.anchorId}` } });
+        let definition;
+        expect(() => { definition = build(model); }).not.toThrow();
+        expect(qrNodes(definition.content)).toHaveLength(0);
+        const written = textsOf(definition.content).join('\n').replaceAll('\u200b', '');
+        expect(written).toContain('x'.repeat(3000));
+        expect(written).toContain('y'.repeat(3000));
+    });
+
+    it('are left out only for the item whose address is too long: the cover and the other items keep theirs', () => {
+        const long = `${REPORT_URL}?${'z'.repeat(3000)}`;
+        const model = pdfModel({ links: { anchorUrl: item => (item.id === 'a2' ? long : `${REPORT_URL}#item-${item.anchorId}`) } });
+        expect(() => build(model)).not.toThrow();
+        expect(qrNodes(build(model).content)).toHaveLength(3);
+    });
+
+    it('are made for the origin the build is given, port and scheme included', () => {
+        const model = pdfModel();
+        expect(qrNodes(buildPdfDocument(model, { assets: noAssets(), qr: qrCode, origin: 'http://hub.example' }).content)).toHaveLength(0);
+        expect(qrNodes(buildPdfDocument(model, { assets: noAssets(), qr: qrCode, origin: ORIGIN }).content).length).toBeGreaterThan(0);
+    });
+});
+
+describe('the images', () => {
+    it('are the figures that were prepared, within the box of their block, and the text of the block under them', () => {
+        const model = pdfModel();
+        const assets = fullAssets(model);
+        const nodes = nodesOf(build(model, assets).content);
+        const images = nodes.filter(n => n.image === JPEG_URL);
+        const snapshots = model.sections.flatMap(s => s.blocks).filter(b => b.type === 'mapSnapshot');
+        expect(images.length).toBeGreaterThanOrEqual(snapshots.length);
+        const overview = model.sections.find(s => s.kind === 'overview').blocks.find(b => b.type === 'mapSnapshot');
+        const box = figureBox({ contentWidth: 515.28, contentHeight: 715.89 }, overview);
+        const drawn = images.find(n => Math.abs(n.fit[0] - box.widthPt) < 1);
+        expect(drawn).toBeTruthy();
+        expect(textsOf(build(model, assets).content)).toContain(overview.alt);
+    });
+
+    it('are rendered no larger than 2000 px on the long side, however wide the page', () => {
+        const model = pdfModel({ templateExtra: { paper: 'Letter', orientation: 'landscape' } });
+        for (const block of model.sections.flatMap(s => s.blocks).filter(b => b.type === 'mapSnapshot' || b.type === 'chart')) {
+            const box = figureBox({ contentWidth: 712, contentHeight: 486 }, block);
+            expect(Math.max(box.widthPx, box.heightPx)).toBeLessThanOrEqual(2000);
+        }
+    });
+
+    it('show the text of a figure that could not be made, and its note', () => {
+        const model = pdfModel();
+        const assets = noAssets();
+        const snapshot = model.sections.flatMap(s => s.blocks).find(b => b.type === 'mapSnapshot');
+        assets.figures.set(snapshot, { image: null, note: 'Snapshot not available: boom' });
+        const texts = textsOf(build(model, assets).content);
+        expect(texts).toContain(`${snapshot.alt} - Snapshot not available: boom`);
+    });
+
+    it('print the note of the model and the note of the renderer under a figure', () => {
+        const model = pdfModel({ input: { coverView: { deleted: true } } });
+        const assets = noAssets();
+        const overview = model.sections.find(s => s.kind === 'overview').blocks.find(b => b.type === 'mapSnapshot');
+        expect(overview.note).toContain('The cover view was deleted');
+        assets.figures.set(overview, { image: { dataUrl: JPEG_URL, width: 10, height: 5 }, note: 'Basemap not shown: provider does not allow export' });
+        const texts = textsOf(build(model, assets).content);
+        expect(texts).toContain(`${overview.alt} - ${overview.note} - Basemap not shown: provider does not allow export`);
+    });
+
+    it('print a note once when the renderer answers with the note of the model', () => {
+        const model = pdfModel({ features: [mapFeature('l1', '1', 'profile', { type: 'LineString', coordinates: [[11, 45], [11.001, 45]] })] });
+        const chart = model.sections.flatMap(s => s.blocks).find(b => b.type === 'chart');
+        expect(chart.note).toBe('No elevation layer in the cover view');
+        const assets = noAssets();
+        assets.figures.set(chart, { image: null, note: chart.note });
+        const texts = textsOf(build(model, assets).content);
+        expect(texts).toContain(`${chart.alt} - ${chart.note}`);
+        expect(texts).not.toContain(`${chart.note} - ${chart.note}`);
+    });
+
+    it('print the note of the model when the renderer has none', () => {
+        const model = pdfModel({ input: { coverView: { deleted: true } } });
+        const overview = model.sections.find(s => s.kind === 'overview').blocks.find(b => b.type === 'mapSnapshot');
+        expect(textsOf(build(model, noAssets()).content)).toContain(`${overview.alt} - ${overview.note}`);
+    });
+
+    it('show a photo that could not be read as "Missing photo" with its path, and keep its caption', () => {
+        const model = pdfModel();
+        const texts = textsOf(build(model, noAssets()).content);
+        expect(texts.join('\n')).toContain('Missing photo');
+        expect(texts.join('\n')).toContain('photos/a.jpg');
+        expect(texts).toContain('The crack');
+    });
+
+    it('put the photos in rows of three on a portrait page, and in rows of three under the map on a landscape one', () => {
+        const photos = Array.from({ length: 5 }, (_, i) => ({ path: `p/${i}.jpg`, source: 'dataset' }));
+        const features = [threeItems()[2]].map(f => ({ ...f, properties: { ...f.properties, photos } }));
+        const rowsOf = model => nodesOf(build(model, fullAssets(model)).content).filter(n => n.columns && n.columns.every(c => typeof c.width === 'number' && c.stack?.[0]?.image && c.stack[0].fit));
+        expect(rowsOf(pdfModel({ features })).map(r => r.columns.length)).toEqual([3, 2]);
+        expect(rowsOf(pdfModel({ features, templateExtra: { orientation: 'landscape' } })).map(r => r.columns.length)).toEqual([3, 2]);
+    });
+});
+
+describe('the text of the user', () => {
+    it('is text: the notes are not interpreted as HTML', () => {
+        const model = pdfModel();
+        const notes = model.sections.find(s => s.kind === 'notes');
+        const hostile = { ...model, sections: model.sections.map(s => (s === notes ? { ...s, blocks: [...s.blocks, { type: 'markdown', text: '<script>alert(1)</script> <img src=x onerror=alert(2)> **bold** [x](javascript:alert(3))' }] } : s)) };
+        const content = build(hostile).content;
+        // A run with no place to break has a zero-width space every 16 characters, which is no text
+        const texts = textsOf(content).join('\n').replaceAll('\u200b', '');
+        expect(texts).toContain('<script>alert(1)</script>');
+        expect(nodesOf(content).some(n => typeof n.link === 'string' && n.link.startsWith('javascript:'))).toBe(false);
+        expect(JSON.stringify(content)).not.toContain('"html"');
+    });
+
+    it('keeps the disclaimer of the template as text', () => {
+        const model = pdfModel({ templateExtra: { disclaimer: 'Not **legal** advice.' } });
+        const paragraphs = nodesOf(build(model).content).filter(n => Array.isArray(n.text) && n.text.some(run => run.text === 'legal' && run.bold));
+        expect(paragraphs.map(textOf)).toEqual(['Not legal advice.']);
+    });
+});

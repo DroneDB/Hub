@@ -2,56 +2,70 @@
     <div class="file-browser">
         <ContextMenu :items="contextMenu" />
         <div id="search-box">
-            <IconField style="flex: 1; min-width: 0;">
-                <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" @keyup.enter="search()" placeholder="Search files" style="width: 100%;" />
-            </IconField>
-            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" v-on:click="clearSearch()">
-                <i class="fa-solid fa-xmark"></i>
-            </div>
+            <!-- The shared search: its x and Escape empty it (clearSearch goes back to the tree) -->
+            <SearchField ref="searchField" v-model="filterRaw" label="Search files" style="flex: 1; min-width: 0;" @enter="search(filterRaw)" @clear="clearSearch()" />
             <Button
                 :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
                 :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
+                :aria-label="sortDescending ? 'Sorted Z to A, sort A to Z' : 'Sorted A to Z, sort Z to A'"
                 severity="secondary" text size="small"
-                @click="toggleSortDirection"
                 style="flex-shrink: 0;"
+                @click="toggleSortDirection"
             />
         </div>
-        <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
-            :getChildren="getChildren" :canWrite="canWrite" ref="treeView" />
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
+        <!-- What the search found: the number of results, and what they are for -->
+        <div v-if="!loading && searchStaticPaths != null && !noResults" class="search-summary" role="status">
+            {{ countOf(searchResultCount, 'result') }} for &ldquo;{{ filter }}&rdquo;
         </div>
-        <div v-if="!loading && noResults" class="no-results">
-            No files found
-        </div>
+        <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
+                  :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
+        <SavedViews v-if="(views.length || canWrite) && dataset && !loading && searchStaticPaths == null" :views="views"
+                    :dataset="dataset" :can-write="canWrite" @rename="v => $emit('renameView', v)"
+                    @delete="v => $emit('deleteView', v)" />
+        <ReportsList v-if="(reports.length || unreadableReports.length || canWrite) && dataset && !loading && searchStaticPaths == null"
+                     :reports="reports" :unreadable="unreadableReports" :dataset="dataset" :can-write="canWrite"
+                     @new="$emit('newReport')" @edit="r => $emit('editReport', r)" @duplicate="r => $emit('duplicateReport', r)"
+                     @delete="r => $emit('deleteReport', r)" />
+        <LoadingSpinner v-if="loading" />
+        <EmptyState v-if="!loading && noResults" title="No files found" items="files" :query="filter || ''" @clear="clearSearch(); $refs.searchField?.focus()" />
     </div>
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
-import TreeNode from './TreeNode.vue';
-import ContextMenu from '@/components/ContextMenu';
-import InputText from 'primevue/inputtext';
-import InputIcon from 'primevue/inputicon';
-import IconField from 'primevue/iconfield';
+import SavedViews from './SavedViews.vue';
+import ReportsList from './ReportsList.vue';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
+import SearchField from '@/components/SearchField.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import Button from 'primevue/button';
-import env from '@/dynamic/env';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
-import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator } from '@/libs/contextMenuItems';
+import { buildStandardContextMenu } from '@/libs/contextMenuItems';
+import { runShortcut } from '@/libs/dataset/explorerActions';
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
+import { deletedPathsOf } from '@/libs/dataset/deletedEntries';
+import { useRequestScope, isAbort } from '@/composables/useRequestScope';
+import { useLatestOnly } from '@/composables/useLatestOnly';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { usePreference } from '@/composables/usePreference';
+import { isUnauthorized } from '@/libs/ddb/apiError';
+import { countOf } from '@/libs/format';
 
 const { pathutils } = ddb;
 
+const isBlank = (text) => text == null || text.length === 0;
+
 export default {
     components: {
-        TreeView, ContextMenu, InputText, InputIcon, IconField, Button
+        LoadingSpinner,
+        TreeView, SavedViews, ReportsList, ContextMenu, SearchField, EmptyState, Button
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {
@@ -65,7 +79,25 @@ export default {
         dataset: {
             type: Object,
             default: null
+        },
+        // The dataset's saved views, listed under the tree (not while searching)
+        views: {
+            type: Array,
+            default: () => []
+        },
+        // The dataset's reports, and the stored items that cannot be read as one, listed under the saved views
+        reports: {
+            type: Array,
+            default: () => []
+        },
+        unreadableReports: {
+            type: Array,
+            default: () => []
         }
+    },
+    emits: ['upload', 'refresh', 'renameView', 'deleteView', 'newReport', 'editReport', 'duplicateReport', 'deleteReport', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'rescanEntries', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    setup() {
+        return { countOf, latestRefresh: useLatestOnly(), latestSelection: useLatestOnly(), requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
@@ -79,68 +111,38 @@ export default {
             component: self
         };
 
-        let contextMenu = [];
-
-        if (env.isElectron()) {
-            contextMenu = contextMenu.concat([{
-                label: "Open Item Location",
-                icon: 'fa-regular fa-folder-open',
-                isVisible: () => {
-                    return this.lastSelectedNode !== null;
-                },
-                click: () => {
-                    if (this.lastSelectedNode !== null) shell.showItemInFolder(this.lastSelectedNode.node.path);
-                }
-            }, {
-                type: 'separator'
-            }
-            ]);
-        }
-
-        contextMenu = contextMenu.concat([
-        {
-            label: 'Select All',
-            icon: 'fa-regular fa-square-check',
-            isVisible: () => { return this.lastSelectedNode === null; },
-            click: () => {
-                this.$emit('selectAll');
-            }
-        },
-        {
-            label: 'Create folder',
-            icon: 'fa-solid fa-folder',
-            isVisible: () => { return this.canWrite && this.lastSelectedNode === null; },
-            click: () => {
-                this.$emit('createFolder');
-            }
-        },
-        ...buildViewerMenuItems(ctx),
-        ...buildActionMenuItems(ctx),
-        deleteSeparator(ctx),
-        deleteItem(ctx),
-        ]);
+        // The same menu as the file list, for the selection of the tree (a right click selects the node under the
+        // pointer first); with nothing selected in the tree, the folder's (Select all selects the files of the list)
+        const contextMenu = buildStandardContextMenu(ctx);
 
         return {
             nodes: [],
             loading: true,
             lastSelectedNode: null,
             contextMenu,
+            // What is in the search box, and the query last searched (null: no search)
             filterRaw: null,
             filter: null,
             searchStaticPaths: null,
             noResults: false,
-            sortDescending: localStorage.getItem('sortDescending') === 'true',
         };
     },
+    computed: {
+        // The entries the search found (searchEntries of the dataset root, folders and files)
+        searchResultCount() {
+            const found = this.searchStaticPaths ? Object.values(this.searchStaticPaths)[0] : null;
+            return found ? found.length : 0;
+        }
+    },
     watch: {
+        // Search as the user types; Enter may have searched this text already
         filterRaw: debounce(function (newVal) {
-            this.filter = newVal;
-            if ((newVal == null || newVal.length === 0) && this.searchStaticPaths == null) return;
-            this.search();
+            if (isBlank(newVal) ? this.searchStaticPaths == null : newVal === this.filter) return;
+            this.search(newVal);
         }, 500),
         sortDescending: function () {
             if (this.searchStaticPaths != null) {
-                this.search();
+                this.search(this.filter);
             } else {
                 this.refreshNodes();
             }
@@ -148,8 +150,8 @@ export default {
     },
     mounted: async function () {
         // Forget a deleted/moved node so the context menu doesn't offer actions for it.
-        this._onDeleteEntries = (deleted) => {
-            if (this.lastSelectedNode && isPathRemoved(this.lastSelectedNode.node.entry.path, deleted)) {
+        this._onDeleteEntries = event => {
+            if (this.lastSelectedNode && isPathRemoved(this.lastSelectedNode.node.entry.path, deletedPathsOf(event))) {
                 this.lastSelectedNode = null;
             }
         };
@@ -168,54 +170,35 @@ export default {
             return liveSelectionEntries(tree ? tree.selectedNodes : null);
         },
 
-        // Emits an action (context menu or keyboard) for the current tree selection.
+        // Emits an action (context menu or keyboard) for the current tree selection: the page runs it on
+        // getTreeSelectionEntries(), whatever the file list shows (a folder of the tree is listed by what it holds).
         emitTreeAction: function (event, ...args) {
-            const entries = this.getTreeSelectionEntries();
-
             // Copy/cut carry the tree selection explicitly: the clipboard handlers
-            // otherwise read the explorer selection, which the tree never sets.
+            // otherwise read the selection of the file list.
             if (event === 'copySelectedItems' || event === 'cutSelectedItems') {
-                this.$emit(event, entries);
+                this.$emit(event, this.getTreeSelectionEntries());
                 return;
-            }
-
-            // For FileBrowser, some actions need to emit selectionChanged first
-            const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
-            if (needsSelectionSync.includes(event) && entries.length > 0) {
-                this.$emit('selectionChanged', entries);
             }
             this.$emit(event, ...args);
         },
 
-        // Ctrl/Cmd + C / X and Delete typed in the tree (routed by ViewDataset).
-        // Ctrl+V is handled by the document paste listener and pastes into the
-        // current folder.
+        // The accelerators of the action registry typed in the tree (routed by ViewDataset), on the
+        // tree selection: Ctrl/Cmd + C / X and Delete. Ctrl+V is the document paste listener's and
+        // pastes into the current folder.
         handleTreeKeyDown: function (e) {
-            const entries = this.getTreeSelectionEntries();
-            if (entries.length === 0) return;
+            runShortcut(e, {
+                getSelectedEntries: () => this.getTreeSelectionEntries(),
+                canWrite: this.canWrite,
+                emit: (event, ...args) => this.emitTreeAction(event, ...args)
+            });
+        },
 
-            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-                const k = (e.key || '').toLowerCase();
-                if (k === 'c') {
-                    e.preventDefault();
-                    this.emitTreeAction('copySelectedItems');
-                } else if (k === 'x' && this.canWrite) {
-                    e.preventDefault();
-                    this.emitTreeAction('cutSelectedItems');
-                }
-                return;
-            }
-
-            if (e.key === 'Delete' && this.canWrite
-                && !entries.some(f => f.entry.type === ddb.entry.type.DRONEDB)) {
-                e.preventDefault();
-                this.emitTreeAction('deleteSelecteditems');
-            }
+        reportLoadError: function (e) {
+            this.$emit('error', isUnauthorized(e) ? "You are not allowed to perform this action" : e, "Load entries");
         },
 
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
-            localStorage.setItem('sortDescending', this.sortDescending);
             // Watcher handles the refresh
         },
 
@@ -227,40 +210,26 @@ export default {
             await this.refreshNodes();
         },
 
-        search: async function () {
+        // Searches the tree for query (a blank one clears the search)
+        search: async function (query) {
 
-            if (this.filter == null || this.filter.length == 0) {
+            if (isBlank(query)) {
                 await this.clearSearch();
                 return;
             };
 
+            this.filter = query;
+
             try {
 
                 var rootPath = this.nodes[0].path;
-
-                var query = this.filter;
 
                 if (!query.includes('*') && !query.includes('*'))
                     query = "*" + query + "*";
 
                 const entries = await ddb.searchEntries(rootPath, query);
 
-                var res = sortEntriesDirectoriesFirst(
-                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path),
-                    this.sortDescending
-                )
-                    .map(entry => {
-                        const base = pathutils.basename(entry.path);
-                        return {
-                            icon: icons.getForType(entry.type, entry.path),
-                            label: base,
-                            path: pathutils.join(rootPath, entry.path),
-                            selected: false,
-                            entry,
-                            isExpandable: ddb.entry.isDirectory(entry)
-                        }
-                    });
+                const res = this.nodesOf(entries, entry => pathutils.join(rootPath, entry.path));
 
                 this.searchStaticPaths = {};
                 this.searchStaticPaths[rootPath] = res;
@@ -272,15 +241,27 @@ export default {
             } catch (e) {
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
 
                 this.nodes = [];
 
             }
+        },
+
+        // Tree nodes of listed entries: folders first, hidden entries left out
+        nodesOf: function (entries, pathOf) {
+            return sortEntriesDirectoriesFirst(
+                entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
+                e => pathutils.basename(e.path),
+                this.sortDescending
+            ).map(entry => ({
+                icon: icons.getForType(entry.type, entry.path),
+                label: pathutils.basename(entry.path),
+                path: pathOf(entry),
+                selected: false,
+                entry,
+                isExpandable: ddb.entry.isDirectory(entry)
+            }));
         },
 
         getChildren: async function (path) {
@@ -295,56 +276,43 @@ export default {
                     withHash: false,
                     recursive: true,
                     maxRecursionDepth: 1,
-                    stopOnError: false
+                    stopOnError: false,
+                    signal: this.requestSignal
                 });
 
-                var res = sortEntriesDirectoriesFirst(
-                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path),
-                    this.sortDescending
-                )
-                    .map(entry => {
-                        const base = pathutils.basename(entry.path);
-
-                        return {
-                            icon: icons.getForType(entry.type, entry.path),
-                            label: base,
-                            path: pathutils.join(path, base),
-                            selected: false,
-                            entry,
-                            isExpandable: ddb.entry.isDirectory(entry)
-                        }
-                    });
-                return res;
+                return this.nodesOf(entries, entry => pathutils.join(path, pathutils.basename(entry.path)));
             } catch (e) {
+                // The browser is gone: nobody waits for this listing
+                if (isAbort(e)) return [];
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
                 return [];
             }
 
         },
 
         refreshNodes: async function () {
+            // Two refreshes in a row (a rename and an upload end together) each read the roots: the newest one gives
+            // the tree, built apart and set once, so the roots are never listed twice
+            const current = this.latestRefresh();
 
             this.nodes = [];
             this.loading = true;
 
             const rootNodes = await this.rootNodes();
+            const nodes = [];
 
             for (let i = 0; i < rootNodes.length; i++) {
                 const n = rootNodes[i];
 
                 try {
                     const entry = n.entry || (await ddb.fetchEntries(n.path, {
-                        withHash: false
+                        withHash: false,
+                        signal: this.requestSignal
                     }))[0];
 
-                    this.nodes.push({
+                    nodes.push({
                         icon: n.icon,
                         label: n.label,
                         path: n.path,
@@ -354,15 +322,22 @@ export default {
                         entry
                     });
                 } catch (e) {
-                    if (e.message == "Unauthorized") {
-                        this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                    } else {
-                        this.$emit('error', e, "Load entries");
-                    }
+                    if (current()) this.reportLoadError(e);
                 }
             }
 
+            if (!current()) return;
+            this.nodes = nodes;
             this.loading = false;
+        },
+
+        /**
+         * Shows another name on the root of the tree, in place (the dataset was renamed): the tree is not
+         * read again, so what is expanded stays expanded.
+         */
+        setRootLabel: function (label) {
+            const root = this.nodes.find(n => n.root);
+            if (root && label && root.label !== label) root.label = label;
         },
 
         /**
@@ -371,10 +346,15 @@ export default {
          * tree level by level; if a folder along the way no longer exists, it
          * stops at the closest existing parent. When targetPath is null/empty
          * it navigates to the dataset root.
+         *
+         * It is a selection that ends late: a folder the user clicks meanwhile, or a newer refresh, takes over, and this
+         * one stops at its next step instead of putting its target over the newer choice.
          */
         refreshAndNavigate: async function (targetPath) {
+            const current = this.latestSelection();
             await this.refreshNodes();
             await this.$nextTick();
+            if (!current()) return;
 
             const rootTreeNodes = this.$refs.treeView?.$refs?.treeNodes;
             if (!rootTreeNodes || !rootTreeNodes.length) return;
@@ -386,6 +366,7 @@ export default {
             if (currentNode.isExpandable) {
                 await currentNode.expand();
                 await this.$nextTick();
+                if (!current()) return;
             }
 
             const segments = targetPath ? targetPath.split('/').filter(Boolean) : [];
@@ -402,6 +383,7 @@ export default {
                 if (next.isExpandable) {
                     await next.expand();
                     await this.$nextTick();
+                    if (!current()) return;
                 }
                 currentNode = next;
             }
@@ -410,6 +392,9 @@ export default {
         },
 
         handleSelectionChanged: async function (selectedNodes) {
+            // Folders load their children before the list follows: a later click that answers first wins, an earlier
+            // answer coming after it must not put its folder over the one clicked last
+            const current = this.latestSelection();
 
             // Keep track of nodes for "Open Item Location"
             this.lastSelectedNode = selectedNodes.length > 0 ? selectedNodes[selectedNodes.length - 1] : null;
@@ -425,9 +410,8 @@ export default {
                     // (or the arrow keys) expands a node in the tree.
                     if (!n.loadedChildren) {
                         await n.loadChildren();
+                        if (!current()) return;
                     }
-
-                    n.children.forEach(c => c.selected = false);
 
                     this.$emit('currentUriChanged', n.node.path);
                     this.$emit('selectionChanged', n.children);
@@ -440,7 +424,9 @@ export default {
             } else {
                 this.$emit('currentUriChanged', null);
             }
-            this.$emit('selectionChanged', selectedNodes.map(n => n.node));
+            // The items picked in the tree (a file, several nodes) are listed on their own, as the selection of the
+            // list: the actions of the page (its header, the toolbar, the keys) act on them
+            this.$emit('selectionChanged', selectedNodes.map(n => n.node), { selected: true });
 
         },
         handleOpen: function (component, sender) {
@@ -487,46 +473,17 @@ export default {
     gap: 0.25rem;
     width: 100%;
 
-    .box {
-        width: 100%;
-        position: relative;
-    }
-
     input {
         width: 100%;
         text-align: left;
     }
 
-    #cancel {
-        cursor: pointer;
-        visibility: hidden;
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        padding-right: 0.5rem;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
 
-        .icon {
-            margin: 0;
-        }
-    }
+}
 
-    #src {
-        margin-left: 0.5rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-    }
-
-    .no-results {
-        text-align: center;
-        padding: 1rem;
-        color: var(--ddb-text-muted);
-        font-style: italic;
-    }
+.search-summary {
+    padding: 0.25rem 0.5rem;
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
 }
 </style>

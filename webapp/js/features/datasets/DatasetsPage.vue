@@ -1,0 +1,1461 @@
+<template>
+    <div id="datasets" ref="page">
+        <!-- The list and the map take the whole width of the screen -->
+        <Message v-model="error" />
+
+        <!-- The organization is not there, or not for this user: the page state in place of the header, the toolbar and the table.
+             While the page loads, its frame is there with placeholder rows: the page size is measured on it -->
+        <ResourceState v-if="loadKind" :kind="loadKind" resource="organization" :name="$route.params.org" />
+        <div v-else class="ds-content">
+            <!-- Organization header -->
+            <div class="org-header">
+                <div class="org-header-layout">
+                    <!-- Left: identity -->
+                    <div class="org-identity">
+                        <div class="d-flex align-items-center gap-3">
+                            <!-- Its logo, or its initials; the name beside it says it -->
+                            <Skeleton v-if="loading && !orgInfo" width="3.5rem" height="3.5rem" border-radius="var(--ddb-radius-md)" class="org-logo-skeleton" />
+                            <OrgLogo v-else :org="headerOrg" size="lg" decorative />
+                            <div>
+                                <div class="org-title-row">
+                                    <!-- The pencil follows the last word of the name, whatever the lines it takes -->
+                                    <span class="org-title">
+                                        <Skeleton v-if="loading && !orgInfo" width="16rem" height="2rem" />
+                                        <h1 v-else class="my-0 org-name">{{ orgName }}</h1>
+                                        <Button v-if="canManageOrg" class="org-edit" severity="secondary" text rounded size="small" title="Edit Organization" aria-label="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
+                                    </span>
+                                    <div class="org-tags d-flex align-items-center gap-2 flex-wrap">
+                                        <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
+                                            {{ orgInfo.owner }}
+                                        </Tag>
+                                        <VisibilityTag v-if="orgInfo" rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
+                                        <!-- The datasets of the organization, not those a search shows (the count is not known before the first page) -->
+                                        <Tag rounded severity="info" icon="fa-solid fa-database"
+                                             :title="loading ? undefined : countOf(orgTotal, 'dataset')">
+                                            {{ loading ? '…' : orgTotal }}
+                                        </Tag>
+                                        <Tag v-if="userRole" rounded severity="contrast" icon="fa-solid fa-shield-halved">
+                                            {{ userRole }}
+                                        </Tag>
+                                    </div>
+                                </div>
+                                <div v-if="orgInfo?.description" class="org-description mt-1">{{ orgInfo.description }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Right: what the user can do in the organization -->
+                    <div v-if="(memberManagementEnabled && canManageOrg) || canCreateDataset" class="org-actions">
+                        <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" class="org-secondary-action"
+                                title="Manage Members" aria-label="Manage members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
+                        <Button v-if="canCreateDataset" severity="secondary" outlined size="small" class="org-secondary-action"
+                                title="Import Dataset" aria-label="Import dataset" icon="fa-solid fa-download" label="Import" @click.stop="openImportDialog()" />
+                        <Button v-if="canCreateDataset" severity="primary" size="small" class="org-primary-action"
+                                icon="fa-solid fa-plus" label="Create Dataset" @click.stop="handleNew()" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- How the datasets are shown: the search, the datasets without a location, list or map -->
+            <ListToolbar ref="searchField" v-model:search="searchQuery" search-label="Search datasets">
+                <template #end>
+                    <UnlocatedDatasetsButton v-if="view === 'map'" :groups="visibleLocationGroups" />
+                    <ViewSelect v-model="view" label="Show the datasets as" />
+                </template>
+            </ListToolbar>
+
+            <!-- While the first page loads: placeholder rows in the place of the table, under its real header -->
+            <DataTable v-if="loading" ref="table" :value="skeletonRows" striped-rows class="ds-table ds-table-skeleton" aria-busy="true">
+                <Column header="" style="width: 3.75rem;">
+                    <template #body><Skeleton width="2.5rem" height="2.5rem" /></template>
+                </Column>
+                <Column>
+                    <template #header><i class="fa-solid fa-database" /> Dataset</template>
+                    <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
+                </Column>
+                <Column header="Creation Date" v-bind="columnFrom(COLUMNS_FROM.creationDate)">
+                    <template #body><Skeleton width="6rem" /></template>
+                </Column>
+                <Column header="Modified" v-bind="columnFrom(COLUMNS_FROM.lastModified)">
+                    <template #body><Skeleton width="6rem" /></template>
+                </Column>
+                <Column header="Files" v-bind="columnFrom(COLUMNS_FROM.entries)">
+                    <template #body><Skeleton width="2rem" /></template>
+                </Column>
+                <Column header="Size" v-bind="columnFrom(COLUMNS_FROM.size)">
+                    <template #body><Skeleton width="4rem" /></template>
+                </Column>
+                <Column header="Visibility" v-bind="columnFrom(COLUMNS_FROM.visibility)">
+                    <template #body><Skeleton width="5rem" height="1.5rem" border-radius="1rem" /></template>
+                </Column>
+            </DataTable>
+            <!-- Where the datasets are -->
+            <DatasetLocationsMap v-else-if="view === 'map'" :groups="visibleLocationGroups" :loading="locationsLoading" />
+            <!-- Nothing to list: the empty state, not an empty table with its header -->
+            <EmptyState v-else-if="datasets.length === 0" title="No datasets found" items="datasets" :query="searchQuery"
+                        class="ds-empty" @clear="searchQuery = ''; $refs.searchField?.focus()">
+                <p v-if="canCreateDataset">This organization has no datasets yet. Create one, import one from another Registry, or upload files.</p>
+                <template v-if="canCreateDataset" #actions>
+                    <Button severity="primary" size="small" icon="fa-solid fa-plus" label="Create dataset" @click="handleNew()" />
+                    <Button severity="secondary" size="small" icon="fa-solid fa-download" label="Import" @click="openImportDialog()" />
+                    <Button severity="secondary" size="small" icon="fa-solid fa-upload" label="Upload" @click="upload()" />
+                </template>
+            </EmptyState>
+            <!-- Datasets Table -->
+            <DataTable v-else ref="table" :value="datasets" :paginator="false" striped-rows
+                       row-hover class="ds-table" scrollable scroll-height="flex"
+                       :sort-field="sortColumn" :sort-order="sortOrderPrimevue"
+                       :row-class="rowClass" @row-click="onRowClick" @row-contextmenu="onRowContextMenu"
+                       @sort="onSort">
+                <Column header="" style="width: 3.75rem;">
+                    <template #body="slotProps">
+                        <ProgressSpinner v-if="slotProps.data.loading" class="ds-row-spinner" stroke-width="4" />
+                        <img v-else :src="slotProps.data.thumbUrl" alt="" class="ds-thumb-img"
+                             :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }">
+                    </template>
+                </Column>
+                <Column field="name" :sortable="true" :pt="{ bodyCell: { class: 'ds-name-cell' } }">
+                    <template #header>
+                        <i class="fa-solid fa-database" /> Dataset
+                    </template>
+                    <template #body="slotProps">
+                        <!-- A link (Tab, Enter, open in a new tab) over the whole cell; Shift+F10 or the Menu key opens the row menu -->
+                        <!-- The lock first, on the line of the name: it never wraps alone -->
+                        <span class="ds-name-line">
+                            <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none"
+                               role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
+                            <!-- A busy dataset (an import or a rescan runs) does not open: its name is text -->
+                            <span v-if="slotProps.data.busy" class="ds-name ds-name-busy">
+                                {{ slotProps.data.name || slotProps.data.slug }}
+                            </span>
+                            <router-link v-else :to="{ name: 'ViewDataset', params: { org: $route.params.org, ds: slotProps.data.slug } }"
+                                         class="ds-name stretched-link" @keydown="onNameKeydown($event, slotProps.data)">
+                                {{ slotProps.data.name || slotProps.data.slug }}
+                            </router-link>
+                            <!-- What keeps it busy, with its progress, from the list and then from the task store -->
+                            <Tag v-if="slotProps.data.busy" severity="info" rounded class="ds-busy" role="status"
+                                 icon="fa-solid fa-circle-notch fa-spin">
+                                {{ busyLabel(slotProps.data.busy) }}
+                            </Tag>
+                        </span>
+                        <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
+                    </template>
+                </Column>
+                <Column field="creationDate" header="Creation Date" :sortable="true" class="ds-col-date"
+                        v-bind="columnFrom(COLUMNS_FROM.creationDate)"
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                    <template #body="slotProps">
+                        <div class="file-date">
+                            <div>{{ formatDateTime(slotProps.data.creationDate) }}</div>
+                            <small class="relative-time">{{ formatCreationDateRel(slotProps.data.creationDate) }}</small>
+                        </div>
+                    </template>
+                </Column>
+                <Column field="lastModified" header="Modified" :sortable="true" class="ds-col-date"
+                        v-bind="columnFrom(COLUMNS_FROM.lastModified)"
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                    <template #body="slotProps">
+                        <div v-if="slotProps.data.lastModified != null" class="file-date">
+                            <div>{{ formatDateTime(slotProps.data.lastModified) }}</div>
+                            <small class="relative-time">{{ formatCreationDateRel(slotProps.data.lastModified) }}</small>
+                        </div>
+                    </template>
+                </Column>
+                <Column field="entries" header="Files" :sortable="true" class="ds-col-count"
+                        v-bind="columnFrom(COLUMNS_FROM.entries)"
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
+                <Column field="size" header="Size" :sortable="true" class="ds-col-count"
+                        v-bind="columnFrom(COLUMNS_FROM.size)"
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                    <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
+                </Column>
+                <Column field="visibility" header="Visibility" :sortable="true" class="ds-col-visibility"
+                        v-bind="columnFrom(COLUMNS_FROM.visibility)" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                    <template #body="slotProps">
+                        <VisibilityTag :visibility="slotProps.data.visibility" />
+                    </template>
+                </Column>
+                <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center; white-space: nowrap' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7rem;">
+                    <template #body="slotProps">
+                        <!-- Each action keeps its place on every row, empty where it does not apply, so the buttons line up -->
+                        <div class="ds-row-buttons">
+                            <RowActionSlot v-if="actionColumns.edit" :shown="rowActions.edit(slotProps.data)">
+                                <ActionButton severity="secondary" outlined size="small" :loading="slotProps.data.editing"
+                                              :disabled="slotProps.data.editing || slotProps.data.deleting || !!slotProps.data.busy"
+                                              :disabled-reason="busyBlockReason(slotProps.data.busy) || ''" icon="fa-solid fa-pencil"
+                                              label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
+                            </RowActionSlot>
+                            <!-- Not solid: the delete of every row would dominate the list -->
+                            <RowActionSlot v-if="actionColumns.delete" :shown="rowActions.delete(slotProps.data)">
+                                <Button severity="danger" text size="small" :loading="slotProps.data.deleting"
+                                        :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
+                                        aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
+                            </RowActionSlot>
+                        </div>
+                    </template>
+                </Column>
+            </DataTable>
+
+            <!-- The row menu of the right click and of Shift+F10 / the Menu key on the name. No button opens it: its items
+                 are the name link and the buttons of the Actions column -->
+            <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" @hide="onRowMenuHide" />
+
+            <!-- Pagination; while the first page loads the bar is there, hidden, so that the page size counts it -->
+            <div v-if="view === 'list' && (loading || totalPages > 0)" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2"
+                 :class="{ 'ds-pagination-placeholder': loading }" :aria-hidden="loading ? 'true' : undefined">
+                <span class="ds-pagination-text">
+                    Showing {{ datasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
+                    {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ countOf(totalDatasets, 'dataset') }}<template v-if="filteredOut">, {{ orgTotal }} in the organization</template>
+                </span>
+                <Paginator v-if="loading || totalPages > 1" class="ds-paginator"
+                           :rows="Number(itemsPerPage)" :total-records="totalDatasets"
+                           :first="(currentPage - 1) * itemsPerPage" @page="onPageChange">
+                    <!-- The size that fits reads "N (fit)": picking it stores no size -->
+                    <template #end>
+                        <Select :model-value="itemsPerPage" :options="pageSizeChoices" option-label="label" option-value="value"
+                                aria-label="Datasets per page" class="page-size-select"
+                                @update:model-value="size => onPageChange({ page: currentPage - 1, rows: size })" />
+                    </template>
+                </Paginator>
+            </div>
+        </div>
+
+        <DialogHost :dialogs="dialogs" />
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
+        <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
+                       :org-slug="$route.params.org" :edited-dataset="dsDialogDataset" :save="saveDataset" @close="handleDatasetClose" />
+
+        <ImportDatasetDialog v-if="importDialogOpen" :org-slug="$route.params.org" :forbidden-slugs="forbiddenSlugs"
+                             @close="handleImportClose" />
+
+        <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel" :save="saveOrganization"
+                            :can-manage-logo="canManageOrg" @logo-changed="onLogoChanged" @close="handleOrgDialogClose" />
+        <OrganizationMembersDialog v-if="membersDialogOpen"
+                                   :org-slug="$route.params.org"
+                                   :can-manage-members="orgInfo?.permissions?.canManageMembers || false"
+                                   @permissions-changed="reloadOrgInfo"
+                                   @close="closeMembersDialog" />
+
+    </div>
+</template>
+
+<script>
+import EmptyState from '@/components/EmptyState.vue';
+import ActionButton from '@/components/ActionButton.vue';
+import RowActionSlot from '@/components/RowActionSlot.vue';
+import { actionsOfAnyRow } from '@/libs/rowActions';
+import ResourceState from '@/components/ResourceState.vue';
+import VisibilityTag from '@/components/VisibilityTag.vue';
+import OrgLogo from '@/components/OrgLogo.vue';
+import Message from '@/components/HubMessage.vue';
+import ViewSelect from '@/components/ViewSelect.vue';
+import ListToolbar from '@/components/ListToolbar.vue';
+import { DatasetLocationsMap } from './locationsMap';
+import UnlocatedDatasetsButton from './UnlocatedDatasetsButton.vue';
+import { setTitle, bytesToSize, formatTimeAgo, parseTimestamp } from '@/libs/utils';
+import { datasetName } from '@/libs/api/registryUtils';
+import { datasetMatchesSearch } from '@/libs/map/datasetPlaces';
+import { getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences } from '@/libs/storageUtils';
+import { shallowRef } from 'vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useEntityDelete } from '@/composables/useEntityDelete';
+import DatasetDialog from './DatasetDialog.vue';
+import { applyCoverChange } from '@/libs/datasetCover';
+import ImportDatasetDialog from './ImportDatasetDialog.vue';
+import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
+import OrganizationDialog from '@/features/organizations/OrganizationDialog.vue';
+import OrganizationMembersDialog from '@/features/organizations/OrganizationMembersDialog.vue';
+import Button from 'primevue/button';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Paginator from 'primevue/paginator';
+import Select from 'primevue/select';
+import Tag from 'primevue/tag';
+import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
+import PrimeContextMenu from 'primevue/contextmenu';
+import reg from '@/libs/api/sharedRegistry';
+import { datasetListQuery } from '@/libs/datasetList';
+import { usePageSize, visibleListHeight, heightOfFirst, averageRowHeight, keptBarHeight, elementOf } from '@/composables/usePageSize';
+import { pageAfterResize } from '@/libs/pageSize';
+import { ref } from 'vue';
+
+// Typing in the search box asks the server once the user pauses
+const SEARCH_DELAY_MS = 300;
+import { Features } from '@/libs/features';
+import { Visibility } from 'ddb';
+import { visibilityLabel } from '@/libs/visibility';
+import { formatDateTime, countOf } from '@/libs/format';
+import taskMonitor, { BUSY_TOOLS, BUSY_DELETING, IMPORT_TOOL_ID, datasetKey } from '@/libs/tasks/taskMonitor';
+import { busyLabel, busyBlockReason, busyDeleteWarning } from '@/libs/dataset/busyReason';
+import { isUnauthorized, loadErrorKind } from '@/libs/ddb/apiError';
+import { columnFrom } from '@/libs/responsiveColumns';
+import { hasOpenOverlay } from '@/composables/useOverlay';
+
+// The width each secondary column appears from, shared by the table and its loading skeleton.
+// Every column with the actions takes about 750 px, more than a 768 px screen holds inside the padding of the page: the creation
+// date, the widest, waits for 992 px so the actions stay on screen, and the date of the last
+// change, as wide, for 1200 px.
+const COLUMNS_FROM = Object.freeze({ creationDate: 'lg', lastModified: 'xl', entries: 'md', size: 'sm', visibility: 'sm' });
+
+export default {
+    name: 'DatasetsPage',
+    components: {
+        EmptyState,
+        ActionButton,
+        RowActionSlot,
+        ResourceState,
+        Message,
+        ViewSelect,
+        ListToolbar,
+        DatasetLocationsMap,
+        UnlocatedDatasetsButton,
+        DialogHost,
+        MessageDialog,
+        DatasetDialog,
+        ImportDatasetDialog,
+        OrganizationDialog,
+        OrganizationMembersDialog,
+        Button,
+        DataTable,
+        Column,
+        Paginator,
+        Select,
+        Tag,
+        VisibilityTag,
+        OrgLogo,
+        
+        ProgressSpinner,
+        Skeleton,
+        PrimeContextMenu
+    },
+    setup() {
+        const dialogs = useDialogs();
+        // A page holds the rows that fit the height until the user chooses a size, which the preferences keep
+        const table = ref(null);
+        const page = ref(null);
+        // The bar below the rows as it is with the paginator (shown, hidden, while the first page loads)
+        const paginatorBar = keptBarHeight(page, '.ds-pagination', '.ds-paginator', 80);
+        const sizing = usePageSize({
+            height: () => visibleListHeight({
+                area: page.value, list: table.value,
+                reserved: () => heightOfFirst(table.value, 'thead', 45) + paginatorBar()
+            }),
+            // The placeholder rows are not the height of dataset rows: the known one until the rows are there
+            rowHeight: () => (elementOf(table.value)?.classList.contains('ds-table-skeleton') ? 65 : averageRowHeight(table.value, 'tbody tr', 65)),
+            initial: getDatasetTablePreferences().itemsPerPage
+        });
+        // The locations are many small objects the map reads whole: not made reactive
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), columnFrom, COLUMNS_FROM, locationGroups: shallowRef([]), ...sizing, table, page };
+    },
+    data: function () {
+        // Load preferences from Local Storage
+        const prefs = getDatasetTablePreferences();
+
+        return {
+            Visibility,
+            skeletonRows: new Array(10).fill({}),
+            error: "",
+            // The organization did not load: not there, not for this user, or sign in (ResourceState)
+            loadError: null,
+            // The page shown (the server searches, sorts and pages)
+            datasets: [],
+            totalDatasets: 0,
+            // The datasets of the organization as the last load without a search counted them (null: none yet)
+            unfilteredTotal: null,
+            // Every slug of the organization, for the create/rename/import dialogs (loaded when
+            // one opens)
+            forbiddenSlugs: [],
+            loading: true,
+            messageDialogOpen: false,
+            currentMessage: null,
+
+            dsDialogModel: null,
+            dsDialogMode: null,
+            dsDialogOpen: false,
+
+            importDialogOpen: false,
+
+            orgEditDialogOpen: false,
+            orgDialogModel: null,
+            membersDialogOpen: false,
+
+            contextMenuDataset: null,
+
+            orgName: "",
+            orgInfo: null,
+
+            // Sorting - use saved preferences or defaults
+            sortColumn: prefs.sortColumn,
+            sortDirection: prefs.sortDirection,
+
+            // The table or the map of where the datasets are
+            view: prefs.view,
+            locationsLoading: false,
+            // Pagination - use saved preferences or defaults
+            currentPage: 1,
+
+            // Filtering: what is typed, and what the server was asked for
+            searchQuery: "",
+            searchTerm: ""
+        }
+    },
+    computed: {
+        // The dataset of an edit: the dialog shows its cover and finds its files
+        dsDialogDataset: function () {
+            return this.dsDialogMode === 'edit' && this.dsDialogModel ? this.org.Dataset(this.dsDialogModel.slug) : null;
+        },
+        canDeleteGlobal: function () {
+            return !HubOptions.disableDatasetCreation;
+        },
+        // What the logo of the header shows of the organization: its name (the slug until it is known) and its logo
+        headerOrg: function () {
+            return { slug: this.$route.params.org, name: this.orgName, logoUrl: this.orgInfo?.logoUrl ?? null };
+        },
+        canManageOrg: function () {
+            return this.orgInfo?.permissions?.canManageMembers || false;
+        },
+        userRole: function () {
+            const p = this.orgInfo?.permissions;
+            if (!p) return null;
+            if (p.canManageMembers) return 'Admin';
+            if (p.canDelete) return 'Editor+';
+            if (p.canWrite) return 'Editor';
+            if (p.canRead) return 'Viewer';
+            return null;
+        },
+        memberManagementEnabled: function () {
+            return reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+        },
+        // The page state of an organization that did not load (loadErrorKind), or null
+        loadKind: function () {
+            return loadErrorKind(this.loadError);
+        },
+        // Check if user can create datasets in this organization: only in an organization that loaded and
+        // says the user may write (an older Registry without permissions: a dataset the user may write)
+        canCreateDataset: function () {
+            if (HubOptions.disableDatasetCreation) return false;
+            // An anonymous visitor (a Public organization opens without signing in) creates nothing: the Registry
+            // sends them no permissions, which the fallback below would read as an older Registry
+            if (!reg.isLoggedIn()) return false;
+            // Nothing is offered before the organization loaded, nor when it did not
+            if (!this.orgInfo) return false;
+            // The organization says what the user may do: write creates, read only (a Public organization of
+            // another user) does not. Without permissions for a signed-in user (an older Registry) a
+            // dataset the user may write decides
+            const orgPermissions = this.orgInfo.permissions;
+            if (orgPermissions) return orgPermissions.canWrite === true;
+            return this.datasets.some(ds => ds.permissions && ds.permissions.canWrite);
+        },
+        // Show Actions column only if at least one dataset has actions available
+        // Whether each action of a row, in the order of its buttons (and of the row menu), applies to a dataset
+        rowActions: function () {
+            return {
+                edit: ds => !!ds.permissions?.canWrite,
+                delete: ds => !!ds.permissions?.canDelete && this.canDeleteGlobal
+            };
+        },
+        // The actions that some dataset of the page has: every row keeps a place for each of them, so the buttons line up
+        actionColumns: function () {
+            return actionsOfAnyRow(this.datasets, this.rowActions);
+        },
+        showActionsColumn: function () {
+            return Object.values(this.actionColumns).some(Boolean);
+        },
+        datasetContextMenuItems: function () {
+            const ds = this.contextMenuDataset;
+            if (!ds) return [];
+
+            // A busy dataset only deletes: Open and Edit are off, and say why
+            const reason = busyBlockReason(ds.busy);
+            const offWhileBusy = label => (reason ? { label: `${label} (${reason})`, disabled: true } : { label });
+            const items = [{
+                ...offWhileBusy('Open'),
+                icon: 'fa-regular fa-folder-open',
+                command: () => { this.viewDataset(ds); }
+            }];
+
+            if (this.rowActions.edit(ds)) {
+                items.push({
+                    ...offWhileBusy('Edit'),
+                    icon: 'fa-solid fa-pencil',
+                    command: () => { this.handleEdit(ds); }
+                });
+            }
+
+            if (this.rowActions.delete(ds)) {
+                items.push({
+                    separator: true
+                });
+                items.push({
+                    label: 'Delete',
+                    icon: 'fa-solid fa-trash',
+                    command: () => { this.handleDelete(ds); }
+                });
+            }
+
+            return items;
+        },
+        // Rows per page: the size the user chose, else the rows that fit the height
+        itemsPerPage: function () {
+            return this.pageSize;
+        },
+        // What the server is asked for: changes to any of it load that page
+        listQuery: function () {
+            return datasetListQuery({
+                page: this.currentPage, pageSize: this.itemsPerPage, search: this.searchTerm,
+                sortColumn: this.sortColumn, sortDirection: this.sortDirection
+            });
+        },
+        // The datasets of the organization, whatever the search shows: what the page counted when none narrows
+        // the list, else the count the organization carries (its members get one), else the last count without a search
+        orgTotal: function () {
+            if (!this.searchTerm) return this.totalDatasets;
+            const counted = this.orgInfo?.datasetCount;
+            return Number.isFinite(counted) ? counted : (this.unfilteredTotal ?? this.totalDatasets);
+        },
+        // A search leaves fewer datasets than the organization has
+        filteredOut: function () {
+            return !!this.searchTerm && this.orgTotal > this.totalDatasets;
+        },
+        // The map shows what the search matches, by name, slug or tagline, as the list does
+        visibleLocationGroups: function () {
+            if (!this.searchTerm.trim()) return this.locationGroups;
+            return this.locationGroups.map(group => ({
+                ...group,
+                datasets: group.datasets.filter(ds => datasetMatchesSearch(ds, this.searchTerm))
+            }));
+        },
+        totalPages: function () {
+            return Math.ceil(this.totalDatasets / this.itemsPerPage);
+        },
+        sortOrderPrimevue: function () {
+            return this.sortDirection === 'asc' ? 1 : -1;
+        }
+    },
+    watch: {
+        // (the first page is asked by mounted, once, with the size that fits by then)
+        listQuery: function () {
+            if (this._firstPageAsked) this.reloadPage();
+        },
+        searchQuery: function (value) {
+            clearTimeout(this._searchTimer);
+            this._searchTimer = setTimeout(() => {
+                this.currentPage = 1;
+                this.searchTerm = value;
+            }, SEARCH_DELAY_MS);
+        },
+        // Another size: the page that holds the first dataset shown
+        itemsPerPage: function (size, previous) {
+            this.currentPage = pageAfterResize(this.currentPage, previous, size);
+        },
+        // Only a size the user chose is a preference
+        pageChoice: function () {
+            this.savePreferences();
+        },
+        sortColumn: function () {
+            this.currentPage = 1;
+            this.savePreferences();
+        },
+        sortDirection: function () {
+            this.currentPage = 1;
+            this.savePreferences();
+        },
+        view: function (view) {
+            this.savePreferences();
+            // The list is back on the page: measure the rows it shows
+            if (view === 'list') this.$nextTick(() => this.measurePageSize());
+            if (view === 'map') {
+                this.loadLocations();
+            } else {
+                // Leaving the map ends a request it is still waiting for; the map asks again when shown
+                this._locationsRequest?.abort();
+                this.locationsLoading = false;
+            }
+        }
+    },
+    created() {
+        // The tasks that keep a dataset busy (an import, a rescan) are in the store of the app: the row follows it, and the
+        // list reloads when one ends. Not reactive on its own: the store tells when its tasks change
+        this._onTasksUpdated = () => this.refreshBusy();
+        // A task ended, or the dataset is gone (the Registry deleted the dataset of an import that was cancelled): the page is
+        // read again
+        this._onBusyEnded = ({ dataset }) => {
+            if (this.org && this.datasets.some(ds => datasetKey(this.org.Dataset(ds.slug)) === datasetKey(dataset))) this.reloadDatasets();
+        };
+        taskMonitor.on('tasksUpdated', this._onTasksUpdated);
+        taskMonitor.on('busyEnded', this._onBusyEnded);
+        taskMonitor.on('datasetGone', this._onBusyEnded);
+        // The table settings follow the Preferences page, other tabs and the account; the watchers
+        // above do not store them again (saveDatasetTablePreferences skips the values already stored)
+        this._stopFollowingPreferences = followDatasetTablePreferences(prefs => {
+            this.sortColumn = prefs.sortColumn;
+            this.sortDirection = prefs.sortDirection;
+            this.pageChoice = prefs.itemsPerPage;
+            this.view = prefs.view;
+        });
+    },
+    mounted: async function () {
+        try {
+            this.org = reg.Organization(this.$route.params.org);
+            const orgInfo = await this.org.info();
+            this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
+            this.orgInfo = orgInfo;
+            setTitle(this.orgName);
+            if (this.view === 'map') this.loadLocations();
+
+            // The header, the toolbar, the table header and the paginator bar are on the page (placeholder rows in
+            // the place of the table): the first page asks for the rows that fit, once
+            await this.$nextTick();
+            this.measurePageSize();
+            // (the watchers of the size measured run before the first page is asked: they ask nothing)
+            await this.$nextTick();
+            this._firstPageAsked = true;
+            await this.loadPage();
+        } catch (e) {
+            // Not there, not for this user, or sign in: the page state says so (with a session, a 401
+            // has already sent the user to Login); any other failure is the message
+            if (loadErrorKind(e)) this.loadError = e;
+            else this.error = e.message;
+        }
+        this.loading = false;
+        this.measureRows();
+    },
+    beforeUnmount() {
+        taskMonitor.off('tasksUpdated', this._onTasksUpdated);
+        taskMonitor.off('busyEnded', this._onBusyEnded);
+        taskMonitor.off('datasetGone', this._onBusyEnded);
+        this._stopFollowingPreferences?.();
+        clearTimeout(this._searchTimer);
+        this._listRequest?.abort();
+        this._locationsRequest?.abort();
+    }, methods: {
+        /**
+         * Save table preferences to Local Storage
+         */
+        savePreferences: function () {
+            saveDatasetTablePreferences({
+                sortColumn: this.sortColumn, sortDirection: this.sortDirection, itemsPerPage: this.pageChoice, view: this.view
+            });
+        },
+        bytesToSize,
+        countOf,
+        datasetName,
+        visibilityLabel,
+
+        formatDateTime,
+
+        formatCreationDateRel(timestamp) {
+            if (!timestamp) return '';
+            return formatTimeAgo(timestamp);
+        },
+
+        onSort(event) {
+            this.sortColumn = event.sortField;
+            this.sortDirection = event.sortOrder === 1 ? 'asc' : 'desc';
+        },
+
+        sortBy(column) {
+            if (this.sortColumn === column) {
+                // Toggle sort direction if clicking the same column
+                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                // Set new sort column with default ascending direction
+                this.sortColumn = column;
+                this.sortDirection = 'asc';
+            }
+        },
+
+        handleDelete(ds) {
+            const dataset = this.org.Dataset(ds.slug);
+            this.deleteEntity(ds, {
+                kind: 'dataset',
+                name: ds.name,
+                // A busy dataset deletes too: the Registry stops its import or rescan first
+                warning: busyDeleteWarning(ds.busy) ?? 'All the files will be deleted too.',
+                remove: async () => {
+                    // The task that keeps it busy ends because of this delete: no notice that it ended
+                    taskMonitor.forgetBusy(dataset);
+                    try {
+                        return await dataset.delete();
+                    } catch (e) {
+                        this.trackBusy(ds);
+                        throw e;
+                    }
+                },
+                // The next dataset moves into the page
+                done: () => this.reloadDatasets()
+            });
+        },
+
+        showMessage(msg) {
+            this.currentMessage = msg;
+            this.messageDialogOpen = true;
+        },
+
+        handleMessageClose() {
+            this.messageDialogOpen = false;
+            this.currentMessage = null;
+        },
+
+        handleEdit(ds) {
+            this.editDataset(ds);
+        }, editDataset(ds) {
+            // Make sure we pass all required properties to the dialog
+            this.dsDialogModel = {
+                slug: ds.slug,
+                name: ds.name || ds.slug, // Use slug as fallback if name is not available
+                visibility: ds.visibility !== undefined ? ds.visibility : Visibility.PRIVATE,
+                tagline: ds.tagline || '',
+                // The cover it has: the dialog shows it at the address the row uses
+                thumbnailUrl: ds.hasThumbnail ? this.org.Dataset(ds.slug).datasetThumbUrl(256, ds.thumbVersion) : null
+            };
+            this.dsDialogMode = "edit";
+            this.dsDialogOpen = true;
+            this.loadForbiddenSlugs();
+        },
+
+        newDataset() {
+            this.dsDialogMode = "new";
+            this.dsDialogOpen = true;
+            this.loadForbiddenSlugs();
+        },
+
+        handleNew() {
+            this.newDataset();
+        },
+
+        openImportDialog() {
+            this.importDialogOpen = true;
+            this.loadForbiddenSlugs();
+        },
+
+        // Adds a placeholder row so the importing dataset shows up immediately in the list.
+        addImportingEntry(payload) {
+            if (this.datasets.some(ds => ds.slug === payload.slug)) return;
+            this.datasets.unshift({
+                slug: payload.slug,
+                creationDate: Date.now(),
+                lastModified: Date.now(),
+                visibility: payload.visibility,
+                entries: 0,
+                size: 0,
+                editing: false,
+                deleting: false,
+                name: payload.name,
+                tagline: '',
+                permissions: { canRead: true, canWrite: true, canDelete: true },
+                thumbError: false,
+                thumbLoaded: false,
+                thumbUrl: '/images/dataset-placeholder.svg',
+                loading: true,
+                isTemporary: true,
+                busy: { kind: BUSY_TOOLS[IMPORT_TOOL_ID], taskId: payload.taskId ?? null, progress: null }
+            });
+        },
+
+        handleImportClose(action, payload) {
+            const slug = payload && payload.slug;
+
+            if (action === 'started') {
+                // Keep the dialog open and show the new dataset as importing. The store of the app follows the task from
+                // here on: it goes on when the dialog closes ("Run in background") or the page is left
+                this.addImportingEntry(payload);
+                if (payload.taskId) taskMonitor.trackBusy(this.org.Dataset(payload.slug), payload.taskId, BUSY_TOOLS[IMPORT_TOOL_ID]);
+                return;
+            }
+
+            this.importDialogOpen = false;
+
+            if (action === 'done') {
+                // The toast that says how it ended is the app's, one for every way an import ends (libs/tasks/importNotices):
+                // here only the list follows
+                if (payload.success) {
+                    this.reloadDatasets();
+                } else {
+                    this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === slug));
+                }
+            } else if (action === 'background') {
+                this.$notify.info(`Import of "${slug}" continues in the background`, { summary: 'Import running', life: 'normal' });
+            }
+        },
+
+        handleDatasetClose() {
+            this.dsDialogOpen = false;
+            this.dsDialogModel = null;
+        },
+
+        /**
+         * The request of the dataset dialog: it runs while the dialog is open, and a failure is thrown for
+         * the dialog to show at its field (a slug that is taken: `errors.slug`) or in its form-level message, with the dialog
+         * open and what was typed. No toast says it while the dialog is on show.
+         */
+        saveDataset(newds) {
+            return this.dsDialogMode === 'edit' ? this.updateDataset(this.dsDialogModel, newds) : this.createDataset(newds);
+        },
+
+        async createDataset(newds) {
+            // A row for the dataset that is being made, until the list is read again
+            this.datasets.unshift({
+                slug: newds.slug,
+                creationDate: Date.now(),
+                lastModified: Date.now(),
+                visibility: newds.visibility,
+                entries: 0,
+                size: 0,
+                editing: false,
+                deleting: false,
+                name: newds.name,
+                tagline: newds.tagline || '',
+                permissions: { canRead: true, canWrite: true, canDelete: true },
+                thumbError: false,
+                thumbLoaded: false,
+                thumbUrl: '/images/dataset-placeholder.svg',
+                loading: true,
+                isTemporary: true
+            });
+
+            try {
+                const ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility, newds.tagline);
+                if (!ret) throw new Error(`Failed to create dataset "${newds.slug}"`);
+            } catch (e) {
+                this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
+                throw e;
+            }
+
+            // The server places the new dataset in the sort order
+            await this.reloadDatasets();
+            this.$notify.success('Dataset created successfully', { summary: 'Dataset Created' });
+
+            // Navigate to the newly created dataset if the user has enabled the preference
+            if (newds.openAfterCreate) {
+                this.$router.push({ name: "ViewDataset", params: { org: this.$route.params.org, ds: newds.slug } });
+            }
+        },
+
+        async updateDataset(model, newds) {
+            const dsitem = this.datasets.find(o => o.slug == model.slug);
+            if (dsitem) dsitem['editing'] = true;
+            let renamed = false;
+
+            try {
+                let dsobj = this.org.Dataset(model.slug);
+
+                // Only a new slug the user asked for (Change URL) renames the dataset: its links change.
+                // It goes first, so a refused slug sends nothing else and the dataset stays as it was.
+                if (newds.changeSlug && newds.slug && newds.slug !== model.slug) {
+                    const ret = await dsobj.rename(newds.slug);
+                    const slug = ret?.slug || newds.slug;
+                    if (dsitem) dsitem['slug'] = slug;
+                    // The dialog stays open when a later step fails: it then edits the dataset at its new slug
+                    model.slug = slug;
+                    renamed = true;
+                    dsobj = this.org.Dataset(slug);
+                }
+
+                // The name is the display name: saving it keeps the URL
+                await dsobj.metaSet('name', newds.name);
+                renamed = true;
+
+                // Visibility only: the name is saved above
+                const update = await dsobj.update(undefined, newds.visibility);
+
+                if (newds.tagline) {
+                    await dsobj.metaSet('tagline', newds.tagline);
+                } else {
+                    await dsobj.metaUnset('tagline');
+                }
+
+                if (dsitem) {
+                    dsitem['name'] = newds.name;
+                    dsitem['visibility'] = newds.visibility;
+                    dsitem['tagline'] = newds.tagline || '';
+                }
+
+                // The cover last: the settings above are saved when it fails, and the dialog says that it did
+                if (newds.cover) await this.changeCover(dsobj, dsitem, newds.cover, model);
+                if (update) this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
+            } finally {
+                // The pins know the dataset by its slug and name, which the edit changed
+                if (renamed) this.invalidateLocations();
+                if (dsitem) dsitem['editing'] = false;
+            }
+        },
+
+        /**
+         * Writes the cover the dataset dialog chose and shows it in the row (a new address, so the browser does not show
+         * the one before). A failure is thrown with no status: it is the dialog's form-level message, not a field's.
+         */
+        async changeCover(dsobj, dsitem, change, model) {
+            let result;
+            try {
+                result = await applyCoverChange(dsobj, change);
+            } catch (e) {
+                throw new Error(`The other settings are saved, the thumbnail is not: ${e.message}`, { cause: e });
+            }
+            const version = Date.now();
+            // The dialog stays open when a later step fails: it then shows the cover as it is now
+            model.thumbnailUrl = result.written ? dsobj.datasetThumbUrl(256, version) : null;
+            if (!dsitem) return;
+            Object.assign(dsitem, {
+                hasThumbnail: !!result.written, thumbVersion: version, thumbLoaded: false, thumbLoading: false,
+                thumbUrl: '/images/dataset-placeholder.svg'
+            });
+            this.preloadDatasetThumbnail(dsitem);
+        },
+
+        viewDataset(ds) {
+            // A busy dataset does not open (its page would only say that it is busy)
+            if (ds.editing || ds.deleting || ds.busy) return;
+
+            this.$router.push({
+                name: "ViewDataset", params: {
+                    org: this.$route.params.org,
+                    ds: ds.slug
+                }
+            });
+        },
+
+        onRowClick(event) {
+            // The name link opens the dataset itself (also in a new tab)
+            const target = event.originalEvent && event.originalEvent.target;
+            if (target instanceof Element && target.closest('a')) return;
+            this.viewDataset(event.data);
+        },
+
+        onRowContextMenu(event) {
+            const e = event.originalEvent;
+            // The Menu key on the focused name: at the name, not at the corner of the page
+            const fromKeyboard = !e.pageX && !e.pageY && e.target instanceof Element;
+            this.contextMenuDataset = event.data;
+            this.$refs.datasetContextMenu.show(fromKeyboard ? this.menuEventAt(e, e.target) : e);
+        },
+
+        /**
+         * The row menu under an element (the name): the focus comes back to it when
+         * the menu closes without opening anything.
+         * @param {Event} event
+         * @param {object} ds
+         */
+        openRowMenu(event, ds) {
+            const element = /** @type {HTMLElement} */ (event.currentTarget);
+            this.contextMenuDataset = ds;
+            this._rowMenuOpener = element;
+            this.$refs.datasetContextMenu.show(this.menuEventAt(event, element));
+        },
+
+        // What ContextMenu.show reads from a pointer event, at the bottom left of the element
+        menuEventAt(event, element) {
+            const box = element.getBoundingClientRect();
+            return {
+                pageX: box.left + window.scrollX,
+                pageY: box.bottom + window.scrollY,
+                stopPropagation: () => event.stopPropagation(),
+                preventDefault: () => event.preventDefault()
+            };
+        },
+
+        // Shift+F10 or the Menu key on the dataset name
+        onNameKeydown(event, ds) {
+            if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return;
+            event.preventDefault();
+            this.openRowMenu(event, ds);
+        },
+
+        // A menu closed with Escape (or a click elsewhere) gives the focus back to its opener,
+        // unless one of its items opened a dialog, which has the focus now
+        onRowMenuHide() {
+            const opener = this._rowMenuOpener;
+            this._rowMenuOpener = null;
+            const active = document.activeElement;
+            const lost = !active || active === document.body || !!active.closest('[role="menubar"], [role="menu"]');
+            if (opener && opener.isConnected && lost && !hasOpenOverlay()) opener.focus();
+        },
+
+        // A page of the paginator, or a size picked there (the watchers keep the page that holds the first
+        // dataset shown, and store the size the user chose)
+        onPageChange(event) {
+            if (event.rows !== this.itemsPerPage) this.choosePageSize(event.rows);
+            else this.currentPage = event.page + 1;
+        },
+
+        // The rows are on the page: their height may differ from the one expected, and so the size that fits
+        measureRows() {
+            if (this._rowsMeasured) return;
+            this._rowsMeasured = true;
+            this.$nextTick(() => this.measurePageSize());
+        },
+
+        upload: function () {
+            this.$router.push({ name: "Upload" });
+        },
+
+        // One server page with the covers checked for its rows only; a newer request
+        // (another page, sort or search) aborts the one in flight
+        async loadPage() {
+            if (!this.org) return;
+            this._listRequest?.abort();
+            const request = new AbortController();
+            this._listRequest = request;
+            try {
+                const { items, total } = await this.org.datasetsPage(this.listQuery,
+                    { includeThumbnailCheck: true, signal: request.signal });
+                if (request.signal.aborted) return;
+                this.datasets = items.map(ds => this.toRow(ds));
+                this.totalDatasets = total;
+                if (!this.searchTerm) this.unfilteredTotal = total;
+                // Past the last page (a dataset was deleted, the search narrowed): show the last one
+                if (this.datasets.length === 0 && total > 0 && this.currentPage > 1)
+                    this.currentPage = Math.max(1, Math.ceil(total / this.itemsPerPage));
+                this.datasets.forEach(ds => {
+                    this.preloadDatasetThumbnail(ds);
+                    this.trackBusy(ds);
+                });
+                // What the store knows and the list may not say yet: the dataset of an import cancelled a moment ago
+                this.refreshBusy();
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                throw e;
+            }
+        },
+
+        // A busy row (the list says so): the store follows its task, which tells the progress and when it ends
+        trackBusy(ds) {
+            if (ds.busy?.taskId && ds.busy.kind !== BUSY_DELETING) taskMonitor.trackBusy(this.org.Dataset(ds.slug), ds.busy.taskId, ds.busy.kind);
+        },
+
+        // The busy state of the rows as the store says it: the progress, or the dataset of a cancelled import that is being
+        // deleted (a row the store does not say is busy keeps what the list said, until the end of its task reloads the list)
+        refreshBusy() {
+            if (!this.org) return;
+            for (const ds of this.datasets) {
+                const busy = taskMonitor.getBusy(this.org.Dataset(ds.slug));
+                if (busy) ds.busy = busy;
+            }
+        },
+
+        busyLabel,
+        busyBlockReason,
+
+        // A row opens its dataset on a click, but a busy one
+        rowClass(ds) {
+            return ds.busy ? 'ds-row-busy' : 'ds-row-open';
+        },
+
+        // Where the datasets are, asked once for the visit to the organization (a dataset added,
+        // removed or renamed asks again); a request in flight is ended when the map is left
+        async loadLocations() {
+            if (!this.org || this._locationsLoaded) return;
+            this._locationsRequest?.abort();
+            const request = new AbortController();
+            this._locationsRequest = request;
+            this.locationsLoading = true;
+            try {
+                const datasets = await this.org.datasetLocations({ signal: request.signal });
+                if (request.signal.aborted) return;
+                this.locationGroups = [{ org: this.$route.params.org, orgName: this.orgName, logoUrl: this.orgInfo?.logoUrl ?? null, datasets }];
+                this._locationsLoaded = true;
+            } catch (e) {
+                if (request.signal.aborted || e.name === 'AbortError') return;
+                this.error = e.message;
+            }
+            this.locationsLoading = false;
+        },
+
+        toRow(ds) {
+            return {
+                slug: ds.slug,
+                creationDate: Date.parse(ds.creationDate),
+                lastModified: parseTimestamp(ds.lastModified),
+                visibility: ds.properties?.meta?.visibility?.data !== undefined ? ds.properties?.meta?.visibility?.data : Visibility.PRIVATE,
+                entries: ds.properties.entries,
+                size: ds.size,
+                editing: false,
+                deleting: false,
+                name: ds.properties?.meta?.name?.data,
+                tagline: ds.properties?.meta?.tagline?.data || '',
+                permissions: ds.permissions,
+                // An import or a rescan runs ({ kind, taskId, progress }): the row does not open, it only deletes
+                busy: ds.busy ?? null,
+                hasThumbnail: ds.hasThumbnail === true,
+                thumbError: false,
+                thumbLoaded: false,
+                thumbUrl: '/images/dataset-placeholder.svg'
+            };
+        },
+
+        // The dialogs refuse a slug in use: they need every slug, not the page
+        async loadForbiddenSlugs() {
+            try {
+                this.forbiddenSlugs = (await this.org.datasets()).map(ds => ds.slug);
+            } catch (e) {
+                console.warn('Cannot list the dataset slugs:', e);
+            }
+        },
+
+        // A dataset was added or removed: the page, the total and the locations change
+        reloadDatasets() {
+            this.invalidateLocations();
+            // The count the organization carries moved too (its members get one), and one counted before the search is stale
+            if (this.searchTerm) this.unfilteredTotal = null;
+            this.refreshOrgCount();
+            return this.reloadPage();
+        },
+
+        // The organization's own count of its datasets, asked again; the header does without it when that fails
+        async refreshOrgCount() {
+            try {
+                const info = await this.org.info();
+                if (this.orgInfo && Number.isFinite(info?.datasetCount)) this.orgInfo = { ...this.orgInfo, datasetCount: info.datasetCount };
+            } catch (e) {
+                console.warn('Could not read the dataset count of the organization:', e);
+            }
+        },
+
+        // The locations loaded are out of date: the map asks again, now if it is shown
+        invalidateLocations() {
+            this._locationsLoaded = false;
+            if (this.view === 'map') this.loadLocations();
+        },
+
+        async reloadPage() {
+            try {
+                await this.loadPage();
+            } catch (e) {
+                this.error = e.message;
+            }
+        },
+
+        preloadDatasetThumbnail(ds) {
+            if (!ds.hasThumbnail || ds.thumbLoaded || ds.thumbLoading) return;
+            ds.thumbLoading = true;
+            const url = this.getDatasetThumbUrl(ds);
+            const img = new Image();
+            img.onload = () => {
+                ds.thumbUrl = url;
+                ds.thumbLoaded = true;
+                ds.thumbLoading = false;
+            };
+            img.onerror = () => {
+                ds.thumbLoading = false;
+            };
+            img.src = url;
+        },
+        getDatasetThumbUrl(ds) {
+            const dsobj = this.org.Dataset(ds.slug);
+            return dsobj.datasetThumbUrl(150, ds.thumbVersion);
+        },
+
+        // Organization management
+        openOrgDialog() {
+            this.orgDialogModel = {
+                slug: this.$route.params.org,
+                name: this.orgInfo?.name || this.orgName,
+                description: this.orgInfo?.description || '',
+                isPublic: this.orgInfo?.isPublic || false,
+                logoUrl: this.orgInfo?.logoUrl ?? null
+            };
+            this.orgEditDialogOpen = true;
+        },
+
+        handleOrgDialogClose() {
+            this.orgEditDialogOpen = false;
+            this.orgDialogModel = null;
+        },
+
+        // The request of the dialog: a failure is thrown for the dialog to show at its field, and the dialog stays open
+        async saveOrganization(neworg) {
+            const ret = await reg.orgs.updateOrganization(
+                this.$route.params.org,
+                neworg.name,
+                neworg.description,
+                neworg.isPublic
+            );
+            if (!ret) throw new Error('Failed to update organization');
+
+            this.orgName = neworg.name || this.$route.params.org;
+            this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
+            setTitle(this.orgName);
+            this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
+        },
+
+        // The logo was sent or removed in the dialog: the header shows it now, whether or not Save follows
+        onLogoChanged(logoUrl) {
+            this.orgInfo = { ...this.orgInfo, logoUrl };
+        },
+
+        openMembersDialog() {
+            this.membersDialogOpen = true;
+        },
+
+        closeMembersDialog() {
+            this.membersDialogOpen = false;
+        },
+
+        // The user changed their own permissions in the members dialog: what the page and the
+        // dialog offer follows the organization's answer
+        async reloadOrgInfo() {
+            try {
+                this.orgInfo = await this.org.info();
+            } catch (e) {
+                if (!isUnauthorized(e)) this.$notify.error(e.message);
+            }
+        }
+    }
+}
+</script>
+
+<style scoped>
+#datasets {
+    /* The space around the page is its padding */
+    padding: 0.75rem;
+    box-sizing: border-box;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .ds-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .org-header {
+        flex-shrink: 0;
+        padding: var(--ddb-spacing-md) 0;
+
+        /* The actions go under the identity when the name needs the room */
+        .org-header-layout {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--ddb-spacing-md) var(--ddb-spacing-xl);
+        }
+
+        .org-identity {
+            flex: 1 1 28rem;
+            min-width: 0;
+        }
+
+        .org-actions {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
+        }
+
+        .org-logo-skeleton {
+            flex-shrink: 0;
+        }
+
+        .org-title-row {
+            display: flex;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        /* The name and its pencil are one run of text, so the pencil stays after the last word, on the last line */
+        .org-title {
+            display: inline;
+            min-width: 0;
+        }
+
+        .org-title .org-name {
+            display: inline;
+            overflow-wrap: anywhere;
+        }
+
+        .org-title .org-edit {
+            vertical-align: middle;
+            margin-inline-start: var(--ddb-spacing-xs);
+        }
+
+        .org-description {
+            color: var(--ddb-text-secondary);
+            font-size: var(--ddb-font-size-sm);
+        }
+    }
+
+    /* Responsive: stack header vertically on small screens */
+    @media screen and (max-width: 767.98px) {
+        .org-header {
+            .org-header-layout {
+                flex-direction: column;
+                align-items: stretch;
+                gap: var(--ddb-spacing-md);
+            }
+
+            /* In a column the basis would be a height */
+            .org-identity {
+                flex: 0 0 auto;
+            }
+
+            /* Create takes the room the other actions leave */
+            .org-primary-action {
+                flex: 1 1 auto;
+            }
+        }
+    }
+
+    /* A phone: the secondary actions as icons (their name stays in aria-label and title), as high as Create */
+    @media screen and (max-width: 575.98px) {
+        /* The tags are a group on their own line under the title: they wrap together, not one by one */
+        .org-header .org-tags {
+            flex-basis: 100%;
+        }
+
+        .org-header .org-secondary-action {
+            align-self: stretch;
+        }
+
+        .org-header .org-secondary-action :deep(.p-button-label) {
+            display: none;
+        }
+    }
+
+    /* The rows keep their height, so the paginator is right below the last one; the table shrinks and
+       scrolls its rows (scroll-height="flex") only when they are more than the screen holds */
+    .ds-table {
+        flex: 0 1 auto;
+        /* scroll-height="flex" gives the table the height of its parent: the height of its rows is wanted */
+        height: auto;
+        min-height: 0;
+    }
+
+    /* The columns take the width of their content, so the free width goes to the Dataset column and a row
+       reads in one look on a wide screen */
+    .ds-table :deep(.ds-col-date) { width: 11rem; }
+    /* A count or a size is one value: "906,06 MB" does not break between the number and its unit */
+    .ds-table :deep(.ds-col-count) { width: 6rem; white-space: nowrap; }
+    .ds-table :deep(.ds-col-visibility) { width: 8rem; }
+
+    /* A header never wraps; the columns that do not fit leave the table instead */
+    .ds-table :deep(th) {
+        white-space: nowrap;
+    }
+
+    .ds-row-buttons {
+        display: inline-flex;
+        gap: var(--ddb-spacing-xs);
+    }
+
+    .ds-pagination {
+        flex-shrink: 0;
+    }
+
+    .ds-pagination-placeholder {
+        visibility: hidden;
+    }
+
+    /* The page size select follows the page links */
+    .ds-pagination :deep(.p-paginator-content-end) {
+        margin-inline-start: 0;
+    }
+
+    @media screen and (max-width: 767.98px) {
+        .ds-pagination {
+            flex-direction: column;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
+
+            > span {
+                font-size: var(--ddb-font-size-sm);
+            }
+
+            :deep(.p-paginator) {
+                flex-wrap: wrap;
+            }
+        }
+    }
+
+    @media screen and (max-width: 575.98px) {
+        .ds-pagination :deep(.p-paginator-first),
+        .ds-pagination :deep(.p-paginator-last) {
+            display: none;
+        }
+    }
+
+    .ds-thumb-img {
+        display: block;
+        width: 3.5rem;
+        height: 2.5rem;
+        object-fit: cover;
+        border-radius: var(--ddb-radius-sm);
+    }
+
+    .ds-thumb-placeholder {
+        opacity: 0.35;
+    }
+
+    /* Spinner shown in the thumb column of temporary (creating/importing) rows */
+    .ds-row-spinner {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    /* No underline, also on hover (the hover rule of app.scss is :where(), so this one wins) */
+    .ds-name {
+        font-weight: bold;
+        color: inherit;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+    }
+
+    .ds-table :deep(tr.ds-row-open) {
+        cursor: pointer;
+    }
+
+    /* A busy dataset does not open: its name is not a link */
+    .ds-name-busy {
+        color: var(--ddb-text-secondary);
+    }
+
+    /* The stretched link of the name covers its cell */
+    .ds-table :deep(.ds-name-cell) {
+        position: relative;
+    }
+
+    .ds-name-line {
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--ddb-spacing-xs);
+    }
+
+    .ds-tagline {
+        font-weight: normal;
+        color: var(--ddb-text-muted);
+        font-size: var(--ddb-font-size-sm);
+        margin-top: var(--ddb-spacing-xs);
+        max-width: 22rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Visibility tags in table: uniform width */
+    .ds-table :deep(.p-tag) {
+        min-width: 6.5rem;
+        justify-content: center;
+    }
+
+    /* Responsive adjustments */
+    @media screen and (max-width: 767.98px) {
+        :deep(.p-datatable) {
+            td, th {
+                padding: 0.5rem;
+            }
+        }
+    }
+
+    /* Relative time under absolute date */
+    .file-date .relative-time {
+        font-size: 0.75rem;
+        color: var(--ddb-text-muted);
+        display: block;
+    }
+}
+</style>

@@ -1,73 +1,43 @@
 /**
- * Vitest setup file - runs before each test.
- * Provides mocks for browser APIs and global constants.
+ * Vitest setup file - runs before each test (happy-dom environment).
+ * Defines the globals webpack's DefinePlugin sets at build time.
  */
-import { vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
-// Mock __APP_PRODUCTION__ global (set by webpack DefinePlugin)
+// __APP_PRODUCTION__ (webpack DefinePlugin)
 globalThis.__APP_PRODUCTION__ = true;
 
-// Mock __HUB_VERSION__ global
-globalThis.__HUB_VERSION__ = '2.7.0';
+// __HUB_VERSION__ (webpack DefinePlugin, from package.json)
+globalThis.__HUB_VERSION__ = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version;
 
-// Mock window/localStorage for Node environment
-if (typeof window === 'undefined') {
-    globalThis.window = {
-        location: {
-            origin: 'http://localhost:7000',
-            protocol: 'http:',
-            href: 'http://localhost:7000/',
-            search: '',
-            pathname: '/'
-        },
-        sessionStorage: {
-            getItem: vi.fn(() => null),
-            setItem: vi.fn(),
-            removeItem: vi.fn()
-        },
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-        scrollTo: vi.fn(),
-        get scrollY() { return 0; }
-    };
-    globalThis.document = {
-        title: 'Test',
-        cookie: '',
-        body: { style: { cursor: '' } },
-        createElement: vi.fn(() => ({
-            addEventListener: vi.fn(),
-            style: {},
-            className: '',
-            getBoundingClientRect: vi.fn(() => ({ top: 0, left: 0, width: 100, height: 100 }))
-        })),
-        getElementById: vi.fn(() => null),
-        getElementsByTagName: vi.fn(() => []),
-        querySelector: vi.fn(() => null),
-        querySelectorAll: vi.fn(() => []),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        exitFullscreen: vi.fn(),
-        webkitExitFullscreen: vi.fn(),
-        mozExitFullscreen: vi.fn(),
-        msExitFullscreen: vi.fn(),
-        scrollLeft: 0,
-        scrollTop: 0
-    };
-    globalThis.localStorage = {
-        getItem: vi.fn(() => null),
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
-        clear: vi.fn()
-    };
-    globalThis.navigator = {
-        userAgent: 'Vitest'
-    };
-    globalThis.atob = (str) => Buffer.from(str, 'base64').toString('binary');
-    globalThis.btoa = (str) => Buffer.from(str, 'binary').toString('base64');
-    globalThis.fetch = vi.fn();
-    globalThis.AbortController = class AbortController {
-        signal = { aborted: false };
-        abort() { this.signal.aborted = true; }
-    };
+// The colour tokens of the light theme (css/_variables.scss :root), on <html> as the stylesheets
+// put them: canvas code reads them through colorToken (libs/colorScheme.js)
+if (typeof document !== 'undefined') {
+    const variables = fs.readFileSync(path.resolve(__dirname, 'webapp/css/_variables.scss'), 'utf8');
+    const start = variables.indexOf(':root {');
+    const block = variables.slice(start, variables.indexOf('\n}', start));
+    for (const [, name, value] of block.matchAll(/^\s*(--ddb-[\w-]+):\s*([^;]+);/gm)) {
+        document.documentElement.style.setProperty(name, value.trim());
+    }
+}
+
+// The name of a node as a browser gives it through the getter of Node.prototype. happy-dom answers nodeName from the
+// class of each node (Element, Text, Comment...) and its getter on Node.prototype answers '', while DOMPurify reads
+// that getter: it would see no tag name, remove every allowed element and keep only its text. The getter of
+// Node.prototype answers here what the node's own class does, as in a browser.
+if (typeof Node !== 'undefined') {
+    const ownNodeName = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeName');
+    if (ownNodeName?.get && ownNodeName.configurable) {
+        Object.defineProperty(Node.prototype, 'nodeName', {
+            configurable: true,
+            get() {
+                for (let proto = Object.getPrototypeOf(this); proto && proto !== Node.prototype; proto = Object.getPrototypeOf(proto)) {
+                    const getter = Object.getOwnPropertyDescriptor(proto, 'nodeName')?.get;
+                    if (getter) return getter.call(this);
+                }
+                return ownNodeName.get.call(this);
+            }
+        });
+    }
 }

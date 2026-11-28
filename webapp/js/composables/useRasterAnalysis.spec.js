@@ -1,0 +1,741 @@
+/**
+ * Area statistics: the Area tool draws a rectangle on the map, asks the statistics of the
+ * pixels under it and shows them; one map tool at a time, and the measurement toolbar waits
+ * while the rectangle is drawn. Inspect reads the value of a pixel and the panel keeps it.
+ * Both send map coordinates (WGS 84): the server finds the pixels of the file. The expected
+ * longitude and latitude of the Web Mercator metres are the ones of the spherical formula, written as literals.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { effectScope, shallowRef, defineComponent, h } from 'vue';
+import { mount } from '@vue/test-utils';
+import Map from 'ol/Map';
+import View from 'ol/View';
+import { Tile as TileLayer } from 'ol/layer';
+import Feature from 'ol/Feature';
+import { fromExtent } from 'ol/geom/Polygon';
+import Point from 'ol/geom/Point';
+import { Vector as VectorSource } from 'ol/source';
+import Draw, { DrawEvent } from 'ol/interaction/Draw';
+import { useRasterAnalysis } from './useRasterAnalysis';
+
+const PATH = 'odm_dem/dsm.tif';
+
+// A 100 x 50 pixel raster on a 1000 x 500 map-unit extent
+function setup({ areaStats = vi.fn(async () => ({ min: 1, max: 2, pixelCount: 4 })), vizParams = {} } = {}) {
+    const map = new Map({ view: new View({ center: [0, 0], zoom: 1 }) });
+    const layer = new TileLayer({ extent: [0, 0, 1000, 500] });
+    // As createRasterTileLayer stamps it
+    layer.file = { path: `ddb://h/o/d/${PATH}`, entry: { path: PATH } };
+    map.addLayer(layer);
+    const dataset = {
+        getRasterValueInfo: vi.fn(async () => ({ width: 100, height: 50, unit: 'm' })),
+        getRasterAreaStatsOfWindow: areaStats,
+        getRasterPointValue: vi.fn(async (path, x, y) => ({ value: 197.1, x, y, hasGeo: false })),
+        getRasterPointValueAt: vi.fn(async (path, lon, lat) => ({ value: 197.1, x: 3, y: 4, lon, lat, hasGeo: true })),
+        getRasterProfile: vi.fn(async () => ({ samples: [] }))
+    };
+    const measureControls = { source: new VectorSource(), setToolsDisabled: vi.fn(), refreshButtons: vi.fn(), deleteMeasurement: vi.fn() };
+    const raster = effectScope().run(() => useRasterAnalysis({
+        dataset: () => dataset, map: shallowRef(map), measureControls: () => measureControls,
+        rasterLayer: () => null, vizParamsByPath: shallowRef(vizParams),
+        refreshRasterLayers: () => () => undefined, onRasterProfileHover: () => undefined
+    }));
+    raster.openRasterAnalysis(PATH);
+    return { map, dataset, measureControls, raster };
+}
+
+const drawOf = map => map.getInteractions().getArray().find(i => i instanceof Draw);
+
+// Ends the drawing with a rectangle, as OpenLayers does on the second click
+async function drawRectangle(map, extent) {
+    drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(fromExtent(extent))));
+    await vi.waitFor(() => expect(drawOf(map)).toBeUndefined());
+}
+
+describe('useRasterAnalysis area statistics', () => {
+    let ctx;
+    beforeEach(() => { ctx = setup(); });
+
+    it('draws a rectangle with the measurement toolbar disabled until it is drawn', async () => {
+        const { map, raster, measureControls } = ctx;
+        raster.toggleRasterAreaDrawing();
+        expect(raster.rasterAreaDrawing.value).toBe(true);
+        expect(drawOf(map)).toBeDefined();
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(true);
+
+        await drawRectangle(map, [100, 300, 205, 405]);
+        expect(raster.rasterAreaDrawing.value).toBe(false);
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+        expect(measureControls.setToolsDisabled).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks the statistics of the pixels under the rectangle and keeps the answer', async () => {
+        const { map, raster, dataset } = ctx;
+        raster.toggleRasterAreaDrawing();
+        await drawRectangle(map, [100, 300, 205, 405]);
+        await vi.waitFor(() => expect(raster.rasterAreaStats.value).toEqual({ min: 1, max: 2, pixelCount: 4 }));
+        // The window of the rectangle in longitude and latitude, never pixels
+        expect(dataset.getRasterAreaStatsOfWindow).toHaveBeenCalledTimes(1);
+        const [path, bbox, options] = dataset.getRasterAreaStatsOfWindow.mock.calls[0];
+        expect(path).toBe(PATH);
+        expect(bbox[0]).toBeCloseTo(0.0008983152841195, 9);
+        expect(bbox[1]).toBeCloseTo(0.0026949458513694, 9);
+        expect(bbox[2]).toBeCloseTo(0.0018415463324450, 9);
+        expect(bbox[3]).toBeCloseTo(0.0036381768982489, 9);
+        expect(options).toEqual({ nodata: undefined });
+        expect(raster.rasterAreaStatsLoading.value).toBe(false);
+        expect(raster.rasterAreaStatsError.value).toBeNull();
+    });
+
+    it('asks the server for a rectangle beside the raster too: it answers that it is outside', async () => {
+        const outside = vi.fn().mockRejectedValue(Object.assign(new Error('No valid data in the area: it is outside the raster'), { status: 400 }));
+        const { map, raster } = setup({ areaStats: outside });
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        raster.toggleRasterAreaDrawing();
+        await drawRectangle(map, [2000, 2000, 2100, 2100]);
+        await vi.waitFor(() => expect(raster.rasterAreaStatsError.value).toBe('No valid data in the area: it is outside the raster'));
+        expect(outside).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends the NoData value of the layer with the window', async () => {
+        const { map, raster, dataset } = setup({ vizParams: { [PATH]: { colormap: 'ironbow', nodata: 0 } } });
+        raster.toggleRasterAreaDrawing();
+        await drawRectangle(map, [100, 300, 205, 405]);
+        await vi.waitFor(() => expect(dataset.getRasterAreaStatsOfWindow).toHaveBeenCalled());
+        expect(dataset.getRasterAreaStatsOfWindow.mock.calls[0][2]).toEqual({ nodata: 0 });
+    });
+
+    it('shows a server error of the request, and a no-data hint for a failure of the server', async () => {
+        const failing = vi.fn()
+            .mockRejectedValueOnce(Object.assign(new Error('Invalid coordinates'), { status: 400 }))
+            .mockRejectedValueOnce(Object.assign(new Error('Internal server error'), { status: 500 }));
+        const { raster } = setup({ areaStats: failing });
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        expect(raster.rasterAreaStatsError.value).toBe('Invalid coordinates');
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        expect(raster.rasterAreaStatsError.value).toMatch(/only pixels without data/);
+        expect(raster.rasterAreaStats.value).toBeNull();
+        expect(raster.rasterAreaStatsLoading.value).toBe(false);
+    });
+
+    it('Esc stops the drawing and gives the toolbar back', () => {
+        const { map, raster, measureControls } = ctx;
+        raster.toggleRasterAreaDrawing();
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        expect(raster.rasterAreaDrawing.value).toBe(false);
+        expect(drawOf(map)).toBeUndefined();
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+    });
+
+    it('Inspect stops the rectangle drawing, and the rectangle drawing stops Inspect', () => {
+        const { raster } = ctx;
+        raster.toggleRasterAreaDrawing();
+        raster.toggleRasterInspect();
+        expect(raster.rasterAreaDrawing.value).toBe(false);
+        expect(raster.rasterInspectActive.value).toBe(true);
+        raster.toggleRasterAreaDrawing();
+        expect(raster.rasterInspectActive.value).toBe(false);
+        expect(raster.rasterAreaDrawing.value).toBe(true);
+    });
+
+    it('clearing removes the rectangle and the statistics; closing the panel removes its layer', async () => {
+        const { map, raster } = ctx;
+        const layers = () => map.getLayers().getLength();
+        const before = layers();
+        raster.toggleRasterAreaDrawing();
+        await drawRectangle(map, [100, 300, 205, 405]);
+        await vi.waitFor(() => expect(raster.rasterAreaStats.value).not.toBeNull());
+        expect(layers()).toBe(before + 1);
+
+        raster.handleClearAreaStats();
+        expect(raster.rasterAreaStats.value).toBeNull();
+        raster.closeRasterAnalysis();
+        expect(layers()).toBe(before);
+    });
+
+    it('opening another raster drops the statistics of the previous one', async () => {
+        const { raster } = ctx;
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        expect(raster.rasterAreaStats.value).not.toBeNull();
+        raster.openRasterAnalysis('other.tif');
+        expect(raster.rasterAreaStats.value).toBeNull();
+    });
+});
+
+describe('useRasterAnalysis queryRasterPoint', () => {
+    it('keeps the value of the pixel for the panel', async () => {
+        const { raster, dataset } = setup();
+        const result = await raster.queryRasterPoint(12, 7);
+        expect(dataset.getRasterPointValue).toHaveBeenCalledWith(PATH, 12, 7, { nodata: undefined });
+        expect(raster.rasterSpotInfo.value).toEqual(result);
+    });
+});
+
+// ---- The gesture rule and the keyboard ----
+
+const key = (k, on = document.body) => on.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+const rightClick = (map, x = 50, y = 50, upX = x, upY = y) => {
+    const vp = map.getViewport();
+    vp.dispatchEvent(new MouseEvent('pointerdown', { clientX: x, clientY: y, button: 2, bubbles: true }));
+    vp.dispatchEvent(new MouseEvent('pointerup', { clientX: upX, clientY: upY, button: 2, bubbles: true }));
+};
+
+describe('Inspect from the keyboard', () => {
+    it('Space on the focused map reads the value at the centre of the view', async () => {
+        const { map, raster, dataset, measureControls } = setup();
+        const target = document.body.appendChild(document.createElement('div'));
+        map.setTarget(target);
+        map.getView().setCenter([500, 250]);
+        raster.toggleRasterInspect();
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(true);
+        key(' ', map.getViewport());
+        // The centre of the view (500 m, 250 m), in longitude and latitude: the server finds the pixel
+        await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1));
+        const [path, lon, lat] = dataset.getRasterPointValueAt.mock.calls[0];
+        expect(path).toBe(PATH);
+        expect(lon).toBeCloseTo(0.0044915764205976, 9);
+        expect(lat).toBeCloseTo(0.0022457882097268, 9);
+        expect(dataset.getRasterPointValue).not.toHaveBeenCalled();
+        expect(raster.rasterInspectActive.value).toBe(true);
+        raster.toggleRasterInspect();
+        map.setTarget(undefined);
+        target.remove();
+    });
+
+    it('Enter places the point too, and the tool stays for the next one', async () => {
+        const { map, raster, dataset } = setup();
+        map.getView().setCenter([100, 50]);
+        raster.toggleRasterInspect();
+        key('Enter');
+        // (100 m, 50 m) and then (900 m, 450 m), in longitude and latitude
+        await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1));
+        expect(dataset.getRasterPointValueAt.mock.calls[0][1]).toBeCloseTo(0.0008983152841195, 9);
+        expect(dataset.getRasterPointValueAt.mock.calls[0][2]).toBeCloseTo(0.0004491576420624, 9);
+        map.getView().setCenter([900, 450]);
+        key('Enter');
+        await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(2));
+        expect(dataset.getRasterPointValueAt.mock.calls[1][1]).toBeCloseTo(0.0080848375570757, 9);
+        expect(dataset.getRasterPointValueAt.mock.calls[1][2]).toBeCloseTo(0.0040424187751903, 9);
+        expect(raster.rasterInspectActive.value).toBe(true);
+    });
+
+    it('shows the crosshair while it is on, and Esc ends it and gives the toolbar back', () => {
+        const { map, raster, measureControls } = setup();
+        raster.toggleRasterInspect();
+        expect(map.getViewport().querySelector('.map-crosshair')).not.toBeNull();
+        key('Escape');
+        expect(raster.rasterInspectActive.value).toBe(false);
+        expect(map.getViewport().querySelector('.map-crosshair')).toBeNull();
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+    });
+});
+
+// The × of the spot value card: the host forgets the value and, if Inspect is on, its marker
+describe('useRasterAnalysis handleClearSpot', () => {
+    it('forgets the spot value when Inspect is off, where there is no marker layer to clear', async () => {
+        const { raster } = setup();
+        await raster.queryRasterPoint(12, 7);
+        expect(raster.rasterSpotInfo.value).not.toBeNull();
+        expect(raster.rasterInspectActive.value).toBe(false);
+        expect(() => raster.handleClearSpot()).not.toThrow();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+
+    it('removes the marker and hides the tooltip of Inspect, which stays on for the next point', async () => {
+        const { map, raster } = setup();
+        map.getView().setCenter([100, 50]);
+        raster.toggleRasterInspect();
+        key('Enter');
+        const markers = () => map.getLayers().getArray().find(l => l.getSource() instanceof VectorSource).getSource().getFeatures();
+        const tooltip = () => map.getOverlays().getArray()[0].getElement();
+        await vi.waitFor(() => expect(tooltip().style.display).toBe('block'));
+        expect(markers()).toHaveLength(1);
+        expect(raster.rasterSpotInfo.value).not.toBeNull();
+
+        raster.handleClearSpot();
+
+        expect(raster.rasterSpotInfo.value).toBeNull();
+        expect(markers()).toHaveLength(0);
+        expect(tooltip().style.display).toBe('none');
+        expect(raster.rasterInspectActive.value).toBe(true);
+        raster.toggleRasterInspect();
+    });
+});
+
+// An answer that comes after the × of the spot card, or after a newer question, would bring back a value the user cleared or
+// replace the newer one
+describe('useRasterAnalysis spot answers that are over', () => {
+    /** A server call whose answers the test releases in its own order */
+    function deferredAnswers(dataset, method) {
+        const pending = [];
+        dataset[method].mockImplementation((path, a, b) => new Promise(resolve => pending.push(() => resolve({ value: a, x: a, y: b, hasGeo: false }))));
+        return pending;
+    }
+
+    it('drops an answer that comes after the spot was cleared', async () => {
+        const { raster, dataset } = setup();
+        const pending = deferredAnswers(dataset, 'getRasterPointValue');
+        const query = raster.queryRasterPoint(12, 7);
+        raster.handleClearSpot();
+        pending[0]();
+        expect(await query).toBeNull();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+
+    it('drops an answer at a map coordinate that comes after the spot was cleared', async () => {
+        const { raster, dataset } = setup();
+        let answer;
+        dataset.getRasterPointValueAt.mockImplementation(() => new Promise(resolve => { answer = () => resolve({ value: 197.1, hasGeo: true }); }));
+        const query = raster.queryRasterPointAt([505, 255]);
+        raster.handleClearSpot();
+        answer();
+        expect(await query).toBeNull();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+
+    it('keeps the newest question when an older answer comes last', async () => {
+        const { raster, dataset } = setup();
+        const pending = deferredAnswers(dataset, 'getRasterPointValue');
+        const older = raster.queryRasterPoint(1, 1);
+        const newer = raster.queryRasterPoint(2, 2);
+        pending[1]();
+        expect(await newer).toMatchObject({ value: 2 });
+        pending[0]();
+        expect(await older).toBeNull();
+        expect(raster.rasterSpotInfo.value).toMatchObject({ value: 2 });
+    });
+
+    it('drops an answer that comes after the panel was closed and opened again on the same raster', async () => {
+        const { raster, dataset } = setup();
+        const pending = deferredAnswers(dataset, 'getRasterPointValue');
+        const query = raster.queryRasterPoint(12, 7);
+        raster.closeRasterAnalysis();
+        raster.openRasterAnalysis(PATH);
+        pending[0]();
+        expect(await query).toBeNull();
+        expect(raster.rasterSpotInfo.value).toBeNull();
+    });
+});
+
+describe('Profile from the keyboard and the mouse', () => {
+    it('Space adds a vertex, Enter finishes the line: one profile measurement, asked of the server', async () => {
+        const { map, raster, dataset, measureControls } = setup();
+        raster.startRasterProfileDrawing();
+        expect(raster.rasterProfileDrawing.value).toBe(true);
+        map.getView().setCenter([200, 100]);
+        key(' ');
+        map.getView().setCenter([300, 200]);
+        key(' ');
+        key('Enter');
+        const features = measureControls.source.getFeatures();
+        expect(features).toHaveLength(1);
+        expect(features[0].get('measurementType')).toBe('profile');
+        expect(features[0].getGeometry().getCoordinates()).toEqual([[200, 100], [300, 200]]);
+        expect(raster.rasterProfileDrawing.value).toBe(false);
+        await vi.waitFor(() => expect(dataset.getRasterProfile).toHaveBeenCalledTimes(1));
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+        await vi.waitFor(() => expect(drawOf(map)).toBeUndefined());
+    });
+
+    it('a right click finishes the line, and a right-drag of 20 px does not', () => {
+        const { map, raster, measureControls } = setup();
+        raster.startRasterProfileDrawing();
+        map.getView().setCenter([200, 100]);
+        key(' ');
+        map.getView().setCenter([300, 200]);
+        key(' ');
+        rightClick(map, 50, 50, 70, 50);
+        expect(measureControls.source.getFeatures()).toHaveLength(0);
+        expect(raster.rasterProfileDrawing.value).toBe(true);
+        rightClick(map, 50, 50, 52, 51);
+        expect(measureControls.source.getFeatures()).toHaveLength(1);
+    });
+
+    it('Esc cancels the line: nothing reaches the measurements, the toolbar is given back', () => {
+        const { map, raster, measureControls } = setup();
+        raster.startRasterProfileDrawing();
+        map.getView().setCenter([200, 100]);
+        key(' ');
+        map.getView().setCenter([300, 200]);
+        key(' ');
+        key('Escape');
+        expect(measureControls.source.getFeatures()).toHaveLength(0);
+        expect(raster.rasterProfileDrawing.value).toBe(false);
+        expect(drawOf(map)).toBeUndefined();
+        expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+        expect(measureControls.setToolsDisabled).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('Area from the keyboard', () => {
+    it('Space places the first corner, Enter the opposite one: the statistics of the window in between', async () => {
+        const { map, raster, dataset } = setup();
+        raster.toggleRasterAreaDrawing();
+        map.getView().setCenter([100, 300]);
+        key(' ');
+        map.getView().setCenter([205, 405]);
+        key('Enter');
+        // The corners (100 m, 300 m) and (205 m, 405 m) in longitude and latitude
+        await vi.waitFor(() => expect(dataset.getRasterAreaStatsOfWindow).toHaveBeenCalledTimes(1));
+        const [path, bbox] = dataset.getRasterAreaStatsOfWindow.mock.calls[0];
+        expect(path).toBe(PATH);
+        expect(bbox[0]).toBeCloseTo(0.0008983152841195, 9);
+        expect(bbox[1]).toBeCloseTo(0.0026949458513694, 9);
+        expect(bbox[2]).toBeCloseTo(0.0018415463324450, 9);
+        expect(bbox[3]).toBeCloseTo(0.0036381768982489, 9);
+        expect(raster.rasterAreaDrawing.value).toBe(false);
+    });
+
+    it('Esc after the first corner leaves no rectangle and asks nothing', () => {
+        const { map, raster, dataset } = setup();
+        raster.toggleRasterAreaDrawing();
+        key(' ');
+        key('Escape');
+        expect(raster.rasterAreaDrawing.value).toBe(false);
+        expect(dataset.getRasterAreaStatsOfWindow).not.toHaveBeenCalled();
+        expect(drawOf(map)).toBeUndefined();
+    });
+});
+
+describe('useRasterAnalysis queryRasterPointAt', () => {
+    // The map is in Web Mercator: (505 m, 255 m) is longitude 0.0045364921848036, latitude 0.0022907039739066
+    it('asks the value at the map coordinate in longitude and latitude, never a pixel, and keeps the answer', async () => {
+        const { raster, dataset } = setup();
+        const result = await raster.queryRasterPointAt([505, 255]);
+        expect(dataset.getRasterPointValue).not.toHaveBeenCalled();
+        expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1);
+        const [path, lon, lat, options] = dataset.getRasterPointValueAt.mock.calls[0];
+        expect(path).toBe(PATH);
+        expect(lon).toBeCloseTo(0.0045364921848036, 9);
+        expect(lat).toBeCloseTo(0.0022907039739066, 9);
+        expect(options).toEqual({ nodata: undefined });
+        expect(raster.rasterSpotInfo.value).toEqual(result);
+    });
+
+    it('sends the NoData value of the layer', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { nodata: 0 } } });
+        await raster.queryRasterPointAt([505, 255]);
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: 0 });
+    });
+
+    // The tooltip writes a value as the panel does
+    it('Inspect writes the value in the one format of a raster value, "29.1 °C"', async () => {
+        const { map, raster, dataset } = setup();
+        dataset.getRasterPointValueAt.mockResolvedValueOnce({ value: 29.06, unit: 'Celsius', isThermal: true, lon: 0, lat: 0 });
+        raster.toggleRasterInspect();
+        drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(new Point([505, 255]))));
+        await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1));
+        const tooltip = () => map.getOverlays().getArray().map(o => o.getElement()).find(el => el && el.textContent);
+        await vi.waitFor(() => expect(tooltip()?.textContent).toBe('29.1 °C'));
+    });
+
+    it('Inspect shows the value of the newest click when the answer of an earlier one comes late', async () => {
+        const { map, raster, dataset } = setup();
+        let late;
+        dataset.getRasterPointValueAt
+            .mockImplementationOnce(() => new Promise(resolve => { late = resolve; }))
+            .mockResolvedValueOnce({ value: 11, unit: 'm', isThermal: false, lon: 0, lat: 0 });
+        raster.toggleRasterInspect();
+        const click = coordinate => drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(new Point(coordinate))));
+        const tooltip = () => map.getOverlays().getArray().map(o => o.getElement()).find(el => el && el.textContent);
+        click([505, 255]);
+        await vi.waitFor(() => expect(late).toBeTypeOf('function'));
+        click([605, 255]);
+        await vi.waitFor(() => expect(tooltip()?.textContent).toBe('11.00 m'));
+
+        late({ value: 99, unit: 'm', isThermal: false, lon: 0, lat: 0 });
+        await new Promise(resolve => setTimeout(resolve, 20));
+        // The tooltip of the newest click is not replaced, or hidden, by the answer of the first
+        expect(tooltip()?.textContent).toBe('11.00 m');
+        expect(tooltip().style.display).toBe('block');
+    });
+
+    it('Inspect on a click inside the raster asks the server; beside the raster it does not ask', async () => {
+        const { map, raster, dataset } = setup();
+        raster.toggleRasterInspect();
+        // A click ends the point of the drawing session, as OpenLayers does
+        const click = coordinate => drawOf(map).dispatchEvent(new DrawEvent('drawend', new Feature(new Point(coordinate))));
+        click([505, 255]);
+        await vi.waitFor(() => expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1));
+        click([5000, 255]);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(dataset.getRasterPointValueAt).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('useRasterAnalysis queryRasterPoint (an R-JPEG: pixels of its raw thermal grid)', () => {
+    it('keeps the value of the pixel for the panel', async () => {
+        const { raster, dataset } = setup();
+        const result = await raster.queryRasterPoint(12, 7);
+        expect(dataset.getRasterPointValue).toHaveBeenCalledWith(PATH, 12, 7, { nodata: undefined });
+        expect(raster.rasterSpotInfo.value).toEqual(result);
+    });
+
+    it('sends the NoData value of the layer with the pixel', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { nodata: -9999 } } });
+        await raster.queryRasterPoint(12, 7);
+        expect(dataset.getRasterPointValue).toHaveBeenCalledWith(PATH, 12, 7, { nodata: -9999 });
+    });
+});
+
+describe('useRasterAnalysis profile', () => {
+    it('sends the NoData value of the layer with the line', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { nodata: 0 } } });
+        await raster.queryRasterProfile([[0, 0], [1, 1]], 32);
+        expect(dataset.getRasterProfile).toHaveBeenCalledWith(PATH, { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, 32, { nodata: 0 });
+    });
+});
+
+// Ddb converts the values to the unit of the layer's thermal formula; the panel asks in it, and again when it changes
+describe('useRasterAnalysis thermal units', () => {
+    const KELVIN_LAYER = { [PATH]: { formula: 'KELVIN', colormap: 'ironbow', rescale: '280,310' } };
+
+    it('sends the thermal formula of the layer with a point, an area and a profile', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { formula: 'FAHRENHEIT', colormap: 'ironbow', nodata: 0 } } });
+        await raster.queryRasterPointAt([505, 255]);
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        expect(dataset.getRasterAreaStatsOfWindow.mock.calls[0][2]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+        await raster.queryRasterProfile([[0, 0], [1, 1]], 8);
+        expect(dataset.getRasterProfile.mock.calls[0][3]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+        await raster.queryRasterPoint(3, 4);
+        expect(dataset.getRasterPointValue.mock.calls[0][3]).toEqual({ nodata: 0, formula: 'FAHRENHEIT' });
+    });
+
+    it('does not send a vegetation index as the unit of a value', async () => {
+        const { raster, dataset } = setup({ vizParams: { [PATH]: { formula: 'NDVI', colormap: 'rdylgn' } } });
+        await raster.queryRasterPointAt([505, 255]);
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: undefined });
+    });
+
+    it('reads the spot value, the area and the profile again in the new unit when the unit changes', async () => {
+        const { raster, dataset, map } = setup({ vizParams: KELVIN_LAYER });
+        await raster.queryRasterPointAt([505, 255]);
+        await raster.queryRasterArea([0, 0, 1, 1]);
+        raster.rasterAreaStats.value = { min: 284.6 };
+        await raster.queryRasterProfile([[0, 0], [1, 1]], 8);
+        dataset.getRasterPointValueAt.mockClear();
+        dataset.getRasterAreaStatsOfWindow.mockClear();
+        dataset.getRasterProfile.mockClear();
+        dataset.getRasterPointValueAt.mockResolvedValueOnce({ value: 11.5, unit: '°C', lon: 0.0045, lat: 0.0023 });
+        dataset.getRasterAreaStatsOfWindow.mockResolvedValueOnce({ min: 11.45, unit: '°C' });
+
+        raster.handleRasterVizParamsChanged({ formula: 'CELSIUS', colormap: 'ironbow', rescale: '280,310', rescaleUnit: 'K' });
+
+        await vi.waitFor(() => expect(raster.rasterSpotInfo.value.value).toBe(11.5));
+        expect(dataset.getRasterPointValueAt.mock.calls[0][3]).toEqual({ nodata: undefined, formula: 'CELSIUS' });
+        await vi.waitFor(() => expect(raster.rasterAreaStats.value).toEqual({ min: 11.45, unit: '°C' }));
+        expect(dataset.getRasterAreaStatsOfWindow.mock.calls[0][2]).toEqual({ nodata: undefined, formula: 'CELSIUS' });
+        expect(dataset.getRasterProfile).toHaveBeenCalledTimes(1);
+        expect(dataset.getRasterProfile.mock.calls[0][3]).toEqual({ nodata: undefined, formula: 'CELSIUS' });
+        expect(map).toBeDefined();
+    });
+
+    it('reads nothing again when another part of the style changes', async () => {
+        const { raster, dataset } = setup({ vizParams: KELVIN_LAYER });
+        await raster.queryRasterPointAt([505, 255]);
+        dataset.getRasterPointValueAt.mockClear();
+        raster.handleRasterVizParamsChanged({ formula: 'KELVIN', colormap: 'magma', rescale: '280,310' });
+        await new Promise(resolve => setTimeout(resolve, 20));
+        expect(dataset.getRasterPointValueAt).not.toHaveBeenCalled();
+    });
+});
+
+describe('an answer that comes after a newer question', () => {
+    /** A call of the server that answers when the test says */
+    const deferred = () => {
+        let resolve;
+        const promise = new Promise(r => { resolve = r; });
+        return { promise, resolve };
+    };
+    const LINE = [[0, 0], [1, 1]];
+
+    it('keeps the profile of the newest line when the slow answer of the first one comes last', async () => {
+        const slow = deferred();
+        const getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ samples: ['B'] });
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = getRasterProfile;
+
+        const first = raster.queryRasterProfile(LINE);
+        await raster.queryRasterProfile([[0, 0], [2, 2]]);
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        expect(raster.rasterProfileLoading.value).toBe(false);
+
+        slow.resolve({ samples: ['A'] });
+        await first;
+
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        expect(raster.rasterProfileLoading.value).toBe(false);
+    });
+
+    it('keeps the loading of the newest question while the answer of an older one comes', async () => {
+        const slow = deferred();
+        const newest = deferred();
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise).mockReturnValueOnce(newest.promise);
+
+        const first = raster.queryRasterProfile(LINE);
+        const second = raster.queryRasterProfile(LINE);
+        slow.resolve({ samples: ['A'] });
+        await first;
+
+        expect(raster.rasterProfile.value).toBeNull();
+        expect(raster.rasterProfileLoading.value).toBe(true);
+        newest.resolve({ samples: ['B'] });
+        await second;
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        expect(raster.rasterProfileLoading.value).toBe(false);
+    });
+
+    it('ignores the profile asked for the raster the panel left (the target changed to another one)', async () => {
+        const slow = deferred();
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise);
+
+        const first = raster.queryRasterProfile(LINE);
+        raster.openRasterAnalysis('odm_dem/dtm.tif');
+        slow.resolve({ samples: ['A'] });
+        await first;
+
+        expect(raster.rasterProfile.value).toBeNull();
+        expect(raster.rasterProfileLoading.value).toBe(false);
+        // The query asked of the first raster named its path
+        expect(dataset.getRasterProfile.mock.calls[0][0]).toBe(PATH);
+    });
+
+    it('does not show a profile that failed after a newer one answered', async () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const slow = deferred();
+        const { raster, dataset } = setup();
+        dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ samples: ['B'] });
+
+        const first = raster.queryRasterProfile(LINE);
+        await raster.queryRasterProfile(LINE);
+        slow.resolve(Promise.reject(new Error('boom')));
+        await first;
+
+        expect(raster.rasterProfileError.value).toBeNull();
+        expect(raster.rasterProfile.value).toEqual({ samples: ['B'] });
+        error.mockRestore();
+    });
+
+    describe('a profile asked for a line that is then erased, cleared or drawn again', () => {
+        const slowProfile = () => {
+            const slow = deferred();
+            const ctx = setup();
+            ctx.dataset.getRasterProfile = vi.fn().mockReturnValueOnce(slow.promise);
+            ctx.raster.startRasterProfileDrawing();
+            ctx.map.getView().setCenter([200, 100]);
+            key(' ');
+            ctx.map.getView().setCenter([300, 200]);
+            key(' ');
+            key('Enter');
+            expect(ctx.raster.rasterProfileLoading.value).toBe(true);
+            return { ...ctx, slow };
+        };
+        const settled = async ({ raster, slow }) => {
+            slow.resolve({ samples: ['late'] });
+            await vi.waitFor(() => expect(raster.rasterProfileLoading.value).toBe(false));
+            await Promise.resolve();
+            expect(raster.rasterProfile.value).toBeNull();
+            expect(raster.rasterProfileError.value).toBeNull();
+        };
+
+        it('shows nothing of the late answer and stops the spinner when the line is erased', async () => {
+            const ctx = slowProfile();
+            const [line] = ctx.measureControls.source.getFeatures();
+
+            ctx.measureControls.source.removeFeature(line);
+
+            expect(ctx.raster.rasterProfileLoading.value).toBe(false);
+            await settled(ctx);
+        });
+
+        it('shows nothing of the late answer and stops the spinner on Clear profile', async () => {
+            const ctx = slowProfile();
+
+            ctx.raster.handleClearProfile();
+
+            expect(ctx.raster.rasterProfileLoading.value).toBe(false);
+            await settled(ctx);
+        });
+
+        it('shows nothing of the late answer and stops the spinner when the line is drawn again', async () => {
+            const ctx = slowProfile();
+
+            ctx.raster.startRasterProfileDrawing();
+
+            expect(ctx.raster.rasterProfileLoading.value).toBe(false);
+            await settled(ctx);
+        });
+    });
+
+    it('keeps the statistics of the newest rectangle when the slow answer of the first one comes last', async () => {
+        const slow = deferred();
+        const areaStats = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce({ min: 5, max: 6, pixelCount: 2 });
+        const { raster } = setup({ areaStats });
+
+        const first = raster.queryRasterArea([0, 0, 1, 1]);
+        await raster.queryRasterArea([2, 2, 3, 3]);
+        slow.resolve({ min: 1, max: 2, pixelCount: 4 });
+        await first;
+
+        expect(raster.rasterAreaStats.value).toEqual({ min: 5, max: 6, pixelCount: 2 });
+        expect(raster.rasterAreaStatsLoading.value).toBe(false);
+    });
+
+    it('does not bring the statistics back after Clear', async () => {
+        const slow = deferred();
+        const { raster } = setup({ areaStats: vi.fn().mockReturnValueOnce(slow.promise) });
+
+        const asked = raster.queryRasterArea([0, 0, 1, 1]);
+        raster.handleClearAreaStats();
+        slow.resolve({ min: 1, max: 2, pixelCount: 4 });
+        await asked;
+
+        expect(raster.rasterAreaStats.value).toBeNull();
+        expect(raster.rasterAreaStatsLoading.value).toBe(false);
+    });
+});
+
+describe('the drawing modes when the component goes away', () => {
+    const hosted = () => {
+        const map = new Map({ view: new View({ center: [0, 0], zoom: 1 }) });
+        const measureControls = { source: new VectorSource(), setToolsDisabled: vi.fn(), refreshButtons: vi.fn(), deleteMeasurement: vi.fn() };
+        const dataset = { getRasterValueInfo: vi.fn(async () => ({ width: 100, height: 50, unit: 'm' })), getRasterPointValueAt: vi.fn(async () => ({})) };
+        let raster;
+        const wrapper = mount(defineComponent({
+            setup() {
+                raster = useRasterAnalysis({
+                    dataset: () => dataset, map: shallowRef(map), measureControls: () => measureControls,
+                    rasterLayer: () => null, vizParamsByPath: shallowRef({}),
+                    refreshRasterLayers: () => () => undefined, onRasterProfileHover: () => undefined
+                });
+                return () => h('div');
+            }
+        }));
+        return { wrapper, raster, map, measureControls };
+    };
+
+    for (const [name, start, flag] of [
+        ['the statistics rectangle', r => r.toggleRasterAreaDrawing(), r => r.rasterAreaDrawing],
+        ['the profile line', r => r.startRasterProfileDrawing(), r => r.rasterProfileDrawing],
+        ['Inspect', r => r.toggleRasterInspect(), r => r.rasterInspectActive]
+    ]) {
+        it(`ends ${name} with the component: no interaction and no lock is left`, () => {
+            const { wrapper, raster, map, measureControls } = hosted();
+            raster.openRasterAnalysis(PATH);
+            start(raster);
+            expect(flag(raster).value).toBe(true);
+            expect(drawOf(map)).toBeDefined();
+
+            wrapper.unmount();
+
+            expect(flag(raster).value).toBe(false);
+            expect(drawOf(map)).toBeUndefined();
+            expect(measureControls.setToolsDisabled).toHaveBeenLastCalledWith(false);
+        });
+    }
+});
+

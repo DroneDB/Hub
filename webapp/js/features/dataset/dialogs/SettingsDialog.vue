@@ -1,106 +1,180 @@
 <template>
-    <Window title="Settings" id="settings" @onClose="close('close')" modal maxWidth="70%" fixedSize fixedPosition
-        closeModalOnClick>
-        <Message bindTo="error" />
+    <Window id="settings" title="Dataset Settings" modal size-class="dialog-lg" fixed-position close-modal-on-click
+            :busy="saving" :confirm-disabled="!dirty" @confirm="save" @close="requestClose">
+        <Message v-model="error" />
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
-        <div class="settings-body" v-else>
-            <div class="settings-section">
-                <div class="mb-2">
-                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
-                    Visibility: <Select v-model="visibility" @change="setVisibility" :options="visibilityOptions" optionLabel="label" optionValue="value" />
-                </div>
-                <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
-                    <span v-html="safeDescription" />
-                </PrimeMessage>
-            </div>
+        <LoadingSpinner v-if="loading" />
+        <div v-else class="settings-body">
+            <section v-if="canWrite" class="settings-group" aria-labelledby="settings-general">
+                <h3 id="settings-general" class="settings-group-title">General</h3>
 
-            <div class="settings-section">
-                <div>
-                    <i class="fa-solid fa-scale-balanced"></i>
-                    License: <Select v-model="license" @change="setLicense" :options="licenseOptions" optionLabel="label" optionValue="value" class="license-dropdown" :title="Licenses[license].name" />
-                </div>
-            </div>
-
-            <div class="settings-section" v-if="canWrite">
-                <div class="mb-2">
-                    <i class="fa-solid fa-tag"></i>
-                    Tagline
-                </div>
-                <div class="tagline-field">
-                    <InputText v-model="tagline" maxlength="256"
-                        placeholder="Brief description of your dataset (max 256 chars)"
-                        @change="setTagline" fluid />
-                    <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
-                </div>
-            </div>
-
-            <div class="settings-section" v-if="canWrite">
-                <div class="mb-2">
-                    <i class="fa-solid fa-image"></i>
-                    Thumbnail
-                </div>
-                <div class="thumbnail-upload">
-                    <div class="thumbnail-preview-container">
-                        <img v-if="thumbnailPreview && !thumbnailError"
-                            :src="thumbnailPreview"
-                            class="thumbnail-preview"
-                            @error="thumbnailError = true" />
-                        <img v-else
-                            src="/images/dataset-placeholder.svg"
-                            class="thumbnail-preview thumbnail-placeholder" />
-                    </div>
-                    <div class="thumbnail-actions">
-                        <input type="file" ref="thumbnailInput"
-                            @change="handleThumbnailSelect"
-                            accept="image/webp,image/jpeg,image/png"
-                            style="display: none" />
-                        <Button @click="$refs.thumbnailInput.click()"
-                            :loading="thumbnailUploading" icon="fa-solid fa-upload" label="Upload" />
-                        <Button v-if="thumbnailPreview && !thumbnailError"
-                            severity="danger"
-                            @click="removeThumbnail"
-                            :loading="thumbnailRemoving" icon="fa-solid fa-trash" label="Remove" />
+                <!-- The display name only: the URL does not change with it -->
+                <div class="settings-field">
+                    <label for="settings-name" class="settings-label"><i class="fa-solid fa-signature" aria-hidden="true" />Name</label>
+                    <div class="settings-control">
+                        <InputText id="settings-name" v-model="name" :maxlength="nameMaxLength" autocomplete="off"
+                                   placeholder="Dataset name" :invalid="!!nameError" :aria-invalid="nameError ? 'true' : undefined"
+                                   :aria-describedby="nameError ? 'settings-name-error' : 'settings-name-hint'"
+                                   :disabled="saving" fluid @input="nameError = ''" />
+                        <FieldError id="settings-name-error" :message="nameError" />
+                        <small id="settings-name-hint" class="field-hint">Shown on the dataset page and in the lists. The URL stays as it is.</small>
                     </div>
                 </div>
-            </div>
 
-            <div class="settings-section" v-if="readme == null">
-                <Button @click="addDocument('README.md')" icon="fa-solid fa-book" label="Add Readme" />
-            </div>
-
-            <div class="settings-section settings-maintenance" v-if="canWrite">
-                <div class="mb-2">
-                    <i class="fa-solid fa-gear"></i>
-                    Maintenance
+                <div class="settings-field">
+                    <label for="settings-slug" class="settings-label"><i class="fa-solid fa-link" aria-hidden="true" />URL slug</label>
+                    <div class="settings-control">
+                        <InputText id="settings-slug" v-model="slug" autocomplete="off" spellcheck="false"
+                                   :invalid="!!slugError" :aria-invalid="slugError ? 'true' : undefined"
+                                   :aria-describedby="slugError ? 'settings-slug-error settings-slug-hint' : 'settings-slug-hint'"
+                                   :disabled="saving" fluid @input="slugError = ''" />
+                        <FieldError id="settings-slug-error" :message="slugError" />
+                        <small id="settings-slug-hint" class="field-hint">The dataset is at /r/{{ dataset.org }}/{{ slug.trim() || '…' }}. A slug: {{ slugRuleText }}</small>
+                        <!-- A new slug breaks the links that exist: said before it is saved, and asked again on Save -->
+                        <PrimeMessage v-if="slugChanged" severity="warn" :closable="false" class="slug-warning">
+                            {{ slugChangeWarning }}
+                        </PrimeMessage>
+                    </div>
                 </div>
-                <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-2">
-                    <strong>Rescan</strong> re-processes all indexed files to update their metadata
-                    (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
-                    or if file metadata appears outdated or incorrect.
-                </PrimeMessage>
-                <Button @click="$emit('rescanRequested')" icon="fa-solid fa-rotate" label="Rescan Dataset" />
-            </div>
+
+                <div class="settings-field">
+                    <label for="settings-tagline" class="settings-label"><i class="fa-solid fa-tag" aria-hidden="true" />Tagline</label>
+                    <div class="settings-control">
+                        <InputText id="settings-tagline" v-model="tagline" :maxlength="taglineMaxLength"
+                                   placeholder="A short description" aria-describedby="settings-tagline-count"
+                                   :disabled="saving" fluid />
+                        <small id="settings-tagline-count" class="char-count">{{ tagline ? tagline.length : 0 }}/{{ taglineMaxLength }}</small>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-group" aria-labelledby="settings-sharing">
+                <h3 id="settings-sharing" class="settings-group-title">Sharing</h3>
+
+                <div class="settings-field">
+                    <label id="settings-visibility-label" for="settings-visibility" class="settings-label">
+                        <i class="fa-solid" :class="noAuthRequired ? 'fa-unlock' : 'fa-lock'" aria-hidden="true" />Visibility
+                    </label>
+                    <div class="settings-control">
+                        <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label"
+                                aria-describedby="settings-visibility-hint" :options="visibilityOptions" option-label="label"
+                                option-value="value" :disabled="!canWrite || saving" class="settings-select" />
+                        <small id="settings-visibility-hint" class="field-hint">{{ visibilityHint }}</small>
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <label id="settings-license-label" for="settings-license" class="settings-label">
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true" />License
+                    </label>
+                    <div class="settings-control">
+                        <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label"
+                                :options="licenseOptions" option-label="label" option-value="value" :disabled="!canWrite || saving"
+                                class="settings-select" :title="licenseInfo.name" />
+                        <small v-if="licenseInfo.url" class="field-hint">
+                            <a :href="licenseInfo.url" target="_blank" rel="noopener">Read the license</a>
+                        </small>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Files of the dataset: these buttons write or delete them at once, Save is not needed -->
+            <section v-if="canWrite" class="settings-group" aria-labelledby="settings-files" aria-describedby="settings-files-hint">
+                <h3 id="settings-files" class="settings-group-title">Files</h3>
+                <p id="settings-files-hint" class="settings-group-hint">These buttons change the files of the dataset right away.</p>
+
+                <div class="settings-field">
+                    <span id="settings-thumbnail-label" class="settings-label"><i class="fa-solid fa-image" aria-hidden="true" />Thumbnail</span>
+                    <div class="settings-control">
+                        <DatasetCoverField v-model="coverChange" :dataset="dataset" :current-url="coverUrl" :busy="coverSaving"
+                                           labelledby="settings-thumbnail-label" />
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <span class="settings-label"><i class="fa-solid fa-book" aria-hidden="true" />Readme</span>
+                    <div class="settings-control">
+                        <template v-if="readme == null">
+                            <Button severity="secondary" icon="fa-solid fa-plus" label="Add Readme" @click="addDocument('README.md')" />
+                            <small class="field-hint">Creates README.md at the root of the dataset, a file to describe it.</small>
+                        </template>
+                        <template v-else>
+                            <span class="settings-value">{{ readme }}</span>
+                            <div class="readme-actions">
+                                <Button severity="secondary" icon="fa-solid fa-book-open" label="Open" @click="leaveFor('openReadme', readme)" />
+                                <Button severity="secondary" icon="fa-solid fa-pen-to-square" label="Edit" @click="leaveFor('editReadme', readme)" />
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </section>
+
+            <section v-if="canWrite" class="settings-group" aria-labelledby="settings-maintenance">
+                <h3 id="settings-maintenance" class="settings-group-title">Maintenance</h3>
+
+                <div class="settings-field">
+                    <span class="settings-label"><i :class="RESCAN_ICON" aria-hidden="true" />Rescan</span>
+                    <div class="settings-control">
+                        <Button severity="secondary" :icon="RESCAN_ICON" label="Rescan Dataset"
+                                aria-describedby="settings-rescan-hint" @click="leaveFor('rescanRequested')" />
+                        <small id="settings-rescan-hint" class="field-hint">
+                            Reads the metadata of every file again (GPS position, timestamps, thumbnails).
+                            Use it after a DroneDB upgrade or when file metadata looks wrong.
+                        </small>
+                    </div>
+                </div>
+            </section>
         </div>
+
+        <template #footer>
+            <template v-if="canWrite">
+                <span v-if="dirty" class="unsaved-note me-auto" role="status">Unsaved changes</span>
+                <Button label="Cancel" severity="secondary" data-cancel :disabled="saving" @click="requestClose" />
+                <Button label="Save" icon="fa-solid fa-floppy-disk" data-confirm :disabled="!dirty || saving" :loading="saving"
+                        @click="save" />
+            </template>
+            <Button v-else label="Close" severity="secondary" data-cancel @click="$emit('close', 'close')" />
+        </template>
     </Window>
 </template>
 
 <script>
-import Message from '@/components/Message.vue';
-import mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Message from '@/components/HubMessage.vue';
 import { Licenses } from '@/libs/licenses';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
+import FieldError from '@/components/FieldError.vue';
+import DatasetCoverField from '@/components/DatasetCoverField.vue';
 import ddb from 'ddb';
-import { sanitizeHtml } from '@/libs/sanitize';
+import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
+import { VISIBILITY_OPTIONS, DEFAULT_VISIBILITY, visibilityDescription } from '@/libs/visibility';
+import { datasetThumbnailUrl } from '@/libs/optionalFile';
+import { applyCoverChange } from '@/libs/datasetCover';
+import { slugProblem, slugDescription } from '@/libs/slug';
+import { displayNameLimits, displayNameLengthProblem } from '@/libs/nameRules';
+import { RESCAN_ICON } from '@/libs/glyphs';
+
+/**
+ * The settings Save writes, in this order: the slug is last because a new slug takes the page to the new address.
+ * `write` sends the value; `what` names the setting in an error that has no field of its own.
+ */
+const SETTINGS = [
+    { key: 'name', write: (ds, v) => ds.metaSet('name', v) },
+    { key: 'tagline', what: 'tagline', write: (ds, v) => (v ? ds.metaSet('tagline', v) : ds.metaUnset('tagline')) },
+    { key: 'license', what: 'license', write: (ds, v) => ds.metaSet('license', v) },
+    { key: 'visibility', what: 'visibility', write: (ds, v) => ds.setVisibility(v) },
+    { key: 'slug', write: (ds, v) => ds.rename(v) }
+];
 
 export default {
+    components: {
+        LoadingSpinner,
+        Message, Window, Button, Select, InputText, PrimeMessage, FieldError, DatasetCoverField
+    },
     props: {
         dataset: {
             required: true,
@@ -109,80 +183,94 @@ export default {
         canWrite: {
             type: Boolean,
             default: false
+        },
+        // Asked on Save when the URL slug changed, with the old and the new slug: resolves to false when the user does not
+        // agree, and nothing is saved then
+        confirmSlugChange: {
+            type: Function,
+            default: null
+        },
+        // Asked on Save when the visibility changed, with the dataset's name and the old and the new visibility (every change
+        // asks, as in the header): resolves to false when the user does not agree, and nothing is saved then
+        confirmVisibilityChange: {
+            type: Function,
+            default: null
+        },
+        // Asked before the window closes (or opens something else) with changes that are not saved: resolves to true to
+        // discard them
+        confirmDiscard: {
+            type: Function,
+            default: null
         }
     },
-    emits: ['onClose'],
-    components: {
-        Message, Window, Button, Select, InputText, PrimeMessage
-    },
+    // close: the window closes ('saved' after a Save); changed: a setting was saved (the page reads the dataset again);
+    // slugRenamed: the URL changed, the page goes to it; openReadme / editReadme: the README opens in its viewer / in the
+    // editor; fileSaved / filesRemoved: files of the dataset were written / deleted (the thumbnail), the file list shows it
+    emits: ['close', 'rescanRequested', 'addMarkdown', 'openReadme', 'editReadme', 'changed', 'slugRenamed', 'fileSaved', 'filesRemoved'],
     data: function () {
         return {
+            taglineMaxLength: TAGLINE_MAX_LENGTH,
             error: "",
-            properties: null,
             loading: true,
+            saving: false,
             readme: null,
-            license: "proprietary",
+            // The fields: a draft until Save
+            name: "",
+            slug: this.dataset.ds,
             tagline: "",
-            thumbnailPreview: null,
-            thumbnailError: false,
-            thumbnailUploading: false,
-            thumbnailRemoving: false,
+            license: "proprietary",
+            visibility: DEFAULT_VISIBILITY,
+            // The settings as the dataset has them (normalised as `draft`): a field that differs is a change
+            saved: null,
+            nameError: "",
+            nameMaxLength: displayNameLimits().max,
+            slugError: "",
+            // The cover the dataset has (null: none), and the change the user chose, applied at once (a file button)
+            coverUrl: null,
+            coverChange: null,
+            coverSaving: false,
             Licenses,
-            Visibilities: {
-                [ddb.Visibility.PUBLIC]: { label: "Public" },
-                [ddb.Visibility.UNLISTED]: { label: "Unlisted" },
-                [ddb.Visibility.PRIVATE]: { label: "Private" }
-            },
-            visibility: ddb.Visibility.PRIVATE
+            RESCAN_ICON,
+            visibilityOptions: VISIBILITY_OPTIONS
         }
-    },
-    mounted: async function () {
-        try {
-            const info = await this.dataset.info();
-            this.properties = info[0].properties;
-
-            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
-            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
-            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
-            this.tagline = this.properties?.meta?.tagline?.data ?? '';
-
-            // Load existing dataset thumbnail preview
-            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
-            this.thumbnailError = false;
-
-            console.log(this.Visibilities);
-        } catch (e) {
-            this.error = e.message;
-        }
-
-        this.loading = false;
-    },
-    beforeUnmount: function () {
     },
     computed: {
-        currentUrl: function () {
-            return window.location.href;
-        },
         noAuthRequired: function () {
             return [ddb.Visibility.PUBLIC, ddb.Visibility.UNLISTED].indexOf(this.visibility) !== -1;
         },
-        description: function () {
-            if (parseInt(this.visibility) === ddb.Visibility.PUBLIC) {
-                return `This dataset will be discoverable. Anybody with the <a href="${this.currentUrl}">link</a> to this page can also see and download the data`;
-            } else if (parseInt(this.visibility) === ddb.Visibility.UNLISTED) {
-                return `Anybody with the <a href="${this.currentUrl}">link</a> to this page can see and download the data, but it will not be discoverable.`;
-            } else {
-                return `Only you and people in your organization can see and download the data.`;
-            }
+        // What the chosen visibility means, in the words of the header's visibility menu
+        visibilityHint: function () {
+            return visibilityDescription(parseInt(this.visibility));
         },
-        safeDescription: function () {
-            return sanitizeHtml(this.description);
+        // The fields as Save sends them
+        draft: function () {
+            return {
+                name: this.name.trim(),
+                slug: this.slug.trim(),
+                tagline: (this.tagline || '').trim(),
+                license: this.license,
+                visibility: parseInt(this.visibility)
+            };
         },
-        visibilityOptions: function () {
-            return Object.entries(this.Visibilities).map(([k, v]) => ({
-                value: parseInt(k),
-                label: v.label
-            }));
+        // The settings that differ from the dataset, in the order Save writes them
+        changes: function () {
+            if (!this.saved || !this.canWrite) return [];
+            return SETTINGS.filter(s => this.draft[s.key] !== this.saved[s.key]);
+        },
+        dirty: function () {
+            return this.changes.length > 0;
+        },
+        slugChanged: function () {
+            return this.slug.trim() !== this.dataset.ds;
+        },
+        slugRuleText: function () {
+            return slugDescription();
+        },
+        slugChangeWarning: function () {
+            return `Links to /r/${this.dataset.org}/${this.dataset.ds} will stop working`;
+        },
+        licenseInfo: function () {
+            return this.Licenses[this.license] ?? { name: this.license, url: null };
         },
         licenseOptions: function () {
             return Object.entries(this.Licenses).map(([k, v]) => ({
@@ -191,118 +279,154 @@ export default {
             }));
         }
     },
+    watch: {
+        coverChange: function (change) {
+            this.applyCover(change);
+        }
+    },
+    mounted: async function () {
+        try {
+            const info = await this.dataset.info();
+            const properties = info[0].properties;
+
+            this.readme = (typeof properties.readme !== 'undefined') ? properties.readme : null;
+            this.license = properties?.meta?.license?.data ?? 'proprietary';
+            this.visibility = properties?.meta?.visibility?.data ?? DEFAULT_VISIBILITY;
+            this.tagline = properties?.meta?.tagline?.data ?? '';
+            // Without a name the dataset shows its slug
+            this.name = properties?.meta?.name?.data ?? '';
+            this.saved = { ...this.draft };
+
+            // The existing dataset thumbnail, asked for only when the dataset has one (its entry says so): a request for
+            // a cover that is not there logs a 404 in the console
+            this.coverUrl = datasetThumbnailUrl(this.dataset, properties, 256, Date.now());
+
+        } catch (e) {
+            this.error = e.message;
+        }
+
+        this.loading = false;
+    },
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose', buttonId);
+        /** The field problems of the changes, at their fields: true when there is none. */
+        validate: function () {
+            const changed = new Set(this.changes.map(s => s.key));
+            // A name is never empty: the dataset would show its slug in its place
+            this.nameError = !changed.has('name') ? ''
+                : this.draft.name === '' ? 'Enter a name' : (displayNameLengthProblem(this.draft.name) || '');
+            this.slugError = changed.has('slug') ? (slugProblem(this.draft.slug, { kind: 'Dataset' }) || '') : '';
+            return !this.nameError && !this.slugError;
         },
-        setVisibility: async function () {
+        /**
+         * Writes the settings that changed, the slug last. Nothing is sent while a field has a problem or when the user
+         * does not agree to a new visibility or a new URL. A setting that fails stops the save: the window stays open with the error, and the
+         * settings written before it are no longer changes. All saved: the window closes, or the page goes to the new URL.
+         */
+        save: async function () {
+            if (!this.dirty || this.saving) return;
+            this.error = '';
+            if (!this.validate()) return;
+            const changes = this.changes;
+            const draft = { ...this.draft };
+            const renames = changes.some(s => s.key === 'slug');
+            const revisibles = changes.some(s => s.key === 'visibility');
+            if (revisibles && this.confirmVisibilityChange
+                && !await this.confirmVisibilityChange(draft.name || this.dataset.ds, this.saved.visibility, draft.visibility)) return;
+            if (renames && this.confirmSlugChange && !await this.confirmSlugChange(this.dataset.ds, draft.slug)) return;
+
+            this.saving = true;
+            let written = 0;
+            let renamed = null;
             try {
-                this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);
-                this.$toast.add({ severity: 'success', summary: 'Visibility Updated', detail: 'Dataset visibility updated successfully', life: 3000 });
+                for (const setting of changes) {
+                    const result = await setting.write(this.dataset, draft[setting.key]);
+                    if (setting.key === 'slug') renamed = result?.slug || draft.slug;
+                    this.saved = { ...this.saved, [setting.key]: draft[setting.key] };
+                    written++;
+                }
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update visibility: ' + e.message, life: 5000 });
-                this.error = e.message;
+                const failed = changes[written];
+                // The Registry's words, at the field when it has one
+                if (failed.key === 'name') this.nameError = e.message;
+                else if (failed.key === 'slug') this.slugError = e.message;
+                else this.error = `Could not save the ${failed.what}: ${e.message}`;
+            }
+            if (written) this.$emit('changed');
+            if (written < changes.length) {
+                this.saving = false;
+                return;
+            }
+
+            // The fields as they were saved (trimmed)
+            this.name = draft.name;
+            this.tagline = draft.tagline;
+            this.slug = draft.slug;
+            this.$notify.success('Settings saved', { summary: 'Dataset Settings' });
+            // A new URL: the page goes there, and the window stays busy until it does
+            if (renamed) this.$emit('slugRenamed', renamed);
+            else {
+                this.saving = false;
+                this.$emit('close', 'saved');
             }
         },
-        setLicense: async function () {
-            try {
-                this.properties.meta.license = await this.dataset.metaSet("license", this.license);
-                this.$toast.add({ severity: 'success', summary: 'License Updated', detail: 'Dataset license updated successfully', life: 3000 });
-            } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update license: ' + e.message, life: 5000 });
-                this.error = e.message;
-            }
+        /** Whether the window can go: no changes, or the user discards them. */
+        canLeave: async function () {
+            if (!this.dirty) return true;
+            return this.confirmDiscard ? !!await this.confirmDiscard() : true;
         },
-        setTagline: async function () {
+        /** Cancel, the close button, Escape and a click beside the window. */
+        requestClose: async function () {
+            if (this.saving) return;
+            if (await this.canLeave()) this.$emit('close', 'close');
+        },
+        /** An action that closes the window to open something else: asked first with changes that are not saved. */
+        leaveFor: async function (event, ...args) {
+            if (await this.canLeave()) this.$emit(event, ...args);
+        },
+        /** The cover the user chose, written at once (the Files buttons do not wait for Save). */
+        applyCover: async function (change) {
+            if (!change || this.coverSaving) return;
+            this.coverSaving = true;
+            this.error = '';
             try {
-                if (this.tagline && this.tagline.trim()) {
-                    await this.dataset.metaSet('tagline', this.tagline.trim());
-                    this.$toast.add({ severity: 'success', summary: 'Tagline Updated', detail: 'Tagline updated successfully', life: 3000 });
+                const { written, removed } = await applyCoverChange(this.dataset, change);
+                this.coverUrl = written ? this.dataset.datasetThumbUrl(256, Date.now()) : null;
+                if (removed.length) this.$emit('filesRemoved', removed);
+                if (written) {
+                    // The thumbnail is a file of the dataset: the toast names it
+                    this.$notify.success(`Saved as ${written} in the dataset root`, { summary: 'Thumbnail Updated' });
+                    this.$emit('fileSaved', written);
                 } else {
-                    await this.dataset.metaUnset('tagline');
-                    this.tagline = '';
-                    this.$toast.add({ severity: 'success', summary: 'Tagline Removed', detail: 'Tagline removed successfully', life: 3000 });
+                    this.$notify.success('Thumbnail removed', { summary: 'Thumbnail Removed' });
                 }
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update tagline: ' + e.message, life: 5000 });
-                this.error = e.message;
+                this.error = `Could not change the thumbnail: ${e.message}`;
             }
-        },
-        handleThumbnailSelect: async function (event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            this.thumbnailUploading = true;
-            this.error = '';
-
-            try {
-                // Determine the target filename based on file type
-                const ext = file.type === 'image/webp' ? 'webp'
-                          : file.type === 'image/png' ? 'png'
-                          : 'jpg';
-                const path = `thumbnail.${ext}`;
-
-                await this.dataset.uploadObj(path, file);
-
-                // Refresh preview with cache-busting timestamp
-                this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
-                this.thumbnailError = false;
-                this.$toast.add({ severity: 'success', summary: 'Thumbnail Updated', detail: 'Thumbnail uploaded successfully', life: 3000 });
-            } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to upload thumbnail: ' + e.message, life: 5000 });
-                this.error = 'Failed to upload thumbnail: ' + e.message;
-            }
-
-            this.thumbnailUploading = false;
-            // Reset file input so the same file can be re-selected
-            this.$refs.thumbnailInput.value = '';
-        },
-        removeThumbnail: async function () {
-            this.thumbnailRemoving = true;
-            this.error = '';
-
-            try {
-                // Try to delete all possible thumbnail candidates
-                const candidates = ['thumbnail.webp', 'thumbnail.jpg', 'thumbnail.png',
-                                    'cover.webp', 'cover.jpg', 'cover.png'];
-                for (const candidate of candidates) {
-                    try {
-                        await this.dataset.deleteObj(candidate);
-                    } catch (e) {
-                        // Ignore 404 errors - file doesn't exist
-                    }
-                }
-
-                this.thumbnailPreview = null;
-                this.thumbnailError = true;
-                this.$toast.add({ severity: 'success', summary: 'Thumbnail Removed', detail: 'Thumbnail removed successfully', life: 3000 });
-            } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove thumbnail: ' + e.message, life: 5000 });
-                this.error = 'Failed to remove thumbnail: ' + e.message;
-            }
-
-            this.thumbnailRemoving = false;
+            this.coverSaving = false;
+            this.coverChange = null;
         },
         addDocument: async function (document) {
+            // The new README opens in the editor and this window closes: its changes are asked about first
+            if (!await this.canLeave()) return;
 
             this.loading = true;
 
-            var entry = null;
+            var entry;
 
             try {
                 switch (document) {
                     case "README.md":
-                        entry = await this.dataset.writeObj(document, "\n");
+                        entry = await this.dataset.writeObj(document, "\n", { overwrite: true });
                         this.readme = document;
                         break;
                     default:
                         throw new Error("Invalid document: " + document);
                 }
 
-                this.$toast.add({ severity: 'success', summary: 'Document Created', detail: `${document} created successfully`, life: 3000 });
+                this.$notify.success(`${document} created successfully`, { summary: 'Document Created' });
                 this.$emit('addMarkdown', document, entry);
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create document: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to create document: ' + e.message);
                 this.error = e.message;
             }
 
@@ -313,93 +437,99 @@ export default {
 </script>
 
 <style scoped>
-#settings {
-    min-height: 12.5rem;
-    padding: 1rem;
-    margin-top: 0.75rem;
-}
-
-.loading {
-    text-align: center;
-    padding: 1rem;
-}
-
 .settings-body {
-    padding: 0.25rem 0.5rem 0 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ddb-spacing-lg);
 }
 
-.settings-section {
-    padding: var(--ddb-spacing-md) 0;
-    border-bottom: var(--ddb-border-width) solid rgba(0, 0, 0, 0.08);
-}
-
-.settings-section:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.settings-section .ui.header {
-    margin-top: 0;
-    margin-bottom: var(--ddb-spacing-xs);
-}
-
-.settings-desc {
-    font-size: 90%;
-    margin-top: 0.25rem;
-    max-width: 26.25rem;
+.settings-group-title {
+    margin: 0 0 var(--ddb-spacing-sm);
+    padding-bottom: var(--ddb-spacing-xs);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
+    font-size: var(--ddb-font-size-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
     color: var(--ddb-text-secondary);
 }
 
-.settings-desc a {
-    text-decoration: underline;
+/* A label column and a control column; stacked on a phone */
+.settings-field {
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
+    gap: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+    align-items: start;
+    padding: var(--ddb-spacing-sm) 0;
 }
 
-.settings-section .ui.button {
-    color: var(--ddb-text) !important;
+.settings-label {
+    display: flex;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    min-height: 2.5rem;
+    font-weight: 600;
+    color: var(--ddb-text);
 }
 
-.license-dropdown {
-    max-width: 16rem;
+.settings-label i {
+    flex-shrink: 0;
+    width: 1.25em;
+    text-align: center;
+    color: var(--ddb-text-secondary);
 }
 
-
-
-.tagline-field {
-    position: relative;
+.settings-control {
+    min-width: 0;
 }
 
-.tagline-field .char-count {
-    color: var(--ddb-text-muted);
-    float: right;
+.settings-select {
+    width: min(18rem, 100%);
+}
+
+.settings-value {
+    display: flex;
+    align-items: center;
+    min-height: 2.5rem;
+    color: var(--ddb-text-secondary);
+}
+
+.readme-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ddb-spacing-sm);
+}
+
+.slug-warning {
+    margin: var(--ddb-spacing-sm) 0;
+}
+
+.field-hint {
+    display: block;
     margin-top: var(--ddb-spacing-xs);
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
+    line-height: 1.4;
+}
+
+.unsaved-note {
+    align-self: center;
+    color: var(--ddb-text-muted);
     font-size: var(--ddb-font-size-sm);
 }
 
-.thumbnail-upload {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
+.settings-group-hint {
+    margin: 0 0 var(--ddb-spacing-xs);
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
 }
 
-.thumbnail-preview-container {
-    flex-shrink: 0;
-}
+@media only screen and (max-width: 575.98px) {
+    .settings-field {
+        grid-template-columns: minmax(0, 1fr);
+    }
 
-.thumbnail-preview {
-    max-width: 7.5rem;
-    max-height: 5rem;
-    object-fit: contain;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-}
-
-.thumbnail-placeholder {
-    opacity: 0.4;
-}
-
-.thumbnail-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    .settings-label {
+        min-height: 0;
+    }
 }
 </style>

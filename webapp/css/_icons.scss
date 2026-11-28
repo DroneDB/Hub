@@ -1,0 +1,28 @@
+// ============================================================
+// The glyphs drawn for the Hub (webapp/icons/<name>.svg), for the buttons Font Awesome has no glyph for.
+// A glyph is a class, used as a Font Awesome class is (libs/glyphs.js gives each meaning its class):
+//   <i class="ddb-icon ddb-icon-area" />
+// It is drawn in the colour of the text around it (the SVG is the mask of a box filled with currentColor), so it
+// follows a button's states and both themes, and it is sized in em, so it follows the font size as a font glyph
+// does. A glyph is drawn on a 24 x 24 grid at the weight of Font Awesome Solid, and shows at 1.125em: the height
+// its shapes need to stand as tall as a Font Awesome glyph of 1em.
+// ============================================================
+$glyphs: area, callouts, compare, direction, edit-vertices, file-geojson, file-table, flight-path, raster-analysis,
+    select-clear, select-polygon, select-rectangle, stockpile;
+
+.ddb-icon {
+    display: inline-block;
+    width: 1.125em;
+    height: 1.125em;
+    // On the line as a font glyph is: its box is centred on the middle of the text
+    vertical-align: -0.2em;
+    background-color: currentColor;
+    -webkit-mask: var(--ddb-icon-glyph) center / contain no-repeat;
+    mask: var(--ddb-icon-glyph) center / contain no-repeat;
+}
+
+@each $glyph in $glyphs {
+    .ddb-icon-#{$glyph} {
+        --ddb-icon-glyph: url('../icons/#{$glyph}.svg');
+    }
+}

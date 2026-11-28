@@ -19,6 +19,12 @@
  *
  * The correction is a rotation of the tileset's own Object3D - rigid, so it preserves every
  * distance and area the measurement tools report.
+ *
+ * A georeferenced model (an ODM mesh with its coords.txt) comes with a root transform from its
+ * local east-north-up frame to Earth-centred coordinates (ECEF). The flat scene of a model is not a
+ * globe: left there, the model keeps the tilt of the Earth's surface at its latitude and longitude
+ * and shows edge-on. Its content is first brought back to the local frame (localizeGeocentricContent),
+ * where it is Z-up, and only then checked by the up-axis detection.
  */
 
 const ORIENT = {
@@ -26,9 +32,10 @@ const ORIENT = {
     // keeps the pass cheap on dense meshes.
     maxTrianglesPerMesh: 4000,
     // |sum of normals| / sum of |normals|. A closed object tends to 0 (its normals cancel), an
-    // open surface to 1. Terrain sits near 0.3 even when hilly, so this only rejects the genuinely
-    // directionless case.
-    minCoherence: 0.05,
+    // open surface to 1. Aerial meshes measure 0.4 to 0.95 (hilly terrain about 0.3), while a
+    // closed object with one large open or double-walled panel (a refrigerator's glass door)
+    // still measures below 0.1: its panel must not be taken for the ground.
+    minCoherence: 0.2,
     // How closely the mean normal must line up with a signed axis before it is trusted.
     minAxisDot: 0.8
 };
@@ -106,6 +113,9 @@ export function alignContentUpAxis(libs, root, up, options = {}) {
     if (!measured) return null;
     if (measured.coherence < (options.minCoherence || ORIENT.minCoherence)) return null;
 
+    // The correction turns `root` in its parent's frame, so the direction is read there (a
+    // localized georeferenced model carries the rotation from ECEF to its local frame)
+    const normal = measured.normal.clone().transformDirection(root.matrix);
     const minAxisDot = options.minAxisDot || ORIENT.minAxisDot;
     const axes = [
         new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
@@ -115,7 +125,7 @@ export function alignContentUpAxis(libs, root, up, options = {}) {
     let axis = null;
     let best = minAxisDot;
     for (const candidate of axes) {
-        const dot = measured.normal.dot(candidate);
+        const dot = normal.dot(candidate);
         if (dot > best) { best = dot; axis = candidate; }
     }
     if (!axis) return null;
@@ -124,11 +134,54 @@ export function alignContentUpAxis(libs, root, up, options = {}) {
     if (axis.dot(target) > 0.999) return null; // already upright
 
     // Shortest arc between two axes is a quarter or half turn about a third axis, so the model's
-    // horizontal bearing survives the correction.
+    // horizontal bearing survives the correction. It turns about the scene origin, the position of
+    // `root` with it (a localized georeferenced model has one), as the returned matrix turns a box.
     const quaternion = new THREE.Quaternion().setFromUnitVectors(axis, target);
-    root.quaternion.premultiply(quaternion);
+    const rotation = new THREE.Matrix4().makeRotationFromQuaternion(quaternion);
+    root.applyMatrix4(rotation);
     root.updateMatrixWorld(true);
-    return new THREE.Matrix4().makeRotationFromQuaternion(quaternion);
+    return rotation;
+}
+
+// Distance of the ground from the Earth's centre, metres, with a wide margin: from the polar
+// radius (6 356 752 m) less the deepest land to the equatorial radius (6 378 137 m) plus the highest
+// summits. The translation of a root transform to ECEF is in this range; a local frame is not.
+const GROUND_RADIUS = { min: 6.3e6, max: 6.4e6 };
+
+/**
+ * The transform that brings a tileset's content from Earth-centred coordinates back to its own
+ * local frame, when the root transform of the tileset places it on the Earth, else null.
+ *
+ * @param libs - { THREE }.
+ * @param transform - the root tile's `transform` (16 numbers, column-major), or undefined.
+ * @returns the inverse of the root transform as a Matrix4, or null.
+ */
+export function geocentricPlacementInverse(libs, transform) {
+    const { THREE } = libs;
+    if (!Array.isArray(transform) || transform.length !== 16 || !transform.every(Number.isFinite)) return null;
+    const distance = Math.hypot(transform[12], transform[13], transform[14]);
+    if (distance < GROUND_RADIUS.min || distance > GROUND_RADIUS.max) return null;
+    const placement = new THREE.Matrix4().fromArray(transform);
+    if (placement.determinant() === 0) return null;
+    return placement.invert();
+}
+
+/**
+ * Brings the content of a tileset placed on the Earth (a root transform to ECEF) back to its local
+ * east-north-up frame in a flat scene: `root` gets the inverse of the root transform. No-op for a
+ * tileset in local coordinates.
+ *
+ * @param libs - { THREE }.
+ * @param root - the tileset Object3D to move in place.
+ * @param transform - the root tile's `transform`, or undefined.
+ * @returns the applied Matrix4 (to bring cached bounding boxes along), or null.
+ */
+export function localizeGeocentricContent(libs, root, transform) {
+    const inverse = geocentricPlacementInverse(libs, transform);
+    if (!inverse) return null;
+    root.applyMatrix4(inverse);
+    root.updateMatrixWorld(true);
+    return inverse;
 }
 
 export { ORIENT };

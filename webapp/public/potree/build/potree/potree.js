@@ -51881,8 +51881,12 @@
 			let spriteWidth = 2 * margin + textWidth + 2 * this.borderThickness;
 			let spriteHeight = this.fontsize * 1.4 + 2 * this.borderThickness;
 
-			context.canvas.width = spriteWidth;
-			context.canvas.height = spriteHeight;
+			// The text is drawn at TextSprite.resolutionScale x the sprite's size (the pixel ratio of the screen):
+			// the sprite keeps its size in the scene, its texture has more pixels
+			const resolutionScale = TextSprite.resolutionScale || 1;
+			context.canvas.width = Math.ceil(spriteWidth * resolutionScale);
+			context.canvas.height = Math.ceil(spriteHeight * resolutionScale);
+			context.scale(resolutionScale, resolutionScale);
 			context.font = 'Bold ' + this.fontsize + 'px ' + this.fontface;
 
 			// background color
@@ -56985,19 +56989,49 @@
 			child.parent = this;
 		}
 
+		// A node loads in steps (its hierarchy page, its points, their decoding in a worker): when one fails, the node
+		// gives back its loading slot (failLoading) and is asked for again later, rather than staying "loading" for the
+		// rest of the session, which left a hole in the cloud and, after maxNodesLoading failures, stopped all loading
 		async load() {
 			if (this.loaded || this.loading) return;
+			if (this.isWaitingToRetry()) return;
 			if (Potree.numNodesLoading >= Potree.maxNodesLoading) return;
 
 			this.loading = true;
 			++Potree.numNodesLoading;
 
-			if (!this.nodeinfo) await this.loadHierarchy();
-			this.loadPoints();
+			try {
+				if (!this.nodeinfo) await this.loadHierarchy();
+				await this.loadPoints();
+			} catch (e) {
+				this.failLoading(e);
+			}
 		}
 
 		loadPoints(){
-			this.owner.loader.load(this);
+			return this.owner.loader.load(this);
+		}
+
+		// After a failed load the node waits before it is asked for again: 1 s, doubling with each failure in a row, up
+		// to 30 s; meanwhile the renderer gives its turn to the other nodes in view
+		isWaitingToRetry() {
+			return this.retryAt !== undefined && Date.now() < this.retryAt;
+		}
+
+		failLoading(error) {
+			if (!this.loading) return;
+			this.loading = false;
+			--Potree.numNodesLoading;
+			this.failures = (this.failures || 0) + 1;
+			const delay = Math.min(1000 * Math.pow(2, this.failures - 1), 30000);
+			// A read the server refused for good (a 401 or a 404: the transport says retryable === false) is never asked
+			// for again: the same answer would come every 30 s for the rest of the session
+			const forGood = !!error && error.retryable === false;
+			this.retryAt = forGood ? Infinity : Date.now() + delay;
+			// Reads stopped on purpose (the viewer closed) are no failure to report
+			if (error && error.name === 'AbortError') return;
+			if (forGood) console.warn(`Point cloud node ${this.name} cannot be loaded:`, error);
+			else console.warn(`Point cloud node ${this.name} did not load, asked again in ${delay / 1000} s:`, error);
 		}
 
 		async loadHierarchy() {
@@ -57063,6 +57097,8 @@
 			this.mean = mean;
 			this.loaded = true;
 			this.loading = false;
+			this.failures = 0;
+			this.retryAt = undefined;
 			--Potree.numNodesLoading;
 		}
 
@@ -60428,8 +60464,9 @@ void main() {
 
 		updateMaterial (material, visibleNodes, camera, renderer) {
 			material.fov = camera.fov * (Math.PI / 180);
-			material.screenWidth = renderer.domElement.clientWidth;
-			material.screenHeight = renderer.domElement.clientHeight;
+			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio)
+			material.screenWidth = renderer.domElement.width;
+			material.screenHeight = renderer.domElement.height;
 			material.spacing = this.pcoGeometry.spacing; // * Math.max(this.scale.x, this.scale.y, this.scale.z);
 			material.near = camera.near;
 			material.far = camera.far;
@@ -61642,7 +61679,8 @@ void main() {
 					node = pointcloud.toTreeNode(node, parent);
 					loadedToGPUThisFrame++;
 				} else {
-					unloadedGeometry.push(node);
+					// A node waiting to retry a failed load does not take one of the maxNodesLoading turns of this frame
+					if (!(node.isWaitingToRetry && node.isWaitingToRetry())) unloadedGeometry.push(node);
 					visibleGeometry.push(node);
 				}
 			}
@@ -61957,8 +61995,9 @@ void main() {
 
 		updateMaterial (material, visibleNodes, camera, renderer) {
 			material.fov = camera.fov * (Math.PI / 180);
-			material.screenWidth = renderer.domElement.clientWidth;
-			material.screenHeight = renderer.domElement.clientHeight;
+			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio)
+			material.screenWidth = renderer.domElement.width;
+			material.screenHeight = renderer.domElement.height;
 			material.spacing = this.pcoGeometry.spacing;
 			material.near = camera.near;
 			material.far = camera.far;
@@ -63372,6 +63411,13 @@ void main() {
 			}
 		}
 
+		/** How many pixels of `target` (the drawing buffer when null) a CSS px is: 1 for a target of the CSS size (the pick). */
+		pointSizeScale(target){
+			const cssWidth = this.threeRenderer.getSize(this.sizeTmp ?? (this.sizeTmp = new Vector2())).width;
+			const width = target ? target.width : this.threeRenderer.domElement.width;
+			return cssWidth > 0 && width > 0 ? Math.round(100 * width / cssWidth) / 100 : 1;
+		}
+
 		renderOctree(octree, nodes, camera, target, params = {}){
 
 			let gl = this.gl;
@@ -63621,9 +63667,17 @@ void main() {
 				}
 
 
-				shader.setUniform1f("size", material.size);
-				shader.setUniform1f("maxSize", material.uniforms.maxSize.value);
-				shader.setUniform1f("minSize", material.uniforms.minSize.value);
+				// Point sizes are CSS px (the material, the Appearance menu and the pick keep them so); they are
+				// drawn in the pixels of the target: the size of the drawing buffer is the CSS size x the pixel ratio.
+				// The shader draws `size` as pixels for a fixed size, and for an attenuated size with an orthographic
+				// camera; the other sizes are multiplied by uScreenWidth or uScreenHeight, already in the pixels of the target.
+				// minSize and maxSize are pixels for every type.
+				const sizeScale = this.pointSizeScale(target);
+				const sizeIsPixels = material.pointSizeType === PointSizeType.FIXED ||
+					(material.pointSizeType === PointSizeType.ATTENUATED && camera instanceof OrthographicCamera);
+				shader.setUniform1f("size", sizeIsPixels ? material.size * sizeScale : material.size);
+				shader.setUniform1f("maxSize", material.uniforms.maxSize.value * sizeScale);
+				shader.setUniform1f("minSize", material.uniforms.minSize.value * sizeScale);
 
 
 				// uniform float uPCIndex
@@ -66796,8 +66850,17 @@ void main() {
 			const { Copc, Getter } = window.Copc;
 
 			const url = file;
-			const getter = Getter.http(url);
-			const copc = await Copc.create(getter);
+			// The page may read the file through its own transport (Potree.createCopcGetter), else copc.js reads it
+			const getter = Potree.createCopcGetter ? Potree.createCopcGetter(url) : Getter.http(url);
+			let copc;
+			try {
+				copc = await Copc.create(getter);
+			} catch (e) {
+				// No header, no cloud: the caller is told (loading_failed) instead of waiting for ever
+				console.error(`Unable to read the COPC header of ${url}:`, e);
+				callback(null);
+				return;
+			}
 
 			let geometry = new Potree.PointCloudCopcGeometry(getter, copc);
 			let root = new Potree.PointCloudCopcGeometryNode(geometry);
@@ -66979,24 +67042,21 @@ void main() {
 			const compressed = await node.owner.getter(
 				pointDataOffset,
 				pointDataOffset + pointDataLength);
-			this.parse(node, compressed.buffer);
+			return this.parse(node, compressed.buffer);
 		}
 
+		// A failure here (and in the read before it) rejects the node's load, which gives back its loading slot
 		async parse(node, compressed) {
 			let handler = new EptLazBatcher(node);
 
-			try {
-				handler.push({
-					isFullFile: false,
-					compressed,
-					header: node.owner.copc.header,
-					eb: node.owner.copc.eb,
-					pointCount: node.nodeinfo.pointCount,
-					nodemin: node.bounds.slice(0, 3),
-				});
-			} catch (e) {
-				console.log('Failed:', e);
-			}
+			handler.push({
+				isFullFile: false,
+				compressed,
+				header: node.owner.copc.header,
+				eb: node.owner.copc.eb,
+				pointCount: node.nodeinfo.pointCount,
+				nodemin: node.bounds.slice(0, 3),
+			});
 		}
 	};
 
@@ -67011,7 +67071,26 @@ void main() {
 			let worker = Potree.workerPool.getWorker(workerPath);
 			const pointAttributes = this.node.owner.pointAttributes;
 
+			// A decoding that fails (in the worker, or on its answer here) gives the worker back to the pool and fails
+			// the node's load, which frees its loading slot
+			const fail = (error) => {
+				Potree.workerPool.returnWorker(workerPath, worker);
+				if (this.node.failLoading) this.node.failLoading(error);
+				else console.error('Point cloud node decoding failed:', error);
+			};
+			worker.onerror = (e) => {
+				e.preventDefault();
+				fail(e.error || new Error(e.message || 'decoder worker error'));
+			};
 			worker.onmessage = (e) => {
+				try {
+					onDecoded(e);
+				} catch (error) {
+					fail(error);
+				}
+			};
+
+			const onDecoded = (e) => {
 				let g = new BufferGeometry();
 
 				let positions = new Float32Array(e.data.position);
@@ -70554,7 +70633,8 @@ void main() {
 
 			const viewer = this.viewer;
 			let camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-			const {width, height} = this.viewer.renderer.getSize(new Vector2());
+			// The targets have the size of the drawing buffer (CSS size x pixel ratio), not the CSS size
+			const {width, height} = this.viewer.renderer.getDrawingBufferSize(new Vector2());
 
 
 			viewer.dispatchEvent({type: "render.pass.begin",viewer: viewer});
@@ -70806,7 +70886,10 @@ void main() {
 
 			const viewer = this.viewer;
 			const camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-			const {width, height} = this.viewer.renderer.getSize(new Vector2());
+			// The targets have the size of the drawing buffer (CSS size x pixel ratio), not the CSS size;
+			// a viewport (below) is in CSS px, three.js multiplies it by the pixel ratio
+			const {width, height} = this.viewer.renderer.getDrawingBufferSize(new Vector2());
+			const cssSize = this.viewer.renderer.getSize(new Vector2());
 
 			viewer.dispatchEvent({type: "render.pass.begin",viewer: viewer});
 
@@ -71012,11 +71095,11 @@ void main() {
 			viewer.renderer.render(viewer.clippingTool.sceneVolume, camera);
 			viewer.renderer.render(viewer.transformationTool.scene, camera);
 
-			viewer.renderer.setViewport(width - viewer.navigationCube.width,
-										height - viewer.navigationCube.width,
+			viewer.renderer.setViewport(cssSize.width - viewer.navigationCube.width,
+										cssSize.height - viewer.navigationCube.width,
 										viewer.navigationCube.width, viewer.navigationCube.width);
 			viewer.renderer.render(viewer.navigationCube, viewer.navigationCube.camera);
-			viewer.renderer.setViewport(0, 0, width, height);
+			viewer.renderer.setViewport(0, 0, cssSize.width, cssSize.height);
 
 			viewer.dispatchEvent({type: "render.pass.end",viewer: viewer});
 
@@ -90461,6 +90544,7 @@ ENDSEC
 				CopcLoader.load(path, function(geometry) {
 					if (!geometry) {
 						console.error(new Error(`failed to load point cloud from URL: ${path}`));
+						resolve({type: 'loading_failed'});
 					}
 					else {
 						let pointcloud = new PointCloudOctree(geometry);
@@ -90528,8 +90612,9 @@ ENDSEC
 		});
 
 		if(callback){
-			promise.then(pointcloud => {
-				loaded(pointcloud);
+			promise.then(e => {
+				if (e.type === 'loading_failed') callback(e);
+				else loaded(e);
 			});
 		}else {
 			return promise;
@@ -90711,6 +90796,8 @@ ENDSEC
 	exports.loadProject = loadProject;
 	exports.lru = lru;
 	exports.maxNodesLoading = maxNodesLoading;
+	// (url) => (begin, end) => Promise<Uint8Array>: how a COPC file is read (CopcLoader); null reads it with copc.js
+	exports.createCopcGetter = null;
 	exports.numNodesLoading = numNodesLoading;
 	exports.pointBudget = pointBudget;
 	exports.resourcePath = resourcePath;
@@ -90724,4 +90811,3 @@ ENDSEC
 	Object.defineProperty(exports, '__esModule', { value: true });
 
 })));
-//# sourceMappingURL=potree.js.map

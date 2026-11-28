@@ -1,33 +1,41 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 import ddb from 'ddb';
-import { bytesToSize } from './utils';
 const { pathutils } = ddb;
 
 // Extensions that should open as text by default
 const TEXT_EXTENSIONS = [
     'txt', 'md', 'markdown', 'json',
     'csv', 'xml', 'yml', 'yaml', 'ini', 'cfg', 'conf',
-    'log', 'properties', 'env', 'gitignore', 'dockerignore',
+    'log', 'properties', 'env',
     'sh', 'bash', 'zsh', 'bat', 'cmd', 'ps1',
     'py', 'js', 'ts', 'jsx', 'tsx', 'html', 'htm', 'css', 'scss', 'sass', 'less',
     'sql', 'c', 'cpp', 'h', 'hpp', 'java', 'cs', 'go', 'rs', 'rb', 'php',
-    'wkt', 'prj'
+    'wkt', 'prj',
+    // Text of surveys: the position logs of a drone (DJI MRK), of an RTK receiver (POS), RINEX observation and
+    // navigation files, ground control points
+    'mrk', 'pos', 'obs', 'nav', 'gcp'
 ];
 
-// Binary extensions that should never be opened as text
-const BINARY_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff',
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
-    'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz',
-    'exe', 'dll', 'so', 'dylib', 'bin',
-    'mp3', 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'wav', 'ogg', 'flac',
-    'las', 'laz', 'ply', 'obj', 'fbx', 'glb', 'gltf', 'dae', 'stl', '3ds',
-    'shp', 'dbf', 'shx', 'gpkg', 'mbtiles', 'sqlite', 'db',
-    'ddb', 'nxs', 'nxz'
+// Text files with no extension, by name (compared in lower case): the notes of a project and the dotfiles of tools.
+// The editor opens them as the files with an extension of the list above
+const TEXT_NAMES = new Set([
+    'license', 'licence', 'readme', 'notice', 'authors', 'contributors', 'copying', 'changelog', 'changes', 'todo',
+    'makefile', 'dockerfile',
+    '.env', '.gitignore', '.dockerignore', '.gitattributes', '.editorconfig'
+]);
+
+// Text formats that open in their viewer by default but can also be edited as text:
+// vector and model formats stored as text, and the text sidecars of drone and GIS files
+// (subtitles of a drone video, world files, VRT, XMP, QGIS/SLD styles...), ASCII point
+// clouds and grids (XYZ, PTS, Esri ASCII grid), CZML and TOML
+const EDITABLE_TEXT_EXTENSIONS = [
+    'geojson', 'topojson', 'kml', 'gpx', 'gml', 'svg', 'dxf', 'obj', 'mtl',
+    'srt', 'tfw', 'jgw', 'pgw', 'wld', 'vrt', 'xmp', 'cpg', 'qml', 'sld', 'tsv',
+    'xyz', 'asc', 'pts', 'czml', 'toml'
 ];
+
+// Every extension the text editor may open: an allow-list, by extension or by name (an entry type
+// such as VECTOR covers binary formats too: KMZ, FlatGeobuf, GeoPackage, Shapefile, DWG)
+const OPENABLE_TEXT_EXTENSIONS = new Set([...TEXT_EXTENSIONS, ...EDITABLE_TEXT_EXTENSIONS]);
 
 // Maximum file size for text editing (5MB)
 const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
@@ -36,26 +44,19 @@ const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
  * Get file extension from path
  */
 function getExtension(path) {
-    const base = pathutils.basename(path);
-    const lastDot = base.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === 0) return '';
-    return base.substring(lastDot + 1).toLowerCase();
+    return pathutils.extname(path).slice(1);
+}
+
+/** A file with no extension (a dotfile has none) that is a known text file by its name. */
+function isTextName(path) {
+    return !getExtension(path) && TEXT_NAMES.has(pathutils.basename(path).toLowerCase());
 }
 
 /**
- * Check if file should open as text by default (based on extension)
+ * Check if file should open as text by default (based on extension, or on its name without one)
  */
 function isDefaultTextFile(path) {
-    const ext = getExtension(path);
-    return TEXT_EXTENSIONS.includes(ext);
-}
-
-/**
- * Check if file is definitely binary (should never be opened as text)
- */
-function isBinaryFile(path) {
-    const ext = getExtension(path);
-    return BINARY_EXTENSIONS.includes(ext);
+    return TEXT_EXTENSIONS.includes(getExtension(path)) || isTextName(path);
 }
 
 /**
@@ -68,13 +69,13 @@ function isPdfFile(entry) {
 
 /**
  * Check if file can potentially be opened as text
- * (not binary AND within size limit)
+ * (a known text extension, or a known text name without one, AND within size limit)
  */
 function canOpenAsText(entry) {
     if (!entry || !entry.path) return false;
 
-    // Check if binary
-    if (isBinaryFile(entry.path)) return false;
+    // Only known text formats
+    if (!OPENABLE_TEXT_EXTENSIONS.has(getExtension(entry.path)) && !isTextName(entry.path)) return false;
 
     // Check size limit
     if (entry.size && entry.size > MAX_TEXT_FILE_SIZE) return false;
@@ -88,6 +89,19 @@ function canOpenAsText(entry) {
 function shouldOpenAsText(entry) {
     if (!canOpenAsText(entry)) return false;
     return isDefaultTextFile(entry.path);
+}
+
+// How much of the loaded content is looked at for a NUL character
+const BINARY_SNIFF_LENGTH = 8192;
+
+/**
+ * Check if loaded file content is not text: a NUL character near the start, or the
+ * header of a ZIP archive (KMZ, 3TZ and the like are ZIPs)
+ * @param {unknown} content
+ */
+function looksBinary(content) {
+    if (typeof content !== 'string') return false;
+    return content.startsWith('PK\u0003\u0004') || content.slice(0, BINARY_SNIFF_LENGTH).includes('\u0000');
 }
 
 /**
@@ -104,6 +118,8 @@ function getLanguageMode(path) {
         case 'markdown':
             return 'markdown';
         case 'xml':
+        case 'gpx':
+        case 'kml':
         case 'html':
         case 'htm':
         case 'svg':
@@ -130,12 +146,13 @@ function canFormat(path) {
 function formatContent(content, mode) {
     try {
         switch (mode) {
-            case 'json':
+            case 'json': {
                 const parsed = JSON.parse(content);
                 return {
                     success: true,
                     content: JSON.stringify(parsed, null, 2)
                 };
+            }
             default:
                 return {
                     success: false,
@@ -153,15 +170,11 @@ function formatContent(content, mode) {
 }
 
 export {
-    TEXT_EXTENSIONS,
-    BINARY_EXTENSIONS,
     MAX_TEXT_FILE_SIZE,
-    getExtension,
-    isDefaultTextFile,
-    isBinaryFile,
     isPdfFile,
     canOpenAsText,
     shouldOpenAsText,
+    looksBinary,
     getLanguageMode,
     canFormat,
     formatContent

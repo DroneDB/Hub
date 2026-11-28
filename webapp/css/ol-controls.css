@@ -3,7 +3,7 @@
  */
 
 .ol-control {
-    background-color: rgba(255, 255, 255, .4) !important;
+    background-color: rgba(var(--ddb-glass-rgb), 0.4) !important;
     border-radius: 0.25rem !important;
     padding: 0.25rem !important;
 }
@@ -12,7 +12,7 @@
     background-color: rgba(var(--ddb-primary-rgb), 0.5) !important;
     margin: 0.25rem !important;
     padding: 0 !important;
-    color: #fff !important;
+    color: var(--ddb-text-on-dark) !important;
     font-weight: bold !important;
     text-decoration: none !important;
     font-size: inherit !important;
@@ -28,9 +28,33 @@
     background-color: rgba(var(--ddb-primary-rgb), 0.8) !important;
 }
 
+/* The glyph of a button (libs/glyphs.js: a Font Awesome glyph or one drawn for the Hub): one size on every button,
+   whichever toolbar or OpenLayers control it belongs to */
+.ol-control button i {
+    font-size: 1rem;
+}
+
 .ol-control button.active {
     background-color: var(--ddb-success) !important;
-    box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 0 0 0.25rem rgba(var(--ddb-glass-rgb), 0.5);
+}
+
+/* The keyboard focus ring: the --ddb-focus-ring-* set, with its halo, as the button sits
+   on the map, whose colours are not known: the ring and the halo are 3:1 or more against each other,
+   so one of them always shows. A mouse focus draws no ring (OpenLayers draws a 1px one on :focus). */
+.ol-control button:hover,
+.ol-control button:focus:not(:focus-visible) {
+    outline: none !important;
+}
+
+.ol-control button:focus-visible {
+    outline: var(--ddb-focus-ring-width) solid var(--ddb-focus-ring-color) !important;
+    outline-offset: var(--ddb-focus-ring-offset) !important;
+    box-shadow: 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
+}
+
+.ol-control button.active:focus-visible {
+    box-shadow: inset 0 0 0 0.25rem rgba(var(--ddb-glass-rgb), 0.5), 0 0 0 var(--ddb-focus-ring-offset) var(--ddb-focus-ring-halo);
 }
 
 /* ---------------------------------------------------------------------------
@@ -42,6 +66,52 @@
    how short the viewport is. Each zone is itself transparent to pointer events
    so only the actual controls capture clicks; the gaps fall through to the map.
 */
+/* What the right-hand toolbar rail takes from the width of the map, what the bottom-left controls
+   (map settings) take from its height, and the height of a folded sheet. They are defined on the
+   map so the panels over it (the bottom panels here, the analysis sheets in _analysis-panel.scss)
+   keep out of the controls by the same measure.
+   Rail: 0.5rem (inset of the zone) + 0.5rem (padding of the control) + 0.5rem (margins of a button)
+   + 2rem (button) = 3.5rem, and 0.5rem of air between it and the panels.
+   Bottom: the same sum upwards for the one button of the bottom-left zone: 0.5rem (inset) + 0.5rem
+   (padding) + 0.5rem (margins) + 2rem (button) = 3.5rem, and 0.5rem of air above it.
+   Top: the same sum downwards for the row of buttons of the top-centre zone (direction, flight path,
+   split): what sits at the top of the map in the middle (the labels of the split) goes below it.
+   Peek: the panel header on a phone: 0.5rem + 2rem button + 0.5rem.
+
+   Layers, bottom to top: the map, the bottom panels, the split of the map (dividers and labels),
+   the controls (the toolbar zones and what OpenLayers puts with them: its own controls, popups and
+   tooltips), the analysis panels and sheets. The controls are above the split, so a divider dragged
+   under the toolbar never takes its clicks; the panels stay above the controls, as they keep out of
+   the rail by themselves. The map is its own stacking context, so these numbers never compete with
+   the page around it. */
+.map-container {
+    --map-rail-reserve: 4rem;
+    --map-bottom-reserve: 4rem;
+    --map-top-reserve: 4rem;
+    /* The default zoom control of OpenLayers at the top left: 0.5rem (inset) + 0.25rem (padding) + two buttons of
+       2rem with 0.25rem of margin around each + 0.25rem (padding); the labels of the split go below it */
+    --map-zoom-reserve: 6.25rem;
+    /* The column of controls at the left (zoom, selection): 0.5rem (inset) + 3rem (a control) + 0.5rem of air, as the
+       rail on the right */
+    --map-left-reserve: 4rem;
+    /* The bottom-left controls along the bottom row: the settings button, then the scale bar from 4rem, whose bar is
+       100px to 250px long (ScaleLine minWidth 100: the next round length is at most 2.5 times the one before) and
+       whose last label hangs over its end; what shares that row (the colour legend) starts after it */
+    --map-scale-reserve: 21rem;
+    --map-sheet-peek: 3rem;
+    --map-layer-bottom-panel: 1;
+    --map-layer-split: 2;
+    --map-layer-controls: 3;
+    --map-layer-panel: 4;
+    isolation: isolate;
+}
+
+/* OpenLayers writes z-index: 0 inline on the container of its controls (the toolbar zones live in it),
+   which put every overlay of the map above the toolbar; only !important lifts it over the inline style */
+.map-container .ol-overlaycontainer-stopevent {
+    z-index: var(--map-layer-controls) !important;
+}
+
 .ol-zone {
     position: absolute;
     display: flex;
@@ -77,10 +147,15 @@
     align-items: flex-start;
 }
 
+/* The rail: every button of the map, the measure tools and the tools of the saved measurements (18 with a report
+   and measurements) are taller than a map in a 1280 x 720 window, and a compact map's open tools than a small frame.
+   The zone stops at the bottom of the map (max-height) and its buttons scroll inside it, at any size of the map. */
 .ol-zone-top-right {
     top: 0.5rem;
     right: 0.5rem;
     align-items: flex-end;
+    overflow-y: auto;
+    scrollbar-width: none;
 }
 
 .ol-zone-top-center {
@@ -115,9 +190,32 @@
     margin: 0 !important;
 }
 
+/* A compact map (MapCore sets .is-compact from the size of the map itself: narrower than `sm`, or too low
+   for the whole rail, as the default 600x400 frame of an embed is) keeps one button of the measure tools
+   in the rail, 'Measure', and the tools open from it. The same rule serves a phone
+   and a small frame. The rail scrolls when the open tools are still taller than the map (.ol-zone-top-right). */
+.ol-measure-toggle {
+    display: none;
+}
+
+.map-container.is-compact .ol-measure-toggle {
+    display: block;
+}
+
+.map-container.is-compact .ol-measure-control:not(.is-open) > .ol-control:not(.ol-measure-toggle) {
+    display: none !important;
+}
+
 .ol-settings {
     bottom: 0.5rem;
     left: 0.5rem;
+}
+
+/* The scale bar, beside the settings button (about 3rem wide) and clear of the attribution at the bottom right;
+   with its text it is about 3rem high, under --map-bottom-reserve, which the bottom panels keep clear */
+.map-container .ol-scale-bar {
+    bottom: 0.5rem;
+    left: 4rem;
 }
 
 .ol-map-buttons {
@@ -138,7 +236,7 @@
 
 .ol-tooltip-measure:before,
 .ol-tooltip-static:before {
-    border-top: 0.5rem solid rgb(255 255 255 / 90%);
+    border-top: 0.5rem solid rgba(var(--ddb-glass-rgb), 0.9);
     border-right: 0.5rem solid transparent;
     border-left: 0.5rem solid transparent;
     content: "";
@@ -150,8 +248,8 @@
 
 .ol-tooltip-static {
     background-color: var(--ddb-measure-color);
-    color: black;
-    border: var(--ddb-border-width) solid white;
+    color: rgba(var(--ddb-shade-rgb), 1);
+    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 1);
 }
 
 /* Persistent measurement labels are hidden by default and revealed only
@@ -163,9 +261,9 @@
 
 .ol-tooltip {
     position: relative;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(var(--ddb-shade-rgb), 0.5);
     border-radius: 0.25rem;
-    color: white;
+    color: var(--ddb-text-on-dark);
     padding: 0.25rem 0.5rem;
     opacity: 0.9;
     white-space: nowrap;
@@ -178,7 +276,7 @@
     font-weight: bold;
     font-size: 0.75rem;
     margin-bottom: 0.25rem;
-    border-bottom: var(--ddb-border-width) solid rgba(255, 255, 255, 0.3);
+    border-bottom: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.3);
     padding-bottom: 0.25rem;
 }
 
@@ -186,11 +284,109 @@
     font-size: 0.75rem;
 }
 
+/* The hint that follows the pointer while drawing: long, so it wraps (a phone screen is narrower
+   than one line of it) and sits on the side of the pointer that has the room */
+.ol-tooltip-help {
+    width: max-content;
+    max-width: min(16rem, 60vw);
+    white-space: normal;
+}
+
+/* The point of the keyboard: while a tool draws, Space adds the centre of the map. A cross with
+   a dark edge, so it shows on a light and on a dark map; it takes no click */
+.map-crosshair {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 1.75rem;
+    height: 1.75rem;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+    background:
+        linear-gradient(var(--ddb-measure-color), var(--ddb-measure-color)) center / 2px 100% no-repeat,
+        linear-gradient(var(--ddb-measure-color), var(--ddb-measure-color)) center / 100% 2px no-repeat;
+    filter: drop-shadow(0 0 1px rgba(var(--ddb-shade-rgb), 0.9));
+}
+
+/* Panels over the bottom centre of the map (layer opacity): as wide as their content but never
+   wider than the map, and above the bottom controls at any size: centred, a wide panel on a compact
+   or narrow map reaches over the bottom left, where the scale bar stands up to about 3rem high */
+.map-bottom-panel {
+    position: absolute;
+    bottom: var(--map-bottom-reserve);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--map-layer-bottom-panel);
+    width: max-content;
+    max-width: calc(100% - 2 * var(--map-rail-reserve));
+    box-sizing: border-box;
+    background: rgba(var(--ddb-shade-rgb), 0.6);
+    color: var(--ddb-text-on-dark);
+    font-size: 0.75rem;
+    user-select: none;
+    /* Dark in both themes: the ring of the dark surfaces */
+    --ddb-focus-ring-color: var(--ddb-focus-ring-on-dark);
+}
+
+.map-bottom-panel .opacity-value {
+    min-width: 2.2rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.map-bottom-panel .ph-btn {
+    background: transparent;
+    border: none;
+    color: rgba(var(--ddb-glass-rgb), 0.75);
+    cursor: pointer;
+    padding: 0 0.15rem;
+    font-size: var(--ddb-font-size-base);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+
+.map-bottom-panel .ph-btn:hover {
+    color: var(--ddb-text-on-dark);
+}
+
+.map-bottom-panel .ph-btn.active {
+    color: var(--ddb-map-control-active);
+}
+
+/* A phone: from the left edge to the rail, not centred, so it never reaches the toolbar, and above
+   the map settings button, which it would cover at that width */
+@media (max-width: 575.98px) {
+    .map-bottom-panel {
+        left: 0.5rem;
+        right: var(--map-rail-reserve);
+        transform: none;
+        width: auto;
+        max-width: none;
+        bottom: var(--map-bottom-reserve);
+    }
+}
+
+/* Fingers: the buttons and sliders of the panel are as tall as the map buttons are wide */
+@media (pointer: coarse) {
+    .map-bottom-panel .ph-btn {
+        min-width: 2rem;
+        min-height: 2rem;
+        justify-content: center;
+    }
+
+    .map-bottom-panel input[type="range"] {
+        min-height: 2rem;
+    }
+}
+
 /* Point location popup */
 .ol-point-popup {
-    background: white;
+    background: var(--ddb-bg-surface);
     border-radius: 0.5rem;
-    box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0.25rem 1rem rgba(var(--ddb-shade-rgb), 0.25);
     font-size: 0.75rem;
     color: var(--ddb-text);
     white-space: nowrap;
@@ -199,7 +395,6 @@
     font-family: inherit;
     display: flex;
     flex-direction: column;
-    min-width: 14rem;
 }
 
 .ol-point-popup::after {
@@ -210,7 +405,7 @@
     margin-left: -0.5rem;
     border-left: 0.5rem solid transparent;
     border-right: 0.5rem solid transparent;
-    border-top: 0.5rem solid white;
+    border-top: 0.5rem solid var(--ddb-bg-surface);
 }
 
 .ol-point-popup-header {
@@ -218,12 +413,25 @@
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0.75rem;
-    background: var(--ddb-bg-subtle, #f6f8fa);
-    border-bottom: 1px solid var(--ddb-border-separator, #e5e7eb);
+    background: var(--ddb-bg-subtle);
+    border-bottom: 1px solid var(--ddb-border-separator);
     border-left: 0.25rem solid var(--ddb-primary);
     font-weight: 600;
     font-size: 0.8rem;
     color: var(--ddb-text);
+}
+
+/* Callouts on hover (the measure control's toggle): a point's popup shows while its point is hovered or tapped */
+.ol-point-callouts-hover .ol-point-popup:not(.ol-point-popup-shown) {
+    display: none;
+}
+
+/* Below its point (no room above it): the arrow points up */
+.ol-point-popup-below::after {
+    bottom: auto;
+    top: -0.5rem;
+    border-top: 0;
+    border-bottom: 0.5rem solid var(--ddb-bg-surface);
 }
 
 .ol-point-popup-title {
@@ -239,34 +447,20 @@
     gap: 0.5rem;
 }
 
-.ol-point-popup-coords {
+.ol-point-popup-text {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+/* A point with neither a name nor a description: its decimal degrees ("lat, lon"), the same point in DMS as tooltip */
+.ol-point-popup-coords {
     font-family: monospace;
+    font-size: 0.75rem;
+    color: var(--ddb-text-muted);
     user-select: all;
     cursor: text;
-}
-
-.ol-point-popup-coord-icon {
-    width: 0.85rem;
-    margin-right: 0.35rem;
-    color: var(--ddb-text-muted);
-    font-size: 0.7rem;
-}
-
-.ol-point-popup-dms {
-    font-size: 0.75rem;
-    color: var(--ddb-text);
-    display: inline-flex;
-    align-items: center;
-}
-
-.ol-point-popup-dd {
-    font-size: 0.75rem;
-    color: var(--ddb-text-muted);
-    display: inline-flex;
-    align-items: center;
 }
 
 .ol-point-popup-actions {
@@ -301,17 +495,32 @@
 }
 
 .ol-point-popup-copy .icon.check {
-    color: var(--ddb-success);
+    color: var(--ddb-success-text);
 }
 
+/* What the user wrote about the point: the first line of the popup */
 .ol-point-popup-description {
-    font-size: 0.75rem;
-    color: var(--ddb-text-secondary);
-    white-space: normal;
-    max-width: 14rem;
-    word-wrap: break-word;
-    margin-top: 0.25rem;
-    font-family: inherit;
+    font-size: 0.8rem;
+    color: var(--ddb-text);
+    /* the lines the user wrote, wrapped */
+    white-space: pre-line;
+    max-width: 16rem;
+    overflow-wrap: anywhere;
+}
+
+/* The move handle: a drag, not a click; touch drags it instead of scrolling the page */
+.ol-point-popup-actions .ol-point-popup-move {
+    cursor: grab;
+    touch-action: none;
+}
+
+.ol-point-popup-moving,
+.ol-point-popup-moving .ol-point-popup-actions .ol-point-popup-move {
+    cursor: grabbing;
+}
+
+.ol-point-popup-moving {
+    opacity: 0.85;
 }
 
 .ol-point-popup-edit:hover {
