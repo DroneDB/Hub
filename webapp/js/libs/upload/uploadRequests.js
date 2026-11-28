@@ -26,7 +26,14 @@
  *
  * Every request carries an `X-Upload-Id`. When a request fails after the whole body was
  * sent (a proxy timeout while the server is still adding the file, a dropped connection),
- * the outcome is asked for by that id instead of sending the file again.
+ * the outcome is asked for by that id instead of sending the file again. The receipt is polled until the
+ * server answers: only a 404 (it knows no such upload) means the file was never added; a poll that fails (network
+ * error, 5xx, 429) is asked again until the deadline, never taken for "unknown", and a bundle sent again keeps its id.
+ * An endpoint without receipts (the share batch, `receipts: false`) is asked what the batch holds (`batchInfoUrl`)
+ * instead: a file the batch lists is done, whether the lost answer was the first request's or a later one's.
+ *
+ * `overwrite=true` or `overwrite=false` goes in every request to `{dataset}/obj`, so that the Registry never has to
+ * guess the intention of a request that carries no flag (an older client replaced silently).
  *
  * The requests carry the session's bearer header themselves, so they do not pass through the client's 401 handling:
  * a 401 goes to `onUnauthorized` (the session is no longer accepted), and `canSend` is asked before each request
@@ -51,6 +58,7 @@ const AMBIGUOUS_STATUSES = new Set([0, 502, 504]);
  * @param {string} [deps.singleUrl] where single files go (default `${baseUrl}/obj`; the share page
  *   uploads to its batch instead)
  * @param {boolean} [deps.receipts] whether the endpoint keeps receipts by X-Upload-Id (default true)
+ * @param {string} [deps.batchInfoUrl] without receipts: where the files of the batch are listed (`GET`, `{ entries: [{ path }] }`)
  * @param {() => string|null} deps.authToken
  * @param {(url: string) => Promise<{status: number, body: any}>} deps.getJson GET with auth, never throws for HTTP statuses
  * @param {(item) => string} deps.destination the dataset path of an item
@@ -102,6 +110,18 @@ export function createUploadRequests(deps) {
         return item.uploadId;
     }
 
+    // A bundle sent again with the same files keeps its id: when the first request got through, the server answers the
+    // repeat from its receipt instead of refusing every file as a name that exists
+    function bundleIdOf(items) {
+        const key = items.map(item => item.id).join('\n');
+        const held = items[0];
+        if (!held.bundleId || held.bundleKey !== key) {
+            held.bundleId = newUploadId();
+            held.bundleKey = key;
+        }
+        return held.bundleId;
+    }
+
     /**
      * The id of a chunked upload (see the top): kept for the destination it was made for, remade when the destination
      * changes (Keep both), unless the item resumes a stored upload at that very path.
@@ -150,7 +170,7 @@ export function createUploadRequests(deps) {
     async function sendSingle(item, hooks) {
         const form = new FormData();
         form.append('path', deps.destination(item));
-        appendOverwrite(form, item);
+        appendOverwriteFlag(form, item);
         form.append('file', item.file, item.name);
 
         // One id per file, kept across retries: the server answers a repeat from its receipt
@@ -167,14 +187,29 @@ export function createUploadRequests(deps) {
         if (res.status >= 200 && res.status < 300) return ok(item, res.body);
         if (receipts && res.uploaded && AMBIGUOUS_STATUSES.has(res.status))
             return (await fromReceipt(item.uploadId, [item], hooks))[0];
-        return failure(item, res);
+        return (await fromBatchListing(item, res)) ?? failure(item, res);
+    }
+
+    // The share batch keeps no receipts: when the answer to a file was lost (the body was sent, then a proxy timeout or
+    // a dropped connection), what the batch lists tells whether the file was added. A file whose answer was lost once
+    // asks again after any later failure: its resend is refused as already uploaded when the first request got through
+    async function fromBatchListing(item, res) {
+        if (receipts || !deps.batchInfoUrl) return null;
+        const lost = res.uploaded && AMBIGUOUS_STATUSES.has(res.status);
+        if (!lost && !item.answerLost) return null;
+        item.answerLost = true;
+
+        const info = await getJson(deps.batchInfoUrl);
+        const entries = info.status === 200 && Array.isArray(info.body?.entries) ? info.body.entries : [];
+        const destination = normalizedPath(deps.destination(item));
+        return entries.some(e => normalizedPath(e?.path) === destination) ? ok(item, null) : null;
     }
 
     async function sendBundle(items, hooks) {
         const form = new FormData();
         for (const item of items) {
             form.append('path', deps.destination(item));
-            appendOverwrite(form, item);
+            appendOverwriteFlag(form, item);
             form.append('file', item.file, item.name);
         }
 
@@ -183,7 +218,7 @@ export function createUploadRequests(deps) {
         let total = 0;
         for (const item of items) ends.push(total += item.size);
 
-        const uploadId = newUploadId();
+        const uploadId = bundleIdOf(items);
         const res = await transport({
             url: `${deps.baseUrl}/obj`,
             body: form,
@@ -245,6 +280,7 @@ export function createUploadRequests(deps) {
             if (res.status !== 200) return failure(item, res);
             sentTo.add(fileId);
             stored += end - start;
+            hooks.onStored?.(item.id);
         }
 
         hooks.onUploaded([item.id]);
@@ -263,8 +299,10 @@ export function createUploadRequests(deps) {
         return failure(item, commit);
     }
 
-    // Asks the server what became of an upload whose answer was lost; resolves with one
-    // result per item. Unknown upload: a retryable failure, the file is sent again
+    // Asks the server what became of an upload whose answer was lost; resolves with one result per item. Only a
+    // 404 (the server knows no such upload) or a refusal of the question is "unknown": the files are sent again. A
+    // poll that fails (network error, 5xx, 429) or finds the upload still running is asked again until the deadline,
+    // as the upload may be committed meanwhile
     async function fromReceipt(uploadId, items, hooks) {
         const deadline = now() + RECEIPT_MAX_WAIT_MS;
         while (!hooks.signal?.aborted) {
@@ -274,8 +312,10 @@ export function createUploadRequests(deps) {
             if (res.status === 200 && receipt?.state === 'Done') return partResults(items, receipt.results ?? []);
             if (res.status === 200 && receipt?.state === 'Failed')
                 return items.map(item => ({ id: item.id, ok: false, status: receipt.status ?? 500, error: receipt.error, noRetry: true }));
-            if (res.status !== 202 || now() > deadline)
-                return items.map(item => ({ id: item.id, ok: false, status: 503, error: 'Upload interrupted, sending again', retryAfter: 0 }));
+            // Not answered (yet): the server may still be adding the files
+            const asking = res.status === 200 || res.status === 202 || res.status === 0 || res.status === 429 || res.status >= 500;
+            if (!asking) return unknownUpload(items, 0);
+            if (now() > deadline) return unknownUpload(items, null);
 
             await sleep(RECEIPT_POLL_MS);
         }
@@ -297,6 +337,21 @@ function ok(item, entry) {
 // Before the file part: the Registry reads the flag that comes before the file
 function appendOverwrite(form, item) {
     if (item.overwrite) form.append('overwrite', 'true');
+}
+
+// The same, always: a file of `{dataset}/obj` says whether it may replace, true or false
+function appendOverwriteFlag(form, item) {
+    form.append('overwrite', item.overwrite === true ? 'true' : 'false');
+}
+
+// Not a refusal of the server and not backpressure (status 0, which the scheduler's AIMD ignores): the files go again
+function unknownUpload(items, retryAfter) {
+    return items.map(item => ({ id: item.id, ok: false, status: 0, error: 'Upload interrupted, sending again', retryAfter }));
+}
+
+// A path as the batch lists it: forward slashes, no leading slash
+function normalizedPath(path) {
+    return typeof path === 'string' ? path.replace(/\\/g, '/').replace(/^(\.?\/)+/, '') : '';
 }
 
 // The path of the entry that refused the name (D-040), or null
@@ -332,7 +387,10 @@ function failure(item, res) {
         retryAfter: res.retryAfter
     };
     const conflictPath = res.status === 409 ? conflict(body?.conflictPath) : null;
-    return conflictPath ? { ...result, conflictPath } : result;
+    if (conflictPath) return { ...result, conflictPath };
+    // A 409 that the server does not call final (noRetry: false, no name that exists): an upload still in progress,
+    // chunks that are missing. The same request succeeds later: the scheduler sends it again after its backoff
+    return res.status === 409 && body?.noRetry === false ? { ...result, retryable: true } : result;
 }
 
 function statusText(status) {

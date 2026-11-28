@@ -7,7 +7,7 @@ import { createUploadScheduler, STATUS } from './uploadScheduler';
 import { planNextJob, BUNDLE_MAX_FILES, BUNDLE_MAX_BYTES, SMALL_FILE_BYTES, CHUNKED_FILE_BYTES } from './uploadPlanner';
 import { createAimdConcurrency, useResilientUpload } from '@/composables/useResilientUpload';
 import { createUploadRequests } from './uploadRequests';
-import { uploadConcurrency, negotiatedProtocol } from './protocolLimits';
+import { uploadConcurrency, negotiatedProtocol, HTTP1_UPLOAD_CONNECTIONS, HTTP1_CONNECTIONS } from './protocolLimits';
 import { windowHint } from './uploadProbe';
 
 const file = (i, size = 5 * 1024 * 1024) => ({ id: `f${i}`, file: {}, name: `f${i}.jpg`, path: `f${i}.jpg`, size });
@@ -357,11 +357,14 @@ describe('uploadRequests', () => {
 });
 
 describe('protocol limits and probe hint', () => {
-    it('allows 16 streams on h2/h3 and 6 connections otherwise', () => {
+    // Over HTTP/1.1 the browser has 6 connections: uploads that held all of them made every other request wait
+    // for an upload request to end
+    it('allows 16 streams on h2/h3 and 4 of the 6 connections otherwise, so pages keep two for their own requests', () => {
         expect(uploadConcurrency('h2')).toBe(16);
         expect(uploadConcurrency('h3')).toBe(16);
-        expect(uploadConcurrency('http/1.1')).toBe(6);
-        expect(uploadConcurrency(null)).toBe(6);
+        expect(uploadConcurrency('http/1.1')).toBe(4);
+        expect(uploadConcurrency(null)).toBe(4);
+        expect(HTTP1_UPLOAD_CONNECTIONS).toBeLessThan(HTTP1_CONNECTIONS);
     });
 
     it('reads the negotiated protocol from Resource Timing', () => {
@@ -480,5 +483,128 @@ describe('uploadScheduler pause and resume (FR-UPL-04)', () => {
         scheduler.resume();
 
         expect(scheduler.snapshot().paused).toBe(false);
+    });
+});
+
+describe('uploadScheduler retries', () => {
+    it('sends again a refusal the server calls recoverable (an upload still in progress), and not one that is final', async () => {
+        const server = heldServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, throttleMs: 0, policy: policy() });
+        scheduler.add([file(0), file(1)]);
+        await flush();
+
+        server.releaseNext({ ok: false, status: 409, error: 'Upload is still in progress', retryable: true });
+        server.releaseNext({ ok: false, status: 409, error: 'Name exists', noRetry: true });
+        await flush();
+        await flush();
+
+        // f0 went back to the queue and started again; f1 stays failed
+        expect(server.started.map(j => j.items[0].id)).toEqual(['f0', 'f1', 'f0']);
+        expect(scheduler.snapshot().items[1]).toMatchObject({ status: STATUS.ERROR, canRetry: false });
+        scheduler.cancelAll();
+    });
+
+    it('a 409 that is not marked recoverable is a failure, as before', async () => {
+        const server = heldServer();
+        const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 1, throttleMs: 0, policy: policy() });
+        scheduler.add([file(0)]);
+        await flush();
+
+        server.releaseNext({ ok: false, status: 409, error: 'Conflict' });
+        await flush();
+
+        expect(server.started).toHaveLength(1);
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.ERROR);
+    });
+
+    // A 100 GB file has many chunks: the retries are for a run of failures, not for the whole life of the file
+    it('gives a chunked file its retries again each time a chunk is stored', async () => {
+        const clock = { now: () => 0, setTimeout: vi.fn(f => { f(); return 1; }), clearTimeout: vi.fn() };
+        const started = [];
+        // Eight attempts each store a chunk and then fail with a transient error; the ninth finishes
+        const send = vi.fn(async (job, hooks) => {
+            started.push(job);
+            const id = job.items[0].id;
+            if (started.length > 8) return [{ id, ok: true, entry: { path: id } }];
+            hooks.onStored(id);
+            return [{ id, ok: false, status: 502 }];
+        });
+        const scheduler = createUploadScheduler({
+            send, maxConcurrency: () => 1, clock, throttleMs: 0, policy: policy({ maxRetries: 2 })
+        });
+        scheduler.add([file(0)]);
+        await flush();
+        await flush();
+
+        // Far more failures than the 2 retries: without the reset the file would have failed after the third
+        expect(started).toHaveLength(9);
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.DONE);
+    });
+
+    it('still fails a file whose retries run out without a chunk stored in between', async () => {
+        const clock = { now: () => 0, setTimeout: vi.fn(f => { f(); return 1; }), clearTimeout: vi.fn() };
+        const send = vi.fn(async job => [{ id: job.items[0].id, ok: false, status: 502 }]);
+        const scheduler = createUploadScheduler({
+            send, maxConcurrency: () => 1, clock, throttleMs: 0, policy: policy({ maxRetries: 2 })
+        });
+        scheduler.add([file(0)]);
+        await flush();
+        await flush();
+
+        expect(send).toHaveBeenCalledTimes(3);
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.ERROR);
+    });
+});
+
+describe('uploadScheduler never leaves a pending file with nothing to start it', () => {
+    it('resume before the aborted request has ended: the file goes on when that request ends', async () => {
+        // An abort the transport answers late: the request is still in its slot when resume() comes
+        const started = [];
+        const rejects = [];
+        const send = (job, hooks) => new Promise((resolve, reject) => {
+            started.push(job);
+            hooks.signal.addEventListener('abort', () => rejects.push(() => reject(Object.assign(new Error('Upload aborted'), { name: 'AbortError' }))));
+        });
+        const scheduler = createUploadScheduler({ send, maxConcurrency: () => 1, policy: policy() });
+        scheduler.add([file(0, 300 * 1024 * 1024)]);
+        await flush();
+
+        scheduler.pause();
+        scheduler.resume();
+        await flush();
+        // The old request still holds the only slot
+        expect(started).toHaveLength(1);
+
+        rejects[0]();
+        await flush();
+
+        expect(started).toHaveLength(2);
+        expect(started[1].items[0].id).toBe('f0');
+        scheduler.cancelAll();
+    });
+
+    it('a clock set back while a retry waits does not keep the file from starting when its delay ends', async () => {
+        let t = 1_800_000_000_000;
+        const timers = [];
+        const clock = { now: () => t, setTimeout: vi.fn((f, ms) => { timers.push({ f, ms }); return timers.length; }), clearTimeout: vi.fn() };
+        const server = heldServer();
+        const scheduler = createUploadScheduler({
+            send: server.send, maxConcurrency: () => 1, clock, throttleMs: 0,
+            policy: policy({ computeRetryDelayMs: () => 60_000 })
+        });
+        scheduler.add([file(0)]);
+        await flush();
+
+        server.releaseNext({ ok: false, status: 502 });
+        await flush();
+        expect(server.started).toHaveLength(1);
+
+        // The system clock goes back an hour while the file waits
+        t -= 3_600_000;
+        timers.find(x => x.ms === 60_000).f();
+        await flush();
+
+        expect(server.started).toHaveLength(2);
+        scheduler.cancelAll();
     });
 });

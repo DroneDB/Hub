@@ -59,8 +59,12 @@
             <UploadQueueView v-else v-model:filter="activeFilter" :snapshot="snapshot" :rows="filteredFiles" @retry="retryFile">
                 <template #footer>
                     <div class="actions">
-                        <Button v-if="hasFailed && !committing" severity="secondary" icon="fa-solid fa-rotate-right"
+                        <Button v-if="commitFailed && !committing" severity="secondary" icon="fa-solid fa-rotate-right"
+                                label="Try again" @click="commitBatch" />
+                        <Button v-if="hasRetryable && !committing" severity="secondary" icon="fa-solid fa-rotate-right"
                                 label="Retry failed" @click="retryFailed" />
+                        <Button v-if="canFinishWithoutFailed && !committing" severity="secondary" icon="fa-solid fa-flag-checkered"
+                                :label="finishWithoutLabel(failedCount)" @click="finishWithoutFailed" />
                         <Button v-if="!committing" severity="danger" icon="fa-solid fa-circle-stop" label="Cancel"
                                 :disabled="cancelling" @click="handleCancel" />
                     </div>
@@ -85,6 +89,7 @@ import { bytesToSize } from '@/libs/utils';
 import { useConfirm } from '@/composables/useConfirm';
 import { useDialogs } from '@/composables/useDialogs';
 import { cancelUploadQuestion } from '@/libs/upload/cancelQuestion';
+import { finishWithoutLabel, finishWithoutQuestion } from '@/libs/upload/finishQuestion';
 import reg from '@/libs/api/sharedRegistry';
 import { notify } from '@/libs/notify';
 import { useUploadQueue } from '@/composables/useUploadQueue';
@@ -99,7 +104,7 @@ import {
 } from '@/libs/upload/uploadForm';
 import { markRaw } from 'vue';
 
-// The share endpoint takes one file per request and keeps no receipts
+// The share endpoint takes one file per request and keeps no receipts (it lists the files of the batch instead)
 const ONE_FILE_PER_REQUEST = { bundleMaxFiles: 1, chunkedFileBytes: Number.POSITIVE_INFINITY };
 
 const NO_WRITABLE_ORG = 'You cannot upload files: you have no organization where you can add datasets. Ask an organization to add you as a member who can write.';
@@ -112,8 +117,9 @@ const pathOf = file => file.fullPath || file.webkitRelativePath || file.name;
  * user chooses another), then the files dropped or picked here go to a new share batch, which is committed (and the
  * dataset opened) once every file is uploaded. Cancel, and leaving the page before the commit, roll the batch back
  * on the Registry through the upload queue's cancel (FR-XC-27): no half-filled dataset stays (FR-UPL-01). The
- * Registry also rolls back a batch with no upload for 24 hours (D-049). Same upload queue as the dataset
- * upload dialog (useUploadQueue).
+ * Registry also rolls back a batch with no upload for 24 hours. When some files fail for good the user may
+ * finish without them (the others are kept), and a commit that failed can be tried again; neither Cancel's rollback
+ * nor leaving the page is the only way out. Same upload queue as the dataset upload dialog (useUploadQueue).
  */
 export default {
     name: 'UploadPage',
@@ -143,12 +149,18 @@ export default {
             dragging: false,
             starting: false,
             committing: false,
+            // A commit was sent: from then on its outcome is not known unless it answered, so leaving the page does not
+            // roll the batch back (it may be the dataset)
+            commitAttempted: false,
+            // The last commit failed: the files are all uploaded, and the batch can be committed again
+            commitFailed: false,
             cancelling: false,
             // The question before Cancel is open
             asking: false,
 
             NO_WRITABLE_ORG,
-            DATASET_NAME_MAX_LENGTH
+            DATASET_NAME_MAX_LENGTH,
+            finishWithoutLabel
         }
     },
     computed: {
@@ -165,11 +177,16 @@ export default {
         snapshot() {
             return this.queue.state.value;
         },
-        hasFailed() {
-            return this.snapshot != null && this.snapshot.done && this.snapshot.counts.error > 0;
+        failedCount() {
+            return this.snapshot != null && this.snapshot.done ? this.snapshot.counts.error : 0;
         },
-        filesCount() {
-            return this.snapshot?.counts.total ?? 0;
+        // Sending again can only help a file whose failure is not a refusal (a refused file stays failed with its reason)
+        hasRetryable() {
+            return this.failedCount > 0 && this.snapshot.items.some(i => i.status === 'error' && i.canRetry);
+        },
+        // Some files failed for good and others are in the batch: the user may keep what went through
+        canFinishWithoutFailed() {
+            return this.failedCount > 0 && this.uploadedFiles > 0 && !this.commitFailed;
         },
         // The files that are added to the batch: what Cancel would delete
         uploadedFiles() {
@@ -195,10 +212,10 @@ export default {
     },
     beforeUnmount: function () {
         // No ghost uploads: requests in flight and pending retries stop with the view, and a batch that was not
-        // committed goes with it (a commit in flight is left to finish)
+        // committed goes with it (a commit in flight, or one that failed without telling what the server did, is left alone)
         this._isUnmounted = true;
         const token = this.uploadToken;
-        if (token && !this.committing && !this.committed) {
+        if (token && !this.committing && !this.committed && !this.commitAttempted) {
             this.queue.cancel({ cleanup: () => reg.share.rollback(token) }).then(({ cleanupError }) => {
                 // The Registry rolls the batch back itself after 24 hours (D-049)
                 if (cleanupError) console.warn('Cannot roll back the upload batch', cleanupError);
@@ -311,6 +328,8 @@ export default {
                     authToken: () => reg.getAuthToken(),
                     getJson: authorizedGetJson(reg),
                     destination: item => item.path,
+                    // The batch keeps no receipts: what it lists tells whether a file whose answer was lost got in
+                    batchInfoUrl: `${reg.url}/share/info/${encodeURIComponent(this.uploadToken)}`,
                     receipts: false
                 });
                 const files = this.staged;
@@ -326,9 +345,10 @@ export default {
             }
         },
 
-        // Commit only when every file went through
+        // Commit by itself only when every file went through; with failures the page offers Retry failed, and Finish
+        // without the failed files when some went through
         async onIdle(snapshot) {
-            if (this._isUnmounted || this.committing || this.cancelling || !this.uploadToken) return;
+            if (this._isUnmounted || this.committing || this.cancelling || this.commitFailed || this.committed || !this.uploadToken) return;
             const failed = snapshot.items.filter(i => i.status === 'error');
             if (failed.length > 0) {
                 this.activeFilter = 'error';
@@ -338,7 +358,30 @@ export default {
                 return;
             }
 
+            await this.commitBatch();
+        },
+
+        // The user keeps the files that went through and leaves the failed ones out
+        async finishWithoutFailed() {
+            if (this.committing || this.cancelling || this.asking) return;
+            this.asking = true;
+            let ok;
+            try {
+                ok = await this.confirm(finishWithoutQuestion({ failed: this.failedCount, uploaded: this.uploadedFiles }));
+            } finally {
+                this.asking = false;
+            }
+            if (ok) await this.commitBatch();
+        },
+
+        // Commits the batch: once every file is done, or when the user finishes without the failed ones, or again
+        // after a commit that failed
+        async commitBatch() {
+            if (this._isUnmounted || this.committing || this.cancelling || this.committed || !this.uploadToken) return;
             this.committing = true;
+            this.commitAttempted = true;
+            this.commitFailed = false;
+            this.error = '';
             try {
                 const r = await reg.share.commit(this.uploadToken);
                 this.committed = true;
@@ -347,6 +390,7 @@ export default {
                 else if (r.error) this.error = r.error;
             } catch (e) {
                 this.error = e.message;
+                this.commitFailed = true;
             } finally {
                 this.committing = false;
             }
@@ -356,7 +400,7 @@ export default {
         openDataset(result) {
             const tag = result?.tag;
             if (tag?.organizationSlug && tag?.datasetSlug) {
-                notify.success(`${this.filesCount} ${this.filesCount === 1 ? 'file' : 'files'} uploaded to ${this.datasetName.trim()}`,
+                notify.success(`${this.uploadedFiles} ${this.uploadedFiles === 1 ? 'file' : 'files'} uploaded to ${this.datasetName.trim()}`,
                     { summary: 'Upload complete' });
                 this.$router.push({ name: 'ViewDataset', params: { org: tag.organizationSlug, ds: tag.datasetSlug } });
             } else if (result?.url) {

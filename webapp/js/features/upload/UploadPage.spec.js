@@ -54,6 +54,7 @@ async function drop(files) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.send.mockImplementation(() => new Promise(() => {}));
     mocks.reg.orgs.getOrganizations.mockResolvedValue([
         org('alice', 'alice', true), org('survey-team', 'Survey Team', false), org('drone-lab', 'Drone Lab', true)
     ]);
@@ -451,7 +452,7 @@ describe('UploadPage commit', () => {
         expect(mocks.reg.share.commit).not.toHaveBeenCalled();
     });
 
-    it('does not commit when a file failed: it offers Retry failed and Cancel', async () => {
+    it('does not commit by itself when a file failed: it shows why, and the failed file in the Errors filter', async () => {
         await started();
 
         await wrapper.vm.onIdle({ items: [{ status: 'error', name: 'a.jpg', errorMessage: 'boom' }] });
@@ -459,5 +460,112 @@ describe('UploadPage commit', () => {
 
         expect(mocks.reg.share.commit).not.toHaveBeenCalled();
         expect(wrapper.find('.error-msg').text()).toContain('Failed to upload a.jpg: boom');
+    });
+});
+
+// A real queue over a server that answers per file
+const buttonOf = label => wrapper.findAll('button').find(b => b.text().includes(label));
+// Started, with the answers of the server rendered
+async function run(files) {
+    await started(files);
+    await flushPromises();
+}
+const answers = refused => mocks.send.mockImplementation(async job => job.items.map(i => (refused.includes(i.path)
+    ? { id: i.id, ok: false, status: 400, error: 'Extension .py is not allowed', noRetry: true }
+    : { id: i.id, ok: true, entry: { path: i.path } })));
+
+describe('UploadPage with a file the Registry refuses for good (blocked extension)', () => {
+    beforeEach(() => { answers(['run.py']); });
+
+    it('offers to finish without the failed file, and no "Retry failed" that would send nothing', async () => {
+        await run([file('a.jpg'), file('b.jpg'), file('run.py')]);
+
+        expect(mocks.reg.share.commit).not.toHaveBeenCalled();
+        expect(buttonOf('Finish without the 1 failed file')).toBeDefined();
+        expect(buttonOf('Retry failed')).toBeUndefined();
+        expect(buttonOf('Cancel')).toBeDefined();
+    });
+
+    it('finishing commits the batch with the files that went through and rolls nothing back', async () => {
+        await run([file('a.jpg'), file('b.jpg'), file('run.py')]);
+
+        await buttonOf('Finish without the 1 failed file').trigger('click');
+        await flushPromises();
+        // Asks first, and says what the dataset gets
+        expect(question().textContent).toContain('The 2 files uploaded are added to the dataset. The 1 failed file is left out.');
+        expect(mocks.reg.share.commit).not.toHaveBeenCalled();
+        await answer('[data-confirm]');
+
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(1);
+        expect(mocks.reg.share.commit).toHaveBeenCalledWith('tok-1');
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+        expect(router.push).toHaveBeenCalledWith({ name: 'ViewDataset', params: { org: 'alice', ds: 'brighton' } });
+        // The notice counts what the dataset got, not what was dropped
+        expect(mocks.notify.success.mock.calls[0][0]).toContain('2 files uploaded');
+    });
+
+    it('"Keep the upload open" commits nothing', async () => {
+        await run([file('a.jpg'), file('run.py')]);
+
+        await buttonOf('Finish without the 1 failed file').trigger('click');
+        await flushPromises();
+        await answer('[data-cancel]');
+
+        expect(mocks.reg.share.commit).not.toHaveBeenCalled();
+        expect(buttonOf('Finish without the 1 failed file')).toBeDefined();
+    });
+
+    it('offers no finish when no file went through: only Cancel, which discards the batch', async () => {
+        await run([file('run.py')]);
+
+        expect(buttonOf('Finish without')).toBeUndefined();
+        expect(buttonOf('Cancel')).toBeDefined();
+    });
+
+    it('offers "Retry failed" for a failure that can be sent again, next to the finish', async () => {
+        mocks.send.mockImplementation(async job => job.items.map(i => (i.path === 'b.jpg'
+            ? { id: i.id, ok: false, status: 400, error: 'Bad request' }
+            : { id: i.id, ok: true, entry: { path: i.path } })));
+        await run([file('a.jpg'), file('b.jpg')]);
+
+        expect(buttonOf('Retry failed')).toBeDefined();
+        expect(buttonOf('Finish without the 1 failed file')).toBeDefined();
+    });
+});
+
+describe('UploadPage when the commit fails', () => {
+    beforeEach(() => { answers([]); });
+
+    it('shows why and offers Try again, which commits the same batch again', async () => {
+        mocks.reg.share.commit.mockRejectedValueOnce(new ApiError('Gateway timeout', 504));
+        await run([file('a.jpg')]);
+
+        expect(wrapper.find('.error-msg').text()).toContain('Gateway timeout');
+        expect(buttonOf('Try again')).toBeDefined();
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+
+        await buttonOf('Try again').trigger('click');
+        await flushPromises();
+
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(2);
+        expect(mocks.reg.share.commit).toHaveBeenLastCalledWith('tok-1');
+        expect(router.push).toHaveBeenCalledWith({ name: 'ViewDataset', params: { org: 'alice', ds: 'brighton' } });
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+    });
+
+    it('does not commit again by itself, and leaving the page does not roll back a commit whose outcome is unknown', async () => {
+        mocks.reg.share.commit.mockRejectedValue(new ApiError('Gateway timeout', 504));
+        await run([file('a.jpg')]);
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(1);
+
+        // The queue reports idle again (a retry, a snapshot): no second commit
+        await wrapper.vm.onIdle(wrapper.vm.queue.state.value);
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(1);
+
+        wrapper.unmount();
+        await flushPromises();
+
+        expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
+        wrapper = null;
     });
 });

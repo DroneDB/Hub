@@ -184,3 +184,17 @@ describe('useUploadQueue.add, a splat level-of-detail folder (FR-UPL-09)', () =>
         expect(warn).not.toHaveBeenCalled();
     });
 });
+
+describe('useUploadQueue concurrency', () => {
+    // On HTTP/1.1 (production) the browser has 6 connections: uploads that held them all made listings, tiles and
+    // thumbnails wait for an upload request to end
+    it('keeps two of the six HTTP/1.1 connections free: 4 upload requests at most when the protocol is not multiplexed', async () => {
+        const send = vi.fn(() => new Promise(() => {}));
+        const queue = useUploadQueue({ send, plan: ready => ({ kind: 'single', items: [ready[0]] }), announceActivity: false });
+        queue.add(Array.from({ length: 10 }, (_, i) => ({ file: { size: 20 * 1024 * 1024 }, path: `f${i}.jpg` })));
+        await flush();
+
+        expect(send).toHaveBeenCalledTimes(4);
+        await queue.cancel();
+    });
+});

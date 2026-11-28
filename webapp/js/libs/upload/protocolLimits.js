@@ -2,11 +2,16 @@
  * protocolLimits - how many uploads can run at once on the connection to the Registry.
  *
  * Over HTTP/1.1 a browser opens 6 connections per host: a 7th request only waits in the
- * browser's queue. Over HTTP/2 or HTTP/3 requests are streams on one connection, each
- * with its own flow-control window, so more of them can run in parallel.
+ * browser's queue, and a request that has to wait for a free connection waits for an upload
+ * request to end (minutes, for a large body on a slow uplink). Uploads therefore take 4 of the
+ * 6, so listings, tiles and thumbnails always find a free connection. Over HTTP/2 or HTTP/3
+ * requests are streams on one connection, each with its own flow-control window, so more of
+ * them can run in parallel and nothing waits behind an upload.
  */
 
 export const HTTP1_CONNECTIONS = 6;
+// What uploads may hold of the HTTP/1.1 connections: the rest stays for the pages' own requests
+export const HTTP1_UPLOAD_CONNECTIONS = 4;
 export const MULTIPLEXED_STREAMS = 16;
 
 /**
@@ -32,11 +37,12 @@ export function negotiatedProtocol(origin = globalThis.location?.origin, perf = 
 }
 
 /**
- * Upload requests to run in parallel for a protocol: 16 on h2/h3, 6 otherwise.
+ * Upload requests to run in parallel for a protocol: 16 on h2/h3, 4 otherwise (an unknown protocol is
+ * taken as HTTP/1.1).
  * @param {string|null} protocol
  */
 export function uploadConcurrency(protocol) {
-    return isMultiplexed(protocol) ? MULTIPLEXED_STREAMS : HTTP1_CONNECTIONS;
+    return isMultiplexed(protocol) ? MULTIPLEXED_STREAMS : HTTP1_UPLOAD_CONNECTIONS;
 }
 
 /** Whether `protocol` runs requests as streams on one connection (HTTP/2, HTTP/3). */

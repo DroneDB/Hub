@@ -28,7 +28,8 @@ const CLASH = {
 };
 
 describe('uploadRequests overwrite', () => {
-    it('sends overwrite before the file of a single upload that replaces, and nothing otherwise', async () => {
+    // The Registry reads a request with no flag as an older client's replace: the Hub always says which it means
+    it('sends overwrite before the file of a single upload, true for a replace and false otherwise', async () => {
         const transport = vi.fn(async () => ({ status: 201, body: { path: 'a' }, uploaded: true }));
         const r = requests(transport);
 
@@ -37,7 +38,8 @@ describe('uploadRequests overwrite', () => {
 
         expect(fieldNames(transport.mock.calls[0][0].body)).toEqual(['path', 'overwrite', 'file']);
         expect(transport.mock.calls[0][0].body.get('overwrite')).toBe('true');
-        expect(fieldNames(transport.mock.calls[1][0].body)).toEqual(['path', 'file']);
+        expect(fieldNames(transport.mock.calls[1][0].body)).toEqual(['path', 'overwrite', 'file']);
+        expect(transport.mock.calls[1][0].body.get('overwrite')).toBe('false');
     });
 
     it('sends the flag of each file of a bundle before that file', async () => {
@@ -45,7 +47,9 @@ describe('uploadRequests overwrite', () => {
 
         await requests(transport).send({ kind: 'bundle', items: [item('a'), item('b', { overwrite: true })] }, hooks());
 
-        expect(fieldNames(transport.mock.calls[0][0].body)).toEqual(['path', 'file', 'path', 'overwrite', 'file']);
+        const body = transport.mock.calls[0][0].body;
+        expect(fieldNames(body)).toEqual(['path', 'overwrite', 'file', 'path', 'overwrite', 'file']);
+        expect(body.getAll('overwrite')).toEqual(['false', 'true']);
     });
 
     it('sends the flag in every chunk, before the chunk', async () => {
@@ -395,3 +399,145 @@ describe('uploadRequests failure messages', () => {
     });
 });
 
+
+describe('uploadRequests receipt poll', () => {
+    const lost = () => vi.fn(async () => ({ status: 504, body: null, uploaded: true }));
+    const done = { status: 200, body: { state: 'Done', results: [{ status: 201, entry: { path: 'a' } }] } };
+
+    // A poll that fails says nothing about the upload: sending the file again would meet the name it already has
+    it.each([[0], [500], [503], [429]])('a poll answered %i is asked again until the server tells, and the file is not sent again', async status => {
+        const transport = lost();
+        const getJson = vi.fn().mockResolvedValueOnce({ status, body: null }).mockResolvedValueOnce({ status, body: null }).mockResolvedValueOnce(done);
+
+        const [result] = await requests(transport, getJson).send({ kind: 'single', items: [item('a')] }, hooks());
+
+        expect(result).toEqual({ id: 'a', ok: true, entry: { path: 'a' } });
+        expect(getJson).toHaveBeenCalledTimes(3);
+        expect(transport).toHaveBeenCalledTimes(1);
+    });
+
+    it('only a 404 means the server never had the upload: a retry with no backpressure signal (status 0, not 503)', async () => {
+        const getJson = vi.fn(async () => ({ status: 404, body: null }));
+
+        const [result] = await requests(lost(), getJson).send({ kind: 'single', items: [item('a')] }, hooks());
+
+        expect(result).toMatchObject({ ok: false, status: 0, retryAfter: 0 });
+        expect(result.noRetry).toBeFalsy();
+        expect(getJson).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up at the deadline with a retry that is not backpressure either', async () => {
+        let t = 0;
+        const getJson = vi.fn(async () => ({ status: 500, body: null }));
+        const r = requests(lost(), getJson, { now: () => (t += 4 * 60 * 1000) });
+
+        const [result] = await r.send({ kind: 'single', items: [item('a')] }, hooks());
+
+        expect(result).toMatchObject({ ok: false, status: 0, retryAfter: null });
+        // Polled for the 15 minutes, not once
+        expect(getJson.mock.calls.length).toBeGreaterThan(2);
+    });
+
+    it('a bundle sent again keeps its id, so a server that committed the first answers from its receipt', async () => {
+        const transport = vi.fn(async () => ({ status: 504, body: null, uploaded: false }));
+        const items = [item('a'), item('b')];
+        const r = requests(transport);
+
+        await r.send({ kind: 'bundle', items }, hooks());
+        await r.send({ kind: 'bundle', items }, hooks());
+        await r.send({ kind: 'bundle', items: [items[0]] }, hooks());
+
+        const idOf = call => transport.mock.calls[call][0].headers['X-Upload-Id'];
+        expect(idOf(1)).toBe(idOf(0));
+        // Other files in the request: another upload
+        expect(idOf(2)).not.toBe(idOf(0));
+    });
+});
+
+describe('uploadRequests on an endpoint without receipts (the share batch)', () => {
+    const INFO = 'http://hub/share/info/tok';
+    const listing = paths => ({ status: 200, body: { entries: paths.map(path => ({ path })) } });
+    const shareRequests = (transport, getJson) => requests(transport, getJson, { receipts: false, batchInfoUrl: INFO, singleUrl: 'http://hub/share/upload/tok' });
+
+    it('counts a file done when the answer was lost and the batch lists it', async () => {
+        const transport = vi.fn(async () => ({ status: 504, body: null, uploaded: true }));
+        const getJson = vi.fn(async () => listing(['sub/a.jpg', 'b.jpg']));
+
+        const [result] = await shareRequests(transport, getJson).send({ kind: 'single', items: [item('sub/a.jpg')] }, hooks());
+
+        expect(result).toMatchObject({ id: 'sub/a.jpg', ok: true });
+        expect(getJson).toHaveBeenCalledWith(INFO);
+        expect(transport).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends it again when the batch does not list it, and a resend the batch refuses as already uploaded is done', async () => {
+        const refused = { status: 400, body: { title: 'Bad Request', detail: 'Entry already uploaded', noRetry: true }, uploaded: true };
+        const transport = vi.fn()
+            .mockResolvedValueOnce({ status: 0, body: null, uploaded: true })
+            .mockResolvedValueOnce(refused);
+        // The first request was still being processed when asked, and had been added when the resend was refused
+        const getJson = vi.fn().mockResolvedValueOnce(listing([])).mockResolvedValueOnce(listing(['a.jpg']));
+        const it0 = item('a.jpg');
+        const r = shareRequests(transport, getJson);
+
+        const [first] = await r.send({ kind: 'single', items: [it0] }, hooks());
+        expect(first).toMatchObject({ ok: false, status: 0 });
+        expect(first.noRetry).toBeFalsy();
+
+        const [second] = await r.send({ kind: 'single', items: [it0] }, hooks());
+        expect(second.ok).toBe(true);
+    });
+
+    it('asks nothing for a file that was not sent in full, or a refusal of a file whose answer was never lost', async () => {
+        const transport = vi.fn()
+            .mockResolvedValueOnce({ status: 504, body: null, uploaded: false })
+            .mockResolvedValueOnce({ status: 400, body: { detail: 'Extension blocked', noRetry: true }, uploaded: true });
+        const getJson = vi.fn();
+        const r = shareRequests(transport, getJson);
+
+        await r.send({ kind: 'single', items: [item('a.jpg')] }, hooks());
+        const [refused] = await r.send({ kind: 'single', items: [item('b.py')] }, hooks());
+
+        expect(refused).toMatchObject({ ok: false, status: 400, noRetry: true });
+        expect(getJson).not.toHaveBeenCalled();
+    });
+
+    it('a listing that cannot be read leaves the failure as it was (the file is sent again)', async () => {
+        const transport = vi.fn(async () => ({ status: 504, body: null, uploaded: true }));
+        const getJson = vi.fn(async () => ({ status: 0, body: null }));
+
+        const [result] = await shareRequests(transport, getJson).send({ kind: 'single', items: [item('a.jpg')] }, hooks());
+
+        expect(result).toMatchObject({ ok: false, status: 504 });
+    });
+});
+
+describe('uploadRequests recoverable refusals and stored chunks', () => {
+    it('a 409 the server does not call final (an upload still in progress) is marked retryable; a name that exists is not', async () => {
+        const inProgress = { title: 'Conflict', status: 409, noRetry: false, detail: 'Upload is still in progress' };
+        const transport = vi.fn()
+            .mockResolvedValueOnce({ status: 409, body: inProgress, uploaded: true })
+            .mockResolvedValueOnce({ status: 409, body: CLASH, uploaded: true })
+            .mockResolvedValueOnce({ status: 409, body: { ...inProgress, noRetry: true }, uploaded: true });
+        const r = requests(transport);
+
+        const [recoverable] = await r.send({ kind: 'single', items: [item('a')] }, hooks());
+        const [clash] = await r.send({ kind: 'single', items: [item('b')] }, hooks());
+        const [final] = await r.send({ kind: 'single', items: [item('c')] }, hooks());
+
+        expect(recoverable).toMatchObject({ ok: false, status: 409, noRetry: false, retryable: true });
+        expect(clash.retryable).toBeUndefined();
+        expect(final.retryable).toBeUndefined();
+    });
+
+    it('tells the scheduler after each chunk the server stored', async () => {
+        const transport = vi.fn(async ({ url }) => (url.endsWith('/commit')
+            ? { status: 201, body: { path: 'big' }, uploaded: true }
+            : { status: 200, body: {}, uploaded: true }));
+        const h = { ...hooks(), onStored: vi.fn() };
+
+        await requests(transport, undefined, { chunkBytes: 4 }).send({ kind: 'chunked', items: [item('big')] }, h);
+
+        expect(h.onStored.mock.calls).toEqual([['big'], ['big'], ['big']]);
+    });
+});

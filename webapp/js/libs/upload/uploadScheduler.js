@@ -2,7 +2,7 @@
  * uploadScheduler - runs a queue of file uploads.
  *
  * A pool of request slots: the moment a request settles its slot takes the next request
- * (no timer between files). Concurrency follows the protocol limit (6 on HTTP/1.1, 16 on
+ * (no timer between files). Concurrency follows the protocol limit (4 on HTTP/1.1, 16 on
  * HTTP/2) and the AIMD controller, which only backs off when the server asks for it (429 or
  * 503 with Retry-After). Retries follow the shared policy of useResilientUpload. A file
  * whose bytes are all sent is "processing" until the server answers: no progress, no ETA.
@@ -157,6 +157,11 @@ export function createUploadScheduler(opts) {
                     notify();
                 }
             },
+            // A chunk was stored: the file moves on, so the failures before it no longer count against its retries
+            onStored(itemId) {
+                const item = byId.get(itemId);
+                if (item && item.status === STATUS.UPLOADING) item.retryCount = 0;
+            },
             onUploaded(itemIds) {
                 for (const itemId of itemIds) {
                     const item = byId.get(itemId);
@@ -186,7 +191,9 @@ export function createUploadScheduler(opts) {
                 setSent(item, 0);
                 setStatus(item, STATUS.PENDING);
             }
-            updateActivity();
+            // resume() may have come while this request was still ending: its slot is free now and nobody else
+            // would start the files that went back to pending (pump does nothing while paused)
+            pump();
             notify(true);
             return;
         }
@@ -220,12 +227,16 @@ export function createUploadScheduler(opts) {
         if ((r.status === 429 || r.status === 503) && r.retryAfter != null)
             opts.policy.aimd.onFailure();
 
-        const canRetry = !r.noRetry && opts.policy.shouldRetryStatus(r.status) &&
+        // A transient status, or a refusal that the server says goes away by itself (`retryable`: an upload that is
+        // still in progress, chunks that are missing)
+        const canRetry = !r.noRetry && (r.retryable === true || opts.policy.shouldRetryStatus(r.status)) &&
             item.retryCount < opts.policy.maxRetries;
         if (canRetry) {
             const delay = opts.policy.computeRetryDelayMs(item.retryCount, r.retryAfter ?? null);
             item.retryCount++;
-            item.notBefore = clock.now() + delay;
+            // Waiting: only the timer below makes the file ready, not a comparison with the clock, so a clock that
+            // was set back meanwhile cannot leave the file with nothing to start it
+            item.notBefore = Number.POSITIVE_INFINITY;
             item.errorMessage = `Retrying... (${item.retryCount}/${opts.policy.maxRetries})`;
             setStatus(item, STATUS.PENDING);
             let timer = null;
@@ -233,6 +244,7 @@ export function createUploadScheduler(opts) {
             timer = clock.setTimeout(() => {
                 fired = true;
                 retryTimers.delete(timer);
+                item.notBefore = 0;
                 pump();
             }, delay);
             if (!fired) retryTimers.add(timer);
