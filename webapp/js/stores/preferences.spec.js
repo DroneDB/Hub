@@ -54,6 +54,8 @@ beforeEach(() => {
     _resetPrefListenersForTests();
     localStorage.clear();
     sessionStorage.clear();
+    // The device is Ann's (her session was the last one): what is set on it is hers
+    localStorage.setItem('accountPrefsOwner', 'ann');
     h.auth.isLoggedIn = true;
     h.auth.username = 'ann';
     h.reg.getRequest.mockReset();
@@ -626,14 +628,51 @@ describe('preferences store: another user on the same device', () => {
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
     });
 
-    it('lets the first user of a device that has no owner on record keep what was set while anonymous', async () => {
+    // Values from before the device recorded an owner, or set while nobody was signed in, may be another user's
+    it('gives the first user of a device that has no owner on record the values of their account alone, and sends none', async () => {
+        localStorage.removeItem('accountPrefsOwner');
         h.auth.isLoggedIn = false;
         setPref(PREF.MEASURE_UNIT, 'imperial');
-        await start({});
+        setPref(PREF.CUSTOM_BASEMAP, CUSTOM);
+        await start({ units: { measurement: 'metric' } });
+        h.auth.username = 'ben';
+        h.auth.isLoggedIn = true;
+        await tick(600);
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('metric');
+        expect(getPref(PREF.CUSTOM_BASEMAP, null)).toBeNull();
+        expect(h.reg.patchRequest).not.toHaveBeenCalled();
+
+        // From then on the device is Ben's: what he sets is sent, and kept when he signs in again
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await tick(600);
+        expect(bodies().at(-1)).toMatchObject({ units: { measurement: 'imperial' } });
+        h.auth.isLoggedIn = false;
+        await tick();
+        h.reg.getRequest.mockResolvedValue({});
         h.auth.isLoggedIn = true;
         await tick(600);
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
-        expect(bodies().at(-1)).toMatchObject({ units: { measurement: 'imperial' } });
+    });
+
+    // The previous session ended while no page was open (it expired): no page saw it end
+    it('removes the splat views and the clipboard of the previous user when another user signs in', async () => {
+        const { useClipboardStore } = await import('@/stores/clipboard');
+        h.auth.isLoggedIn = false;
+        setPref(PREF.SPLAT_VIEW_SETTINGS, [['ddb://h/o/d/a.spz', { upAxis: '+z' }]]);
+        setActivePinia(createPinia());
+        const clipboard = useClipboardStore();
+        clipboard.copy({ orgSlug: 'acme', dsSlug: 'site', basePath: '' }, [{ entry: { path: 'a.jpg', type: 1, size: 1 } }]);
+        h.reg.getRequest.mockResolvedValue({});
+        store = usePreferencesStore();
+        await tick();
+        // Nobody is signed in yet: a visitor's splat views stay
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).not.toBeNull();
+
+        h.auth.username = 'ben';
+        h.auth.isLoggedIn = true;
+        await tick(600);
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).toBeNull();
+        expect(clipboard.isEmpty).toBe(true);
     });
 
     it('tells the open views that the previous user\'s values are gone', async () => {

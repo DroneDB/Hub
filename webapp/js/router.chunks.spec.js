@@ -34,4 +34,23 @@ describe('createAppRouter: a route chunk that fails', () => {
         expect(assign).toHaveBeenCalledTimes(1);
         expect(notify.error).toHaveBeenCalledOnce();
     });
+
+    it('does not reload when the browser refuses session storage, which would reload for ever: it tells the user', async () => {
+        vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => { throw new DOMException('denied', 'SecurityError'); });
+        const router = createAppRouter();
+        router.addRoute({ path: '/broken', component: () => Promise.reject(new Error('Failed to fetch dynamically imported module: https://hub.test/auth.js')) });
+        await router.push('/broken').catch(() => { });
+        expect(assign).not.toHaveBeenCalled();
+        expect(notify.error).toHaveBeenCalledOnce();
+    });
+
+    it('does not reload when session storage cannot take the target (it is full)', async () => {
+        const storage = window.sessionStorage;
+        vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue({ getItem: key => storage.getItem(key), removeItem: key => storage.removeItem(key), setItem: () => { throw new DOMException('full', 'QuotaExceededError'); } });
+        const router = createAppRouter();
+        router.addRoute({ path: '/broken', component: () => Promise.reject(new Error('Failed to fetch dynamically imported module: https://hub.test/auth.js')) });
+        await router.push('/broken').catch(() => { });
+        expect(assign).not.toHaveBeenCalled();
+        expect(notify.error).toHaveBeenCalledOnce();
+    });
 });

@@ -14,6 +14,8 @@ const { default: DatasetMap } = await import('./DatasetMap.vue');
 
 const T = ddb.entry.type;
 const photo = path => ({ path, type: T.GEOIMAGE, point_geom: { type: 'Point', coordinates: [10, 45] } });
+/** The search of a Registry over these entries: the type asked, at most `limit` of them */
+const searchOf = entries => vi.fn(async (query, { type, limit } = {}) => entries.filter(e => type === undefined || e.type === type).slice(0, limit ?? Infinity));
 let wrapper;
 const mountMap = (props, search) => {
     wrapper = mount(DatasetMap, { props: { dataset: { search }, currentPath: null, loading: false, active: true, ...props } });
@@ -23,7 +25,7 @@ afterEach(() => wrapper?.unmount());
 
 describe('DatasetMap geo subfolder hint', () => {
     it('shows "Photos are in images - Show" at a root that has only the folder, and Show gives the subfolder', async () => {
-        const search = vi.fn(async () => Array.from({ length: 18 }, (_, i) => photo(`images/p${i}.jpg`)));
+        const search = searchOf(Array.from({ length: 18 }, (_, i) => photo(`images/p${i}.jpg`)));
         mountMap({ files: [{ entry: { path: 'images', type: T.DIRECTORY } }] }, search);
         await flushPromises();
 
@@ -34,7 +36,9 @@ describe('DatasetMap geo subfolder hint', () => {
         await wrapper.find('[data-testid="geo-subfolder-show"]').trigger('click');
 
         expect(wrapper.emitted('showFolder')).toEqual([['images']]);
-        expect(search).toHaveBeenCalledTimes(1);
+        // A few searches of one entry each, not the listing of the folder
+        expect(search).toHaveBeenCalled();
+        expect(search.mock.calls.every(([, options]) => options.limit === 1)).toBe(true);
     });
 
     it('shows no chip at a folder that has geo entries of its own', async () => {
@@ -47,7 +51,7 @@ describe('DatasetMap geo subfolder hint', () => {
     });
 
     it('searches nothing while the tab is hidden (the page keeps the map mounted), and looks when it shows', async () => {
-        const search = vi.fn(async () => [photo('images/p.jpg')]);
+        const search = searchOf([photo('images/p.jpg')]);
         mountMap({ files: [{ entry: { path: 'images', type: T.DIRECTORY } }], active: false }, search);
         await flushPromises();
         expect(search).not.toHaveBeenCalled();
@@ -55,7 +59,7 @@ describe('DatasetMap geo subfolder hint', () => {
 
         await wrapper.setProps({ active: true });
         await flushPromises();
-        expect(search).toHaveBeenCalledTimes(1);
+        expect(search).toHaveBeenCalled();
         expect(wrapper.find('[data-testid="geo-subfolder-chip"]').exists()).toBe(true);
     });
 

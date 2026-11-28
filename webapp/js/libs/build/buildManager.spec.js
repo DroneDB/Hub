@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getTasks: vi.fn(() => []), isLoaded: vi.fn(() => true), acquire: vi.fn(), release: vi.fn(), forceRefresh: vi.fn(), onFilesAdded: vi.fn() } }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getTasks: vi.fn(() => []), isLoaded: vi.fn(() => true), acquire: vi.fn(), release: vi.fn(), forceRefresh: vi.fn(), listRequests: vi.fn(() => 0), onFilesAdded: vi.fn() } }));
 const { default: manager } = await import('./buildManager');
 
 const T = ddb.entry.type;
@@ -62,10 +62,13 @@ describe('the build state of a file follows the task list', async () => {
         const ds = { baseApi: `/orgs/o/ds/${Math.random()}`, listOne: vi.fn(async () => ({ path: PATH, type: T.MODEL })), build: vi.fn(async () => true) };
         manager.registerDataset(ds);
         const [, onTasksUpdated] = taskMonitor.on.mock.calls.find(([event]) => event === 'tasksUpdated');
+        const [, onTasksListed] = taskMonitor.on.mock.calls.find(([event]) => event === 'tasksListed');
         const listChanges = tasks => { taskMonitor.getTasks.mockReturnValue(tasks); onTasksUpdated({ dataset: ds }); };
+        // The monitor shows the list that answered request number `request` (1: the first one asked for after the build)
+        const listed = (request = 1) => onTasksListed({ dataset: ds, request });
         const events = [];
         manager.on('buildStateChanged', e => events.push(e));
-        return { ds, listChanges, events, state: () => manager.getBuildState(ds, PATH)?.currentState ?? null };
+        return { ds, listChanges, listed, events, state: () => manager.getBuildState(ds, PATH)?.currentState ?? null };
     }
 
     // A dataset opened as the page does it: the task monitor has not fetched its list yet
@@ -139,9 +142,9 @@ describe('the build state of a file follows the task list', async () => {
 
     // The server takes some builds without queueing a job (a .laz under ept-data): no task will ever end the "Enqueued"
     it('stops showing a build that was just started when the list asked for afterwards has no task of it', async () => {
-        const { ds, events, state } = setup([failed]);
+        const { ds, events, state, listed } = setup([failed]);
         await manager.startBuild(ds, PATH, true);
-        await Promise.resolve();
+        listed();
 
         expect(state()).toBe('Failed');
         expect(manager.hasActiveBuild(ds, PATH)).toBe(false);
@@ -150,9 +153,9 @@ describe('the build state of a file follows the task list', async () => {
     });
 
     it('shows no build at all once a build of a file that never had one is dropped', async () => {
-        const { ds, events, state } = setup([]);
+        const { ds, events, state, listed } = setup([]);
         await manager.startBuild(ds, PATH, false);
-        await Promise.resolve();
+        listed();
 
         expect(state()).toBe(null);
         expect(manager.hasActiveBuild(ds, PATH)).toBe(false);
@@ -160,15 +163,45 @@ describe('the build state of a file follows the task list', async () => {
     });
 
     it('keeps the task of the build when the list asked for afterwards has it', async () => {
-        const { ds, listChanges, state } = setup([failed]);
+        const { ds, listChanges, listed, state } = setup([failed]);
         taskMonitor.forceRefresh.mockImplementationOnce(async () => {
             listChanges([task('5296', 'Enqueued', '2026-10-26T02:03:35Z'), failed]);
+            listed();
         });
         await manager.startBuild(ds, PATH, true);
         await Promise.resolve();
 
         expect(state()).toBe('Enqueued');
         expect(manager.hasActiveBuild(ds, PATH)).toBe(true);
+    });
+
+    // The refresh asked for after the build can fail (a network error), or answer after a later poll did
+    it('keeps a build that was just started shown when the refresh shows no list, until a list asked for afterwards is shown', async () => {
+        const { ds, state, listed, events } = setup([failed]);
+        taskMonitor.listRequests.mockReturnValueOnce(4); // four requests were asked for before the server accepted it
+        await manager.startBuild(ds, PATH, true);
+        await Promise.resolve();
+        await Promise.resolve();
+        // The refresh is over and no list came: the build is still on its way
+        expect(state()).toBe('Enqueued');
+        expect(manager.hasActiveBuild(ds, PATH)).toBe(true);
+
+        // A list that answers a request asked before the build was accepted does not decide
+        listed(4);
+        expect(state()).toBe('Enqueued');
+
+        // The next poll's list, unchanged and without its task: no task will come
+        listed(6);
+        expect(state()).toBe('Failed');
+        expect(events).toEqual([]);
+    });
+
+    it('drops a build that was just started once the refresh is over when the monitor does not follow the dataset', async () => {
+        const { ds, state } = setup([failed]);
+        taskMonitor.listRequests.mockReturnValueOnce(null);
+        await manager.startBuild(ds, PATH, true);
+        await Promise.resolve();
+        expect(state()).toBe('Failed');
     });
 
     // The server defers the build of a file that waits for files again, and only adds a task for it

@@ -293,6 +293,55 @@ describe('AuthSession: a refresh that answers after the session changed', () => 
         expect(reg.getUsername()).toBe('bob');
     });
 
+    // localStorage is shared by every tab of the site: another tab writes it while this one waits for its answer
+    it('does not sign the user back in after another tab signed out', async () => {
+        const reg = signedIn('http://refresh.test');
+        const release = holdRefresh();
+        const outcome = reg.refreshToken().catch(e => e);
+        await Promise.resolve();
+        // The other tab's sign-out: the stored session goes, this tab's own count of sessions does not change
+        for (const key of ['_jwt_token', '_jwt_token_expires', '_username']) localStorage.removeItem(`http://refresh.test${key}`);
+        release(answer({ token: 'x.e30.old', expires: Math.floor(Date.now() / 1000) + 3600 }));
+
+        expect((await outcome).message).toBe('logged out');
+        expect(localStorage.getItem('http://refresh.test_jwt_token')).toBe(null);
+        expect(reg.getUsername()).toBe(null);
+    });
+
+    it('does not store the old user\'s token under the user another tab signed in', async () => {
+        const reg = signedIn('http://refresh.test');
+        const release = holdRefresh();
+        const outcome = reg.refreshToken().catch(e => e);
+        await Promise.resolve();
+        localStorage.setItem('http://refresh.test_username', 'bob');
+        localStorage.setItem('http://refresh.test_jwt_token', bobToken);
+        release(answer({ token: 'x.e30.ann-refreshed', expires: Math.floor(Date.now() / 1000) + 3600 }));
+
+        expect((await outcome).message).toBe('logged out');
+        expect(reg.getUsername()).toBe('bob');
+        expect(reg.getAuthToken()).toBe(bobToken);
+    });
+
+    it('keeps the token another tab renewed for the same user, and a refusal of the old one does not end the session', async () => {
+        for (const reply of [answer({ token: 'x.e30.mine', expires: Math.floor(Date.now() / 1000) + 3600 }), answer({ title: 'Unauthorized' }, 401)]) {
+            localStorage.clear();
+            vi.restoreAllMocks();
+            const reg = signedIn('http://refresh.test');
+            const release = holdRefresh();
+            const onLogout = vi.fn();
+            reg.addEventListener('logout', onLogout);
+            const refreshing = reg.refreshToken();
+            await Promise.resolve();
+            localStorage.setItem('http://refresh.test_jwt_token', 'x.e30.other-tab');
+            release(reply);
+            await refreshing;
+
+            expect(reg.getAuthToken()).toBe('x.e30.other-tab');
+            expect(reg.getUsername()).toBe('ann');
+            expect(onLogout).not.toHaveBeenCalled();
+        }
+    });
+
     it('still renews the token of a session that did not change', async () => {
         const reg = signedIn('http://refresh.test');
         const release = holdRefresh();

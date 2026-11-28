@@ -122,9 +122,13 @@ export function formatNumber(value, digits = PRECISION.value, { placeholder = EM
         if (Math.abs(shown) < 0.5 * Math.pow(10, -decimals)) shown = 0;
     }
     if (!latin) return numberFormat({ useGrouping: grouping, ...options }).format(shown);
+    // The signs as typed ("-", not the U+2212 of fa), and without the direction marks around them (ar, fa, he)
     return numberFormat({ useGrouping: grouping, numberingSystem: 'latn', ...options }).formatToParts(shown)
-        .map(p => (p.type === 'decimal' ? separators().decimal : p.value)).join('');
+        .map(p => LATIN_PART[p.type]?.() ?? p.value.replace(DIRECTION_MARKS, '')).join('');
 }
+
+/** The parts of a number in a text field the user edits that are written as parseNumber reads them */
+const LATIN_PART = /** @type {Record<string, () => string>} */ ({ decimal: () => separators().decimal, minusSign: () => '-', plusSign: () => '+' });
 
 /**
  * A number to put in a text field the user edits: the browser's decimal sign, no group separators,
@@ -228,6 +232,8 @@ const groupedDigits = (/** @type {string} */ group) =>
 // Group separators that are never a decimal sign: an apostrophe or a right single quotation mark
 // (de-CH writes 1’234.5)
 const APOSTROPHES = /['\u2019]/g;
+/** The marks that set the direction of a text (Arabic, Persian and Hebrew numbers carry them around the sign): never part of a number */
+const DIRECTION_MARKS = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
 
 /**
  * The digits of a number written with `decimal` and `group`, as JavaScript reads them ("1234.5"),
@@ -276,7 +282,7 @@ export function parseNumber(text) {
     if (typeof text !== 'string') return NaN;
     const { decimal, group } = separators();
     // \s includes the no-break spaces some locales group digits with
-    let t = text.replace(/\s/g, '').replace(APOSTROPHES, '').replace(NATIVE_DIGITS, latinOf);
+    let t = text.replace(/\s/g, '').replace(APOSTROPHES, '').replace(DIRECTION_MARKS, '').replace(NATIVE_DIGITS, latinOf);
     // Any other group separator than "." and "," is only ever a group separator
     if (group !== '.' && group !== ',' && !/\s/.test(group)) t = t.split(group).join('');
     let sign = 1;

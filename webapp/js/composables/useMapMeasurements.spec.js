@@ -94,6 +94,22 @@ describe('useMapMeasurements', () => {
         expect(events.loaded).toBe(2);
     });
 
+    it('reads the colour of a group of the file as a measurement colour: a CSS text that is not a colour is the default', async () => {
+        const file = JSON.parse(fileOf('m1'));
+        file.metadata = { views: { map: { groups: [
+            { id: 'g1', name: 'Bad', color: 'red;position:fixed;inset:0;background:url(https://evil.example/x)' },
+            { id: 'g2', name: 'Good', color: '#12ab34' },
+            { id: 'g3', name: 'None' }
+        ] } } };
+        stored['a/ortho_measurements.geojson'] = JSON.stringify(file);
+        const m = start();
+        await m.loadSavedMeasurements();
+        const colours = m.measurementGroups.value.map(g => [g.name, g.color]);
+        expect(colours[1]).toEqual(['Good', '#12ab34']);
+        expect(colours[0][1]).toBe(colours[2][1]);
+        expect(colours[0][1]).toMatch(/^#[0-9a-f]{3,8}$/i);
+    });
+
     it('does not tell the map when the file could not be read', async () => {
         dataset.getFileContents.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
         const m = start();

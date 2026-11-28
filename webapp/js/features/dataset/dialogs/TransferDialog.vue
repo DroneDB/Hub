@@ -7,6 +7,9 @@
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
                     {{ errorMessage }}
                 </PrimeMessage>
+                <PrimeMessage v-if="sameNameError" severity="error" :closable="false" data-same-name>
+                    {{ sameNameError }}
+                </PrimeMessage>
 
                 <!-- Source Info -->
                 <PrimeMessage severity="info" :closable="false">
@@ -77,6 +80,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { useTimerGroup } from '@/composables/useTimers';
 import { transferModeOf } from '@/libs/dataset/transferMode';
 import { destFor } from '@/composables/usePasteStrategy';
+import { outermostItems, sameNameGroups, sameNameMessage } from '@/libs/dataset/transferTargets';
 
 
 export default {
@@ -131,11 +135,22 @@ export default {
             return transferModeOf(this.keepSource);
         },
 
+        // What is sent: an item inside another selected folder goes with that folder
+        toSend: function () {
+            return outermostItems(/** @type {{ entry: { path: string } }[]} */ (this.files), f => f.entry.path);
+        },
+
+        // Every item lands in one folder under its own name: two with one name would replace each other
+        sameNameError: function () {
+            const groups = sameNameGroups(this.toSend, f => f.entry.path);
+            return groups.length ? sameNameMessage(groups) : null;
+        },
+
         sourceInfo: function () {
-            if (this.files.length === 1) {
-                return `${this.sourceOrg}/${this.sourceDs}/${this.files[0].entry.path}`;
+            if (this.toSend.length === 1) {
+                return `${this.sourceOrg}/${this.sourceDs}/${this.toSend[0].entry.path}`;
             } else {
-                return `${this.files.length} items from ${this.sourceOrg}/${this.sourceDs}`;
+                return `${this.toSend.length} items from ${this.sourceOrg}/${this.sourceDs}`;
             }
         },
 
@@ -153,7 +168,7 @@ export default {
         },
 
         canTransfer: function () {
-            return !this.isTransferring && this.destOrg && this.destDs;
+            return !this.isTransferring && this.destOrg && this.destDs && !this.sameNameError;
         },
 
         hasError: function () {
@@ -222,7 +237,7 @@ export default {
             if (!this.canTransfer) return;
 
             this.isTransferring = true;
-            this.progress = Math.round((this.sent.length / this.files.length) * 100);
+            this.progress = Math.round((this.sent.length / this.toSend.length) * 100);
             this.transferredCount = this.sent.length;
             this.errorMessage = null;
 
@@ -231,7 +246,7 @@ export default {
             try {
                 // A retry after a partial failure sends only what is still to go: the files that moved are gone
                 // from the source (and the ones that were copied are already there)
-                for (const file of this.files.filter(f => !this.sent.includes(f))) {
+                for (const file of this.toSend.filter(f => !this.sent.includes(f))) {
                     const sourcePath = file.entry.path;
 
                     this.statusMessage = `${this.mode.working} ${sourcePath}...`;
@@ -247,7 +262,7 @@ export default {
 
                     this.sent.push(file);
                     this.transferredCount = this.sent.length;
-                    this.progress = Math.round((this.transferredCount / this.files.length) * 100);
+                    this.progress = Math.round((this.transferredCount / this.toSend.length) * 100);
                 }
 
                 this.statusMessage = this.mode.summary;

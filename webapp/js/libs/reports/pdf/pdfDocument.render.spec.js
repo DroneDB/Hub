@@ -191,6 +191,33 @@ describe('the cover', () => {
         expect(facts.y).toBeGreaterThan(bandBottom);
     }, 120000);
 
+    // Bold capitals are wider than the average letter: a title estimated a line short overflowed its band, and the
+    // map, given the room the estimate left, could go to a page of its own and put the contents on page 3
+    it('keeps a long title in capitals in its band, with its map on the cover and the contents on page 2', async () => {
+        const capitals = (words, length) => {
+            let text = '';
+            for (let k = 0; text.length < length; k++) text += (text ? ' ' : '') + words[k % words.length];
+            return text.slice(0, length).trim();
+        };
+        for (const [length, subtitleLength] of [[40, 0], [86, 0], [120, 60], [184, 0], [200, 120]]) {
+            const title = capitals(['WMWM', 'MOWMW', 'QWMW', 'MWWM'], length);
+            const subtitle = capitals(['WMW', 'MWMW'], subtitleLength);
+            const definition = definitionOf(['a.geojson'], { title, subtitle, preparedBy: 'A. Kaczmarek', sections: [{ kind: 'cover', enabled: true }, { kind: 'summary', enabled: true }, { kind: 'items', enabled: true }] });
+            // A stockpile gives the cover its tiles of figures, which leave the map less room
+            const model = coverModel({ features: [pile(), ...threeItems()], input: { definition } });
+            // A tall map: it takes all the room the cover leaves it
+            const assets = fullAssets(model);
+            for (const [block, figure] of assets.figures) assets.figures.set(block, { ...figure, image: { ...figure.image, width: 1000, height: 3000 } });
+            const laid = await laidOut(model, assets);
+            const band = laid.vectors.find(v => v.page === 1 && v.type === 'rect' && v.w >= laid.width - 1 && v.h > 50);
+            const words = new Set([...title.split(' '), ...subtitle.split(' ')].filter(Boolean));
+            const runs = laid.runs.filter(run => run.page === 1 && words.has(run.text.trim()));
+            expect(runs.length, title).toBeGreaterThan(3);
+            for (const run of runs) expect(run.y + run.inline.height, `${length}: ${run.text} at ${run.y}`).toBeLessThanOrEqual(band.y + band.h + 0.5);
+            expect(laid.runs.find(run => run.text.trim() === 'Contents')?.page, title).toBe(2);
+        }
+    }, 120000);
+
     it('has a word of the title with no break in it wrap in the band too', async () => {
         const title = 'N'.repeat(120);
         const definition = definitionOf(['a.geojson'], { title, sections: [{ kind: 'cover', enabled: true }] });

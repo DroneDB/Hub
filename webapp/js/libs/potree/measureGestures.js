@@ -24,7 +24,10 @@
  * lets go of the marker. A tap on the canvas (a touch released where it was pressed) is therefore placed here: the
  * marker is taken in hand again, moved to the point of the cloud under the finger, and released as a mouse release
  * does it. A tap that is on no point of the cloud places nothing; a touch that moves the view (a drag, a pinch) gives
- * the marker back to the pointer afterwards, as a right-drag does.
+ * the marker back to the pointer afterwards, as a right-drag does. A touch is known by the touch events it sends (a
+ * touchstart on the canvas between the press and the release), not by the pointer type: a stylus on a tablet (an Apple
+ * Pencil, a pen on Android) is a 'pen' that sends touch events, and a pen on Windows is a 'pen' that sends mouse events,
+ * which place their point as a mouse does.
  *
  * The measure of the tools of the Hub (`start(kind)`) and the one that the icons of the Potree sidebar start are
  * both followed: Potree tells the measuring tool starts one (`start_inserting_measurement`).
@@ -83,7 +86,7 @@ export class PotreeMeasureGestures {
         this.leftUps = /** @type {{ clientX: number, clientY: number, detail: number }[]} */ ([]);
         /** The fingers on the canvas, by pointer id, and whether the gesture is more than one tap (a second finger, a drag) */
         this.touches = /** @type {Map<number, { clientX: number, clientY: number }>} */ (new Map());
-        this.touchGesture = /** @type {{ start: { clientX: number, clientY: number }, carried: any, tap: boolean } | null} */ (null);
+        this.touchGesture = /** @type {{ start: { clientX: number, clientY: number }, carried: any, tap: boolean, touched: boolean } | null} */ (null);
         /** The measure whose marker is given back to the pointer when Potree's touchend, which lets go of it, has run */
         this.restoreFollower = /** @type {any} */ (null);
 
@@ -103,8 +106,9 @@ export class PotreeMeasureGestures {
         session.track(canvas, 'mouseup', (/** @type {MouseEvent} */ e) => this.onMouseUp(e));
         session.track(doc, 'keydown', (/** @type {KeyboardEvent} */ e) => this.onKey(e));
         // A touch gives Potree no mouse events: the pointer events are the only ones a finger sends (seen before Potree's
-        // touchstart, which lets go of the marker that follows the pointer)
+        // touchstart, which lets go of the marker that follows the pointer). The touchstart tells that the pointer is a touch
         session.track(doc, 'pointerdown', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchDown(e); }, true);
+        session.track(doc, 'touchstart', (/** @type {Event} */ e) => { if (e.target === canvas) this.onTouchStarted(); }, true);
         session.track(doc, 'pointermove', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchMove(e); }, true);
         session.track(doc, 'pointerup', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchUp(e, true); }, true);
         session.track(doc, 'pointercancel', (/** @type {PointerEvent} */ e) => { if (e.target === canvas) this.onTouchUp(e, false); }, true);
@@ -300,9 +304,9 @@ export class PotreeMeasureGestures {
 
     // ---- Touch ----------------------------------------------------------------------------
 
-    /** @param {PointerEvent} e */
+    /** A pointer is pressed on the canvas: a touch when touch events follow (onTouchStarted). @param {PointerEvent} e */
     onTouchDown(e) {
-        if (e.pointerType !== 'touch') return;
+        if (e.pointerType === 'mouse') return;
         this.touches.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
         if (this.touchGesture) {
             // A second finger: a pinch or a pan of the view, not a tap
@@ -314,14 +318,20 @@ export class PotreeMeasureGestures {
             start: { clientX: e.clientX, clientY: e.clientY },
             // The marker that follows the pointer: Potree's touchstart lets go of it
             carried: measure && this.carrying(measure) ? this.viewer.inputHandler.drag.object : null,
-            tap: true
+            tap: true,
+            touched: false
         };
+    }
+
+    /** The pressed pointer sends touch events: Potree hears it as a touch, with no mouse event to place a point. */
+    onTouchStarted() {
+        if (this.touchGesture) this.touchGesture.touched = true;
     }
 
     /** @param {PointerEvent} e */
     onTouchMove(e) {
         const gesture = this.touchGesture;
-        if (e.pointerType !== 'touch' || !gesture || !gesture.tap) return;
+        if (!this.touches.has(e.pointerId) || !gesture || !gesture.tap) return;
         const { start } = gesture;
         if (Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY) > TAP_MAX_MOVE_PX) gesture.tap = false;
     }
@@ -332,11 +342,12 @@ export class PotreeMeasureGestures {
      * @param {boolean} released  false when the touch was cancelled (it places nothing)
      */
     onTouchUp(e, released) {
-        if (e.pointerType !== 'touch') return;
-        this.touches.delete(e.pointerId);
+        if (!this.touches.delete(e.pointerId)) return;
         const gesture = this.touchGesture;
         if (!gesture || this.touches.size > 0) return;
         this.touchGesture = null;
+        // A pen that sends mouse events: Potree's mouse release places its point
+        if (!gesture.touched) return;
         const measure = this.measure;
         if (!measure) return;
         if (!gesture.carried) return;

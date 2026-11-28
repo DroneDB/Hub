@@ -110,12 +110,21 @@ export default class AuthSession {
 
     async _doRefreshToken() {
         // The answer belongs to the session that asked: one that signed out, or was replaced by another user's, meanwhile
-        // must not be signed in again, nor have its token stored for the next user, nor be ended by a refusal
+        // must not be signed in again, nor have its token stored for the next user, nor be ended by a refusal. The
+        // session is the stored one, which every tab of the site shares: another tab that signed out (no token now) or
+        // signed another user in ended it too, which the count of this tab's sessions does not see
         const epoch = this._epoch;
-        const ended = () => epoch !== this._epoch;
+        const tokenKey = `${this.registry.url}_jwt_token`;
+        const sentToken = storage.getItem(tokenKey);
+        const user = this._getUsernameFromStorage();
+        const ended = () => epoch !== this._epoch || storage.getItem(tokenKey) === null || this._getUsernameFromStorage() !== user;
+        // Another tab renewed the session of the same user meanwhile: its token stands, and an answer to the old one
+        // neither replaces it nor ends the session
+        const renewedElsewhere = () => storage.getItem(tokenKey) !== sentToken;
         try {
             const res = await this.registry.postRequest('/users/authenticate/refresh');
             if (ended()) throw new Error("logged out");
+            if (renewedElsewhere()) return;
 
             if (res.token) {
                 this.setCredentials(this._getUsernameFromStorage(), res.token, res.expires);
@@ -124,6 +133,7 @@ export default class AuthSession {
             }
         } catch (error) {
             if (ended()) throw new Error("logged out", { cause: error });
+            if (renewedElsewhere()) return;
             if (error.status === 401) {
                 this.endRefusedSession(error);
                 throw new Error("logged out", { cause: error });

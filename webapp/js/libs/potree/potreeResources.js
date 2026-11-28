@@ -35,7 +35,7 @@ export const POTREE_RESOURCES = [
  * Potree without a new version would never be fetched again by a browser that has the old one. potreeResources.spec
  * fails when a file changes without this digest: update it with the one it reports.
  */
-export const POTREE_FILES_DIGEST = '6c7d3b769330';
+export const POTREE_FILES_DIGEST = '65ace1d6ef59';
 
 /**
  * What the URLs of the Potree files carry after `?v=`: the Hub version and the digest of the files, so that either one

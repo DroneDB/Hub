@@ -12,9 +12,10 @@
  *    device with a stale copy of the other fields cannot overwrite what another device saved.
  *
  * The local values of the synced keys belong to the account that last had a session on this device (OWNER_KEY): when
- * another account starts one, they are removed first, so that its first sign-in neither shows nor sends the previous
- * user's settings (a custom basemap with its access token, the stockpile prices). The values that only the device keeps
- * and that are the user's own (the splat views they set up) go when the session ends.
+ * another account starts one, or the device has no owner on record, they are removed first, so that its first sign-in
+ * neither shows nor sends a previous user's settings (a custom basemap with its access token, the stockpile prices).
+ * The values that only the device keeps and that are the user's own (the splat views they set up, the clipboard) go
+ * when the session ends, and when another account starts one (a session can end while no page is open).
  *
  * The store is the only subscriber to the login state of the sync; it does not subscribe to
  * the client's events (the auth store does).
@@ -119,15 +120,25 @@ const isConflict = e => !!e && typeof e === 'object' && /** @type {any} */ (e).s
 /** The Registry has no such route (an older one): there is nothing to sync with, which is not a failure to warn about. @param {unknown} e */
 const isMissingRoute = e => !!e && typeof e === 'object' && [404, 405].includes(/** @type {any} */ (e).status);
 
+/** The data the device keeps for the signed-in user alone (the splat views they set up, the clipboard of the dataset page). */
+function forgetUserDeviceData() {
+    removePref(PREF.SPLAT_VIEW_SETTINGS);
+    useClipboardStore().clear();
+}
+
 /**
  * The synced local values stay with the account they were synced with: another account that signs in on this
- * device starts without them. Records `user` as their owner.
+ * device starts without them, and without the data the device kept for the previous user (which a session that
+ * expired while no page was open left behind). A device with no owner on record (values from before the owner
+ * was recorded, or set while nobody was signed in) cannot tell whose they are: the account alone gives the
+ * values of its first session. Records `user` as their owner.
  * @param {string} user
  */
 function adoptDevice(user) {
     const owner = safeStorage.getItem(OWNER_KEY);
-    if (owner !== null && owner !== user) {
+    if (owner !== user) {
         for (const key of Object.keys(ACCOUNT_SECTIONS)) removePref(key);
+        forgetUserDeviceData();
     }
     safeStorage.setItem(OWNER_KEY, user);
 }
@@ -348,8 +359,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
             adoptDevice(auth.username);
             void start();
         } else if (before) {
-            removePref(PREF.SPLAT_VIEW_SETTINGS);
-            useClipboardStore().clear();
+            forgetUserDeviceData();
         }
     }, { immediate: true });
 

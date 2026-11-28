@@ -569,4 +569,56 @@ describe('UploadPage when the commit fails', () => {
         expect(mocks.reg.share.rollback).not.toHaveBeenCalled();
         wrapper = null;
     });
+
+    it('offers no Try again while failed files are sent again, and asks again before finishing without a file that failed again', async () => {
+        let attempts = 0;
+        let again;
+        mocks.send.mockImplementation(job => {
+            const failed = { id: job.items[0].id, ok: false, status: 400, error: 'Bad request' };
+            if (job.items[0].path !== 'b.jpg') return Promise.resolve(job.items.map(i => ({ id: i.id, ok: true, entry: { path: i.path } })));
+            attempts++;
+            return attempts === 1 ? Promise.resolve([failed]) : new Promise(resolve => { again = () => resolve([failed]); });
+        });
+        mocks.reg.share.commit.mockRejectedValueOnce(new ApiError('Gateway timeout', 504));
+        await run([file('a.jpg'), file('b.jpg')]);
+        await buttonOf('Finish without the 1 failed file').trigger('click');
+        await flushPromises();
+        await answer('[data-confirm]');
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(1);
+        expect(buttonOf('Try again')).toBeDefined();
+
+        // b.jpg is sent again: committing now would leave it out while it is on its way
+        await buttonOf('Retry failed').trigger('click');
+        await flushPromises();
+        expect(buttonOf('Try again')).toBeUndefined();
+
+        // It fails again: nothing is committed by itself, and finishing without it asks again
+        again();
+        await flushPromises();
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(1);
+        expect(buttonOf('Try again')).toBeUndefined();
+        await buttonOf('Finish without the 1 failed file').trigger('click');
+        await flushPromises();
+        expect(question().textContent).toContain('The 1 failed file is left out.');
+        await answer('[data-confirm]');
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(2);
+    });
+
+    it('commits by itself when the files sent again after a failed commit all go through', async () => {
+        let attempts = 0;
+        mocks.send.mockImplementation(async job => job.items.map(i => (i.path === 'b.jpg' && ++attempts === 1
+            ? { id: i.id, ok: false, status: 400, error: 'Bad request' }
+            : { id: i.id, ok: true, entry: { path: i.path } })));
+        mocks.reg.share.commit.mockRejectedValueOnce(new ApiError('Gateway timeout', 504));
+        await run([file('a.jpg'), file('b.jpg')]);
+        await buttonOf('Finish without the 1 failed file').trigger('click');
+        await flushPromises();
+        await answer('[data-confirm]');
+
+        await buttonOf('Retry failed').trigger('click');
+        await flushPromises();
+
+        expect(mocks.reg.share.commit).toHaveBeenCalledTimes(2);
+        expect(router.push).toHaveBeenCalledWith({ name: 'ViewDataset', params: { org: 'alice', ds: 'brighton' } });
+    });
 });

@@ -1,19 +1,24 @@
 // @ts-check
 /**
  * useGeoSubfolder - the Map tab of a folder that has nothing to put on the map, while a subfolder has: the
- * photos of a dataset are in `images/`, its root has none. The subfolders are asked about one at a time, each for its
- * own entries; the first that holds some is the hint ("Photos are in images - Show"). No recursive search and no
- * toggle: the user opens the subfolder, the map then shows its entries.
+ * photos of a dataset are in `images/`, its root has none. The first subfolder that holds some is the hint ("Photos
+ * are in images - Show"); no toggle: the user opens the subfolder, the map then shows its entries.
+ *
+ * The Registry is asked for the first entry of each type that can have a place on the map below the folder (a search
+ * with a limit of one): a few answers of one entry, however many photos `images/` holds. A Registry older than the
+ * limit answers with every entry: then, for the rest of the page's life with that Registry, the subfolders are asked
+ * about one at a time instead, each for its own entries.
  *
  *   const { hint } = useGeoSubfolder({ dataset, files: () => props.files, currentPath: () => props.currentPath,
  *                                      loading: () => props.loading, active: () => props.active });
  *   hint.value   // null, or { folder: 'images', path: 'site/images', text: 'Photos are in images' }
  *
- * It asks only while the map is on show, for a folder that has a subfolder and no geo entry of its own: the geotagged
- * subfolders in name order, each followed down its own tree, and stops at the first that holds a geo entry (at most
- * MAX_FOLDER_PROBES folders: the server answers a recursive search with every entry it finds, which on a large
- * dataset is the whole index). The answer is kept for the folder while the page is open; a change of
- * what the folder holds, or another dataset, asks again. An answer that a later visit overtook is dropped.
+ * It asks only while the map is on show, for a folder that has a subfolder and no geo entry of its own. Folder by
+ * folder (an older Registry), the subfolders go in name order, each followed down its own tree, up to the first that
+ * holds a geo entry (at most MAX_FOLDER_PROBES folders: without a limit the server answers a recursive search with
+ * every entry it finds, which on a large dataset is the whole index). The answer is kept for the folder while the
+ * page is open; a change of what the folder holds, or another dataset, asks again. An answer that a later visit
+ * overtook is dropped.
  */
 import { ref, watch, toValue, getCurrentScope, onScopeDispose } from 'vue';
 import ddb from 'ddb';
@@ -57,6 +62,45 @@ export function geoSubfolderOf(entries, folder) {
  */
 export const MAX_FOLDER_PROBES = 30;
 
+const T = ddb.entry.type;
+/**
+ * The entry types that can have a place on the map (isGeoEntry): the photos first, the most common. The others (a
+ * plain image, a video, a document) never have one.
+ */
+export const GEO_TYPES = Object.freeze([T.GEOIMAGE, T.GEORASTER, T.POINTCLOUD, T.VECTOR, T.MODEL, T.GEOVIDEO, T.GEOPANORAMA, T.TILES3D, T.GAUSSIAN_SPLAT]);
+
+/** The entries each probe asks for: is there one of the type below the folder */
+const PROBE_LIMIT = 1;
+
+/**
+ * The registries that answered a search with more entries than its limit (older than the limit): asked folder by
+ * folder from then on. By registry, as all its datasets answer alike.
+ * @type {WeakSet<object>}
+ */
+const ignoresLimit = new WeakSet();
+
+/** The subfolder of `folder` an entry is in ('' for an entry of the folder itself). @param {string} path @param {string} prefix */
+const topOf = (path, prefix) => {
+    const rest = path.slice(prefix.length);
+    const slash = rest.indexOf('/');
+    return slash > 0 ? rest.slice(0, slash) : '';
+};
+
+/**
+ * The hint from the first entry of each geo type below `folder`: the subfolder of the one that comes first by path,
+ * as the Registry orders a search. Its entries are contiguous in that order, so the first entry of a type that is
+ * not in it says that the subfolder has none of the type: "Photos" when every first entry found in it is a photo.
+ * @param {any[]} entries @param {string | null} folder
+ */
+function hintOfFirstEntries(entries, folder) {
+    const prefix = folder ? `${folder.replace(/\/+$/, '')}/` : '';
+    const geo = entries.filter(e => isGeoEntry(e) && typeof e.path === 'string' && e.path.startsWith(prefix) && topOf(e.path, prefix))
+        .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+    if (!geo.length) return null;
+    const top = topOf(geo[0].path, prefix);
+    return geoSubfolderOf(geo.filter(e => topOf(e.path, prefix) === top), folder);
+}
+
 /**
  * The folders a listing holds, by path.
  * @param {any[]} entries  the entries of one folder
@@ -99,12 +143,33 @@ export function useGeoSubfolder({ dataset, files, currentPath, loading = () => f
     const hasFolder = () => items().some(f => f.entry && ddb.entry.isDirectory(f.entry));
 
     /**
-     * The first subfolder (by name) that holds geo entries at any depth. The folders are asked one at a time, each for
-     * its own entries (a recursive search returns every entry of the dataset that has a place): the subfolders of a
-     * folder come after it and the next subfolder of `folder` only when it had none, so the first hit ends it.
+     * The first subfolder that holds geo entries at any depth: the first entry of each geo type below the folder, the
+     * photos first (an older Registry answers that one with all its photos and is then asked folder by folder).
      * @param {any} ds @param {string | null} folder @param {AbortSignal} signal
      */
     async function search(ds, folder, signal) {
+        const registry = ds.registry ?? ds;
+        if (ignoresLimit.has(registry)) return walk(ds, folder, signal);
+        const probe = (/** @type {number} */ type) => ds.search('*', { path: folder ?? undefined, recursive: true, type, limit: PROBE_LIMIT, signal });
+        const [first, ...others] = GEO_TYPES;
+        const photos = (await probe(first)) || [];
+        if (photos.length > PROBE_LIMIT) {
+            ignoresLimit.add(registry);
+            return hintOfFirstEntries(photos, folder) ?? walk(ds, folder, signal);
+        }
+        const rest = (await Promise.all(others.map(type => probe(type)))).map(found => found || []);
+        // A Registry older than the limit, below a folder with at most one photo: what it answered still holds the first entries
+        if (rest.some(found => found.length > PROBE_LIMIT)) ignoresLimit.add(registry);
+        return hintOfFirstEntries([...photos, ...rest.flat()], folder);
+    }
+
+    /**
+     * Folder by folder (a Registry that has no limit): the folders are asked one at a time, each for its own entries (a
+     * recursive search returns every entry of the dataset that has a place): the subfolders of a folder come after it
+     * and the next subfolder of `folder` only when it had none, so the first hit ends it.
+     * @param {any} ds @param {string | null} folder @param {AbortSignal} signal
+     */
+    async function walk(ds, folder, signal) {
         let budget = MAX_FOLDER_PROBES;
         for (const top of subfoldersOf(items().map(f => f.entry), folder)) {
             const queue = [top];

@@ -86,6 +86,12 @@ class BuildManager {
             };
             taskMonitor.on('tasksUpdated', this._boundOnTasksUpdated);
         }
+        if (!this._boundOnTasksListed) {
+            this._boundOnTasksListed = ({ dataset: listed, request }) => {
+                if (listed && this.datasets.has(this.getDatasetKey(listed))) this._settleListed(listed, request);
+            };
+            taskMonitor.on('tasksListed', this._boundOnTasksListed);
+        }
         // Start the unified poller for this dataset (once per dataset, released on unregister)
         if (!this._acquired.has(key)) {
             this._acquired.add(key);
@@ -209,14 +215,19 @@ class BuildManager {
             const key = this.getDatasetKey(dataset);
             const knownTaskIds = new Set(taskMonitor.getTasks(dataset)
                 .filter(t => t.toolId === 'build' && t.path === filePath).map(t => t.taskId));
+            // The requests asked for before the server accepted the build: a list that answers one of them may not
+            // have its task yet. The first list shown that answers a later request decides (see _settleListed),
+            // whichever request it answers: the refresh below can fail, or a later poll can answer first
+            const listedAfter = taskMonitor.listRequests(dataset);
             const next = new Map(this._buildByPath.get(key) ?? []);
-            next.set(filePath, { path: filePath, state: BUILD_STATES.ENQUEUED, knownTaskIds });
+            next.set(filePath, { path: filePath, state: BUILD_STATES.ENQUEUED, knownTaskIds, listedAfter });
             this._buildByPath.set(key, next);
             const placeholder = next.get(filePath);
 
-            // Trigger immediate refresh so the new build task shows up; the list that answers is the first one asked
-            // for after the server accepted the build: if it has no task, none will come
-            Promise.resolve(taskMonitor.forceRefresh(dataset)).then(() => this._settle(dataset, filePath, placeholder));
+            // Trigger immediate refresh so the new build task shows up. A dataset the monitor does not follow gets
+            // no list: its build is dropped once the refresh is over, as no task will replace it
+            const refreshed = Promise.resolve(taskMonitor.forceRefresh(dataset));
+            if (listedAfter === null) refreshed.then(() => this._settle(dataset, filePath, placeholder));
             this.emit('buildStarted', { dataset, filePath, force });
             return true;
         } catch (error) {
@@ -234,6 +245,21 @@ class BuildManager {
         if (this._buildByPath.get(key)?.get(filePath) !== placeholder) return;
         placeholder.settled = true;
         this._sync(dataset);
+    }
+
+    /**
+     * The task monitor shows the list that answered request `request`: the builds shown from `startBuild` before
+     * that request was asked for are settled (_settle), as the list is one asked for after the server accepted them.
+     */
+    _settleListed(dataset, request) {
+        const held = this._buildByPath.get(this.getDatasetKey(dataset));
+        let settled = false;
+        for (const placeholder of held?.values() ?? []) {
+            if (!placeholder.knownTaskIds || placeholder.settled || placeholder.listedAfter == null || request <= placeholder.listedAfter) continue;
+            placeholder.settled = true;
+            settled = true;
+        }
+        if (settled) this._sync(dataset);
     }
 
     /* ---- load builds (delegates to taskMonitor) ---- */
@@ -284,6 +310,8 @@ class BuildManager {
         for (const ds of Array.from(this.datasets.values())) this.unregisterDataset(ds);
         taskMonitor.off('tasksUpdated', this._boundOnTasksUpdated);
         this._boundOnTasksUpdated = null;
+        taskMonitor.off('tasksListed', this._boundOnTasksListed);
+        this._boundOnTasksListed = null;
         this._buildByPath.clear();
         this.datasets.clear();
         this._acquired.clear();

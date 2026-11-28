@@ -589,6 +589,41 @@ describe('a measure drawn with a finger', () => {
         expect(viewer.inputHandler.drag.object).toBe(measures[0].spheres[0]);
     });
 
+    // An Apple Pencil or a pen on Android is a 'pen' that sends touch events: Potree's touchstart lets go of the marker
+    it('a tap of a stylus that sends touch events places a point', () => {
+        gestures.start('point');
+        flushTimers();
+        pointerZ = 4;
+        pointer('pointerdown', 12, 14, { pointerType: 'pen' });
+        touch('touchstart');
+        pointer('pointerup', 12, 14, { pointerType: 'pen' });
+        touch('touchend');
+        flushTimers();
+        expect(coords(measures[0])).toEqual([[12, 14, 4]]);
+        expect(gestures.activeKind).toBeNull();
+    });
+
+    // A pen on Windows is a 'pen' that sends mouse events, which place the point as a mouse does
+    it('a tap of a pen that sends mouse events places one point', () => {
+        gestures.start('distance');
+        flushTimers();
+        const penTap = (x, y, z) => {
+            pointerZ = z;
+            pointer('pointermove', x, y, { pointerType: 'pen' });
+            fire('mousemove', { clientX: x, clientY: y, buttons: 0 });
+            pointer('pointerdown', x, y, { pointerType: 'pen' });
+            fire('mousedown', { clientX: x, clientY: y, buttons: 1 });
+            pointer('pointerup', x, y, { pointerType: 'pen' });
+            fire('mouseup', { clientX: x, clientY: y });
+        };
+        penTap(7, 9, 2);
+        // The placed point and the marker that follows the pointer: one point per tap
+        expect(measures[0].points).toHaveLength(2);
+        penTap(20, 21, 3);
+        key('Enter');
+        expect(coords(measures[0])).toEqual([[7, 9, 2], [20, 21, 3]]);
+    });
+
     it('a touch that is cancelled places nothing and gives the marker back', () => {
         gestures.start('distance');
         flushTimers();

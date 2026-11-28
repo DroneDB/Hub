@@ -51881,7 +51881,7 @@
 			let spriteWidth = 2 * margin + textWidth + 2 * this.borderThickness;
 			let spriteHeight = this.fontsize * 1.4 + 2 * this.borderThickness;
 
-			// The text is drawn at TextSprite.resolutionScale x the sprite's size (the pixel ratio of the screen, FR-XC-32):
+			// The text is drawn at TextSprite.resolutionScale x the sprite's size (the pixel ratio of the screen):
 			// the sprite keeps its size in the scene, its texture has more pixels
 			const resolutionScale = TextSprite.resolutionScale || 1;
 			context.canvas.width = Math.ceil(spriteWidth * resolutionScale);
@@ -60464,7 +60464,7 @@ void main() {
 
 		updateMaterial (material, visibleNodes, camera, renderer) {
 			material.fov = camera.fov * (Math.PI / 180);
-			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio, FR-XC-32)
+			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio)
 			material.screenWidth = renderer.domElement.width;
 			material.screenHeight = renderer.domElement.height;
 			material.spacing = this.pcoGeometry.spacing; // * Math.max(this.scale.x, this.scale.y, this.scale.z);
@@ -61995,7 +61995,7 @@ void main() {
 
 		updateMaterial (material, visibleNodes, camera, renderer) {
 			material.fov = camera.fov * (Math.PI / 180);
-			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio, FR-XC-32)
+			// The drawing buffer, in the pixels the points are drawn in (CSS size x pixel ratio)
 			material.screenWidth = renderer.domElement.width;
 			material.screenHeight = renderer.domElement.height;
 			material.spacing = this.pcoGeometry.spacing;
@@ -63668,7 +63668,7 @@ void main() {
 
 
 				// Point sizes are CSS px (the material, the Appearance menu and the pick keep them so); they are
-				// drawn in the pixels of the target: the size of the drawing buffer is the CSS size x the pixel ratio (FR-XC-32).
+				// drawn in the pixels of the target: the size of the drawing buffer is the CSS size x the pixel ratio.
 				// The shader draws `size` as pixels for a fixed size, and for an attenuated size with an orthographic
 				// camera; the other sizes are multiplied by uScreenWidth or uScreenHeight, already in the pixels of the target.
 				// minSize and maxSize are pixels for every type.
@@ -70633,7 +70633,7 @@ void main() {
 
 			const viewer = this.viewer;
 			let camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-			// The targets have the size of the drawing buffer (CSS size x pixel ratio, FR-XC-32), not the CSS size
+			// The targets have the size of the drawing buffer (CSS size x pixel ratio), not the CSS size
 			const {width, height} = this.viewer.renderer.getDrawingBufferSize(new Vector2());
 
 
@@ -70886,7 +70886,7 @@ void main() {
 
 			const viewer = this.viewer;
 			const camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-			// The targets have the size of the drawing buffer (CSS size x pixel ratio, FR-XC-32), not the CSS size;
+			// The targets have the size of the drawing buffer (CSS size x pixel ratio), not the CSS size;
 			// a viewport (below) is in CSS px, three.js multiplies it by the pixel ratio
 			const {width, height} = this.viewer.renderer.getDrawingBufferSize(new Vector2());
 			const cssSize = this.viewer.renderer.getSize(new Vector2());

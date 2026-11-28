@@ -261,6 +261,9 @@ async function _fetch(ent) {
         } else {
             ent.idleStreak++;
         }
+        // Every list shown, changed or not, with the number of its request (see listRequests): a reader that waits
+        // for a list asked for after some moment knows it from this one
+        emit('tasksListed', { dataset: ds, request: seq });
     } catch (err) {
         if (stores.get(datasetKey(ds)) !== ent) return;
         if (isNotFound(err)) {
@@ -483,6 +486,15 @@ const TaskMonitor = {
     onFilesAdded(dataset) {
         const ent = peekStore(dataset);
         if (ent && ent._started) _fetch(ent).then(() => _wake(ent));
+    },
+
+    /**
+     * How many task-list requests of this dataset were asked for so far, or null when the dataset is not followed
+     * (or was deleted): no list will come. A 'tasksListed' with a higher `request` answers a request asked after now.
+     */
+    listRequests(dataset) {
+        const ent = peekStore(dataset);
+        return ent && !ent.gone ? ent.fetches : null;
     },
 
     /** Whether the server has returned this dataset's task list at least once. */

@@ -81,15 +81,28 @@ export async function generateReportPdf(model, { dataset, signal, onProgress, de
     const libraries = dependencies ?? await loadPdfDependencies();
     signal?.throwIfAborted();
 
+    // The text is the model's: the question is asked of the document without its images, before the images are made
+    // (minutes for a large report), so a No costs no wait. The notes of the figures that could not be made are text
+    // too: a character among them that was not asked about yet is asked about once the images are there
+    /** @type {Set<string>} */
+    const asked = new Set();
+    /** @param {any} document */
+    const accepts = async document => {
+        const missing = unsupportedCharacters(document).filter(c => !asked.has(c));
+        if (!missing.length || !confirmUnsupported) return;
+        missing.forEach(c => asked.add(c));
+        if (!await confirmUnsupported(missing)) throw stopped('The PDF was not made: its text has characters the font cannot draw');
+        signal?.throwIfAborted();
+    };
+    await accepts(buildPdfDocument(model, { assets: { logo: null, figures: new Map(), photos: new Map() }, qr: libraries.qr, origin }));
+
     // The queue the live page draws its snapshots through: at most two canvases of a few megapixels exist at once
     const queue = libraries.renderers.sharedRenderQueue;
     const assets = await loadAssets(model, { dataset, layout: pageLayout(model.template), deps: { renderers: libraries.renderers, queue }, signal, onProgress, photoMaxSide: photos.maxSide });
     const definition = buildPdfDocument(model, { assets, qr: libraries.qr, origin });
 
     signal?.throwIfAborted();
-    const missing = unsupportedCharacters(definition);
-    if (missing.length && confirmUnsupported && !await confirmUnsupported(missing)) throw stopped('The PDF was not made: its text has characters the font cannot draw');
-    signal?.throwIfAborted();
+    await accepts(definition);
     onLayout?.();
     await nextPaint();
     signal?.throwIfAborted();

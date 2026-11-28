@@ -53,7 +53,9 @@ const RELOAD_KEY = 'hub.chunkReloadTarget';
 /**
  * A route whose code cannot be loaded (a tab left open across a deploy): the page reloads once to the target, which
  * brings the new build. The target is remembered until a navigation succeeds, so a chunk that fails again after the
- * reload is told to the user instead of reloading for ever.
+ * reload is told to the user instead of reloading for ever. Where the target cannot be remembered across the reload
+ * (the browser refuses session storage, or it is full) there is no reload at all: the reloaded page could not know
+ * it had reloaded, and would reload for ever.
  * @param {unknown} error
  * @param {{ fullPath: string }} to
  * @param {{ storage?: Pick<Storage, 'getItem'|'setItem'|'removeItem'>, reload?: (target: string) => void }} [deps]
@@ -61,13 +63,27 @@ const RELOAD_KEY = 'hub.chunkReloadTarget';
  */
 export function recoverFromChunkError(error, to, { storage = safeSessionStorage(), reload = target => window.location.assign(target) } = {}) {
     if (!isChunkLoadError(error)) return false;
-    if (storage.getItem(RELOAD_KEY) === to.fullPath) {
+    if (storage.getItem(RELOAD_KEY) === to.fullPath || !remembers(storage, to.fullPath)) {
         notify.error('Check the connection and try again, or reload the page.', { summary: 'Cannot open this page' });
         return true;
     }
-    storage.setItem(RELOAD_KEY, to.fullPath);
     reload(to.fullPath);
     return true;
+}
+
+/**
+ * Stores the target of the reload, and says whether the reloaded page will find it: not in the memory of this page,
+ * nor in a storage that refused it.
+ * @param {Pick<Storage, 'getItem'|'setItem'>} storage @param {string} target
+ */
+function remembers(storage, target) {
+    if (storage === memoryStorage) return false;
+    try {
+        storage.setItem(RELOAD_KEY, target);
+        return storage.getItem(RELOAD_KEY) === target;
+    } catch {
+        return false;
+    }
 }
 
 /** The guard of recoverFromChunkError is forgotten once a navigation has worked. */
@@ -75,7 +91,8 @@ export function forgetChunkReload(storage = safeSessionStorage()) {
     storage.removeItem(RELOAD_KEY);
 }
 
-// sessionStorage where the browser allows it (a blocked one throws), else a guard that lasts for the page only
+// sessionStorage where the browser allows it (a blocked one throws), else one that lasts for the page only (which
+// recoverFromChunkError does not reload with)
 function safeSessionStorage() {
     try {
         const storage = window.sessionStorage;
@@ -104,7 +121,7 @@ export function createAppRouter(embed = false) {
         { path: '/r/:org/:ds', name: 'ViewDataset', components: viewsFor(ViewDataset), meta: { title: 'View Dataset' } },
         // The map viewer: a new view of a file, and a saved view
         // The live page of a report: the sections of its model, drawn from the measurement files as they are now
-        { path: '/r/:org/:ds/reports/:uid', name: 'Report', components: viewsFor(Report), meta: { title: 'Report', viewer: true } },
+        { path: '/r/:org/:ds/reports/:uid', name: 'Report', components: viewsFor(Report), meta: { title: 'Report', viewer: true, pageParam: 'uid' } },
         { path: '/r/:org/:ds/view/:encodedPath/map', name: 'MapViewer', components: viewsFor(MapViewer), meta: { title: 'Map', viewer: true, embeddable: true } },
         { path: '/r/:org/:ds/views/:uid', name: 'SavedView', components: viewsFor(MapViewer), meta: { title: 'Map', viewer: true, embeddable: true } },
         { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: 'PointCloud', components: viewsFor(Potree), meta: { title: 'Point Cloud', viewer: true, embeddable: true } },

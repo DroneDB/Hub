@@ -47,10 +47,14 @@ function skipToMain() {
 }
 
 // Forces a remount when switching dataset: /r/:org/:ds is a single route
-// record, so without a key Vue would reuse the instance and skip its hooks.
+// record, so without a key Vue would reuse the instance and skip its hooks. A page that is one thing of the dataset
+// (a report: `meta.pageParam` names the parameter) is another page for another value of it: the report page reads
+// its report once, so "Save as new", which goes to the new report, must get a new instance.
 const contentKey = computed(() => {
     const p = route.params;
-    return p.org && p.ds ? `${p.org}/${p.ds}` : route.path;
+    if (!(p.org && p.ds)) return route.path;
+    const own = /** @type {string | undefined} */ (route.meta.pageParam);
+    return own ? `${p.org}/${p.ds}/${String(route.name)}/${p[own]}` : `${p.org}/${p.ds}`;
 });
 </script>
 

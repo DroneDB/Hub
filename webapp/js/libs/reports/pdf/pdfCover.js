@@ -19,8 +19,11 @@ const LOGO_CARD = Object.freeze({ x: 0, y: 24, width: 190, height: 62, padding: 
 const QR = Object.freeze({ side: 62, padding: 6, label: 24 });
 /** The space between the title and the white card, in points */
 const BAND_CARD_GAP = 18;
-/** The width of a character of the title as a share of its size (Roboto Bold), to tell how many lines it takes */
-const TITLE_CHARACTER = 0.56;
+/**
+ * The width of a character of the title as a share of its size (Roboto Bold), to tell how many lines it takes: the
+ * width of wide capitals, as a title in capitals is common and an estimate a line short leaves the map too much room
+ */
+const TITLE_CHARACTER = 0.7;
 
 /**
  * Where the band of the cover begins and how tall it is at least (a taller title makes it taller): the title is `pad` from
@@ -67,7 +70,10 @@ const titleSize = text => (text.length > 70 ? 20 : text.length > 45 ? 24 : 28);
 function titleHeight(title, subtitle, width) {
     const size = titleSize(title);
     const lines = (/** @type {string} */ text, /** @type {number} */ fontSize) => Math.max(1, Math.ceil((text.length * fontSize * TITLE_CHARACTER) / width));
-    return lines(title, size) * size * 1.05 + 8 + (subtitle ? lines(subtitle, 13) * 13 * 1.15 : 0);
+    // A line is wrapped at a word, so the last word of a line can leave most of a line empty: one line more is kept
+    // for a title of more than one line
+    const titleLines = lines(title, size);
+    return (titleLines > 1 ? titleLines + 1 : titleLines) * size * 1.05 + 8 + (subtitle ? lines(subtitle, 13) * 13 * 1.15 : 0);
 }
 
 /**

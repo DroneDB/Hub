@@ -131,6 +131,27 @@ describe('parseNumber', () => {
         expect(formatInputNumber(1234.5)).toBe('1234.5');
         expect(formatInputNumber(null)).toBe('');
     });
+
+    // Arabic, Persian and Hebrew write a direction mark before the sign, and Persian the minus sign U+2212: an NDVI
+    // minimum of -0.2 in a field read back as no number
+    it('writes a negative number for a field as the user types it, and reads it back, in right-to-left locales', () => {
+        for (const locale of ['ar-EG', 'fa-IR', 'he-IL', 'de-DE', 'fr-FR']) {
+            inLocale(locale);
+            for (const x of [-0.2, -1234.5, -7, 0.2]) {
+                const text = formatInputNumber(x);
+                expect(text, `${locale} ${x}`).toMatch(/^-?[\d.,]+$/);
+                expect(parseNumber(text), `${locale} ${x}`).toBe(x);
+            }
+        }
+        inLocale('en-US');
+    });
+
+    it('reads a number with the direction marks a right-to-left text puts around it', () => {
+        expect(parseNumber('\u200E-0.2')).toBe(-0.2);
+        expect(parseNumber('\u200F\u22120,5')).toBe(-0.5);
+        expect(parseNumber('\u061C-3')).toBe(-3);
+        expect(parseNumber('\u2066-3\u2069')).toBe(-3);
+    });
 });
 
 describe('localiseNumberText', () => {

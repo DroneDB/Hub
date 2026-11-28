@@ -11,6 +11,7 @@ import { selectionBasePath } from '@/features/dataset/explorer/treeSelection';
 import { itemFor, isInFolder } from '@/libs/dataset/explorerItems';
 import { useNotify } from '@/composables/useNotify';
 import { freeName, namesClash } from '@/libs/nameRules';
+import { outermostItems, sameNameGroups, sameNameMessage } from '@/libs/dataset/transferTargets';
 import PasteConflictDialog from '@/features/dataset/dialogs/PasteConflictDialog.vue';
 import PasteResultDialog from '@/features/dataset/dialogs/PasteResultDialog.vue';
 
@@ -142,12 +143,16 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         if (clipboard.isEmpty) return;
         if (!canWrite.value) return notify.warn('You do not have write access to this dataset', { summary: 'Paste', life: 'short' });
         const { mode, source } = clipboard;
-        const items = clipboard.items.slice();
+        // An item inside another item of the clipboard goes with that folder (removePaths drops it with it)
+        const items = outermostItems(clipboard.items.slice(), it => it.path);
         const target = { ...here(), basePath: listing.currentPath.value || '', dataset };
         const sameDataset = source && source.orgSlug === target.orgSlug && source.dsSlug === target.dsSlug;
         if (sameDataset && (source.basePath || '') === target.basePath) {
             return notify.info(mode === 'cut' ? 'Cannot move into the same folder' : 'Cannot copy into the same folder', { summary: 'Paste' });
         }
+        // Every item lands in the folder under its own name: two with one name would replace each other
+        const sameNames = sameNameGroups(items, it => it.path);
+        if (sameNames.length) return notify.warn(sameNameMessage(sameNames), { summary: 'Paste' });
 
         let strategy;
         try {

@@ -85,6 +85,12 @@ export default {
     font-size: 0.85rem;
 }
 
+/* A viewer in full screen fills the page at z-index 900 (libs/views/viewerFullscreen.js): the panel, fixed above the
+   page, would cover its corner, and the clipboard has nothing to do there */
+html:fullscreen .clipboard-panel {
+    display: none;
+}
+
 .clipboard-panel.cut-mode {
     border-left: 3px solid var(--ddb-warning);
 }

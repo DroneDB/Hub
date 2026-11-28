@@ -59,7 +59,7 @@
             <UploadQueueView v-else v-model:filter="activeFilter" :snapshot="snapshot" :rows="filteredFiles" @retry="retryFile">
                 <template #footer>
                     <div class="actions">
-                        <Button v-if="commitFailed && !committing" severity="secondary" icon="fa-solid fa-rotate-right"
+                        <Button v-if="canCommitAgain" severity="secondary" icon="fa-solid fa-rotate-right"
                                 label="Try again" @click="commitBatch" />
                         <Button v-if="hasRetryable && !committing" severity="secondary" icon="fa-solid fa-rotate-right"
                                 label="Retry failed" @click="retryFailed" />
@@ -179,6 +179,11 @@ export default {
         },
         failedCount() {
             return this.snapshot != null && this.snapshot.done ? this.snapshot.counts.error : 0;
+        },
+        // The last commit failed and nothing changed since: every file is done (none is being sent again), so the
+        // same batch can be committed again. A file sent again ends the offer (see retryFailed)
+        canCommitAgain() {
+            return this.commitFailed && !this.committing && this.snapshot?.done === true;
         },
         // Sending again can only help a file whose failure is not a refusal (a refused file stays failed with its reason)
         hasRetryable() {
@@ -413,13 +418,17 @@ export default {
             }
         },
 
+        // A file sent again after a commit failed makes the batch another one: when the queue is done again the page
+        // decides afresh (a commit when every file went through, else Finish without the failed files, which asks)
         retryFailed() {
             this.error = '';
             this.activeFilter = 'all';
+            this.commitFailed = false;
             this.queue.retryFailed();
         },
 
         retryFile(file) {
+            this.commitFailed = false;
             this.queue.retry(file.id);
         },
 

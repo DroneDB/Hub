@@ -22,6 +22,7 @@ import { MeasurementStorage, MeasurementOwner, saveResultMessage, notifySaveRefu
 import { measurementOwnerEntry } from '@/libs/map/measurementOwner';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
+import { safeColour } from '@/libs/map/measurementColour';
 import { createFeatureScope } from '@/composables/featureScope';
 import { escapeHtml } from '@/libs/sanitize';
 import { measurementsToCsv } from '@/libs/map/measurementCsv';
@@ -618,7 +619,9 @@ const definition = {
          */
         restoreGroupsFromMetadata(groups) {
             if (Array.isArray(groups) && groups.length > 0) {
-                this.measurementGroups = groups;
+                // The colour of a group is read from the file as the colours of its measurements are: one a file may
+                // carry, else the default (it reaches the style of the list)
+                this.measurementGroups = groups.map(g => ({ ...g, color: safeColour(g?.color, GROUP_COLOR) }));
             }
         }
     }

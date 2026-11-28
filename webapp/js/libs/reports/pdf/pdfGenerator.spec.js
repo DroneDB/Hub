@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateReportPdf } from '@/libs/reports/pdf/pdfGenerator';
 import { ORIGIN, pdfModel, threeItems } from '@/libs/reports/pdf/pdfDocument.fixtures';
-import { MOST_PHOTOS } from '@/libs/reports/pdf/pdfBudget';
+import { countFigures, mostPhotosWith } from '@/libs/reports/pdf/pdfBudget';
 import { PHOTO_MAX_SIDE } from '@/libs/reports/pdf/pdfImages';
 import { qrCode } from '@/libs/qr';
 
@@ -89,9 +89,10 @@ describe('generateReportPdf', () => {
         it('are refused before anything is loaded or made when there are more than a PDF holds, with the reason', async () => {
             const { dependencies } = libraries();
             const photos = photosDataset();
-            const error = await generateReportPdf(withPhotos(MOST_PHOTOS + 1), { dataset: photos, dependencies, origin: ORIGIN }).catch(e => e);
+            const most = mostPhotosWith(countFigures(withPhotos(0)));
+            const error = await generateReportPdf(withPhotos(most + 1), { dataset: photos, dependencies, origin: ORIGIN }).catch(e => e);
             expect(error).toBeInstanceOf(Error);
-            expect(error.message).toContain(`at most ${MOST_PHOTOS}`);
+            expect(error.message).toContain(`at most ${most}`);
             expect(photos.thumbUrl).not.toHaveBeenCalled();
             expect(dependencies.renderers.renderMapSnapshot).not.toHaveBeenCalled();
             expect(dependencies.pdfMake.createPdf).not.toHaveBeenCalled();
@@ -130,6 +131,24 @@ describe('generateReportPdf', () => {
             await expect(generateReportPdf(cjk(), { dataset, dependencies, origin: ORIGIN, confirmUnsupported })).rejects.toMatchObject({ name: 'AbortError' });
             expect(confirmUnsupported).toHaveBeenCalledWith(['\u5165', '\u53e3', '\u0e3f']);
             expect(dependencies.pdfMake.createPdf).not.toHaveBeenCalled();
+        });
+
+        it('are asked about before any image is made, so a No costs no wait', async () => {
+            const { dependencies } = libraries();
+            const rendersWhenAsked = [];
+            const confirmUnsupported = vi.fn(async () => { rendersWhenAsked.push(dependencies.renderers.renderMapSnapshot.mock.calls.length); return false; });
+            await expect(generateReportPdf(cjk(), { dataset, dependencies, origin: ORIGIN, confirmUnsupported })).rejects.toMatchObject({ name: 'AbortError' });
+            expect(rendersWhenAsked).toEqual([0]);
+            expect(dependencies.renderers.renderMapSnapshot).not.toHaveBeenCalled();
+        });
+
+        it('are asked about once when the user says to go on, and a character only the note of a figure has is asked about then', async () => {
+            const { dependencies } = libraries();
+            dependencies.renderers.renderMapSnapshot.mockImplementation(async (_b, { width, height }) => ({ image: null, width, height, note: 'Basemap \u0e01 not shown' }));
+            const confirmUnsupported = vi.fn(async () => true);
+            await generateReportPdf(cjk(), { dataset, dependencies, origin: ORIGIN, confirmUnsupported });
+            expect(confirmUnsupported.mock.calls).toEqual([[['\u5165', '\u53e3', '\u0e3f']], [['\u0e01']]]);
+            expect(dependencies.pdfMake.createPdf).toHaveBeenCalledTimes(1);
         });
 
         it('are written as empty boxes when the user says to go on', async () => {

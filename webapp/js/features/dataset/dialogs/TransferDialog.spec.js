@@ -187,4 +187,29 @@ describe('TransferDialog', () => {
         expect(w.vm.destPath).toBe('images/2024');
         expect(w.find('[data-picker]').exists()).toBe(false);
     });
+
+    it('refuses two items with one name, which would land on one path, and names them before anything is sent', async () => {
+        for (const sameName of [[{ entry: { path: 'a/x.jpg' } }, { entry: { path: 'b/X.jpg' } }], [{ entry: { path: 'f1/images' } }, { entry: { path: 'f2/images' } }]]) {
+            transferObj.mockClear();
+            const w = await open({ files: sameName });
+            await w.setData({ overwrite: true });
+            for (const destPath of ['in', '']) {
+                await w.setData({ destPath });
+                await w.find('[data-confirm]').trigger('click');
+                await flushPromises();
+            }
+            expect(transferObj).not.toHaveBeenCalled();
+            expect(w.find('[data-same-name]').text()).toContain(sameName.map(f => f.entry.path).join(', '));
+            expect(w.findComponent(WindowStub).props('confirmDisabled')).toBe(true);
+        }
+    });
+
+    it('sends a selected folder once with what it holds: an item inside it is not sent on its own', async () => {
+        const w = await open({ files: [{ entry: { path: 'a' } }, { entry: { path: 'a/one.jpg' } }, { entry: { path: 'b.jpg' } }] });
+        expect(w.text()).toContain('2 items from org/ds');
+        await w.find('[data-confirm]').trigger('click');
+        await flushPromises();
+        expect(transferObj.mock.calls.map(call => call[0])).toEqual(['a', 'b.jpg']);
+        expect(w.vm.progress).toBe(100);
+    });
 });

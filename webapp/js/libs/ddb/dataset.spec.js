@@ -344,6 +344,16 @@ describe('Dataset.search', () => {
         expect(names(formData)).toEqual(['query', 'path', 'recursive', 'type']);
         expect(formData.get('type')).toBe('3');
     });
+
+    it('posts the most entries to return as the limit form field, only when asked', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.search('*', { path: 'site', recursive: true, type: 3, limit: 1 });
+        const [, formData] = post.mock.calls[0];
+        expect(names(formData)).toEqual(['query', 'path', 'recursive', 'type', 'limit']);
+        expect(formData.get('limit')).toBe('1');
+        await ds.search('*', { path: 'site', limit: undefined });
+        expect(names(post.mock.calls[1][1])).toEqual(['query', 'path']);
+    });
 });
 
 describe('Dataset chunked upload sessions', () => {

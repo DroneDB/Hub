@@ -213,6 +213,33 @@ describe('tasksUpdated event', () => {
             expect(taskMonitor.getTasks(d.dataset)).not.toHaveLength(0);
         }
     });
+
+    it('tells every list it shows, changed or not, with the number of its request, and none that failed or came late', async () => {
+        const dataset = followed(makeDataset());
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const seen = watch('tasksListed');
+        // The request of followed() is the first one
+        expect(taskMonitor.listRequests(dataset)).toBe(1);
+
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset); // the same list again
+        dataset.getTasks.mockRejectedValueOnce(new Error('offline'));
+        await taskMonitor.forceRefresh(dataset);
+        // A request answered after a later one was shown
+        let late;
+        dataset.getTasks.mockImplementationOnce(() => new Promise(resolve => { late = resolve; }));
+        const slow = taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+        late([]);
+        await slow;
+
+        expect(seen.map(d => d.request)).toEqual([2, 3, 6]);
+        expect(seen.every(d => d.dataset === dataset)).toBe(true);
+        expect(taskMonitor.listRequests(dataset)).toBe(6);
+        // A dataset that is not followed gets no list
+        expect(taskMonitor.listRequests(makeDataset())).toBeNull();
+        error.mockRestore();
+    });
 });
 
 describe('acquire/release refcounting', () => {

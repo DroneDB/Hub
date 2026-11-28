@@ -477,16 +477,18 @@ export default class Dataset {
 
     /**
      * @param {string} [query]  a file name pattern ('*' is any)
-     * @param {{ path?: string, recursive?: boolean, type?: number, signal?: AbortSignal }} [options]  the folder to search
-     *   in (the whole dataset by default), whether to go into its subfolders (the server's default is yes) and the one
-     *   entry type to return (`entry.type`, any by default)
+     * @param {{ path?: string, recursive?: boolean, type?: number, limit?: number, signal?: AbortSignal }} [options]  the
+     *   folder to search in (the whole dataset by default), whether to go into its subfolders (the server's default is
+     *   yes), the one entry type to return (`entry.type`, any by default) and the most entries to return (a whole number
+     *   of 1 or more: the first ones, by path; all by default). A Registry older than the limit ignores it and returns all
      */
-    async search(query, { path, recursive, type, signal } = {}){
+    async search(query, { path, recursive, type, limit, signal } = {}){
         const formData = new FormData();
         if (query !== undefined && query !== null) formData.append('query', query);
         if (path !== undefined && path !== null) formData.append('path', path);
         if (recursive !== undefined) formData.append('recursive', String(!!recursive));
         if (type !== undefined && type !== null) formData.append('type', String(type));
+        if (limit !== undefined && limit !== null) formData.append('limit', String(limit));
         return this.registry.postFormData(`${this.baseApi}/search`, formData, { readOnly: true, signal });
     }
 

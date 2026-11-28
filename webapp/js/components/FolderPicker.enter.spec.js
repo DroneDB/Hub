@@ -39,6 +39,9 @@ describe('FolderPicker Enter', () => {
 
         await press(field());
         expect(question().textContent).toContain('new-folder');
+        // The window's own Enter handling (confirm on Enter) does not check the path a second time
+        expect(dataset.list).toHaveBeenCalledTimes(2);
+        expect(document.querySelectorAll('#confirmDialog')).toHaveLength(1);
 
         // The answer is an Enter on the focused Create button (the browser clicks it on the key press); the focus goes
         // back to the field and the key is released there

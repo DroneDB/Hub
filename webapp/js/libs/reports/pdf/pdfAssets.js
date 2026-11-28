@@ -24,13 +24,16 @@ import { fetchImageBlob } from '@/libs/imageBlob';
 /** What a failed render or read says under its figure ("Snapshot not available: ..."). @param {string} what @param {unknown} error */
 const unavailable = (what, error) => `${what} not available: ${error instanceof Error && error.message ? error.message : String(error)}`;
 
+/** Whether a block is a figure the PDF renders an image for: a map snapshot, a chart, a 3D capture of a file. @param {any} block */
+export const isFigure = block => block.type === 'mapSnapshot' || block.type === 'chart' || (block.type === 'capture3d' && !!block.path);
+
 /** The blocks that need an image, grouped by the item they belong to (the report's own, the cover and overview, form one group). @param {any} model */
 export function planAssetWork(model) {
     /** @type {Map<string, any[]>} */
     const groups = new Map();
     for (const section of model.sections) {
         for (const block of section.blocks) {
-            const needs = block.type === 'mapSnapshot' || block.type === 'chart' || (block.type === 'capture3d' && block.path) || (block.type === 'photoGrid' && block.photos.length);
+            const needs = isFigure(block) || (block.type === 'photoGrid' && block.photos.length);
             if (!needs) continue;
             const key = block.itemId ?? '';
             groups.set(key, [...(groups.get(key) ?? []), block]);

@@ -17,11 +17,13 @@ import { ApiError } from '@/libs/ddb/apiError';
 import { setPref, PREF } from '@/libs/preferences';
 
 const notify = vi.hoisted(() => ({ success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }));
+// The dataset a clipboard of another dataset was taken from: the transfer is sent through it
+const otherDataset = vi.hoisted(() => ({ transferObj: null }));
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => notify }));
 // The clipboard store follows the signed-in user (the auth store reads the client's session)
 vi.mock('@/libs/api/sharedRegistry', () => ({
     default: {
-        Organization: () => ({ Dataset: () => ({}) }), features: { value: () => null, get: () => false },
+        Organization: () => ({ Dataset: () => otherDataset }), features: { value: () => null, get: () => false },
         getUsername: () => 'tester', isLoggedIn: () => true, isAdmin: () => false, addEventListener: () => {}, url: 'http://hub.test'
     }
 }));
@@ -43,6 +45,7 @@ beforeEach(() => {
     setPref(PREF.CLIPBOARD, null, { session: true });
     setActivePinia(createPinia());
     Object.values(notify).forEach(fn => fn.mockClear());
+    otherDataset.transferObj = vi.fn(async () => ({}));
     // The folder "dest" holds A.tif (a.tif in another letter case) and a (2).tif
     dataset = {
         org: 'o', ds: 'd',
@@ -169,5 +172,44 @@ describe('Paste twice in a row (Ctrl+V pressed again while the first paste is on
         dataset.list = vi.fn(async () => []);
         await paste();
         expect(dataset.copyObj).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('Paste of items that would land on one path', () => {
+    const dir = path => ({ ...item(path), entry: { path, type: T.DIRECTORY, size: 0 } });
+
+    it('refuses a transfer from another dataset of two items with one name, naming both, before anything is sent', async () => {
+        dataset.list = vi.fn(async () => []);
+        clipboard.cut({ orgSlug: 'o', dsSlug: 'other', basePath: '' }, [item('a/x.jpg'), item('b/X.jpg')]);
+
+        await paste();
+
+        expect(otherDataset.transferObj).not.toHaveBeenCalled();
+        expect(notify.warn).toHaveBeenCalledTimes(1);
+        expect(notify.warn.mock.calls[0][0]).toContain('a/x.jpg, b/X.jpg');
+        expect(notify.success).not.toHaveBeenCalled();
+        // Nothing moved: the clipboard keeps both
+        expect(clipboard.items.map(it => it.path)).toEqual(['a/x.jpg', 'b/X.jpg']);
+    });
+
+    it('refuses a copy inside one dataset of two folders with one name', async () => {
+        dataset.list = vi.fn(async () => []);
+        clipboard.copy({ orgSlug: 'o', dsSlug: 'd', basePath: '' }, [dir('f1/images'), dir('f2/images')]);
+
+        await paste();
+
+        expect(dataset.copyObj).not.toHaveBeenCalled();
+        expect(notify.warn.mock.calls[0][0]).toContain('f1/images, f2/images');
+    });
+
+    it('sends a folder once with what it holds: an item inside a selected folder is not sent on its own', async () => {
+        dataset.list = vi.fn(async () => []);
+        clipboard.cut({ orgSlug: 'o', dsSlug: 'other', basePath: '' }, [dir('a'), item('a/one.jpg'), item('b.jpg')]);
+
+        await paste();
+
+        expect(otherDataset.transferObj.mock.calls.map(c => [c[0], c[3]])).toEqual([['a', 'dest/a'], ['b.jpg', 'dest/b.jpg']]);
+        // The moved folder takes its file off the clipboard too
+        expect(clipboard.isEmpty).toBe(true);
     });
 });
