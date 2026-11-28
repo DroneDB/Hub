@@ -6,24 +6,15 @@ JS Client Application for Registry
 
 ## Build
 
-The project is compatible with Node.js 18+ (recommended: 22.x LTS).
+The project needs Node.js 20.19 or later (`engines` in `package.json`: the lint and test tools do not run on older versions). The Registry's CI builds with Node.js 24.
 
 ```bash
-git clone https://github.com/DroneDB/Hub --recurse-submodules && cd Hub
+git clone https://github.com/DroneDB/Hub && cd Hub
 npm install
 npm run build
 ```
 
-### Alternative: Direct webpack command
-
-If you prefer to run webpack directly:
-
-```bash
-npm install
-node --openssl-legacy-provider ./node_modules/webpack/bin/webpack.js
-```
-
-> **Note**: The `--openssl-legacy-provider` flag is required for Node.js 17+ due to OpenSSL 3.0 changes. The `npm run build` script handles this automatically.
+`npm run build:prod` builds the production bundle (minified, with the `.br` and `.gz` twins the Registry serves).
 
 ## Run
 

@@ -7,7 +7,9 @@
  *   - the initial (entrypoint `main`) payload, raw and gzip-6, with the biggest packages inside it;
  *   - packages that only lazy routes import but that landed in an initial chunk;
  *   - which vendor chunks each route group pulls (to catch eager imports inside route components);
- *   - data: URIs embedded in CSS (fonts inlined by the asset module rule).
+ *   - data: URIs embedded in CSS (fonts inlined by the asset module rule);
+ *   - third-party requests: no unpkg.com address in the emitted scripts apart from the renderer's unused
+ *     decoder defaults, and the Draco and basis decoders shipped under wasm/.
  * Exits 1 when the budgets below are exceeded.
  *
  *   - the size of the vendored Potree folder, with no source maps or never-loaded libraries.
@@ -18,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { checkLocalDecoders } from './lib/localDecoders.mjs';
 
 const [statsPath, outDir] = process.argv.slice(2);
 if (!statsPath || !outDir) { console.error('usage: check_bundle_budget.mjs <stats.json> <outputDir>'); process.exit(2); }
@@ -111,6 +114,12 @@ if (fs.existsSync(potree)) {
     if (bytes / 1024 / 1024 > POTREE_BUDGET_MB) fail(`potree/ is ${(bytes / 1024 / 1024).toFixed(1)} MB > ${POTREE_BUDGET_MB} MB`);
     for (const o of offending) fail(`potree/ ships ${o}, which the viewer never loads`);
 }
+
+// 6. decoders from this server, no unpkg.com
+console.log('== local decoders ==');
+const decoderProblems = checkLocalDecoders(outDir);
+if (!decoderProblems.length) console.log('  Draco and basis decoders shipped, no unpkg.com request');
+for (const p of decoderProblems) fail(p);
 
 console.log(failed ? '\nRESULT: budget exceeded' : '\nRESULT: within budget');
 process.exit(failed ? 1 : 0);

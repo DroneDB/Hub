@@ -7,21 +7,41 @@
  * the lists only shrink.
  */
 const SCOPE = ['webapp/js/**/*.vue', 'webapp/js/composables/**/*.js'];
+// Specs read and write the storage and the network to set a case up
+const SPECS = ['**/*.spec.js', '**/*.test.js'];
 
 export const GUARDS = [
     {
         id: 'mixins',
         rule: 'no-restricted-syntax',
-        entries: [{
-            selector: "ExportDefaultDeclaration > ObjectExpression > Property[key.name='mixins']",
-            message: 'Use a composable from setup(), not a mixin.'
-        }],
+        entries: [
+            {
+                // `export default { mixins }`, `defineComponent({ mixins })` (exported or not) and `app.mixin(...)`
+                selector: "Property:matches([key.name='mixins'], [key.value='mixins']):matches("
+                    + "ExportDefaultDeclaration > ObjectExpression > *, CallExpression[callee.name='defineComponent'] > ObjectExpression > *)",
+                message: 'Use a composable from setup(), not a mixin.'
+            },
+            {
+                selector: "CallExpression[callee.property.name='mixin']",
+                message: 'Use a composable from setup(), not a global mixin.'
+            }
+        ],
         allow: []
     },
     {
         id: '$parent',
         rule: 'no-restricted-properties',
         entries: [{ property: '$parent', message: 'Pass data with props/emits, provide/inject or a store, not $parent.' }],
+        allow: []
+    },
+    {
+        // Templates are not covered by no-restricted-properties
+        id: 'template-$parent',
+        rule: 'vue/no-restricted-syntax',
+        entries: [{
+            selector: "Identifier[name='$parent']",
+            message: 'Pass data with props/emits, provide/inject or a store, not $parent.'
+        }],
         allow: []
     },
     {
@@ -39,7 +59,12 @@ export const GUARDS = [
         entries: [
             { object: 'window', property: 'localStorage', message: 'Use libs/preferences.js or usePreference().' },
             { object: 'window', property: 'sessionStorage', message: 'Use libs/preferences.js.' },
-            { object: 'window', property: 'fetch', message: 'Use the Registry client.' }
+            { object: 'window', property: 'fetch', message: 'Use the Registry client.' },
+            ...['globalThis', 'self'].flatMap(object => [
+                { object, property: 'localStorage', message: 'Use libs/preferences.js or usePreference().' },
+                { object, property: 'sessionStorage', message: 'Use libs/preferences.js.' },
+                { object, property: 'fetch', message: 'Use the Registry client.' }
+            ])
         ],
         allow: []
     },
@@ -72,7 +97,7 @@ export function guardConfigs() {
         exceptions.get(f).add(g.id);
     }
     return [
-        { files: SCOPE, rules: rulesFor() },
-        ...[...exceptions].map(([file, ids]) => ({ files: [file], rules: rulesFor(ids) }))
+        { files: SCOPE, ignores: SPECS, rules: rulesFor() },
+        ...[...exceptions].map(([file, ids]) => ({ files: [file], ignores: SPECS, rules: rulesFor(ids) }))
     ];
 }

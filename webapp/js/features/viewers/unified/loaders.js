@@ -32,7 +32,9 @@ const name = entry => ddb.pathutils.basename(entry.path);
 
 /** A tileset streamed coarse-to-fine: the coarse tiles stay up while finer ones load (no holes). */
 async function addTileset(scene, url, errorTarget) {
-    const tileset = new scene.libs.Tiles3D({ url, errorTarget, ktx2DecoderPath: '/wasm/basis/' });
+    const tileset = new scene.libs.Tiles3D({
+        url, errorTarget, ktx2DecoderPath: '/wasm/basis/', dracoDecoderPath: '/wasm/draco/'
+    });
     // The renderer's default, set because its docs say otherwise and this viewer once disabled it
     tileset.tiles.loadAncestors = true;
     scene.shadeUntexturedTiles(tileset);

@@ -270,6 +270,12 @@ module.exports = {
                 // textures transcode without fetching the transcoder from a public CDN.
                 { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.js', to: 'wasm/basis/basis_transcoder.js' },
                 { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.wasm', to: 'wasm/basis/basis_transcoder.wasm' },
+                // Serve the Draco decoder locally (offline-first): a Draco-compressed 3D Tiles archive
+                // makes the viewer pass dracoDecoderPath: '/wasm/draco/' to Tiles3D. Without it Giro3D
+                // fetches the decoder from unpkg.com and runs it, unpinned, in a same-origin worker.
+                { from: 'node_modules/three/examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js', to: 'wasm/draco/draco_wasm_wrapper.js' },
+                { from: 'node_modules/three/examples/jsm/libs/draco/gltf/draco_decoder.wasm', to: 'wasm/draco/draco_decoder.wasm' },
+                { from: 'node_modules/three/examples/jsm/libs/draco/gltf/draco_decoder.js', to: 'wasm/draco/draco_decoder.js' },
                 // Serve the bm3d decoder locally: the 3D model viewer passes decoderPath: '/wasm/bm3d/'
                 // to Bm3dObject, which starts the worker from there (a worker must come from the
                 // page's origin) and loads corto.wasm next to it.

@@ -22,7 +22,7 @@ export default {
         const file = context.filename;
         const idx = file.lastIndexOf(JS_ROOT);
         const rel = idx >= 0 ? file.slice(idx + JS_ROOT.length).split(path.sep).join('/') : file;
-        if (HELPER_FILES.has(rel) || /\.(spec|test)\./.test(file) || /[\\/]vendor[\\/]/.test(file)) return {};
+        if (HELPER_FILES.has(rel) || /\.(spec|test)\./.test(file) || /^vendor\//.test(rel)) return {};
         return {
             'Program:exit'(node) {
                 const r = auditSource(context.sourceCode.text, { timeouts: auditsTimeouts(rel) });

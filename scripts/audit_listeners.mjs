@@ -9,18 +9,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { auditSource, auditsTimeouts, HELPER_FILES } from './lib/listenerAudit.mjs';
+import { auditSource, auditsTimeouts, listSources, HELPER_FILES } from './lib/listenerAudit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = process.argv[2] || path.join(here, '..', 'webapp', 'js');
-const files = [];
-(function walk(d) {
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-        const p = path.join(d, e.name);
-        if (e.isDirectory()) { if (!/vendor|node_modules/.test(p)) walk(p); }
-        else if (/\.(vue|js)$/.test(e.name) && !/\.spec\.|\.test\./.test(e.name)) files.push(p);
-    }
-})(root);
+const files = listSources(root);
+// A folder that holds no source is a wrong path, not a clean audit
+if (!files.length) { console.error(`No source files under ${root}`); process.exit(2); }
 
 const rows = [];
 for (const f of files) {

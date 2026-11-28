@@ -65,7 +65,7 @@
     color: var(--panel-text);
     border-radius: 0.5rem;
     font-size: 0.875rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 2px 8px rgba(var(--ddb-shade-rgb), 0.4);
     max-height: calc(100% - 1rem);
     overflow-y: auto;
     // The panel is the container its tool bar and footer query: what they need depends on the width the panel has (16rem on a
@@ -147,7 +147,7 @@
         padding: 0;
 
         &:hover {
-            color: #fff;
+            color: var(--ddb-text-on-dark);
         }
     }
 
@@ -251,7 +251,7 @@
         color: var(--panel-text);
 
         &:disabled {
-            color: #777;
+            color: var(--panel-text-faint);
         }
     }
 
@@ -331,11 +331,11 @@
         // widths the container queries below are measured from hold on every system
         font-family: inherit;
         font-size: 0.875rem;
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(var(--ddb-glass-rgb), 0.15);
         color: var(--panel-text-soft);
 
         &:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.25);
+            background: rgba(var(--ddb-glass-rgb), 0.25);
         }
 
         &:disabled {
@@ -351,7 +351,7 @@
         // The tool the map is in (drawing, inspecting)
         &.is-active {
             background: rgba(var(--panel-active-rgb), 0.45);
-            color: #fff;
+            color: var(--ddb-text-on-dark);
             border-color: var(--panel-active);
             box-shadow: 0 0 0 1px rgba(var(--panel-active-rgb), 0.35);
         }
@@ -472,7 +472,7 @@
         padding: 0.4rem 0;
         background: none;
         border: 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(var(--ddb-glass-rgb), 0.1);
         color: var(--panel-text-soft);
         font: inherit;
         font-size: 0.78125rem;
@@ -519,9 +519,9 @@
     .result-card {
         margin-bottom: 0.5rem;
         padding: 0.4rem 0.5rem;
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(var(--ddb-glass-rgb), 0.12);
         border-radius: 0.375rem;
-        background: rgba(255, 255, 255, 0.04);
+        background: rgba(var(--ddb-glass-rgb), 0.04);
     }
 
     .result-card-header {
@@ -550,7 +550,7 @@
         cursor: pointer;
 
         &:hover {
-            color: #fff;
+            color: var(--ddb-text-on-dark);
         }
 
         &:focus-visible {

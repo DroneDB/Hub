@@ -56,7 +56,7 @@
         $size: 2.25rem,
         $radius: 4px,
         $background: transparent,
-        $hover-background: rgba(255, 255, 255, 0.15),
+        $hover-background: rgba(var(--ddb-glass-rgb), 0.15),
         // The viewers are dark in both themes: the blue that takes white text in both
         $active-background: var(--ddb-viewer-btn-primary),
         $font-size: var(--ddb-font-size-base),

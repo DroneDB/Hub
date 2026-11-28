@@ -17,6 +17,8 @@ The licence covers only the work of Digipa S.R.L. Each component below keeps its
 | Potree and its libraries | BSD-2-Clause and the licences in `potree/libs` |
 | bm3d-viewer (3D model viewer) | MIT |
 | Nexus web viewer (models built before bm3d) | MIT |
+| Photo Sphere Viewer (panorama viewer) | MIT |
+| uevent (event library of Photo Sphere Viewer) | MIT |
 | DOMPurify | MPL-2.0 or Apache-2.0 |
 | Font Awesome Free | CC-BY-4.0, OFL-1.1 and MIT |
 | Inter font | OFL-1.1 |

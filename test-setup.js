@@ -9,7 +9,7 @@ import path from 'node:path';
 globalThis.__APP_PRODUCTION__ = true;
 
 // __HUB_VERSION__ (webpack DefinePlugin, from package.json)
-globalThis.__HUB_VERSION__ = '2.7.0';
+globalThis.__HUB_VERSION__ = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version;
 
 // The colour tokens of the light theme (css/_variables.scss :root), on <html> as the stylesheets
 // put them: canvas code reads them through colorToken (libs/colorScheme.js)

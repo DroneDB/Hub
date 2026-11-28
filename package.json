@@ -1,8 +1,11 @@
 {
   "name": "hub",
-  "version": "2.7.0",
+  "version": "3.0.0",
   "description": "JS Client Application for Registry",
   "main": "webpack.config.js",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
   "scripts": {
     "dev": "npx webpack --watch",
     "build": "npx webpack",
@@ -15,6 +18,7 @@
     "lint": "eslint . --max-warnings 0",
     "test:coverage": "vitest run --coverage",
     "typecheck": "vue-tsc --noEmit -p jsconfig.json",
+    "typecheck:components": "node scripts/check_component_types.mjs",
     "e2e": "node --test --test-concurrency=1 e2e/*.test.mjs"
   },
   "repository": {
@@ -39,6 +43,7 @@
     "@fortawesome/fontawesome-free": "^6.5.0",
     "@giro3d/giro3d": "^2.0.3",
     "@primevue/forms": "^4.5.4",
+    "@primevue/icons": "^4.5.4",
     "@primevue/themes": "^4.5.4",
     "@sparkjsdev/spark": "^2.4.0",
     "@tanstack/vue-virtual": "^3.10.0",
@@ -48,7 +53,7 @@
     "bootstrap": "^5.3.8",
     "chart.js": "^4.5.1",
     "clipboard-copy": "^4.0.1",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.5.0",
     "geographiclib-geodesic": "^2.2.0",
     "markdown-it": "^14.1.0",
     "mitt": "^3.0.1",

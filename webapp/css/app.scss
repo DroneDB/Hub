@@ -679,7 +679,7 @@ $window-margin-wide: 2rem; // and on a tablet or a desktop
     &--dark {
         background: var(--ddb-tooltip-bg);
         color: var(--ddb-text-on-dark);
-        border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.2);
+        border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.2);
     }
 
     &--light {
