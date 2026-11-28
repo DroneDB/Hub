@@ -108,3 +108,32 @@ describe('the Photos tab of the annotation dialog', () => {
         expect(wrapper.emitted('save')[0][0].photos).toEqual([{ path: 'a/annotations/id-1-1.jpg', source: 'upload' }]);
     });
 });
+
+describe('the Delete button of the annotation dialog', () => {
+    const confirmDialog = () => document.querySelector('#confirmDialog');
+    const confirmButton = name => [...confirmDialog().querySelectorAll('button')].find(b => b.textContent.trim() === name);
+
+    it('asks first, naming the annotation, and deletes only on Delete', async () => {
+        await show({ showDelete: true });
+        buttonNamed('Delete').click();
+        await flushPromises();
+        expect(wrapper.emitted('delete')).toBeUndefined();
+        expect(confirmDialog().querySelector('.p-dialog-title').textContent.trim()).toBe('Delete annotation “Gate”');
+
+        confirmButton('Delete').click();
+        await flushPromises();
+        expect(wrapper.emitted('delete')).toHaveLength(1);
+        expect(wrapper.emitted('close')).toHaveLength(1);
+    });
+
+    it('keeps the annotation and its dialog when the question is cancelled', async () => {
+        await show({ showDelete: true });
+        buttonNamed('Delete').click();
+        await flushPromises();
+        confirmButton('Cancel').click();
+        await flushPromises();
+        expect(confirmDialog()).toBeNull();
+        expect(wrapper.emitted('delete')).toBeUndefined();
+        expect(wrapper.emitted('close')).toBeUndefined();
+    });
+});

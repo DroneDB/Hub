@@ -28,10 +28,11 @@
             </AnnotationTabs>
             <p v-if="captureAction.message.value" class="capture-message" role="status">{{ captureAction.message.value }}</p>
         </div>
+        <ConfirmDialog v-if="deleteQuestion" v-bind="deleteQuestion" @close="answerDelete" />
 
         <template #footer>
             <Button v-if="showDelete" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto" :disabled="photoUploading"
-                    title="Delete this annotation" @click="deleteAnnotation" />
+                    title="Delete this annotation" @click="askToDelete" />
             <Button v-if="capture" label="Capture for report" icon="fa-solid fa-camera" severity="secondary" text
                     :loading="captureAction.capturing.value" title="Frame this annotation and keep the 3D view as its picture in reports" @click="captureAction.run" />
             <Button label="Cancel" severity="secondary" :disabled="photoUploading" @click="cancel" />
@@ -58,6 +59,9 @@ import { FIELD_LIMITS, inspectionSummary, storedFields } from '@/libs/map/annota
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
 import { annotationFieldsOf } from '@/libs/potree/measureStyle';
 import { useDialogCapture } from '@/libs/reports/snapshots/useCaptureAction';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { useDeleteQuestion } from '@/composables/useDeleteQuestion';
+import { measurementDeleteQuestion } from '@/libs/map/measurementTypes';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
@@ -66,8 +70,8 @@ import { useDialogCapture } from '@/libs/reports/snapshots/useCaptureAction';
  * (CopyableCoordinates), and the inspection fields (AnnotationFields: category, severity, status, due date, assignee,
  * in reports) in an Inspection part that folds away as the map's dialog does (useFoldedSections, the same choice).
  * Emits save with the changes (the fields as they are stored: a field with no value is undefined, so that it is
- * cleared, and the `ref` is there only when it has a value), delete when the delete button
- * is pressed (annotation stays in memory until the caller removes it).
+ * cleared, and the `ref` is there only when it has a value), delete when the user confirmed the question the
+ * Delete button asks (the annotation stays in memory until the caller removes it; Cancel there leaves the dialog open).
  *
  * Props:
  *   annotation    - Potree.Annotation object with `title`, `description`, and `position` (THREE.Vector3).
@@ -82,7 +86,7 @@ import { useDialogCapture } from '@/libs/reports/snapshots/useCaptureAction';
  */
 export default {
     components: {
-        Window, Button, InputText, Textarea, Accordion, FormSection, CopyableCoordinates, AnnotationFields, AnnotationRefField, AnnotationTabs
+        Window, Button, InputText, Textarea, Accordion, FormSection, CopyableCoordinates, AnnotationFields, AnnotationRefField, AnnotationTabs, ConfirmDialog
     },
     props: {
         annotation: {
@@ -116,7 +120,7 @@ export default {
         const sections = useFoldedSections('annotation-properties', {
             opened: () => (props.annotation && inspectionSummary(annotationFieldsOf(props.annotation), props.schema) ? ['inspection'] : [])
         });
-        return { FIELD_LIMITS, sections, ...useDialogCapture(props) };
+        return { FIELD_LIMITS, sections, ...useDialogCapture(props), ...useDeleteQuestion() };
     },
     data() {
         return {
@@ -180,6 +184,11 @@ export default {
             const photos = this.photoContext && this.photos !== this.savedPhotos ? { photos: storedPhotos(this.photos) } : {};
             this.$emit('save', { ...this.formData, ...fields, ...(ref !== undefined ? { ref } : {}), ...photos });
             this.$emit('close');
+        },
+        // Delete asks first, naming the annotation as it is saved (not the name being typed)
+        askToDelete() {
+            const item = { name: htmlToText(this.annotation?.title || ''), type: 'point', value: this.coordsCopyText };
+            this.askDelete(measurementDeleteQuestion([item]), () => this.deleteAnnotation());
         },
         deleteAnnotation() {
             this.$emit('delete');

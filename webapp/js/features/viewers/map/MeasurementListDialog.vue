@@ -155,7 +155,7 @@ import MeasurementSelectionBar from './MeasurementSelectionBar.vue';
 import { useFileSelection } from '@/composables/useFileSelection';
 import { useListNavigation } from '@/composables/useListNavigation';
 import { duplicateRefs } from '@/libs/map/annotationIds';
-import { compareMeasurements, measurementName, measurementTypeLabel } from '@/libs/map/measurementTypes';
+import { compareMeasurements, measurementDeleteQuestion, measurementName, measurementTypeLabel } from '@/libs/map/measurementTypes';
 import { measurementTotalsText } from '@/libs/map/measurementTotals';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 import { countOf } from '@/libs/format';
@@ -248,9 +248,8 @@ export default {
     },
     computed: {
         deleteConfirmDialog() {
-            const items = this.pendingDeleteItems.map(m => ({ name: measurementName(m), note: m.value ? `(${m.value})` : '' }));
-            if (!items.length) return { message: '' };
-            return confirmDialogProps({ kind: 'measurement', items });
+            if (!this.pendingDeleteItems.length) return { message: '' };
+            return confirmDialogProps(measurementDeleteQuestion(this.pendingDeleteItems));
         },
         deleteGroupConfirmDialog() {
             const group = this.pendingDeleteGroup;

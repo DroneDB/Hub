@@ -79,10 +79,11 @@
             <p v-if="captureAction.message.value" class="capture-message" role="status">{{ captureAction.message.value }}</p>
         </div>
         <MeasurementGroupDialog v-if="groupDialogOpen" @save="chooseNewGroup" @close="groupDialogOpen = false" />
+        <ConfirmDialog v-if="deleteQuestion" v-bind="deleteQuestion" @close="answerDelete" />
 
         <template #footer>
             <Button v-if="showDelete && !isNew" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto" :disabled="photoUploading"
-                    :title="`Delete this ${isPoint ? 'annotation' : 'measurement'}`" @click="deleteMeasurement" />
+                    :title="`Delete this ${isPoint ? 'annotation' : 'measurement'}`" @click="askToDelete" />
             <Button v-if="capture" label="Capture for report" icon="fa-solid fa-camera" severity="secondary" text
                     :loading="captureAction.capturing.value" title="Frame this measurement and keep the 3D view as its picture in reports" @click="captureAction.run" />
             <Button :label="isNew ? 'Discard' : 'Cancel'" severity="secondary" :disabled="photoUploading" @click="cancel" />
@@ -106,7 +107,7 @@
  * [longitude, latitude], only when they were changed; the annotation fields as they are stored, a field with no value
  * as undefined so that it is cleared, the `ref` only when there is one; `newGroup`, { name, color }, when the measurement
  * goes in a group made in the dialog: the host makes it and puts the measurement in it), `delete` from the
- * Delete button, and `discard` when a new point (`isNew`) is not kept: Discard, the close button or Esc.
+ * Delete button once the user confirmed the question it asks (Cancel there leaves the dialog open), and `discard` when a new point (`isNew`) is not kept: Discard, the close button or Esc.
  */
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
@@ -122,6 +123,9 @@ import FormSection from '@/components/FormSection.vue';
 import { useFoldedSections } from '@/composables/useFoldedSections';
 import AnnotationTabs from '@/components/measurements/AnnotationTabs.vue';
 import MeasurementGroupDialog from '@/components/measurements/MeasurementGroupDialog.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { useDeleteQuestion } from '@/composables/useDeleteQuestion';
+import { measurementDeleteQuestion } from '@/libs/map/measurementTypes';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { FIELD_KEYS, FIELD_LIMITS, inspectionSummary, storedFields } from '@/libs/map/annotationIds';
 import { storedPhotos } from '@/libs/reports/annotationPhotos';
@@ -140,7 +144,7 @@ const fieldsOf = feature => Object.fromEntries(FIELD_KEYS.filter(key => feature.
 export default {
     components: {
         Window, Button, InputText, Textarea, Select, Accordion,
-        ColorSwatchPicker, FieldError, AnnotationFields, AnnotationRefField, AnnotationTabs, FormSection, MeasurementGroupDialog
+        ColorSwatchPicker, FieldError, AnnotationFields, AnnotationRefField, AnnotationTabs, FormSection, MeasurementGroupDialog, ConfirmDialog
     },
     props: {
         feature: {
@@ -202,7 +206,7 @@ export default {
         const sections = useFoldedSections('annotation-properties', {
             opened: () => (inspectionSummary(fieldsOf(props.feature), props.schema) ? ['inspection'] : [])
         });
-        return { copyCoords, coordsCopied, FIELD_LIMITS, sections, ...useDialogCapture(props) };
+        return { copyCoords, coordsCopied, FIELD_LIMITS, sections, ...useDialogCapture(props), ...useDeleteQuestion() };
     },
     data() {
         return {
@@ -342,6 +346,16 @@ export default {
             this.done = true;
             this.$emit('save', this.properties());
             this.$emit('close');
+        },
+        // Delete asks first, naming the measurement as it is saved (not the name being typed)
+        askToDelete() {
+            const feature = this.feature;
+            const item = {
+                name: feature?.get?.('name') || feature?.get?.('title') || '',
+                type: this.isPoint ? 'point' : feature?.get?.('measurementType'),
+                value: this.pointText
+            };
+            this.askDelete(measurementDeleteQuestion([item]), () => this.deleteMeasurement());
         },
         deleteMeasurement() {
             this.done = true;

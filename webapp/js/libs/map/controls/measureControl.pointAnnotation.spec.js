@@ -12,12 +12,13 @@ import Feature from 'ol/Feature';
 import { fromLonLat } from 'ol/proj';
 import MeasureControls from './measureControl';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { PREF, getPref, setPref, _resetPrefListenersForTests } from '@/libs/preferences';
 import { readSource, ruleOf } from '@/specs/cssSource';
 
 let control;
 let map;
-/** The props of the dialogs the control opened, the last one last */
+/** The props of the dialogs the control opened, the last one last; `answer` closes one with a result */
 let dialogs;
 
 beforeEach(() => {
@@ -25,7 +26,12 @@ beforeEach(() => {
     localStorage.clear();
     dialogs = [];
     control = new MeasureControls({
-        openDialog: (component, props) => { dialogs.push({ ...props, component }); return { close: vi.fn() }; },
+        openDialog: (component, props) => {
+            let answer;
+            const handle = new Promise(resolve => { answer = resolve; });
+            dialogs.push({ ...props, component, answer });
+            return Object.assign(handle, { close: vi.fn() });
+        },
         getGroups: () => [{ id: 'g1', name: 'North' }]
     });
     const target = document.createElement('div');
@@ -52,6 +58,8 @@ const LINE = {
 /** The popups of the points on the map */
 const popups = () => map.getOverlays().getArray().map(o => o.getElement()).filter(el => el.classList.contains('ol-point-popup'));
 const button = (popup, action) => /** @type {HTMLElement} */ (popup.querySelector(`.ol-point-popup-${action}`));
+/** Lets the answer of a question reach the code that awaited it */
+const settled = () => new Promise(resolve => setTimeout(resolve));
 const importSaved = (...features) => control.importFromGeoJSON({ type: 'FeatureCollection', features }).features;
 
 describe('the popup of a saved point annotation', () => {
@@ -82,11 +90,31 @@ describe('the popup of a saved point annotation', () => {
         expect(point.get('description')).toBe('second');
     });
 
-    it('deleted from its button: the point and its popup leave the map', () => {
-        importSaved(SAVED_POINT);
+    it('deleted from its button once the user confirms: the point and its popup leave the map', async () => {
+        importSaved({ ...SAVED_POINT, properties: { ...SAVED_POINT.properties, name: 'Gate' } });
         button(popups()[0], 'delete').click();
+
+        // The button asks first, as every delete of the Hub does: nothing is gone yet
+        const question = dialogs.at(-1);
+        expect(question.component).toBe(ConfirmDialog);
+        expect(question.title).toBe('Delete annotation “Gate”');
+        expect(question.confirmText).toBe('Delete');
+        expect(question.confirmButtonClass).toBe('danger');
+        expect(control.source.getFeatures()).toHaveLength(1);
+
+        question.answer('confirm');
+        await settled();
         expect(control.source.getFeatures()).toHaveLength(0);
         expect(popups()).toHaveLength(0);
+    });
+
+    it('kept when the question of its delete button is cancelled', async () => {
+        importSaved(SAVED_POINT);
+        button(popups()[0], 'delete').click();
+        dialogs.at(-1).answer('cancel');
+        await settled();
+        expect(control.source.getFeatures()).toHaveLength(1);
+        expect(popups()).toHaveLength(1);
     });
 
     it('keeps its buttons when the point is moved and the move undone', () => {
@@ -409,7 +437,12 @@ describe('the photos of a measurement in its dialog', () => {
         control.setMap(null);
         dialogs = [];
         control = new MeasureControls({
-            openDialog: (component, props) => { dialogs.push({ ...props, component }); return { close: vi.fn() }; },
+            openDialog: (component, props) => {
+            let answer;
+            const handle = new Promise(resolve => { answer = resolve; });
+            dialogs.push({ ...props, component, answer });
+            return Object.assign(handle, { close: vi.fn() });
+        },
             getPhotoHost
         });
         control.setMap(map);

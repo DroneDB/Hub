@@ -22,6 +22,9 @@ import { toLonLat, fromLonLat } from 'ol/proj';
 import { containsCoordinate, createEmpty, extend, getHeight, getWidth } from 'ol/extent';
 import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
+import { useConfirm } from '@/composables/useConfirm';
+import { deleteConfirmation } from '@/libs/deleteConfirmation';
+import { measurementDeleteQuestion } from '@/libs/map/measurementTypes';
 import { showPointPopup, removeMeasureTooltip, setPointPopupShown, CALLOUTS_ON_HOVER_CLASS } from '@/libs/map/pointPopup';
 import { MEASURE_COLOR, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
 import { mapFeatureGeometry } from '@/libs/reports/annotationPhotos';
@@ -621,33 +624,54 @@ class MeasureControls extends Control {
      * @returns {Array} Array of { name, type, value, feature, groupId, ref, category, severity, status } (and the name of each choice: categoryLabel, ...)
      */
     getMeasurementsList() {
-        const features = this.source.getFeatures();
-        return features
+        return this.source.getFeatures()
             .filter(f => f.get('measurementType'))
-            .map(f => {
-                const type = f.get('measurementType');
-                const name = f.get('name') || f.get('title') || '';
-                let value;
-                if (type === 'point') {
-                    const [lon, lat] = toLonLat(f.getGeometry().getCoordinates());
-                    value = latLonText(lat, lon);
-                } else {
-                    // A stockpile with its volume: built from the stored metric properties, in the units of the map now
-                    const label = type === 'stockpile' ? stockpileText(f.getProperties(), this.unitPref) : null;
-                    // Otherwise the tooltip text, without its HTML tags
-                    value = label ?? (f.get('tooltipText') || '').replace(/<[^>]*>/g, '');
-                }
-                return {
-                    name, type, value, feature: f, groupId: f.get('groupId') || '',
-                    ref: f.get('ref') ? String(f.get('ref')) : '',
-                    category: f.get('category') || '',
-                    categoryLabel: choiceLabel(this.annotationSchema.categories, f.get('category')),
-                    severity: f.get('severity') || '',
-                    severityLabel: choiceLabel(this.annotationSchema.severities, f.get('severity')),
-                    status: f.get('status') || '',
-                    statusLabel: choiceLabel(this.annotationSchema.statuses, f.get('status'))
-                };
-            });
+            .map(f => this.measurementListItem(f));
+    }
+
+    /**
+     * A measurement as the measurement list shows it (and as the question before its delete names it)
+     * @param {ol.Feature} f
+     * @returns {{ name: string, type: string, value: string, feature: ol.Feature, groupId: string, ref: string, category: string, categoryLabel: string, severity: string, severityLabel: string, status: string, statusLabel: string }}
+     */
+    measurementListItem(f) {
+        const type = f.get('measurementType');
+        const name = f.get('name') || f.get('title') || '';
+        let value;
+        if (type === 'point') {
+            const [lon, lat] = toLonLat(f.getGeometry().getCoordinates());
+            value = latLonText(lat, lon);
+        } else {
+            // A stockpile with its volume: built from the stored metric properties, in the units of the map now
+            const label = type === 'stockpile' ? stockpileText(f.getProperties(), this.unitPref) : null;
+            // Otherwise the tooltip text, without its HTML tags
+            value = label ?? (f.get('tooltipText') || '').replace(/<[^>]*>/g, '');
+        }
+        return {
+            name, type, value, feature: f, groupId: f.get('groupId') || '',
+            ref: f.get('ref') ? String(f.get('ref')) : '',
+            category: f.get('category') || '',
+            categoryLabel: choiceLabel(this.annotationSchema.categories, f.get('category')),
+            severity: f.get('severity') || '',
+            severityLabel: choiceLabel(this.annotationSchema.severities, f.get('severity')),
+            status: f.get('status') || '',
+            statusLabel: choiceLabel(this.annotationSchema.statuses, f.get('status'))
+        };
+    }
+
+    /**
+     * Deletes a measurement once the user confirmed the question the Hub asks before every delete (the delete button
+     * of a point's callout). Cancel, Esc or the close button keep it.
+     * @param {ol.Feature} feature
+     * @returns {Promise<boolean>} whether it was deleted
+     */
+    async confirmDeleteMeasurement(feature) {
+        const question = deleteConfirmation(measurementDeleteQuestion([this.measurementListItem(feature)]));
+        if (!await useConfirm({ open: this.openDialog })(question)) return false;
+        // Gone meanwhile (an undo, a reload of the file): nothing to delete
+        if (!this.source.hasFeature(feature)) return false;
+        this.deleteMeasurement(feature);
+        return true;
     }
 
     /**
@@ -1210,13 +1234,13 @@ class MeasureControls extends Control {
 
     /**
      * The handlers of the buttons of a point's popup: the properties dialog of the point, the deletion
-     * of a measurement, and the end of a drag of its move handle.
+     * of a measurement (once the user confirmed it), and the end of a drag of its move handle.
      * @returns {import('@/libs/map/pointPopup').PointPopupActions}
      */
     pointPopupActions() {
         return {
             onEdit: feature => this.openPropertiesDialog(feature),
-            onDelete: feature => this.deleteMeasurement(feature),
+            onDelete: feature => this.confirmDeleteMeasurement(feature),
             onMoved: (feature, from) => this.pointMoved(feature, from)
         };
     }

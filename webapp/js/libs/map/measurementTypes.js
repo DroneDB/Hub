@@ -41,3 +41,18 @@ export function compareMeasurements(a, b) {
         || compareText(measurementName(a), measurementName(b))
         || compareText(a.feature?.get?.('createdAt'), b.feature?.get?.('createdAt'));
 }
+
+/**
+ * The question asked before measurements are deleted, as libs/deleteConfirmation options: the same from the
+ * measurement list, the delete button of a point's callout and the Delete of a properties dialog. Each item is named
+ * as its row is (measurementName), with its value after it; one point is an "annotation", anything else a
+ * "measurement" (several items are "<n> items" either way).
+ * @param {{ name?: string, type?: string, value?: string }[]} items
+ * @returns {{ kind: string, items: { name: string, note: string }[] }}
+ */
+export function measurementDeleteQuestion(items) {
+    return {
+        kind: items.length === 1 && items[0].type === 'point' ? 'annotation' : 'measurement',
+        items: items.map(m => ({ name: measurementName(m), note: m.value ? `(${m.value})` : '' }))
+    };
+}

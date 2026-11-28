@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils';
 import AnnotationManager from './AnnotationManager.vue';
 import PinCard from './PinCard.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 const pins = [
     { id: 1, title: 'Gate', text: 'The **north** gate', link: 'https://example.com/gate', image: 'photos/gate.jpg', position: [0, 0, 0], view: null },
@@ -32,9 +33,22 @@ describe('the panel of pins', () => {
         names[1].element.value = '  Back door ';
         await names[1].trigger('change');
         expect(wrapper.emitted('goto')[0]).toEqual([1]);
+        // Remove asks first, as every delete of the Hub does
+        expect(wrapper.emitted('delete')).toBeUndefined();
+        const question = wrapper.findComponent(ConfirmDialog);
+        expect(question.props('title')).toBe('Delete pin “Door”');
+        await question.vm.$emit('close', 'confirm');
         expect(wrapper.emitted('delete')[0]).toEqual([1]);
         expect(wrapper.emitted('move')[0]).toEqual([{ index: 0, dir: 1 }]);
         expect(wrapper.emitted('rename')[0]).toEqual([{ index: 1, name: 'Back door' }]);
+    });
+
+    it('keeps the pin when the question of Remove is cancelled', async () => {
+        const wrapper = manager();
+        await wrapper.findAll('[aria-label="Remove this pin"]')[0].trigger('click');
+        await wrapper.findComponent(ConfirmDialog).vm.$emit('close', 'cancel');
+        expect(wrapper.findComponent(ConfirmDialog).exists()).toBe(false);
+        expect(wrapper.emitted('delete')).toBeUndefined();
     });
 
     it('shows a reader the pins and nothing to change them with', () => {

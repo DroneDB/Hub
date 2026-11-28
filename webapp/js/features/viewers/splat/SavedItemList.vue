@@ -24,12 +24,13 @@
                     <i class="fa-solid fa-arrow-down" />
                 </button>
                 <button v-if="canWrite" class="act danger" :title="`Remove this ${noun}`" :aria-label="`Remove this ${noun}`"
-                        @click="emit('delete', i)">
+                        @click="askToDelete(i)">
                     <i class="fa-solid fa-trash" />
                 </button>
             </div>
         </li>
     </ul>
+    <ConfirmDialog v-if="deleteQuestion" v-bind="deleteQuestion" @close="answerDelete" />
 </template>
 
 <script setup>
@@ -37,9 +38,13 @@
  * SavedItemList - the list the splat viewer keeps of what the user saves with a splat (camera
  * views, pins): a number, a name that can be edited, and the actions to go to an item, replace its
  * view with the current one, move it and remove it. The editing actions are for those who can write.
- * The list does not change anything: it says what the user asked for and its owner does it.
+ * The list does not change anything: it says what the user asked for and its owner does it; a remove
+ * once the user confirmed the question it asks, as every delete of the Hub does.
  */
-defineProps({
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { useDeleteQuestion } from '@/composables/useDeleteQuestion';
+
+const props = defineProps({
     items: { type: Array, required: true },
     /** The field of an item that names it */
     nameKey: { type: String, default: 'name' },
@@ -55,6 +60,14 @@ defineProps({
     indexTitle: { type: Function, default: () => null }
 });
 const emit = defineEmits(['goto', 'update', 'move', 'delete', 'rename']);
+
+const { deleteQuestion, askDelete, answerDelete } = useDeleteQuestion();
+/** @param {number} index  the item's place in the list (an item with no name is called by its number) */
+function askToDelete(index) {
+    const item = /** @type {Record<string, any>} */ (props.items[index]);
+    const name = String(item[props.nameKey] || '').trim() || `${props.noun} ${index + 1}`;
+    askDelete({ kind: props.noun, items: [name] }, () => emit('delete', index));
+}
 </script>
 
 <style scoped>

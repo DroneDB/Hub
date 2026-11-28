@@ -507,3 +507,37 @@ describe('the parts that fold away', () => {
         expect(buttonNamed('Save').disabled).toBe(true);
     });
 });
+
+describe('the Delete button of the properties dialog', () => {
+    const confirmDialog = () => document.querySelector('#confirmDialog');
+    const confirmButton = name => [...confirmDialog().querySelectorAll('button')].find(b => b.textContent.trim() === name);
+
+    it('asks first, naming the annotation, and deletes only on Delete', async () => {
+        await show(point({ name: 'Gate' }), { showDelete: true });
+        buttonNamed('Delete').click();
+        await flushPromises();
+        expect(wrapper.emitted('delete')).toBeUndefined();
+        expect(wrapper.emitted('close')).toBeUndefined();
+        expect(confirmDialog().querySelector('.p-dialog-title').textContent.trim()).toBe('Delete annotation “Gate”');
+
+        confirmButton('Delete').click();
+        await flushPromises();
+        expect(wrapper.emitted('delete')).toHaveLength(1);
+        expect(wrapper.emitted('close')).toHaveLength(1);
+        expect(wrapper.emitted('discard')).toBeUndefined();
+    });
+
+    it('keeps the dialog and the measurement when the question is cancelled', async () => {
+        await show(area(), { showDelete: true });
+        buttonNamed('Delete').click();
+        await flushPromises();
+        expect(confirmDialog().querySelector('.p-dialog-title').textContent.trim()).toBe('Delete measurement “Area”');
+
+        confirmButton('Cancel').click();
+        await flushPromises();
+        expect(confirmDialog()).toBeNull();
+        expect(wrapper.emitted('delete')).toBeUndefined();
+        expect(wrapper.emitted('close')).toBeUndefined();
+        expect(dialog()).not.toBeNull();
+    });
+});
