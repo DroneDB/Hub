@@ -30,6 +30,7 @@
  * both followed: Potree tells the measuring tool starts one (`start_inserting_measurement`).
  */
 import { isRightClick, RIGHT_BUTTON, RIGHT_CLICK_MAX_MOVE_PX } from '@/libs/mouse';
+import { isTypingTarget } from '@/libs/typingTarget';
 
 /**
  * What Potree's own icons ask for, by kind: the arguments of `startInsertion`.
@@ -51,7 +52,6 @@ const TAP_MAX_MOVE_PX = 10;
 const MIN_OPEN = Object.freeze({ distance: 2, area: 3 });
 
 // Typing keeps its keys
-const isTyping = (/** @type {any} */ t) => t instanceof Element && !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
 // Enter on a focused button or link presses it (as drawingSession's keepsItsKeys); Escape still drops the measure
 const pressesOnEnter = (/** @type {any} */ t) => t instanceof Element && !!t.closest('button, a[href]');
 
@@ -381,7 +381,7 @@ export class PotreeMeasureGestures {
 
     /** @param {KeyboardEvent} e */
     onKey(e) {
-        if (!this.measure || isTyping(e.target)) return;
+        if (!this.measure || isTypingTarget(e.target)) return;
         if (e.key === 'Escape') this.cancel();
         else if (e.key === 'Enter' && !pressesOnEnter(e.target)) this.finish({ dropShort: false });
         else return;

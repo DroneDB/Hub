@@ -1,4 +1,4 @@
-/** The share API (§7.1, FR-UPL-02, FR-UPL-01): init carries the form fields, rollback has its endpoint. */
+/** The share API: init carries the form fields, rollback has its endpoint, the upload and info URLs escape the token. */
 import { describe, it, expect, vi } from 'vitest';
 import ShareApi from './shareApi';
 
@@ -42,5 +42,14 @@ describe('ShareApi.rollback', () => {
         await share.rollback('a/b c');
 
         expect(registry.makeRequest).toHaveBeenCalledWith('/share/rollback/a%2Fb%20c', 'POST');
+    });
+});
+
+describe('ShareApi URLs', () => {
+    it('builds the absolute upload and info URLs of a session with the token escaped', () => {
+        const { share } = setup();
+
+        expect(share.uploadUrl('a/b c')).toBe('http://reg.test/share/upload/a%2Fb%20c');
+        expect(share.infoUrl('a/b c')).toBe('http://reg.test/share/info/a%2Fb%20c');
     });
 });

@@ -35,12 +35,13 @@
  * @property {{ path: string, camera?: any, capturedAt: string | null } | null} snapshot  the capture of a 3D item
  * @property {string | null} pointCloudFile  the point cloud of the file of a 3D item
  * @property {import('./reportKinds').Measured} measured
- * @property {Record<string, any>} properties  as the file stores them
+ * @property {Record<string, any>} properties  as the file stores them; a 3D measure with the values worked out from its
+ *   points (reportKinds' pointCloudMeasures) in place of the stored ones
  */
 import { passesFilter } from '@/libs/reports/reportDefinition';
 import { idOf, refOf, inCreationOrder, duplicateRefs } from '@/libs/map/annotationIds';
 import { VIEW, sectionOf, LEGACY_GEOMETRY } from '@/libs/map/measurementFormat';
-import { kindOfFeature, measuredOf } from '@/libs/reports/reportKinds';
+import { kindOfFeature, measuredOf, pointCloudMeasures } from '@/libs/reports/reportKinds';
 
 /** What a report writes for a value that is not there: a hyphen (a report writes no long dash). */
 export const NO_VALUE = '-';
@@ -104,6 +105,8 @@ const snapshotOf = snapshot => (snapshot && typeof snapshot.path === 'string' &&
  * @property {string} file
  * @property {string} [label]
  * @property {Record<string, any> | null} [document]  the file, parsed (measurementFormat.parse)
+ * @property {string | null} [pointCloudCrs]  the SRS of the COPC of the file's point cloud, when it is known: the 3D
+ *   measures are measured in it
  * @property {string | { message?: string }} [error]  why it could not be read
  */
 
@@ -145,6 +148,7 @@ export function buildItems(definition, loaded, schema, today) {
         const groups = new Map((Array.isArray(sectionOf(document, VIEW.MAP).groups) ? sectionOf(document, VIEW.MAP).groups : [])
             .filter((/** @type {any} */ g) => g && typeof g.id === 'string').map((/** @type {any} */ g) => [g.id, String(g.name ?? '')]));
         const pointCloudFile = textOrNull(sectionOf(document, VIEW.POINT_CLOUD).pointCloudFile);
+        const measuresOf = pointCloudMeasures(document, input?.pointCloudCrs ?? null);
 
         /** @type {ReportItem[]} */
         const own = [];
@@ -154,8 +158,10 @@ export function buildItems(definition, loaded, schema, today) {
                 skipped++;
                 return;
             }
-            const props = feature.properties ?? {};
-            if (props.report === false) return;
+            const stored = feature.properties ?? {};
+            if (stored.report === false) return;
+            const values = info.owner === VIEW.POINT_CLOUD ? measuresOf(feature) : null;
+            const props = values ? { ...stored, ...values } : stored;
             const ref = refOf(feature);
             const georeferenced = isGeoreferenced(document, info.owner) && !!feature.geometry;
             const group = textOrNull(props.groupId);
@@ -188,7 +194,7 @@ export function buildItems(definition, loaded, schema, today) {
                 photos: photosOf(props.photos),
                 snapshot: info.owner === VIEW.POINT_CLOUD ? snapshotOf(props.snapshot) : null,
                 pointCloudFile: info.owner === VIEW.POINT_CLOUD ? pointCloudFile : null,
-                measured: measuredOf(info, feature),
+                measured: measuredOf(info, values ? { ...feature, properties: props } : feature),
                 properties: props
             });
             item.overdue = isOverdue(item, schema, today);

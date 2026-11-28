@@ -199,4 +199,15 @@ describe('useBuildEvents', () => {
         expect(notify.error).toHaveBeenCalledOnce();
         expect(notify.error).toHaveBeenCalledWith('f0.tif (failed)', { summary: 'Photogrammetry - 0 built, 1 failed so far' });
     });
+
+    it('tells the buildable files of the page\'s dataset, held by another object of it, and not those of another dataset', () => {
+        listen();
+
+        // The task monitor hands out the object of whoever acquired the dataset last (a background archive)
+        BuildManager.emit('newBuildableFilesDetected', { dataset: { baseApi: dataset.baseApi }, filePaths: ['a.laz', 'b.tif'] });
+        BuildManager.emit('newBuildableFilesDetected', { dataset: { baseApi: '/orgs/o/ds/other' }, filePaths: ['c.tif'] });
+
+        expect(notify.info).toHaveBeenCalledOnce();
+        expect(notify.info).toHaveBeenCalledWith('2 buildable files detected - processing in background', { summary: 'Buildable Files Detected' });
+    });
 });

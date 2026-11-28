@@ -2,10 +2,11 @@
  * What an annotation is to a report: its kind, the total it adds to, and what it measures.
  */
 import { describe, it, expect } from 'vitest';
-import { kindOfFeature, totalKeyOf, metresPerUnit, measuredOf, KIND_ORDER, KIND_LABELS } from './reportKinds';
+import { kindOfFeature, totalKeyOf, metresPerUnit, measuredOf, pointCloudMeasures, KIND_ORDER, KIND_LABELS } from './reportKinds';
 import { MEASUREMENT_KINDS } from './reportDefinition';
 import { geodesicLength, geodesicArea } from '@/libs/map/geodesic';
-import { mapFeature, cloudFeature, square } from './reportModel.fixtures';
+import { mapFeature, cloudFeature, square, documentOf } from './reportModel.fixtures';
+import { US_FOOT_WKT } from '@/libs/map/crs.fixtures';
 
 const POINT = { type: 'Point', coordinates: [9.2, 45.1] };
 const LINE = { type: 'LineString', coordinates: [[9.2, 45.1], [9.2005, 45.1005]] };
@@ -110,3 +111,34 @@ describe('what an item measures', () => {
         expect(measuredOf({ owner: 'pointCloud', kind: 'length' }, odd)).toMatchObject({ length: null, unconvertible: true });
     });
 });
+
+describe('pointCloudMeasures: the values of the 3D measures of a file, from their points', () => {
+    const feetFile = features => {
+        const doc = documentOf(features);
+        doc.metadata.views.pointCloud.coordinateSystem = { srs: US_FOOT_WKT };
+        return doc;
+    };
+    const square3d = [[2000000, 500000, 10], [2000010, 500000, 10], [2000010, 500010, 10], [2000000, 500010, 10]];
+
+    it('measures in the unit of the CRS the file states', () => {
+        const area = cloudFeature('a', '1', 'area', POLYGON, { localCoordinates: square3d, area: 1, unit: 'm²' });
+        const height = cloudFeature('h', '2', 'height', LINE, { localCoordinates: [[2000000, 500000, 10], [2000003, 500004, 22]], distance: 1, unit: 'm' });
+        const valuesOf = pointCloudMeasures(feetFile([area, height]));
+        expect(valuesOf(area)).toEqual({ area: 100, perimeter: 40, unit: 'ftUS²' });
+        expect(valuesOf(height)).toEqual({ distance: 12, unit: 'ftUS' });
+    });
+
+    it('measures in the CRS of the COPC when it is given, which wins over the one the file states', () => {
+        const distance = cloudFeature('d', '1', 'distance', LINE, { localCoordinates: [[2000000, 500000, 10], [2000100, 500000, 10]], distance: 100, unit: 'm' });
+        expect(pointCloudMeasures(feetFile([distance]), US_FOOT_WKT)(distance)).toEqual({ distance: 100, unit: 'ftUS' });
+    });
+
+    it('leaves a feature with too few points, no points, or of a kind with no values to its stored values', () => {
+        const one = cloudFeature('d', '1', 'distance', LINE, { distance: 5, unit: 'm' });
+        const none = mapFeature('n', '2', 'distance', LINE, { distance: 5, unit: 'm' });
+        const point = cloudFeature('p', '3', 'point', POINT);
+        const valuesOf = pointCloudMeasures(feetFile([one, none, point]));
+        expect([valuesOf(one), valuesOf(none), valuesOf(point)]).toEqual([null, null, null]);
+    });
+});
+

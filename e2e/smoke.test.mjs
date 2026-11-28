@@ -9,9 +9,13 @@
  * Chromium binary (otherwise Playwright's own, else the newest one in ~/.cache/ms-playwright, or
  * %LOCALAPPDATA%\ms-playwright on Windows).
  * It creates a throw-away dataset in the user's organisation and deletes it at the end.
- * To test a local build: `npm run build`, copy build/* into <storage>/ClientApp, write the
- * package version into <storage>/ClientApp/version.txt and restart the Registry. Without
- * version.txt the Registry replaces the folder with the Hub embedded in its own binary.
+ * To test a local build: `npm run build`, copy build/* into <storage>/ClientApp, write a stamp into
+ * <storage>/ClientApp/version.txt and restart the Registry. The Registry stamps the Hub it extracts
+ * as `<version>+<build hash>` and extracts its embedded Hub again over a folder whose stamp has the
+ * same version and another build (a plain `3.0.0` counts as another build) or no version.txt. So
+ * write either a version higher than the one of the Registry's embedded Hub (say `99.0.0`), or the
+ * exact stamp of that Hub (the Registry's ClientApp/build/version.txt); the package version alone
+ * gets the hand-placed Hub replaced.
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

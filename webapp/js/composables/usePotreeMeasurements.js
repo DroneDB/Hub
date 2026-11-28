@@ -30,9 +30,9 @@ import { flash } from '@/composables/useMapAlerts';
 import { notify } from '@/libs/notify';
 import { textToHtml } from '@/libs/sanitize';
 import { inModalDialog } from '@/libs/views/modalFocus';
+import { isTypingTarget } from '@/libs/typingTarget';
 import { useTimerGroup } from '@/composables/useTimers';
 
-const isTyping = t => t instanceof Element && (t.closest('input, textarea, select') || t.isContentEditable);
 
 /**
  * @param {object} ctx  refs from useViewerEntry and useDialogs
@@ -363,7 +363,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
         // Ctrl+Z undoes, Ctrl+Shift+Z and Ctrl+Y redo (Cmd for the Mac); what is behind a modal dialog is not touched
         session.track(document, 'keydown', event => {
-            if (!(event.ctrlKey || event.metaKey) || isTyping(event.target) || behindModal(event.target)) return;
+            if (!(event.ctrlKey || event.metaKey) || isTypingTarget(event.target) || behindModal(event.target)) return;
             const key = event.key.toLowerCase();
             if (key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); }
             else if (key === 'y') { event.preventDefault(); redo(); }

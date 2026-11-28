@@ -155,6 +155,7 @@ import { supportsFullScreen } from '@/libs/utils';
 import { useFullscreen } from '@/composables/useFullscreen';
 import { fullscreenRoot } from '@/libs/views/viewerFullscreen';
 import { inModalDialog } from '@/libs/views/modalFocus';
+import { isTypingTarget } from '@/libs/typingTarget';
 
 const error = defineModel('error', { type: String, default: '' });
 const settingsOpen = defineModel('settingsOpen', { type: Boolean, default: false });
@@ -270,7 +271,7 @@ function toggleFullscreen() {
 
 /** Typing in a field: the keys belong to it (a slider's Home goes to its start) */
 function isTyping(target) {
-    return target instanceof Element && (!!target.closest('input, textarea, select, [role="combobox"]') || target.isContentEditable);
+    return isTypingTarget(target) || (target instanceof Element && !!target.closest('[role="combobox"]'));
 }
 
 /** The viewer leaves the key F to the shell: it has no `fullscreen-key`, or that does not return false */

@@ -1,6 +1,6 @@
 /**
- * Every immersive viewer has the fullscreen control of the ViewerShell (FR-VWR-38): the 3D, model and Nexus viewers
- * through the navigation toolbar (FR-VWR-11), the point cloud and the splat viewers through the button of the view bar,
+ * Every immersive viewer has the fullscreen control of the ViewerShell: the 3D, model and Nexus viewers
+ * through the navigation toolbar, the point cloud and the splat viewers through the button of the view bar,
  * which stands over the view when the viewer is embedded (ShareEmbed: a frame that allows fullscreen).
  *
  * The attributes each viewer gives its <ViewerShell> are read from its template (the viewers themselves need WebGL), and
@@ -66,7 +66,7 @@ afterEach(() => {
     request.mockClear();
 });
 
-describe('the viewers of the Hub and their fullscreen control (FR-VWR-38)', () => {
+describe('the viewers of the Hub and their fullscreen control', () => {
     it.each([
         ['the 3D viewer', '../features/viewers/unified/UnifiedViewer.vue'],
         ['the model viewers', '../features/viewers/model/ModelViewerShell.vue']
@@ -77,7 +77,7 @@ describe('the viewers of the Hub and their fullscreen control (FR-VWR-38)', () =
     it.each([
         ['the point cloud viewer', '../features/viewers/pointcloud/PotreeViewer.vue', 'bottom-right'],
         ['the splat viewer', '../features/viewers/splat/SplatViewer.vue', 'top-right']
-    ])('%s, embedded, has the fullscreen button over its view, in the %s corner, and it toggles fullscreen', async (_name, file, corner) => {
+    ])('%s, embedded, has the fullscreen button over its view, in the %s corner, and it toggles the page fullscreen', async (_name, file, corner) => {
         const { attributes } = shellOf(file);
         expect(attributes['fullscreen-button']).toBe(true);
         HTMLElement.prototype.requestFullScreen = request;
@@ -90,7 +90,8 @@ describe('the viewers of the Hub and their fullscreen control (FR-VWR-38)', () =
         expect(button.attributes('aria-pressed')).toBe('false');
         await button.trigger('click');
         expect(request).toHaveBeenCalledTimes(1);
-        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        // The page goes fullscreen, not the shell: the dialogs, toasts and lists of PrimeVue are outside the shell
+        expect(request.mock.contexts[0]).toBe(document.documentElement);
     });
 
     it('the point cloud viewer tells its shell when F is its own (PotreeViewer.spec has the rule)', () => {

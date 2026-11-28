@@ -225,7 +225,7 @@ describe('the toolbar rail of a compact map (FR-MAP-12, FR-SHR-05)', () => {
     it('turns the arrow of a popup below its point up', () => {
         const arrow = ruleOf(css, '.ol-point-popup-below::after');
         expect(arrow).toMatch(/top:\s*-0\.5rem/);
-        expect(arrow).toMatch(/border-bottom:\s*0\.5rem solid white/);
+        expect(arrow).toMatch(/border-bottom:\s*0\.5rem solid var\(--ddb-bg-surface\)/);
     });
 });
 

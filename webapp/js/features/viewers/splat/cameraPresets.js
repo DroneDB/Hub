@@ -138,8 +138,10 @@ export function turnBetween(from, to) {
  * A saved view (a camera, or the view of a pin) carried with a turn of the scene about its origin: its position and its
  * target turn, and its orientation follows. A view is a pose in the world, and the scene turned under it when the up axis
  * changed: left as it was, it showed another part of the scene, or the scene on its side.
- * @param {{ position: number[], quaternion: number[], target?: number[] | null }} view
+ * @template {{ position: number[], quaternion: number[], target?: number[] | null }} V
+ * @param {V} view
  * @param {number[]} turn  [x, y, z, w]
+ * @returns {V}  the view with the same fields (a camera keeps its id, name and fov)
  */
 export function turnView(view, turn) {
     return {

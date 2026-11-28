@@ -79,4 +79,32 @@ describe('the Photos tab of the annotation dialog', () => {
         buttonNamed('Save').click();
         expect(wrapper.emitted('save')[0][0]).toHaveProperty('photos', undefined);
     });
+
+    it('cannot be saved, closed or deleted while a photo uploads, and saves the photo once it is in the annotation', async () => {
+        const ctx = context();
+        let finish;
+        ctx.dataset.writeObj = vi.fn(() => new Promise(resolve => { finish = () => resolve({}); }));
+        await show({ photoContext: ctx });
+        tab('Photos').click();
+        await flushPromises();
+        const input = dialog().querySelector('input[type="file"]');
+        Object.defineProperty(input, 'files', { value: [new File(['x'], 'IMG_1.JPG', { type: 'image/jpeg' })], configurable: true });
+        input.dispatchEvent(new Event('change'));
+        await flushPromises();
+
+        expect(buttonNamed('Save').disabled).toBe(true);
+        expect(buttonNamed('Cancel').disabled).toBe(true);
+        expect(buttonNamed('Delete').disabled).toBe(true);
+        expect(dialog().querySelector('.p-dialog-close-button')).toBeNull();
+        // Enter and a call of save do nothing either
+        document.querySelector('#ap-name').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        wrapper.vm.save();
+        expect(wrapper.emitted('save')).toBeUndefined();
+
+        finish();
+        await flushPromises();
+        expect(buttonNamed('Save').disabled).toBe(false);
+        buttonNamed('Save').click();
+        expect(wrapper.emitted('save')[0][0].photos).toEqual([{ path: 'a/annotations/id-1-1.jpg', source: 'upload' }]);
+    });
 });

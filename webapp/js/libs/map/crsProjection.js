@@ -195,17 +195,36 @@ const UNIT_TOLERANCE = 1e-9;
  * @returns {Readonly<LinearUnit>}
  */
 export function linearUnitOf(crs) {
-    if (typeof crs !== 'string' || !crs.trim()) return LINEAR_UNITS.METRE;
+    const projection = horizontalProjectionOf(crs);
+    const factor = Number(projection?.to_meter);
+    if (!projection || projection.projName === 'longlat' || !Number.isFinite(factor) || factor <= 0) return LINEAR_UNITS.METRE;
+    return unitOfFactor(factor, projection.units);
+}
+
+/**
+ * The projection proj4 makes of the horizontal CRS of a CRS (horizontalDefinition), or null when there is none or proj4
+ * cannot read it.
+ * @param {any} crs
+ * @returns {any}
+ */
+function horizontalProjectionOf(crs) {
+    if (typeof crs !== 'string' || !crs.trim()) return null;
     try {
         const definition = horizontalDefinition(crs);
-        if (!definition) return LINEAR_UNITS.METRE;
-        const projection = /** @type {any} */ (proj4.Proj(definition));
-        const factor = Number(projection.to_meter);
-        if (projection.projName === 'longlat' || !Number.isFinite(factor) || factor <= 0) return LINEAR_UNITS.METRE;
-        return unitOfFactor(factor, projection.units);
+        return definition ? proj4.Proj(definition) : null;
     } catch {
-        return LINEAR_UNITS.METRE;
+        return null;
     }
+}
+
+/**
+ * Whether the x and y of a CRS are longitude and latitude (degrees, which are no length: what is measured in them is
+ * measured in another CRS). False for no CRS and for one proj4 cannot read.
+ * @param {any} crs  an EPSG code, a proj string or WKT
+ * @returns {boolean}
+ */
+export function isGeographicCrs(crs) {
+    return horizontalProjectionOf(crs)?.projName === 'longlat';
 }
 
 /**

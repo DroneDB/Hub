@@ -21,3 +21,23 @@ if (typeof document !== 'undefined') {
         document.documentElement.style.setProperty(name, value.trim());
     }
 }
+
+// The name of a node as a browser gives it through the getter of Node.prototype. happy-dom answers nodeName from the
+// class of each node (Element, Text, Comment...) and its getter on Node.prototype answers '', while DOMPurify reads
+// that getter: it would see no tag name, remove every allowed element and keep only its text. The getter of
+// Node.prototype answers here what the node's own class does, as in a browser.
+if (typeof Node !== 'undefined') {
+    const ownNodeName = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeName');
+    if (ownNodeName?.get && ownNodeName.configurable) {
+        Object.defineProperty(Node.prototype, 'nodeName', {
+            configurable: true,
+            get() {
+                for (let proto = Object.getPrototypeOf(this); proto && proto !== Node.prototype; proto = Object.getPrototypeOf(proto)) {
+                    const getter = Object.getOwnPropertyDescriptor(proto, 'nodeName')?.get;
+                    if (getter) return getter.call(this);
+                }
+                return ownNodeName.get.call(this);
+            }
+        });
+    }
+}

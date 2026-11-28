@@ -3,7 +3,7 @@
  * of it: only for a COPC built in another CRS than its file; nothing when the build or the server predates the field.
  */
 import { describe, it, expect } from 'vitest';
-import { copcCrsOf, streamedInText, copcDownloadNote, unstatedMeasurementCrs } from './pointCloudCrs';
+import { copcCrsOf, copcSrsOf, streamedInText, copcDownloadNote, unstatedMeasurementCrs } from './pointCloudCrs';
 import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 
 const SOURCE_WKT = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],UNIT["degree",0.0174532925199433]]';
@@ -60,5 +60,23 @@ describe('unstatedMeasurementCrs: the CRS of a measurements file that states non
         expect(unstatedMeasurementCrs(cloud(undefined, { projection: SOURCE_WKT, crsStatus: 'implausible' }), copc)).toBe(copc);
         expect(unstatedMeasurementCrs(cloud(UTM, {}), copc)).toBe(copc);
         expect(unstatedMeasurementCrs(null, copc)).toBe(copc);
+    });
+});
+
+describe('copcSrsOf: the CRS of the COPC, for what reads no COPC', () => {
+    it('is the EPSG code the build states for a COPC built in another CRS than the file', () => {
+        expect(copcSrsOf(cloud(UTM, { projection: SOURCE_WKT, crsStatus: 'geographic' }))).toBe('EPSG:32633');
+    });
+
+    it('is the CRS of the file when the COPC is in it', () => {
+        expect(copcSrsOf(cloud({ ...UTM, transformed: false }, { projection: SOURCE_WKT }))).toBe(SOURCE_WKT);
+        expect(copcSrsOf(cloud(undefined, { projection: SOURCE_WKT, crsStatus: 'projected' }))).toBe(SOURCE_WKT);
+    });
+
+    it('is null when it cannot be told: built in another CRS with no EPSG code stated, or no CRS at all', () => {
+        expect(copcSrsOf(cloud(undefined, { projection: SOURCE_WKT, crsStatus: 'geographic' }))).toBeNull();
+        expect(copcSrsOf(cloud({ ...UTM, epsg: null }, { projection: SOURCE_WKT }))).toBeNull();
+        expect(copcSrsOf(cloud(undefined, {}))).toBeNull();
+        expect(copcSrsOf(null)).toBeNull();
     });
 });

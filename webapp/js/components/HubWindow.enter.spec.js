@@ -7,6 +7,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 import Window from './HubWindow.vue';
+import SearchField from './SearchField.vue';
 
 let wrapper;
 afterEach(() => {
@@ -15,10 +16,10 @@ afterEach(() => {
     document.body.innerHTML = '';
 });
 
-async function show(props) {
+async function show(props, content = '<input class="name">') {
     wrapper = mount(Window, {
         props: { visible: true, title: 'T', confirmLabel: 'Go', ...props },
-        slots: { default: '<input class="name">' },
+        slots: { default: content },
         attachTo: document.body, global: { plugins: [PrimeVue] }
     });
     await wrapper.vm.$nextTick();
@@ -79,9 +80,14 @@ describe('HubWindow Enter', () => {
 
         it('leaves the Enter of a search box, a search form and a field that owns it', async () => {
             await show({});
-            press(inDialog('<div class="search-field"><input></div>'));
             press(inDialog('<form role="search"><input></form>'));
             press(inDialog('<div data-owns-enter><input></div>'));
+            expect(wrapper.emitted('confirm')).toBeUndefined();
+        });
+
+        it('leaves the Enter of a SearchField, which searches', async () => {
+            await show({}, { components: { SearchField }, template: '<input class="name"><SearchField label="Search" />' });
+            press(document.querySelector('.window-dialog input[aria-label="Search"]'));
             expect(wrapper.emitted('confirm')).toBeUndefined();
         });
 

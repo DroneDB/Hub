@@ -78,7 +78,7 @@ describe('the details panel and saved views', () => {
         const compare = buttonByLabel(w, 'Compare to');
         expect(compare.attributes('title')).toBe('Compare this georaster with others of the dataset');
         await compare.trigger('click');
-        expect(window.open).toHaveBeenCalledWith('/r/org/ds/view/ZmxpZ2h0cy9vcnRoby50aWY=/map?pick=1', '_blank', 'noopener');
+        expect(window.open).toHaveBeenCalledWith('/r/org/ds/view/ZmxpZ2h0cy9vcnRoby50aWY%3D/map?pick=1', '_blank', 'noopener');
     });
 
     it('does not offer "Compare to" for a file that is not a georaster', async () => {

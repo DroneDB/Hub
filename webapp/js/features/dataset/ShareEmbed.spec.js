@@ -38,7 +38,7 @@ async function open(file) {
     await flushPromises();
 }
 const origin = () => window.location.origin;
-const orthoPrefix = () => `${origin()}/r/org/ds/view/ZmxpZ2h0cy9vcnRoby50aWY=/map`;
+const orthoPrefix = () => `${origin()}/r/org/ds/view/ZmxpZ2h0cy9vcnRoby50aWY%3D/map`;
 const linkInput = () => document.body.querySelector('input[aria-label="Share link"]');
 const viewerOnlyBox = () => document.body.querySelector('[data-testid="share-viewer-only"]');
 async function chooseMode(value) {
@@ -216,7 +216,7 @@ describe('ShareEmbed', () => {
         ])('gives the same link as ever for a %s, with and without Viewer only', async (_, type, properties, view) => {
             const path = 'sub dir/ünï.file';
             await open({ path: `ddb://h/org/ds/${path}`, entry: { path, type, properties } });
-            const plain = `${origin()}/r/org/ds/view/${Buffer.from(path).toString('base64')}/${view}`;
+            const plain = `${origin()}/r/org/ds/view/${encodeURIComponent(Buffer.from(path).toString('base64'))}/${view}`;
             expect(linkInput().value).toBe(plain);
             viewerOnlyBox().click();
             await flushPromises();

@@ -216,7 +216,7 @@ describe('the folder on show leaves the dataset path it had (deleted, renamed or
     it('opens the folder that held it, after the tree heard of the removal', async () => {
         const { emitter, listing } = await showing('a/b');
         listing.removed(['a/b']);
-        expect(emitter.emit.mock.calls).toEqual([['deleteEntries', ['a/b']], ['folderOpened', ['a']]]);
+        expect(emitter.emit.mock.calls).toEqual([['deleteEntries', { dataset: { org: 'o', ds: 'd' }, paths: ['a/b'] }], ['folderOpened', ['a']]]);
     });
 
     it('opens the root for a folder of the root, as the root crumb of the path does', async () => {
@@ -237,7 +237,7 @@ describe('the folder on show leaves the dataset path it had (deleted, renamed or
         const { emitter, listing } = await showing('a/b');
         listing.removed(['a/b/photo.jpg', 'a/c', 'a/bc', 'a/b2']);
         expect(opened(emitter)).toEqual([]);
-        expect(emitter.emit).toHaveBeenCalledWith('deleteEntries', ['a/b/photo.jpg', 'a/c', 'a/bc', 'a/b2']);
+        expect(emitter.emit).toHaveBeenCalledWith('deleteEntries', { dataset: { org: 'o', ds: 'd' }, paths: ['a/b/photo.jpg', 'a/c', 'a/bc', 'a/b2'] });
     });
 
     it('stays at the root, which nothing removes', async () => {
@@ -273,7 +273,7 @@ describe('the list showed only what was removed (items picked in the tree are li
         const { emitter, listing } = await picked('out', 'out/ortho.tif');
         listing.removed(['out/ortho.tif']);
         expect(listing.files.value).toEqual([]);
-        expect(emitter.emit.mock.calls).toEqual([['deleteEntries', ['out/ortho.tif']], ['folderOpened', ['out']]]);
+        expect(emitter.emit.mock.calls).toEqual([['deleteEntries', { dataset: { org: 'o', ds: 'd' }, paths: ['out/ortho.tif'] }], ['folderOpened', ['out']]]);
     });
 
     it('opens the root for a file of the root', async () => {

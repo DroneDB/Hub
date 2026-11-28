@@ -16,6 +16,7 @@ import { itemFor, sortItems, isInFolder, entriesInView } from '@/libs/dataset/ex
 import { isPathRemoved } from '@/features/dataset/explorer/treeSelection';
 import { isSameDataset } from '@/libs/build/datasetIdentity';
 import { useLatestOnly } from '@/composables/useLatestOnly';
+import { deletedEntriesEvent } from '@/libs/dataset/deletedEntries';
 
 /** @param {any} dataset */
 export function useDatasetListing(dataset) {
@@ -74,7 +75,7 @@ export function useDatasetListing(dataset) {
         const shown = files.value.length;
         drop(paths);
         if (!paths.length) return;
-        emitter.emit('deleteEntries', paths);
+        emitter.emit('deleteEntries', deletedEntriesEvent(dataset, paths));
         const holders = paths.filter(path => isPathRemoved(currentPath.value, [path]));
         if (holders.length) open(ddb.pathutils.getParentFolder(holders.reduce((a, b) => (b.length < a.length ? b : a))));
         else if (shown > 0 && files.value.length === 0) open(currentPath.value);

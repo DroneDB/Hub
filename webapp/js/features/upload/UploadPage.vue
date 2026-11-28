@@ -329,7 +329,7 @@ export default {
                     getJson: authorizedGetJson(reg),
                     destination: item => item.path,
                     // The batch keeps no receipts: what it lists tells whether a file whose answer was lost got in
-                    batchInfoUrl: `${reg.url}/share/info/${encodeURIComponent(this.uploadToken)}`,
+                    batchInfoUrl: reg.share.infoUrl(this.uploadToken),
                     receipts: false
                 });
                 const files = this.staged;

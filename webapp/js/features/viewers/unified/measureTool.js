@@ -14,6 +14,7 @@
  */
 import { measureFormatters, measureColor } from './sceneUtils';
 import { isRightClick, RIGHT_BUTTON } from '@/libs/mouse';
+import { isTypingTarget } from '@/libs/typingTarget';
 import { measureLabelPx, MEASURE_LINE_PX } from '@/libs/measureScale';
 
 /** The least points a shape is kept with: the shape being drawn with fewer is dropped. */
@@ -41,7 +42,6 @@ export function trimDrawnPoints(points, closed) {
 }
 
 // Typing keeps its keys
-const isTyping = t => t instanceof Element && !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
 
 export class MeasureTool {
     /**
@@ -187,7 +187,7 @@ export class MeasureTool {
     }
 
     handleKey(e) {
-        if (!this.abort || isTyping(e.target)) return;
+        if (!this.abort || isTypingTarget(e.target)) return;
         if (e.key === 'Escape') this.cancel();
         else if (e.key === 'Enter') this.finish();
         else return;

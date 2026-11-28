@@ -4,7 +4,7 @@
  * (`gdaltransform -s_srs EPSG:4326 -t_srs EPSG:32633`, `cs2cs EPSG:4979 EPSG:4978`), not computed by the code.
  */
 import { describe, it, expect } from 'vitest';
-import { horizontalDefinition, crsToWgs84, wgs84ToCrs, linearUnitOf, cloudUnitsOf, LINEAR_UNITS } from './crsProjection';
+import { horizontalDefinition, crsToWgs84, wgs84ToCrs, linearUnitOf, cloudUnitsOf, isGeographicCrs, LINEAR_UNITS } from './crsProjection';
 import {
     WGS84_WKT, GEOCENTRIC_WKT, UTM_33N_WKT, UTM_33N_WKT2, COMPOUND_WKT, COMPOUND_WKT2, FOOT_WKT, US_FOOT_WKT, US_FOOT_WKT2,
     US_FOOT_COMPOUND_WKT, CUSTOM_TM_WKT, METRE_US_FOOT_HEIGHT_WKT, METRE_US_FOOT_HEIGHT_WKT2, US_FOOT_METRE_HEIGHT_WKT
@@ -131,5 +131,17 @@ describe('cloudUnitsOf', () => {
         expect(cloudUnitsOf(US_FOOT_COMPOUND_WKT)).toMatchObject({ mixed: false, vertical: LINEAR_UNITS.US_FOOT });
         expect(cloudUnitsOf(FOOT_WKT)).toMatchObject({ mixed: false, horizontal: LINEAR_UNITS.FOOT, vertical: LINEAR_UNITS.FOOT });
         expect(cloudUnitsOf(null)).toMatchObject({ mixed: false, metresPerAxis: [1, 1, 1] });
+    });
+});
+
+describe('isGeographicCrs', () => {
+    it('is true for a CRS in longitude and latitude, false for a projected or geocentric one, no CRS and one proj4 cannot read', () => {
+        expect(isGeographicCrs('EPSG:4326')).toBe(true);
+        expect(isGeographicCrs(WGS84_WKT)).toBe(true);
+        expect(isGeographicCrs(UTM_33N_WKT)).toBe(false);
+        expect(isGeographicCrs(US_FOOT_WKT)).toBe(false);
+        expect(isGeographicCrs(GEOCENTRIC_WKT)).toBe(false);
+        expect(isGeographicCrs(null)).toBe(false);
+        expect(isGeographicCrs('not a crs')).toBe(false);
     });
 });

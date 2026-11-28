@@ -9,11 +9,11 @@ export default class ShareApi {
     }
 
     /**
-     * Starts a share session (§7.1): the Registry creates the dataset `datasetName` in the organization `orgSlug` with
-     * `visibility` (a `Visibility` value; the Hub sends Private unless the user chose another, D-009) and derives its
+     * Starts a share session: the Registry creates the dataset `datasetName` in the organization `orgSlug` with
+     * `visibility` (a `Visibility` value; the Hub sends Private unless the user chose another) and derives its
      * slug from the name. Without a field the Registry decides (`ddb share`, older clients).
      * A refused name or visibility rejects with the ApiError of a 400 whose `errors` names the field
-     * (`errors.datasetName`, D-047).
+     * (`errors.datasetName`).
      * @param {{ orgSlug?: string, datasetName?: string, visibility?: number }} [target]
      * @returns {Promise<{ token: string }>}
      */
@@ -30,13 +30,18 @@ export default class ShareApi {
         return `${this.registry.url}/share/upload/${encodeURIComponent(token)}`;
     }
 
+    /** Absolute URL that lists the files the session has received. @param {string} token */
+    infoUrl(token) {
+        return `${this.registry.url}/share/info/${encodeURIComponent(token)}`;
+    }
+
     /** Ends the session. @param {string} token @returns {Promise<{ url: string }>} */
     commit(token) {
         return this.registry.makeRequest(`/share/commit/${encodeURIComponent(token)}`, 'POST');
     }
 
     /**
-     * Discards the session: the Registry removes its files and the dataset the session created (FR-UPL-01). The
+     * Discards the session: the Registry removes its files and the dataset the session created. The
      * step `cleanup` of the upload cancel on /upload.
      * @param {string} token
      */

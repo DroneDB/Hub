@@ -3,7 +3,7 @@ import { newId } from '@/libs/ids';
 import { RefSequence, choiceLabel, isAnnotationType } from '@/libs/map/annotationIds';
 import { DEFAULT_SCHEMA } from '@/libs/reports/reportSettings';
 import { controlButton, controlGroup } from './controlButton';
-import { isTypingTarget } from './typingTarget';
+import { isTypingTarget } from '@/libs/typingTarget';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Collection from 'ol/Collection';

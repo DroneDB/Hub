@@ -1,5 +1,5 @@
 <template>
-    <IconField class="search-field" :data-owns-escape="model ? '' : undefined" @keydown.esc="onEscape">
+    <IconField class="search-field" data-owns-enter :data-owns-escape="model ? '' : undefined" @keydown.esc="onEscape">
         <InputIcon class="fa-solid fa-magnifying-glass" />
         <InputText ref="input" v-model="model" :size="size" :placeholder="placeholder || label" :aria-label="label" autocomplete="off"
                    fluid @keyup.enter="$emit('enter', model)" />
@@ -10,8 +10,9 @@
 
 <script setup>
 /**
- * SearchField - the one search box of the Hub (FR-XC-20): the search icon, the field, and a
- * 'Clear search' button while the field is not empty. Escape empties the field (it is the field's key
+ * SearchField - the one search box of the Hub: the search icon, the field, and a
+ * 'Clear search' button while the field is not empty. Enter searches (`enter`): it is the field's, so a
+ * window around it does not confirm (HubWindow's data-owns-enter). Escape empties the field (it is the field's key
  * while there is text, so a dialog that holds it stays open: useOverlay's data-owns-escape; with
  * nothing to clear the key goes to the dialog as usual). Clearing, by the button or by Escape,
  * emits `clear` after the model is emptied and keeps the focus in the field. Escape is the key of the

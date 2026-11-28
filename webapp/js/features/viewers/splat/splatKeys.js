@@ -5,9 +5,8 @@
  * tour.
  */
 import { MOVE_KEYS } from './flyControls';
+import { isTypingTarget } from '@/libs/typingTarget';
 
-// Where a key belongs to the page: typing, or choosing in a control
-const EDITABLE = 'input, textarea, select';
 // A list the arrow keys scroll or move through
 const LIST = 'ul, ol, [role="listbox"], [role="menu"]';
 const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -32,7 +31,7 @@ export function keyAction(e, { loaded, dialogOpen, cameraCount }) {
     if (!loaded || dialogOpen || e.ctrlKey || e.metaKey || e.altKey) return null;
     const { code, target } = e;
     // Typing and choosing keep their keys
-    if (inside(target, EDITABLE) || (target instanceof Element && target.isContentEditable)) return null;
+    if (isTypingTarget(target)) return null;
     // The arrows belong to a list that scrolls
     if (ARROWS.includes(code) && inside(target, LIST)) return null;
 

@@ -10,7 +10,6 @@ import Feature from 'ol/Feature';
 import { LineString, Polygon } from 'ol/geom';
 import { fromLonLat } from 'ol/proj';
 import MeasureControls, { isDegenerateMeasurement } from './measureControl';
-import { isTypingTarget } from './typingTarget';
 import { _resetPrefListenersForTests } from '@/libs/preferences';
 
 let control;
@@ -68,18 +67,6 @@ describe('the keys of edit mode', () => {
         expect(undo).toHaveBeenCalledTimes(1);
         key(document.body, { key: 'Escape' });
         expect(control.isEditMode).toBe(false);
-    });
-});
-
-describe('isTypingTarget', () => {
-    it('is true inside a field, a select or an editable element, false elsewhere', () => {
-        const make = html => { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; };
-        expect(isTypingTarget(make('<input>'))).toBe(true);
-        expect(isTypingTarget(make('<div contenteditable="true"><span>x</span></div>').firstElementChild)).toBe(true);
-        expect(isTypingTarget(make('<select></select>'))).toBe(true);
-        expect(isTypingTarget(make('<button></button>'))).toBe(false);
-        expect(isTypingTarget(null)).toBe(false);
-        expect(isTypingTarget(document)).toBe(false);
     });
 });
 

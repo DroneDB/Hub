@@ -11,6 +11,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import emitter from '@/libs/eventBus';
+import { deletedPathsOf, deletedDatasetOf } from '@/libs/dataset/deletedEntries';
 import { getPref, setPref, PREF } from '@/libs/preferences';
 
 const SESSION = { session: true };
@@ -99,17 +100,6 @@ export const useClipboardStore = defineStore('clipboard', () => {
         if (items.value.length === 0) clear();
     }
 
-    /** The dataset the page shows (its address is /r/<organization>/<dataset>...), the one the entries of a deletion belong to. */
-    function datasetOnShow() {
-        const m = /^\/r\/([^/]+)\/([^/]+)/.exec(window.location.pathname);
-        if (!m) return null;
-        try {
-            return { orgSlug: decodeURIComponent(m[1]), dsSlug: decodeURIComponent(m[2]) };
-        } catch {
-            return null;
-        }
-    }
-
     // Restore (a corrupt or partial value starts empty)
     const saved = getPref(PREF.CLIPBOARD, null, SESSION);
     if (saved && (saved.mode === 'copy' || saved.mode === 'cut') && Array.isArray(saved.items) && saved.items.length > 0) {
@@ -126,12 +116,12 @@ export const useClipboardStore = defineStore('clipboard', () => {
     }, { deep: true });
 
     // deleteEntries carries the paths removed by any deletion (batch delete, transfer,
-    // cover replacement, rescan, ...).
-    // The event carries the paths only; the entries that left are those of the dataset on show.
+    // cover replacement, rescan, ...) and the dataset they left: only the clipboard of that dataset loses them, whatever
+    // page is on show when the deletion is told. An event that names no dataset is not the clipboard's.
     // lifetime: app (the store lives as long as the page)
-    emitter.on('deleteEntries', /** @param {unknown} paths */ paths => {
-        const here = datasetOnShow();
-        if (here) removePaths(/** @type {string[]} */ (paths), here);
+    emitter.on('deleteEntries', /** @param {unknown} event */ event => {
+        const dataset = deletedDatasetOf(event);
+        if (dataset) removePaths(deletedPathsOf(event), { orgSlug: dataset.org, dsSlug: dataset.ds });
     });
 
     return { mode, source, items, capturedAt, isEmpty, isCut, count, cutPaths, isCutAt, clear, copy, cut, removePaths };

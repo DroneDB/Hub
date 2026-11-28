@@ -22,12 +22,17 @@
  *
  * A 2D annotation is measured on its geometry (geodesic: libs/map/geodesicCore, the numbers of the map,
  * without the map library the model must not load);
- * a 3D one has the distance or the area it was saved with, in the unit of its point cloud's CRS.
+ * a 3D one on its points (`localCoordinates`), placed in the CRS of its point cloud's COPC and measured in its unit as
+ * the 3D viewer measures them (pointCloudMeasures): the values a file stores can be stale (a file of an older Hub
+ * labels feet as metres, a measure saved while the COPC was in degrees has a distance of 0). Only a measure without
+ * points, or one that cannot be placed in a CRS that measures lengths, keeps the values it was saved with.
  */
 import { lonLatLength, lonLatArea } from '@/libs/map/geodesicCore';
-import { VIEW, ownerOf } from '@/libs/map/measurementFormat';
+import { VIEW, ownerOf, savedPositions, sectionOf } from '@/libs/map/measurementFormat';
 import { isAnnotation } from '@/libs/map/annotationIds';
-import { LINEAR_UNITS } from '@/libs/map/crsProjection';
+import { LINEAR_UNITS, isGeographicCrs } from '@/libs/map/crsProjection';
+import { localPointsOf, srsDefinitionOf } from '@/libs/map/pointCloudGeometry';
+import { measureValues, measurementFrame } from '@/libs/map/potreeMeasurementConverter';
 
 /** @typedef {'point' | 'length' | 'area' | 'volume' | 'profile' | 'measure3d'} MeasurementKind */
 /** @typedef {'length' | 'area' | 'volume'} TotalKey */
@@ -143,7 +148,38 @@ function measuredFromGeometry(geometry) {
 }
 
 /**
- * What a 3D feature measures: the values it was saved with, converted from the unit of its cloud to metres.
+ * The values of the 3D measures of a measurements file, worked out from their points as the 3D viewer does: each
+ * feature's local coordinates are placed in the CRS of the point cloud's COPC (savedPositions: the file's CRS can be
+ * another, when the COPC was built again in UTM) and measured in its unit (measurementFrame). Without the COPC's CRS,
+ * the CRS the file states is the one measured in. A function from a feature to its values (the keys of its properties:
+ * `distance`, `area`, `unit`...), null for a feature that keeps the values it was saved with: one without local
+ * coordinates or with too few of them, one that cannot be placed, or any when the CRS to measure in is in degrees (a
+ * COPC not built again).
+ * @param {any} document  the file, read (measurementFormat)
+ * @param {any} [pointCloudCrs]  the SRS of the COPC of the file's point cloud, when it is known
+ * @returns {(feature: any) => Record<string, number | string> | null}
+ */
+export function pointCloudMeasures(document, pointCloudCrs = null) {
+    const crs = pointCloudCrs ?? sectionOf(document, VIEW.POINT_CLOUD).coordinateSystem ?? null;
+    const srs = srsDefinitionOf(crs);
+    if (srs && isGeographicCrs(srs)) return () => null;
+    const positionsOf = savedPositions(document, crs);
+    const frame = measurementFrame(srs);
+    return feature => {
+        const type = feature?.properties?.measurementType;
+        const points = localPointsOf(feature);
+        if (!Object.hasOwn(POINTS_TO_MEASURE, type) || !points || points.length < POINTS_TO_MEASURE[type]) return null;
+        const positions = positionsOf(feature);
+        return positions ? measureValues(type, positions, frame) : null;
+    };
+}
+
+// The points a 3D measure needs for its values (a line of one point has no length); a point or an annotation has none
+const POINTS_TO_MEASURE = Object.freeze(/** @type {Record<string, number>} */ ({ distance: 2, height: 2, area: 3, circle: 3, angle: 3 }));
+
+/**
+ * What a 3D feature measures: its values (pointCloudMeasures, or the ones it was saved with), converted from the unit of
+ * its cloud to metres.
  * @param {Record<string, any>} properties
  * @returns {Measured}
  */

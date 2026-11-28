@@ -155,7 +155,7 @@ describe('the map entries of the context menu', () => {
         expect(visible(compareTo)).toBe(true);
         expect(visible(compareInMap)).toBe(false);
         compareTo.click();
-        expect(window.open).toHaveBeenCalledWith(`/r/org/ds/view/${b64('flights/ortho.tif')}/map?pick=1`, '_blank', 'noopener');
+        expect(window.open).toHaveBeenCalledWith(`/r/org/ds/view/${encodeURIComponent(b64('flights/ortho.tif'))}/map?pick=1`, '_blank', 'noopener');
     });
 
     it('"Compare in Map" opens the first file with the others added in list order, in a new tab', () => {

@@ -63,6 +63,21 @@ export function copcDownloadNote(entry) {
 }
 
 /**
+ * The CRS the entry's COPC is in, as an SRS to measure and place in: the EPSG code its artifact states when the COPC was
+ * built in another CRS than the file (the UTM zone of a cloud in longitude and latitude), else the file's own CRS
+ * (`properties.projection`). Null when it cannot be told: a COPC built in another CRS whose artifact states no EPSG
+ * code, or a file with no CRS. For what reads no COPC (a report); a viewer reads the CRS from the COPC's header.
+ * @param {any} entry
+ * @returns {string | null}
+ */
+export function copcSrsOf(entry) {
+    const crs = copcCrsOf(entry);
+    if (crs?.transformed === true || REPROJECTED_STATUSES.has(entry?.properties?.crsStatus)) return crs?.epsg ? `EPSG:${crs.epsg}` : null;
+    const projection = entry?.properties?.projection;
+    return typeof projection === 'string' && projection.trim() ? projection : null;
+}
+
+/**
  * The CRS the coordinates of a measurements file were in when the file states none: the CRS of the COPC
  * when it was written. A COPC was always built in the CRS of its file before COPCs were built in UTM, so
  * for a COPC that is (or is about to be) built in another CRS it is the file's CRS (`properties.projection`),

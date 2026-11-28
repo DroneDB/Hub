@@ -195,6 +195,7 @@ import MeasurementListDialog from './MeasurementListDialog.vue';
 import MeasurementGroupDialog from '@/components/measurements/MeasurementGroupDialog.vue';
 import { onColorSchemeChange } from '@/libs/colorScheme';
 import { notify } from '@/libs/notify';
+import { isTypingTarget } from '@/libs/typingTarget';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
 
 // A layer added to a view is looked for this often, this long apart, until the map has drawn it
@@ -898,8 +899,7 @@ export default {
         // The shortcuts are the map's while the pointer or focus is on it, not while typing
         shortcutsFor: function (e) {
             const t = e && e.target;
-            const typing = t instanceof Element && (t.closest('input, textarea, select') || t.isContentEditable);
-            return (this.pointerInside || this.focusInside) && !typing;
+            return (this.pointerInside || this.focusInside) && !isTypingTarget(t);
         },
 
         shotStyleKey: function () {

@@ -91,6 +91,7 @@ import BuildManager from '@/libs/build/buildManager';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import { useDatasetBusy } from '@/composables/useDatasetBusy';
 import emitter from '@/libs/eventBus';
+import { deletedPathsOf } from '@/libs/dataset/deletedEntries';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError, needsConfirm, confirmMessage } from '@/libs/datasetDownloads';
 import { describeSelection, selectionSize } from '@/libs/dataset/selection';
 import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
@@ -534,7 +535,7 @@ async function reloadRoot() {
 const READMES = ['README.md'];
 const touchesReadme = paths => paths.some(path => READMES.includes(path));
 const onItemsAdded = items => { if (touchesReadme((items || []).map(i => i.entry?.path))) reloadRoot(); };
-const onEntriesDeleted = paths => { if (touchesReadme(paths || [])) reloadRoot(); };
+const onEntriesDeleted = event => { if (touchesReadme(deletedPathsOf(event))) reloadRoot(); };
 emitter.on('addItems', onItemsAdded);
 emitter.on('deleteEntries', onEntriesDeleted);
 onBeforeUnmount(() => {

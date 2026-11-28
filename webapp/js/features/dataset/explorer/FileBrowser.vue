@@ -48,6 +48,7 @@ import { runShortcut } from '@/libs/dataset/explorerActions';
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
+import { deletedPathsOf } from '@/libs/dataset/deletedEntries';
 import { useRequestScope, isAbort } from '@/composables/useRequestScope';
 import { useLatestOnly } from '@/composables/useLatestOnly';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
@@ -149,8 +150,8 @@ export default {
     },
     mounted: async function () {
         // Forget a deleted/moved node so the context menu doesn't offer actions for it.
-        this._onDeleteEntries = (deleted) => {
-            if (this.lastSelectedNode && isPathRemoved(this.lastSelectedNode.node.entry.path, deleted)) {
+        this._onDeleteEntries = event => {
+            if (this.lastSelectedNode && isPathRemoved(this.lastSelectedNode.node.entry.path, deletedPathsOf(event))) {
                 this.lastSelectedNode = null;
             }
         };

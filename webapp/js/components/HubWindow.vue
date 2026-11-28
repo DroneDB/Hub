@@ -26,8 +26,8 @@
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
  *   something else; never with `enterConfirms` false or `confirmDisabled`). That Enter is used up (default prevented).
  *   An Enter that something handled already, that comes from outside the dialog (the filter box of a Select list is
- *   appended to the body), or from a search box or a form that submits itself (`role="search"`, a SearchField, or
- *   `data-owns-enter`) is not the window's: it chooses, filters or searches, and does not confirm.
+ *   appended to the body), or from a search box or a form that submits itself (`role="search"`, or
+ *   `data-owns-enter`, as a SearchField has) is not the window's: it chooses, filters or searches, and does not confirm.
  * - `busy` disables closing and the footer buttons.
  * - A size: `size-class` (dialog-xs ... dialog-xl, dialog-log, dialog-wide) gives the window a stable width, the same
  *   whatever its content; a form dialog uses `dialog-xl`, a log `dialog-log`, a chart or a two-column form `dialog-wide`.
@@ -123,7 +123,7 @@ const NOT_FOR_ENTER = 'button, a, textarea, select, [role="button"], [role="menu
 // that submits itself), one from outside the dialog element (the filter and the list of a Select, which PrimeVue appends
 // to the body, or the page behind a window that is not modal; the body itself means that nothing has the focus), and
 // one from a field that owns it: a search box or a form that submits itself
-const OWNS_ENTER = '[role="search"], .search-field, [data-owns-enter]';
+const OWNS_ENTER = '[role="search"], [data-owns-enter]';
 const leavesEnterAlone = e => {
     if (e.defaultPrevented) return true;
     const target = e.target;

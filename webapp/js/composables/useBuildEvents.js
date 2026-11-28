@@ -13,6 +13,7 @@ import taskMonitor from '@/libs/tasks/taskMonitor';
 import reg from '@/libs/api/sharedRegistry';
 import { toolTitle } from '@/libs/tasks/taskFormat';
 import { isActiveState } from '@/libs/tasks/taskStates';
+import { isSameDataset } from '@/libs/build/datasetIdentity';
 import { notify } from '@/libs/notify';
 import { useTimerGroup } from '@/composables/useTimers';
 
@@ -125,7 +126,7 @@ export function useBuildEvents() {
     const onStarted = data => notify.info(`Build started for ${fileNameOf(data)}`, { summary: 'Build Started' });
     const onError = data => showError(data.error, 'Build Error');
     const onNewBuildable = data => {
-        if (data.dataset !== getDataset()) return;
+        if (!isSameDataset(data.dataset, getDataset())) return;
         const n = data.filePaths.length;
         notify.info(`${n} buildable file${n > 1 ? 's' : ''} detected - processing in background`, { summary: 'Buildable Files Detected' });
     };

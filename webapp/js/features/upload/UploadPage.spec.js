@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
         share: {
             init: vi.fn(),
             uploadUrl: vi.fn(token => `http://reg.test/share/upload/${token}`),
+            infoUrl: vi.fn(token => `http://reg.test/share/info/${token}`),
             commit: vi.fn(),
             rollback: vi.fn()
         }

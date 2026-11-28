@@ -22,6 +22,7 @@ import { requestMove } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import ddb from 'ddb';
 import { isPathRemoved, nearestKnownChain } from './treeSelection';
+import { deletedPathsOf } from '@/libs/dataset/deletedEntries';
 import { useDragDrop } from '@/composables/useDragDrop';
 const { pathutils } = ddb;
 
@@ -80,7 +81,8 @@ export default {
 
         // Drop deleted/moved nodes (and their descendants) from the selection,
         // so later actions don't target entries that no longer exist.
-        this._onDeleteEntries = (deleted) => {
+        this._onDeleteEntries = event => {
+            const deleted = deletedPathsOf(event);
             const removed = n => isPathRemoved(n.node.entry.path, deleted);
             this.selectedNodes = this.selectedNodes.filter(n => !removed(n));
             if (this.rangeStartNode && removed(this.rangeStartNode)) this.rangeStartNode = null;
