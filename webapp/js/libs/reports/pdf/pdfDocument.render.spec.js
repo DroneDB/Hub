@@ -179,6 +179,43 @@ describe('the volumes table of a portrait page', () => {
         }
     }, 120000);
 
+    // Figures in the millions in every column: the five figures and a two-word status were wider than a portrait page, so
+    // the status ended beyond the margin. A one-word name is the widest word of the column that takes the rest of the width.
+    it('has its last column on the page and every header and value written whole for figures in the millions, on A4 and Letter, in English, French and German', async () => {
+        const features = [pile({
+            name: 'Northpiles', cutVolume: 1234567.89, fillVolume: 1234567.89, netVolume: 1234567.89,
+            weightEstimate: { tons: 2100000.84, basedOn: 'netVolume' }, costEstimate: { amount: 25000000, currency: 'EUR' }
+        })];
+        /** A text with no space of any kind and no break opportunity: a cell that wrapped reads as the one it was */
+        const squeezed = text => text.replace(/[\s\u00a0\u200b]/g, '');
+        for (const locale of ['en-US', 'fr-FR', 'de-DE']) {
+            const language = vi.spyOn(navigator, 'language', 'get').mockReturnValue(locale);
+            try {
+                for (const paper of ['A4', 'Letter']) {
+                    const model = pdfModel({ features, templateExtra: { paper, orientation: 'portrait' } });
+                    const volumes = model.sections.flatMap(s => s.blocks).find(b => b.type === 'table' && b.columns.some(c => c.key === 'cut'));
+                    const laid = await laidOut(model, fullAssets(model));
+                    expect(names(pastMargin(laid)), `${locale} ${paper}`).toEqual([]);
+                    // The runs of the table, in the order they are laid out (the lines of a cell follow each other), up to the
+                    // title of the next table, the punch list, which repeats the category and the status
+                    const first = laid.runs.findIndex(run => run.text.trim() === volumes.title);
+                    const next = laid.runs.findIndex((run, i) => i > first && run.text.trim() === 'Punch');
+                    const runs = laid.runs.slice(first + 1, next < 0 ? undefined : next);
+                    const written = squeezed(runs.map(run => run.text).join(''));
+                    const texts = [...volumes.columns.map(c => c.label), ...volumes.columns.map(c => volumes.rows[0].cells[c.key] ?? '')];
+                    expect(texts).toEqual(expect.arrayContaining(['Cut', 'Status', volumes.rows[0].cells.cut, volumes.rows[0].cells.cost]));
+                    for (const text of texts) expect(written, `${locale} ${paper}: ${text}`).toContain(squeezed(text));
+                    // A word is never cut in two: every one-word header and the name are one run each
+                    for (const word of [...volumes.columns.map(c => c.label).filter(label => !label.includes(' ')), 'Northpiles']) {
+                        expect(runs.some(run => run.text.trim() === word), `${locale} ${paper}: ${word}`).toBe(true);
+                    }
+                }
+            } finally {
+                language.mockRestore();
+            }
+        }
+    }, 240000);
+
     it('has a long unbroken assignee and a long word of a description wrap on the item page', async () => {
         const word = 'Northquarrybenchstockpile'.repeat(6).slice(0, 140);
         const point = mapFeature('p1', '1', 'point', { type: 'Point', coordinates: [9.2, 45.1] }, { name: 'Gate', description: `See ${word} now`, category: 'observation', status: 'open', assignee: word });

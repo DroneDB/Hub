@@ -13,6 +13,7 @@ import { softBadge } from '@/libs/reports/reportStyling';
 import { qrSvg } from '@/libs/qr';
 import { isOriginUrl } from '@/libs/originUrl';
 import { MISSING_PHOTO, figureCaption } from '@/libs/reports/reportSections';
+import { pdfText } from '@/libs/reports/pdf/pdfText';
 
 export { INK, MUTED };
 
@@ -208,15 +209,62 @@ export function kpiTiles(block, ctx, { perRow, width } = {}) {
 
 /** The columns of a table whose cells stay on one line */
 const NEVER_WRAPPED = new Set(['ref', 'type']);
+/** The column of a table that takes the width the others leave */
+const REST_COLUMN = 'name';
+
+/** A word of a text with the places after it where a line may break: spaces, zero-width spaces, hyphens, slashes */
+const WORD = /[^ \u200b\-/]+[ \u200b\-/]*|[ \u200b\-/]+/g;
+
+/**
+ * A text as one run for each word, which the library never cuts. The column that takes the rest of the width is never
+ * narrower than its widest word, but the library finds that width by subtractions, which can leave it a rounding error
+ * short, and it then cuts the word in two ("Nam" over "e"). A run that does not wrap is never cut, and a line still
+ * breaks between two runs. The text is the font's first (pdfText), so that a long run of characters with no break has its
+ * break opportunities before it becomes runs; a text of several lines stays as it is.
+ * @param {string} text
+ * @returns {string | { text: string, noWrap: true }[]}
+ */
+function uncutWords(text) {
+    if (text.includes('\n')) return text;
+    const words = pdfText(text).match(WORD);
+    return words ? words.map(word => ({ text: word, noWrap: true })) : text;
+}
+
+/** A sign between two digits of a figure: a group separator or the decimal sign */
+const BETWEEN_DIGITS = /(\p{Nd})(\P{Nd})(?=\p{Nd})/gu;
+/** A space after a digit: the one between a figure and its unit */
+const DIGIT_SPACE = /(\p{Nd}) /gu;
+
+/**
+ * A figure that may also wrap between its groups of digits: a zero-width space after each group separator. The group
+ * separator is the sign that the figure has between digits twice or more (the decimal sign is there once at most), so
+ * a figure in the millions or more gets the breaks, in the separator of any locale (",", ".", a no-break space, an
+ * apostrophe), and a smaller one, which fits its column, stays as it is.
+ * @param {string} text
+ */
+function breakableFigure(text) {
+    /** @type {Map<string, number>} */
+    const counts = new Map();
+    for (const [, , sign] of text.matchAll(BETWEEN_DIGITS)) counts.set(sign, (counts.get(sign) ?? 0) + 1);
+    const groups = new Set([...counts].filter(([, count]) => count > 1).map(([sign]) => sign));
+    if (!groups.size) return text;
+    // The unit stays with the last group: a second line of "567.89 m³" rather than a third of "m³" alone
+    return text.replace(BETWEEN_DIGITS, (match, digit, sign) => (groups.has(sign) ? `${digit}${sign}\u200b` : match)).replace(DIGIT_SPACE, '$1\u00a0');
+}
 
 /** @param {any} block @param {BlockContext} ctx */
 function table(block, ctx) {
     const align = (/** @type {string} */ a) => (a === 'right' ? 'right' : 'left');
-    const header = block.columns.map((/** @type {any} */ c) => ({ text: c.label, style: 'tableHeader', color: textOn(ctx.colours.primary), alignment: align(c.align) }));
+    const portrait = ctx.layout.pageOrientation === 'portrait';
+    const header = block.columns.map((/** @type {any} */ c) => ({ text: c.key === REST_COLUMN ? uncutWords(c.label) : c.label, style: 'tableHeader', color: textOn(ctx.colours.primary), alignment: align(c.align) }));
     const body = block.rows.map((/** @type {any} */ row) => block.columns.map((/** @type {any} */ column, /** @type {number} */ index) => {
-        const text = row.cells[column.key] ?? '';
+        const value = row.cells[column.key] ?? '';
+        // A figure of a portrait page may wrap between its groups of digits too: five figures in the millions and the
+        // columns beside them are wider than the page, though each would fit with its unit on a second line
+        const text = portrait && column.align === 'right' ? breakableFigure(value) : value;
         const note = row.note && column.key === 'name' ? ` (${row.note})` : '';
-        const cell = /** @type {Record<string, any>} */ ({ text: `${text}${note}`, style: 'tableCell', alignment: align(column.align) });
+        const written = `${text}${note}`;
+        const cell = /** @type {Record<string, any>} */ ({ text: column.key === REST_COLUMN ? uncutWords(written) : written, style: 'tableCell', alignment: align(column.align) });
         // A reference and a type stay on one line (they are short); every other cell wraps where its text can break, so that
         // a long name, material or status never pushes the last column off the page, and a figure goes to a second line at
         // its unit when the page is narrow
@@ -237,7 +285,7 @@ function table(block, ctx) {
     return [
         { text: block.title, style: 'tableTitle', color: ctx.colours.primary },
         {
-            table: { headerRows: 1, dontBreakRows: true, widths: block.columns.map((/** @type {any} */ c) => (c.key === 'name' ? '*' : 'auto')), body: [header, ...body] },
+            table: { headerRows: 1, dontBreakRows: true, widths: block.columns.map((/** @type {any} */ c) => (c.key === REST_COLUMN ? '*' : 'auto')), body: [header, ...body] },
             layout: {
                 hLineWidth: (/** @type {number} */ i, /** @type {any} */ node) => (i === 0 || i === 1 || i === node.table.body.length ? 0 : 0.5),
                 vLineWidth: () => 0,
