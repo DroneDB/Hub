@@ -12,6 +12,7 @@ import { loadFeaturesAndBranding } from '@/libs/hubBranding';
 import { loginLocation, SIGNED_OUT_TEXT } from '@/libs/authRoutes';
 import { currentPath } from '@/libs/routeQuery';
 import { notify } from '@/libs/notify';
+import { clearXAuthSignedOut } from '@/libs/api/xauth';
 
 export const useAuthStore = defineStore('auth', () => {
     const username = ref(reg.getUsername() || '');
@@ -26,9 +27,25 @@ export const useAuthStore = defineStore('auth', () => {
         isAdmin.value = isLoggedIn.value && reg.isAdmin();
     }
 
+    /** The loads, one after the other: the answer of an earlier one (a sign-out's) cannot overwrite the flags of a later one (a sign-in's). */
+    let featuresQueue = Promise.resolve();
+
+    /** Loads the flags (and the branding) of the session as it is now. */
+    function refreshFeatures() {
+        const run = featuresQueue
+            .then(() => loadFeaturesAndBranding(reg))
+            .finally(() => { featuresVersion.value++; });
+        featuresQueue = run.then(() => { }, () => { });
+        return run;
+    }
+
     // lifetime: app (the store lives as long as the page)
     reg.addEventListener('login', sync);
-    reg.addEventListener('logout', sync);
+    // A sign-out empties the feature flags (they were the user's): anonymous browsing reads the anonymous ones
+    reg.addEventListener('logout', () => {
+        sync();
+        void refreshFeatures().catch(() => { });
+    });
 
     /** @type {import('vue-router').Router | null} */
     let router = null;
@@ -54,27 +71,22 @@ export const useAuthStore = defineStore('auth', () => {
         sync();
         if (wasLoggedIn && !isLoggedIn.value) {
             notify.info(SIGNED_OUT_TEXT, { summary: 'Signed out', life: 'long', action: { label: 'Sign in', run: signIn } });
+            void refreshFeatures().catch(() => { });
         }
     }
     // lifetime: app (the store lives as long as the page)
     if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);
 
-    async function refreshFeatures() {
-        try {
-            await loadFeaturesAndBranding(reg);
-        } finally {
-            featuresVersion.value++;
-        }
-    }
-
     /**
-     * Sign in and load the user's feature flags.
-     * @param {string} user
-     * @param {string} password
+     * Sign in and load the user's feature flags. Credentials typed by the user are an explicit sign-in: the website's
+     * single sign-on may sign them in again after a later sign-out (libs/api/xauth.js).
+     * @param {string|null} user
+     * @param {string|null} password
      * @param {string|null} [xAuthToken]
      */
     async function login(user, password, xAuthToken = null) {
         await reg.login(user, password, xAuthToken);
+        if (!xAuthToken) clearXAuthSignedOut();
         sync();
         await refreshFeatures();
     }

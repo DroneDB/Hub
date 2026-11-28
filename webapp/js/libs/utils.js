@@ -4,15 +4,30 @@ export function setTitle(title) {
     document.title = `${title} - ${HubOptions.appName || "DroneDB"}`;
 }
 
+/** decodeURIComponent that keeps the text as it is when it is not valid percent-encoding (a raw `%` in a value). @param {string} text */
+function decodeCookiePart(text) {
+    try {
+        return decodeURIComponent(text);
+    } catch {
+        return text;
+    }
+}
+
+/**
+ * The value of cookie `key`, decoded. A pair is cut at its FIRST `=` only: a value may hold more (a URL
+ * with a query string), and so may the encoded form of one a server wrote with `setcookie`.
+ * @param {string} key
+ * @returns {string|undefined}
+ */
 export function getCookie(key) {
     const cobj = document.cookie
         .split(';')
         .filter(v => v.includes('='))
-        .map(v => v.split('='))
-        .reduce((acc, v) => {
-            acc[decodeURIComponent(v[0].trim())] = decodeURIComponent((v[1] || '').trim());
+        .reduce((acc, pair) => {
+            const at = pair.indexOf('=');
+            acc[decodeCookiePart(pair.slice(0, at).trim())] = decodeCookiePart(pair.slice(at + 1).trim());
             return acc;
-        }, {});
+        }, /** @type {Record<string, string>} */ ({}));
     return cobj[key];
 }
 

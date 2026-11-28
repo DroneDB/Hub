@@ -50,6 +50,26 @@ describe('getCookie', () => {
     it('returns undefined for missing key', () => {
         expect(getCookie('nonexistent')).toBeUndefined();
     });
+
+    describe('a value with `=` and `&` in it (the website\'s cookie)', () => {
+        const LOGOUT = 'https://dronedb.app/wp-login.php?action=logout&_wpnonce=abc';
+        afterEach(() => { document.cookie = 'xAuthToken=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT'; });
+
+        it('comes back whole when PHP setcookie wrote it (URL-encoded)', () => {
+            document.cookie = `xAuthToken=${encodeURIComponent(`tok123|${LOGOUT}`)};path=/`;
+            expect(getCookie('xAuthToken')).toBe(`tok123|${LOGOUT}`);
+        });
+
+        it('is cut at the first `=` of the pair only, so a raw value keeps its own', () => {
+            document.cookie = `xAuthToken=tok123|${LOGOUT};path=/`;
+            expect(getCookie('xAuthToken')).toBe(`tok123|${LOGOUT}`);
+        });
+
+        it('keeps a value that is not valid percent-encoding as it is', () => {
+            document.cookie = 'xAuthToken=50%off;path=/';
+            expect(getCookie('xAuthToken')).toBe('50%off');
+        });
+    });
 });
 
 describe('queryParams', () => {

@@ -221,3 +221,86 @@ describe('AuthSession: a refused token refresh ends the session', () => {
         expect(reg.getAuthToken()).toBe('x.e30.y');
     });
 });
+
+describe('AuthSession: a refresh that answers after the session changed', () => {
+    beforeEach(() => localStorage.clear());
+
+    const bobToken = 'x.eyJzdWIiOiJib2IifQ.y';
+    const answer = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+    /** fetch that holds the refresh request until `release(response)`; every other request is answered 200 at once. */
+    const holdRefresh = () => {
+        let release;
+        vi.spyOn(globalThis, 'fetch').mockImplementation(url => {
+            if (String(url).endsWith('/users/authenticate/refresh')) return new Promise(resolve => { release = resolve; });
+            if (String(url).endsWith('/users/authenticate')) return Promise.resolve(answer({ token: bobToken, username: 'bob', expires: Math.floor(Date.now() / 1000) + 3600 }));
+            return Promise.resolve(new Response(null, { status: 200 }));
+        });
+        return response => release(response);
+    };
+
+    it('does not sign the user back in after a sign-out', async () => {
+        const reg = signedIn('http://refresh.test');
+        const release = holdRefresh();
+        const onLogin = vi.fn();
+        reg.addEventListener('login', onLogin);
+
+        const refreshing = reg.refreshToken();
+        const outcome = refreshing.catch(e => e);
+        await Promise.resolve();
+        reg.logout();
+        release(answer({ token: 'x.e30.old', expires: Math.floor(Date.now() / 1000) + 3600 }));
+
+        expect((await outcome).message).toBe('logged out');
+        expect(reg.getAuthToken()).toBe(null);
+        expect(reg.getUsername()).toBe(null);
+        expect(localStorage.getItem('http://refresh.test_jwt_token')).toBe(null);
+    });
+
+    it('does not store the old user\'s token under the next user', async () => {
+        const reg = signedIn('http://refresh.test');
+        const release = holdRefresh();
+
+        const outcome = reg.refreshToken().catch(e => e);
+        await Promise.resolve();
+        reg.logout();
+        await reg.login('bob', 'pw');
+        release(answer({ token: 'x.e30.ann-refreshed', expires: Math.floor(Date.now() / 1000) + 3600 }));
+
+        expect((await outcome).message).toBe('logged out');
+        expect(reg.getUsername()).toBe('bob');
+        expect(reg.getAuthToken()).toBe(bobToken);
+    });
+
+    it('a refusal that arrives after the sign-out does not end the next user\'s session', async () => {
+        const reg = signedIn('http://refresh.test');
+        const release = holdRefresh();
+        const onLogout = vi.fn();
+        reg.addEventListener('logout', onLogout);
+        const unauthorized = vi.fn();
+        reg.onUnauthorized(unauthorized);
+
+        const outcome = reg.refreshToken().catch(e => e);
+        await Promise.resolve();
+        reg.logout();
+        await reg.login('bob', 'pw');
+        onLogout.mockClear();
+        release(answer({ title: 'Unauthorized' }, 401));
+
+        expect((await outcome).message).toBe('logged out');
+        expect(unauthorized).not.toHaveBeenCalled();
+        expect(onLogout).not.toHaveBeenCalled();
+        expect(reg.getUsername()).toBe('bob');
+    });
+
+    it('still renews the token of a session that did not change', async () => {
+        const reg = signedIn('http://refresh.test');
+        const release = holdRefresh();
+        const refreshing = reg.refreshToken();
+        await Promise.resolve();
+        release(answer({ token: 'x.e30.renewed', expires: Math.floor(Date.now() / 1000) + 7200 }));
+        await refreshing;
+        expect(reg.getAuthToken()).toBe('x.e30.renewed');
+        expect(reg.getUsername()).toBe('ann');
+    });
+});

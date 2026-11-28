@@ -7,17 +7,19 @@ const forbidden = () => Promise.reject(Object.assign(new Error('Only administrat
 
 const h = vi.hoisted(() => ({ reg: {} }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: h.reg }));
-vi.mock('@/libs/api/xauth', () => ({ xAuthLogout: vi.fn() }));
 
 const { default: AccountPage } = await import('./AccountPage.vue');
+const { xAuthAvailable, clearXAuthSignedOut } = await import('@/libs/api/xauth');
 
 let wrapper;
+let push;
 async function render() {
+    push = vi.fn(() => Promise.resolve());
     wrapper = mount(AccountPage, {
         global: {
             plugins: [PrimeVue],
             stubs: { UploadDiagnostics: true, ChangePwdDialog: true },
-            mocks: { $router: { push: vi.fn(() => Promise.resolve()) } }
+            mocks: { $router: { push } }
         }
     });
     await flushPromises();
@@ -49,6 +51,68 @@ beforeEach(() => {
 afterEach(() => {
     wrapper?.unmount();
     wrapper = null;
+});
+
+describe('AccountPage: the quota request fails', () => {
+    beforeEach(() => signIn({ admin: false }));
+
+    it('says the usage is not available, not "0 B used" and "Unlimited"; the profile still shows', async () => {
+        h.reg.storageInfo = vi.fn(() => Promise.reject(new Error('Storage is down')));
+        await render();
+        expect(wrapper.text()).toContain('Storage usage is not available');
+        expect(wrapper.text()).not.toContain('Unlimited');
+        expect(wrapper.text()).not.toContain('0 B used');
+        expect(item('Email')).toBe('docsdemo@example.com');
+        expect(wrapper.text()).toContain('Storage is down');
+    });
+
+    it('a failed profile request does not hide the usage', async () => {
+        h.reg.currentUser = vi.fn(() => Promise.reject(new Error('Profile is down')));
+        await render();
+        expect(wrapper.text()).toContain('3 MB used');
+        expect(wrapper.text()).toContain('Profile is down');
+    });
+});
+
+describe('AccountPage: Logout with the website\'s cookie', () => {
+    const LOGOUT_URL = 'https://dronedb.app/wp-login.php?action=logout&_wpnonce=abc';
+    let frames;
+    beforeEach(() => {
+        signIn({ admin: false });
+        h.reg.logout = vi.fn();
+        localStorage.clear();
+        document.cookie = `xAuthToken=${encodeURIComponent(`unused-token|${LOGOUT_URL}`)};path=/`;
+        frames = [];
+        const append = document.body.append.bind(document.body);
+        vi.spyOn(document.body, 'append').mockImplementation((...nodes) => {
+            frames.push(...nodes.filter(n => n?.tagName === 'IFRAME'));
+            const rest = nodes.filter(n => n?.tagName !== 'IFRAME');
+            if (rest.length) append(...rest);
+        });
+    });
+    afterEach(() => {
+        document.cookie = 'xAuthToken=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        clearXAuthSignedOut();
+        vi.restoreAllMocks();
+    });
+
+    it('ends signed out when Login shows: an unused token in the cookie cannot sign in again', async () => {
+        await render();
+        let availableAtLogin;
+        push.mockImplementation(() => { availableAtLogin = xAuthAvailable(); return Promise.resolve(); });
+        const logout = wrapper.findAll('.account-card button').find(b => b.text().includes('Logout'));
+        await logout.trigger('click');
+        await flushPromises();
+        expect(h.reg.logout).toHaveBeenCalledTimes(1);
+        expect(push).toHaveBeenCalledTimes(1);
+        expect(availableAtLogin).toBe(false);
+        expect(frames.map(f => f.src)).toEqual([LOGOUT_URL]);
+        frames.forEach(f => f.onload());
+        await flushPromises();
+        // The website's session writes a new token: still signed out
+        document.cookie = `xAuthToken=${encodeURIComponent(`fresh-token|${LOGOUT_URL}`)};path=/`;
+        expect(xAuthAvailable()).toBe(false);
+    });
 });
 
 describe.each([

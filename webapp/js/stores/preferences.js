@@ -11,6 +11,11 @@
  *    server merges field by field (MERGED_SECTIONS): only the fields that changed are sent, so a
  *    device with a stale copy of the other fields cannot overwrite what another device saved.
  *
+ * The local values of the synced keys belong to the account that last had a session on this device (OWNER_KEY): when
+ * another account starts one, they are removed first, so that its first sign-in neither shows nor sends the previous
+ * user's settings (a custom basemap with its access token, the stockpile prices). The values that only the device keeps
+ * and that are the user's own (the splat views they set up) go when the session ends.
+ *
  * The store is the only subscriber to the login state of the sync; it does not subscribe to
  * the client's events (the auth store does).
  */
@@ -18,10 +23,13 @@ import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
 import { useAuthStore } from '@/stores/auth';
+import { useClipboardStore } from '@/stores/clipboard';
 import { useNotify } from '@/composables/useNotify';
-import { ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF, RENAMED_PREFS, applyAccountValue, getPref, onPrefChange, removePref } from '@/libs/preferences';
+import { ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF, RENAMED_PREFS, applyAccountValue, getPref, onPrefChange, removePref, safeStorage } from '@/libs/preferences';
 
 const ENDPOINT = '/users/preferences';
+/** The device's record of whose the synced local values are (the user name of the last session). */
+const OWNER_KEY = 'accountPrefsOwner';
 const SAVE_DELAY_MS = 600;
 
 /** Section name -> its keys and the field each has in the section. @type {Map<string, { key: string, field: string }[]>} */
@@ -108,6 +116,22 @@ const buildBody = pending => Object.fromEntries([...pending].map(([name, only]) 
 /** @param {unknown} e */
 const isConflict = e => !!e && typeof e === 'object' && /** @type {any} */ (e).status === 409;
 
+/** The Registry has no such route (an older one): there is nothing to sync with, which is not a failure to warn about. @param {unknown} e */
+const isMissingRoute = e => !!e && typeof e === 'object' && [404, 405].includes(/** @type {any} */ (e).status);
+
+/**
+ * The synced local values stay with the account they were synced with: another account that signs in on this
+ * device starts without them. Records `user` as their owner.
+ * @param {string} user
+ */
+function adoptDevice(user) {
+    const owner = safeStorage.getItem(OWNER_KEY);
+    if (owner !== null && owner !== user) {
+        for (const key of Object.keys(ACCOUNT_SECTIONS)) removePref(key);
+    }
+    safeStorage.setItem(OWNER_KEY, user);
+}
+
 export const usePreferencesStore = defineStore('preferences', () => {
     const auth = useAuthStore();
     const notify = useNotify();
@@ -125,6 +149,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
     let loading = false;
     let sending = false;
     let warned = false;
+    /** The Registry answered that it has no preferences route: the sync is off for the page's lifetime. */
+    let unsupported = false;
     /** @type {Promise<void>|null} */
     let loadRunning = null;
     /** @type {(() => void)|null} */
@@ -137,7 +163,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
     /** @param {string} name @param {string} [field] the changed field; the whole section when not given */
     function markSection(name, field) {
-        if (!auth.isLoggedIn || !SECTIONS.has(name)) return;
+        if (unsupported || !auth.isLoggedIn || !SECTIONS.has(name)) return;
         addPending(dirty, name, field);
         if (!loading) status.value = 'saving';
         clearTimer();
@@ -160,6 +186,16 @@ export const usePreferencesStore = defineStore('preferences', () => {
         }
     }
 
+    /** The Registry has no preferences route: nothing is synced, nothing is pending, nothing is said. @returns {false} */
+    function switchOff() {
+        unsupported = true;
+        clearTimer();
+        dirty.clear();
+        inFlight.clear();
+        status.value = 'idle';
+        return false;
+    }
+
     /**
      * Reads the account and applies it to the fields that are not dirty or being sent (those
      * hold a newer local change; a whole section for the sections the server replaces whole, a field for the
@@ -179,6 +215,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
         } catch (e) {
             if (sessionId !== session) return false;
             loading = false;
+            if (isMissingRoute(e)) return switchOff();
             fail(e);
             return false;
         }
@@ -222,6 +259,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
                     await reg.patchRequest(ENDPOINT, buildBody(batch), { invalidate: ENDPOINT });
                 } catch (e) {
                     if (sessionId !== session) return;
+                    if (isMissingRoute(e)) {
+                        switchOff();
+                        return;
+                    }
                     inFlight.clear();
                     for (const [name, fields] of batch) {
                         if (fields === null) addPending(dirty, name);
@@ -254,7 +295,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
     /** Reads the account's preferences and reconciles (see fetchAndApply), then sends what is pending. */
     function load() {
-        if (!auth.isLoggedIn) return Promise.resolve();
+        if (unsupported || !auth.isLoggedIn) return Promise.resolve();
         loadRunning ??= (async () => {
             const sessionId = session;
             try {
@@ -300,10 +341,16 @@ export const usePreferencesStore = defineStore('preferences', () => {
         for (const name of SECTIONS.keys()) resetSection(name);
     }
 
-    // A new session starts for every login and every change of user
-    watch(() => (auth.isLoggedIn ? `user:${auth.username}` : ''), who => {
+    // A new session starts for every login and every change of user; a session that ended takes the user's device-only data
+    watch(() => (auth.isLoggedIn ? `user:${auth.username}` : ''), (who, before) => {
         stop();
-        if (who) void start();
+        if (who) {
+            adoptDevice(auth.username);
+            void start();
+        } else if (before) {
+            removePref(PREF.SPLAT_VIEW_SETTINGS);
+            useClipboardStore().clear();
+        }
     }, { immediate: true });
 
     return { status, sections: [...SECTIONS.keys()], load, resetSection, resetAll };

@@ -39,6 +39,9 @@ export default class AuthSession {
     constructor(registry) {
         this.registry = registry;
         this._refreshPromise = null;
+        // Counts the sessions: bumped when the credentials are cleared and when a sign-in starts a new one, so that the
+        // answer of a request made for an earlier session is recognised
+        this._epoch = 0;
     }
 
     // Login
@@ -55,6 +58,7 @@ export default class AuthSession {
                 // A server-set (HttpOnly) cookie of the previous user would silently win over the
                 // one setCredentials writes: have it expired first
                 await this.expireServerCookie();
+                this._epoch++;
                 this.setCredentials(res.username, res.token, res.expires);
                 this.setAutoRefreshToken();
                 this.registry.emit("login", res.username);
@@ -105,8 +109,13 @@ export default class AuthSession {
     }
 
     async _doRefreshToken() {
+        // The answer belongs to the session that asked: one that signed out, or was replaced by another user's, meanwhile
+        // must not be signed in again, nor have its token stored for the next user, nor be ended by a refusal
+        const epoch = this._epoch;
+        const ended = () => epoch !== this._epoch;
         try {
             const res = await this.registry.postRequest('/users/authenticate/refresh');
+            if (ended()) throw new Error("logged out");
 
             if (res.token) {
                 this.setCredentials(this._getUsernameFromStorage(), res.token, res.expires);
@@ -114,6 +123,7 @@ export default class AuthSession {
                 throwError(res.error || "Cannot refresh token: Invalid response", res.status || 400);
             }
         } catch (error) {
+            if (ended()) throw new Error("logged out", { cause: error });
             if (error.status === 401) {
                 this.endRefusedSession(error);
                 throw new Error("logged out", { cause: error });
@@ -253,6 +263,7 @@ export default class AuthSession {
     }
 
     clearCredentials() {
+        this._epoch++;
         this.registry.invalidateCache();
         storage.removeItem(`${this.registry.url}_jwt_token`);
         storage.removeItem(`${this.registry.url}_jwt_token_expires`);

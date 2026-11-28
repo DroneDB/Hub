@@ -4,7 +4,9 @@
  *
  * Holds the selection captured by Ctrl+C / Ctrl+X / the context menu, and persists it in
  * sessionStorage so it survives a refresh but not closing the tab (like a file manager).
- * Clipboard state only: pasting lives in usePasteStrategy + useDatasetClipboard.
+ * Clipboard state only: pasting lives in usePasteStrategy + useDatasetClipboard. It is the signed-in user's: the
+ * preferences store, which follows the session, empties it (`clear`) when the session ends, so the next user of the
+ * tab does not find (or paste) it.
  */
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
@@ -82,12 +84,30 @@ export const useClipboardStore = defineStore('clipboard', () => {
     /** @param {ClipboardSource|null} src @param {Array<object>} files */
     const cut = (src, files) => capture('cut', src, files);
 
-    /** Drop deleted entries; an emptied clipboard resets so the panel disappears. @param {string[]} paths */
-    function removePaths(paths) {
+    /**
+     * Drop entries that left their dataset: the paths themselves and what was under them (a deleted folder takes its
+     * files); an emptied clipboard resets so the panel disappears. A deletion in `within` concerns the clipboard only
+     * when it was copied from that dataset (the same path of another dataset is another file).
+     * @param {string[]} paths
+     * @param {{ orgSlug: string, dsSlug: string }|null} [within]  the dataset the paths are of; any when not given
+     */
+    function removePaths(paths, within = null) {
         if (!paths || paths.length === 0 || items.value.length === 0) return;
-        const deleted = new Set(paths);
-        items.value = items.value.filter(it => !deleted.has(it.path));
+        if (within && (source.value?.orgSlug !== within.orgSlug || source.value?.dsSlug !== within.dsSlug)) return;
+        const gone = (/** @type {string} */ path) => paths.some(p => path === p || path.startsWith(`${p}/`));
+        items.value = items.value.filter(it => !gone(it.path));
         if (items.value.length === 0) clear();
+    }
+
+    /** The dataset the page shows (its address is /r/<organization>/<dataset>...), the one the entries of a deletion belong to. */
+    function datasetOnShow() {
+        const m = /^\/r\/([^/]+)\/([^/]+)/.exec(window.location.pathname);
+        if (!m) return null;
+        try {
+            return { orgSlug: decodeURIComponent(m[1]), dsSlug: decodeURIComponent(m[2]) };
+        } catch {
+            return null;
+        }
     }
 
     // Restore (a corrupt or partial value starts empty)
@@ -107,8 +127,12 @@ export const useClipboardStore = defineStore('clipboard', () => {
 
     // deleteEntries carries the paths removed by any deletion (batch delete, transfer,
     // cover replacement, rescan, ...).
+    // The event carries the paths only; the entries that left are those of the dataset on show.
     // lifetime: app (the store lives as long as the page)
-    emitter.on('deleteEntries', removePaths);
+    emitter.on('deleteEntries', /** @param {unknown} paths */ paths => {
+        const here = datasetOnShow();
+        if (here) removePaths(/** @type {string[]} */ (paths), here);
+    });
 
     return { mode, source, items, capturedAt, isEmpty, isCut, count, cutPaths, isCutAt, clear, copy, cut, removePaths };
 });

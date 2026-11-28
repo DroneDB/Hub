@@ -152,4 +152,53 @@ describe('ResourceState', () => {
         wrapper = mount(ResourceState, { props: { kind: 'not-found', resource: 'dataset', name: 'x' }, global: { plugins: [router] } });
         expect(buttons()).toContain('Back');
     });
+
+    describe('a visitor the website has signed in (its xAuth cookie)', () => {
+        const LOGOUT_URL = 'https://dronedb.app/wp-login.php?action=logout&_wpnonce=abc';
+        beforeEach(() => {
+            localStorage.clear();
+            document.cookie = `xAuthToken=${encodeURIComponent(`unused-token|${LOGOUT_URL}`)};path=/`;
+        });
+        afterEach(() => {
+            document.cookie = 'xAuthToken=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            localStorage.clear();
+        });
+
+        it('is sent to Login, which signs in with it and comes back, instead of being told to sign in', async () => {
+            await render({ kind: 'sign-in', resource: 'dataset', name: 'brighton-beach' }, '/r/r3sharing/brighton-beach');
+            expect(router.currentRoute.value.fullPath).toBe('/login?redirect=/r/r3sharing/brighton-beach');
+        });
+
+        it('stays on the page, with its Sign in link, after a sign-out on purpose', async () => {
+            const { xAuthSignOut } = await import('@/libs/api/xauth');
+            vi.spyOn(document.body, 'append').mockImplementation(() => { });
+            xAuthSignOut();
+            document.cookie = `xAuthToken=${encodeURIComponent(`fresh-token|${LOGOUT_URL}`)};path=/`;
+            await render({ kind: 'sign-in', resource: 'dataset', name: 'brighton-beach' }, '/r/r3sharing/brighton-beach');
+            expect(router.currentRoute.value.path).toBe('/r/r3sharing/brighton-beach');
+            expect(heading()).toBe('Sign in to open this dataset');
+            vi.restoreAllMocks();
+        });
+
+        it('stays on the page in a frame, which has no sign-in to offer', async () => {
+            await render({ kind: 'sign-in', resource: 'dataset', name: 'brighton-beach' }, '/r/r3sharing/brighton-beach', { embed: true });
+            expect(router.currentRoute.value.path).toBe('/r/r3sharing/brighton-beach');
+        });
+
+        it('does not redirect for another kind of page state', async () => {
+            await render({ kind: 'not-found', resource: 'dataset', name: 'x' }, '/r/r3sharing/x');
+            expect(router.currentRoute.value.path).toBe('/r/r3sharing/x');
+        });
+
+        it('Sign in as another user also ends the cookie, or Login would sign the same user in again', async () => {
+            const { xAuthAvailable } = await import('@/libs/api/xauth');
+            vi.spyOn(document.body, 'append').mockImplementation(() => { });
+            h.loggedIn = true;
+            await render({ kind: 'no-access', resource: 'dataset', name: 'x' }, '/r/acme/x');
+            await wrapper.findAll('button').find(b => b.text() === 'Sign in as another user').trigger('click');
+            await flushPromises();
+            expect(xAuthAvailable()).toBe(false);
+            vi.restoreAllMocks();
+        });
+    });
 });

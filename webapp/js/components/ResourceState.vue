@@ -44,7 +44,7 @@
  * The kind comes from loadErrorKind(error) (libs/ddb/apiError.js). The heading is the page's
  * h1 and its title.
  */
-import { computed, inject, watch, useId } from 'vue';
+import { computed, getCurrentInstance, inject, watch, useId } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
 import { homeLocation, loginLocation } from '@/libs/authRoutes';
@@ -52,6 +52,7 @@ import { currentPath } from '@/libs/routeQuery';
 import { LoadErrorKind } from '@/libs/ddb/apiError';
 import { busyLabel, busyPageText } from '@/libs/dataset/busyReason';
 import { useAuthStore } from '@/stores/auth';
+import { xAuthAvailable, xAuthSignOut } from '@/libs/api/xauth';
 
 const props = defineProps({
     /** A LoadErrorKind value: 'not-found', 'no-access', 'sign-in', 'invalid-link', 'busy' */
@@ -163,14 +164,26 @@ function goBack() {
 }
 
 /**
- * Signed out first: Login sends a signed-in user straight back here.
+ * Signed out first (of the website's single sign-on too, which would sign the same user in again): Login sends a
+ * signed-in user straight back here.
  * @param {import('vue-router').Router} router
  */
 async function signInAsAnotherUser(router) {
     const back = loginLocation(currentPath());
     useAuthStore().logout();
+    const websiteSignOut = xAuthSignOut().catch(e => console.warn('Logout error:', e.message));
     await router.push(back).catch(() => { });
+    await websiteSignOut;
 }
+
+// A visitor the website has signed in (its cookie) is signed in here without a form: Login does it with the cookie and
+// comes back to this page. Not in a frame (no sign-in to offer there), and not after a sign-out on purpose
+// (xAuthAvailable is false then). When the cookie does not sign them in, Login stays and asks.
+// (the router when there is one: a page that mounts the state without it only has no sign-in to go to)
+const router = getCurrentInstance()?.appContext.config.globalProperties.$router ?? null;
+watch(() => props.kind === LoadErrorKind.SIGN_IN && !signedIn() && !embed && xAuthAvailable(), signInWithWebsite => {
+    if (signInWithWebsite) router?.replace(loginLocation(currentPath())).catch(() => { });
+}, { immediate: true });
 
 watch(heading, value => setTitle(value), { immediate: true });
 </script>

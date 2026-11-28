@@ -132,7 +132,7 @@ import UploadIndicator from '@/layout/UploadIndicator.vue';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { lazyComponent } from '@/libs/lazyComponent';
-import { xAuthLogout } from '@/libs/api/xauth';
+import { xAuthSignOut } from '@/libs/api/xauth';
 import { bytesToSize } from '@/libs/utils';
 import { storageUsage } from '@/libs/storageUsage';
 import emitter from '@/libs/eventBus';
@@ -195,7 +195,6 @@ export default {
             // Where the dataset actions go (a dataset page); who may use them is the registry's rule
             showDownload: !!this.$route.params.ds,
             showShare: !!this.$route.params.ds,
-            showSettings: !!this.$route.params.ds && !this.$route.params.encodedPath,
             isDownloading: false,
             downloadConfirmOpen: false,
             // The size of a selection with a folder, read while the question is open (null: not yet)
@@ -218,6 +217,12 @@ export default {
     },
 
     computed: {
+        // Settings belong to the dataset page; a viewer (a file's, a saved view, a report) has none. Worked out from the
+        // route as it is now, so a viewer reached by navigation has none either (the page's own settings request
+        // is not there to answer it)
+        showSettings: function () {
+            return !!this.params.ds && !this.params.encodedPath && !this.$route.meta?.viewer;
+        },
         // The popup menu is rendered in <body>: styled through pass-through, not global CSS
         userMenuPt: function () {
             return {
@@ -398,7 +403,6 @@ export default {
 
             this.showDownload = !!params.ds;
             this.showShare = !!params.ds;
-            this.showSettings = !!this.$route.params.ds;
 
             // Off the dataset page there is no selection, tab or archive in progress
             if (!params.ds) useDatasetSessionStore().reset();
@@ -553,9 +557,11 @@ export default {
 
         // To Login first: a page with unsaved edits asks, and Cancel keeps the page and the
         // session. The session ends once nothing stops the navigation, before Login shows (Login
-        // sends a signed-in user back to where they came from).
+        // sends a signed-in user back to where they came from). It ends for the website's single
+        // sign-on too, at the same moment: Login signs in with the cookie of the website otherwise.
         logout: async function () {
             let signedOut = false;
+            let websiteSignOut = Promise.resolve();
             const endSession = () => {
                 if (signedOut) return;
                 signedOut = true;
@@ -564,6 +570,7 @@ export default {
                 } catch (e) {
                     console.warn('Logout error:', e.message);
                 }
+                websiteSignOut = xAuthSignOut();
             };
             const removeHook = this.$router.beforeResolve(to => {
                 if (to.name !== 'Login') return;
@@ -586,7 +593,7 @@ export default {
             }
             if (!signedOut) return;
             try {
-                await xAuthLogout();
+                await websiteSignOut;
             } catch (e) {
                 console.warn('Logout error:', e.message);
             }

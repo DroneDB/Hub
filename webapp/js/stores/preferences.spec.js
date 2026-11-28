@@ -591,6 +591,143 @@ describe('preferences store: session end', () => {
     });
 });
 
+describe('preferences store: another user on the same device', () => {
+    const CUSTOM = { url: 'https://tiles.example/{z}/{x}/{y}?access_token=ann-secret' };
+
+    it('does not carry the previous user\'s synced settings into the next user\'s account', async () => {
+        await start({});
+        setPref(PREF.CUSTOM_BASEMAP, CUSTOM);
+        setPref(PREF.STOCKPILE_MATERIALS, { overrides: {}, custom: [{ name: 'Ann gravel', price: 31 }] });
+        await tick(600);
+        expect(bodies().at(-1)).toMatchObject({ map: { customBasemap: CUSTOM } });
+        h.reg.patchRequest.mockClear();
+
+        // Ann signs out, Ben signs in on the same browser: his account is empty
+        h.auth.isLoggedIn = false;
+        await tick();
+        h.reg.getRequest.mockResolvedValue({});
+        h.auth.username = 'ben';
+        h.auth.isLoggedIn = true;
+        await tick(600);
+
+        expect(getPref(PREF.CUSTOM_BASEMAP, null)).toBeNull();
+        expect(getPref(PREF.STOCKPILE_MATERIALS, null)).toBeNull();
+        expect(h.reg.patchRequest).not.toHaveBeenCalled();
+    });
+
+    it('keeps the settings for the same user signing in again, and sends nothing for them', async () => {
+        await start({});
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await tick(600);
+        h.auth.isLoggedIn = false;
+        await tick();
+        h.auth.isLoggedIn = true;
+        await tick(600);
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
+    });
+
+    it('lets the first user of a device that has no owner on record keep what was set while anonymous', async () => {
+        h.auth.isLoggedIn = false;
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await start({});
+        h.auth.isLoggedIn = true;
+        await tick(600);
+        expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
+        expect(bodies().at(-1)).toMatchObject({ units: { measurement: 'imperial' } });
+    });
+
+    it('tells the open views that the previous user\'s values are gone', async () => {
+        await start({});
+        setPref(PREF.BASEMAP, 'streets');
+        h.auth.isLoggedIn = false;
+        await tick();
+        const seen = [];
+        const off = (await import('@/libs/preferences')).onPrefChange((key, value) => seen.push([key, value]));
+        h.reg.getRequest.mockResolvedValue({});
+        h.auth.username = 'ben';
+        h.auth.isLoggedIn = true;
+        await tick(600);
+        off();
+        expect(seen).toContainEqual([PREF.BASEMAP, null]);
+    });
+
+    it('removes the splat views the user set up when the session ends, and not before', async () => {
+        await start({});
+        setPref(PREF.SPLAT_VIEW_SETTINGS, [['ddb://h/o/d/a.spz', { upAxis: '+z' }]]);
+        await tick(600);
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).not.toBeNull();
+        h.auth.isLoggedIn = false;
+        await tick();
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).toBeNull();
+    });
+
+    it('empties the clipboard of the dataset page when the session ends, so the next user does not paste it', async () => {
+        const { useClipboardStore } = await import('@/stores/clipboard');
+        await start({});
+        const clipboard = useClipboardStore();
+        clipboard.copy({ orgSlug: 'acme', dsSlug: 'site', basePath: '' }, [{ entry: { path: 'a.jpg', type: 1, size: 1 } }]);
+        await tick();
+        expect(sessionStorage.getItem(PREF.CLIPBOARD)).not.toBeNull();
+        h.auth.isLoggedIn = false;
+        await tick();
+        expect(clipboard.isEmpty).toBe(true);
+        expect(sessionStorage.getItem(PREF.CLIPBOARD)).toBeNull();
+    });
+
+    it('does not remove the splat views of a visitor who was never signed in', async () => {
+        h.auth.isLoggedIn = false;
+        setPref(PREF.SPLAT_VIEW_SETTINGS, [['ddb://h/o/d/a.spz', { upAxis: '+z' }]]);
+        await start({});
+        expect(getPref(PREF.SPLAT_VIEW_SETTINGS, null)).not.toBeNull();
+    });
+});
+
+describe('preferences store: a Registry without the preferences route', () => {
+    const missing = () => Object.assign(new Error('Not Found'), { status: 404 });
+
+    it('is quiet: no warning, no error status, nothing sent', async () => {
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        h.reg.getRequest.mockRejectedValue(missing());
+        setActivePinia(createPinia());
+        store = usePreferencesStore();
+        await tick();
+        expect(h.notify.warn).not.toHaveBeenCalled();
+        expect(console.warn).not.toHaveBeenCalled();
+        expect(store.status).toBe('idle');
+        expect(h.reg.patchRequest).not.toHaveBeenCalled();
+    });
+
+    it('does not ask again on a change, a reload of the store or a new session of the page', async () => {
+        h.reg.getRequest.mockRejectedValue(missing());
+        setActivePinia(createPinia());
+        store = usePreferencesStore();
+        await tick();
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await tick(600);
+        await store.load();
+        expect(h.reg.getRequest).toHaveBeenCalledTimes(1);
+        expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        expect(h.notify.warn).not.toHaveBeenCalled();
+    });
+
+    it('a route that goes missing on save is quiet too', async () => {
+        await start({});
+        h.reg.patchRequest.mockRejectedValue(missing());
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await tick(600);
+        expect(h.notify.warn).not.toHaveBeenCalled();
+        expect(store.status).toBe('idle');
+    });
+
+    it('any other failure still warns', async () => {
+        h.reg.getRequest.mockRejectedValue(failure());
+        setActivePinia(createPinia());
+        store = usePreferencesStore();
+        await tick();
+        expect(h.notify.warn).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('preferences store: reset', () => {
     it('resetSection removes the local values and sends the section as null', async () => {
         setPref(PREF.MEASURE_UNIT, 'imperial');

@@ -38,7 +38,8 @@
                 <Card class="account-card">
                     <template #content>
                         <h2><i class="fa-solid fa-database" /> Storage</h2>
-                        <div class="storage-bar-container">
+                        <p v-if="storageUsed === null" class="storage-unknown">Storage usage is not available right now.</p>
+                        <div v-else class="storage-bar-container">
                             <div class="storage-details">
                                 <span class="used">{{ usage.usedText }} used</span>
                                 <span class="available">{{ usage.unlimited ? 'Unlimited' : `of ${usage.totalText}` }}</span>
@@ -112,7 +113,7 @@ import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { storageUsage } from '@/libs/storageUsage';
-import { xAuthLogout } from '@/libs/api/xauth';
+import { xAuthSignOut } from '@/libs/api/xauth';
 import { loginLocation } from '@/libs/authRoutes';
 
 export default {
@@ -136,7 +137,8 @@ export default {
             organizationsCount: 0,
 
             // Storage info
-            storageUsed: 0,
+            // Null while unknown (the request failed): the card says so, not "0 B used, Unlimited"
+            storageUsed: null,
             storageTotal: null,
 
             // Account management availability
@@ -146,7 +148,7 @@ export default {
     computed: {
         // The state of the quota: the one helper of the header, the Account page and Admin > Users (libs/storageUsage.js)
         usage() {
-            return storageUsage(this.storageUsed, this.storageTotal);
+            return storageUsage(this.storageUsed ?? 0, this.storageTotal);
         }
     },
     mounted: async function () {
@@ -163,15 +165,20 @@ export default {
 
             // The routes of the signed-in user, which answer every user; the ones that take a user name are
             // for administrators and refuse everyone else
-            try {
-                const [profile, storage] = await Promise.all([reg.currentUser(), reg.storageInfo()]);
-                this.username = profile.userName || this.username;
-                this.email = profile.email || '';
-                this.organizationsCount = profile.organizations?.length ?? 0;
-                this.storageUsed = storage.used || 0;
-                this.storageTotal = storage.total ?? null;
-            } catch (e) {
-                this.error = e.message;
+            // Each answer on its own: a failed quota request leaves the profile, and the other way round
+            const [profile, storage] = await Promise.allSettled([reg.currentUser(), reg.storageInfo()]);
+            if (profile.status === 'fulfilled') {
+                this.username = profile.value.userName || this.username;
+                this.email = profile.value.email || '';
+                this.organizationsCount = profile.value.organizations?.length ?? 0;
+            } else {
+                this.error = profile.reason?.message || 'Your profile could not be loaded.';
+            }
+            if (storage.status === 'fulfilled') {
+                this.storageUsed = storage.value.used || 0;
+                this.storageTotal = storage.value.total ?? null;
+            } else {
+                this.error ||= storage.reason?.message || 'Your storage usage could not be loaded.';
             }
             this.loading = false;
         },
@@ -184,16 +191,24 @@ export default {
             this.$router.push({ name: "Upload" });
         },
 
+        // The session ends for the website's single sign-on too, before Login shows (Login signs in with the cookie
+        // of the website otherwise); the page does not wait for the website to answer before it goes there
         async handleLogout() {
             this.loggingOut = true;
+            let websiteSignOut = Promise.resolve();
             try {
                 reg.logout();
-                await xAuthLogout();
+                websiteSignOut = xAuthSignOut();
+            } catch (e) {
+                console.warn('Logout error:', e.message);
+            }
+            this.$router.push(loginLocation()).catch(() => { });
+            try {
+                await websiteSignOut;
             } catch (e) {
                 console.warn('Logout error:', e.message);
             } finally {
                 this.loggingOut = false;
-                this.$router.push(loginLocation()).catch(() => { });
             }
         }
     }

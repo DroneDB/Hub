@@ -47,12 +47,11 @@ vi.mock('@/stores/preferences', async () => {
     const store = reactive({ status: 'idle', resetSection() {}, resetAll() {} });
     return { usePreferencesStore: () => store };
 });
-const xauth = vi.hoisted(() => ({ logout: vi.fn(() => Promise.resolve()) }));
-vi.mock('@/libs/api/xauth', async importOriginal => ({ ...(await importOriginal()), xAuthLogout: () => xauth.logout() }));
 
 const { default: HubHeader } = await import('./HubHeader.vue');
 const { resetUpdateCheck } = await import('@/composables/useUpdateCheck');
 const { replaceQueryKeys, replaceHash } = await import('@/libs/routeQuery');
+const { xAuthAvailable, clearXAuthSignedOut } = await import('@/libs/api/xauth');
 const { useDatasetSessionStore } = await import('@/stores/datasetSession');
 const { explorerTools } = await import('@/libs/dataset/explorerTools');
 const { actionMenuItem } = await import('@/libs/dataset/explorerActions');
@@ -730,12 +729,17 @@ describe('HubHeader logout', () => {
     let signedInAtLogin;
     // The answer of the page's leave guard (unsaved edits)
     let pageLets;
+    // The website's cookie as PHP setcookie writes it: an unused token and the logout URL with its nonce
+    const LOGOUT_URL = 'https://dronedb.app/wp-login.php?action=logout&_wpnonce=abc';
+    // Whether Login could sign in with the cookie when it showed, and the frames that signed out of the website
+    let xAuthAtLogin;
+    let frames;
 
     async function signedInOnAPage({ loginFails = false } = {}) {
         const vueRouter = await import('vue-router');
         const { defineComponent, h: render } = await import('vue');
         const Page = defineComponent({ beforeRouteLeave: () => pageLets, render: () => render('div', 'page') });
-        const Login = defineComponent({ setup() { signedInAtLogin = h.auth.isLoggedIn; }, render: () => render('div', 'login') });
+        const Login = defineComponent({ setup() { signedInAtLogin = h.auth.isLoggedIn; xAuthAtLogin = xAuthAvailable(); }, render: () => render('div', 'login') });
         router = vueRouter.createRouter({
             history: vueRouter.createMemoryHistory(),
             routes: [
@@ -760,24 +764,61 @@ describe('HubHeader logout', () => {
 
     beforeEach(() => {
         signedInAtLogin = undefined;
+        xAuthAtLogin = undefined;
         pageLets = true;
-        xauth.logout.mockClear();
+        localStorage.clear();
+        document.cookie = `xAuthToken=${encodeURIComponent(`unused-token|${LOGOUT_URL}`)};path=/`;
+        frames = [];
+        const append = document.body.append.bind(document.body);
+        vi.spyOn(document.body, 'append').mockImplementation((...nodes) => {
+            frames.push(...nodes.filter(n => n?.tagName === 'IFRAME'));
+            const rest = nodes.filter(n => n?.tagName !== 'IFRAME');
+            if (rest.length) append(...rest);
+        });
         h.auth.logout = vi.fn(() => { h.auth.isLoggedIn = false; });
     });
     afterEach(() => {
         view?.unmount();
         h.auth.logout = () => {};
+        document.cookie = 'xAuthToken=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        clearXAuthSignedOut();
+        vi.restoreAllMocks();
     });
+
+    // The frame that signs out of the website answers
+    const websiteAnswers = () => frames.forEach(f => f.onload());
+    // Logout, with the website answering once it was asked
+    async function logOut() {
+        const loggingOut = wrapper.vm.logout();
+        await flushPromises();
+        websiteAnswers();
+        await loggingOut;
+        await flushPromises();
+    }
 
     it('goes to Login first and ends the session before Login shows', async () => {
         await signedInOnAPage();
-        await wrapper.vm.logout();
-        await flushPromises();
+        await logOut();
         expect(router.currentRoute.value.name).toBe('Login');
         expect(router.currentRoute.value.query).toEqual({ redirect: '/r/acme/site' });
         expect(h.auth.logout).toHaveBeenCalledTimes(1);
         expect(signedInAtLogin).toBe(false);
-        expect(xauth.logout).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends signed out for the website too: with an unused token in the cookie, Login has nothing to sign in with', async () => {
+        await signedInOnAPage();
+        const loggingOut = wrapper.vm.logout();
+        await flushPromises();
+        expect(router.currentRoute.value.name).toBe('Login');
+        expect(xAuthAtLogin).toBe(false);
+        expect(xAuthAvailable()).toBe(false);
+        // The website's own sign-out is asked for with the whole URL, nonce included
+        expect(frames.map(f => f.src)).toEqual([LOGOUT_URL]);
+        websiteAnswers();
+        await loggingOut;
+        // Its session writes a new token meanwhile: still signed out
+        document.cookie = `xAuthToken=${encodeURIComponent(`fresh-token|${LOGOUT_URL}`)};path=/`;
+        expect(xAuthAvailable()).toBe(false);
     });
 
     it('keeps the session (and the page) when the page cancels the navigation', async () => {
@@ -787,18 +828,19 @@ describe('HubHeader logout', () => {
         await flushPromises();
         expect(router.currentRoute.value.path).toBe('/r/acme/site');
         expect(h.auth.logout).not.toHaveBeenCalled();
-        expect(xauth.logout).not.toHaveBeenCalled();
+        expect(frames).toHaveLength(0);
+        expect(xAuthAvailable()).toBe(true);
         expect(h.auth.isLoggedIn).toBe(true);
     });
 
     it('ends the session all the same when Login cannot be reached (an error, not a guard)', async () => {
         await signedInOnAPage({ loginFails: true });
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        await wrapper.vm.logout();
-        await flushPromises();
+        await logOut();
         expect(h.auth.logout).toHaveBeenCalledTimes(1);
         expect(h.auth.isLoggedIn).toBe(false);
-        expect(xauth.logout).toHaveBeenCalledTimes(1);
+        expect(frames).toHaveLength(1);
+        expect(xAuthAvailable()).toBe(false);
         expect(warn).toHaveBeenCalledWith('Logout error:', 'Loading chunk auth failed');
         warn.mockRestore();
     });
@@ -817,6 +859,52 @@ describe('HubHeader logout', () => {
         await flushPromises();
         expect(router.currentRoute.value.path).toBe('/r/acme');
         expect(h.auth.logout).not.toHaveBeenCalled();
+    });
+});
+
+describe('HubHeader: Settings follow the page the user is on', () => {
+    let router;
+
+    async function mountOnDataset() {
+        const vueRouter = await import('vue-router');
+        const Page = { render: () => null };
+        router = vueRouter.createRouter({
+            history: vueRouter.createMemoryHistory(),
+            routes: [
+                { path: '/r/:org/:ds', name: 'ViewDataset', component: Page },
+                { path: '/r/:org/:ds/view/:encodedPath/map', name: 'MapViewer', component: Page, meta: { viewer: true } },
+                { path: '/r/:org/:ds/views/:uid', name: 'SavedView', component: Page, meta: { viewer: true } }
+            ]
+        });
+        await router.push('/r/acme/site');
+        h.reg.sys.updateInfo = vi.fn(() => Promise.resolve({ ...AVAILABLE, isUpdateAvailable: false }));
+        wrapper = mount(HubHeader, {
+            global: {
+                plugins: [PrimeVue, createPinia(), router],
+                stubs: { UploadIndicator: true, RouterLink: RouterLinkStub, UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+            }
+        });
+        useDatasetSessionStore(wrapper.vm.$pinia).activeTab = 'explorer';
+        await flushPromises();
+    }
+    const settings = () => wrapper.find('[aria-label="Settings"]').exists();
+
+    it('has Settings on the dataset page, and none in a viewer reached by navigation from it', async () => {
+        await mountOnDataset();
+        expect(settings()).toBe(true);
+        await router.push('/r/acme/site/view/a.tif/map');
+        await flushPromises();
+        expect(settings()).toBe(false);
+        await router.push('/r/acme/site');
+        await flushPromises();
+        expect(settings()).toBe(true);
+    });
+
+    it('has none in a saved view either, which has no file in its address', async () => {
+        await mountOnDataset();
+        await router.push('/r/acme/site/views/abc');
+        await flushPromises();
+        expect(settings()).toBe(false);
     });
 });
 
