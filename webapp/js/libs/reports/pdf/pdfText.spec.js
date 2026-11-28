@@ -58,6 +58,17 @@ describe('the text the font draws', () => {
         expect(written.replaceAll('\u200b', '')).toBe(run);
     });
 
+    it('counts a no-break space as part of the run, as the library never breaks there: a long French figure gets its break', () => {
+        // 123 456 789 012,25 m3 written by Intl in French: the spaces are no-break ones once the pass is done
+        const figure = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2 }).format(123456789012.25);
+        const written = pdfText(figure);
+        expect(written).toContain('\u200b');
+        expect(written.replaceAll('\u200b', '')).toBe(figure.replace(/\u202f/g, '\u00a0'));
+        expect(pdfText('N\u00a0'.repeat(10))).toContain('\u200b');
+        // A space that breaks still counts as a place to break
+        expect(pdfText('NNNNNNNNNN NNNNNNNNNN')).toBe('NNNNNNNNNN NNNNNNNNNN');
+    });
+
     it('leaves a run that can break, or is short, as it is', () => {
         expect(pdfText('A'.repeat(16))).toBe('A'.repeat(16));
         expect(pdfText('words '.repeat(10))).toBe('words '.repeat(10));

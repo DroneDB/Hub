@@ -135,6 +135,20 @@ export function turnBetween(from, to) {
 }
 
 /**
+ * Turns the scene (`reorient`, a new up axis) and the saved views with it: a view is a pose in the world, so a camera or
+ * a pin view saved before the turn would show another part of the scene after it. Nothing turns before the scene is
+ * there (no mesh): there is no rotation of before to turn from.
+ * @param {{ quaternion: { toArray: () => number[] } } | null} mesh  the scene
+ * @param {() => void} reorient  turns the scene
+ * @param {(turn: number[]) => void} turnViews  carries the saved views with a turn
+ */
+export function reorientWithViews(mesh, reorient, turnViews) {
+    const before = mesh ? mesh.quaternion.toArray() : null;
+    reorient();
+    if (before && mesh) turnViews(turnBetween(before, mesh.quaternion.toArray()));
+}
+
+/**
  * A saved view (a camera, or the view of a pin) carried with a turn of the scene about its origin: its position and its
  * target turn, and its orientation follows. A view is a pose in the world, and the scene turned under it when the up axis
  * changed: left as it was, it showed another part of the scene, or the scene on its side.

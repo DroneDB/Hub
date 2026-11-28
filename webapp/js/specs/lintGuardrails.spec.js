@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ESLint } from 'eslint';
+import { execFileSync } from 'node:child_process';
 
 import { vueDiagnostics, compareWithBaseline } from '../../../scripts/lib/componentTypes.mjs';
 import { LOCAL_DECODERS, checkLocalDecoders } from '../../../scripts/lib/localDecoders.mjs';
@@ -246,6 +247,20 @@ describe('planning ids in comments and test titles', () => {
     const SECTION = '§' + '7.1';
     const ROADMAP = 'Drone' + 'DB-Roadmap/';
 
+    // The files of the repository: git's list, or, in a copy without git (a container build), the files on disk
+    // outside what is installed or built
+    function repositoryFiles() {
+        try {
+            return execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n').filter(Boolean);
+        } catch {
+            const skipped = new Set(['node_modules', 'build', 'coverage', '.git']);
+            const walk = dir => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })
+                .filter(entry => !skipped.has(entry.name))
+                .flatMap(entry => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+            return walk('');
+        }
+    }
+
     async function planningIdsIn(code, file = 'webapp/js/libs/sample.js') {
         const [result] = await eslint.lintText(code, { filePath: path.join(ROOT, file) });
         return result.messages.filter(m => m.ruleId === 'planning/no-planning-ids').map(m => m.message);
@@ -282,6 +297,25 @@ describe('planning ids in comments and test titles', () => {
             "// UTF-8 and SHA-256 are not ids, nor is a D-1 pile ref or 'ORG-1'"
         ].join('\n');
         expect(await planningIdsIn(clean, 'webapp/js/libs/sample.spec.js')).toEqual([]);
+    });
+
+    it('rejects an id in the name of the file, in either case', async () => {
+        const messages = await planningIdsIn('export const a = 1;\n', `webapp/js/features/map-viewer-${WORK_ITEM.toLowerCase()}.spec.js`);
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toContain('a file name');
+        expect(await planningIdsIn('export const a = 1;\n', 'webapp/js/features/map-viewer.spec.js')).toEqual([]);
+    });
+
+    it('finds no id in the name of any file of the repository (images and documents too, which are not linted)', async () => {
+        const { planningIdInFileName } = await import(path.join(ROOT, 'eslint-rules', 'no-planning-ids.mjs'));
+        const tracked = repositoryFiles();
+        expect(tracked.length).toBeGreaterThan(100);
+        expect(tracked.filter(file => planningIdInFileName(file))).toEqual([]);
+        // The check reads names as they are written
+        for (const name of [`a-${WORK_ITEM.toLowerCase()}.png`, `${AREA.toLowerCase().replace('-', '_')}.md`, `${DECISION}.txt`])
+            expect(planningIdInFileName(`docs/${name}`), name).not.toBeNull();
+        for (const name of ['jquery-3.1.1.min.js', 'sha-256.js', 'h264.mp4', 'd3.v7.js', 'map-viewer.spec.js'])
+            expect(planningIdInFileName(name), name).toBeNull();
     });
 
     it('is on for the sources of the Hub', async () => {

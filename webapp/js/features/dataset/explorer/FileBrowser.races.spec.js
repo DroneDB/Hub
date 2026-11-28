@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
+import { defineComponent, h } from 'vue';
 import PrimeVue from 'primevue/config';
 import ddb from 'ddb';
 
@@ -96,6 +97,55 @@ describe('FileBrowser handleSelectionChanged', () => {
 
         expect(w.emitted('currentUriChanged').map(args => args[0])).toEqual(['quick']);
         expect(w.emitted('selectionChanged')).toHaveLength(1);
+        w.unmount();
+    });
+});
+
+describe('FileBrowser refreshAndNavigate', () => {
+    const root = [{ path: ROOT, label: 'ds', entry: { path: '', type: ddb.entry.type.DRONEDB } }];
+    // The tree as refreshAndNavigate walks it: one root node, a folder with nothing to expand
+    const TreeNode = defineComponent({
+        data: () => ({ isExpandable: false, expanded: false, node: { path: `${ROOT}/target`, entry: { path: 'target' } } }),
+        render: () => h('div')
+    });
+    const TreeView = defineComponent({ render: () => h('div', [h(TreeNode, { ref: 'treeNodes', ref_for: true })]) });
+    const mountWithTree = rootNodes => mount(FileBrowser, {
+        props: { rootNodes },
+        global: { plugins: [PrimeVue], stubs: { TreeView, SavedViews: true, ContextMenu: true, LoadingSpinner: true } }
+    });
+    const file = path => ({ isExpandable: false, expanded: false, node: { path } });
+    const selections = w => (w.emitted('selectionChanged') ?? []).map(args => args[0].map(n => n.path));
+
+    it('leaves the folder that the user clicked while it read the tree', async () => {
+        const reading = deferred();
+        const rootNodes = vi.fn().mockResolvedValueOnce(root).mockReturnValueOnce(reading.promise);
+        const w = mountWithTree(rootNodes);
+        await flushPromises();
+
+        const navigation = w.vm.refreshAndNavigate('target');
+        await w.vm.handleSelectionChanged([file(`${ROOT}/clicked.jpg`)]);
+        reading.resolve(root);
+        await navigation;
+
+        expect(selections(w)).toEqual([[`${ROOT}/clicked.jpg`]]);
+        w.unmount();
+    });
+
+    it('of two that overlap, only the newer one selects, whichever ends last', async () => {
+        const older = deferred();
+        const newer = deferred();
+        const rootNodes = vi.fn().mockResolvedValueOnce(root).mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+        const w = mountWithTree(rootNodes);
+        await flushPromises();
+
+        const a = w.vm.refreshAndNavigate('target');
+        const b = w.vm.refreshAndNavigate('target');
+        newer.resolve(root);
+        await b;
+        older.resolve(root);
+        await a;
+
+        expect(selections(w)).toEqual([[`${ROOT}/target`]]);
         w.unmount();
     });
 });

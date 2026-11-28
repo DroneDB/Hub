@@ -243,6 +243,57 @@ describe('a background refresh of the task list', () => {
     });
 });
 
+// A row action (Retry, Cancel, Delete) on page 2 and the tab shown again leave the user on page 2
+describe('the page after a row action and a tab switch', () => {
+    let wrapper;
+    afterEach(() => wrapper?.unmount());
+
+    it('stays on the page of the row that was retried, and on the page left when the tab comes back', async () => {
+        const many = n => Array.from({ length: n }, (_, i) => ({ taskId: `t${i}`, toolId: 'extract', state: 'Failed', actions: [], createdAt: '2026-11-01T10:00:00Z' }));
+        const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
+        taskMonitor.getTasks.mockReturnValue(many(45));
+        const dataset = {
+            org: 'org', ds: 'ds', getTaskTools: vi.fn(() => Promise.resolve([])), retryTask: vi.fn(() => Promise.resolve()),
+            registry: { sys: { processingNodes: vi.fn(() => Promise.resolve([])) } }
+        };
+        wrapper = mount(TaskHistory, {
+            props: { dataset, canWrite: true },
+            global: { plugins: [PrimeVue], stubs: { TaskLogDialog: true, DialogHost: true, Window: true } }
+        });
+        await flushPromises();
+        wrapper.vm.onPageChange({ first: 20, rows: 20 });
+        await flushPromises();
+
+        await wrapper.vm.taskActions.retry(wrapper.vm.filteredTasks[25]);
+        await flushPromises();
+        expect(dataset.retryTask).toHaveBeenCalledWith('t25');
+        expect(wrapper.vm.currentPageFirst).toBe(20);
+
+        await wrapper.vm.onTabActivated();
+        await flushPromises();
+        expect(wrapper.vm.currentPageFirst).toBe(20);
+
+        // A list that got shorter meanwhile: the last page that exists
+        taskMonitor.getTasks.mockReturnValue(many(15));
+        await wrapper.vm.onTabActivated();
+        expect(wrapper.vm.currentPageFirst).toBe(0);
+    });
+
+    it('goes back to the first page when a filter changes', async () => {
+        const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
+        taskMonitor.getTasks.mockReturnValue(Array.from({ length: 45 }, (_, i) => ({ taskId: `t${i}`, toolId: 'extract', state: 'Failed', actions: [] })));
+        const dataset = { org: 'org', ds: 'ds', getTaskTools: vi.fn(() => Promise.resolve([])), registry: { sys: { processingNodes: vi.fn(() => Promise.resolve([])) } } };
+        wrapper = mount(TaskHistory, {
+            props: { dataset, canWrite: false },
+            global: { plugins: [PrimeVue], stubs: { TaskLogDialog: true, DialogHost: true, Window: true } }
+        });
+        await flushPromises();
+        wrapper.vm.onPageChange({ first: 20, rows: 20 });
+        wrapper.vm.onFilterChange();
+        expect(wrapper.vm.currentPageFirst).toBe(0);
+    });
+});
+
 describe('showClearDialog', () => {
     const { showClearDialog } = TaskHistory.methods;
 

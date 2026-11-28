@@ -91,6 +91,9 @@ export const DOUBLE_CLICK_MAX_MOVE_PX = 12;
 // The contextmenu that follows the release of a right click that ended the session is still the tool's, for this long
 const MENU_GUARD_MS = 500;
 
+// Until when the next contextmenu of a map is still the tool's: the session that a right click ended has gone
+const menuGuardUntil = new WeakMap();
+
 /**
  * A browser sends its contextmenu after the release of the right button (Windows, macOS): when that click
  * ended the session, the session has already gone. The next contextmenu of the viewport is kept from the
@@ -293,7 +296,10 @@ export class DrawingSession {
         if (sessionsByMap.get(this.map) === this) sessionsByMap.delete(this.map);
         const viewport = this.viewport;
         this.detach();
-        if (viewport && performance.now() - this.rightClickedAt < MENU_GUARD_MS) swallowNextContextMenu(viewport);
+        if (viewport && performance.now() - this.rightClickedAt < MENU_GUARD_MS) {
+            swallowNextContextMenu(viewport);
+            menuGuardUntil.set(this.map, performance.now() + MENU_GUARD_MS);
+        }
         this.draw.setActive(false);
         this.rightPan.setActive(false);
         const remove = () => {
@@ -448,6 +454,22 @@ export class DrawingSession {
  */
 export function endSessionOf(map) {
     if (map) sessionsByMap.get(toRaw(map))?.end('abort');
+}
+
+/**
+ * Whether a contextmenu of the map belongs to a drawing tool, not to the page: a session runs on the map (its right
+ * click finishes the shape), or the right click that ended the last one sends its contextmenu after the release. The
+ * owner of the map then neither selects nor opens a menu of its own. That late contextmenu counts once.
+ * @param {import('ol/Map').default | null | undefined} map
+ */
+export function drawingOwnsContextMenu(map) {
+    if (!map) return false;
+    const raw = toRaw(map);
+    if (sessionsByMap.get(raw)?.active) return true;
+    const until = menuGuardUntil.get(raw);
+    if (until === undefined) return false;
+    menuGuardUntil.delete(raw);
+    return performance.now() < until;
 }
 
 /**

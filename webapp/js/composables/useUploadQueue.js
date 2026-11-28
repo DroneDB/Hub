@@ -11,6 +11,7 @@ import { shallowRef } from 'vue';
 import emitter from '@/libs/eventBus';
 import { createUploadScheduler } from '@/libs/upload/uploadScheduler';
 import { negotiatedProtocol, uploadConcurrency, MULTIPLEXED_STREAMS } from '@/libs/upload/protocolLimits';
+import { sharedUploadSlots } from '@/libs/upload/uploadSlots';
 import { useResilientUpload } from '@/composables/useResilientUpload';
 import { UPLOAD_ACTIVITY_EVENT } from '@/libs/upload/uploadEvents';
 import { splatLodWarning } from '@/libs/upload/splatLodFolder';
@@ -39,6 +40,8 @@ export function useUploadQueue(opts) {
         plan: opts.plan,
         policy: resilience,
         maxConcurrency: () => uploadConcurrency(negotiatedProtocol()),
+        // The limit is the page's: every queue (a dataset's, /upload's) takes its requests from the same slots
+        slots: sharedUploadSlots,
         onItemDone: opts.onItemDone,
         onItemFailed: opts.onItemFailed,
         onActivity: active => {

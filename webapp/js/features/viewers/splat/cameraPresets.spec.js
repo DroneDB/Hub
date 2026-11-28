@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { SIDECAR_VERSION, camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove, turnView, turnBetween } from './cameraPresets';
+import { SIDECAR_VERSION, camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove, turnView, turnBetween, reorientWithViews } from './cameraPresets';
+import { readSource } from '@/specs/cssSource';
 import { upAxisQuaternion } from './upAxis';
 import { MAX_SAVED_ITEMS, MAX_SHAPE_POINTS } from './sceneData';
 
@@ -232,5 +233,30 @@ describe('a saved view carried with a turn of the scene (another up axis)', () =
 
     it('turnBetween of the same rotation is no turn', () => {
         near(turnBetween(upAxisQuaternion('-z'), upAxisQuaternion('-z')), identity);
+    });
+
+    it('turns the saved views with the scene when the up axis changes: the turn from the rotation before to the one after', () => {
+        const mesh = new THREE.Object3D();
+        mesh.quaternion.set(...upAxisQuaternion('+y'));
+        const turnViews = vi.fn();
+
+        reorientWithViews(mesh, () => mesh.quaternion.set(...upAxisQuaternion('-z')), turnViews);
+
+        expect(turnViews).toHaveBeenCalledTimes(1);
+        near(turnViews.mock.calls[0][0], turnBetween(upAxisQuaternion('+y'), upAxisQuaternion('-z')));
+    });
+
+    it('turns nothing before the scene is there, and still applies the new axis', () => {
+        const reorient = vi.fn();
+        const turnViews = vi.fn();
+        reorientWithViews(null, reorient, turnViews);
+        expect(reorient).toHaveBeenCalledTimes(1);
+        expect(turnViews).not.toHaveBeenCalled();
+    });
+
+    it('is how the viewer changes its up axis, with the saved views of its scene', () => {
+        const source = readSource(__dirname, 'SplatViewer.vue');
+        const setUpAxis = source.slice(source.indexOf('function setUpAxis('), source.indexOf('\n}\n', source.indexOf('function setUpAxis(')));
+        expect(setUpAxis).toMatch(/reorientWithViews\(splatMesh,[\s\S]*views\.turnViews\)/);
     });
 });

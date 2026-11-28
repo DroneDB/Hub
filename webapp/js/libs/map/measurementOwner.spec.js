@@ -70,10 +70,23 @@ describe('measurementOwnerEntry', () => {
         expect(measurementFileOf([placeholder('flights/ortho.tif'), placeholder('flights/dsm.tif')])).toBe('flights/measurements.geojson');
     });
 
-    it('does not take the sidecar of a file that is not a raster', () => {
+    it('takes the sidecar of any file the map draws, as each of them owns its sidecar while it is alone', () => {
         const T = ddb.entry.type;
         const files = [entry('flights/a.laz', T.POINTCLOUD), entry('flights/b.laz', T.POINTCLOUD), entry('flights/a_measurements.geojson', T.VECTOR)];
-        expect(measurementFileOf(files)).toBe('flights/measurements.geojson');
+        expect(measurementFileOf(files)).toBe('flights/a_measurements.geojson');
+        // A file the map does not draw keeps no sidecar of its own
+        expect(measurementFileOf([entry('flights/a.laz', T.POINTCLOUD), entry('flights/b.laz', T.POINTCLOUD),
+            entry('flights/notes.txt', T.GENERIC), entry('flights/notes_measurements.geojson', T.VECTOR)])).toBe('flights/measurements.geojson');
+    });
+
+    it('keeps the sidecar of a point cloud that was alone when a photo arrives beside it', () => {
+        const T = ddb.entry.type;
+        const alone = [entry('site/cloud.laz', T.POINTCLOUD), entry('site/cloud_measurements.geojson', T.VECTOR)];
+        expect(measurementFileOf(alone)).toBe('site/cloud_measurements.geojson');
+
+        const withPhoto = [...alone, entry('site/photo.jpg', T.GEOIMAGE)];
+        expect(measurementOwnerEntry(withPhoto).path).toBe('site/cloud.laz');
+        expect(measurementFileOf(withPhoto)).toBe('site/cloud_measurements.geojson');
     });
 
     it('is the one file on show: its sidecar holds the measurements', () => {

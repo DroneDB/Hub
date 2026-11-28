@@ -33,6 +33,8 @@ const SPEED_WINDOW_MS = 5000;
  * @param {(job, hooks) => Promise<Array<object>>} opts.send performs a job; resolves with one
  *   result per item: `{ id, ok: true, entry }` or `{ id, ok: false, status, error, noRetry, retryAfter, conflictPath }`
  * @param {() => number} opts.maxConcurrency protocol limit (read on every scheduling decision)
+ * @param {ReturnType<typeof import('./uploadSlots').createUploadSlots>} [opts.slots] request slots shared with the
+ *   other queues of the page: a request starts only with a slot, so the queues together stay within the protocol limit
  * @param {object} opts.policy useResilientUpload(): maxRetries, shouldRetryStatus, computeRetryDelayMs, aimd
  * @param {(job) => object} [opts.plan] groups ready items into a job (default: uploadPlanner)
  * @param {(snapshot) => void} [opts.onChange]
@@ -65,6 +67,8 @@ export function createUploadScheduler(opts) {
     let paused = false;
     let startedAt = null;
     let endedAt = null;
+    // Another queue gave a slot back: this one may start what it has ready
+    const stopWaiting = opts.slots?.onRelease(() => pump()) ?? (() => {});
 
     function setStatus(item, status) {
         if (item.status === status) return;
@@ -133,6 +137,7 @@ export function createUploadScheduler(opts) {
             const ready = readyItems(clock.now());
             const job = plan(ready);
             if (!job) break;
+            if (opts.slots && !opts.slots.tryAcquire()) break;
             start(job);
         }
         updateActivity();
@@ -182,7 +187,11 @@ export function createUploadScheduler(opts) {
     function settle(id, job, results, error) {
         const entry = inFlight.get(id);
         inFlight.delete(id);
+        // cancelAll() gave the slots of the requests it aborted back already
         if (stopped) return;
+        // The slot goes back once the files of the request have their new state, so a queue it wakes (this one
+        // included) sees them as they are
+        const releaseSlot = () => { if (entry) opts.slots?.release(); };
 
         // Aborted by pause(): its files wait for resume() as they were, not failed and not counted as a retry
         if (entry?.pausedByUser) {
@@ -193,6 +202,7 @@ export function createUploadScheduler(opts) {
             }
             // resume() may have come while this request was still ending: its slot is free now and nobody else
             // would start the files that went back to pending (pump does nothing while paused)
+            releaseSlot();
             pump();
             notify(true);
             return;
@@ -206,6 +216,7 @@ export function createUploadScheduler(opts) {
             else fail(item, r);
         }
 
+        releaseSlot();
         pump();
         notify();
     }
@@ -298,7 +309,11 @@ export function createUploadScheduler(opts) {
         stopped = true;
         for (const timer of retryTimers) clock.clearTimeout(timer);
         retryTimers.clear();
-        for (const { controller } of inFlight.values()) controller.abort();
+        stopWaiting();
+        for (const { controller } of inFlight.values()) {
+            controller.abort();
+            opts.slots?.release();
+        }
         inFlight.clear();
         if (notifyTimer != null) clock.clearTimeout(notifyTimer);
         notifyTimer = null;

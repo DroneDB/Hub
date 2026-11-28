@@ -2,7 +2,7 @@
  * The definition is turned into a real PDF by pdfmake (with its embedded Roboto): the pages have the size and the
  * orientation of the template, there are as many pages as the layout needs, and the file is a PDF that opens.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { buildPdfDocument } from '@/libs/reports/pdf/pdfDocument';
 import { fullAssets, options, pdfModel, threeItems, JPEG_URL } from '@/libs/reports/pdf/pdfDocument.fixtures';
 import { definitionOf, mapFeature, square } from '@/libs/reports/reportModel.fixtures';
@@ -157,6 +157,26 @@ describe('the volumes table of a portrait page', () => {
         const model = pdfModel({ features, templateExtra: { orientation: 'portrait' } });
         const laid = await laidOut(model, fullAssets(model));
         expect(names(pastMargin(laid))).toEqual([]);
+    }, 120000);
+
+    it('has its last column on an A4 portrait page in French, whose numbers are held together by no-break spaces', async () => {
+        const language = vi.spyOn(navigator, 'language', 'get').mockReturnValue('fr-FR');
+        try {
+            // An ordinary pile, and one whose cut is a figure of 18 characters held together by no-break spaces
+            const features = [pile(), mapFeature('s2', '2', 'stockpile', square(9.21, 45.1, 20), {
+                name: 'Pile 2', cutVolume: 123456789012.25, fillVolume: 499.75, netVolume: 12500.5, basePlaneMethod: 'best_fit', materialName: 'Sand',
+                weightEstimate: { tons: 21000.84, basedOn: 'netVolume' }, costEstimate: { amount: 262506.3, currency: 'EUR' }, currency: 'EUR',
+                category: 'stockpile', status: 'open'
+            })];
+            const model = pdfModel({ features, templateExtra: { paper: 'A4', orientation: 'portrait' } });
+            const laid = await laidOut(model, fullAssets(model));
+            // The figures are the French ones: a no-break space for the thousands, a comma for the decimals
+            expect(laid.runs.some(run => run.text.includes('13\u00a0000,25'))).toBe(true);
+            expect(names(pastMargin(laid))).toEqual([]);
+            for (const label of ['Cut', 'Net', 'Material', 'Cost', 'Category', 'Status']) expect(laid.runs.some(run => run.text.trim() === label), label).toBe(true);
+        } finally {
+            language.mockRestore();
+        }
     }, 120000);
 
     it('has a long unbroken assignee and a long word of a description wrap on the item page', async () => {

@@ -53,6 +53,18 @@ describe('ReportPdfProgressDialog', () => {
         expect(wrapper.emitted('close')).toBeUndefined();
     });
 
+    it('keeps Cancel while the pages are laid out in a worker, which a cancel stops', async () => {
+        const wrapper = await render({ mode: 'download', done: 4, total: 4, laying: true, layoutCancellable: true });
+        expect(text()).toContain('Laying out the pages');
+        expect(text()).not.toContain('cannot be cancelled');
+        expect(document.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')).toBeNull();
+        const cancel = document.querySelector('[data-cancel]');
+        expect(cancel.disabled).toBe(false);
+        cancel.click();
+        await wrapper.vm.$nextTick();
+        expect(wrapper.emitted('close')).toEqual([['cancel']]);
+    });
+
     it('says the pages are being laid out, and offers no way to cancel, while the library lays them out: it cannot be stopped', async () => {
         const wrapper = await render({ mode: 'download', done: 4, total: 4, laying: true });
         expect(text()).toContain('Laying out the pages');

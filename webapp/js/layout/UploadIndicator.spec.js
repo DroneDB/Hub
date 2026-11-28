@@ -87,9 +87,11 @@ beforeEach(() => {
     setActivePinia(createPinia());
     uploads = useUploadsStore();
 });
-afterEach(() => {
+afterEach(async () => {
     wrapper?.unmount();
     document.body.innerHTML = '';
+    // The queues of a page share their request slots: a queue a test leaves running would hold them in the next test
+    await uploads.cancelAll();
 });
 
 describe('the indicator', () => {

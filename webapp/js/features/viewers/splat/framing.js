@@ -10,6 +10,21 @@ import { estimatedUp } from './upAxis';
  * keeps with its `userInteracted` flag.
  */
 
+/**
+ * The `onMode` hook the viewer gives its presentation: the mode is shown, and an orbit, a tour or a flight is the user
+ * taking the camera, so the retry of the framing (a paged file that was not ready) does not pull the view back to the
+ * opening one, whether the move is still going or has ended.
+ * @param {(mode: string | null) => void} show  shows the mode (null: none)
+ * @param {() => void} takeCamera  marks the camera as the user's
+ * @returns {(mode: string | null) => void}
+ */
+export function presentationModeHook(show, takeCamera) {
+    return mode => {
+        show(mode);
+        if (mode) takeCamera();
+    };
+}
+
 export const FRAME_RETRY_MS = 250;
 // About ten seconds
 export const FRAME_ATTEMPTS = 40;

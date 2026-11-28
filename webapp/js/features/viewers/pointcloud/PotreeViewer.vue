@@ -255,9 +255,11 @@ async function loadViewer() {
     viewer.useHQ = !isMobile();
     applyUnits();
 
-    // A GeoPackage dropped on the page is refused: Potree would request libraries that the Hub does not ship
-    refuseUnsupportedDrops(session, names => notify.warn(
-        `${names.join(', ')} cannot be shown in the point cloud viewer. Open a GeoPackage in the map viewer.`, { summary: 'File not shown' }));
+    // A GeoPackage dropped on the page is refused: Potree would request libraries that the Hub does not ship. The other
+    // files of the drop go to Potree when the browser can send them alone
+    refuseUnsupportedDrops(session, (names, { othersRefused }) => notify.warn(
+        `${names.join(', ')} cannot be shown in the point cloud viewer. Open a GeoPackage in the map viewer.`
+        + (othersRefused ? ' Drop the other files again without the GeoPackage.' : ''), { summary: 'File not shown' }));
 
     // The GUI loads in two requests: when the viewer was left before they came, there is nothing to set up (the session
     // removes what the GUI still adds)

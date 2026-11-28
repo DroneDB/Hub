@@ -245,9 +245,13 @@ export default {
                 this.deleting = null;
 
             } catch (e) {
-                this.$notify.error('Failed to delete organization: ' + (e.message || 'Unknown error'));
-                this.error = e.message || 'Failed to delete organization';
+                // The question is closed, so the error shows in this window and not behind the question; it is shown
+                // once, here, with no toast
+                this.showDeleteDialog = false;
+                this.orgToDelete = null;
                 this.deleting = null;
+                const prefix = 'Failed to delete organization';
+                this.error = e?.message ? (e.message.startsWith(prefix) ? e.message : `${prefix}: ${e.message}`) : prefix;
             }
         },
 

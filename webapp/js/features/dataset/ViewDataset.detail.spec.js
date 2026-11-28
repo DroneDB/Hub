@@ -126,6 +126,19 @@ describe('ViewDataset detail panel follows the list', () => {
         expect(wrapper.find('.panel-stub').exists()).toBe(false);
     });
 
+    it('closes the panel when the list clears its selection and says so with no file (Clear selection of the table)', async () => {
+        const file = item('DJI_0022.JPG');
+        await open({ files: [file, item('DJI_0023.JPG', false)] });
+        h_.explorerAttrs.onSelectionChanged(file);
+        await vi.waitFor(() => expect(wrapper.find('.panel-stub').exists()).toBe(true));
+
+        h_.listing.files.value[0].selected = false;
+        h_.explorerAttrs.onSelectionChanged();
+        await flushPromises();
+
+        expect(wrapper.find('.panel-stub').exists()).toBe(false);
+    });
+
     it('shows the next selected item when the shown one is removed but others stay selected', async () => {
         const [a, b] = [item('a.jpg'), item('b.jpg')];
         await open({ files: [a, b] });

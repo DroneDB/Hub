@@ -30,8 +30,14 @@ const DECIMAL_DIGIT = /\p{Nd}/gu;
 /** The Arabic signs of a number and what they are in ASCII */
 const ARABIC_SIGNS = /** @type {Record<string, string>} */ ({ '\u066a': '%', '\u066b': '.', '\u066c': ',' });
 const ARABIC_SIGN = /[\u066a-\u066c]/g;
-/** A run with no space, hyphen or slash in it and no break already: the line cannot be broken inside it */
-const UNBROKEN = new RegExp(`[^\\s${ZERO_WIDTH_SPACE}\\-/]{${MOST_UNBROKEN + 1},}`, 'gu');
+/**
+ * The spaces where the library breaks a line: every white space but the no-break ones (U+00A0, which this pass writes
+ * for U+202F, the figure space U+2007, U+202F itself and U+FEFF), at which it never breaks. A French number or amount is
+ * one run with no-break spaces in it.
+ */
+const BREAKING_SPACES = '\\t\\n\\v\\f\\r \\u1680\\u2000-\\u2006\\u2008-\\u200a\\u2028\\u2029\\u205f\\u3000';
+/** A run with no breaking space, hyphen or slash in it and no break already: the line cannot be broken inside it */
+const UNBROKEN = new RegExp(`[^${BREAKING_SPACES}${ZERO_WIDTH_SPACE}\\-/]{${MOST_UNBROKEN + 1},}`, 'gu');
 
 const IS_DIGIT = /^\p{Nd}$/u;
 const decimalDigit = (/** @type {number} */ codePoint) => IS_DIGIT.test(String.fromCodePoint(codePoint));

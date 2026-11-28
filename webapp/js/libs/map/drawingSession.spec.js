@@ -9,7 +9,7 @@ import View from 'ol/View';
 import Draw from 'ol/interaction/Draw';
 import DragPan from 'ol/interaction/DragPan';
 import { Vector as VectorSource } from 'ol/source';
-import { createToolLock, startDrawingSession, endSessionOf } from './drawingSession';
+import { createToolLock, startDrawingSession, endSessionOf, drawingOwnsContextMenu } from './drawingSession';
 
 let map;
 let target;
@@ -303,6 +303,40 @@ describe('the context menu', () => {
         const next = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
         map.getViewport().dispatchEvent(next);
         expect(next.defaultPrevented).toBe(false);
+    });
+
+    it('belongs to the tool for the map owner while a session runs, and once after the right click that ended it', () => {
+        expect(drawingOwnsContextMenu(map)).toBe(false);
+        start({ once: true });
+        expect(drawingOwnsContextMenu(map)).toBe(true);
+        addPoint(10, 10);
+        addPoint(20, 20);
+        rightClick();
+        expect(session.active).toBe(false);
+        // The contextmenu that follows the release
+        expect(drawingOwnsContextMenu(map)).toBe(true);
+        // The next one is the page's
+        expect(drawingOwnsContextMenu(map)).toBe(false);
+    });
+
+    it('is the page\'s again after a session that ended with Esc, and after the late menu waited too long', () => {
+        start();
+        session.end();
+        expect(drawingOwnsContextMenu(map)).toBe(false);
+
+        const now = vi.spyOn(performance, 'now');
+        try {
+            start({ once: true });
+            addPoint(10, 10);
+            addPoint(20, 20);
+            now.mockReturnValue(1000);
+            rightClick();
+            expect(session.active).toBe(false);
+            now.mockReturnValue(2000);
+            expect(drawingOwnsContextMenu(map)).toBe(false);
+        } finally {
+            now.mockRestore();
+        }
     });
 
     it('stays away from the map while the session runs and comes back after it', () => {

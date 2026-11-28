@@ -62,17 +62,19 @@ export const useAuthStore = defineStore('auth', () => {
 
     /**
      * Another tab signed in or out: the token (or the whole storage, key null) changed. This tab follows it, and a
-     * session that ended there is told once, with the way back in (the `signed-out` notice).
+     * session that ended there is told once, with the way back in (the `signed-out` notice). The feature flags are the
+     * user's: they are loaded again whenever the user changes (signed out, signed in, another user signed in), not for
+     * a token the same user renewed.
      * @param {StorageEvent} e
      */
     function onStorage(e) {
         if (e.key !== null && !e.key.startsWith(`${reg.url}_jwt_token`)) return;
         const wasLoggedIn = isLoggedIn.value;
+        const userBefore = username.value;
         sync();
-        if (wasLoggedIn && !isLoggedIn.value) {
+        if (wasLoggedIn && !isLoggedIn.value)
             notify.info(SIGNED_OUT_TEXT, { summary: 'Signed out', life: 'long', action: { label: 'Sign in', run: signIn } });
-            void refreshFeatures().catch(() => { });
-        }
+        if (wasLoggedIn !== isLoggedIn.value || userBefore !== username.value) void refreshFeatures().catch(() => { });
     }
     // lifetime: app (the store lives as long as the page)
     if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);

@@ -60,7 +60,8 @@ const AMBIGUOUS_STATUSES = new Set([0, 502, 504]);
  * @param {boolean} [deps.receipts] whether the endpoint keeps receipts by X-Upload-Id (default true)
  * @param {string} [deps.batchInfoUrl] without receipts: where the files of the batch are listed (`GET`, `{ entries: [{ path }] }`)
  * @param {() => string|null} deps.authToken
- * @param {(url: string) => Promise<{status: number, body: any}>} deps.getJson GET with auth, never throws for HTTP statuses
+ * @param {(url: string, init?: { signal?: AbortSignal }) => Promise<{status: number, body: any}>} deps.getJson GET with
+ *   auth, never throws for HTTP statuses; `signal` aborts it (it then answers status 0)
  * @param {(item) => string} deps.destination the dataset path of an item
  * @param {() => boolean} [deps.canSend] whether a request may start now (the session the upload belongs to goes on)
  * @param {() => void} [deps.onUnauthorized] a request was refused with 401
@@ -92,11 +93,17 @@ export function createUploadRequests(deps) {
         return res;
     }
 
-    async function getJson(url) {
+    async function getJson(/** @type {[string, { signal?: AbortSignal }?]} */ ...request) {
         mayStart();
-        const res = await deps.getJson(url);
+        const res = await deps.getJson(...request);
         if (res.status === 401) deps.onUnauthorized?.();
         return res;
+    }
+
+    // A job aborted while it waited for an answer (the user paused): it stops as the transport would, with an
+    // AbortError, and reports nothing more (a file it called uploaded would be processing, and no pause gives it back)
+    function stopIfAborted(signal) {
+        if (signal?.aborted) throw Object.assign(new Error('Upload aborted'), { name: 'AbortError' });
     }
 
     // One id per file and destination, kept across retries: the server answers a repeat from its
@@ -243,9 +250,12 @@ export function createUploadRequests(deps) {
         const totalChunks = Math.max(1, Math.ceil(item.size / chunkBytes));
 
         // Resuming: only the chunks the server does not have yet. A file the server holds no upload of sends them all
+        // The list is the batch's, shared by its files: a pause of this one does not abort it
         const listed = await openUploadIds();
+        stopIfAborted(hooks.signal);
         const held = listed === null || listed.has(fileId) || sentTo.has(fileId);
-        const status = held ? await getJson(`${deps.baseUrl}/obj/chunk/${fileId}`) : null;
+        const status = held ? await getJson(`${deps.baseUrl}/obj/chunk/${fileId}`, { signal: hooks.signal }) : null;
+        stopIfAborted(hooks.signal);
         let missing = status?.status === 200 && status.body?.missing
             ? status.body.missing
             : Array.from({ length: totalChunks }, (_, i) => i);
@@ -283,6 +293,7 @@ export function createUploadRequests(deps) {
             hooks.onStored?.(item.id);
         }
 
+        stopIfAborted(hooks.signal);
         hooks.onUploaded([item.id]);
         // Replace after a refused commit: the stored chunks are committed with the flag
         const commitForm = new FormData();

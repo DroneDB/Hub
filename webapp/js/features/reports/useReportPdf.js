@@ -8,8 +8,9 @@
  * seconds of the click, and a PDF takes longer), the message that it was published has Open PDF instead.
  *
  * Before the work: a report with many photos has them made smaller, and says so; a report with characters the font of the
- * PDF cannot draw asks whether to go on (they print as empty boxes). From the moment the library lays the pages out a
- * cancel can no longer stop it (the tab is busy until it is done), so the dialog says that and offers none.
+ * PDF cannot draw asks whether to go on (they print as empty boxes). The library lays the pages out in a worker, which
+ * Cancel stops; where no worker can start it lays them out on the page, and from that moment a cancel can no longer stop
+ * it (the tab is busy until it is done), so the dialog says that and offers none.
  *
  *   const pdf = useReportPdf({ model, dataset, uid, canWrite, dialogs });
  *   await pdf.run('download');
@@ -40,8 +41,10 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
     const mode = shallowRef(/** @type {'download' | 'publish' | null} */ (null));
     const progress = ref({ done: 0, total: 0 });
     const writing = ref(false);
-    /** The library is laying out the pages: nothing can stop it now */
+    /** The library is laying out the pages */
     const laying = ref(false);
+    /** ...in a worker, which a cancel stops (on the page nothing can stop it) */
+    const layoutCancellable = ref(false);
     const running = computed(() => mode.value !== null);
     /** @type {AbortController | null} */
     let controller = null;
@@ -95,6 +98,7 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
         progress.value = { done: 0, total: 0 };
         writing.value = false;
         laying.value = false;
+        layoutCancellable.value = false;
         /** @type {any} */
         let shown = null;
         try {
@@ -105,13 +109,19 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
                 dataset,
                 signal: controller.signal,
                 onProgress: next => { progress.value = next; },
-                onWriting: () => { writing.value = true; laying.value = false; },
+                onWriting: () => { writing.value = true; laying.value = false; layoutCancellable.value = false; },
                 confirmReplace,
                 confirmUnsupported,
                 onNotice: message => notify.warn(message, { summary: 'The photos are made smaller' }),
-                onLayout: () => { laying.value = true; },
+                onLayout: (/** @type {{ cancellable?: boolean } | undefined} */ layout) => {
+                    laying.value = true;
+                    layoutCancellable.value = layout?.cancellable === true;
+                },
                 onGenerating: () => {
-                    shown = dialogs.open(ReportPdfProgressDialog, () => ({ mode: requested, done: progress.value.done, total: progress.value.total, writing: writing.value, laying: laying.value }));
+                    shown = dialogs.open(ReportPdfProgressDialog, () => ({
+                        mode: requested, done: progress.value.done, total: progress.value.total, writing: writing.value,
+                        laying: laying.value, layoutCancellable: layoutCancellable.value
+                    }));
                     // Cancel, the close button and Escape all answer 'cancel'
                     shown.then((/** @type {string | undefined} */ answer) => { if (answer !== 'done') cancel(); });
                 }
@@ -125,9 +135,10 @@ export function useReportPdf({ model, dataset, uid, canWrite, dialogs, exportPdf
             mode.value = null;
             writing.value = false;
             laying.value = false;
+            layoutCancellable.value = false;
             controller = null;
         }
     }
 
-    return { run, cancel, running, mode, progress, writing, laying };
+    return { run, cancel, running, mode, progress, writing, laying, layoutCancellable };
 }

@@ -22,7 +22,9 @@
  * - when the viewer is closed before its GUI has finished loading (sidebar.html, then profile.html), removes what the
  *   GUI adds after that moment too, once it has added it (viewer.onGUILoaded): the profile window, its renderer and
  *   its resize handler would stay for the life of the page;
- * - gives jQuery's $(fn) back its own implementation when the viewer closes (the replacement above is the session's);
+ * - gives jQuery's $(fn) back its own implementation when the viewer closes (the replacement above is the session's),
+ *   or, for a viewer closed while its GUI still loads, once that GUI has made its last $(fn) calls: those go through
+ *   the replacement too, or jQuery would keep them, and the closed viewer with them, for the life of the page;
  * - tells once, through `onReadRefused`, that the server refused a read of the COPC for good (a 401 or a 404), which
  *   Potree then never asks for again;
  * - reads the COPC files of its viewer through the Hub's range transport (Potree.createCopcGetter,
@@ -206,13 +208,21 @@ export class PotreeSession {
         // profile window, the colour pickers and the resize handler after this moment: the same clean-up runs again then
         const leftovers = () => releaseGuiLeftovers(this.win, $, viewer, bodyBefore, windowHandlersBefore);
         leftovers();
-        if (viewer && !viewer.guiLoaded && typeof viewer.onGUILoaded === 'function') viewer.onGUILoaded(leftovers);
+        // $(fn) is jQuery's own again once this viewer makes no more $(fn) calls (the replacement of create() was its)
+        const restoreReady = this.restoreReady ?? (() => {});
+        this.restoreReady = null;
+        if (viewer && !viewer.guiLoaded && typeof viewer.onGUILoaded === 'function') {
+            // The GUI still loads: its next $(fn) calls (the sidebar, then the one that marks the GUI loaded and runs
+            // these tasks) must not reach jQuery's own, which keeps them. Its tasks run inside the last of them
+            viewer.onGUILoaded(() => {
+                leftovers();
+                restoreReady();
+            });
+        } else {
+            restoreReady();
+        }
         this.bodyBefore = null;
         this.windowHandlersBefore = null;
-
-        // $(fn) is jQuery's own again (the replacement of create() was this viewer's)
-        this.restoreReady?.();
-        this.restoreReady = null;
 
         if (this.win && this.win.viewer === viewer) delete this.win.viewer;
         this.viewer = null;
@@ -224,22 +234,35 @@ export class PotreeSession {
 // readyList, which is never notified and never emptied: the closures there share their scope
 // with fn, so every fn (and what it references: Potree's viewer) stays reachable for the life
 // of the page. Once the document is ready, $(fn) only has to call fn soon, which needs no list.
+// The replacement is shared by the viewers that need it at the same time (a closed one whose GUI still loads, the
+// open one): the returned function says that one of them no longer does, and the last one puts jQuery's own back.
 function nonRetainingReady($, doc) {
-    const ready = $?.fn?.ready;
-    // Another viewer of the page has it replaced already, and puts it back
-    if (typeof ready !== 'function' || ready.nonRetaining) return () => {};
-    const patched = function (fn) {
-        if ($.isReady && typeof fn === 'function') {
-            setTimeout(() => fn.call(doc, $));
-            return this;
-        }
-        return ready.call(this, fn);
-    };
-    patched.nonRetaining = true;
-    $.fn.ready = patched;
-    // Put back with the viewer: left in place, the replacement (and what it was made in) outlives every viewer
+    const current = $?.fn?.ready;
+    if (typeof current !== 'function') return () => {};
+    let patched = current;
+    if (!current.nonRetaining) {
+        const ready = current;
+        patched = function (fn) {
+            if ($.isReady && typeof fn === 'function') {
+                setTimeout(() => fn.call(doc, $));
+                return this;
+            }
+            return ready.call(this, fn);
+        };
+        patched.nonRetaining = true;
+        patched.original = ready;
+        patched.holders = 0;
+        $.fn.ready = patched;
+    }
+    patched.holders++;
+    let released = false;
+    // Put back with the last viewer that needs it: left in place, the replacement (and what it was made in) outlives
+    // every viewer
     return () => {
-        if ($.fn.ready === patched) $.fn.ready = ready;
+        if (released) return;
+        released = true;
+        if (--patched.holders > 0) return;
+        if ($.fn.ready === patched) $.fn.ready = patched.original;
     };
 }
 

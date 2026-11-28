@@ -78,7 +78,11 @@ beforeEach(() => {
     uploads = useUploadsStore();
     emitter.on(UPLOAD_ACTIVITY_EVENT, onActivity);
 });
-afterEach(() => emitter.off(UPLOAD_ACTIVITY_EVENT, onActivity));
+afterEach(async () => {
+    emitter.off(UPLOAD_ACTIVITY_EVENT, onActivity);
+    // The queues of a page share their request slots: a queue a test leaves running would hold them in the next test
+    await uploads.cancelAll();
+});
 
 describe('the queue outlives the dialog', () => {
     it('keeps uploading after the dialog that showed it is gone, and says so to the unload guard', async () => {

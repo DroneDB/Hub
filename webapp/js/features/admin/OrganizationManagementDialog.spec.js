@@ -90,6 +90,26 @@ describe('OrganizationManagementDialog delete', () => {
     });
 });
 
+describe('OrganizationManagementDialog delete that fails', () => {
+    it('closes the question and says why once, in the window, with no toast', async () => {
+        reg.orgs.deleteOrganization = vi.fn(() => Promise.reject(new Error('The organization has datasets')));
+        const notify = { success: vi.fn(), error: vi.fn() };
+        wrapper = mount(OrganizationManagementDialog, { attachTo: document.body, global: { plugins: [PrimeVue], mocks: { $notify: notify } } });
+        await flushPromises();
+        [...document.querySelectorAll('button')].find(b => b.title === 'Delete Organization').click();
+        await flushPromises();
+        await wrapper.findAllComponents(Dialog).at(-1).vm.$emit('show');
+        await type('acme');
+        deleteButton().click();
+        await flushPromises();
+
+        expect(notify.error).not.toHaveBeenCalled();
+        expect(dialog()).toBeNull();
+        const said = document.body.textContent.split('Failed to delete organization: The organization has datasets').length - 1;
+        expect(said).toBe(1);
+    });
+});
+
 describe('OrganizationManagementDialog create', () => {
     async function create(name) {
         reg.orgs.createOrganization = vi.fn(data => Promise.resolve(data));

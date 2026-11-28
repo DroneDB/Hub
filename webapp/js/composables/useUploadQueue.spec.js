@@ -3,10 +3,22 @@
  * rollback of its share batch as the cleanup; the dataset page passes none, because the files already sent stay.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { useUploadQueue } from './useUploadQueue';
+import { useUploadQueue as makeUploadQueue } from './useUploadQueue';
 import { notify } from '@/libs/notify';
 
 const flush = () => new Promise(r => setTimeout(r, 0));
+
+// The queues of a page share their request slots: every queue a test makes is cancelled after it, so a queue left
+// running does not hold the slots of the next test
+const made = [];
+const useUploadQueue = opts => {
+    const queue = makeUploadQueue(opts);
+    made.push(queue);
+    return queue;
+};
+afterEach(async () => {
+    for (const queue of made.splice(0)) await queue.cancel();
+});
 
 /** A queue whose requests never end: a file in flight until it is cancelled */
 function heldQueue() {

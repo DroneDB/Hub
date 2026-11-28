@@ -311,9 +311,10 @@ export default {
         const taskActions = useTaskActions({
             datasetOf: () => props.dataset,
             deleteTask: task => props.dataset.deleteTask(task.taskId),
+            // A row action (Cancel, Retry, Delete) changes its row: the user stays on the page of that row
             refresh: async () => {
                 await taskMonitor.forceRefresh(props.dataset);
-                await vm.loadTasks();
+                await vm.loadTasks({ keepPage: true });
             },
             confirm,
             toolTitle: task => formatting.toolTitle(task.toolId, vm.tools),
@@ -502,12 +503,19 @@ export default {
             }
         },
 
-        async loadTasks() {
+        /**
+         * Reads the rows from the shared store. The page goes back to the first one (a new task is on top), unless
+         * `keepPage`: a reload of the same list (a row action, Refresh, the tab shown again) keeps the page the user is
+         * on, clamped onto the last one when the list got shorter. The tab is one dataset's, so its list stays the same
+         * list across a tab switch.
+         * @param {{ keepPage?: boolean }} [options]
+         */
+        async loadTasks({ keepPage = false } = {}) {
             this.loading = true;
             try {
                 // Read from taskMonitor shared store to avoid duplicate DB roundtrips.
                 this.tasks = taskMonitor.getTasks(this.dataset) || [];
-                this.applyFilters();
+                this.applyFilters(!keepPage);
             } catch (e) {
                 console.error('Failed to load tasks:', e);
                 this.tasks = [];
@@ -520,13 +528,13 @@ export default {
         async refreshData() {
             // Trigger an immediate fetch from taskMonitor and wait for it to land before reading the store.
             await taskMonitor.forceRefresh(this.dataset);
-            await this.loadTasks();
+            await this.loadTasks({ keepPage: true });
         },
 
-        // Called by TabSwitcher when the Tasks tab is activated. Refreshes the task list.
+        // Called by TabSwitcher when the Tasks tab is activated. Refreshes the task list, on the page it was left on.
         async onTabActivated() {
             await taskMonitor.forceRefresh(this.dataset);
-            await this.loadTasks();
+            await this.loadTasks({ keepPage: true });
         },
 
         // Re-read the shared store after a background poll. Keeps the current
@@ -876,7 +884,7 @@ export default {
                 this.loading = true;
                 await this.dataset.clearTasks(this.selectedTool || undefined);
                 await taskMonitor.forceRefresh(this.dataset);
-                await this.loadTasks();
+                await this.loadTasks({ keepPage: true });
                 this.$notify.success('The concluded tasks have been removed.', { summary: 'Tasks cleared' });
             } catch (e) {
                 this.$notify.error(e.message, { summary: 'Clear failed' });

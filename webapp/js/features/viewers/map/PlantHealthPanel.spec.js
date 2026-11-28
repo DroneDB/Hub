@@ -301,6 +301,30 @@ describe('PlantHealthPanel rescale fields', () => {
     });
 });
 
+describe('PlantHealthPanel opened again on another raster', () => {
+    it('shows the style of the second raster, and its first edit keeps that style', async () => {
+        await renderWith(CLEAN_STATS, {
+            pick: null, initialParams: { formula: 'NDVI', colormap: 'rdylgn', rescale: '-0.272,0.644', stretch: 'percentile' }
+        });
+        // Closed (the map keeps the panel mounted), then opened on another raster whose layer has a style
+        await wrapper.setProps({ visible: false, filePath: null, initialParams: null });
+        await flushPromises();
+        const style = { formula: 'EXG', colormap: 'viridis', rescale: '0.2,0.7', stretch: 'percentile' };
+        await wrapper.setProps({ visible: true, filePath: 'second/ortho.tif', initialParams: style });
+        await flushPromises();
+
+        expect(wrapper.find('#plant-health-panel-formula').element.value).toBe('EXG');
+        expect(wrapper.find('#plant-health-panel-rescale-min').element.value).toBe('0.2');
+        expect(wrapper.find('#plant-health-panel-rescale-max').element.value).toBe('0.7');
+
+        await wrapper.find('#plant-health-panel-rescale-max').setValue('0.8');
+        await new Promise(resolve => setTimeout(resolve, 400));
+        await flushPromises();
+        const last = wrapper.emitted('vizParamsChanged').at(-1)[0];
+        expect(last).toMatchObject({ formula: 'EXG', colormap: 'viridis', rescale: '0.2,0.8' });
+    });
+});
+
 describe('PlantHealthPanel close', () => {
     it('closes without changing the style of the layer', () => {
         const vm = { $emit: vi.fn(), reset: vi.fn() };

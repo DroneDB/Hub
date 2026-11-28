@@ -386,6 +386,9 @@ export default {
                 this.indexStretch = null;
                 this.availableFormulas = [];
                 this.availableColormaps = INDEX_COLORMAPS;
+                // The panel stays mounted while it is closed: a raster opened after it takes the style it is opened
+                // with (its layer's), not the defaults that the first edit would then write over that style
+                this._initialParamsApplied = false;
                 if (val) this.loadRasterInfo();
             },
             immediate: true

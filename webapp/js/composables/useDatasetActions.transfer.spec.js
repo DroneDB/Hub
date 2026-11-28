@@ -15,7 +15,7 @@ vi.mock('@/features/dataset/ShareEmbed.vue', () => ({ default: {} }));
 
 const files = [{ entry: { path: 'a.jpg' } }, { entry: { path: 'b.jpg' } }];
 
-function transferAs(canWrite) {
+function transferAs(canWrite, sent = files) {
     const listing = { removed: vi.fn() };
     const dialogs = { open: vi.fn() };
     const actions = useDatasetActions({
@@ -24,7 +24,7 @@ function transferAs(canWrite) {
     });
     actions.transfer(files);
     const props = dialogs.open.mock.calls[0][1];
-    props.onClose('transferred', files);
+    props.onClose('transferred', sent);
     return { props, listing };
 }
 
@@ -43,5 +43,12 @@ describe('the transfer of the dataset page', () => {
         expect(props.keepSource).toBe(true);
         expect(listing.removed).not.toHaveBeenCalled();
         expect(success).toHaveBeenCalledWith('2 items copied successfully', { summary: 'Copy Complete' });
+    });
+
+    it('drops from the list only the files that moved when the transfer failed part-way', () => {
+        success.mockClear();
+        const { listing } = transferAs(true, [files[0]]);
+        expect(listing.removed).toHaveBeenCalledWith(['a.jpg']);
+        expect(success).toHaveBeenCalledWith('1 item transferred successfully', { summary: 'Transfer Complete' });
     });
 });

@@ -6,8 +6,10 @@
  * - One file on show: the measurements are in its sidecar, `<name>_measurements.geojson` (the owner is that file).
  * - Anything else (a folder's children, several files, a view with layers): `measurements.geojson` in the folder of
  *   the first file on show (the dataset root for a file at the root). Where the listing shows no such file and shows
- *   the sidecar of a raster on show (measurements an earlier map saved there), that sidecar is the owner: it is read
- *   and saved as it was, and the folder file is made only when no raster has one.
+ *   the sidecar of a drawn file on show (measurements an earlier map saved there while that file was alone), that
+ *   sidecar is the owner: it is read and saved as it was, and the folder file is made only when no drawn file has
+ *   one. Any type the map draws counts, as any of them owns its sidecar while it is alone: a photo added beside a
+ *   point cloud does not move the cloud's measurements to a new, empty folder file.
  *
  * Only the files the map draws count (drawnByMap): a notes file or a PDF in the folder does not make a raster one of
  * several, so that an upload of one cannot move the measurements to another file.
@@ -65,30 +67,30 @@ export function standaloneMeasurementEntry(files) {
 }
 
 /**
- * The raster on show, the first, whose sidecar is in the listing: measurements that were saved for it alone, which no
- * file of the folder replaces, when the folder has no measurements file of its own.
+ * The drawn file on show, the first, whose sidecar is in the listing: measurements that were saved for it alone, which
+ * no file of the folder replaces, when the folder has no measurements file of its own.
  * @param {ShownFile[]} files
  * @param {ShownFile[]} shown  the files the map draws
  * @returns {ShownFile | null}
  */
-function rasterWithListedSidecar(files, shown) {
+function drawnFileWithListedSidecar(files, shown) {
     const listed = new Set(files.map(shownPath));
     const folderFile = standaloneMeasurementEntry(files).path;
     if (listed.has(folderFile)) return null;
-    return shown.find(f => f.entry && f.entry.type === ddb.entry.type.GEORASTER && listed.has(sidecarPath(f.entry.path))) || null;
+    return shown.find(f => f.entry && listed.has(sidecarPath(f.entry.path))) || null;
 }
 
 /**
  * The entry the measurements belong to: the one file on show (its sidecar holds them), else the folder (the file of
- * the folder of the first file), else, when the folder has none and a raster has a sidecar, that raster.
+ * the folder of the first file), else, when the folder has none and a drawn file has a sidecar, that file.
  * @param {ShownFile[]} files
  * @returns {{ path: string, type?: number }}
  */
 export function measurementOwnerEntry(files) {
     const shown = measuredFiles(files);
     if (shown.length === 1) return shown[0].entry || { path: /** @type {string} */ (shownPath(shown[0])) };
-    const raster = rasterWithListedSidecar(files, shown);
-    return raster ? /** @type {{ path: string, type?: number }} */ (raster.entry) : standaloneMeasurementEntry(files);
+    const owner = drawnFileWithListedSidecar(files, shown);
+    return owner ? /** @type {{ path: string, type?: number }} */ (owner.entry) : standaloneMeasurementEntry(files);
 }
 
 /**

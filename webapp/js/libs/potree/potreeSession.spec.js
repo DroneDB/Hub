@@ -367,6 +367,74 @@ describe('PotreeSession, jQuery ready after the viewer is closed', () => {
     });
 });
 
+describe('PotreeSession, jQuery ready for a viewer closed while its GUI still loads', () => {
+    // Potree's loadGUI: $(fn) for the sidebar, and inside it, once profile.html is in, the $(fn) that marks the GUI
+    // loaded and runs the tasks that waited for it (viewer.onGUILoaded)
+    function loadingViewer($) {
+        const viewer = fakeViewer();
+        viewer.guiLoaded = false;
+        viewer.guiLoadTasks = [];
+        viewer.onGUILoaded = callback => { if (viewer.guiLoaded) callback(); else viewer.guiLoadTasks.push(callback); };
+        viewer.guiCallbacks = [];
+        viewer.finishGui = () => new Promise(resolve => {
+            const sidebar = () => {
+                const loaded = () => {
+                    viewer.guiLoaded = true;
+                    for (const task of viewer.guiLoadTasks) task();
+                    resolve();
+                };
+                viewer.guiCallbacks.push(loaded);
+                $(loaded);
+            };
+            viewer.guiCallbacks.push(sidebar);
+            $(sidebar);
+        });
+        return viewer;
+    }
+
+    it('sends the GUI\'s late $(fn) calls through the replacement, then gives jQuery its own ready back', async () => {
+        const $ = vendoredJQuery();
+        await new Promise(resolve => $(resolve));
+        window.$ = $;
+        const own = $.fn.ready;
+        // jQuery's own ready, which keeps every fn it is given
+        const keeping = vi.fn(function (fn) { return own.call(this, fn); });
+        $.fn.ready = keeping;
+
+        const session = new PotreeSession({ window });
+        const viewer = session.create(() => loadingViewer($), null);
+        session.dispose();
+        // Closed before the GUI is in: the GUI's calls still come
+        expect($.fn.ready.nonRetaining).toBe(true);
+
+        await viewer.finishGui();
+
+        const kept = keeping.mock.calls.map(([fn]) => fn);
+        for (const fn of viewer.guiCallbacks) expect(kept).not.toContain(fn);
+        expect($.fn.ready).toBe(keeping);
+        delete window.$;
+    });
+
+    it('keeps the replacement for the open viewer when the closed one\'s GUI ends, and puts it back with the last', async () => {
+        const $ = vendoredJQuery();
+        await new Promise(resolve => $(resolve));
+        window.$ = $;
+        const own = $.fn.ready;
+
+        const closed = new PotreeSession({ window });
+        const late = closed.create(() => loadingViewer($), null);
+        closed.dispose();
+        const open = new PotreeSession({ window });
+        open.create(() => fakeViewer(), null);
+
+        await late.finishGui();
+        expect($.fn.ready.nonRetaining).toBe(true);
+        open.dispose();
+        expect($.fn.ready).toBe(own);
+        delete window.$;
+    });
+});
+
 describe('PotreeSession.create', () => {
     it('owns the window and document listeners the viewer constructor adds, and restores addEventListener', () => {
         const onOrientation = vi.fn();

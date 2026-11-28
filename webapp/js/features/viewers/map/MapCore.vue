@@ -158,7 +158,7 @@ import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fi
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
 import { ViewZoomCap, rasterFootprint } from '@/libs/map/rasterLayers';
 import { visibleBbox } from '@/libs/map/rasterExport';
-import { endSessionOf } from '@/libs/map/drawingSession';
+import { endSessionOf, drawingOwnsContextMenu } from '@/libs/map/drawingSession';
 import { getVectorColor, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
 
 import { useListenerBag } from '@/composables/useEventListener';
@@ -787,10 +787,12 @@ export default {
             }
         },
 
-        // Right click. Finishing a drawing is the measure control's: the browser menu stays away and nothing is selected. The
-        // map viewer has no selection to toggle (the dataset map's file list), so there the browser keeps its own menu
+        // Right click. Finishing a drawing is the tool's (a measurement, the raster profile line, a stockpile outline or
+        // pick): the browser menu stays away and nothing is selected, also for the contextmenu that a browser sends after
+        // the release of the right click that ended the drawing. The map viewer has no selection to toggle (the dataset
+        // map's file list), so there the browser keeps its own menu
         onContextMenu: function (e) {
-            if (this.measuring) {
+            if (this.measuring || drawingOwnsContextMenu(this.map)) {
                 e.stopPropagation();
                 e.preventDefault();
                 return false;

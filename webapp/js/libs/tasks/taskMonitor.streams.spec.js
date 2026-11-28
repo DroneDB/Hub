@@ -62,6 +62,33 @@ describe('event streams of the task monitor', () => {
         for (const dataset of busy) taskMonitor.forgetBusy(dataset);
     });
 
+    it('opens again, when the page is shown after it was hidden, only the stream of the dataset that is shown', async () => {
+        const registry = makeRegistry();
+        const busy = Array.from({ length: 8 }, () => makeDataset(registry, [importTask]));
+        for (const dataset of busy) taskMonitor.trackBusy(dataset, 'imp', 'importing');
+        const page = makeDataset(registry);
+        acquire(page);
+        await vi.waitFor(() => expect(liveStreams()).toHaveLength(1));
+
+        const hidden = vi.spyOn(document, 'hidden', 'get');
+        try {
+            hidden.mockReturnValue(true);
+            document.dispatchEvent(new Event('visibilitychange'));
+            expect(liveStreams()).toHaveLength(0);
+
+            hidden.mockReturnValue(false);
+            const asked = busy.map(dataset => dataset.getTasks.mock.calls.length);
+            document.dispatchEvent(new Event('visibilitychange'));
+            // Every followed dataset is read again once, and only the shown one streams
+            await vi.waitFor(() => busy.forEach((dataset, i) => expect(dataset.getTasks.mock.calls.length).toBeGreaterThan(asked[i])));
+            await vi.waitFor(() => expect(liveStreams()).toHaveLength(1));
+            expect(liveStreams()[0].url).toBe(`https://hub.test${page.baseApi}/tasks/events`);
+        } finally {
+            hidden.mockRestore();
+            for (const dataset of busy) taskMonitor.forgetBusy(dataset);
+        }
+    });
+
     it('opens the stream of a followed dataset when a consumer starts showing it, and closes it when that one leaves', async () => {
         const registry = makeRegistry();
         const dataset = makeDataset(registry, [importTask]);

@@ -190,6 +190,23 @@ export default {
             this.thumbnail = null;
             this.icon = this.file.icon;
         },
+        // Another version of the file under the same name (uploaded again): the tile is the same component (keyed by
+        // the path), but the thumbnail shown is of the old content. The new one is asked for at once when the tile is in
+        // view, else when it comes into view; the old one stays on show until the new one has loaded
+        'file.entry.hash'(hash, before) {
+            if (hash === before) return;
+            this.clearRetryTimer();
+            this.cancelImageRequest();
+            this.loading = false;
+            this.error = null;
+            this.retryNumber = 0;
+            if (this.lazyLoad && this.thumbnailLoader && !this.inView) {
+                // Not in view: the visibility of the tile asks for it (a tile with nothing shown loads when it shows)
+                if (this.thumbnail) this.stale = true;
+                return;
+            }
+            this.loadThumbnail(true);
+        },
         // Another tile size: a thumbnail shown comes again at the step of the new size, now
         // when the tile is in view, else when it comes into view. A tile still waiting for its turn needs nothing:
         // its URL is built when the turn comes.

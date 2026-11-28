@@ -175,6 +175,54 @@ describe('generateReportPdf', () => {
             expect(order).toEqual(['layout', 'createPdf']);
         });
 
+        it('runs away from the page when a worker can lay it out: announced as one a cancel stops, with the model, the images and the origin', async () => {
+            const { dependencies } = libraries();
+            const blob = new Blob(['%PDF-worker']);
+            const jobs = [];
+            dependencies.layout = vi.fn(async job => { jobs.push(job); return blob; });
+            const onLayout = vi.fn();
+            const model = pdfModel();
+
+            expect(await generateReportPdf(model, { dataset, dependencies, origin: ORIGIN, onLayout })).toBe(blob);
+
+            expect(onLayout).toHaveBeenCalledWith({ cancellable: true });
+            expect(dependencies.pdfMake.createPdf).not.toHaveBeenCalled();
+            expect(jobs[0].model).toBe(model);
+            expect(jobs[0].origin).toBe(ORIGIN);
+            expect(jobs[0].assets.figures).toBeInstanceOf(Map);
+        });
+
+        it('is stopped by a cancel while the worker lays it out: no file, at once', async () => {
+            const { dependencies } = libraries();
+            const controller = new AbortController();
+            // A worker that only ends when it is cancelled (as layoutInWorker does); the user cancels while it works
+            dependencies.layout = vi.fn((_job, { signal }) => new Promise((_resolve, reject) => {
+                signal.addEventListener('abort', () => reject(new DOMException('cancelled', 'AbortError')));
+                queueMicrotask(() => controller.abort());
+            }));
+            const made = generateReportPdf(pdfModel(), { dataset, dependencies, origin: ORIGIN, signal: controller.signal });
+            await expect(made).rejects.toMatchObject({ name: 'AbortError' });
+            expect(dependencies.pdfMake.createPdf).not.toHaveBeenCalled();
+        });
+
+        it('is laid out on the page, announced as one nothing stops, when no worker can start', async () => {
+            const { dependencies } = libraries();
+            vi.spyOn(console, 'warn').mockImplementation(() => {});
+            dependencies.layout = vi.fn(async () => { throw Object.assign(new Error('no worker'), { name: 'WorkerUnavailable' }); });
+            const layouts = [];
+            await generateReportPdf(pdfModel(), { dataset, dependencies, origin: ORIGIN, onLayout: layout => layouts.push(layout) });
+            expect(layouts).toEqual([{ cancellable: true }, { cancellable: false }]);
+            expect(dependencies.pdfMake.createPdf).toHaveBeenCalledTimes(1);
+            vi.restoreAllMocks();
+        });
+
+        it('fails with the error of a worker that started, and does not lay the pages out again on the page', async () => {
+            const { dependencies } = libraries();
+            dependencies.layout = vi.fn(async () => { throw new Error('Out of memory'); });
+            await expect(generateReportPdf(pdfModel(), { dataset, dependencies, origin: ORIGIN })).rejects.toThrow('Out of memory');
+            expect(dependencies.pdfMake.createPdf).not.toHaveBeenCalled();
+        });
+
         it('is not announced for a PDF that was stopped before it', async () => {
             const { dependencies } = libraries();
             const onLayout = vi.fn();

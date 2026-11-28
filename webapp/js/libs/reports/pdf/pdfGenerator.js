@@ -5,12 +5,17 @@
  * document definition from the report model, and has the library write it. The progress is the items rendered out of
  * all of them; aborting the signal stops it and nothing is returned.
  *
+ * The library lays the pages out in a worker (pdfWorkerLayout) where the browser can run one: a large report takes it
+ * tens of seconds, during which the page stays responsive and a cancel stops it. Where no worker can start, the pages
+ * are laid out on the page as before, which nothing interrupts: `onLayout` says which.
+ *
  * Two things are decided before the work and told to the user instead of ending in a bad file or a dead tab: the photos
  * of a report that has too many are made smaller or refused (pdfBudget), and the characters no font of the PDF can draw
  * are listed for the user to accept (pdfText).
  */
-import { addSymbolsFont } from '@/libs/reports/pdf/pdfSymbols';
 import { buildPdfDocument } from '@/libs/reports/pdf/pdfDocument';
+import { loadPdfMake } from '@/libs/reports/pdf/pdfLibrary';
+import { WORKER_UNAVAILABLE, canLayOutInWorker, layoutInWorker } from '@/libs/reports/pdf/pdfWorkerLayout';
 import { loadAssets } from '@/libs/reports/pdf/pdfAssets';
 import { planPhotos, reducedText, refusedText } from '@/libs/reports/pdf/pdfBudget';
 import { pageLayout } from '@/libs/reports/pdf/pdfLayout';
@@ -18,28 +23,25 @@ import { unsupportedCharacters } from '@/libs/reports/pdf/pdfText';
 
 /**
  * @typedef {object} PdfDependencies
- * @property {{ createPdf: (definition: any) => { getBlob: () => Promise<Blob> } }} pdfMake
+ * @property {{ createPdf: (definition: any) => { getBlob: () => Promise<Blob> } }} [pdfMake]  the library on the page
+ *   (loaded when it is needed and none is given)
+ * @property {(job: import('./pdfLayoutJob').PdfLayoutJob, options: { signal?: AbortSignal }) => Promise<Blob>} [layout]
+ *   lays the pages out away from the page, which a cancel stops (a worker); rejects with a `WorkerUnavailable` error when
+ *   it cannot start, and the page lays them out itself
  * @property {(text: string) => { size: number, path: string }} qr
  * @property {{ renderMapSnapshot: Function, renderProfileChart: Function, capture3dImageUrl: Function, sharedRenderQueue: import('./pdfAssets').AssetDeps['queue'] }} renderers
  */
 
 /**
- * The libraries of the PDF, loaded on demand. pdfmake takes its fonts from a virtual file system: Roboto (Latin, Greek and
- * Cyrillic) is embedded, and a character in a script it has no glyph for is drawn as the empty box of the font (it is
- * told to the user first: unsupportedCharacters).
+ * The libraries of the PDF, loaded on demand: the PDF library itself only where the pages are laid out on the page (in
+ * a worker, the worker loads it).
  * @returns {Promise<PdfDependencies>}
  */
 export async function loadPdfDependencies() {
-    const [pdfmake, fonts, qr, renderers] = await Promise.all([
-        import(/* webpackChunkName: "pdfmake" */ 'pdfmake/build/pdfmake'),
-        import(/* webpackChunkName: "pdfmake-fonts" */ 'pdfmake/build/vfs_fonts'),
-        import('@/libs/qr'),
-        import('@/libs/reports/snapshots')
-    ]);
-    const pdfMake = /** @type {any} */ (pdfmake).default ?? pdfmake;
-    pdfMake.addVirtualFileSystem(/** @type {any} */ (fonts).default ?? fonts);
-    addSymbolsFont(pdfMake);
-    return { pdfMake, qr: qr.qrCode, renderers };
+    const [qr, renderers] = await Promise.all([import('@/libs/qr'), import('@/libs/reports/snapshots')]);
+    const common = { qr: qr.qrCode, renderers };
+    if (canLayOutInWorker()) return { ...common, layout: layoutInWorker };
+    return { ...common, pdfMake: await loadPdfMake() };
 }
 
 /** The cancel of a PDF that the user was asked about. @param {string} message */
@@ -47,7 +49,8 @@ const stopped = message => new DOMException(message, 'AbortError');
 
 /**
  * Lets the page draw what it was just given (the dialog that says the pages are being laid out) before the library takes
- * the thread for the whole layout: it cannot be interrupted, and a page that was not drawn would look frozen without a word.
+ * the thread for the whole layout on the page: it cannot be interrupted, and a page that was not drawn would look frozen
+ * without a word.
  * @returns {Promise<void>}
  */
 function nextPaint() {
@@ -69,7 +72,8 @@ function nextPaint() {
  * @param {(message: string) => void} [options.onNotice]  what the user should know before the work starts (the photos are made smaller)
  * @param {(characters: string[]) => boolean | Promise<boolean>} [options.confirmUnsupported]  asked with the characters of
  *   the report that the font cannot draw; `false` stops the PDF (the promise rejects with an AbortError). None given: it goes on.
- * @param {() => void} [options.onLayout]  called when the library starts to lay the pages out, which cannot be cancelled
+ * @param {(layout: { cancellable: boolean }) => void} [options.onLayout]  called when the library starts to lay the pages
+ *   out: in a worker, which a cancel stops (`cancellable`), or on the page, which nothing interrupts
  * @returns {Promise<Blob>}
  */
 export async function generateReportPdf(model, { dataset, signal, onProgress, dependencies, origin = window.location.origin, onNotice, confirmUnsupported, onLayout }) {
@@ -103,10 +107,31 @@ export async function generateReportPdf(model, { dataset, signal, onProgress, de
 
     signal?.throwIfAborted();
     await accepts(definition);
-    onLayout?.();
+    if (libraries.layout) {
+        onLayout?.({ cancellable: true });
+        try {
+            return await libraries.layout({ model, assets, origin }, { signal });
+        } catch (e) {
+            if (/** @type {any} */ (e)?.name !== WORKER_UNAVAILABLE) throw e;
+            console.warn('The PDF is laid out on the page: no worker could start', e);
+        }
+    }
+    return layoutOnPage(libraries.pdfMake ?? await loadPdfMake(), definition, { signal, onLayout });
+}
+
+/**
+ * The pages laid out on the page: the library takes the thread until it is done.
+ * @param {{ createPdf: (definition: any) => { getBlob: () => Promise<Blob> } }} pdfMake
+ * @param {any} definition
+ * @param {{ signal?: AbortSignal, onLayout?: (layout: { cancellable: boolean }) => void }} options
+ * @returns {Promise<Blob>}
+ */
+async function layoutOnPage(pdfMake, definition, { signal, onLayout }) {
+    signal?.throwIfAborted();
+    onLayout?.({ cancellable: false });
     await nextPaint();
     signal?.throwIfAborted();
-    const blob = await libraries.pdfMake.createPdf(definition).getBlob();
+    const blob = await pdfMake.createPdf(definition).getBlob();
     // The library cannot be stopped once it writes: a cancel that came meanwhile still gives no file
     signal?.throwIfAborted();
     return blob;

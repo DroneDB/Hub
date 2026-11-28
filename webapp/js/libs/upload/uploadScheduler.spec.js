@@ -557,6 +557,50 @@ describe('uploadScheduler retries', () => {
 });
 
 describe('uploadScheduler never leaves a pending file with nothing to start it', () => {
+    it('a pause while a chunked file asks which chunks the server has (all of them): resume sends it again and it ends', async () => {
+        const abortError = () => Object.assign(new Error('Upload aborted'), { name: 'AbortError' });
+        const statusReads = [];
+        // The open uploads cannot be listed, so the file asks its own status; the first status answer comes late
+        const getJson = vi.fn((url, init = {}) => {
+            if (url.endsWith('/obj/chunk')) return Promise.resolve({ status: 500, body: null });
+            return new Promise(resolve => statusReads.push({ resolve, signal: init.signal }));
+        });
+        const commits = [];
+        const transport = vi.fn(({ url, signal }) => {
+            if (signal?.aborted) return Promise.reject(abortError());
+            commits.push(url);
+            return Promise.resolve({ status: 201, body: { path: 'big' }, uploaded: true });
+        });
+        const requests = createUploadRequests({
+            baseUrl: 'http://hub/orgs/o/ds/d', authToken: () => null, destination: i => i.path, transport, getJson, chunkBytes: 10
+        });
+        const scheduler = createUploadScheduler({
+            send: requests.send, maxConcurrency: () => 1, policy: policy(), plan: ready => (ready.length ? { kind: 'chunked', items: [ready[0]] } : null)
+        });
+        scheduler.add([{ id: 'big', file: new Blob(['x'.repeat(35)]), name: 'big', path: 'big', size: 35 }]);
+        await flush();
+        expect(statusReads).toHaveLength(1);
+
+        scheduler.pause();
+        // The status read is aborted with the job
+        expect(statusReads[0].signal.aborted).toBe(true);
+        // An answer that still arrives says every chunk is stored
+        statusReads[0].resolve({ status: 200, body: { missing: [] } });
+        await flush();
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.PENDING);
+        expect(commits).toHaveLength(0);
+
+        scheduler.resume();
+        await flush();
+        expect(statusReads).toHaveLength(2);
+        statusReads[1].resolve({ status: 200, body: { missing: [] } });
+        await flush();
+
+        expect(commits).toHaveLength(1);
+        expect(scheduler.snapshot().items[0].status).toBe(STATUS.DONE);
+        scheduler.cancelAll();
+    });
+
     it('resume before the aborted request has ended: the file goes on when that request ends', async () => {
         // An abort the transport answers late: the request is still in its slot when resume() comes
         const started = [];

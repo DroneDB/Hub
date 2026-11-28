@@ -346,10 +346,15 @@ export default {
          * tree level by level; if a folder along the way no longer exists, it
          * stops at the closest existing parent. When targetPath is null/empty
          * it navigates to the dataset root.
+         *
+         * It is a selection that ends late: a folder the user clicks meanwhile, or a newer refresh, takes over, and this
+         * one stops at its next step instead of putting its target over the newer choice.
          */
         refreshAndNavigate: async function (targetPath) {
+            const current = this.latestSelection();
             await this.refreshNodes();
             await this.$nextTick();
+            if (!current()) return;
 
             const rootTreeNodes = this.$refs.treeView?.$refs?.treeNodes;
             if (!rootTreeNodes || !rootTreeNodes.length) return;
@@ -361,6 +366,7 @@ export default {
             if (currentNode.isExpandable) {
                 await currentNode.expand();
                 await this.$nextTick();
+                if (!current()) return;
             }
 
             const segments = targetPath ? targetPath.split('/').filter(Boolean) : [];
@@ -377,6 +383,7 @@ export default {
                 if (next.isExpandable) {
                     await next.expand();
                     await this.$nextTick();
+                    if (!current()) return;
                 }
                 currentNode = next;
             }

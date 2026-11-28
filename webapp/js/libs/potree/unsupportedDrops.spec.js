@@ -31,7 +31,7 @@ describe('files dropped on the point cloud viewer', () => {
         const event = dropOf('layer.gpkg');
         document.body.dispatchEvent(event);
 
-        expect(refuse).toHaveBeenCalledWith(['layer.gpkg']);
+        expect(refuse).toHaveBeenCalledWith(['layer.gpkg'], { names: ['layer.gpkg'], othersShown: false, othersRefused: false });
         expect(potree).not.toHaveBeenCalled();
         expect(event.defaultPrevented).toBe(true);
     });
@@ -47,5 +47,42 @@ describe('files dropped on the point cloud viewer', () => {
 
         expect(refuse).not.toHaveBeenCalled();
         expect(potree).toHaveBeenCalledTimes(1);
+    });
+
+    it('a project dropped with a GeoPackage goes to Potree alone, and the GeoPackage is refused', async () => {
+        const refuse = vi.fn();
+        const seen = [];
+        const potree = event => seen.push(Array.from(event.dataTransfer.items).map(item => item.getAsFile().name));
+        document.body.addEventListener('drop', potree);
+        cleanups.push(() => document.body.removeEventListener('drop', potree));
+        guard(refuse);
+
+        const transfer = new DataTransfer();
+        for (const name of ['project.json5', 'layer.gpkg']) transfer.items.add(new File(['{}'], name));
+        const event = new Event('drop', { bubbles: true, cancelable: true });
+        Object.defineProperty(event, 'dataTransfer', { value: transfer });
+        document.body.dispatchEvent(event);
+
+        // Potree hears one drop, of the project alone
+        expect(seen).toEqual([['project.json5']]);
+        expect(event.defaultPrevented).toBe(true);
+        expect(refuse).toHaveBeenCalledWith(['layer.gpkg'], { names: ['layer.gpkg'], othersShown: true, othersRefused: false });
+    });
+
+    it('refuses the whole drop, and says to drop the other files without the GeoPackage, when the browser cannot send them alone', () => {
+        const refuse = vi.fn();
+        const potree = vi.fn();
+        document.body.addEventListener('drop', potree);
+        cleanups.push(() => document.body.removeEventListener('drop', potree));
+        vi.stubGlobal('DataTransfer', function DataTransfer() { throw new TypeError('Illegal constructor'); });
+        try {
+            guard(refuse);
+            document.body.dispatchEvent(dropOf('project.json5', 'layer.gpkg'));
+        } finally {
+            vi.unstubAllGlobals();
+        }
+
+        expect(potree).not.toHaveBeenCalled();
+        expect(refuse).toHaveBeenCalledWith(['layer.gpkg'], { names: ['layer.gpkg'], othersShown: false, othersRefused: true });
     });
 });

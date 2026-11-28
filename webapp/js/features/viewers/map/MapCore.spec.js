@@ -18,6 +18,7 @@ import { DragPan, MouseWheelZoom } from 'ol/interaction';
 import { b64encode } from '@/libs/base64';
 import { PREF, setPref } from '@/libs/preferences';
 import { notify } from '@/libs/notify';
+import { startDrawingSession } from '@/libs/map/drawingSession';
 
 const T = ddb.entry.type;
 const POLYGON = { type: 'Polygon', coordinates: [[[10, 45], [10.01, 45], [10.01, 45.01], [10, 45.01], [10, 45]]] };
@@ -289,6 +290,38 @@ describe('a right click on the map', () => {
         const event = rightClick();
         expect(select).not.toHaveBeenCalled();
         expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('selects nothing while a tool that is not a measurement draws (the raster profile, a stockpile outline)', async () => {
+        await mountMap([MAIN], { standalone: false });
+        const session = startDrawingSession({ map: wrapper.vm.map, type: 'LineString', source: new VectorSource(), once: true });
+        try {
+            expect(wrapper.vm.measuring).toBe(false);
+            const select = vi.spyOn(wrapper.vm, 'selectAt');
+            const event = rightClick();
+            expect(select).not.toHaveBeenCalled();
+            expect(event.preventDefault).toHaveBeenCalled();
+        } finally {
+            session.end();
+        }
+    });
+
+    it('selects nothing with the contextmenu that follows the right click that finished such a tool, and again with the next', async () => {
+        await mountMap([MAIN], { standalone: false });
+        const session = startDrawingSession({ map: wrapper.vm.map, type: 'LineString', source: new VectorSource(), once: true });
+        session.draw.appendCoordinates([[10, 10]]);
+        session.draw.appendCoordinates([[20, 20]]);
+        const viewport = wrapper.vm.map.getViewport();
+        const pointer = type => viewport.dispatchEvent(new MouseEvent(type, { clientX: 5, clientY: 5, button: 2, bubbles: true, cancelable: true }));
+        pointer('pointerdown');
+        pointer('pointerup');
+        expect(session.active).toBe(false);
+
+        const select = vi.spyOn(wrapper.vm, 'selectAt');
+        rightClick();
+        expect(select).not.toHaveBeenCalled();
+        rightClick();
+        expect(select).toHaveBeenCalledTimes(1);
     });
 });
 

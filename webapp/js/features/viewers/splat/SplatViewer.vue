@@ -122,9 +122,9 @@ import { CameraRig, tiltUp } from './cameraRig';
 import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
-import { createFrameRetry, residentSplatCenters, chooseFraming } from './framing';
+import { createFrameRetry, residentSplatCenters, chooseFraming, presentationModeHook } from './framing';
 import { upChoiceQuaternion, resolvedAutoUp, openingUpChoice } from './upAxis';
-import { turnBetween } from './cameraPresets';
+import { reorientWithViews } from './cameraPresets';
 import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSettings';
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
@@ -411,12 +411,8 @@ async function loadSplat() {
     presentation = new Presentation(rig, {
         cameras: () => cameras.value,
         stops: () => tourStops(cameras.value, annotations.value),
-        onMode: mode => {
-            presentationMode.value = mode;
-            // An orbit, a tour or a flight is the user taking the camera: the retry of the framing (a paged file that was not
-            // ready) must not pull the view back to the opening one, whether the move is still going or has ended
-            if (mode) userInteracted = true;
-        },
+        // An orbit, a tour or a flight is the user taking the camera (see presentationModeHook)
+        onMode: presentationModeHook(mode => { presentationMode.value = mode; }, () => { userInteracted = true; }),
         onCamera: index => { activeCameraIndex.value = index; },
         onPin: index => { activePin.value = index; }
     });
@@ -464,11 +460,11 @@ function remember(changes) {
 }
 
 function setUpAxis(value) {
-    const before = splatMesh ? splatMesh.quaternion.toArray() : null;
-    upAxis.value = value;
-    applyOrientation();
-    // The scene turned under the saved views: they turn with it, to show what they showed
-    if (before) views.turnViews(turnBetween(before, splatMesh.quaternion.toArray()));
+    // The scene turns under the saved views: they turn with it, to show what they showed
+    reorientWithViews(splatMesh, () => {
+        upAxis.value = value;
+        applyOrientation();
+    }, views.turnViews);
     // The scene turned about its own origin: frame it again, so the view is not left beside it
     if (splatMesh) {
         presentation.stop();

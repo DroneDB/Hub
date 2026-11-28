@@ -3,12 +3,13 @@
 /**
  * A GET with the session token of `registry` whose HTTP statuses are results, not
  * exceptions (the upload requests poll receipts and chunk states that may be 202 or 404).
- * @returns {(url: string) => Promise<{status: number, body: any}>}
+ * `signal` aborts the request (the answer is then status 0, as for a network failure).
+ * @returns {(url: string, init?: { signal?: AbortSignal }) => Promise<{status: number, body: any}>}
  */
 export function authorizedGetJson(registry) {
-    return async url => {
+    return async (url, { signal } = {}) => {
         try {
-            const res = await registry.fetchRaw(url, { cache: 'no-store' });
+            const res = await registry.fetchRaw(url, { cache: 'no-store', signal });
             let body = null;
             try {
                 body = await res.json();

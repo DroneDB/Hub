@@ -216,6 +216,11 @@ export default {
         },
         // Build is offered for a buildable file that is not being built and does not wait for files (the notice says
         // which to upload: its build starts by itself then)
+        // Whether the BuildManager shows a build of the file that runs (reactive: its state is). A build just started is
+        // shown as "Enqueued" until the task list has its task; one that queued no job goes away without a state change
+        buildActiveInManager() {
+            return !!(this.dataset && this.file && BuildManager.hasActiveBuild(this.dataset, this.file.entry.path));
+        },
         canBuild() {
             if (!this.file || !this.dataset) return false;
             return canBuildFile(this.dataset, this.file);
@@ -300,6 +305,13 @@ export default {
         }
     },
     watch: {
+        // The build the spinner waits for is no longer there (a build that queued no job is dropped without an event):
+        // the spinner goes with it, and the preview is shown again
+        buildActiveInManager(active) {
+            if (active || !this.buildLoading) return;
+            this.buildLoading = false;
+            if (this.file && !ddb.entry.isDirectory(this.file.entry) && !this.thumbnail) void this.loadThumbnail();
+        },
         file: {
             immediate: true,
             handler(newFile) {

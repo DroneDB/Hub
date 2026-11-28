@@ -76,7 +76,7 @@ describe('useReportPdf', () => {
         expect(dialogs.opened).toHaveLength(1);
         expect(dialogs.opened[0].component).toBe(ReportPdfProgressDialog);
         pdf.requests[0].onProgress({ done: 2, total: 5 });
-        expect(dialogs.opened[0].props()).toEqual({ mode: 'download', done: 2, total: 5, writing: false, laying: false });
+        expect(dialogs.opened[0].props()).toEqual({ mode: 'download', done: 2, total: 5, writing: false, laying: false, layoutCancellable: false });
         pdf.finish({ status: 'downloaded', fileName: 'x.pdf' });
         await run;
         // the dialog was closed with 'done', which is not a cancel
@@ -257,6 +257,21 @@ describe('useReportPdf', () => {
         pdf.finish({ status: 'published', fileName: 'x.pdf', path: 'reports/x.pdf' });
         await run;
         expect(actions.laying.value).toBe(false);
+    });
+
+    it('tells the dialog that pages laid out in a worker can still be cancelled, and a cancel then stops the PDF', async () => {
+        const pdf = pendingExport();
+        const actions = make(pdf.fn);
+        const run = actions.run('download');
+        await flush();
+        pdf.requests[0].onLayout({ cancellable: true });
+        expect(dialogs.opened[0].props()).toMatchObject({ laying: true, layoutCancellable: true });
+        dialogs.opened[0].answer('cancel');
+        await flush();
+        expect(pdf.requests[0].signal.aborted).toBe(true);
+        pdf.finish({ status: 'cancelled', fileName: 'x.pdf' });
+        await run;
+        expect(actions.layoutCancellable.value).toBe(false);
     });
 
     it('says in a warning that the photos are made smaller, before the work starts', async () => {

@@ -111,6 +111,28 @@ describe('the feature flags follow the session', () => {
         expect(reg.features.load).toHaveBeenCalled();
     });
 
+    it('are loaded again when another tab signs another user in, and not when it renews the same user\'s token', async () => {
+        reg.session = { user: 'alice', loggedIn: true, admin: false };
+        window.dispatchEvent(new StorageEvent('storage', { key: 'https://hub.test_jwt_token', oldValue: 'a1', newValue: 'a2' }));
+        await settle();
+        expect(auth.featuresVersion).toBe(0);
+
+        reg.session = { user: 'bob', loggedIn: true, admin: false };
+        window.dispatchEvent(new StorageEvent('storage', { key: 'https://hub.test_jwt_token', oldValue: 'a2', newValue: 'b1' }));
+        await settle();
+        expect(auth.username).toBe('bob');
+        expect(auth.featuresVersion).toBe(1);
+    });
+
+    it('are loaded again when another tab signs in on a page that had nobody signed in', async () => {
+        reg.session = { user: '', loggedIn: false, admin: false };
+        auth.sync();
+        reg.session = { user: 'bob', loggedIn: true, admin: false };
+        window.dispatchEvent(new StorageEvent('storage', { key: 'https://hub.test_jwt_token', newValue: 'b1' }));
+        await settle();
+        expect(auth.featuresVersion).toBe(1);
+    });
+
     it('are loaded one request after the other: the answer of the sign-out cannot overwrite the sign-in\'s', async () => {
         let answerSignedOut;
         reg.features.load.mockImplementationOnce(() => new Promise(resolve => { answerSignedOut = resolve; }));
